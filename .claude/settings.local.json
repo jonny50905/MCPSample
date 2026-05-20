@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(New-Item -ItemType Directory -Force \"D:\\\\TMP\\\\MCPDemo\\\\docs\\\\superpowers\\\\specs\")",
+      "Skill(superpowers:writing-plans)",
+      "Skill(superpowers:writing-plans:*)"
+    ]
+  }
+}

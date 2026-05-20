@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HanshinChat.Mcp.Server/HanshinChat.Mcp.Server.csproj" />
+    <Project Path="src/HanshinChat.Mcp.Server.Skill/HanshinChat.Mcp.Server.Skill.csproj" />
+    <Project Path="src/HanshinChat.OData.Api/HanshinChat.OData.Api.csproj" />
+  </Folder>
+</Solution>
