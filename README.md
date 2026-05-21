@@ -1,13 +1,18 @@
-# HanshinChat MCP + OData
+# HanshinChat MCP + OData + Elasticsearch
 
-三個 .NET 8 專案：
+四個 .NET 8 專案：
 - **`src/HanshinChat.OData.Api`** — read-only OData v4 API，吃本地 SQL Server 的 `HanshinChat` 資料庫
 - **`src/HanshinChat.Mcp.Server`** — stdio MCP server，工具 description 完整版
 - **`src/HanshinChat.Mcp.Server.Skill`** — stdio MCP server，工具 description 精簡版（搭配 Claude Code skill 使用）
+- **`src/HanshinChat.Mcp.ElasticSearch.Skill`** — stdio MCP server，連 Elasticsearch，負責**第一層全文 / 關鍵字搜尋**（搭配 skill 使用）
 
 ```
-Claude Code ──(stdio JSON-RPC)──► HanshinChat.Mcp.Server(.Skill) ──(HTTP)──► HanshinChat.OData.Api ──(TDS)──► localhost\HanshinChat
+                                ┌─► HanshinChat.Mcp.ElasticSearch.Skill ──(HTTP)─► Elasticsearch:9200    (第一層：全文搜尋 → MessageId)
+Claude Code ──(stdio JSON-RPC)──┤
+                                └─► HanshinChat.Mcp.Server(.Skill) ──(HTTP)─► HanshinChat.OData.Api ──(TDS)─► localhost\HanshinChat   (第二層：補明細)
 ```
+
+**雙層搜尋：** Claude 先用 elasticsearch-skill 拿到命中 MessageId（含 highlight 片段），再用 hanshinchat-skill 補完整 metadata / 對話脈絡。
 
 ## 前置需求
 
@@ -62,34 +67,80 @@ claude mcp add -s user hanshinchat-skill -- dotnet "D:\TMP\MCPDemo\src\HanshinCh
 > 兩個 server 共用同一個 OData API，可並行掛載作對照，或只掛 skill 版。
 > 用 `claude mcp list` 確認已註冊；`/mcp` 可看工具清單。
 
-### 3. Claude Code Skill
+### 3. Elasticsearch MCP Server（第一層搜尋）
 
-Skill 檔案位於 `.claude/skills/hanshinchat-mcp/`，包含兩個檔案：
+Build：
 
-| 檔案 | 用途 |
+```powershell
+dotnet build src\HanshinChat.Mcp.ElasticSearch.Skill
+```
+
+註冊：
+
+```powershell
+claude mcp add -s user elasticsearch-skill -- dotnet "D:\TMP\MCPDemo\src\HanshinChat.Mcp.ElasticSearch.Skill\bin\Debug\net8.0\HanshinChat.Mcp.ElasticSearch.Skill.dll"
+```
+
+連線設定 `src/HanshinChat.Mcp.ElasticSearch.Skill/appsettings.json`：
+
+```json
+{
+  "ElasticSearch": {
+    "BaseUrl": "http://localhost:9200",
+    "Username": null,
+    "Password": null,
+    "DefaultIndex": "hanshinchat-messages"
+  }
+}
+```
+
+> 假設 ES 索引已由其他系統建好（內含 HanshinChat 訊息）；本 MCP 不負責 indexing。
+> 若 `Username` + `Password` 兩者皆有則用 Basic auth，否則匿名。
+
+工具清單：
+
+| 工具 | 用途 |
 |---|---|
-| `SKILL.md` | 觸發條件 + 工具決策表，Claude 自動載入 |
-| `tool-usage.md` | 每個工具的完整參數與範例，僅按需讀取 |
+| `search` | 全文 / 關鍵字搜尋（Lucene query string），回傳 hits + highlight |
+| `count` | 估算命中筆數 |
+| `get_document` | 已知 `_id` 取單筆 |
+| `list_indices` | 列出可查的 index 名稱 |
 
-**Skill 讓 Claude 在呼叫 MCP 前先選對工具，避免誤用 `list_messages` 或直接 fallback 到 `query_odata`。**
+工具選擇與雙層搜尋工作流詳見 `.claude/skills/elasticsearch-mcp/SKILL.md`。
 
-Claude Code 只讀 `~/.claude/skills/`（user-level）。要讓 Skill 生效，需建立 Junction 指向本 repo：
+### 4. Claude Code Skill
+
+兩個 skill 檔目錄：
+
+| Skill | 路徑 | 用途 |
+|---|---|---|
+| `hanshinchat-mcp` | `.claude/skills/hanshinchat-mcp/` | OData 工具選擇指引 |
+| `elasticsearch-mcp` | `.claude/skills/elasticsearch-mcp/` | 第一層全文搜尋工作流（先 ES → 再 hanshinchat 補明細） |
+
+每個 skill 都包含 `SKILL.md`（觸發條件 + 工具決策表）與 `tool-usage.md`（按需讀取的詳細參數）。
+
+Claude Code 只讀 `~/.claude/skills/`（user-level）。要讓兩個 Skill 都生效，需各建一個 Junction 指向本 repo：
 
 ```powershell
 # 建立 user-level skills 目錄
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\skills"
 
-# 建立 Junction（不需管理員權限，版控跟著 repo 走）
+# Junction：hanshinchat-mcp
 New-Item -ItemType Junction `
   -Path "$env:USERPROFILE\.claude\skills\hanshinchat-mcp" `
   -Target "D:\TMP\MCPDemo\.claude\skills\hanshinchat-mcp"
+
+# Junction：elasticsearch-mcp
+New-Item -ItemType Junction `
+  -Path "$env:USERPROFILE\.claude\skills\elasticsearch-mcp" `
+  -Target "D:\TMP\MCPDemo\.claude\skills\elasticsearch-mcp"
 ```
 
 驗證：
 
 ```powershell
-# 應列出 SKILL.md 和 tool-usage.md
 ls "$env:USERPROFILE\.claude\skills\hanshinchat-mcp"
+ls "$env:USERPROFILE\.claude\skills\elasticsearch-mcp"
 ```
 
 ## MCP 工具清單
