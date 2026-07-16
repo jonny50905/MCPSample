@@ -223,6 +223,10 @@ ps_get_source_outline
 ps_find_source_references
 ```
 
+> **現況**：`ps_search_source` 由 `PeoplecodeElasticSearch` 承擔、
+> `ps_get_source_chunks` 由 `PeoplecodeSource` 承擔；其餘三個尚未實作
+> （過渡做法見 progressive-source-retrieval.md §6.0）。
+
 ---
 
 ## 4. PeopleSoft Metadata

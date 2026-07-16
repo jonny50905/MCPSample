@@ -183,6 +183,20 @@ maxChunksPerExpansion: 4
 如已有 PeopleCode MCP / SQL MCP / SQR MCP，可各做 Adapter，
 對 Skill 暴露相同的概念與回應結構。
 
+### 6.0 現行環境對映
+
+實際部署為兩個 MCP server（工具 key 前綴以 opencode.json 的註冊名為準）：
+
+| Server | 承擔的協定角色 |
+|---|---|
+| `PeoplecodeElasticSearch` | `ps_search_source` — 搜尋候選 chunk ids（只能當 SEARCH_CANDIDATE） |
+| `PeoplecodeSource` | `ps_get_source_chunks` — 以 chunk id 取完整上下文（正式 Evidence） |
+
+`ps_expand_source_context`、`ps_get_source_outline`、`ps_find_source_references`
+尚未實作，過渡做法：需要展開 / outline / 反查時，以符號、程式名或鄰近關鍵字
+再搜 ES 取得 chunk ids，再用 PeoplecodeSource 取段；仍補不到的記入報告 `gaps`。
+本文其餘章節的工具名一律視為**協定角色名**，不是實際工具 id。
+
 ### 6.1 `ps_search_source`
 
 輸入：

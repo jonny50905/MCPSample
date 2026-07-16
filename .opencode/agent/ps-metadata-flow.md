@@ -2,7 +2,7 @@
 description: PeopleSoft metadata subagent：資料血緣（誰讀誰寫）、Process Scheduler 執行方式（Process/Job/Recurrence/Run Control）、授權路徑（Menu→Component→PL→Role）。回傳 JSON 報告。
 mode: subagent
 temperature: 0.1
-# MCP server 註冊名假設為 peoplesoft，不同時請改前綴
+# MCP 工具 key = <opencode.json 註冊名>_<工具名>，前綴須與註冊 key 完全一致（含大小寫）
 tools:
   read: true
   grep: true
@@ -12,12 +12,14 @@ tools:
   edit: false
   bash: false
   webfetch: false
-  peoplesoft_ps_get_data_lineage: true
-  peoplesoft_ps_get_process_usage: true
-  peoplesoft_ps_get_security_path: true
-  peoplesoft_ps_find_source_references: true
-  peoplesoft_ps_get_source_chunks: true
-  peoplesoft_ps_get_object_origin: true
+  # 血緣的引用反查可先用現有兩個 MCP 半自動達成（搜 table/欄位名 → 取段）：
+  "PeoplecodeElasticSearch_*": true
+  "PeoplecodeSource_*": true
+  # metadata 專用工具尚未實作（未來上線後取消註解並對齊註冊名）：
+  # peoplesoft_ps_get_data_lineage: true
+  # peoplesoft_ps_get_process_usage: true
+  # peoplesoft_ps_get_security_path: true
+  # peoplesoft_ps_get_object_origin: true
 ---
 
 # ps-metadata-flow Subagent
@@ -38,6 +40,14 @@ tools:
    `.opencode/peoplesoft/progressive-source-retrieval.md`）。
 3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
+
+## 現況限制
+
+- **血緣**：可用現有兩個 MCP 半自動達成——以 table / Record.Field 名搜
+  `PeoplecodeElasticSearch` 找引用 chunk ids，再用 `PeoplecodeSource` 取段
+  確認讀寫方向；覆蓋不到的（如 Component 存檔的隱含寫入）寫進 `gaps`。
+- **排程 / 授權**：專用 metadata 工具尚未上線，查無來源時回
+  `status: BLOCKED` + `gaps` 說明缺口，**不得**從程式註解或命名推測。
 
 ## 硬規則
 

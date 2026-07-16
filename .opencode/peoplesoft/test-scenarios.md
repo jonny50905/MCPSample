@@ -297,8 +297,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 ### F2 Orchestrator 不越權取段
 - **輸入**：`選了免役之後會執行什麼？`
 - **檢查點**：
-  1. [致命] orchestrator 沒有自行呼叫 ps_search_source / ps_get_source_chunks
-     （應委派 ps-peoplecode-flow）
+  1. [致命] orchestrator 沒有自行呼叫檢索工具（現行環境即
+     PeoplecodeElasticSearch_* / PeoplecodeSource_*；應委派 ps-peoplecode-flow）
   2. [主要] 委派 prompt 含 businessDomain / searchMode / customPrefixes
      （subagent 看不到主對話，背景必須自帶）
   3. [次要] 收到報告後未把報告全文重複貼進後續委派 prompt
@@ -329,3 +329,7 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
   屬後續工作。
 - F 類需要 OpenCode agent 部署（`.opencode/agent/`）並保留 subagent
   transcript 才能評分；agent 檔的 MCP 工具 key 前綴需與實際 server 註冊名一致。
+- 現行真實環境只有「ES 搜 chunk ids + Source 取段」兩類工具：
+  outline / 展開類題（C2、C3）在真環境改以「程式名或符號搜 ES → 定向取段」
+  的行為評分（不可整支載入的致命檢查點不變）；B 類（UI）與 E3 / E4
+  （排程 / 授權）需等對應 MCP 上線，或先用 mock 跑。

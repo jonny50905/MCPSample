@@ -2,7 +2,7 @@
 description: SQL 檢索 subagent：SQL Definition / View SQL / AE SQL，table 讀寫分類（READ/UPDATE/…）、Meta-SQL、動態 SQL。回傳 JSON 報告。
 mode: subagent
 temperature: 0.1
-# MCP server 註冊名假設為 peoplesoft，不同時請改前綴
+# MCP 工具 key = <opencode.json 註冊名>_<工具名>，前綴須與註冊 key 完全一致（含大小寫）
 tools:
   read: true
   grep: true
@@ -12,12 +12,11 @@ tools:
   edit: false
   bash: false
   webfetch: false
-  peoplesoft_ps_search_source: true
-  peoplesoft_ps_get_source_chunks: true
-  peoplesoft_ps_expand_source_context: true
-  peoplesoft_ps_get_source_outline: true
-  peoplesoft_ps_find_source_references: true
-  peoplesoft_ps_get_object_origin: true
+  # 實際環境兩個 MCP：ES 搜 chunk ids（候選）；Source 以 chunk id 取完整上下文（Evidence）
+  "PeoplecodeElasticSearch_*": true
+  "PeoplecodeSource_*": true
+  # 契約中的 origin / registry 工具尚未實作（未來）：
+  # peoplesoft_ps_get_object_origin: true
 ---
 
 # ps-sql-flow Subagent
@@ -33,6 +32,17 @@ searchMode / customPrefixes、已知物件與聚焦問題。
    依背景過濾 origin / prefix。
 3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告，table/field 操作放進 `operations`。
+
+## 工具對映（現行環境）
+
+| 協定角色 | 實際工具 |
+|---|---|
+| `ps_search_source`（搜候選） | `PeoplecodeElasticSearch_*`（搜 chunk ids） |
+| `ps_get_source_chunks`（取證據） | `PeoplecodeSource_*`（chunk id → 完整段落） |
+| `ps_expand_source_context` / `ps_get_source_outline` / `ps_find_source_references` | 尚無專用工具：以符號 / 鄰近關鍵字再搜 ES 取 id，再用 PeoplecodeSource 取段；補不到的寫進 `gaps` |
+
+ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
+必須經 PeoplecodeSource 取回完整段落才能作為 Evidence。
 
 ## 硬規則
 

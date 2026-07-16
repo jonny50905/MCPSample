@@ -89,8 +89,13 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 
 - OpenCode 開在本專案 → Tab 切到 `ps-orchestrator` 問業務問題；
   或在對話中 `@ps-sqr-flow` 手動指派單項檢索。
-- Agent 檔 frontmatter 的 MCP 工具 key 假設 server 註冊名為 `peoplesoft`
-  （如 `peoplesoft_ps_search_source`）；註冊名不同時把前綴改掉。
+- **現行 MCP 對映**：`PeoplecodeElasticSearch`（搜 chunk ids，候選）+
+  `PeoplecodeSource`（chunk id → 完整上下文，Evidence）。長文本 subagent 的
+  tools 白名單用 `"PeoplecodeElasticSearch_*"` / `"PeoplecodeSource_*"` wildcard，
+  前綴必須與 opencode.json 的 mcp 註冊 key 完全一致（含大小寫）。
+  UI 語意與排程 / 授權 metadata 工具尚未實作，對應 subagent 會回 BLOCKED。
+- Skill / 協定文件內的 `ps_*` 工具名是**協定角色名**；實際工具對映見各 agent
+  檔的「工具對映（現行環境）」與 progressive-source-retrieval.md §6.0。
 - Subagent 看不到主對話——orchestrator 的委派 prompt 模板會自帶
   domain / searchMode / prefixes，這是規則不是選項。
 - 若 orchestrator 的 task 委派在你的版本不可用，改用 @ 提及手動委派，

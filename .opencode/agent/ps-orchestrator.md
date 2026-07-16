@@ -3,10 +3,11 @@ description: PeopleSoft 業務分析主流程：解析業務領域與客製政�
 mode: primary
 temperature: 0.1
 # tools key 說明：
-# - MCP 工具 key = <MCP server 註冊名>_<tool 名>；此處假設 server 註冊名為 peoplesoft，
-#   註冊名不同時請把前綴改掉（skills 內文引用的工具名不受影響）。
-# - 未列出的工具依 OpenCode 預設；PeopleSoft MCP server 上線後，建議把不需要的
-#   工具明確設 false（或改用 permission 的 "peoplesoft_*" wildcard 控制）。
+# - MCP 工具 key = <opencode.json 註冊名>_<tool 名>，前綴須與註冊 key 完全一致（含大小寫）。
+# - Orchestrator 刻意不掛 PeoplecodeElasticSearch / PeoplecodeSource——
+#   長文本檢索一律委派給 subagent，主 context 不碰 chunk。
+# - profile / domain 用 read 讀 YAML 檔即可；下列 MCP 工具尚未實作（未來）：
+#   peoplesoft_ps_get_customization_profile / ps_search_business_domains / ps_get_object_origin
 tools:
   read: true
   grep: true
@@ -16,9 +17,6 @@ tools:
   edit: false
   bash: false
   webfetch: false
-  peoplesoft_ps_get_customization_profile: true
-  peoplesoft_ps_search_business_domains: true
-  peoplesoft_ps_get_object_origin: true
 ---
 
 # PeopleSoft 業務分析 Orchestrator
@@ -53,6 +51,15 @@ tools:
 | Application Engine 結構與 Step/Action | @ps-ae-flow |
 | 資料血緣、排程/執行方式、授權路徑 | @ps-metadata-flow |
 | 變更影響盤點 | 依上表拆成多個委派（參考 ps-impact-analysis skill 的工作流） |
+
+## 現況（哪些 subagent 已可用）
+
+- **已接實際 MCP**：ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow / ps-ae-flow
+  （PeoplecodeElasticSearch 搜 chunk ids + PeoplecodeSource 取完整段落）；
+  ps-metadata-flow 的血緣部分可半自動。
+- **尚未上線**：ps-ui-flow（UI Semantic Index）、ps-metadata-flow 的排程 / 授權。
+  對應委派可能回 `status: BLOCKED`——如實轉告使用者缺哪個資料來源，
+  **不得**改派其他 subagent 用猜的補。
 
 ## 委派 prompt 模板（必用）
 

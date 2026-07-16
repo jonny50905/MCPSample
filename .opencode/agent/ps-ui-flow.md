@@ -2,7 +2,7 @@
 description: PeopleSoft UI 檢索 subagent：畫面顯示文字、欄位選項（label↔儲存值）、Component/Page/Record.Field 對映。回傳 JSON 報告。
 mode: subagent
 temperature: 0.1
-# MCP server 註冊名假設為 peoplesoft，不同時請改前綴
+# MCP 工具 key = <opencode.json 註冊名>_<工具名>，前綴須與註冊 key 完全一致（含大小寫）
 tools:
   read: true
   grep: true
@@ -12,10 +12,11 @@ tools:
   edit: false
   bash: false
   webfetch: false
-  peoplesoft_ps_search_ui_semantics: true
-  peoplesoft_ps_get_ui_graph: true
-  peoplesoft_ps_get_field_choices: true
-  peoplesoft_ps_get_object_origin: true
+  # UI Semantic Index 的 MCP 尚未建置（未來上線後取消註解並對齊註冊名）：
+  # peoplesoft_ps_search_ui_semantics: true
+  # peoplesoft_ps_get_ui_graph: true
+  # peoplesoft_ps_get_field_choices: true
+  # peoplesoft_ps_get_object_origin: true
 ---
 
 # ps-ui-flow Subagent
@@ -30,6 +31,12 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 2. 用委派背景中的 searchMode / customPrefixes 過濾搜尋。
 3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
+
+## 現況限制
+
+UI Semantic Index 的 MCP 工具尚未上線。收到委派而工具不可用時：
+回 `status: BLOCKED` 並在 `gaps` 說明缺哪個工具，**不得**改用猜測或
+從物件命名腦補畫面文字。
 
 ## 硬規則
 
