@@ -20,6 +20,7 @@
 │  ├─ business-domain-map.yaml         兵役等全客製業務領域（alias、rootObjectPolicy）
 │  ├─ progressive-source-retrieval.md  PeopleCode/SQL/SQR/SQC 共用檢索規則 + 長文本工具契約
 │  ├─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
+│  ├─ oracle-query-cookbook.md         oracleMCP 的 PeopleTools 查詢樣板（SELECT-only）
 │  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
 │  ├─ test-scenarios.md                本地模型準確度測試情境（27 題 + 評分規則）
 │  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
@@ -91,11 +92,13 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
   或在對話中 `@ps-sqr-flow` 手動指派單項檢索。
 - 專案根目錄的 `AGENTS.md`（常駐 context）提供路由安全網：
   即使沒切 orchestrator、skill 沒觸發，也會導向正確流程並強制兩條長文本鐵律。
-- **現行 MCP 對映**：`PeoplecodeElasticSearch`（搜 chunk ids，候選）+
-  `PeoplecodeSource`（chunk id → 完整上下文，Evidence）。長文本 subagent 的
-  tools 白名單用 `"PeoplecodeElasticSearch_*"` / `"PeoplecodeSource_*"` wildcard，
-  前綴必須與 opencode.json 的 mcp 註冊 key 完全一致（含大小寫）。
-  UI 語意與排程 / 授權 metadata 工具尚未實作，對應 subagent 會回 BLOCKED。
+- **現行 MCP 對映（三個）**：`PeoplecodeElasticSearch`（搜 chunk ids，候選）、
+  `PeoplecodeSource`（chunk id → 完整上下文，Evidence）、`oracleMCP`
+  （PeopleTools metadata：translate values / label / Page 對映 / 排程 / 授權 /
+  origin / AE 結構——查詢一律照 `oracle-query-cookbook.md` 樣板，SELECT-only）。
+  tools 白名單用 `"<註冊名>_*"` wildcard，前綴必須與 opencode.json 的
+  mcp 註冊 key 完全一致（含大小寫）。UI 全文語意搜尋（Semantic Index）仍未建，
+  相關查詢會以 gaps / BLOCKED 回報。
 - Skill / 協定文件內的 `ps_*` 工具名是**協定角色名**；實際工具對映見各 agent
   檔的「工具對映（現行環境）」與 progressive-source-retrieval.md §6.0。
 - Subagent 看不到主對話——orchestrator 的委派 prompt 模板會自帶

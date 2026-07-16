@@ -54,12 +54,14 @@ tools:
 
 ## 現況（哪些 subagent 已可用）
 
-- **已接實際 MCP**：ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow / ps-ae-flow
-  （PeoplecodeElasticSearch 搜 chunk ids + PeoplecodeSource 取完整段落）；
-  ps-metadata-flow 的血緣部分可半自動。
-- **尚未上線**：ps-ui-flow（UI Semantic Index）、ps-metadata-flow 的排程 / 授權。
-  對應委派可能回 `status: BLOCKED`——如實轉告使用者缺哪個資料來源，
-  **不得**改派其他 subagent 用猜的補。
+- **長文本**：ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow / ps-ae-flow
+  （PeoplecodeElasticSearch 搜 chunk ids + PeoplecodeSource 取完整段落）。
+- **Metadata（oracleMCP + cookbook）**：ps-metadata-flow 的排程 / 授權 /
+  origin / Record 結構；ps-ui-flow 的 translate values / label / 反查 /
+  Page 對映；ps-ae-flow 的 Section / Step 結構。
+- **尚缺**：UI 全文語意搜尋與 Page 覆寫 label 最終解析（UI Semantic Index
+  未建）。對應委派可能回 `status: BLOCKED` 或帶 `gaps`——如實轉告使用者
+  缺哪個資料來源，**不得**改派其他 subagent 用猜的補。
 
 ## 委派 prompt 模板（必用）
 

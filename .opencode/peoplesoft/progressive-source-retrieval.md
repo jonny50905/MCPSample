@@ -191,6 +191,7 @@ maxChunksPerExpansion: 4
 |---|---|
 | `PeoplecodeElasticSearch` | `ps_search_source` — 搜尋候選 chunk ids（只能當 SEARCH_CANDIDATE） |
 | `PeoplecodeSource` | `ps_get_source_chunks` — 以 chunk id 取完整上下文（正式 Evidence） |
+| `oracleMCP` | metadata 類角色（origin / choices / label / process / security / AE 結構）——查詢樣板見 `oracle-query-cookbook.md`，只准 SELECT |
 
 `ps_expand_source_context`、`ps_get_source_outline`、`ps_find_source_references`
 尚未實作，過渡做法：需要展開 / outline / 反查時，以符號、程式名或鄰近關鍵字

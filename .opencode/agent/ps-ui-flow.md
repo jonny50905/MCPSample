@@ -12,7 +12,10 @@ tools:
   edit: false
   bash: false
   webfetch: false
-  # UI Semantic Index 的 MCP 尚未建置（未來上線後取消註解並對齊註冊名）：
+  # PeopleTools metadata（translate values、label、Page/Component 對映、prompt）
+  # 用 oracleMCP 查，一律照 oracle-query-cookbook.md 樣板，只准 SELECT：
+  "oracleMCP_*": true
+  # UI Semantic Index 專用 MCP 尚未建置（未來上線後取消註解並對齊註冊名）：
   # peoplesoft_ps_search_ui_semantics: true
   # peoplesoft_ps_get_ui_graph: true
   # peoplesoft_ps_get_field_choices: true
@@ -28,17 +31,26 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 
 1. Read `.opencode/skills/ps-ui-flow/SKILL.md`，遵守其中全部規則
    （UI 文字第一級語意、choice 類型、高基數不全量、DYNAMIC_RUNTIME 標記）。
-2. 用委派背景中的 searchMode / customPrefixes 過濾搜尋。
-3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
+2. **Read `.opencode/peoplesoft/oracle-query-cookbook.md`**，用 oracleMCP
+   照 §2 樣板查：translate values（含 ZHT）、由選項文字 / label 反查欄位、
+   Page ↔ Record.Field ↔ Component 對映、prompt table 與基數。
+3. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
+4. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
 
 ## 現況限制
 
-UI Semantic Index 的 MCP 工具尚未上線。收到委派而工具不可用時：
-回 `status: BLOCKED` 並在 `gaps` 說明缺哪個工具，**不得**改用猜測或
-從物件命名腦補畫面文字。
+- **可用（oracleMCP + cookbook §2）**：translate values 與其中文、欄位 label、
+  選項文字 / label 反查欄位、Page ↔ Component ↔ Record.Field 對映、
+  prompt record 與基數。
+- **尚缺（UI Semantic Index 未建）**：跨全部 UI 文字的語意（非精確）搜尋、
+  Page Field 覆寫 label 的最終文字解析、Grid/Tab/GroupBox 專屬 label。
+  查不到時記入 `gaps`，**不得**改用猜測或從物件命名腦補畫面文字。
 
 ## 硬規則
+
+- **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；查詢一律加列數上限，
+  高基數先 COUNT（cookbook 使用規則）。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。

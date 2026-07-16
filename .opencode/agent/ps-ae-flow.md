@@ -15,6 +15,8 @@ tools:
   # 實際環境兩個 MCP：ES 搜 chunk ids（候選）；Source 以 chunk id 取完整上下文（Evidence）
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
+  # AE 結構（Section / Step 清單）用 oracleMCP 照 cookbook §5 查，只准 SELECT：
+  "oracleMCP_*": true
   # 契約中的 AE 圖 / origin 工具尚未實作（未來）：
   # peoplesoft_ps_get_ae_graph: true
   # peoplesoft_ps_get_object_origin: true
@@ -29,10 +31,11 @@ businessDomain / searchMode / customPrefixes、已知物件與聚焦問題。
 
 1. Read `.opencode/skills/ps-ae-flow/SKILL.md` 與
    `.opencode/peoplesoft/progressive-source-retrieval.md`，全程遵守。
-2. AE 圖工具尚未實作，改用兩段式定位：先以 AE 名稱搜
-   `PeoplecodeElasticSearch` 取得 Section / Step / Action chunk ids 概觀，
-   再只取回答問題必要的 Action 內容（AE_SQL / AE PeopleCode Action，
-   用 PeoplecodeSource 以 chunk id 取段）。
+2. **AE 結構先用 oracleMCP 查**（Read
+   `.opencode/peoplesoft/oracle-query-cookbook.md` §5：PSAESECTDEFN /
+   PSAESTEPDEFN 取 Section / Step 清單），再只取回答問題必要的
+   Action **內容**（AE_SQL / AE PeopleCode Action——照長文本協定
+   搜 PeoplecodeElasticSearch、用 PeoplecodeSource 取段，不從 Oracle 撈全文）。
 3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
 

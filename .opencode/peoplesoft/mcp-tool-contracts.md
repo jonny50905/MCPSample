@@ -4,6 +4,11 @@
 **不一定需要全部放在同一個 MCP Server，但 Tool Contract（名稱、輸入、輸出結構）應保持一致**；
 既有的 PeopleCode MCP / SQL MCP / SQR MCP 可各做 Adapter 對齊本契約。
 
+> **現況共三個 MCP**：`PeoplecodeElasticSearch`（搜 chunk ids）、
+> `PeoplecodeSource`（chunk id → 完整上下文）、`oracleMCP`（PeopleTools
+> metadata，通用 SQL 查詢——§1 / §2 / §4 的角色由它照
+> `oracle-query-cookbook.md` 樣板承擔，尚無專用工具）。
+
 長文本五個工具（`ps_search_source`、`ps_get_source_chunks`、`ps_expand_source_context`、
 `ps_get_source_outline`、`ps_find_source_references`）的完整 I/O 契約見
 `progressive-source-retrieval.md` §6，此處不重複。

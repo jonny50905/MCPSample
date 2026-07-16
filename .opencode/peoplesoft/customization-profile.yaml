@@ -24,9 +24,10 @@ customization:
   # 客製物件登錄表：名稱不符合 Prefix、但實際為客製的物件由此判斷。
   # 來源可為：手動 Object Registry、Project Migration 清單、Compare Report、
   # 客製套件清單、版控匯出、PeopleTools Project Definition、自訂 Oracle Table。
+  # 查法：oracleMCP 照 oracle-query-cookbook.md §1 樣板（PSPROJECTITEM / 登錄表）。
   customObjectRegistry:
     enabled: true
-    source: oracle-mcp
+    source: oracleMCP
 
   # 物件來源分類（Object Origin）——不可只靠 Prefix 判斷：
   #   CUSTOM_PREFIX      名稱符合客製 Prefix（高可信度客製）

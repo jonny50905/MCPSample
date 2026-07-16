@@ -331,7 +331,11 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
   屬後續工作。
 - F 類需要 OpenCode agent 部署（`.opencode/agent/`）並保留 subagent
   transcript 才能評分；agent 檔的 MCP 工具 key 前綴需與實際 server 註冊名一致。
-- 現行真實環境只有「ES 搜 chunk ids + Source 取段」兩類工具：
-  outline / 展開類題（C2、C3）在真環境改以「程式名或符號搜 ES → 定向取段」
-  的行為評分（不可整支載入的致命檢查點不變）；B 類（UI）與 E3 / E4
-  （排程 / 授權）需等對應 MCP 上線，或先用 mock 跑。
+- 現行真實環境三個 MCP：「ES 搜 chunk ids + Source 取段」+「oracleMCP 查
+  PeopleTools metadata（照 oracle-query-cookbook.md）」。outline / 展開類題
+  （C2、C3）在真環境改以「程式名或符號搜 ES → 定向取段」的行為評分
+  （不可整支載入的致命檢查點不變）；B 類的 translate / label / 反查題
+  （B1、B2、B3）與 E3 / E4（排程 / 授權）可用 oracleMCP 跑，評分時
+  另檢查「查詢照 cookbook 樣板、SELECT-only、有列數上限」；B4 高基數題
+  改為檢查「先 COUNT、只回 metadata」。語意搜尋類仍需 mock 或等 UI
+  Semantic Index 上線。
