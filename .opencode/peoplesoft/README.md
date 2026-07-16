@@ -19,7 +19,9 @@
 │  ├─ customization-profile.yaml       環境規則與 TW_（Prefix、Registry、searchPolicy）
 │  ├─ business-domain-map.yaml         兵役等全客製業務領域（alias、rootObjectPolicy）
 │  ├─ progressive-source-retrieval.md  PeopleCode/SQL/SQR/SQC 共用檢索規則 + 長文本工具契約
-│  └─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
+│  ├─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
+│  ├─ test-scenarios.md                本地模型準確度測試情境（24 題 + 評分規則）
+│  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）

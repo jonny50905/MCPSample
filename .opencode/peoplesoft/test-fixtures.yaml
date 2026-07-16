@@ -1,0 +1,343 @@
+# =============================================================================
+# PeopleSoft Skills 測試 Fixtures（假想環境 TEST）
+# =============================================================================
+# test-scenarios.md 全部題目的標準答案來源。
+# 之後實作 mock MCP server 時，各工具直接依本檔回應：
+#   ps_get_object_origin      → objects[].origin
+#   ps_search_ui_semantics    → uiSemantics / choices
+#   ps_get_field_choices      → choices
+#   ps_search_source          → sourceChunks（只回 snippet 當 candidate）
+#   ps_get_source_chunks      → sourceChunks（回完整 content 當 evidence）
+#   ps_get_source_outline     → outlines
+#   ps_get_data_lineage       → lineage
+#   ps_get_process_usage      → processes
+#   ps_get_security_path      → security
+# =============================================================================
+
+fixtureVersion: 1
+environment: TEST
+
+objects:
+  - objectType: COMPONENT
+    objectName: TW_MILITARY_DATA
+    origin: CUSTOM_PREFIX
+    matchedPrefix: TW_
+    description: 兵役資料維護
+  - objectType: PAGE
+    objectName: TW_MILITARY_PG
+    origin: CUSTOM_PREFIX
+    description: 兵役資料
+  - objectType: RECORD
+    objectName: TW_MILITARY
+    origin: CUSTOM_PREFIX
+    description: 兵役主檔
+  - objectType: COMPONENT
+    objectName: MIL_SVC_TRACKING          # A3 陷阱：描述相似的原生物件
+    origin: DELIVERED
+    description: Military Service Tracking
+    note: 與兵役業務無關聯，客製流程未使用它
+  - objectType: RECORD
+    objectName: HR_NAME_SYNC              # A5：無 TW_ 前綴的客製
+    origin: CUSTOM_REGISTRY
+    registrySource: PeopleTools Project TW_NAME_SYNC_PRJ
+    description: 員工中英文姓名同步
+  - objectType: RECORD
+    objectName: PERSONAL_DATA             # A6：被修改的原生
+    origin: MODIFIED_DELIVERED
+    evidence: "Compare Report 2025-11：新增欄位 TW_NAME_ENG、SavePostChange 已修改"
+    description: Personal Data (delivered, modified)
+  - objectType: FUNCLIB
+    objectName: HR_COMMON_UTIL            # 原生共用 Utility：只能是 DEPENDENCY
+    origin: DELIVERED
+    description: HR common utility functions
+  - objectType: SQR
+    objectName: TW_MIL001
+    origin: CUSTOM_PREFIX
+    description: 兵役狀態批次更新與報表
+  - objectType: SQC
+    objectName: TWMILUTIL
+    origin: CUSTOM_PREFIX
+    description: 兵役共用程序
+  - objectType: AE
+    objectName: TW_MIL_AE
+    origin: CUSTOM_PREFIX
+    description: 兵役資格夜間重算
+  - objectType: SQL
+    objectName: TW_MIL_UPD_SQL
+    origin: CUSTOM_PREFIX
+    description: 兵役狀態更新 SQL Definition
+  - objectType: PROCESS
+    objectName: TWMIL001
+    origin: CUSTOM_PREFIX
+    description: 兵役月結批次
+
+uiSemantics:
+  - componentName: TW_MILITARY_DATA
+    pageName: TW_MILITARY_PG
+    recordName: TW_MILITARY
+    fieldName: MIL_STATUS
+    languageCode: ZHT
+    displayText: 兵役狀態
+    displayTextSource: PAGE_FIELD_OVERRIDE
+  - componentName: TW_MILITARY_DATA
+    pageName: TW_MILITARY_PG
+    recordName: TW_MILITARY
+    fieldName: MIL_STATUS
+    languageCode: ENG
+    displayText: Military Status
+    displayTextSource: PAGE_FIELD_OVERRIDE
+  - componentName: TW_MILITARY_DATA
+    pageName: TW_MILITARY_PG
+    recordName: TW_MILITARY
+    fieldName: EXEMPT_RSN                 # B5 / D3：動態 Label + 動態選項
+    languageCode: ZHT
+    displayText: 免役原因
+    displayTextSource: DYNAMIC_PEOPLECODE
+    status: DYNAMIC_RUNTIME
+    defaultStaticText: 免役原因
+    dynamicLabelEvidence: CHK-PC-004
+  - componentName: TW_MILITARY_DATA
+    pageName: TW_MILITARY_PG
+    recordName: TW_MILITARY
+    fieldName: HANDLER_EMPLID             # B4：高基數 Prompt
+    languageCode: ZHT
+    displayText: 承辦人
+    displayTextSource: RECORD_FIELD_LABEL
+
+choices:
+  - recordName: TW_MILITARY
+    fieldName: MIL_STATUS
+    choiceType: TRANSLATE_VALUE
+    dynamic: false
+    values:
+      - { storedValue: N, displayText: 未服役, languageCode: ZHT, status: ACTIVE }
+      - { storedValue: S, displayText: 服役中, languageCode: ZHT, status: ACTIVE }
+      - { storedValue: D, displayText: 已退伍, languageCode: ZHT, status: ACTIVE }
+      - { storedValue: E, displayText: 免役,   languageCode: ZHT, status: ACTIVE }
+      - { storedValue: A, displayText: 替代役, languageCode: ZHT, status: ACTIVE }
+  - recordName: TW_MILITARY
+    fieldName: HANDLER_EMPLID
+    choiceType: PROMPT_TABLE
+    dynamic: false
+    highCardinality: true                 # 約 30000 筆 → 不可全量回傳
+    approxRowCount: 30000
+    promptRecord: PERSONAL_DATA
+    keyFields: [EMPLID]
+    displayFields: [NAME, TW_NAME_ENG]
+    searchFields: [EMPLID, NAME]
+    securityRecord: PERS_SRCH_QRY
+  - recordName: TW_MILITARY
+    fieldName: EXEMPT_RSN
+    choiceType: DYNAMIC_PEOPLECODE
+    dynamic: true
+    status: DYNAMIC_RUNTIME
+    evidence: [CHK-PC-004]
+
+outlines:
+  - sourceType: SQR
+    sourceId: SQR-TW_MIL001
+    sections:
+      - { symbol: BEGIN-PROGRAM,                startLine: 1,   endLine: 20,  calls: [MAIN] }
+      - { symbol: BEGIN-PROCEDURE MAIN,         startLine: 21,  endLine: 60,  calls: [UPDATE-MIL-STATUS, LOAD-HISTORY, PRINT-REPORT] }
+      - { symbol: BEGIN-PROCEDURE UPDATE-MIL-STATUS, startLine: 61, endLine: 120, chunkId: CHK-SQR-001 }
+      - { symbol: BEGIN-PROCEDURE LOAD-HISTORY, startLine: 121, endLine: 160, chunkId: CHK-SQR-003 }
+      - { symbol: BEGIN-PROCEDURE PRINT-REPORT, startLine: 161, endLine: 220, chunkId: CHK-SQR-002 }
+      - { symbol: "#include 'twmilutil.sqc'",   startLine: 221, endLine: 221 }
+
+sourceChunks:
+  # --- PeopleCode ---
+  - chunkId: CHK-PC-001
+    sourceType: PEOPLECODE
+    sourceId: TW_MILITARY.MIL_STATUS.FieldChange
+    parentSymbol: FieldChange
+    startLine: 1
+    endLine: 14
+    content: |
+      If TW_MILITARY.MIL_STATUS = "E" Then
+         TW_MILITARY.EXEMPT_RSN.Enabled = True;
+         TW_MILITARY.EXEMPT_DT = %Date;
+      Else
+         TW_MILITARY.EXEMPT_RSN.Enabled = False;
+         TW_MILITARY.EXEMPT_RSN = "";
+         TW_MILITARY.EXEMPT_DT = null;
+      End-If;
+  - chunkId: CHK-PC-002
+    sourceType: PEOPLECODE
+    sourceId: TW_MILITARY.MIL_STATUS.SavePostChange
+    parentSymbol: SavePostChange
+    startLine: 1
+    endLine: 10
+    content: |
+      Declare Function fmt_audit_user PeopleCode HR_COMMON_UTIL.FUNCLIB FieldFormula;
+      SQLExec("INSERT INTO PS_TW_MIL_LOG (EMPLID, MIL_STATUS, AUDIT_USER, AUDIT_DTTM)
+               VALUES (:1, :2, :3, %CurrentDateTimeIn)",
+               TW_MILITARY.EMPLID, TW_MILITARY.MIL_STATUS, fmt_audit_user(%UserId));
+  - chunkId: CHK-PC-003                    # D1：動態 SQL
+    sourceType: PEOPLECODE
+    sourceId: TW_MILITARY.MIL_STATUS.SavePostChange
+    parentSymbol: SavePostChange
+    startLine: 11
+    endLine: 18
+    content: |
+      /* 核准後回寫目標表由設定檔決定 */
+      &tbl = TW_MIL_CFG.TARGET_TBL.Value;
+      &sql = "UPDATE PS_" | &tbl | " SET MIL_APPROVED = 'Y' WHERE EMPLID = :1";
+      SQLExec(&sql, TW_MILITARY.EMPLID);
+  - chunkId: CHK-PC-004                    # B5 / D3：動態 Label 與動態選項
+    sourceType: PEOPLECODE
+    sourceId: TW_MILITARY.EXEMPT_RSN.RowInit
+    parentSymbol: RowInit
+    startLine: 1
+    endLine: 12
+    content: |
+      If %Language = "ZHT" Then
+         TW_MILITARY.EXEMPT_RSN.Label = "免役原因（" | TW_MIL_CFG.YEAR | "年度）";
+      End-If;
+      TW_MILITARY.EXEMPT_RSN.ClearDropDownList();
+      SQLExec("SELECT RSN_CD, RSN_DESC FROM PS_TW_MIL_RSN WHERE EFF_STATUS='A'", ...);
+      /* 迴圈 AddDropDownItem(&cd, &desc) */
+
+  # --- SQL Definition ---
+  - chunkId: CHK-SQL-001
+    sourceType: SQL_DEFINITION
+    sourceId: TW_MIL_UPD_SQL
+    parentSymbol: TW_MIL_UPD_SQL
+    startLine: 1
+    endLine: 8
+    metadata:
+      statementType: UPDATE
+      referencedTables:
+        - { table: PS_TW_MILITARY, readWriteType: UPDATE }
+        - { table: PS_TW_MIL_ELIG, readWriteType: READ }
+      bindVariables: [":1", ":2"]
+    content: |
+      UPDATE PS_TW_MILITARY A
+         SET A.MIL_STATUS = :1
+       WHERE A.EMPLID = :2
+         AND EXISTS (SELECT 'X' FROM PS_TW_MIL_ELIG B
+                      WHERE B.EMPLID = A.EMPLID AND B.ELIG_FLG = 'Y')
+
+  # --- SQR / SQC ---
+  - chunkId: CHK-SQR-001
+    sourceType: SQR
+    sourceId: SQR-TW_MIL001
+    parentSymbol: UPDATE-MIL-STATUS
+    startLine: 61
+    endLine: 120
+    content: |
+      begin-procedure UPDATE-MIL-STATUS
+      begin-sql
+      UPDATE PS_TW_MILITARY
+         SET MIL_STATUS = 'D'
+       WHERE MIL_STATUS = 'S'
+         AND DISCHARGE_DT <= SYSDATE
+      end-sql
+      do GET-MIL-DESC('D', $desc)
+      end-procedure
+  - chunkId: CHK-SQR-002
+    sourceType: SQR
+    sourceId: SQR-TW_MIL001
+    parentSymbol: PRINT-REPORT
+    startLine: 161
+    endLine: 220
+    content: |
+      begin-procedure PRINT-REPORT
+      begin-select
+      A.EMPLID, A.MIL_STATUS
+        do GET-MIL-DESC(&A.MIL_STATUS, $desc)
+        print &A.EMPLID (+1,1)
+        print $desc     (,20)
+      from PS_TW_MILITARY A
+      end-select
+      end-procedure
+  - chunkId: CHK-SQR-003                   # D2：動態 table
+    sourceType: SQR
+    sourceId: SQR-TW_MIL001
+    parentSymbol: LOAD-HISTORY
+    startLine: 121
+    endLine: 160
+    content: |
+      begin-procedure LOAD-HISTORY
+      let $hist_table = 'PS_TW_MIL_HIST_' || $prcs_yr
+      begin-select
+      H.EMPLID, H.MIL_STATUS
+      from [$hist_table] H
+      end-select
+      end-procedure
+  - chunkId: CHK-SQC-001                   # C3：SQC 內的共用程序
+    sourceType: SQC
+    sourceId: SQC-TWMILUTIL
+    parentSymbol: GET-MIL-DESC
+    startLine: 1
+    endLine: 20
+    content: |
+      begin-procedure GET-MIL-DESC($cd, :$desc)
+      evaluate $cd
+        when = 'N'
+          let $desc = '未服役'
+        when = 'S'
+          let $desc = '服役中'
+        when = 'D'
+          let $desc = '已退伍'
+        when = 'E'
+          let $desc = '免役'
+        when = 'A'
+          let $desc = '替代役'
+      end-evaluate
+      end-procedure
+
+  # --- AE ---
+  - chunkId: CHK-AE-001
+    sourceType: AE_SQL
+    sourceId: TW_MIL_AE.MAIN.Step010
+    parentSymbol: MAIN.Step010.SQL
+    startLine: 1
+    endLine: 6
+    content: |
+      UPDATE PS_TW_MILITARY
+         SET MIL_STATUS = 'S'
+       WHERE MIL_STATUS = 'N'
+         AND ENLIST_DT <= %CurrentDateIn
+
+lineage:
+  - target: TW_MILITARY.MIL_STATUS
+    edges:
+      - { source: "PeopleCode TW_MILITARY.MIL_STATUS (Component 存檔)", operation: UPDATE, evidence: [CHK-PC-001, CHK-PC-002] }
+      - { source: "SQR TW_MIL001.UPDATE-MIL-STATUS",                    operation: UPDATE, evidence: [CHK-SQR-001] }
+      - { source: "AE TW_MIL_AE.MAIN.Step010",                          operation: UPDATE, evidence: [CHK-AE-001] }
+      - { source: "SQL TW_MIL_UPD_SQL",                                 operation: UPDATE, evidence: [CHK-SQL-001] }
+      - { source: "PeopleCode 動態回寫（PS_ + 設定值）",                 operation: DYNAMIC_RUNTIME, evidence: [CHK-PC-003] }
+      - { source: "SQR TW_MIL001.PRINT-REPORT",                         operation: READ,   evidence: [CHK-SQR-002] }
+
+processes:
+  - objectType: SQR
+    objectName: TW_MIL001
+    processName: TWMIL001
+    processType: SQR Report
+    jobs:
+      - { jobName: TWMILJOB, sequence: 1 }
+    recurrence: "每月 1 日 02:00"
+    runControlRecord: TW_MIL_RUNCTL
+    runControlPage: TW_MIL_RUNCTL_PG
+    launchedFrom: "Run Control Page（手動）或 Recurrence（排程）"
+
+security:
+  - componentName: TW_MILITARY_DATA
+    paths:
+      - menu: TW_MENU
+        component: TW_MILITARY_DATA
+        permissionList: TW_PL_MIL
+        pageAccess: { TW_MILITARY_PG: UPDATE }
+        roles:
+          - { roleName: TW_HR_ADMIN,      origin: CUSTOM_PREFIX, userCount: 12 }
+          - { roleName: HR Administrator, origin: DELIVERED,     userCount: 45, note: dependency }
+    rowLevelSecurity: PERS_SRCH_QRY
+
+# employee_name domain（A4 / A5 / A6 用）
+employeeNameSync:
+  primaryObject: HR_NAME_SYNC              # CUSTOM_REGISTRY
+  involvedDelivered:
+    - { objectName: PERSONAL_DATA, origin: MODIFIED_DELIVERED }
+  note: >
+    客製證據只涵蓋同步觸發與寫入 HR_NAME_SYNC；
+    姓名原始欄位定義需查 PERSONAL_DATA（delivered fallback，使用時必須回報）。
