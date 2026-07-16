@@ -1,6 +1,6 @@
 ---
 name: ps-ui-flow
-description: Use when analyzing PeopleSoft UI — which component/page/control shows a label, where a field is maintained on screen, what options (免役/替代役 …) a field offers and their stored values, or which PeopleCode events a control triggers. Treats user-visible display text and choice labels as first-class business semantics (UI Semantic Index).
+description: PeopleSoft UI 分析 — 畫面顯示文字、選項 label 與儲存值對映、由文字反查 Component / Page / Record.Field。
 ---
 
 # ps-ui-flow：UI 結構 + 業務語意
@@ -141,6 +141,13 @@ UI 搜尋首次最多 20 個 UI Semantic Candidates，
 Choice Values：低基數最多回傳 100 個；
 高基數只回傳查詢命中的 20～50 個。
 ```
+
+## Subagent 模式
+
+以 OpenCode subagent（`.opencode/agent/ps-ui-flow.md`）執行時：
+- 委派 prompt 自帶 domain / searchMode / customPrefixes，直接採用，不重新解析。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告；
+  raw 資料留在本 context，不回傳（單段引用 ≤ 5 行）。
 
 ## 相關檔案
 

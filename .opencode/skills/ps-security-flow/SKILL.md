@@ -1,6 +1,6 @@
 ---
 name: ps-security-flow
-description: Use when answering PeopleSoft security questions — who can access a component/page, which permission lists and roles grant it, the menu → component → permission list → role → user path, and row-level security records involved.
+description: PeopleSoft 授權分析 — Menu → Component → Permission List → Role 路徑與 Row-level Security。
 ---
 
 # ps-security-flow：安全性分析
@@ -40,6 +40,12 @@ component remains the business root.
 |---|---|
 | `ps_get_security_path` | 取授權路徑（Menu → Component → PL → Role） |
 | `ps_get_object_origin` | 分類授權鏈上物件的 origin |
+
+## Subagent 模式
+
+本 skill 由 `.opencode/agent/ps-metadata-flow.md` subagent 承載（授權類問題）：
+- 委派 prompt 自帶 domain / searchMode 與問題，直接採用。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告。
 
 ## 相關檔案
 

@@ -1,6 +1,6 @@
 ---
 name: ps-process-flow
-description: Use when explaining how a PeopleSoft batch object (SQR, AE, COBOL, Crystal) is executed — Process Definition, Process Type, Job/JobSet, Recurrence/schedule, Run Control record and page, and where users launch it from. Based on Oracle Process Scheduler metadata.
+description: PeopleSoft 批次執行方式 — Process Definition / Job / Recurrence / Run Control，SQR 與 AE 怎麼被啟動。
 ---
 
 # ps-process-flow：Process Scheduler 分析
@@ -43,6 +43,12 @@ dependencies of the custom root.
 | `ps_get_process_usage` | Process Definition / Job / Recurrence / Run Control |
 | `ps_get_object_origin` | 分類 Process 相關物件的 origin |
 | `ps_get_ui_graph` | Run Control Page 的欄位與顯示文字（交 ps-ui-flow 規則） |
+
+## Subagent 模式
+
+本 skill 由 `.opencode/agent/ps-metadata-flow.md` subagent 承載（執行方式類問題）：
+- 委派 prompt 自帶 domain / searchMode 與問題，直接採用。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告。
 
 ## 相關檔案
 

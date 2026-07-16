@@ -1,6 +1,6 @@
 ---
 name: ps-ae-flow
-description: Use when analyzing PeopleSoft Application Engine (AE) programs — section/step/action structure, call-section chains, which SQL and PeopleCode actions run and in what order, state records and bind usage. Delegates SQL/PeopleCode action content to ps-sql-flow / ps-peoplecode-flow.
+description: Application Engine 分析 — Section / Step / Action 結構與 Call Section 鏈；Action 內容依 SQL / PeopleCode 規則處理。
 ---
 
 # ps-ae-flow：Application Engine 分析
@@ -50,6 +50,13 @@ Classify each conclusion as CONFIRMED, INFERRED, or DYNAMIC_RUNTIME.
 | `ps_get_ae_graph` | AE Section / Step / Action 圖（Action 附 sourceId） |
 | `ps_search_source` / `ps_get_source_chunks` | 取 AE_SQL / AE PeopleCode Action 精確段 |
 | `ps_get_process_usage` | AE 的執行方式（交由 ps-process-flow 解讀） |
+
+## Subagent 模式
+
+以 OpenCode subagent（`.opencode/agent/ps-ae-flow.md`）執行時：
+- 委派 prompt 自帶 domain / searchMode / customPrefixes，直接採用，不重新解析。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告；
+  raw chunks 留在本 context，不回傳（單段引用 ≤ 5 行）。
 
 ## 相關檔案
 

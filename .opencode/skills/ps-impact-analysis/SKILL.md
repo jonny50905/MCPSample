@@ -1,6 +1,6 @@
 ---
 name: ps-impact-analysis
-description: (選配 / optional) Use when assessing the impact of changing a PeopleSoft object — e.g. adding a translate value, renaming a field, modifying a record — by finding every UI, PeopleCode, SQL, SQR/SQC, AE, process, and security artifact that references it.
+description: (選配) 物件變更影響盤點 — UI / PeopleCode / SQL / SQR / AE / Process / Security 引用面與嚴重度分級。
 ---
 
 # ps-impact-analysis：變更影響分析（選配）
@@ -47,6 +47,12 @@ claiming full coverage.
 State the search scope used; if any source type was not searched, say so —
 do not imply the impact list is complete when it is not.
 ```
+
+## Subagent 模式
+
+Orchestrator 模式下本 skill 不單獨成為 subagent：由 ps-orchestrator 依上方
+工作流把第 2～7 步拆派給對應 subagent（ui / 長文本 / metadata），
+彙整各 JSON 報告後產出影響清單。
 
 ## 相關檔案
 

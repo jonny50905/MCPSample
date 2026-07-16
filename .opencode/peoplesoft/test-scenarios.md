@@ -1,7 +1,7 @@
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen 3.5 9B）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 24 題，分 5 類，全部基於
+是否遵守 Plan Addendum 的規則。共 27 題，分 6 類（F 類需 subagent 架構），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -11,7 +11,7 @@
 | 階段 | 需要什麼 | 測什麼 | 用哪些題 |
 |---|---|---|---|
 | **S1 路由測試** | 只要 Skill 檔，不需 MCP | 問題 → 選對 Skill、解析對 domain / 搜尋模式 | 全部題目的「預期路由」欄 |
-| **S2 規則遵循** | Mock MCP 回傳 fixtures | 工具呼叫順序、防呆（不 dump、不拿 snippet 當證據） | B、C、D 類為主 |
+| **S2 規則遵循** | Mock MCP 回傳 fixtures | 工具呼叫順序、防呆（不 dump、不拿 snippet 當證據） | B、C、D、F 類為主 |
 | **S3 答案準確度** | 同 S2 完整跑完 | 最終回答內容對不對、格式對不對 | 全部，重點 E 類 |
 
 S1 可以大量快跑（每題只看模型第一步宣告）；S2/S3 需要記錄**完整工具呼叫
@@ -281,11 +281,43 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 
 ---
 
+## F 類：Context 紀律（Subagent 架構）
+
+> 需以 OpenCode agent 部署執行（`.opencode/agent/`，ps-orchestrator 為 primary）。
+> 評分需要 orchestrator 主 context 紀錄與各 subagent 的完整 transcript。
+
+### F1 Subagent 回報紀律
+- **輸入**：同 E1（`免役這個選項在哪裡維護？選了以後會執行什麼？`），以 ps-orchestrator 執行
+- **檢查點**：
+  1. [致命] 每個 subagent 的最終回報不含大段原始碼（單段引用 ≤ 5 行、全報告 ≤ 20 行）
+  2. [主要] 回報符合 subagent-report-contract.md（必填欄位齊全、confidence 為合法值）
+  3. [主要] 每個 finding 都附 evidence IDs
+  4. [次要] gaps / dynamicRuntimeWarnings 使用正確（動態 SQL 出現在 warnings）
+
+### F2 Orchestrator 不越權取段
+- **輸入**：`選了免役之後會執行什麼？`
+- **檢查點**：
+  1. [致命] orchestrator 沒有自行呼叫 ps_search_source / ps_get_source_chunks
+     （應委派 ps-peoplecode-flow）
+  2. [主要] 委派 prompt 含 businessDomain / searchMode / customPrefixes
+     （subagent 看不到主對話，背景必須自帶）
+  3. [次要] 收到報告後未把報告全文重複貼進後續委派 prompt
+
+### F3 委派路由正確
+- **輸入**：`TW_MIL001 這支 SQR 在做什麼？`
+- **檢查點**：
+  1. [主要] 委派給 ps-sqr-flow（不是 ps-sql-flow、也不是 orchestrator 自己做）
+  2. [主要] 同一問題不重複委派；收到報告直接彙整
+  3. [次要] 最終回答保留報告中的 evidence IDs 與 confidence 標註
+
+---
+
 ## 5. 快速健檢子集（Smoke Set）
 
-時間有限時先跑這 8 題：**A1、A3、A5、B2、B4、C1、D1、E1**。
-這 8 題涵蓋全部 8 條防呆（Addendum §26），任何一題觸發 [致命] 都代表
-規則層有洞，先修 Skill 再跑全套。
+時間有限時先跑這 9 題：**A1、A3、A5、B2、B4、C1、D1、E1、F2**。
+前 8 題涵蓋全部 8 條防呆（Addendum §26）；F2 驗證 subagent 架構的
+context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 Skill / Agent
+再跑全套。
 
 ## 6. 已知限制
 
@@ -295,3 +327,5 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 - S2/S3 需要 mock MCP server 依 `test-fixtures.yaml` 回應五類工具
   （origin / ui semantics / choices / source search / chunks）；尚未實作，
   屬後續工作。
+- F 類需要 OpenCode agent 部署（`.opencode/agent/`）並保留 subagent
+  transcript 才能評分；agent 檔的 MCP 工具 key 前綴需與實際 server 註冊名一致。

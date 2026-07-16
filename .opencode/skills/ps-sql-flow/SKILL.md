@@ -1,6 +1,6 @@
 ---
 name: ps-sql-flow
-description: Use when analyzing PeopleSoft SQL — SQL Definitions, View SQL, AE SQL actions, SQR SQL blocks; tracing tables/fields, joins and conditions, UPDATE/INSERT/DELETE/MERGE effects, Meta-SQL and dynamic SQL. Produces confirmed data operations for ps-data-lineage. Uses progressive source retrieval.
+description: PeopleSoft SQL 分析（SQL Definition / View / AE SQL）— table 讀寫分類、Meta-SQL、動態 SQL。
 ---
 
 # ps-sql-flow：SQL 分析
@@ -83,6 +83,13 @@ Pass confirmed data operations to ps-data-lineage.
 ## Context Budget
 
 共用停止規則（見 progressive-source-retrieval.md §5）。
+
+## Subagent 模式
+
+以 OpenCode subagent（`.opencode/agent/ps-sql-flow.md`）執行時：
+- 委派 prompt 自帶 domain / searchMode / customPrefixes，直接採用，不重新解析。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告；
+  raw chunks 留在本 context，不回傳（單段引用 ≤ 5 行）。
 
 ## 相關檔案
 

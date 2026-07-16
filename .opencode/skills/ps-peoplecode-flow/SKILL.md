@@ -1,6 +1,6 @@
 ---
 name: ps-peoplecode-flow
-description: Use when analyzing PeopleSoft PeopleCode logic — what happens on FieldChange/SaveEdit/SavePreChange/SavePostChange, how an event branches on a stored value (e.g. MIL_STATUS = 'E'), which functions/classes/methods are involved. Uses progressive source retrieval; never loads whole programs.
+description: PeopleCode 事件與分支邏輯分析（FieldChange / SaveEdit / SavePre/PostChange…）— 漸進式取段，不整支載入。
 ---
 
 # ps-peoplecode-flow：PeopleCode 邏輯分析
@@ -75,6 +75,13 @@ Classify each conclusion as CONFIRMED, INFERRED, or DYNAMIC_RUNTIME.
 maxSearchResults: 20 / maxSelectedSymbols: 8 / maxInitialChunks: 10
 maxTotalChunks: 16 / maxExpansionRounds: 3 / maxChunksPerExpansion: 4
 ```
+
+## Subagent 模式
+
+以 OpenCode subagent（`.opencode/agent/ps-peoplecode-flow.md`）執行時：
+- 委派 prompt 自帶 domain / searchMode / customPrefixes，直接採用，不重新解析。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告；
+  raw chunks 留在本 context，不回傳（單段引用 ≤ 5 行）。
 
 ## 相關檔案
 

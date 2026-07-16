@@ -1,6 +1,6 @@
 ---
 name: ps-sqr-flow
-description: Use when analyzing SQR / SQC programs — program outline, procedure call graph, SQC include graph, SQL blocks, input parameters, run control usage, file/report output, business rules. Uses progressive source retrieval; never loads a whole SQR plus all SQCs at once.
+description: SQR / SQC 程式分析 — outline 優先、procedure call graph、SQC include、Run Control 與報表輸出。
 ---
 
 # ps-sqr-flow：SQR / SQC 分析
@@ -98,6 +98,13 @@ Use Oracle Process metadata through ps-process-flow to explain how the SQR is ru
 ## Context Budget
 
 共用停止規則（見 progressive-source-retrieval.md §5）。
+
+## Subagent 模式
+
+以 OpenCode subagent（`.opencode/agent/ps-sqr-flow.md`）執行時：
+- 委派 prompt 自帶 domain / searchMode / customPrefixes，直接採用，不重新解析。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告；
+  raw chunks 留在本 context，不回傳（單段引用 ≤ 5 行）。
 
 ## 相關檔案
 

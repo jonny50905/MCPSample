@@ -20,8 +20,17 @@
 │  ├─ business-domain-map.yaml         兵役等全客製業務領域（alias、rootObjectPolicy）
 │  ├─ progressive-source-retrieval.md  PeopleCode/SQL/SQR/SQC 共用檢索規則 + 長文本工具契約
 │  ├─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
-│  ├─ test-scenarios.md                本地模型準確度測試情境（24 題 + 評分規則）
+│  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
+│  ├─ test-scenarios.md                本地模型準確度測試情境（27 題 + 評分規則）
 │  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
+├─ agent/
+│  ├─ ps-orchestrator.md               Primary：domain 解析 + 委派 + 彙整（主 context 保持小）
+│  ├─ ps-ui-flow.md                    Subagent：UI 語意檢索
+│  ├─ ps-peoplecode-flow.md            Subagent：PeopleCode
+│  ├─ ps-sql-flow.md                   Subagent：SQL
+│  ├─ ps-sqr-flow.md                   Subagent：SQR / SQC
+│  ├─ ps-ae-flow.md                    Subagent：Application Engine
+│  └─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -52,6 +61,43 @@
     追蹤資料、執行、安全，必要時加入 Delivered Dependency
   ↓ ps-business-explain：產出業務說明
 ```
+
+## Subagent 架構（地端小 context 模型）
+
+針對 context 較小的地端模型（如 Qwen 3.5 9B），提供 OpenCode agent 部署
+（`.opencode/agent/`，OpenCode 1.x）：
+
+```text
+ps-orchestrator（primary，TUI 中 Tab 切換選用）
+  主 context 只保留：業務問題、domain/policy 摘要、各 subagent 的 JSON 報告
+  ├─ @ps-ui-flow          （只掛 UI 三工具 + origin）
+  ├─ @ps-peoplecode-flow  （只掛長文本五工具 + origin）
+  ├─ @ps-sql-flow         （同上）
+  ├─ @ps-sqr-flow         （同上）
+  ├─ @ps-ae-flow          （+ ps_get_ae_graph）
+  └─ @ps-metadata-flow    （血緣 / 排程 / 授權三合一）
+```
+
+省 context 的三個層次：
+
+1. **Raw source chunks 只存在 subagent context**——回報依
+   `subagent-report-contract.md` 只帶結論 + evidence IDs（單段引用 ≤ 5 行）。
+2. **每個 subagent 的 tools 白名單只開它需要的 MCP 工具**，tool schema 不疊加。
+3. **Skill 全文只在對應 subagent 內載入**，orchestrator 不疊五份 skill 全文。
+
+使用方式與注意事項：
+
+- OpenCode 開在本專案 → Tab 切到 `ps-orchestrator` 問業務問題；
+  或在對話中 `@ps-sqr-flow` 手動指派單項檢索。
+- Agent 檔 frontmatter 的 MCP 工具 key 假設 server 註冊名為 `peoplesoft`
+  （如 `peoplesoft_ps_search_source`）；註冊名不同時把前綴改掉。
+- Subagent 看不到主對話——orchestrator 的委派 prompt 模板會自帶
+  domain / searchMode / prefixes，這是規則不是選項。
+- 若 orchestrator 的 task 委派在你的版本不可用，改用 @ 提及手動委派，
+  流程與委派 prompt 模板相同。
+- Trade-off：subagent 每次啟動需重載 system prompt，總 token 較高、延遲較長；
+  換取主 context 峰值小、各階段 context 乾淨——對小 context 地端模型
+  幾乎必然划算。
 
 ## 兵役案例（端到端）
 

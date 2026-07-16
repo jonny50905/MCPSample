@@ -1,6 +1,6 @@
 ---
 name: ps-data-lineage
-description: Use when tracing where a PeopleSoft record/field's data comes from or goes to — which PeopleCode, SQL, AE, SQR reads or writes it, upstream sources and downstream consumers. Consumes confirmed data operations from ps-sql-flow / ps-peoplecode-flow / ps-sqr-flow.
+description: Record.Field 資料血緣 — 上下游誰讀誰寫（READ / UPDATE / … / DYNAMIC_RUNTIME），彙整各 flow 的 confirmed operations。
 ---
 
 # ps-data-lineage：資料血緣
@@ -46,6 +46,12 @@ Do not expand lineage beyond the depth needed to answer the question.
 | `ps_get_data_lineage` | Table/Field 層級讀寫關係圖（UPSTREAM / DOWNSTREAM / BOTH） |
 | `ps_find_source_references` | 反查某 Record.Field 被哪些來源引用（候選） |
 | `ps_get_source_chunks` | 把候選引用轉成正式 Evidence |
+
+## Subagent 模式
+
+本 skill 由 `.opencode/agent/ps-metadata-flow.md` subagent 承載（血緣類問題）：
+- 委派 prompt 自帶 domain / searchMode 與問題，直接採用。
+- 最終輸出只能是 `.opencode/peoplesoft/subagent-report-contract.md` 的 JSON 報告。
 
 ## 相關檔案
 

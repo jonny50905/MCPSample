@@ -1,6 +1,6 @@
 ---
 name: ps-business-explain
-description: Use as the final synthesis step of a PeopleSoft business investigation — turn evidence collected by ps-business-discovery / ps-ui-flow / ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow / ps-data-lineage etc. into a business-language explanation, with clear separation of screen text vs stored value, custom root vs delivered dependency, and CONFIRMED vs INFERRED vs DYNAMIC_RUNTIME.
+description: 最終彙整 — 把各 flow 證據轉成業務說明；畫面文字與儲存值分開、CONFIRMED / INFERRED / DYNAMIC_RUNTIME 標註、原生僅列 Dependency。
 ---
 
 # ps-business-explain：業務說明產出
@@ -62,6 +62,15 @@ and which flow skill should be run to fill the gap.
 6. 根物件與相依物件清單（origin 標註）
 7. Evidence 清單（evidence IDs）
 ```
+
+## Subagent 架構下的輸入
+
+Orchestrator 模式時，輸入是各 subagent 的 JSON 報告
+（`subagent-report-contract.md`），不是 raw evidence：
+- 只彙整報告的 findings / dependencies / dynamicRuntimeWarnings / gaps。
+- confidence 不可升級：報告標 INFERRED / DYNAMIC_RUNTIME 就照實保留。
+- 需要引用原文時，按 evidence ID 請對應 subagent 定向補取單段，不重跑檢索。
+- 多份報告衝突：以 confidence 高者為準；同級衝突如實並陳並標 INFERRED。
 
 ## 相關檔案
 

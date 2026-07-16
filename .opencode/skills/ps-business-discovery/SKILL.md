@@ -1,6 +1,6 @@
 ---
 name: ps-business-discovery
-description: Use when the user asks a PeopleSoft business question in business language (e.g. 兵役資料在哪裡維護？免役有哪些選項？兵役狀態是怎麼決定的？) and the implementing objects are unknown. Entry-point skill — resolves the business domain, applies the customization profile (CUSTOM_ONLY_ROOTS / CUSTOM_FIRST), and locates root business objects before any deep flow analysis.
+description: PeopleSoft 業務問題入口（例：兵役資料在哪裡維護？）— 解析 business domain 與客製政策（CUSTOM_ONLY_ROOTS / CUSTOM_FIRST），定位業務根物件。
 ---
 
 # ps-business-discovery：業務問題 → 根物件定位
@@ -155,6 +155,13 @@ search signals.
 Do not call a delivered object the root business implementation when it is only
 a dependency of a TW_ custom object.
 ```
+
+## Orchestrator 模式（小 context 部署）
+
+地端小 context 模型建議用 `.opencode/agent/ps-orchestrator.md`（primary agent）
+承載本 skill：本 skill 只做 domain 解析與根物件定位；長文本檢索一律依
+orchestrator 的委派表派給 ps-* subagents，主 context 只保留
+`subagent-report-contract.md` 格式的 JSON 報告，不累積 raw chunks。
 
 ## 相關檔案
 
