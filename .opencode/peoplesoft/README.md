@@ -89,6 +89,8 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 
 - OpenCode 開在本專案 → Tab 切到 `ps-orchestrator` 問業務問題；
   或在對話中 `@ps-sqr-flow` 手動指派單項檢索。
+- 專案根目錄的 `AGENTS.md`（常駐 context）提供路由安全網：
+  即使沒切 orchestrator、skill 沒觸發，也會導向正確流程並強制兩條長文本鐵律。
 - **現行 MCP 對映**：`PeoplecodeElasticSearch`（搜 chunk ids，候選）+
   `PeoplecodeSource`（chunk id → 完整上下文，Evidence）。長文本 subagent 的
   tools 白名單用 `"PeoplecodeElasticSearch_*"` / `"PeoplecodeSource_*"` wildcard，
