@@ -14,7 +14,8 @@
    `ps-business-discovery` skill 依其流程處理，重的檢索用 @ 委派給 ps-* subagent。
 2. 搜尋任何 PeopleSoft 物件前，先讀
    `.opencode/peoplesoft/customization-profile.yaml` 與 `business-domain-map.yaml`；
-   `TW_` 是強客製訊號但非唯一判斷。
+   `TW_` 是強客製訊號但非唯一判斷。**未命中已定義領域時，改用
+   `searchPolicy.defaultMode` 繼續搜尋——不得以「領域不存在」拒答。**
 3. 長文本鐵律（任何 agent 都適用）：
    - `PeoplecodeElasticSearch` 搜到的 chunk ids / snippet 只是候選（SEARCH_CANDIDATE）；
      必須用 `PeoplecodeSource` 以 chunk id 取回完整段落才能作為證據。

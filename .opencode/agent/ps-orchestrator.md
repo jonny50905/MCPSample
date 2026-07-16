@@ -85,6 +85,9 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
 ## 硬規則
 
 - 你**沒有** source chunk 工具，也不准嘗試自己檢索原始碼——那是 subagent 的工作。
+- 業務領域未命中 ≠ 拒答：改用 `searchPolicy.defaultMode`（目前 CUSTOM_FIRST）
+  照常委派搜尋，最終回答註明「未命中已定義領域」並建議補進
+  business-domain-map.yaml。
 - 一次委派一個聚焦問題；同一 subagent 不重派已回答過的問題。
 - 報告中 confidence 非 CONFIRMED 的敘述，最終說明必須保留其 INFERRED /
   DYNAMIC_RUNTIME 標註，不可升級成事實。

@@ -13,6 +13,13 @@
 #   deliveredFallback      找不到客製證據時，可否 fallback 到原生物件
 #
 # 由 customization-profile.yaml 的 businessDomainMap 指向本檔。
+#
+# 維護重點：
+# - aliases 必須涵蓋使用者「實際會打的字」——中文、英文、口語簡稱都要放
+#   （使用者用英文問 probation 時，只有中文 alias 是比不到的）。
+# - 未命中任何 domain ≠ 不能查：Skill 會改用 customization-profile.yaml 的
+#   searchPolicy.defaultMode 繼續搜尋；在此定義領域只是讓排序與政策更準。
+# - 新業務領域上線時，照下方格式加一段即可，Skill 邏輯不用改。
 # =============================================================================
 
 mapVersion: 1
@@ -47,6 +54,25 @@ businessDomains:
       - 姓名同步
       - 中英文姓名
 
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true
+
+  probation:
+    displayName: 試用期
+    aliases:
+      - 試用期
+      - 試用
+      - 試用期滿
+      - 試用考核
+      - 留用
+      - probation
+      - probationary
+
+    # 依實際環境調整：若試用期功能為全客製，改 CUSTOM_ONLY_ROOTS 並關 fallback
     rootObjectPolicy: CUSTOM_FIRST
     preferredPrefixes:
       - TW_

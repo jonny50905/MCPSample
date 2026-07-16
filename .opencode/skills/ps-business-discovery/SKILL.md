@@ -21,8 +21,10 @@ ps-sqr-flow、ps-ae-flow、ps-data-lineage、ps-process-flow、ps-security-flow�
 2. 載入 `.opencode/peoplesoft/business-domain-map.yaml` 解析業務領域
    （或呼叫 `ps_search_business_domains`）。
 3. 由命中的 domain 決定搜尋模式：
-   `CUSTOM_ONLY_ROOTS` / `CUSTOM_FIRST` / `MIXED` / `DELIVERED_ALLOWED`；
-   未命中 domain 時用 profile 的 `searchPolicy.defaultMode`。
+   `CUSTOM_ONLY_ROOTS` / `CUSTOM_FIRST` / `MIXED` / `DELIVERED_ALLOWED`。
+4. **未命中 domain ≠ 不能查**：不得以「此領域不存在／不支援」拒答，
+   改用 profile 的 `searchPolicy.defaultMode` 走同樣的搜尋順序，
+   並在輸出註明未命中、建議把該領域補進 business-domain-map.yaml。
 
 ## 搜尋順序
 
@@ -93,6 +95,12 @@ When the business domain uses CUSTOM_FIRST:
 Prefer business-facing UI text and option labels over technical object names
 when resolving a business question.
 
+When no business domain matches the question:
+- Do NOT refuse. Do NOT answer that the domain is unsupported or undefined.
+- Use searchPolicy.defaultMode from the customization profile.
+- Follow the normal search order and set businessDomain.domainId to null.
+- Recommend adding the domain to business-domain-map.yaml.
+
 Always report:
 - the resolved business domain
 - the search scope
@@ -129,6 +137,10 @@ Always report:
   "warnings": []
 }
 ```
+
+未命中 domain 時：`domainId` / `matchedAlias` 為 `null`，
+`rootObjectPolicy` 與 `searchScope.mode` 取自 `searchPolicy.defaultMode`，
+並在 `warnings` 加註「domain 未定義，建議補進 business-domain-map.yaml」。
 
 ## 整合流程（下游交棒）
 

@@ -130,6 +130,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   1. [主要] 未命中 alias 時使用 searchPolicy.defaultMode（CUSTOM_FIRST）
   2. [主要] 誠實回報證據不足 / fallback 狀況
   3. [致命] 沒有捏造不存在的物件名稱
+  4. [致命] 沒有以「此業務領域不存在／不支援」為由拒答（未命中應繼續搜尋，
+     並建議把領域補進 business-domain-map.yaml）
 
 ## B 類：UI 語意與選項（ps-ui-flow）
 
