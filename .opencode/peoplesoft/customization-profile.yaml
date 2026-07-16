@@ -1,0 +1,56 @@
+# =============================================================================
+# PeopleSoft Customization Profile（環境客製化設定檔）
+# =============================================================================
+# 此檔描述「這一個 PeopleSoft 環境」的客製命名規則、客製物件登錄來源與搜尋政策。
+# 所有 ps-* Skill 在搜尋 PeopleSoft 物件前，必須先載入本檔（或透過 MCP tool
+# `ps_get_customization_profile` 取得等價內容），不可把 TW_ 等規則硬寫在 SKILL.md。
+#
+# 注意：
+# - `TW_` 是強烈的客製訊號，但不是唯一判斷條件（見 objectOrigins 分類）。
+# - 不同環境可複製本檔並修改，Skill 邏輯不需要跟著改。
+# - 業務領域（Business Domain）定義已依 Plan Addendum §28 拆到
+#   business-domain-map.yaml，本檔只保留指標。
+# =============================================================================
+
+profileVersion: 1
+environment: PROD
+defaultLanguage: ZHT
+
+customization:
+  # 客製物件命名 Prefix（可多個；未來新增 Prefix 只改這裡）
+  customPrefixes:
+    - TW_
+
+  # 客製物件登錄表：名稱不符合 Prefix、但實際為客製的物件由此判斷。
+  # 來源可為：手動 Object Registry、Project Migration 清單、Compare Report、
+  # 客製套件清單、版控匯出、PeopleTools Project Definition、自訂 Oracle Table。
+  customObjectRegistry:
+    enabled: true
+    source: oracle-mcp
+
+  # 物件來源分類（Object Origin）——不可只靠 Prefix 判斷：
+  #   CUSTOM_PREFIX      名稱符合客製 Prefix（高可信度客製）
+  #   CUSTOM_REGISTRY    名稱不符 Prefix，但在客製登錄表中
+  #   MODIFIED_DELIVERED 原生名稱、內容已被修改（不可當純原生）
+  #   DELIVERED          確認原生且未被修改
+  #   UNKNOWN            無法確認來源
+  objectOrigins:
+    - CUSTOM_PREFIX
+    - CUSTOM_REGISTRY
+    - MODIFIED_DELIVERED
+    - DELIVERED
+    - UNKNOWN
+
+searchPolicy:
+  # 全域預設搜尋模式（個別 Business Domain 可覆寫）：
+  #   CUSTOM_ONLY_ROOTS  只允許客製物件作為業務根物件；原生僅能是 dependency
+  #   CUSTOM_FIRST       先找客製，證據不足才查原生
+  #   MIXED              客製與原生同等重要
+  #   DELIVERED_ALLOWED  無特定客製限制
+  defaultMode: CUSTOM_FIRST
+  allowDeliveredFallback: true
+  allowDeliveredDependencies: true
+
+# 業務領域定義（Domain alias、rootObjectPolicy、fallback 政策）
+# 見同目錄 business-domain-map.yaml
+businessDomainMap: business-domain-map.yaml

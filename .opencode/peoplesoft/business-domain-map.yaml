@@ -1,0 +1,55 @@
+# =============================================================================
+# PeopleSoft Business Domain Map（業務領域對照表）
+# =============================================================================
+# 定義「全客製 / 客製優先」的業務領域，供 ps-business-discovery 在選定
+# 根物件（Root Object）之前解析業務領域與搜尋政策。
+#
+# 每個領域可設定：
+#   displayName            領域顯示名稱
+#   aliases                業務同義詞（使用者問題會先比對這裡）
+#   rootObjectPolicy       CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED / DELIVERED_ALLOWED
+#   preferredPrefixes      此領域偏好的客製 Prefix
+#   allowDeliveredDependencies  原生物件可否作為相依物件
+#   deliveredFallback      找不到客製證據時，可否 fallback 到原生物件
+#
+# 由 customization-profile.yaml 的 businessDomainMap 指向本檔。
+# =============================================================================
+
+mapVersion: 1
+
+businessDomains:
+  military_service:
+    displayName: 兵役
+    aliases:
+      - 兵役
+      - 役別
+      - 役男
+      - 服役
+      - 退伍
+      - 免役
+      - 替代役
+      - 軍種
+      - 兵役狀態
+
+    # 兵役為全客製功能：只有客製物件可作為業務根物件，
+    # 原生物件僅能列為 DEPENDENCY，且預設不做 delivered fallback。
+    rootObjectPolicy: CUSTOM_ONLY_ROOTS
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: false
+
+  employee_name:
+    displayName: 員工姓名
+    aliases:
+      - 員工姓名
+      - 姓名同步
+      - 中英文姓名
+
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true
