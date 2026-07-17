@@ -30,10 +30,11 @@ searchMode / customPrefixes、已知物件與聚焦問題。
 
 1. Read `.opencode/skills/ps-sqr-flow/SKILL.md` 與
    `.opencode/peoplesoft/progressive-source-retrieval.md`，全程遵守。
-2. **先 `PeoplecodeSource_get_file_structure` 取程式結構**
-   （Section / Procedure 清單與 `File.FilePath`），再**只取**回答問題
-   必要的 Procedure / SQL Block / SQC Include
-   （搜 ES 定位 chunk id → PeoplecodeSource 取段）。仍不可整支載入。
+2. 先以程式名 `search_chunks` 一次取得 `fileId`，
+   **再 `get_file_structure(fileId)` 取完整程式結構**
+   （Section / Procedure 清單），之後**只取**回答問題必要的
+   Procedure / SQL Block / SQC Include（依結構以 `get_chunks_details`
+   取段）。仍不可整支載入（大檔依結構選段；小檔 ≤ 6 段可全取）。
 3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
 
@@ -58,7 +59,7 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
   filePath ← `FilePath`、lines ← `StartLine`-`EndLine`），
   工具沒給的欄位省略，**禁止自創 id 或路徑**（非 UUID 的 id＝捏造）。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
-- **分頁與截斷**：`search_chunks` 有分頁（limit / offset），單頁不是全部
-  ——宣告「查無」前必須翻到最後一頁或換條件確認；Procedure 截斷時走
-  `get_file_structure` → 接續取段（協定 §5.1）。
+- **定位後切換檔案模式**（協定 §5.1）：命中後 `get_file_structure(fileId)`
+  → 依結構取段；**禁止換關鍵字重搜同一檔案的內容**；
+  Procedure 截斷＝取結構中下一段；單頁「查無」結論無效。
 - 程式「怎麼被執行」不要猜——寫進 `suggestedNext` 建議查 ps-metadata-flow。

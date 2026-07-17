@@ -227,6 +227,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   2. [主要] 以 get_file_structure 或分頁定位到接續段（CHK-PC-003）並取回
   3. [主要] 兩段邏輯完整涵蓋（寫 LOG ＋ 動態回寫 DYNAMIC_RUNTIME）
   4. [次要] 接續取段次數計入 budget，未失控
+  5. [主要] 命中檔案後沒有用「換關鍵字重搜」找同檔內容
+     （應走 get_file_structure(fileId) 檔案模式）
 
 ## D 類：DYNAMIC_RUNTIME
 

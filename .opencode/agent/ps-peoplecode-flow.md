@@ -31,7 +31,10 @@ searchMode / customPrefixes、已知物件與聚焦問題。
 1. Read `.opencode/skills/ps-peoplecode-flow/SKILL.md` 與
    `.opencode/peoplesoft/progressive-source-retrieval.md`，全程遵守
    （search → 精確取段 → 定向展開 → 停止；Context Budget；DYNAMIC_RUNTIME）。
-2. `sourceTypes: ["PEOPLECODE"]`；依背景過濾 origin / prefix。
+2. 兩階段檢索（協定 §5.1）：`search_chunks` 定位（依背景過濾
+   origin / prefix，同一目標最多換 2 組關鍵字）→ 命中後取 hits 的
+   `fileId` → `get_file_structure(fileId)` 看該檔完整結構 →
+   依結構用 `get_chunks_details` 取必要段。
 3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
 
@@ -57,10 +60,10 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
   lines ← `StartLine`-`EndLine`），工具沒給的欄位省略，
   **禁止自創 id 或路徑**（非 UUID 的 id＝捏造）。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
-- **分頁與截斷**：`search_chunks` 有分頁（limit / offset），單頁不是全部
-  ——宣告「查無」前必須翻到最後一頁或換條件確認；chunk 在 `EndLine`
-  截斷時走 `get_file_structure` → 接續取段（協定 §5.1），
-  不得只看一頁就回報「ES 沒有其他 chunk」。
+- **定位後切換檔案模式**（協定 §5.1）：命中目標檔案後一律
+  `get_file_structure(fileId)` → 依結構取段；**禁止換關鍵字重搜
+  同一檔案的內容**。截斷＝取結構中 EndLine 之後的下一段；
+  宣告「查無」前須翻頁到底或以結構確認，單頁結論無效。
 - 每個 claim 標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME 並附 evidence IDs。
 - 遵守 budget（maxTotalChunks 16 / maxExpansionRounds 3）；到頂就回報
   已分析範圍與 gaps，不硬灌。

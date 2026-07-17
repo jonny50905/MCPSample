@@ -180,28 +180,34 @@ maxChunksPerExpansion: 4
 
 ---
 
-## 5.1 分頁與截斷接續（實務必讀）
+## 5.1 定位後切換檔案模式（實務必讀）
 
-**搜尋是分頁的**：`search_chunks` 單次只回一頁（limit 預設約 10，
-用 offset 翻頁）。**「這一頁沒有」≠「索引裡沒有」**：
+**搜尋只負責「定位」，不負責「盤點」。** `search_chunks` 是分頁的
+（limit 約 10，offset 翻頁），且「換關鍵字重搜」對**同一檔案的其餘內容**
+幾乎必然失敗——第一輪已經用掉最貼題的關鍵字，之後越換越偏。
 
-- 要宣告「查無」，必須翻頁到最後一頁（回傳數 < limit）或換查詢條件
-  再確認；只看第一頁就說「ES 沒回傳其他 chunk」是錯誤結論。
-- 翻頁計入 Context Budget（每翻一頁算一次 search），不是無限翻。
-
-**截斷接續配方**（chunk 在 `EndLine` 被切斷、邏輯沒完時）：
+正確流程（兩階段）：
 
 ```text
-1. get_file_structure(該 chunk 的 FilePath)
-   → 看同一檔案的結構，定位 EndLine 之後的下一段
-2. 取回接續段（結構含 chunk id → 直接 get_chunks_details；
-   否則以該檔案 / 物件為條件搜尋並翻頁定位）
-3. 重複直到邏輯完整或觸及 budget 上限（剩餘缺口寫進 gaps）
+階段一：定位（search-mode）
+  search_chunks 查 1~2 組關鍵字 → 命中的 hits 帶 fileId
+  → 鎖定目標檔案
+
+階段二：盤點與取證（file-mode）
+  get_file_structure(fileId) → 該檔完整結構（所有段落的地圖）
+  → 依結構挑必要段 → get_chunks_details 取回
+  → 截斷接續＝取結構中 EndLine 之後的下一段
 ```
 
-截斷是**同一檔案的下一段**——是定向接續問題，不是搜尋問題；
-不要用「換關鍵字重搜」處理，更不准直接回報「程式碼截斷、無法確認」
-而不嘗試接續。
+硬規則：
+
+- **命中目標檔案後，禁止再用「換關鍵字重搜」找同一檔案的更多內容**
+  ——那是 file-mode 的工作（結構是完整的，搜尋不是）。
+- 同一目標最多換 2 組關鍵字；仍定位不到 → 回報 gaps，不是繼續漂移。
+- 小檔案（結構 ≤ 6 段）可全取；大檔案依結構選段。Budget（§5）照常適用。
+- 宣告「查無」前：翻頁到最後一頁（回傳數 < limit），或已進 file-mode
+  以結構確認不存在——只看第一頁就說「ES 沒有」是錯誤結論。
+- 不准回報「程式碼截斷、無法確認」而不嘗試 file-mode 接續。
 
 ## 6. MCP Tool Contract（長文本共用）
 
@@ -215,9 +221,9 @@ maxChunksPerExpansion: 4
 
 | Server | 承擔的協定角色 |
 |---|---|
-| `PeoplecodeElasticSearch`（tool `search_chunks`） | `ps_search_source` — 搜尋候選（只能當 SEARCH_CANDIDATE）；回傳 `result[].filePath` 與 chunk UUID 等欄位 |
+| `PeoplecodeElasticSearch`（tool `search_chunks`） | `ps_search_source` — 搜尋候選（只能當 SEARCH_CANDIDATE）；回傳 `result[].filePath`、chunk UUID、`fileId` 等欄位 |
 | `PeoplecodeSource`（tool `get_chunks_details`） | `ps_get_source_chunks` — chunk ids → 完整內容；回傳 `ChunkText` / `ChunkId`(UUID) / `FilePath` / `StartLine`/`EndLine` / `ComponentType` / `ObjectName` / `EventName` / `FieldName` |
-| `PeoplecodeSource`（tool `get_file_structure`） | `ps_get_source_outline` — 程式結構（回傳 `File.FilePath` 與結構清單） |
+| `PeoplecodeSource`（tool `get_file_structure(fileId)`） | `ps_get_source_outline` — 以 fileId 取該檔完整結構（回傳 `File.FilePath` 與段落清單）；file-mode 的核心工具 |
 | `oracleMCP` | metadata 類角色（origin / choices / label / process / security / AE 結構）——查詢樣板見 `oracle-query-cookbook.md`，只准 SELECT |
 
 `ps_expand_source_context`、`ps_find_source_references` 尚未實作，過渡做法：

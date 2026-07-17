@@ -30,8 +30,10 @@ searchMode / customPrefixes、已知物件與聚焦問題。
 
 1. Read `.opencode/skills/ps-sql-flow/SKILL.md` 與
    `.opencode/peoplesoft/progressive-source-retrieval.md`，全程遵守。
-2. `sourceTypes: ["SQL_DEFINITION","AE_SQL","VIEW_SQL","QUERY_SQL"]`；
-   依背景過濾 origin / prefix。
+2. 兩階段檢索（協定 §5.1）：`search_chunks` 定位
+   （`sourceTypes: ["SQL_DEFINITION","AE_SQL","VIEW_SQL","QUERY_SQL"]`，
+   依背景過濾 origin / prefix，最多換 2 組關鍵字）→ 命中後取 `fileId`
+   → `get_file_structure(fileId)` → 依結構取必要段。
 3. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告，table/field 操作放進 `operations`。
 
@@ -57,7 +59,7 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
   filePath ← `FilePath`、lines ← `StartLine`-`EndLine`），
   工具沒給的欄位省略，**禁止自創 id 或路徑**（非 UUID 的 id＝捏造）。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
-- **分頁與截斷**：`search_chunks` 有分頁（limit / offset），單頁不是全部
-  ——宣告「查無」前必須翻到最後一頁或換條件確認；SQL 段截斷時走
-  `get_file_structure` → 接續取段（協定 §5.1）。
+- **定位後切換檔案模式**（協定 §5.1）：命中後 `get_file_structure(fileId)`
+  → 依結構取段；**禁止換關鍵字重搜同一檔案的內容**；
+  截斷＝取結構中下一段；單頁「查無」結論無效。
 - 遵守 budget；到頂回報 gaps。

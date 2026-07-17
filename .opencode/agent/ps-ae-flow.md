@@ -57,8 +57,9 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 - **oracleMCP 規則**：只准 SELECT；先 `list-connections` → `connect` →
   查完 → `disconnect`；connect 或查詢逾時（~30 秒）→ 停手回報
   `status: BLOCKED`，**不准重試迴圈**。
-- **分頁與截斷**：`search_chunks` 有分頁（limit / offset），單頁不是全部；
-  Action 內容截斷時走 `get_file_structure` → 接續取段（協定 §5.1）。
+- **定位後切換檔案模式**（協定 §5.1）：命中後 `get_file_structure(fileId)`
+  → 依結構取段；**禁止換關鍵字重搜同一檔案的內容**；
+  Action 內容截斷＝取結構中下一段；單頁「查無」結論無效。
 - SQL Action 的 table 操作必分類（READ / UPDATE / … / DYNAMIC_RUNTIME）。
 - 動態 Section 名 / 動態 SQL 標 DYNAMIC_RUNTIME。
 - Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行；
