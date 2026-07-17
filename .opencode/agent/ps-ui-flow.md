@@ -54,6 +54,9 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 
 - **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；查詢一律加列數上限，
   高基數先 COUNT（cookbook 使用規則）。
+- **oracleMCP 連線生命週期**：先 `list-connections` 取連線名 → `connect` →
+  查完 → `disconnect`；connect 或查詢逾時（~30 秒）→ 停手回報
+  `status: BLOCKED`，**不准重試迴圈**。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。

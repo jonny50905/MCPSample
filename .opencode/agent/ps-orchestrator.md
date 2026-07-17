@@ -35,7 +35,11 @@ tools:
    `business-domain-map.yaml`（或用 MCP `ps_get_customization_profile`）。
    解析 business domain 與搜尋模式（CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED /
    DELIVERED_ALLOWED）。規則詳見 `.opencode/skills/ps-business-discovery/SKILL.md`。
-2. **委派**：依下方委派表用 task 工具派給 subagent；可平行派互不相依的工作。
+2. **委派**：依下方委派表用 task 工具派給 subagent。純長文本類
+   （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
+   可平行派；**會用 oracleMCP 的委派（ps-ui-flow / ps-metadata-flow /
+   ps-ae-flow）一次只准一個**，等報告回來才派下一個——後端 SQLcl 是
+   單工有狀態的，平行會互相排隊卡死、互踩「目前連線」。
 3. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。
 4. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份
