@@ -57,6 +57,10 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
   lines ← `StartLine`-`EndLine`），工具沒給的欄位省略，
   **禁止自創 id 或路徑**（非 UUID 的 id＝捏造）。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
+- **分頁與截斷**：`search_chunks` 有分頁（limit / offset），單頁不是全部
+  ——宣告「查無」前必須翻到最後一頁或換條件確認；chunk 在 `EndLine`
+  截斷時走 `get_file_structure` → 接續取段（協定 §5.1），
+  不得只看一頁就回報「ES 沒有其他 chunk」。
 - 每個 claim 標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME 並附 evidence IDs。
 - 遵守 budget（maxTotalChunks 16 / maxExpansionRounds 3）；到頂就回報
   已分析範圍與 gaps，不硬灌。

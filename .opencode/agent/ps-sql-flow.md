@@ -57,4 +57,7 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
   filePath ← `FilePath`、lines ← `StartLine`-`EndLine`），
   工具沒給的欄位省略，**禁止自創 id 或路徑**（非 UUID 的 id＝捏造）。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
+- **分頁與截斷**：`search_chunks` 有分頁（limit / offset），單頁不是全部
+  ——宣告「查無」前必須翻到最後一頁或換條件確認；SQL 段截斷時走
+  `get_file_structure` → 接續取段（協定 §5.1）。
 - 遵守 budget；到頂回報 gaps。

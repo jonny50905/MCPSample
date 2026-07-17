@@ -180,6 +180,29 @@ maxChunksPerExpansion: 4
 
 ---
 
+## 5.1 分頁與截斷接續（實務必讀）
+
+**搜尋是分頁的**：`search_chunks` 單次只回一頁（limit 預設約 10，
+用 offset 翻頁）。**「這一頁沒有」≠「索引裡沒有」**：
+
+- 要宣告「查無」，必須翻頁到最後一頁（回傳數 < limit）或換查詢條件
+  再確認；只看第一頁就說「ES 沒回傳其他 chunk」是錯誤結論。
+- 翻頁計入 Context Budget（每翻一頁算一次 search），不是無限翻。
+
+**截斷接續配方**（chunk 在 `EndLine` 被切斷、邏輯沒完時）：
+
+```text
+1. get_file_structure(該 chunk 的 FilePath)
+   → 看同一檔案的結構，定位 EndLine 之後的下一段
+2. 取回接續段（結構含 chunk id → 直接 get_chunks_details；
+   否則以該檔案 / 物件為條件搜尋並翻頁定位）
+3. 重複直到邏輯完整或觸及 budget 上限（剩餘缺口寫進 gaps）
+```
+
+截斷是**同一檔案的下一段**——是定向接續問題，不是搜尋問題；
+不要用「換關鍵字重搜」處理，更不准直接回報「程式碼截斷、無法確認」
+而不嘗試接續。
+
 ## 6. MCP Tool Contract（長文本共用）
 
 不一定要把現有 MCP 合併成同一個 Server，但 Tool Schema 必須一致；

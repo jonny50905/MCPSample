@@ -1,7 +1,7 @@
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen 3.5 9B）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 27 題，分 6 類（F 類需 subagent 架構），全部基於
+是否遵守 Plan Addendum 的規則。共 28 題，分 6 類（F 類需 subagent 架構），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -216,6 +216,17 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   1. [主要] 取段總數不超過 maxTotalChunks=16
   2. [主要] 明確回報已分析範圍與缺口
   3. [致命] 沒有無限制連續抓段（超出 budget 繼續抓）
+
+### C6 截斷接續與分頁
+- **輸入**：`存檔之後系統到底做了哪些事？完整說明。`
+  （SavePostChange 邏輯跨 CHK-PC-002 / CHK-PC-003 兩段，同一檔案連續行號）
+- **標準答案要點**：兩段都取回並完整說明（含第二段的動態回寫標
+  DYNAMIC_RUNTIME）；不得只憑第一段就總結或回報「程式碼截斷無法確認」
+- **檢查點**：
+  1. [致命] 沒有只看單頁 / 單段就宣告「沒有其他 chunk」或「截斷無法確認」
+  2. [主要] 以 get_file_structure 或分頁定位到接續段（CHK-PC-003）並取回
+  3. [主要] 兩段邏輯完整涵蓋（寫 LOG ＋ 動態回寫 DYNAMIC_RUNTIME）
+  4. [次要] 接續取段次數計入 budget，未失控
 
 ## D 類：DYNAMIC_RUNTIME
 
