@@ -8,6 +8,8 @@
 #   ps_get_field_choices      → choices
 #   ps_search_source          → sourceChunks（只回 snippet 當 candidate）
 #   ps_get_source_chunks      → sourceChunks（回完整 content 當 evidence）
+#   （註：真實環境 get_chunks_details 的 ChunkId 為 Elasticsearch UUID；
+#     本檔 CHK-* 可讀 id 僅為 mock / 評分方便）
 #   ps_get_source_outline     → outlines
 #   ps_get_data_lineage       → lineage
 #   ps_get_process_usage      → processes

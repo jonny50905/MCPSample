@@ -43,8 +43,8 @@ businessDomain / searchMode / customPrefixes、已知物件與聚焦問題。
 
 | 協定角色 | 實際工具 |
 |---|---|
-| `ps_search_source`（搜候選） | `PeoplecodeElasticSearch_*`（搜 chunk ids） |
-| `ps_get_source_chunks`（取證據） | `PeoplecodeSource_*`（chunk id → 完整段落） |
+| `ps_search_source`（搜候選） | `PeoplecodeElasticSearch_search_chunks`（回傳 `result[].filePath` 與 chunk UUID） |
+| `ps_get_source_chunks`（取證據） | `PeoplecodeSource_get_chunks_details`（chunk ids → `ChunkText` / `ChunkId`(UUID) / `FilePath` / `StartLine`/`EndLine`） |
 | `ps_get_ae_graph`（結構） | oracleMCP 照 cookbook §5（PSAESECTDEFN / PSAESTEPDEFN）；來源檔結構亦可用 `PeoplecodeSource_get_file_structure` |
 | `ps_expand_source_context` / `ps_find_source_references` | 尚無專用工具：Call Section 展開以「Section 名搜 ES → Source 取段」達成；補不到的寫進 `gaps` |
 

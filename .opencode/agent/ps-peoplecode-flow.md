@@ -42,7 +42,7 @@ skill 內文的協定工具名對映到實際 MCP 如下：
 | 協定角色 | 實際工具 |
 |---|---|
 | `ps_search_source`（搜候選） | `PeoplecodeElasticSearch_search_chunks`（回傳 `result[].filePath` 等） |
-| `ps_get_source_chunks`（取證據） | `PeoplecodeSource_*` 取段工具（chunk id → 完整段落） |
+| `ps_get_source_chunks`（取證據） | `PeoplecodeSource_get_chunks_details`（chunk ids → `ChunkText` / `ChunkId`(UUID) / `FilePath` / `StartLine`/`EndLine` / `ObjectName` / `EventName`） |
 | `ps_get_source_outline`（結構） | `PeoplecodeSource_get_file_structure`（回傳 `File.FilePath` 與結構清單） |
 | `ps_expand_source_context` / `ps_find_source_references` | 尚無專用工具：以符號 / 鄰近關鍵字再搜 ES 取 id → 取段；補不到的寫進 `gaps` |
 
@@ -52,9 +52,10 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 ## 硬規則
 
 - Raw chunks 留在你的 context，**不放進報告**：單一 quote ≤ 5 行，
-  全報告引用總量 ≤ 20 行；evidence 的 `filePath` / id / lines **逐字複製**
-  工具回傳（`search_chunks` 的 `result[].filePath`、`get_file_structure` 的
-  `File.FilePath`），工具沒給的欄位省略，**禁止自創 id 或路徑**。
+  全報告引用總量 ≤ 20 行；evidence 欄位**逐字複製** `get_chunks_details`
+  回傳（id ← `ChunkId`（UUID）、filePath ← `FilePath`、
+  lines ← `StartLine`-`EndLine`），工具沒給的欄位省略，
+  **禁止自創 id 或路徑**（非 UUID 的 id＝捏造）。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
 - 每個 claim 標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME 並附 evidence IDs。
 - 遵守 budget（maxTotalChunks 16 / maxExpansionRounds 3）；到頂就回報

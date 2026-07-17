@@ -20,10 +20,12 @@ orchestrator 主 context 只累積小而結構化的報告。
 6. delivered 物件一律進 dependencies，不進 findings 的主要實作敘述
    （CUSTOM_ONLY_ROOTS 模式下尤其如此）。
 7. evidence 分兩種（`kind`），欄位不得混用、不得補假值：
-   - `CHUNK`（來自 ES / Source）：`id` / `filePath` / `lines` **逐字複製**
-     工具回傳欄位（`search_chunks` 的 `result[].filePath`、
-     `get_file_structure` 的 `File.FilePath`）；給人看的引用寫
-     「filePath:行號」，id 供機器重取。
+   - `CHUNK`（來自 ES / Source）：欄位**逐字取自** `get_chunks_details` 回傳——
+     `id` ← `ChunkId`（Elasticsearch chunk UUID；**非 UUID 格式＝捏造**）、
+     `filePath` ← `FilePath`、`lines` ← `StartLine`-`EndLine`、
+     `quote` ← `ChunkText` 節錄（≤ 5 行）；選填 `objectName` ← `ObjectName`、
+     `event` ← `EventName`、`fieldName` ← `FieldName`。
+     給人看的引用寫「filePath:行號」，id 供機器重取。
    - `SQL`（來自 oracleMCP）：附 `sql` 與 `keyRows`（關鍵列摘要），
      **沒有 id、也不准自創 id**——`SQL-XLAT-1` 這種自編字串＝報告不合格。
 8. **禁止捏造識別碼**：id / filePath / lines 只能來自工具回傳；
@@ -55,11 +57,10 @@ orchestrator 主 context 只累積小而結構化的報告。
       "evidence": [
         {
           "kind": "CHUNK",
-          "id": "CHK-SQR-001",
+          "id": "9b2f5c1e-4a3d-4f0a-8f21-7e5d0c9a1b2c",
           "filePath": "sqr/TWMIL001.sqr",
           "lines": "61-120",
-          "symbol": "UPDATE-MIL-STATUS",
-          "sourceId": "SQR-TW_MIL001",
+          "objectName": "TW_MIL001",
           "quote": "UPDATE PS_TW_MILITARY SET MIL_STATUS = 'D' ..."
         }
       ]

@@ -192,8 +192,8 @@ maxChunksPerExpansion: 4
 
 | Server | 承擔的協定角色 |
 |---|---|
-| `PeoplecodeElasticSearch`（tool `search_chunks`） | `ps_search_source` — 搜尋候選（只能當 SEARCH_CANDIDATE）；回傳 `result[].filePath` 等欄位 |
-| `PeoplecodeSource`（取段工具） | `ps_get_source_chunks` — 以 chunk id 取完整上下文（正式 Evidence） |
+| `PeoplecodeElasticSearch`（tool `search_chunks`） | `ps_search_source` — 搜尋候選（只能當 SEARCH_CANDIDATE）；回傳 `result[].filePath` 與 chunk UUID 等欄位 |
+| `PeoplecodeSource`（tool `get_chunks_details`） | `ps_get_source_chunks` — chunk ids → 完整內容；回傳 `ChunkText` / `ChunkId`(UUID) / `FilePath` / `StartLine`/`EndLine` / `ComponentType` / `ObjectName` / `EventName` / `FieldName` |
 | `PeoplecodeSource`（tool `get_file_structure`） | `ps_get_source_outline` — 程式結構（回傳 `File.FilePath` 與結構清單） |
 | `oracleMCP` | metadata 類角色（origin / choices / label / process / security / AE 結構）——查詢樣板見 `oracle-query-cookbook.md`，只准 SELECT |
 
