@@ -51,7 +51,8 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 ## 硬規則
 
 - Raw chunks 留在你的 context，**不放進報告**：單一 quote ≤ 5 行，
-  全報告引用總量 ≤ 20 行；用 evidence IDs（chunkId + 行號）代替原文。
+  全報告引用總量 ≤ 20 行；evidence 帶 `filePath`（MCP 的 FilePath 欄位）
+  + 行號（給人看）與 chunkId（機器重取），不貼原文。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
 - 每個 claim 標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME 並附 evidence IDs。
 - 遵守 budget（maxTotalChunks 16 / maxExpansionRounds 3）；到頂就回報

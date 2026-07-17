@@ -75,7 +75,8 @@ and which flow skill should be run to fill the gap.
 4. 什麼條件會變成哪個值 / 選擇後會發生什麼（PeopleCode / SQL / AE / SQR，逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME）
 5. 資料流向（讀了什麼、更新了什麼）
 6. 根物件與相依物件清單（origin 標註）
-7. Evidence 清單（evidence IDs）
+7. Evidence 清單——給人看的格式：`filePath:行號`（如
+   `sqr/TWMIL001.sqr:61-120`）；chunkId 附在後面供機器重取
 ```
 
 ## Subagent 架構下的輸入

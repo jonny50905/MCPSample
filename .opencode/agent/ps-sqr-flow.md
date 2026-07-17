@@ -52,6 +52,8 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 
 - 不可一次載入整支 SQR 或整個 SQC。
 - 動態 procedure / include / table（如 `from [$var]`）標 DYNAMIC_RUNTIME。
-- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。
+- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行；
+  evidence 帶 `filePath`（MCP 的 FilePath 欄位，SQR/SQC 檔案路徑）
+  + 行號與 chunkId。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
 - 程式「怎麼被執行」不要猜——寫進 `suggestedNext` 建議查 ps-metadata-flow。

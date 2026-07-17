@@ -51,6 +51,7 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 - 每個 table / field 操作必分類：READ / INSERT / UPDATE / DELETE / MERGE /
   UNKNOWN / DYNAMIC_RUNTIME。
 - 動態組成的 table / 欄位 / 條件標 DYNAMIC_RUNTIME，不猜執行期結果。
-- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。
+- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行；
+  evidence 帶 `filePath`（MCP 的 FilePath 欄位）+ 行號與 chunkId。
 - Search snippet 不是證據；下結論前必先 `ps_get_source_chunks`。
 - 遵守 budget；到頂回報 gaps。

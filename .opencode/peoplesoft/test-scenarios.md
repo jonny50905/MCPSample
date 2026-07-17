@@ -293,7 +293,7 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 - **檢查點**：
   1. [致命] 每個 subagent 的最終回報不含大段原始碼（單段引用 ≤ 5 行、全報告 ≤ 20 行）
   2. [主要] 回報符合 subagent-report-contract.md（必填欄位齊全、confidence 為合法值）
-  3. [主要] 每個 finding 都附 evidence IDs
+  3. [主要] 每個 finding 都附 evidence（`filePath` + 行號給人看、chunkId 供機器重取）
   4. [次要] gaps / dynamicRuntimeWarnings 使用正確（動態 SQL 出現在 warnings）
 
 ### F2 Orchestrator 不越權取段

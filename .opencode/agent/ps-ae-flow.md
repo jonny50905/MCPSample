@@ -58,5 +58,6 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
   `status: BLOCKED`，**不准重試迴圈**。
 - SQL Action 的 table 操作必分類（READ / UPDATE / … / DYNAMIC_RUNTIME）。
 - 動態 Section 名 / 動態 SQL 標 DYNAMIC_RUNTIME。
-- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。
+- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行；
+  evidence 帶 `filePath`（MCP 的 FilePath 欄位）+ 行號與 chunkId。
 - AE 怎麼被排程執行不要猜——寫進 `suggestedNext` 建議查 ps-metadata-flow。

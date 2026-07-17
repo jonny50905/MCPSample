@@ -149,6 +149,7 @@ sourceChunks:
   - chunkId: CHK-PC-001
     sourceType: PEOPLECODE
     sourceId: TW_MILITARY.MIL_STATUS.FieldChange
+    filePath: peoplecode/TW_MILITARY/MIL_STATUS/FieldChange.pcode
     parentSymbol: FieldChange
     startLine: 1
     endLine: 14
@@ -164,6 +165,7 @@ sourceChunks:
   - chunkId: CHK-PC-002
     sourceType: PEOPLECODE
     sourceId: TW_MILITARY.MIL_STATUS.SavePostChange
+    filePath: peoplecode/TW_MILITARY/MIL_STATUS/SavePostChange.pcode
     parentSymbol: SavePostChange
     startLine: 1
     endLine: 10
@@ -175,6 +177,7 @@ sourceChunks:
   - chunkId: CHK-PC-003                    # D1：動態 SQL
     sourceType: PEOPLECODE
     sourceId: TW_MILITARY.MIL_STATUS.SavePostChange
+    filePath: peoplecode/TW_MILITARY/MIL_STATUS/SavePostChange.pcode
     parentSymbol: SavePostChange
     startLine: 11
     endLine: 18
@@ -186,6 +189,7 @@ sourceChunks:
   - chunkId: CHK-PC-004                    # B5 / D3：動態 Label 與動態選項
     sourceType: PEOPLECODE
     sourceId: TW_MILITARY.EXEMPT_RSN.RowInit
+    filePath: peoplecode/TW_MILITARY/EXEMPT_RSN/RowInit.pcode
     parentSymbol: RowInit
     startLine: 1
     endLine: 12
@@ -201,6 +205,7 @@ sourceChunks:
   - chunkId: CHK-SQL-001
     sourceType: SQL_DEFINITION
     sourceId: TW_MIL_UPD_SQL
+    filePath: sql/TW_MIL_UPD_SQL.sql
     parentSymbol: TW_MIL_UPD_SQL
     startLine: 1
     endLine: 8
@@ -221,6 +226,7 @@ sourceChunks:
   - chunkId: CHK-SQR-001
     sourceType: SQR
     sourceId: SQR-TW_MIL001
+    filePath: sqr/TWMIL001.sqr
     parentSymbol: UPDATE-MIL-STATUS
     startLine: 61
     endLine: 120
@@ -237,6 +243,7 @@ sourceChunks:
   - chunkId: CHK-SQR-002
     sourceType: SQR
     sourceId: SQR-TW_MIL001
+    filePath: sqr/TWMIL001.sqr
     parentSymbol: PRINT-REPORT
     startLine: 161
     endLine: 220
@@ -253,6 +260,7 @@ sourceChunks:
   - chunkId: CHK-SQR-003                   # D2：動態 table
     sourceType: SQR
     sourceId: SQR-TW_MIL001
+    filePath: sqr/TWMIL001.sqr
     parentSymbol: LOAD-HISTORY
     startLine: 121
     endLine: 160
@@ -267,6 +275,7 @@ sourceChunks:
   - chunkId: CHK-SQC-001                   # C3：SQC 內的共用程序
     sourceType: SQC
     sourceId: SQC-TWMILUTIL
+    filePath: sqc/TWMILUTIL.sqc
     parentSymbol: GET-MIL-DESC
     startLine: 1
     endLine: 20
@@ -290,6 +299,7 @@ sourceChunks:
   - chunkId: CHK-AE-001
     sourceType: AE_SQL
     sourceId: TW_MIL_AE.MAIN.Step010
+    filePath: ae/TW_MIL_AE/MAIN/Step010.sql
     parentSymbol: MAIN.Step010.SQL
     startLine: 1
     endLine: 6

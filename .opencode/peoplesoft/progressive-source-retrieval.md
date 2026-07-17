@@ -62,6 +62,9 @@ SQC
    **不可直接作為最終 Evidence**。
 2. 只有 `ps_get_source_chunks` / `ps_expand_source_context` 回傳的資料庫 Chunk
    （含 `sourceHash`、`startLine`/`endLine`）才是正式 Evidence。
+   來源有提供檔案路徑（如現行 MCP 的 `FilePath` 欄位）時，Evidence 必須
+   同時保留 `filePath`（給人看的引用：`filePath:行號`）與 `chunkId`
+   （機器重取 / 防重的鍵）。
 3. 每個結論必須標記狀態：
 
 ```text

@@ -67,4 +67,6 @@ tools:
 - 排程 / 授權一律以 metadata 工具為準，不從程式註解或物件名稱推測。
 - 血緣每條邊必標操作類型與 evidence IDs；動態寫入標 DYNAMIC_RUNTIME。
 - 使用者層級資訊以彙總呈現（人數 / 角色），不主動列具名清單。
-- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。
+- Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行；
+  血緣的原始碼 evidence 帶 `filePath` + 行號與 chunkId；
+  oracleMCP 的 metadata 證據無檔案路徑，附「使用的 SQL + 關鍵列」。

@@ -19,6 +19,10 @@ orchestrator 主 context 只累積小而結構化的報告。
 5. 報告目標長度 ≤ 600 tokens（軟性）；findings 依相關性排序，最多 8 筆。
 6. delivered 物件一律進 dependencies，不進 findings 的主要實作敘述
    （CUSTOM_ONLY_ROOTS 模式下尤其如此）。
+7. 來源 MCP 有提供檔案路徑（FilePath 欄位）時，evidence **必帶** filePath；
+   給人看的引用一律寫「filePath:行號」，chunkId 保留作機器重取與防重的鍵
+   ——兩者都要，不是二選一。oracleMCP 的 metadata 證據無檔案路徑，
+   改附「使用的 SQL + 關鍵列」。
 ```
 
 ## JSON 結構
@@ -46,9 +50,10 @@ orchestrator 主 context 只累積小而結構化的報告。
       "evidence": [
         {
           "id": "CHK-SQR-001",
-          "sourceId": "SQR-TW_MIL001",
-          "symbol": "UPDATE-MIL-STATUS",
+          "filePath": "sqr/TWMIL001.sqr",
           "lines": "61-120",
+          "symbol": "UPDATE-MIL-STATUS",
+          "sourceId": "SQR-TW_MIL001",
           "quote": "UPDATE PS_TW_MILITARY SET MIL_STATUS = 'D' ..."
         }
       ]
