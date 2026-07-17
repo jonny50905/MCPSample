@@ -22,16 +22,22 @@
 │  ├─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
 │  ├─ oracle-query-cookbook.md         oracleMCP 的 PeopleTools 查詢樣板（SELECT-only）
 │  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
-│  ├─ test-scenarios.md                本地模型準確度測試情境（27 題 + 評分規則）
+│  ├─ report-templates/
+│  │  ├─ overview-template.md          Deep research 總覽模板（含調查 checklist）
+│  │  └─ function-detail-template.md   Deep research 單功能細查模板
+│  ├─ test-scenarios.md                本地模型準確度測試情境（30 題 + 評分規則）
 │  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
 ├─ agent/
-│  ├─ ps-orchestrator.md               Primary：domain 解析 + 委派 + 彙整（主 context 保持小）
+│  ├─ ps-orchestrator.md               Primary：問答模式（domain 解析 + 委派 + 彙整，唯讀）
+│  ├─ ps-deep-research.md              Primary：文件生成模式（盤點 + 逐項深查 + 寫檔，可續跑）
 │  ├─ ps-ui-flow.md                    Subagent：UI 語意檢索
 │  ├─ ps-peoplecode-flow.md            Subagent：PeopleCode
 │  ├─ ps-sql-flow.md                   Subagent：SQL
 │  ├─ ps-sqr-flow.md                   Subagent：SQR / SQC
 │  ├─ ps-ae-flow.md                    Subagent：Application Engine
 │  └─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
+├─ command/
+│  └─ ps-research.md                   /ps-research <領域> — 文件生成指令（可續跑）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -111,6 +117,31 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 - Trade-off：subagent 每次啟動需重載 system prompt，總 token 較高、延遲較長；
   換取主 context 峰值小、各階段 context 乾淨——對小 context 地端模型
   幾乎必然划算。
+
+## Deep Research 文件生成模式
+
+問答模式（ps-orchestrator，唯讀）之外的第二個入口：對**任一**業務領域
+產出人類可讀的 markdown 文件集——領域**不必**先登錄在 domain map
+（30 年系統，多數領域沒登錄是常態）。
+
+```text
+/ps-research 轉職        ← 或 Tab 切到 ps-deep-research 直接下指令
+  ↓ 階段一：多角度盤點 → docs/ps-research/轉職/00-overview.md
+    （功能地圖、批次、核心表、調查進度 checklist、掃描範圍聲明）
+  ↓ 階段二：逐項深查（復用問答模式的深度鏈）→ NN-<物件>.md、逐項打勾
+```
+
+特性：
+
+- **可中斷續跑**：狀態就是 00-overview.md 的 checklist——中斷後重跑
+  `/ps-research <領域>`，從第一個未勾選項繼續，不重查已完成項。
+- **checklist 可人工編輯**：覺得盤點漏了功能，直接在「調查進度」加一行，
+  系統照著查。
+- **領域未登錄照樣跑**：未命中 domain map 時自展同義詞＋CUSTOM_FIRST，
+  完成後總覽附「建議 domain 登錄」YAML 片段，人工決定是否收錄對照表。
+- **輸出進 git**：`docs/ps-research/` 納版控，git diff 就是文件審閱介面。
+- **9B 全跑注意**：一次跑到底 context 可能撐不完——沒關係，斷了就重跑
+  指令續跑；每項完成即寫檔＋打勾，進度不會遺失。
 
 ## 兵役案例（端到端）
 

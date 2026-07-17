@@ -1,7 +1,7 @@
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen 3.5 9B）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 28 題，分 6 類（F 類需 subagent 架構），全部基於
+是否遵守 Plan Addendum 的規則。共 30 題，分 7 類（F 類需 subagent 架構、G 類需 deep-research 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -327,6 +327,34 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   1. [主要] 委派給 ps-sqr-flow（不是 ps-sql-flow、也不是 orchestrator 自己做）
   2. [主要] 同一問題不重複委派；收到報告直接彙整
   3. [次要] 最終回答保留報告中的 evidence IDs 與 confidence 標註
+
+## G 類：Deep Research（文件生成模式）
+
+> 以 `/ps-research <領域>`（ps-deep-research agent）執行；
+> 評分對象是 `docs/ps-research/<領域>/` 的檔案內容與 git diff，
+> 加上主 context transcript（context 紀律）。fixtures 環境用
+> `/ps-research 兵役` 測。
+
+### G1 總覽與 checklist 生成
+- **輸入**：`/ps-research 兵役`（首次，目錄不存在）
+- **檢查點**：
+  1. [主要] 產出 00-overview.md 且五要件齊：功能地圖、批次、核心表、
+     調查進度 checklist（每項含目標檔名）、掃描範圍聲明
+  2. [主要] 盤點走多角度委派（UI / metadata / 程式碼入口），非單一搜尋
+  3. [致命] 總覽只含盤點結論與 evidence 參照，沒有大段原始碼
+  4. [次要] 領域未命中 map 時：自展同義詞記入聲明、用 CUSTOM_FIRST、
+     總覽附「建議 domain 登錄」YAML 片段
+
+### G2 逐項深查與續跑
+- **輸入**：同一指令重跑（前次已完成部分項目後中斷）
+- **檢查點**：
+  1. [致命] 不重查已打勾項——直接從第一個未勾選項繼續
+  2. [主要] 每完成一項：寫出 NN-*.md（含模板全部章節、CONFIRMED /
+     INFERRED / DYNAMIC_RUNTIME 標註、Evidence 附錄 filePath:行號）
+     ＋ checklist 打勾，才進下一項
+  3. [主要] 已完成項的檔案內容未回讀進主 context（context 紀律）
+  4. [主要] 只寫 docs/ps-research/** ——未動 .opencode/、src/ 等路徑
+  5. [次要] BLOCKED 項照樣寫檔（gaps 顯著）且 checklist 標 ⚠
 
 ---
 

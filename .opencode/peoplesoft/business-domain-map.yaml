@@ -61,6 +61,27 @@ businessDomains:
     allowDeliveredDependencies: true
     deliveredFallback: true
 
+  job_transfer:
+    displayName: 轉職
+    aliases:
+      - 轉職
+      - 調職
+      - 職務異動
+      - 調動
+      - 派任
+      - 異動作業
+      - transfer
+      - job transfer
+
+    # 30 年老系統、客製範圍未知 → 先 CUSTOM_FIRST（fallback 必回報）；
+    # 深查後確認為全客製時，再改 CUSTOM_ONLY_ROOTS
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true
+
   probation:
     displayName: 試用期
     aliases:
