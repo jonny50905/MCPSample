@@ -57,6 +57,9 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **oracleMCP 連線生命週期**：先 `list-connections` 取連線名 → `connect` →
   查完 → `disconnect`；connect 或查詢逾時（~30 秒）→ 停手回報
   `status: BLOCKED`，**不准重試迴圈**。
+- **oracle 證據格式**：`kind: "SQL"` ＋ `sql` ＋ `keyRows`（關鍵列摘要）；
+  **沒有 id、也不准自創 id**（`SQL-XLAT-1` 這種自編字串＝報告不合格）。
+  只有真的取了 source chunk 才有 id / filePath，且必須逐字來自工具回傳。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。

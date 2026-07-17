@@ -45,7 +45,8 @@ businessDomain / searchMode / customPrefixes、已知物件與聚焦問題。
 |---|---|
 | `ps_search_source`（搜候選） | `PeoplecodeElasticSearch_*`（搜 chunk ids） |
 | `ps_get_source_chunks`（取證據） | `PeoplecodeSource_*`（chunk id → 完整段落） |
-| `ps_get_ae_graph` / `ps_expand_source_context` / `ps_find_source_references` | 尚無專用工具：AE 結構以「AE 名搜 ES」近似；Call Section 展開以「Section 名搜 ES → Source 取段」達成；補不到的寫進 `gaps` |
+| `ps_get_ae_graph`（結構） | oracleMCP 照 cookbook §5（PSAESECTDEFN / PSAESTEPDEFN）；來源檔結構亦可用 `PeoplecodeSource_get_file_structure` |
+| `ps_expand_source_context` / `ps_find_source_references` | 尚無專用工具：Call Section 展開以「Section 名搜 ES → Source 取段」達成；補不到的寫進 `gaps` |
 
 ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 必須經 PeoplecodeSource 取回完整段落才能作為 Evidence。
@@ -59,5 +60,6 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 - SQL Action 的 table 操作必分類（READ / UPDATE / … / DYNAMIC_RUNTIME）。
 - 動態 Section 名 / 動態 SQL 標 DYNAMIC_RUNTIME。
 - Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行；
-  evidence 帶 `filePath`（MCP 的 FilePath 欄位）+ 行號與 chunkId。
+  chunk 證據的 `filePath` / id / lines **逐字複製**工具回傳、
+  oracle 證據用 `kind: "SQL"` ＋ `sql` ＋ `keyRows`；**禁止自創 id**。
 - AE 怎麼被排程執行不要猜——寫進 `suggestedNext` 建議查 ps-metadata-flow。

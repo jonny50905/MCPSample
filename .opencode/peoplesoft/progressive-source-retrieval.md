@@ -192,14 +192,15 @@ maxChunksPerExpansion: 4
 
 | Server | 承擔的協定角色 |
 |---|---|
-| `PeoplecodeElasticSearch` | `ps_search_source` — 搜尋候選 chunk ids（只能當 SEARCH_CANDIDATE） |
-| `PeoplecodeSource` | `ps_get_source_chunks` — 以 chunk id 取完整上下文（正式 Evidence） |
+| `PeoplecodeElasticSearch`（tool `search_chunks`） | `ps_search_source` — 搜尋候選（只能當 SEARCH_CANDIDATE）；回傳 `result[].filePath` 等欄位 |
+| `PeoplecodeSource`（取段工具） | `ps_get_source_chunks` — 以 chunk id 取完整上下文（正式 Evidence） |
+| `PeoplecodeSource`（tool `get_file_structure`） | `ps_get_source_outline` — 程式結構（回傳 `File.FilePath` 與結構清單） |
 | `oracleMCP` | metadata 類角色（origin / choices / label / process / security / AE 結構）——查詢樣板見 `oracle-query-cookbook.md`，只准 SELECT |
 
-`ps_expand_source_context`、`ps_get_source_outline`、`ps_find_source_references`
-尚未實作，過渡做法：需要展開 / outline / 反查時，以符號、程式名或鄰近關鍵字
-再搜 ES 取得 chunk ids，再用 PeoplecodeSource 取段；仍補不到的記入報告 `gaps`。
-本文其餘章節的工具名一律視為**協定角色名**，不是實際工具 id。
+`ps_expand_source_context`、`ps_find_source_references` 尚未實作，過渡做法：
+以符號、程式名或鄰近關鍵字再搜 ES 取得 chunk ids，再用 PeoplecodeSource 取段；
+仍補不到的記入報告 `gaps`。本文其餘章節的工具名一律視為**協定角色名**。
+Evidence 的 id / filePath / lines **逐字複製**工具回傳欄位，禁止自創。
 
 ### 6.1 `ps_search_source`
 

@@ -19,10 +19,15 @@ orchestrator 主 context 只累積小而結構化的報告。
 5. 報告目標長度 ≤ 600 tokens（軟性）；findings 依相關性排序，最多 8 筆。
 6. delivered 物件一律進 dependencies，不進 findings 的主要實作敘述
    （CUSTOM_ONLY_ROOTS 模式下尤其如此）。
-7. 來源 MCP 有提供檔案路徑（FilePath 欄位）時，evidence **必帶** filePath；
-   給人看的引用一律寫「filePath:行號」，chunkId 保留作機器重取與防重的鍵
-   ——兩者都要，不是二選一。oracleMCP 的 metadata 證據無檔案路徑，
-   改附「使用的 SQL + 關鍵列」。
+7. evidence 分兩種（`kind`），欄位不得混用、不得補假值：
+   - `CHUNK`（來自 ES / Source）：`id` / `filePath` / `lines` **逐字複製**
+     工具回傳欄位（`search_chunks` 的 `result[].filePath`、
+     `get_file_structure` 的 `File.FilePath`）；給人看的引用寫
+     「filePath:行號」，id 供機器重取。
+   - `SQL`（來自 oracleMCP）：附 `sql` 與 `keyRows`（關鍵列摘要），
+     **沒有 id、也不准自創 id**——`SQL-XLAT-1` 這種自編字串＝報告不合格。
+8. **禁止捏造識別碼**：id / filePath / lines 只能來自工具回傳；
+   工具沒提供的欄位一律省略，不得補一個「看起來像」的值。
 ```
 
 ## JSON 結構
@@ -49,6 +54,7 @@ orchestrator 主 context 只累積小而結構化的報告。
       ],
       "evidence": [
         {
+          "kind": "CHUNK",
           "id": "CHK-SQR-001",
           "filePath": "sqr/TWMIL001.sqr",
           "lines": "61-120",
@@ -62,6 +68,11 @@ orchestrator 主 context 只累積小而結構化的報告。
   "dependencies": [
     { "type": "FUNCLIB", "name": "HR_COMMON_UTIL", "origin": "DELIVERED", "role": "DEPENDENCY" }
   ],
+  "_sqlEvidenceExample": {
+    "kind": "SQL",
+    "sql": "SELECT FIELDVALUE, XLATLONGNAME FROM PSXLATITEM WHERE FIELDNAME = 'MIL_STATUS' ...",
+    "keyRows": ["E=免役 (ACTIVE)", "A=替代役 (ACTIVE)"]
+  },
   "dynamicRuntimeWarnings": [
     "LOAD-HISTORY 讀取的 table 由 [$hist_table] 執行期組成（CHK-SQR-003）"
   ],

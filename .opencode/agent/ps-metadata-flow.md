@@ -68,5 +68,6 @@ tools:
 - 血緣每條邊必標操作類型與 evidence IDs；動態寫入標 DYNAMIC_RUNTIME。
 - 使用者層級資訊以彙總呈現（人數 / 角色），不主動列具名清單。
 - Raw chunks 不放進報告：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行；
-  血緣的原始碼 evidence 帶 `filePath` + 行號與 chunkId；
-  oracleMCP 的 metadata 證據無檔案路徑，附「使用的 SQL + 關鍵列」。
+  血緣的原始碼 evidence（`kind: "CHUNK"`）之 `filePath` / id / lines
+  **逐字複製**工具回傳；oracleMCP 證據用 `kind: "SQL"` ＋ `sql` ＋
+  `keyRows`，**沒有 id、也不准自創 id**。
