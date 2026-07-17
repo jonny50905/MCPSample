@@ -97,7 +97,10 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
   （PeopleTools metadata：translate values / label / Page 對映 / 排程 / 授權 /
   origin / AE 結構——查詢一律照 `oracle-query-cookbook.md` 樣板，SELECT-only）。
   tools 白名單用 `"<註冊名>_*"` wildcard，前綴必須與 opencode.json 的
-  mcp 註冊 key 完全一致（含大小寫）。UI 全文語意搜尋（Semantic Index）仍未建，
+  mcp 註冊 key 完全一致（含大小寫）。**注意：OpenCode 的 tools 是覆寫表，
+  沒列出的工具預設開啟——不該用某 server 的 agent 必須明確設 `false`，
+  不能靠不列**（orchestrator 對三個 MCP 全 deny，主 context 物理上碰不到
+  chunk / SQL）。UI 全文語意搜尋（Semantic Index）仍未建，
   相關查詢會以 gaps / BLOCKED 回報。
 - Skill / 協定文件內的 `ps_*` 工具名是**協定角色名**；實際工具對映見各 agent
   檔的「工具對映（現行環境）」與 progressive-source-retrieval.md §6.0。

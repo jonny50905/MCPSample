@@ -4,8 +4,9 @@ mode: primary
 temperature: 0.1
 # tools key 說明：
 # - MCP 工具 key = <opencode.json 註冊名>_<tool 名>，前綴須與註冊 key 完全一致（含大小寫）。
-# - Orchestrator 刻意不掛 PeoplecodeElasticSearch / PeoplecodeSource——
-#   長文本檢索一律委派給 subagent，主 context 不碰 chunk。
+# - OpenCode 的 tools 是「覆寫表」：沒列出的工具一律預設開啟。
+#   所以三個 MCP 必須「明確 deny」，不能靠不列——主 context 絕不碰 chunk / SQL，
+#   長文本與 metadata 檢索一律委派給 subagent。
 # - profile / domain 用 read 讀 YAML 檔即可；下列 MCP 工具尚未實作（未來）：
 #   peoplesoft_ps_get_customization_profile / ps_search_business_domains / ps_get_object_origin
 tools:
@@ -17,6 +18,9 @@ tools:
   edit: false
   bash: false
   webfetch: false
+  "PeoplecodeElasticSearch_*": false
+  "PeoplecodeSource_*": false
+  "oracleMCP_*": false
 ---
 
 # PeopleSoft 業務分析 Orchestrator
