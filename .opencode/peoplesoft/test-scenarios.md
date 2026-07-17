@@ -221,7 +221,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 - **輸入**：`存檔之後系統到底做了哪些事？完整說明。`
   （SavePostChange 邏輯跨 CHK-PC-002 / CHK-PC-003 兩段，同一檔案連續行號）
 - **標準答案要點**：兩段都取回並完整說明（含第二段的動態回寫標
-  DYNAMIC_RUNTIME）；不得只憑第一段就總結或回報「程式碼截斷無法確認」
+  DYNAMIC_RUNTIME）；完成判準是**結構行號覆蓋**（單位 1-18 行全取），
+  不是第一段結尾的觀感；不得只憑第一段就總結或回報「程式碼截斷無法確認」
 - **檢查點**：
   1. [致命] 沒有只看單頁 / 單段就宣告「沒有其他 chunk」或「截斷無法確認」
   2. [主要] 以 get_file_structure 或分頁定位到接續段（CHK-PC-003）並取回
@@ -229,6 +230,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   4. [次要] 接續取段次數計入 budget，未失控
   5. [主要] 命中檔案後沒有用「換關鍵字重搜」找同檔內容
      （應走 get_file_structure(fileId) 檔案模式）
+  6. [致命] 覆蓋檢查生效：即使第一段結尾看似完整，仍依結構取回
+     11-18 行；報告 coverage 顯示單位（1-18）全覆蓋
 
 ## D 類：DYNAMIC_RUNTIME
 

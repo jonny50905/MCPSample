@@ -62,4 +62,6 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 - **定位後切換檔案模式**（協定 §5.1）：命中後 `get_file_structure(fileId)`
   → 依結構取段；**禁止換關鍵字重搜同一檔案的內容**；
   Procedure 截斷＝取結構中下一段；單頁「查無」結論無效。
+- **覆蓋檢查**：完成判準＝行號覆蓋整個 Procedure / Section 的結構範圍，
+  不是結尾觀感；報告必附 coverage，未覆蓋區間必列 gaps。
 - 程式「怎麼被執行」不要猜——寫進 `suggestedNext` 建議查 ps-metadata-flow。

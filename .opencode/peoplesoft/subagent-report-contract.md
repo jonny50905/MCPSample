@@ -30,6 +30,10 @@ orchestrator 主 context 只累積小而結構化的報告。
      **沒有 id、也不准自創 id**——`SQL-XLAT-1` 這種自編字串＝報告不合格。
 8. **禁止捏造識別碼**：id / filePath / lines 只能來自工具回傳；
    工具沒提供的欄位一律省略，不得補一個「看起來像」的值。
+9. 長文本分析必附 `coverage`：本次分析的程式單位、其**結構行號範圍**、
+   已取回並分析的行號區間；單位內未覆蓋的行號區間**必須**同時出現在
+   `gaps`，不可默默省略。`quote` 節錄要挑**支撐 claim 的關鍵行**
+   （判斷條件、寫入語句），不是 chunk 開頭幾行。
 ```
 
 ## JSON 結構
@@ -44,6 +48,13 @@ orchestrator 主 context 只累積小而結構化的報告。
     "customPrefixes": ["TW_"],
     "deliveredFallbackUsed": false
   },
+  "coverage": [
+    {
+      "unit": "UPDATE-MIL-STATUS",
+      "structureLines": "61-120",
+      "analyzedLines": "61-120"
+    }
+  ],
   "findings": [
     {
       "claim": "UPDATE-MIL-STATUS 將 DISCHARGE_DT 已到期者的 MIL_STATUS 更新為 'D'",
@@ -94,6 +105,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `task` | ✔ | 一句話重述任務（供 orchestrator 對帳） |
 | `status` | ✔ | COMPLETE：已回答；PARTIAL：部分回答（見 gaps）；BLOCKED：無法進行（工具失敗 / 查無） |
 | `searchScope` | ✔ | 實際使用的搜尋模式；用了 delivered fallback 必須在此如實回報 |
+| `coverage[]` | 長文本必填 | 程式單位、結構行號範圍、已分析行號區間；未覆蓋區間必同時列於 gaps |
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
 | `dependencies[]` | ✔（可為空陣列） | 原生 / 相依物件，只能出現在這裡 |
 | `dynamicRuntimeWarnings[]` | ✔（可為空陣列） | 所有 DYNAMIC_RUNTIME 事項集中列出 |

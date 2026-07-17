@@ -64,6 +64,10 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
   `get_file_structure(fileId)` → 依結構取段；**禁止換關鍵字重搜
   同一檔案的內容**。截斷＝取結構中 EndLine 之後的下一段；
   宣告「查無」前須翻頁到底或以結構確認，單頁結論無效。
+- **覆蓋檢查**：完成判準＝已取回 chunks 的行號**覆蓋整個程式單位的
+  結構範圍**——「結尾斷在註解 / End-If 看起來很完整」不算數；
+  有缺口就取下一段，報告必附 coverage（單位 / 結構範圍 / 已分析行號），
+  未覆蓋區間必列 gaps。
 - 每個 claim 標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME 並附 evidence IDs。
 - 遵守 budget（maxTotalChunks 16 / maxExpansionRounds 3）；到頂就回報
   已分析範圍與 gaps，不硬灌。
