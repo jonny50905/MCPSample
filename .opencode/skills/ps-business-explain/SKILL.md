@@ -23,6 +23,21 @@ SQL 更新：CONFIRMED / DYNAMIC_RUNTIME
 原生物件：僅列為 Dependency
 ```
 
+## 選項生命狀態（選項類問題必附）
+
+每個選項先標三個證據維度，再下生命狀態結論：
+
+```text
+XLAT 狀態      ACTIVE / INACTIVE
+程式邏輯       有（附 evidence IDs）/ 查無
+資料分布       N 筆 / 0 筆（彙總數字）
+```
+
+- 「已停用 / 沒在用」要三重證據齊全才標 CONFIRMED；
+  缺任何一項只能標 INFERRED，並寫明缺哪一項。
+- 「僅定義未使用」（ACTIVE、程式查無、資料 0 筆）與
+  「歷史遺留」（INACTIVE 但資料仍有 N 筆）是不同結論，分開講。
+
 ## Skill Rules
 
 ```text
@@ -56,8 +71,8 @@ and which flow skill should be run to fill the gap.
 ```text
 1. 一句話結論（業務語言）
 2. 在哪裡維護（Component / Page，含畫面文字與語系）
-3. 選項與儲存值對照（如適用）
-4. 選擇後會發生什麼（PeopleCode / SQL / AE / SQR，逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME）
+3. 選項與儲存值對照＋生命狀態（如適用）
+4. 什麼條件會變成哪個值 / 選擇後會發生什麼（PeopleCode / SQL / AE / SQR，逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME）
 5. 資料流向（讀了什麼、更新了什麼）
 6. 根物件與相依物件清單（origin 標註）
 7. Evidence 清單（evidence IDs）

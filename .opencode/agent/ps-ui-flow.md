@@ -63,3 +63,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - 每個 claim 必附 evidence IDs；沒證據的寫入 `gaps`，不寫入 `findings`。
 - 高基數 prompt 只回 metadata，不列值清單。
 - UI 候選最多看 20 筆、報告最多回 8 筆最相關。
+- **選項類任務的報告義務**：`suggestedNext` 必附一筆
+  `{ "agent": "ps-peoplecode-flow", "task": "搜尋 <RECNAME>.<FIELDNAME> 與值 '<V1>','<V2>'… 的設值 / 分支邏輯" }`
+  （除非委派 prompt 明說只要清單）——選項清單不等於業務含意的全部。
+- 問題涉及「還在不在用 / 廢棄」時：XLAT 查詢**不要**過濾 EFF_STATUS
+  （cookbook §2g），每個值標 ACTIVE / INACTIVE。

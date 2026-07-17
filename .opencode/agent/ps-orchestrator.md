@@ -43,8 +43,12 @@ tools:
 3. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。
 4. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份
-   報告的相關 evidence IDs，不帶全文）。
-5. **產出說明**：依 `.opencode/skills/ps-business-explain/SKILL.md` 的規則
+   報告的相關 evidence IDs，不帶全文）。**深度規則命中時（選項含意 / 條件 /
+   使用狀況），ui-flow 報告附的 ps-peoplecode-flow suggestedNext 不是選擇性
+   ——必須執行。**
+5. **產出說明**：先做**子問句覆蓋檢查**——把使用者問題拆成子問句，逐一
+   確認都有對應報告；缺的先補派，補不到的在回答中明說「這部分查不到」。
+   然後依 `.opencode/skills/ps-business-explain/SKILL.md` 的規則
    彙整最終業務說明（畫面文字 vs 儲存值分開、CONFIRMED / INFERRED /
    DYNAMIC_RUNTIME 標註、原生物件僅列 Dependency、附 evidence IDs）。
 
@@ -59,6 +63,19 @@ tools:
 | Application Engine 結構與 Step/Action | @ps-ae-flow |
 | 資料血緣、排程/執行方式、授權路徑 | @ps-metadata-flow |
 | 變更影響盤點 | 依上表拆成多個委派（參考 ps-impact-analysis skill 的工作流） |
+
+### 問題深度規則（選項 / 欄位類必看）
+
+- 只問「有哪些選項 / 清單」→ ps-ui-flow 一跳即可。
+- 問到**含意、什麼條件會變成某值、業務流程、還在不在用**→ 一跳不夠，
+  必須鏈式跑：
+  1. ps-ui-flow：取得 Record.Field 與全部 stored values；
+  2. **必接** ps-peoplecode-flow：委派 prompt 帶上該 Record.Field 與
+     全部 stored values 當搜尋詞，找「誰設值、什麼條件、什麼分支」；
+  3. 報告發現批次寫入（SQR / AE）→ 再派 ps-sqr-flow / ps-ae-flow 追；
+  4. 問「還在不在用」→ 加派 ps-metadata-flow 查值分布與停用狀態
+     （cookbook §2g，三重證據）。
+- 「清單查完就回答」只有在使用者**明確只要清單**時才允許。
 
 ## 現況（哪些 subagent 已可用）
 

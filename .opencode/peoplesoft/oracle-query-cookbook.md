@@ -152,6 +152,32 @@ SELECT RECNAME, FIELDNAME, EDITTABLE
 SELECT COUNT(*) FROM PS_<EDITTABLE>;
 ```
 
+**2g. 選項使用實況（「哪些選項還在用？」）**
+
+```sql
+-- 各值的實際資料分布（只回彙總，不撈明細；實體表名規則見 §6）
+SELECT <FIELDNAME>, COUNT(*) AS CNT
+  FROM PS_<RECNAME>
+ GROUP BY <FIELDNAME>
+ ORDER BY CNT DESC
+FETCH FIRST 50 ROWS ONLY
+```
+
+```sql
+-- 含停用的完整選項清單（判斷廢棄選項時不要過濾 EFF_STATUS）
+SELECT A.FIELDVALUE, A.EFF_STATUS, A.EFFDT, A.XLATLONGNAME
+  FROM PSXLATITEM A
+ WHERE A.FIELDNAME = :fieldName
+   AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM PSXLATITEM B
+                   WHERE B.FIELDNAME = A.FIELDNAME
+                     AND B.FIELDVALUE = A.FIELDVALUE AND B.EFFDT <= SYSDATE)
+FETCH FIRST 100 ROWS ONLY
+```
+
+> 「已經沒用到」的結論需要**三重證據**：XLAT 狀態（INACTIVE？）＋
+> 程式邏輯（ps-peoplecode-flow 以該值搜尋是否命中）＋ 資料分布
+> （上面的 COUNT 是否為 0）。只有部分證據時標 INFERRED。
+
 ---
 
 ## 3. Process / 排程（協定角色：ps_get_process_usage）
