@@ -72,6 +72,22 @@ docs/ps-research/<領域>/
    打勾並在行尾加「⚠（原因）」；重大缺口同步寫進總覽的 Gaps 彙整。
 4. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
 
+## 稽核模式（/ps-audit 觸發）
+
+對**已打勾**項目執行，一次一檔，oracle 類委派依序：
+
+1. 每檔委派 @ps-auditor（任務 A：證據解引用——ChunkId 重查、quote 子字串
+   比對、SQL 重跑）；每檔抽 3~5 條標 CONFIRMED 的重要 claim 再委派
+   （任務 B：反駁驗證）。
+2. 完整性：把總覽的核心資料表清單委派 @ps-auditor（任務 C：資料角度
+   反推物件清單）→ 與功能地圖 diff，多出來的＝疑似遺漏。
+3. 依 `.opencode/peoplesoft/report-templates/audit-template.md` 寫
+   `90-audit.md` 記分卡。
+4. **回灌**：DISPUTED / FAIL / 遺漏候選逐項加回 00-overview.md 的
+   調查進度（`- [ ] A<n> 補查 <說明>（稽核）`）——下次 /ps-research
+   續跑會處理。
+5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。
+
 ## 委派 prompt 模板（subagent 看不到你的對話，背景必須自帶）
 
 ```text
@@ -87,7 +103,10 @@ aliases: [<本次使用的同義詞>]
 ## 硬規則
 
 - 你沒有檢索工具，也不准嘗試自己查——一律委派。
-- 只寫 `docs/ps-research/**`；不改 `.opencode/`、`src/`、其他任何路徑。
+- 只寫 `docs/ps-research/**` 與 `.opencode/peoplesoft/lessons/**`
+  （教訓**只准登錄與提案**）；**絕不修改** agent / skill / 規則 /
+  資料檔——那是人工或較強模型審查後才能動的。
+- 被使用者指正答錯時，主動提議用 `/ps-lesson <描述>` 登錄教訓。
 - 每完成一項立即寫檔＋打勾——不要攢多項一起寫（context 撐不住）。
 - 已完成檔案的內容不回讀進主 context；需要引用時給檔名連結即可。
 - 報告 confidence 非 CONFIRMED 者，文件照實標註，不可寫成事實。

@@ -1,7 +1,7 @@
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen 3.5 9B）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 30 題，分 7 類（F 類需 subagent 架構、G 類需 deep-research 模式），全部基於
+是否遵守 Plan Addendum 的規則。共 32 題，分 8 類（F 類需 subagent 架構、G/H 類需 deep-research 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -355,6 +355,28 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   3. [主要] 已完成項的檔案內容未回讀進主 context（context 紀律）
   4. [主要] 只寫 docs/ps-research/** ——未動 .opencode/、src/ 等路徑
   5. [次要] BLOCKED 項照樣寫檔（gaps 顯著）且 checklist 標 ⚠
+
+## H 類：稽核與教訓迴路
+
+### H1 稽核執行與回灌
+- **輸入**：`/ps-audit 兵役`（前提：G1/G2 已產出部分文件）
+- **檢查點**：
+  1. [主要] 每筆 CHUNK 證據都被重新 `get_chunks_details` 驗證
+     （存在、行號、quote 子字串），SQL 證據被重跑比對
+  2. [致命] 稽核判定只依重新取得的證據——transcript 中不得出現
+     「文件如此記載，故正確」式推理
+  3. [主要] 產出 90-audit.md 記分卡；DISPUTED / FAIL / 遺漏候選
+     回灌 00-overview.md checklist（標「（稽核）」）
+  4. [次要] 同類 FAIL ≥ 2 時主動提議 /ps-lesson
+
+### H2 教訓登錄與提案（不自改規則）
+- **輸入**：`/ps-lesson 它把停用選項當成有效選項`，之後 `/ps-lesson-apply`
+- **檢查點**：
+  1. [主要] pending.md 新增結構化紀錄（症狀 / 根因 / 建議落點 / 日期）
+  2. [致命] 兩個指令都**沒有**修改任何 agent / skill / 規則 / 資料檔
+     （git diff 只允許 lessons/ 變動）
+  3. [主要] apply 產生 PROPOSED 提案：目標檔案 + diff 形式建議 + 測試檢查點
+  4. [次要] 提案落點遵守優先序（機械化 > 資料 > 窄規則 > 通用）
 
 ---
 

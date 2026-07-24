@@ -24,7 +24,11 @@
 │  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
 │  ├─ report-templates/
 │  │  ├─ overview-template.md          Deep research 總覽模板（含調查 checklist）
-│  │  └─ function-detail-template.md   Deep research 單功能細查模板
+│  │  ├─ function-detail-template.md   Deep research 單功能細查模板
+│  │  └─ audit-template.md             稽核報告（90-audit）模板
+│  ├─ lessons/
+│  │  ├─ pending.md                    教訓登錄簿（/ps-lesson 寫入；含格式與落點優先序）
+│  │  └─ applied.md                    已套用教訓的歷史歸檔（不進 context）
 │  ├─ test-scenarios.md                本地模型準確度測試情境（30 題 + 評分規則）
 │  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
 ├─ agent/
@@ -35,9 +39,13 @@
 │  ├─ ps-sql-flow.md                   Subagent：SQL
 │  ├─ ps-sqr-flow.md                   Subagent：SQR / SQC
 │  ├─ ps-ae-flow.md                    Subagent：Application Engine
-│  └─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
+│  ├─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
+│  └─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
 ├─ command/
-│  └─ ps-research.md                   /ps-research <領域> — 文件生成指令（可續跑）
+│  ├─ ps-research.md                   /ps-research <領域> — 文件生成（可續跑）
+│  ├─ ps-audit.md                      /ps-audit <領域> — 稽核 + 回灌 checklist
+│  ├─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓（只登錄）
+│  └─ ps-lesson-apply.md               /ps-lesson-apply — 教訓分類提案（不改規則檔）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -142,6 +150,34 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 - **輸出進 git**：`docs/ps-research/` 納版控，git diff 就是文件審閱介面。
 - **9B 全跑注意**：一次跑到底 context 可能撐不完——沒關係，斷了就重跑
   指令續跑；每項完成即寫檔＋打勾，進度不會遺失。
+
+## 稽核與教訓迴路
+
+**稽核**（`/ps-audit <領域>`）——不信模型說了什麼，驗它引用了什麼：
+
+1. **證據解引用**：每筆 CHUNK 證據以 ChunkId 重查、quote 做子字串比對；
+   SQL 證據重跑比對 keyRows；非 UUID 的 id 直接判捏造。
+2. **反駁抽驗**：每檔抽 3~5 條重要 claim，由乾淨 context 的 ps-auditor
+   以「反駁為目標」重新取證判定 VERIFIED / DISPUTED / UNVERIFIABLE。
+3. **換角度完整性**：從核心資料表反推物件清單，與功能地圖 diff 抓遺漏。
+4. 產 `90-audit.md` 記分卡；**問題回灌 checklist**（標「（稽核）」），
+   下次 `/ps-research` 續跑自動補查——研究→稽核→補查閉環。
+5. 格式層另有確定性 lint：`.\scripts\ps-doc-lint.ps1 -Domain <領域>`
+   （checklist 對帳、必要章節、confidence 標註、UUID 格式）。
+
+**教訓迴路**（跨 session 記取教訓）——模型不會學習，教訓必須外部化：
+
+```text
+被指正 / 稽核發現系統性錯誤
+  → /ps-lesson <描述>        登錄 lessons/pending.md（任何人可登錄）
+  → /ps-lesson-apply         分類 + 產落檔提案（機械化 > 資料 > 窄規則 > 通用）
+  → 人工或較強模型審查提案    才准修改規則檔（push 後交審）
+  → 移入 applied.md + 對應測試檢查點（防回歸）
+```
+
+原則：本地模型**永遠不能直接修改**自己的 agent / skill / 規則檔——
+一條錯誤教訓會變成永久的錯誤規則。能機械化的教訓優先機械化
+（lint / 稽核判定 / tools deny），prose 規則是最後手段。
 
 ## 兵役案例（端到端）
 
