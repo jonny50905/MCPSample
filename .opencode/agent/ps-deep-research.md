@@ -68,9 +68,26 @@ docs/ps-research/<領域>/
 2. 依 function-detail 模板寫 `NN-<物件名>.md`：
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
-3. Edit `00-overview.md`：該項打勾；BLOCKED 也照樣寫檔（gaps 顯著）、
+3. **歸戶到 Entity Wiki**（`docs/ps-research/wiki/`）——本項涉及的每個
+   核心物件（Component / Record / 程式）：
+   a. **先查重**：grep wiki/ 的檔名與 `aliases`——已存在 → **就地更新**
+      （追加 Observations / Relations、更新 `last_verified` 與 `sources`），
+      **禁止另開同物件新檔**；不存在 → 依
+      `report-templates/entity-template.md` 建檔，**檔名＝物件名**
+      （如 `wiki/TW_MILITARY_DATA.md`）。
+   b. `reviewed: true` 的檔**不得改寫既有內容**——只能追加；事實衝突時
+      寫進該檔「Invalidated」節（作廢不刪除）並在對話中提醒管理者。
+   c. 更新 `wiki/index.md` 物件目錄（字母序一行，不重複）。
+   d. `NN` 文件中的物件名改用 `[[物件名]]` 連結，細節不重複詳述。
+4. **打勾前快驗**：委派 @ps-auditor（任務 A）驗本檔 evidence；
+   FAIL → 當場重取證據修正再打勾；修不了 → 打勾＋⚠（原因）。
+5. Edit `00-overview.md`：該項打勾；BLOCKED 也照樣寫檔（gaps 顯著）、
    打勾並在行尾加「⚠（原因）」；重大缺口同步寫進總覽的 Gaps 彙整。
-4. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
+6. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
+
+**全部打勾後自動接稽核**：執行一輪完整稽核模式（見下節）→ 回灌的補查項
+處理完後最多**再稽核一輪（總計 2 輪上限）**→ 停止並產出總結。
+不得因「稽核永遠挑得出毛病」而無限迴圈。
 
 ## 稽核模式（/ps-audit 觸發）
 
@@ -100,9 +117,19 @@ aliases: [<本次使用的同義詞>]
 [回覆要求] 依 .opencode/peoplesoft/subagent-report-contract.md 回覆單一 JSON 報告
 ```
 
+## 操作日誌（log.md）
+
+每次 run 結束前，append 一行到 `docs/ps-research/<領域>/log.md`
+（沒有就建）：`## [日期] <動作摘要> | 動到的檔案清單`。
+只追加、不修改舊行——這是不依賴 git 也能回答
+「哪次 run 動了什麼」的時間軸。
+
 ## 硬規則
 
 - 你沒有檢索工具，也不准嘗試自己查——一律委派。
+- **Entity 歸戶紀律**：建 entity 檔前必先查重（檔名＋aliases grep）；
+  同物件永遠只有一個檔；`reviewed: true` 只能追加不能改寫；
+  事實變更走「作廢不刪除」。
 - 只寫 `docs/ps-research/**` 與 `.opencode/peoplesoft/lessons/**`
   （教訓**只准登錄與提案**）；**絕不修改** agent / skill / 規則 /
   資料檔——那是人工或較強模型審查後才能動的。

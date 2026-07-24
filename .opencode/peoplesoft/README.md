@@ -16,6 +16,7 @@
 .opencode/
 ├─ peoplesoft/
 │  ├─ README.md                        本檔
+│  ├─ SOP.md                           管理者人工作業 SOP（教訓套用/lint/git/回滾…）
 │  ├─ customization-profile.yaml       環境規則與 TW_（Prefix、Registry、searchPolicy）
 │  ├─ business-domain-map.yaml         兵役等全客製業務領域（alias、rootObjectPolicy）
 │  ├─ progressive-source-retrieval.md  PeopleCode/SQL/SQR/SQC 共用檢索規則 + 長文本工具契約
@@ -25,6 +26,7 @@
 │  ├─ report-templates/
 │  │  ├─ overview-template.md          Deep research 總覽模板（含調查 checklist）
 │  │  ├─ function-detail-template.md   Deep research 單功能細查模板
+│  │  ├─ entity-template.md            Entity wiki 物件檔模板（Observations/Relations）
 │  │  └─ audit-template.md             稽核報告（90-audit）模板
 │  ├─ lessons/
 │  │  ├─ pending.md                    教訓登錄簿（/ps-lesson 寫入；含格式與落點優先序）
@@ -147,9 +149,36 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
   系統照著查。
 - **領域未登錄照樣跑**：未命中 domain map 時自展同義詞＋CUSTOM_FIRST，
   完成後總覽附「建議 domain 登錄」YAML 片段，人工決定是否收錄對照表。
-- **輸出進 git**：`docs/ps-research/` 納版控，git diff 就是文件審閱介面。
+- **輸出進「內部」git**：`docs/ps-research/` commit 到內部 repo
+  （**嚴禁外部 remote**，見 SOP-3）；git diff / blame 提供審閱與溯源。
+- **逐項自動快驗**：每檔寫完、打勾前先委派 ps-auditor 驗證據；
+  全部打勾後自動接一輪完整稽核＋回灌（上限 2 輪）。
+- **知識歸戶**：每項深查完成即把核心物件寫入 Entity Wiki（見下節）。
+- **操作日誌**：每次 run 追加 `log.md` 一行（不依賴 git 的時間軸）。
 - **9B 全跑注意**：一次跑到底 context 可能撐不完——沒關係，斷了就重跑
   指令續跑；每項完成即寫檔＋打勾，進度不會遺失。
+
+## Entity Wiki 層（知識歸戶與問答飛輪）
+
+領域敘事文件之上的**跨領域物件層**：`docs/ps-research/wiki/`，
+一個 PeopleSoft 物件一個檔（**檔名＝物件名**），
+格式見 `report-templates/entity-template.md`
+（frontmatter：aliases / status / confidence / last_verified / sources /
+reviewed；內容：Observations ＋ typed Relations `[[wikilink]]`）。
+
+```text
+研究：deep-research 每查完一項 → 物件發現「歸戶」到 wiki
+      （先查重 grep 檔名＋aliases → 就地更新，同物件永遠一個檔）
+問答：orchestrator 先讀 wiki/index.md → 命中 entity 檔直接引用
+      （verified 免重查）→ wiki 沒有才委派現查 → 回答標註來源
+修正：答錯的事實修在 entity 檔（作廢不刪除）→ 之後每次問答都對
+```
+
+設計依據（2026-07 研究結論）：編譯過的互連 wiki 對多跳檢索勝過
+flat RAG 約 6~8 F1；確定性 index-first 檢索是本地小模型的可靠路徑；
+`[[wikilink]]` 是純文字，backlink 用 grep 即可重建——**不需要任何工具**。
+Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
+見 SOP-7；`.obsidian/` 要 gitignore）。
 
 ## 稽核與教訓迴路
 
@@ -171,7 +200,9 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 被指正 / 稽核發現系統性錯誤
   → /ps-lesson <描述>        登錄 lessons/pending.md（任何人可登錄）
   → /ps-lesson-apply         分類 + 產落檔提案（機械化 > 資料 > 窄規則 > 通用）
-  → 人工或較強模型審查提案    才准修改規則檔（push 後交審）
+  → 事實類（docs/ps-research/**）：apply 直接套用（作廢不刪除）
+  → 規則類（.opencode/**）：人工依 SOP-1 審查後套用
+    （可將遮敏後提案貼給較強模型審——機密不出機器）
   → 移入 applied.md + 對應測試檢查點（防回歸）
 ```
 

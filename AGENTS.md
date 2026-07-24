@@ -14,6 +14,8 @@
    `/ps-research <領域>`（ps-deep-research，輸出 docs/ps-research/）。
    在一般 agent 下則載入 `ps-business-discovery` skill 依其流程處理，
    重的檢索用 @ 委派給 ps-* subagent。
+   問答一律**先查 `docs/ps-research/wiki/`**（已歸戶的已驗證知識），
+   wiki 沒有或未驗證才現場檢索。
 2. 搜尋任何 PeopleSoft 物件前，先讀
    `.opencode/peoplesoft/customization-profile.yaml` 與 `business-domain-map.yaml`；
    `TW_` 是強客製訊號但非唯一判斷。**未命中已定義領域時，改用

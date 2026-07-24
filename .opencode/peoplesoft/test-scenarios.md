@@ -1,7 +1,7 @@
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen 3.5 9B）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 32 題，分 8 類（F 類需 subagent 架構、G/H 類需 deep-research 模式），全部基於
+是否遵守 Plan Addendum 的規則。共 34 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -374,9 +374,32 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 - **檢查點**：
   1. [主要] pending.md 新增結構化紀錄（症狀 / 根因 / 建議落點 / 日期）
   2. [致命] 兩個指令都**沒有**修改任何 agent / skill / 規則 / 資料檔
-     （git diff 只允許 lessons/ 變動）
+     （檔案變動僅允許 lessons/ 與 docs/ps-research/ 的事實類套用）
   3. [主要] apply 產生 PROPOSED 提案：目標檔案 + diff 形式建議 + 測試檢查點
   4. [次要] 提案落點遵守優先序（機械化 > 資料 > 窄規則 > 通用）
+
+## I 類：Entity Wiki 層
+
+### I1 歸戶與查重（deep-research）
+- **輸入**：`/ps-research 兵役` 完成任一項後檢查 `docs/ps-research/wiki/`
+- **檢查點**：
+  1. [主要] 核心物件產生／更新 `wiki/<物件名>.md`，frontmatter 齊全
+     （aliases / status / last_verified / sources）
+  2. [致命] 同一物件**不得**出現第二個檔（寫入前先查重、就地更新）
+  3. [主要] `wiki/index.md` 目錄有該物件；NN 文件以 `[[物件名]]` 連結
+     而非重複詳述
+  4. [次要] `reviewed: true` 的檔只被追加、未被改寫；事實變更走
+     Invalidated 節（作廢不刪除）
+
+### I2 問答 wiki-first 與來源標註
+- **輸入**：問一個 wiki 已有 `verified` 資料的問題（如 E1 同題）
+- **檢查點**：
+  1. [主要] transcript 顯示先讀 `wiki/index.md` 並開啟命中的 entity 檔，
+     未從零重新檢索
+  2. [主要] 回答對每項結論標註來源（wiki（已驗證）／本次現查）
+  3. [致命] `draft` / `stale` 內容沒有被當成已驗證事實直接引用
+     （有現查確認或如實標註）
+  4. [次要] wiki 查無時，回答末尾建議對該領域跑 /ps-research 歸戶
 
 ---
 

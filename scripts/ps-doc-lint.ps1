@@ -7,6 +7,7 @@ param(
 
 $dir = Join-Path "docs/ps-research" $Domain
 $violations = @()
+$warnings = @()
 
 if (-not (Test-Path $dir)) {
     Write-Error "目錄不存在：$dir"
@@ -72,7 +73,62 @@ Get-ChildItem $dir -Filter "*.md" |
         }
     }
 
+# 3) Entity Wiki 檢查（wiki/ 為跨領域共用層，存在才檢）
+$wikiDir = "docs/ps-research/wiki"
+if (Test-Path $wikiDir) {
+    $allMd = Get-ChildItem "docs/ps-research" -Recurse -Filter "*.md"
+    $noteNames = @{}
+    $allMd | ForEach-Object {
+        $noteNames[[IO.Path]::GetFileNameWithoutExtension($_.Name)] = $true
+    }
+    $wikiNotes = Get-ChildItem $wikiDir -Filter "*.md" |
+        Where-Object { $_.Name -ne 'index.md' }
+
+    foreach ($n in $wikiNotes) {
+        $t = Get-Content $n.FullName -Raw -Encoding UTF8
+        foreach ($key in @('aliases', 'status', 'last_verified')) {
+            if ($t -notmatch "(?m)^${key}\s*:") {
+                $violations += "wiki/$($n.Name)：frontmatter 缺 $key"
+            }
+        }
+        if ($t -match '(?m)^status\s*:\s*(\S+)') {
+            if ($Matches[1] -notin @('draft', 'verified', 'stale')) {
+                $violations += "wiki/$($n.Name)：status 值非法：$($Matches[1])"
+            }
+        }
+        if ($t -match '(?m)^last_verified\s*:\s*(\d{4}-\d{2}-\d{2})') {
+            $d = [datetime]::ParseExact($Matches[1], 'yyyy-MM-dd', $null)
+            if (((Get-Date) - $d) -gt [timespan]::FromDays(90)) {
+                $warnings += "wiki/$($n.Name)：last_verified 超過 90 天（$($Matches[1])）→ 建議排入複查"
+            }
+        }
+    }
+
+    # 斷鏈與孤兒（[[目標]] 以「檔名（不含副檔名）」解析，跨全部領域）
+    $referenced = @{}
+    foreach ($f in $allMd) {
+        $t = Get-Content $f.FullName -Raw -Encoding UTF8
+        foreach ($m in [regex]::Matches($t, '\[\[([^\]|#]+)')) {
+            $target = $m.Groups[1].Value.Trim()
+            $referenced[$target] = $true
+            if (-not $noteNames.ContainsKey($target)) {
+                $warnings += "$($f.Name)：wikilink 目標不存在：[[${target}]]"
+            }
+        }
+    }
+    foreach ($n in $wikiNotes) {
+        $entity = [IO.Path]::GetFileNameWithoutExtension($n.Name)
+        if (-not $referenced.ContainsKey($entity)) {
+            $warnings += "wiki/$($n.Name)：孤兒 entity（沒有任何 [[${entity}]] 入鏈）"
+        }
+    }
+}
+
 # 輸出
+if ($warnings.Count -gt 0) {
+    Write-Host "WARN：$($warnings.Count) 項警告（不擋通過）" -ForegroundColor Yellow
+    $warnings | ForEach-Object { Write-Host " - $_" }
+}
 if ($violations.Count -eq 0) {
     Write-Host "PASS：$Domain 全部檢查通過" -ForegroundColor Green
     exit 0

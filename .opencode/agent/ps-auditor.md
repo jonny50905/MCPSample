@@ -26,7 +26,11 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 
 ### A. 證據解引用驗證（以檔案為單位）
 
-1. Read 目標 `NN-*.md`，抽出 Evidence 附錄的每一筆。
+適用於 `NN-*.md` 與 **wiki entity 檔**（`docs/ps-research/wiki/*.md`——
+驗 Observations 的 evidence 與 frontmatter `sources` 的 chunk hash 是否仍成立；
+過期 → 回報建議標 `stale`）。
+
+1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：以 ChunkId 呼叫 `get_chunks_details` → 驗證
    chunk 存在、FilePath / 行號一致、文件引用的 quote 是 ChunkText 的
    **子字串**。id 非 UUID 格式 → 直接 `FAIL(FABRICATED)`，不用查。

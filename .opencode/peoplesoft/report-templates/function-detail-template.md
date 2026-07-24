@@ -1,7 +1,17 @@
-# <NN> <功能名>（`<Component / 物件名>`）
+# <NN> <功能名>（[[<Component / 物件名>]]）
 
 > 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE | PARTIAL | BLOCKED
 > Origin：<CUSTOM_PREFIX | …>　搜尋政策：<mode>　Delivered fallback：<未使用 | 使用於…>
+
+<!-- 物件細節寫進 wiki entity 檔（../wiki/<物件名>.md），本文用 [[物件名]]
+     連結、不重複詳述；本文專注「功能流程」的敘事。 -->
+
+## 相關物件
+
+| 物件 | 角色 |
+|---|---|
+| [[TW_XXX]] | 主 Component |
+| [[PS_YYY]] | 寫入目標 |
 
 ## 功能定位
 
