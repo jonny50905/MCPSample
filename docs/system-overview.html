@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeopleSoft 智能分析系統 — 架構與使用指南</title>
+<style>
+  :root{
+    --ink:#1a1d21; --ink2:#5f6b7a; --ink3:#8b95a3;
+    --line:#e3e8ee; --line2:#d3dae3;
+    --accent:#1d4ed8; --accent-bg:#eff4ff; --accent-line:#bfd0f5;
+    --soft:#f6f8fa;
+    --good:#15803d; --good-bg:#ecfdf3;
+    --warn:#b45309; --warn-bg:#fffaeb;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:"Segoe UI","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+    background:#fff;color:var(--ink);line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:1060px;margin:0 auto;padding:56px 32px 80px}
+  /* ---------- header ---------- */
+  .kicker{font-size:12px;letter-spacing:.18em;color:var(--ink3);text-transform:uppercase;margin-bottom:10px}
+  h1{font-size:30px;font-weight:700;letter-spacing:-.01em}
+  .subtitle{font-size:16px;color:var(--ink2);margin-top:8px;max-width:720px}
+  .meta{font-size:12px;color:var(--ink3);margin-top:14px}
+  /* ---------- stat tiles ---------- */
+  .tiles{display:flex;gap:14px;margin:32px 0 0;flex-wrap:wrap}
+  .tile{flex:1;min-width:150px;border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .tile .num{font-size:28px;font-weight:700;letter-spacing:-.02em}
+  .tile .lbl{font-size:12.5px;color:var(--ink2);margin-top:2px}
+  /* ---------- sections ---------- */
+  section{margin-top:64px}
+  .sec-kicker{font-size:11.5px;letter-spacing:.16em;color:var(--accent);font-weight:600;margin-bottom:6px}
+  h2{font-size:21px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
+  .sec-note{font-size:14px;color:var(--ink2);margin-bottom:22px;max-width:760px}
+  /* ---------- value row ---------- */
+  .values{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .value{border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .value b{display:block;font-size:14.5px;margin-bottom:4px}
+  .value span{font-size:13px;color:var(--ink2)}
+  /* ---------- problem→solution flow ---------- */
+  .flow-h{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .flow-h .step{flex:1;min-width:170px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fff}
+  .flow-h .step b{display:block;font-size:14px;margin-bottom:3px}
+  .flow-h .step span{font-size:12.5px;color:var(--ink2)}
+  .flow-h .arr{display:flex;align-items:center;padding:0 10px;color:var(--ink3);font-size:18px}
+  /* ---------- architecture ---------- */
+  .arch{border:1px solid var(--line2);border-radius:12px;padding:22px;position:relative;background:#fff}
+  .arch-secure{position:absolute;top:-11px;right:18px;background:var(--good-bg);color:var(--good);
+    border:1px solid #b7e3c5;border-radius:99px;font-size:12px;font-weight:600;padding:2px 12px}
+  .layer{display:flex;align-items:stretch;gap:12px;margin-bottom:0}
+  .layer-label{width:96px;flex-shrink:0;font-size:11.5px;color:var(--ink3);letter-spacing:.06em;
+    display:flex;align-items:center;justify-content:flex-end;text-align:right;padding-right:4px}
+  .layer-body{flex:1;display:flex;gap:10px;flex-wrap:wrap}
+  .node{border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:#fff;flex:1;min-width:130px}
+  .node b{display:block;font-size:13.5px}
+  .node span{font-size:11.5px;color:var(--ink2)}
+  .node.hl{border-color:var(--accent-line);background:var(--accent-bg)}
+  .node.hl b{color:var(--accent)}
+  .node.dim{background:var(--soft)}
+  .down{display:flex;margin:6px 0}
+  .down .layer-label{visibility:hidden}
+  .down .layer-body{justify-content:center;color:var(--ink3);font-size:15px}
+  .down .cap{font-size:11.5px;color:var(--ink3);border:1px dashed var(--line2);border-radius:99px;padding:1px 12px}
+  /* ---------- scenario cards ---------- */
+  .scenarios{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .sc{border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .sc-head{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .sc-head .tag{font-size:11px;font-weight:700;color:#fff;background:var(--accent);border-radius:6px;padding:2px 8px;flex-shrink:0}
+  .sc-head b{font-size:15px}
+  .sc-body{padding:14px 18px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
+  .sc-step{display:flex;gap:10px;font-size:13px}
+  .sc-step .n{width:20px;height:20px;border-radius:50%;background:var(--soft);border:1px solid var(--line);
+    color:var(--ink2);font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+  .sc-step code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:0 6px;font-size:12px;
+    font-family:Consolas,"Courier New",monospace;white-space:nowrap}
+  .sc-out{margin-top:auto;background:var(--soft);border-radius:8px;padding:9px 12px;font-size:12.5px;color:var(--ink2)}
+  .sc-out b{color:var(--ink);font-size:12.5px}
+  .sc-ex{font-size:12px;color:var(--ink3);font-style:normal}
+  /* ---------- quickstart ---------- */
+  .quick{display:flex;gap:0;align-items:stretch;flex-wrap:wrap}
+  .quick .step{flex:1;min-width:200px;border:1px solid var(--line);border-radius:10px;padding:16px 18px;position:relative}
+  .quick .step .qn{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.1em;margin-bottom:4px}
+  .quick .step b{font-size:14.5px;display:block;margin-bottom:3px}
+  .quick .step span{font-size:12.5px;color:var(--ink2)}
+  .quick .arr{display:flex;align-items:center;padding:0 10px;color:var(--ink3);font-size:18px}
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{font-size:12px;color:var(--ink2);text-align:left;font-weight:600;letter-spacing:.04em;
+    border-bottom:1px solid var(--line2);padding:8px 12px}
+  td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
+  td code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:0 6px;font-size:12px;
+    font-family:Consolas,"Courier New",monospace;white-space:nowrap}
+  .role{font-size:11px;font-weight:600;border-radius:99px;padding:1px 10px;white-space:nowrap}
+  .role.user{background:var(--accent-bg);color:var(--accent)}
+  .role.admin{background:var(--warn-bg);color:var(--warn)}
+  /* ---------- quality gates ---------- */
+  .gates{display:flex;gap:0;align-items:stretch;flex-wrap:wrap}
+  .gate{flex:1;min-width:190px;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .gate .g-ic{font-size:16px}
+  .gate b{display:block;font-size:14px;margin:4px 0 3px}
+  .gate span{font-size:12.5px;color:var(--ink2)}
+  .gates .arr{display:flex;align-items:center;padding:0 8px;color:var(--ink3);font-size:18px}
+  /* ---------- flywheel ---------- */
+  .loop{border:1px solid var(--line);border-radius:12px;padding:18px 22px;background:var(--soft)}
+  .loop-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+  .loop .lnode{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px}
+  .loop .lnode b{font-size:13px}
+  .loop .larr{color:var(--ink3)}
+  .loop-cap{text-align:center;font-size:12.5px;color:var(--ink2);margin-top:10px}
+  /* ---------- footer ---------- */
+  footer{margin-top:72px;border-top:1px solid var(--line);padding-top:18px;font-size:12.5px;color:var(--ink3);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  footer code{font-family:Consolas,monospace;font-size:12px}
+  @media print{
+    .page{padding:24px}
+    section{margin-top:36px;break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= HEADER ================= -->
+  <div class="kicker">內部系統簡報</div>
+  <h1>PeopleSoft 智能分析系統</h1>
+  <p class="subtitle">用中文直接詢問 30 年歷史 ERP 的業務邏輯——AI 在<b>公司內部</b>檢索程式碼與資料庫，
+    給出<b>附程式證據</b>的答案與文件。全程地端運行，機密不出公司。</p>
+  <div class="meta">介面：OpenCode CLI（終端機對話）｜ 模型：地端部署 ｜ 資料源：程式碼索引 ＋ Oracle</div>
+
+  <div class="tiles">
+    <div class="tile"><div class="num">2</div><div class="lbl">工作模式（問答／文件生成）</div></div>
+    <div class="tile"><div class="num">8</div><div class="lbl">分工 AI Agent（含稽核員）</div></div>
+    <div class="tile"><div class="num">3</div><div class="lbl">資料源 MCP（搜尋／原始碼／DB）</div></div>
+    <div class="tile"><div class="num">34</div><div class="lbl">回歸測試情境（品質驗收）</div></div>
+  </div>
+
+  <!-- ================= WHY ================= -->
+  <section>
+    <div class="sec-kicker">WHY ─ 解決什麼問題</div>
+    <h2>把「只存在老同事腦中和百萬行程式裡」的業務邏輯，變成問得到的知識</h2>
+    <div class="flow-h" style="margin-top:18px">
+      <div class="step"><b>過去</b><span>「免役選項背後跑什麼邏輯？」→ 翻程式數天，或找還記得的人</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>現在</b><span>用中文問 AI → 它檢索程式與 DB → 幾分鐘給答案</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>而且可信</b><span>每個結論附「檔案:行號」證據，並經獨立稽核驗證</span></div>
+    </div>
+    <div class="values" style="margin-top:16px">
+      <div class="value"><b>機密不出公司</b><span>地端模型＋內網 MCP，程式碼與資料零外流</span></div>
+      <div class="value"><b>答案附證據</b><span>結論標註出處與可信度，杜絕 AI 憑空編造</span></div>
+      <div class="value"><b>知識會累積</b><span>查過的物件歸戶到知識庫（wiki），越用越快越準</span></div>
+      <div class="value"><b>錯誤會記取</b><span>答錯經指正後進入教訓機制，之後不再犯</span></div>
+    </div>
+  </section>
+
+  <!-- ================= ARCHITECTURE ================= -->
+  <section>
+    <div class="sec-kicker">ARCHITECTURE ─ 系統架構</div>
+    <h2>分層分工：主控不碰資料，專家各查各的，稽核員獨立驗證</h2>
+    <p class="sec-note">主控 AI 的記憶空間很小，所以它只負責「派工與彙整」；真正的檢索由各專家
+      在自己的獨立空間完成，只把<b>結論＋證據</b>交回來。</p>
+
+    <div class="arch">
+      <div class="arch-secure">✓ 全程地端／內網</div>
+
+      <div class="layer">
+        <div class="layer-label">使用者</div>
+        <div class="layer-body">
+          <div class="node" style="flex:2"><b>OpenCode CLI（終端機對話）</b><span>唯一操作介面——打字問問題、下指令</span></div>
+        </div>
+      </div>
+      <div class="down"><div class="layer-label">.</div><div class="layer-body">↓ <span class="cap">Tab 鍵切換模式</span></div></div>
+
+      <div class="layer">
+        <div class="layer-label">模式層</div>
+        <div class="layer-body">
+          <div class="node hl"><b>PS MODE（問答）</b><span>問業務問題，唯讀最安全</span></div>
+          <div class="node hl"><b>Deep Research（文件）</b><span>整個領域產成文件集</span></div>
+          <div class="node dim"><b>build（臨機）</b><span>查資料表等雜項</span></div>
+        </div>
+      </div>
+      <div class="down"><div class="layer-label">.</div><div class="layer-body">↓ <span class="cap">派工（主控不自己查）</span></div></div>
+
+      <div class="layer">
+        <div class="layer-label">專家層</div>
+        <div class="layer-body">
+          <div class="node"><b>UI 專家</b><span>畫面欄位選項</span></div>
+          <div class="node"><b>PeopleCode 專家</b><span>程式邏輯</span></div>
+          <div class="node"><b>SQL／SQR／AE 專家</b><span>批次與資料異動</span></div>
+          <div class="node"><b>Metadata 專家</b><span>血緣排程權限</span></div>
+          <div class="node" style="border-style:dashed"><b>稽核員</b><span>獨立重查證據</span></div>
+        </div>
+      </div>
+      <div class="down"><div class="layer-label">.</div><div class="layer-body">↓ <span class="cap">白名單工具（各拿各的鑰匙）</span></div></div>
+
+      <div class="layer">
+        <div class="layer-label">資料層</div>
+        <div class="layer-body">
+          <div class="node"><b>程式碼搜尋</b><span>Elasticsearch 全文索引</span></div>
+          <div class="node"><b>原始碼取段</b><span>精確段落＝正式證據</span></div>
+          <div class="node"><b>Oracle 查詢</b><span>唯讀 SELECT，逾時保護</span></div>
+        </div>
+      </div>
+      <div class="down"><div class="layer-label">.</div><div class="layer-body">↓</div></div>
+
+      <div class="layer">
+        <div class="layer-label">系統本體</div>
+        <div class="layer-body">
+          <div class="node dim" style="flex:2"><b>PeopleSoft（30 年）</b><span>PeopleCode／SQR／SQC／AE 程式 ＋ Oracle 資料庫</span></div>
+          <div class="node dim"><b>知識庫 Wiki</b><span>研究成果歸戶，問答直接引用</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCENARIOS ================= -->
+  <section>
+    <div class="sec-kicker">HOW ─ 同事使用指南</div>
+    <h2>四種情境，各走各的路</h2>
+    <p class="sec-note">記住一件事就好：<b>問問題用 PS MODE、產文件打指令</b>。其餘都是變化。</p>
+
+    <div class="scenarios">
+      <div class="sc">
+        <div class="sc-head"><span class="tag">情境 A</span><b>我想問一個業務問題</b></div>
+        <div class="sc-body">
+          <div class="sc-step"><span class="n">1</span><span>按 <code>Tab</code> 切到 <code>ps-orchestrator</code>（PS MODE）</span></div>
+          <div class="sc-step"><span class="n">2</span><span>直接用中文問，愈具體愈好</span></div>
+          <div class="sc-step"><span class="n">3</span><span class="sc-ex">例：「兵役狀態有哪些選項？選了免役之後系統會做什麼？」</span></div>
+          <div class="sc-out"><b>得到：</b>業務語言的答案＋每個結論的證據（檔案:行號）與可信度標註</div>
+        </div>
+      </div>
+
+      <div class="sc">
+        <div class="sc-head"><span class="tag">情境 B</span><b>我要某領域的完整文件</b></div>
+        <div class="sc-body">
+          <div class="sc-step"><span class="n">1</span><span>打 <code>/ps-research 轉職</code>（任何領域詞都行）</span></div>
+          <div class="sc-step"><span class="n">2</span><span>它自動盤點功能清單 → 逐一深查 → 寫成文件</span></div>
+          <div class="sc-step"><span class="n">3</span><span>中斷沒關係——<b>重打同一指令會接著跑</b>，不重工</span></div>
+          <div class="sc-out"><b>得到：</b><code>docs/ps-research/轉職/</code> 資料夾——總覽＋逐功能文件＋稽核報告</div>
+        </div>
+      </div>
+
+      <div class="sc">
+        <div class="sc-head"><span class="tag">情境 C</span><b>我要查資料表的內容</b></div>
+        <div class="sc-body">
+          <div class="sc-step"><span class="n">1</span><span>按 <code>Tab</code> 切到 <code>build</code>（一般模式）</span></div>
+          <div class="sc-step"><span class="n">2</span><span>請它查，它會直接連 Oracle</span></div>
+          <div class="sc-step"><span class="n">3</span><span class="sc-ex">例：「查 PS_XXX 裡 EMPLID=123 的資料」</span></div>
+          <div class="sc-out"><b>得到：</b>查詢結果表格。<span style="color:var(--ink3)">（臨機查詢請走這裡，別用 PS MODE）</span></div>
+        </div>
+      </div>
+
+      <div class="sc">
+        <div class="sc-head"><span class="tag">情境 D</span><b>它答錯了</b></div>
+        <div class="sc-body">
+          <div class="sc-step"><span class="n">1</span><span>直接指正——它會<b>重新查證</b>，不會盲目附和</span></div>
+          <div class="sc-step"><span class="n">2</span><span>確認真的錯 → 打 <code>/ps-lesson 一句話描述</code> 登錄教訓</span></div>
+          <div class="sc-step"><span class="n">3</span><span>管理者批准後，全系統之後不再犯同類錯</span></div>
+          <div class="sc-out"><b>得到：</b>當下的更正答案＋長期的系統改善（跨 session 記取教訓）</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= QUICKSTART ================= -->
+  <section>
+    <div class="sec-kicker">QUICK START ─ 新手 3 步上路</div>
+    <h2>從沒用過 OpenCode？三步就能開始</h2>
+    <div class="quick" style="margin-top:16px">
+      <div class="step"><div class="qn">STEP 1</div><b>開啟 OpenCode</b><span>在專案目錄開終端機，輸入 <code style="background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:0 6px;font-family:Consolas,monospace;font-size:12px">opencode</code></span></div>
+      <div class="arr">→</div>
+      <div class="step"><div class="qn">STEP 2</div><b>按 Tab 選模式</b><span>看到 <b>ps-orchestrator</b> 就是問答模式（PS MODE）</span></div>
+      <div class="arr">→</div>
+      <div class="step"><div class="qn">STEP 3</div><b>用中文開始問</b><span>它會自己分派專家去查，回來給你附證據的答案</span></div>
+    </div>
+
+    <h2 style="margin-top:40px;font-size:17px">指令速查表</h2>
+    <table style="margin-top:12px">
+      <thead><tr><th style="width:220px">指令</th><th>用途</th><th style="width:110px">誰會用到</th></tr></thead>
+      <tbody>
+        <tr><td><code>Tab</code> → PS MODE</td><td>問業務問題（最常用，打字就好，不用指令）</td><td><span class="role user">所有人</span></td></tr>
+        <tr><td><code>/ps-research 領域</code></td><td>產出領域完整文件；中斷後重打即續跑</td><td><span class="role user">所有人</span></td></tr>
+        <tr><td><code>/ps-audit 領域</code></td><td>稽核已產出文件：重查證據、抓遺漏、產記分卡</td><td><span class="role user">所有人</span></td></tr>
+        <tr><td><code>/ps-lesson 描述</code></td><td>登錄一條「它答錯了」的教訓（只登錄，不改規則）</td><td><span class="role user">所有人</span></td></tr>
+        <tr><td><code>/ps-lesson-apply</code></td><td>把累積的教訓分類、產生修改提案</td><td><span class="role admin">管理者</span></td></tr>
+        <tr><td><code>ps-doc-lint.ps1</code></td><td>文件格式健檢腳本（終端機執行）</td><td><span class="role admin">管理者</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ================= QUALITY ================= -->
+  <section>
+    <div class="sec-kicker">TRUST ─ 為什麼能信</div>
+    <h2>四道品質關卡，專治 AI「一本正經地胡說」</h2>
+    <div class="gates" style="margin-top:16px">
+      <div class="gate"><div class="g-ic">🔗</div><b>1. 證據紀律</b><span>每個結論必附「檔案:行號＋證據編號」；格式不對＝視同捏造，機械判定</span></div>
+      <div class="arr">→</div>
+      <div class="gate"><div class="g-ic">🔍</div><b>2. 獨立稽核</b><span>稽核員 AI 不看推理過程，自己重新取證，專門找碴反駁</span></div>
+      <div class="arr">→</div>
+      <div class="gate"><div class="g-ic">📋</div><b>3. 教訓機制</b><span>答錯→登錄→提案→<b>人工批准</b>才改規則；AI 不能自改自己的憲法</span></div>
+      <div class="arr">→</div>
+      <div class="gate"><div class="g-ic">✅</div><b>4. 回歸測試</b><span>34 個測試情境守住歷史教訓，改版必跑，不走回頭路</span></div>
+    </div>
+
+    <div class="loop" style="margin-top:26px">
+      <div class="loop-row">
+        <div class="lnode"><b>研究</b>（產文件）</div><span class="larr">→</span>
+        <div class="lnode"><b>歸戶</b>（進知識庫）</div><span class="larr">→</span>
+        <div class="lnode"><b>問答</b>（先查庫，更快更準）</div><span class="larr">→</span>
+        <div class="lnode"><b>指正</b>（發現錯）</div><span class="larr">→</span>
+        <div class="lnode"><b>修正</b>（庫被更新）</div><span class="larr">↺</span>
+      </div>
+      <div class="loop-cap">知識飛輪：同一個問題，第二次起直接命中已驗證的知識庫——查得愈多，系統愈聰明</div>
+    </div>
+  </section>
+
+  <!-- ================= ROLES & SAFETY ================= -->
+  <section>
+    <div class="sec-kicker">GOVERNANCE ─ 權責與安全</div>
+    <h2>一般同事只要會對話；管理動作全部有 SOP</h2>
+    <table style="margin-top:14px">
+      <thead><tr><th style="width:140px">角色</th><th>做什麼</th><th>依據</th></tr></thead>
+      <tbody>
+        <tr><td><span class="role user">一般使用者</span></td><td>對話問答、產文件、跑稽核、登錄教訓——全部在 OpenCode 內完成</td><td>本頁情境 A–D</td></tr>
+        <tr><td><span class="role admin">管理者</span></td><td>批准教訓套用、lint 健檢、內部 git 版控、回滾、人工修正標記</td><td><code>SOP.md</code>（8 份核取清單）</td></tr>
+      </tbody>
+    </table>
+    <div class="values" style="margin-top:16px">
+      <div class="value"><b>唯讀為預設</b><span>問答模式零寫入權限；資料庫僅允許 SELECT，附列數上限與逾時保護</span></div>
+      <div class="value"><b>權限白名單</b><span>每個 AI 專家只拿得到自己需要的工具，越權在物理上不可能</span></div>
+      <div class="value"><b>版控與回滾</b><span>產出進「內部」git（嚴禁外部遠端），任何損壞可回滾</span></div>
+      <div class="value"><b>人在關鍵環節</b><span>規則變更、檔名變更、教訓生效——一律人工批准</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <div>詳細文件：<code>.opencode/peoplesoft/README.md</code>（架構）｜<code>SOP.md</code>（管理程序）｜<code>test-scenarios.md</code>（驗收）</div>
+    <div>PeopleSoft 智能分析系統 · 內部文件</div>
+  </footer>
+
+</div>
+</body>
+</html>
