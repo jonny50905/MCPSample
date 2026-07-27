@@ -80,6 +80,23 @@ Get-ChildItem $dir -Filter "*.md" |
         }
     }
 
+# 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋）
+$auditPath = Join-Path $dir "90-audit.md"
+if (Test-Path $auditPath) {
+    $auditText = Get-Content $auditPath -Raw -Encoding UTF8
+    $auditSections = @('## 總覽記分卡', '## FAIL / DISPUTED 明細',
+        '## 完整性（換角度 diff）', '## 已回灌 checklist 的行動項',
+        '## 系統性錯誤觀察')
+    foreach ($sec in $auditSections) {
+        if ($auditText -notmatch [regex]::Escape($sec)) {
+            $warnings += "90-audit.md：缺模板章節「$sec」（報告偏離模板，對帳會失準）"
+        }
+    }
+    if ($auditText -match '(?i)partial[_ ]pass') {
+        $warnings += "90-audit.md：出現契約外狀態 partial_pass（合法詞彙：PASS/FAIL/UNVERIFIABLE/VERIFIED/DISPUTED）"
+    }
+}
+
 # 3) Entity Wiki 檢查（wiki/ 為跨領域共用層，存在才檢）
 $wikiDir = "docs/ps-research/wiki"
 if (Test-Path $wikiDir) {
