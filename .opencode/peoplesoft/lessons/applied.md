@@ -62,3 +62,8 @@
   順序約束註記；H1 改致命檢查點＋狀態詞彙檢查。
 - 套用：本 commit（ps-deep-research／ps-audit 命令／audit-template／
   test-scenarios H1）。
+- 後續確認（2026-07-27）：舊版 90-audit 的「已回灌」節其實列好了
+  5 個 A 項——模型**在報告裡聲稱已回灌，實際檔案一行未寫**
+  （填表代替做事：模板有該節，就把它當一般章節填完）。遷移時已把
+  這 5 項搬進 checklist.md。新順序（checklist 先寫、報告節只准抄錄
+  實際行）＋結束前 read 自檢即針對此機制。
