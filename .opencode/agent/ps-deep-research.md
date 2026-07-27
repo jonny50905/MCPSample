@@ -94,9 +94,14 @@ docs/ps-research/<領域>/
    checklist.md 的 Gaps 彙整。**00-overview.md 不改。**
 6. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
 
-**全部打勾後自動接稽核**：執行一輪完整稽核模式（見下節）→ 回灌的補查項
-處理完後最多**再稽核一輪（總計 2 輪上限）**→ 停止並產出總結。
-不得因「稽核永遠挑得出毛病」而無限迴圈。
+**全部打勾後自動接稽核（每次 run 最多一輪）**：
+- 觸發條件：本 run 打勾的項目**含稽核回灌項（A<n>）**，或 checklist
+  全勾且本 run 尚未稽核 → **必須**執行一輪稽核模式（見下節）再結束。
+  **「90-audit.md 已存在」不是跳過的理由**——那是上一輪的舊報告，
+  本輪必須重驗重寫。
+- 稽核產生的新回灌項**留給下一次 /ps-research run 處理**（本 run 不
+  接著查），結束總結時提醒使用者再跑一次。單次 run 稽核不超過一輪，
+  天然不會無限迴圈。
 
 ## 稽核模式（/ps-audit 觸發）
 
@@ -107,14 +112,17 @@ docs/ps-research/<領域>/
    （任務 B：反駁驗證）。
 2. 完整性：把總覽的核心資料表清單委派 @ps-auditor（任務 C：資料角度
    反推物件清單）→ 與功能地圖 diff，多出來的＝疑似遺漏。
-3. **先回灌**：**任何非 PASS 的判定**（FAIL／DISPUTED／UNVERIFIABLE
-   ／其他自創狀態一律算）與遺漏候選，逐項加進 `checklist.md` 的
-   調查進度（`- [ ] A<n> 補查 <說明>（稽核）`）——下次 /ps-research
-   續跑會處理。
+3. **先回灌＋輪次遞增**：read `checklist.md` 的「稽核輪次：N」行
+   （沒有該行視為 N=0）。**任何非 PASS 的判定**（FAIL／DISPUTED／
+   UNVERIFIABLE／其他自創狀態一律算）與遺漏候選，逐項加進
+   `checklist.md` 的調查進度（`- [ ] A<n> 補查 <說明>（稽核）`），
+   並把輪次行更新為「稽核輪次：N+1」——補查項下次 /ps-research 處理。
 4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`
-   寫 `90-audit.md`；「已回灌 checklist 的行動項」節**逐行抄錄**步驟 3
-   實際加進 checklist.md 的行。**順序不可顛倒**：非 PASS 判定 ≥ 1 而
-   checklist.md 還沒有新 A 行時，禁止寫 90-audit.md。
+   **整檔重寫** `90-audit.md`：表頭寫「稽核輪次：N+1」與本日日期；
+   **所有判定只准來自本輪 auditor 回報——禁止 read 舊 90-audit.md、
+   禁止沿用其數字或內容**；「已回灌 checklist 的行動項」節**逐行抄錄**
+   步驟 3 實際加進 checklist.md 的行。**順序不可顛倒**：非 PASS 判定
+   ≥ 1 而 checklist.md 還沒有新 A 行時，禁止寫 90-audit.md。
 5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。
 6. 結束前最後一個動作：read `checklist.md` 確認回灌行都在——缺就
    立刻補上再結束。

@@ -95,6 +95,9 @@ if (Test-Path $auditPath) {
     if ($auditText -match '(?i)partial[_ ]pass') {
         $warnings += "90-audit.md：出現契約外狀態 partial_pass（合法詞彙：PASS/FAIL/UNVERIFIABLE/VERIFIED/DISPUTED）"
     }
+    if ($auditText -notmatch '稽核輪次') {
+        $warnings += "90-audit.md：表頭缺「稽核輪次」（無法判斷是否為最新一輪重驗）"
+    }
 }
 
 # 3) Entity Wiki 檢查（wiki/ 為跨領域共用層，存在才檢）

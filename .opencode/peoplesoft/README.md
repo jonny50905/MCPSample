@@ -152,7 +152,8 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 - **輸出進「內部」git**：`docs/ps-research/` commit 到內部 repo
   （**嚴禁外部 remote**，見 SOP-3）；git diff / blame 提供審閱與溯源。
 - **逐項自動快驗**：每檔寫完、打勾前先委派 ps-auditor 驗證據；
-  全部打勾後自動接一輪完整稽核＋回灌（上限 2 輪）。
+  全部打勾後自動接一輪完整稽核＋回灌（單次 run 最多一輪；
+  稽核新回灌項由下一次 run 處理，輪次記錄於 checklist.md）。
 - **知識歸戶**：每項深查完成即把核心物件寫入 Entity Wiki（見下節）。
 - **操作日誌**：每次 run 追加 `log.md` 一行（不依賴 git 的時間軸）。
 - **9B 全跑注意**：一次跑到底 context 可能撐不完——沒關係，斷了就重跑

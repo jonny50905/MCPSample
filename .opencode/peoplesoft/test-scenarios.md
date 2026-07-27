@@ -397,6 +397,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   5. [次要] 判定狀態只用契約詞彙（PASS／FAIL／UNVERIFIABLE／
      VERIFIED／DISPUTED），不自創（如 partial_pass）
   6. [次要] 同類 FAIL ≥ 2 時主動提議 /ps-lesson
+  7. [致命] 90-audit.md 表頭「稽核輪次」較上一輪 +1、日期為本輪——
+     輪次未變＝報告未重驗（抄舊帳）；checklist.md 輪次行同步更新
 
 ### H2 教訓登錄即生效（本機套用、PR 把關）
 - **輸入**：`/ps-lesson 它把停用選項當成有效選項`
