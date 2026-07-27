@@ -3,7 +3,13 @@ description: 稽核 deep-research 文件（證據解引用、claim 反駁抽驗�
 agent: ps-deep-research
 ---
 對 `docs/ps-research/$ARGUMENTS/` 執行稽核模式（見你 system prompt 的
-「稽核模式」章節）：
+「稽核模式」章節）。
+
+**禁止複述計畫——第一個回應必須是工具呼叫：先 read
+`docs/ps-research/$ARGUMENTS/00-overview.md` 取得已完成項清單，
+然後立刻委派第一個稽核任務。**
+
+流程提要：
 
 1. 逐一已完成檔案委派 ps-auditor 做證據解引用驗證（任務 A）；
    每檔抽 3~5 條標 CONFIRMED 的重要 claim 做反駁驗證（任務 B）。

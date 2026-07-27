@@ -6,6 +6,10 @@ agent: ps-deep-research
 
 $ARGUMENTS
 
+**禁止複述計畫——第一個回應必須是工具呼叫：先 read
+`.opencode/peoplesoft/lessons/applied.md` 取得下一個流水號，
+然後立刻進行分類與套用。**
+
 步驟：
 1. 依 lessons 檔頭格式整理（症狀／根因／落點；從對話還原得到的就填，
    不確定的寫「待補」，**不要編造**）。
