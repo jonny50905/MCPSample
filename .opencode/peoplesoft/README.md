@@ -63,7 +63,8 @@
 ```
 
 各 Skill 只描述該分析領域的決策與輸出；環境規則、共用檢索協定、工具契約
-獨立維護，避免單一 SKILL.md 過大（目標模型 Qwen 3.5 9B）。
+獨立維護，避免單一 SKILL.md 過大（目標模型 Qwen3.6-35B-A3B——
+MoE，每 token 活躍參數約 3B，**程序紀律屬小模型等級**）。
 
 ## 整合流程
 
@@ -79,10 +80,11 @@
   ↓ ps-business-explain：產出業務說明
 ```
 
-## Subagent 架構（地端小 context 模型）
+## Subagent 架構（地端模型）
 
-針對 context 較小的地端模型（如 Qwen 3.5 9B），提供 OpenCode agent 部署
-（`.opencode/agent/`，OpenCode 1.x）：
+針對地端模型（Qwen3.6-35B-A3B，262K：MoE active ~3B——程序紀律屬
+小模型等級；名目 context 大，但長 context 中段品質與 KV cache 成本
+仍受限），提供 OpenCode agent 部署（`.opencode/agent/`，OpenCode 1.x）：
 
 ```text
 ps-orchestrator（primary，TUI 中 Tab 切換選用）
@@ -125,8 +127,9 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 - 若 orchestrator 的 task 委派在你的版本不可用，改用 @ 提及手動委派，
   流程與委派 prompt 模板相同。
 - Trade-off：subagent 每次啟動需重載 system prompt，總 token 較高、延遲較長；
-  換取主 context 峰值小、各階段 context 乾淨——對小 context 地端模型
-  幾乎必然划算。
+  換取主 context 峰值小、各階段 context 乾淨——對地端模型幾乎必然
+  划算（主 context 乾淨的價值不因名目 262K 而消失：中段記憶劣化與
+  KV cache 成本仍在）。
 
 ## Deep Research 文件生成模式
 
@@ -156,8 +159,8 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
   稽核新回灌項由下一次 run 處理，輪次記錄於 checklist.md）。
 - **知識歸戶**：每項深查完成即把核心物件寫入 Entity Wiki（見下節）。
 - **操作日誌**：每次 run 追加 `log.md` 一行（不依賴 git 的時間軸）。
-- **9B 全跑注意**：一次跑到底 context 可能撐不完——沒關係，斷了就重跑
-  指令續跑；每項完成即寫檔＋打勾，進度不會遺失。
+- **全跑注意**：一次跑到底可能中斷（serving 端 context 上限、當機）
+  ——沒關係，斷了就重跑指令續跑；每項完成即寫檔＋打勾，進度不會遺失。
 
 ## Entity Wiki 層（知識歸戶與問答飛輪）
 
@@ -176,7 +179,7 @@ reviewed；內容：Observations ＋ typed Relations `[[wikilink]]`）。
 ```
 
 設計依據（2026-07 研究結論）：編譯過的互連 wiki 對多跳檢索勝過
-flat RAG 約 6~8 F1；確定性 index-first 檢索是本地小模型的可靠路徑；
+flat RAG 約 6~8 F1；確定性 index-first 檢索是地端模型的可靠路徑；
 `[[wikilink]]` 是純文字，backlink 用 grep 即可重建——**不需要任何工具**。
 Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
 見 SOP-7；`.obsidian/` 要 gitignore）。

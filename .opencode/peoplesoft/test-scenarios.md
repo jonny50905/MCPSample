@@ -1,6 +1,7 @@
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
-用來測試本地模型（目標：Qwen 3.5 9B）掛上 `.opencode/` 的 ps-* Skill 後，
+用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
+程序紀律屬小模型等級）掛上 `.opencode/` 的 ps-* Skill 後，
 是否遵守 Plan Addendum 的規則。共 36 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
