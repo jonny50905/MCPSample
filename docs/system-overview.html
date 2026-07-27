@@ -290,6 +290,18 @@
     </table>
   </section>
 
+  <!-- ================= OPERATIONS ================= -->
+  <section>
+    <div class="sec-kicker">OPERATIONS ─ 使用守則</div>
+    <h2>四條好習慣，避開絕大多數的問題</h2>
+    <div class="values" style="margin-top:16px">
+      <div class="value"><b>中斷不怕，重打即續</b><span>進度存在「檔案」不在對話——關掉、當機、跑一半都沒關係，開新視窗重打 /ps-research 會從上次未完成處接著跑，不重工</span></div>
+      <div class="value"><b>續跑開新視窗，不叫回舊對話</b><span>舊對話帶著失敗歷史會誤導模型。原則：檔案即狀態、對話即拋棄式</span></div>
+      <div class="value"><b>卡住就喊停</b><span>出現「continue after repeat failures」提示時選「拒絕」，然後跟它說：「這項標 BLOCKED，繼續下一項」</span></div>
+      <div class="value"><b>更新後要重啟</b><span>git pull 拿到新版規則後，重啟 OpenCode 才會載入生效</span></div>
+    </div>
+  </section>
+
   <!-- ================= QUALITY ================= -->
   <section>
     <div class="sec-kicker">TRUST ─ 為什麼能信</div>
@@ -314,6 +326,26 @@
       </div>
       <div class="loop-cap">知識飛輪：同一個問題，第二次起直接命中已驗證的知識庫——查得愈多，系統愈聰明</div>
     </div>
+  </section>
+
+  <!-- ================= FEEDBACK ================= -->
+  <section>
+    <div class="sec-kicker">FEEDBACK ─ 答錯了怎麼辦</div>
+    <h2>糾錯流程：本機立即修正，PR 審核把關團隊生效</h2>
+    <p class="sec-note">發現答案有誤時不用客氣——指正是讓系統變聰明的正式管道，而且有雙重安全設計：
+      AI 不盲從你的說法、規則變更必經人審。</p>
+    <div class="flow-h" style="margin-top:14px">
+      <div class="step"><b>1. 直接指正</b><span>AI 會<b>重新查證</b>而非附和——你說的內容也會被驗證</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>2. 確認真錯 → /ps-lesson</b><span>一句話描述錯誤；AI 自動分類落點並<b>本機立即修正</b>（規則只加不刪、事實留作廢紀錄）</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>3. 內部 git PR</b><span>修改以 PR 送審，管理者看 diff 把關；不合格退回 revert</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>4. merge → 全員 pull</b><span>其他同事 pull＋重啟後，<b>整個團隊</b>不再犯同類錯</span></div>
+    </div>
+    <p class="sec-note" style="margin-top:14px;margin-bottom:0">
+      註：若重新查證後發現其實沒有錯，AI 會拿證據向你說明——它被規定不能為了迎合使用者而改口。
+      每筆教訓都記錄在 applied.md，可追溯、可回滾。</p>
   </section>
 
   <!-- ================= ROLES & SAFETY ================= -->
