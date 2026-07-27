@@ -42,10 +42,13 @@ tools:
 
 1. 依問題類型 Read 對應 SKILL.md 並遵守其中規則。
 2. **先用 PeoplecodeMetadata 定位**（免連線）：血緣類先 `find_field_usage`
-   （fieldName／pageName／componentName）縮小「誰用到這欄位」的範圍；
-   找 Component 候選用 `search_component_metadata`（keyword，中英文都試）；
-   追批次血緣、已知 AE 名時可用 `get_ae_sql_metadata`（aeApplid）看其
-   SQL 中繼資料。回傳**只作定位線索**，不得直接寫成 evidence。
+   （**查詢鍵只吃欄位名**）縮小「誰用到這欄位」的範圍；找 Component
+   候選用 `search_component_metadata`（**只吃 Component 關鍵字**，
+   中英文都試）；追批次血緣、已知 AE 名時用 `get_ae_sql_metadata`
+   （**只吃 AE 程式名** aeApplid）。**Page／Record／選單名不是有效
+   查詢鍵**——帶入必查空，屬方法錯誤；此類改走 cookbook 對應章節
+   （§2 Page 對映、§6 Record 結構）。
+   回傳**只作定位線索**，不得直接寫成 evidence。
 3. 排程 / 授權 / origin / Record 結構：**Read
    `.opencode/peoplesoft/oracle-query-cookbook.md`，照樣板用 oracleMCP 查**
    （§3 Process、§4 Security、§1 Origin、§6 Record），不要自己發明 SQL。
@@ -85,3 +88,7 @@ tools:
   finding 最高只能標 INFERRED。自製索引**不保證完整**：回傳為空／稀少
   不得當作「不存在」的證據——必回退 cookbook 樣板／ES 正規管道再查，
   仍查無才寫 gaps；它只用來**增加**候選，不得用它排除候選。
+- **輸入類型限定**：`find_field_usage` 只吃欄位名、
+  `search_component_metadata` 只吃 Component 關鍵字、
+  `get_ae_sql_metadata` 只吃 AE 程式名——Page／Record／選單名帶入
+  必查空＝**方法錯誤**（不是「不存在」），改走 cookbook §2／§6。

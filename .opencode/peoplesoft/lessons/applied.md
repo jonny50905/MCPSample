@@ -37,6 +37,12 @@
 - 追記（2026-07-27）：server 第三個 tool `get_ae_sql_metadata`
   （aeApplid）→ 開放 ps-ae-flow（AE 結構定位優先）與 ps-metadata-flow
   （批次血緣鑽查）；同樣定位不作證、空結果必回退。
+- 修正（2026-07-27）：管理者澄清**查詢鍵只有「欄位名」與「Component
+  關鍵字」**（AE tool 只吃 AE 名）——Page／Record／選單名帶入必查空。
+  原文件誤把 pageName／componentName 列為 find_field_usage 可查參數，
+  已全數改正；ui／metadata-flow 與 auditor 加「輸入類型限定」硬規則
+  （帶錯類型＝方法錯誤，不是「不存在」，改走 cookbook §2／§6 對映），
+  F5 加對應檢查點。
 
 ### L2 write 工具呼叫 JSON 被截斷——大檔整檔覆寫超出小模型可靠輸出長度（2026-07-27）
 - 症狀：持續出現 invalid[tool=write, error=... JSON Parse error

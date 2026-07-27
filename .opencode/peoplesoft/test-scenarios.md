@@ -352,6 +352,9 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      PeoplecodeMetadata（deny 維持）
   5. [主要] PeoplecodeMetadata 回傳為空／稀少時回退 oracleMCP／ES 續查，
      未把空結果寫成「不存在／沒有畫面使用」的結論
+  6. [主要] 未把 Page／Record 名帶入 find_field_usage／
+     search_component_metadata（輸入類型限定：只吃欄位名／Component
+     關鍵字）——Page 類問題先走 cookbook §2 對映換出欄位名
 
 ## G 類：Deep Research（文件生成模式）
 

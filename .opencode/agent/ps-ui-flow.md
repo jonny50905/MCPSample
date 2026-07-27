@@ -38,10 +38,16 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 1. Read `.opencode/skills/ps-ui-flow/SKILL.md`，遵守其中全部規則
    （UI 文字第一級語意、choice 類型、高基數不全量、DYNAMIC_RUNTIME 標記）。
 2. **先用 PeoplecodeMetadata 定位**（免連線，優先於開 oracleMCP）：
-   - `find_field_usage`（參數 fieldName／pageName／componentName，依實際
-     schema 填）：欄位出現在哪些 Page／Component、被誰使用——先縮小目標。
-   - `search_component_metadata`（keyword）：以領域關鍵字找候選 Component；
-     中英文關鍵字都試（如 batch、eAssignment）。
+   - `find_field_usage`：**查詢鍵只吃「欄位名（FIELDNAME）」**——查該
+     欄位出現在哪些 Page／Component、被誰使用，先縮小目標。
+   - `search_component_metadata`（keyword）：**只吃 Component 相關
+     關鍵字**；以領域關鍵字找候選 Component，中英文都試
+     （如 batch、eAssignment）。
+   - **輸入類型限定**：Page 名、Record 名、選單名**不是**這兩個工具的
+     有效查詢鍵——帶進去必查空，那是**方法錯誤，不是「不存在」**。
+     問題給的是 Page 名 → 直接走 cookbook §2 的 Page ↔ Component ↔
+     Record.Field 對映（oracleMCP）換出欄位名，需要時再回頭用
+     `find_field_usage`。
    回傳**只作定位線索**，不得直接寫成 evidence。
 3. **Read `.opencode/peoplesoft/oracle-query-cookbook.md`**，用 oracleMCP
    照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
@@ -55,8 +61,9 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **可用（oracleMCP + cookbook §2）**：translate values 與其中文、欄位 label、
   選項文字 / label 反查欄位、Page ↔ Component ↔ Record.Field 對映、
   prompt record 與基數。
-- **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查、
-  `search_component_metadata` Component 關鍵字搜尋。
+- **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查
+  （只吃欄位名）、`search_component_metadata` Component 關鍵字搜尋
+  （只吃 Component 關鍵字）——Page／Record 名帶入必查空。
 - **尚缺（UI Semantic Index 未建）**：跨全部 UI 文字的語意（非精確）搜尋、
   Page Field 覆寫 label 的最終文字解析、Grid/Tab/GroupBox 專屬 label。
   查不到時記入 `gaps`，**不得**改用猜測或從物件命名腦補畫面文字。
@@ -76,6 +83,10 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
   finding 最高只能標 INFERRED。自製索引**不保證完整**：回傳為空／稀少
   不得當作「不存在」的證據——必回退 cookbook §2 正規管道再查，仍查無
   才寫 gaps；它只用來**增加**候選，不得用它排除候選。
+- **輸入類型限定**：`find_field_usage` 只吃欄位名、
+  `search_component_metadata` 只吃 Component 關鍵字——Page／Record／
+  選單名帶入必查空＝**方法錯誤**（不是「不存在」），此類問題改走
+  cookbook §2 對映。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。
