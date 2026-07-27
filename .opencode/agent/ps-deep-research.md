@@ -131,7 +131,9 @@ docs/ps-research/<領域>/
    禁止沿用其數字或內容**；判定詞彙只准契約五詞（證據層 PASS／FAIL／
    UNVERIFIABLE；claim 層 VERIFIED／DISPUTED／UNVERIFIABLE），auditor
    回報出現其他字（weakened、contradicted、partial 等）→ **就近映射**
-   （claim 層歸 DISPUTED、證據層歸 FAIL）後記錄；「已回灌 checklist
+   （claim 層歸 DISPUTED、證據層歸 FAIL）後記錄；**明細表三種非過
+   判定每筆一列——UNVERIFIABLE 也要列，原因欄逐字取自 auditor 回報**
+   （只在記分卡出現數字、明細查無其列＝報告不完整）；「已回灌 checklist
    的行動項」節**逐行抄錄**步驟 3 實際加進 checklist.md 的行。**順序不可顛倒**：非 PASS 判定
    ≥ 1 而 checklist.md 還沒有新 A 行時，禁止寫 90-audit.md。
 5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。

@@ -13,11 +13,16 @@
 
 燈號：🟢 無 FAIL / DISPUTED；🟡 僅 UNVERIFIABLE；🔴 有 FAIL 或 DISPUTED
 
-## FAIL / DISPUTED 明細
+## FAIL / DISPUTED / UNVERIFIABLE 明細
+
+<!-- 三種非過判定**每一筆都要有一列**，UNVERIFIABLE 不得只出現在
+     記分卡數字——原因欄逐字取自 auditor 回報（逾時／連線失敗／
+     chunk 查無／工具不可用…），這是判斷環境問題 vs 資料問題的依據。 -->
 
 | 檔案 | 類型 | 內容 | 原因 | 處置 |
 |---|---|---|---|---|
 | 01-… | 證據 FAIL | ChunkId … | quote 非 ChunkText 子字串 | 回灌補查 |
+| 02-… | 證據 UNVERIFIABLE | SQL … | oracleMCP 逾時（~30s） | 回灌重驗 |
 
 ## 完整性（換角度 diff）
 

@@ -402,6 +402,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   6. [次要] 同類 FAIL ≥ 2 時主動提議 /ps-lesson
   7. [致命] 90-audit.md 表頭「稽核輪次」較上一輪 +1、日期為本輪——
      輪次未變＝報告未重驗（抄舊帳）；checklist.md 輪次行同步更新
+  8. [次要] UNVERIFIABLE 每筆都在明細表有列、原因欄非空（逐字取自
+     auditor 回報）——只有記分卡數字、無明細＝報告不完整
 
 ### H2 教訓登錄即生效（本機套用、PR 把關）
 - **輸入**：`/ps-lesson 它把停用選項當成有效選項`
