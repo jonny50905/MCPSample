@@ -26,10 +26,13 @@
 ## 已回灌 checklist 的行動項
 
 <!-- 順序約束：這些行必須「先」實際寫進 checklist.md，再抄錄到本節。
-     任何非 PASS 判定（FAIL／DISPUTED／UNVERIFIABLE／其他）≥ 1 而
-     checklist.md 沒有對應 A<n> 行＝流程錯誤，不得產出本報告。 -->
+     任何非 PASS／VERIFIED 判定 ≥ 1 而 checklist.md 沒有對應 A<n> 行
+     ＝流程錯誤，不得產出本報告。回灌以「檔」為單位彙整（一檔一行），
+     禁止逐筆開項。判定詞彙限契約五詞：PASS/FAIL/UNVERIFIABLE（證據）、
+     VERIFIED/DISPUTED/UNVERIFIABLE（claim）；auditor 自創詞就近映射
+     （claim→DISPUTED、證據→FAIL）。 -->
 
-- [ ] A1 <補查說明>（稽核）
+- [ ] A1 補查 01-<物件名>.md：FAIL 2／DISPUTED 3／UNVERIFIABLE 1（稽核）
 
 ## 系統性錯誤觀察（同類 FAIL ≥ 2 → 建議 /ps-lesson）
 

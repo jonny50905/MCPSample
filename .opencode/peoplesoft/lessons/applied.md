@@ -89,3 +89,19 @@
   (5) H1 加致命檢查點（輪次未 +1＝抄舊帳）；lint 警缺輪次表頭。
 - 套用：本 commit（ps-deep-research／兩個命令／兩個模板／README／
   test-scenarios H1／lint）。
+
+### L5 首輪全量稽核量大：回灌改以檔彙整；自創判定詞就近映射（2026-07-27）
+- 症狀：輪次 1 真實重驗產出 84 筆證據判定（58 PASS／10 FAIL／
+  16 UNVERIFIABLE）＋48 筆 claim 判定（19 VERIFIED／29 筆用自創詞
+  weakened/contradicted）。非 PASS 共 55 筆——逐筆回灌會塞爆
+  checklist.md（回到大檔覆寫→JSON 截斷的老問題）；自創詞再現
+  （堵不完，改吸收）。
+- 落點：機械化——(1) 回灌單位改「一檔一行」彙整（上限＝檔案數），
+  禁止逐筆開項；(2) 自創判定詞**就近映射**（claim 層→DISPUTED、
+  證據層→FAIL），lint 擴充詞彙警告；(3) A 項處理規則明確化：FAIL
+  重取證、DISPUTED 二選一（補證據保 CONFIRMED 或降級 INFERRED，
+  不得原樣保留）、UNVERIFIABLE 重驗一次不迴圈。
+- 套用：本 commit。
+- 解讀備忘：首輪 69% 證據存活率屬正常起點；29 筆 DISPUTED 中預期
+  相當比例是 9B 稽核員把「找不到支持」誤標為「矛盾」——定向補查後
+  會翻回或正確降級。指標看輪次間趨勢，不看單輪絕對值。

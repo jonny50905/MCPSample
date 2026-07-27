@@ -94,6 +94,12 @@ docs/ps-research/<領域>/
    checklist.md 的 Gaps 彙整。**00-overview.md 不改。**
 6. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
 
+**稽核回灌項（A<n>）的處理**（取代標準深度鏈，做定向補查）：
+- FAIL 證據：重新取證（chunk 重取／SQL 重跑）修正該檔的引用。
+- DISPUTED 主張二選一：取得可靠證據 → 修證據、保 CONFIRMED；
+  取不到 → 把該敘述**降級 INFERRED** 或依新證據改寫——不得原樣保留。
+- UNVERIFIABLE：重驗一次；再失敗記 gaps（工具原因照實寫），不重試迴圈。
+
 **全部打勾後自動接稽核（每次 run 最多一輪）**：
 - 觸發條件：本 run 打勾的項目**含稽核回灌項（A<n>）**，或 checklist
   全勾且本 run 尚未稽核 → **必須**執行一輪稽核模式（見下節）再結束。
@@ -113,15 +119,20 @@ docs/ps-research/<領域>/
 2. 完整性：把總覽的核心資料表清單委派 @ps-auditor（任務 C：資料角度
    反推物件清單）→ 與功能地圖 diff，多出來的＝疑似遺漏。
 3. **先回灌＋輪次遞增**：read `checklist.md` 的「稽核輪次：N」行
-   （沒有該行視為 N=0）。**任何非 PASS 的判定**（FAIL／DISPUTED／
-   UNVERIFIABLE／其他自創狀態一律算）與遺漏候選，逐項加進
-   `checklist.md` 的調查進度（`- [ ] A<n> 補查 <說明>（稽核）`），
-   並把輪次行更新為「稽核輪次：N+1」——補查項下次 /ps-research 處理。
+   （沒有該行視為 N=0）。回灌對象＝**任何非 PASS／VERIFIED 的判定**
+   （FAIL／DISPUTED／UNVERIFIABLE／自創詞一律算）與遺漏候選；
+   **以「檔」為單位彙整，一檔一行**：
+   `- [ ] A<n> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
+   ——**禁止逐筆開項**（幾十筆會塞爆 checklist）；遺漏候選每個物件
+   一行。寫入時把輪次行更新為「稽核輪次：N+1」。
 4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`
    **整檔重寫** `90-audit.md`：表頭寫「稽核輪次：N+1」與本日日期；
    **所有判定只准來自本輪 auditor 回報——禁止 read 舊 90-audit.md、
-   禁止沿用其數字或內容**；「已回灌 checklist 的行動項」節**逐行抄錄**
-   步驟 3 實際加進 checklist.md 的行。**順序不可顛倒**：非 PASS 判定
+   禁止沿用其數字或內容**；判定詞彙只准契約五詞（證據層 PASS／FAIL／
+   UNVERIFIABLE；claim 層 VERIFIED／DISPUTED／UNVERIFIABLE），auditor
+   回報出現其他字（weakened、contradicted、partial 等）→ **就近映射**
+   （claim 層歸 DISPUTED、證據層歸 FAIL）後記錄；「已回灌 checklist
+   的行動項」節**逐行抄錄**步驟 3 實際加進 checklist.md 的行。**順序不可顛倒**：非 PASS 判定
    ≥ 1 而 checklist.md 還沒有新 A 行時，禁止寫 90-audit.md。
 5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。
 6. 結束前最後一個動作：read `checklist.md` 確認回灌行都在——缺就

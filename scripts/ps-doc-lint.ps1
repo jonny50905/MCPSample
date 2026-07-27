@@ -92,8 +92,8 @@ if (Test-Path $auditPath) {
             $warnings += "90-audit.md：缺模板章節「$sec」（報告偏離模板，對帳會失準）"
         }
     }
-    if ($auditText -match '(?i)partial[_ ]pass') {
-        $warnings += "90-audit.md：出現契約外狀態 partial_pass（合法詞彙：PASS/FAIL/UNVERIFIABLE/VERIFIED/DISPUTED）"
+    foreach ($bad in [regex]::Matches($auditText, '(?i)\b(partial[_ ]?pass|weakened|contradicted)\b')) {
+        $warnings += "90-audit.md：出現契約外狀態「$($bad.Value)」（合法詞彙：PASS/FAIL/UNVERIFIABLE/VERIFIED/DISPUTED；自創詞應就近映射）"
     }
     if ($auditText -notmatch '稽核輪次') {
         $warnings += "90-audit.md：表頭缺「稽核輪次」（無法判斷是否為最新一輪重驗）"

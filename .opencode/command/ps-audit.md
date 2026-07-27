@@ -16,9 +16,11 @@ agent: ps-deep-research
    每檔抽 3~5 條標 CONFIRMED 的重要 claim 做反駁驗證（任務 B）。
 2. 以總覽的核心資料表清單做換角度完整性盤點（任務 C），與功能地圖 diff。
 3. **先回灌＋輪次遞增**：read `checklist.md` 的「稽核輪次：N」
-   （沒有該行視為 0）；任何非 PASS 判定（FAIL／DISPUTED／其他一律算）
-   與遺漏候選，逐項加進 `checklist.md` 的調查進度
-   （格式：`- [ ] A<n> 補查 <說明>（稽核）`），輪次行更新為 N+1。
+   （沒有該行視為 0）；任何非 PASS／VERIFIED 判定（FAIL／DISPUTED／
+   自創詞一律算）與遺漏候選，**以檔為單位彙整、一檔一行**加進
+   `checklist.md` 的調查進度（格式：`- [ ] A<n> 補查 <NN-檔名>：
+   FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`；禁止逐筆開項），
+   輪次行更新為 N+1。
 4. **後寫** `90-audit.md`：**整檔重寫**，表頭「稽核輪次：N+1」＋本日
    日期；判定只准來自本輪 auditor 回報，**禁止 read 舊 90-audit.md、
    禁止沿用其數字或內容**；「已回灌」節逐行抄錄步驟 3 加的行。
