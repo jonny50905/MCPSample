@@ -34,6 +34,9 @@
 - 補強（2026-07-27）：自製索引不保證完整 → 空／稀少結果不得當
   「不存在」證據，必回退 cookbook／ES 正規管道；auditor 任務 C 需
   兩角度交叉才可列疑似遺漏；F5 加對應檢查點。
+- 追記（2026-07-27）：server 第三個 tool `get_ae_sql_metadata`
+  （aeApplid）→ 開放 ps-ae-flow（AE 結構定位優先）與 ps-metadata-flow
+  （批次血緣鑽查）；同樣定位不作證、空結果必回退。
 
 ### L2 write 工具呼叫 JSON 被截斷——大檔整檔覆寫超出小模型可靠輸出長度（2026-07-27）
 - 症狀：持續出現 invalid[tool=write, error=... JSON Parse error

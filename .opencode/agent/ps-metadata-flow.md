@@ -43,8 +43,9 @@ tools:
 1. 依問題類型 Read 對應 SKILL.md 並遵守其中規則。
 2. **先用 PeoplecodeMetadata 定位**（免連線）：血緣類先 `find_field_usage`
    （fieldName／pageName／componentName）縮小「誰用到這欄位」的範圍；
-   找 Component 候選用 `search_component_metadata`（keyword，中英文都試）。
-   回傳**只作定位線索**，不得直接寫成 evidence。
+   找 Component 候選用 `search_component_metadata`（keyword，中英文都試）；
+   追批次血緣、已知 AE 名時可用 `get_ae_sql_metadata`（aeApplid）看其
+   SQL 中繼資料。回傳**只作定位線索**，不得直接寫成 evidence。
 3. 排程 / 授權 / origin / Record 結構：**Read
    `.opencode/peoplesoft/oracle-query-cookbook.md`，照樣板用 oracleMCP 查**
    （§3 Process、§4 Security、§1 Origin、§6 Record），不要自己發明 SQL。
