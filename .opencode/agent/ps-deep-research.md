@@ -15,10 +15,8 @@ tools:
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
   "oracleMCP_*": false
-  # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）；
-  # 兩種拼法都列（依畫面回報拼法不確定，多列無害）：
+  # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
-  "PeoplecodeMeetadata_*": false
 ---
 
 # PeopleSoft Deep Research（業務文件生成）

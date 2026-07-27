@@ -24,3 +24,5 @@
   deny」檢查項；test-scenarios 加 F4。
 - 套用：本 commit；後續正式整合（預定歸 ps-metadata-flow）待管理者
   提供該 server 的確切註冊名與完整工具清單。
+- 後續（2026-07-27）：管理者確認註冊名為 `PeoplecodeMetadata`（單 e）→
+  已移除九檔的 `PeoplecodeMeetadata_*` 備援項；正式整合仍待完整工具清單。

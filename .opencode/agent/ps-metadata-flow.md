@@ -21,7 +21,6 @@ tools:
   # 新 MCP「PeoplecodeMetadata」（find_field_usage 等）待確認工具清單後
   # 最優先整合進本 agent；整合前先 deny（沒列＝預設開）：
   "PeoplecodeMetadata_*": false
-  "PeoplecodeMeetadata_*": false
   # 契約專用工具尚未實作（未來上線後取消註解並對齊註冊名）：
   # peoplesoft_ps_get_data_lineage: true
   # peoplesoft_ps_get_process_usage: true

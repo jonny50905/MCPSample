@@ -19,7 +19,6 @@ tools:
   "oracleMCP_*": true
   # 尚未整合的新 MCP 先 deny（沒列＝預設開）：
   "PeoplecodeMetadata_*": false
-  "PeoplecodeMeetadata_*": false
   # 契約中的 AE 圖 / origin 工具尚未實作（未來）：
   # peoplesoft_ps_get_ae_graph: true
   # peoplesoft_ps_get_object_origin: true
