@@ -73,7 +73,9 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
   只有真的取了 source chunk 才有 id / filePath，且必須逐字來自工具回傳。
 - **PeoplecodeMetadata 只作定位**：其回傳不得作為 evidence 條目
   （evidence 僅 SQL／CHUNK 兩種）；只有定位線索、未經 oracleMCP 查證的
-  finding 最高只能標 INFERRED。
+  finding 最高只能標 INFERRED。自製索引**不保證完整**：回傳為空／稀少
+  不得當作「不存在」的證據——必回退 cookbook §2 正規管道再查，仍查無
+  才寫 gaps；它只用來**增加**候選，不得用它排除候選。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。

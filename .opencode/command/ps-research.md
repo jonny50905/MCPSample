@@ -12,8 +12,8 @@ agent: ps-deep-research
 
 - **不存在** → 立刻執行系統提示的「階段一：盤點」——下一個動作是
   read `.opencode/peoplesoft/customization-profile.yaml`。
-- **存在** → read 它的「調查進度」checklist，立刻對**第一個未勾選項**
-  執行「階段二：逐項深查」。
+- **存在** → read 同目錄 `checklist.md`（沒有就先照系統提示做一次性
+  遷移），立刻對**第一個未勾選項**執行「階段二：逐項深查」。
 
 之後照系統提示流程逐項做到 checklist 全勾（含收尾自動稽核）。
 過程中只在「完成一項」或「遇到 BLOCKED」時簡短回報一行，其餘時間持續行動。

@@ -111,8 +111,10 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 
 ```text
 方式 A（推薦）：對話裡講——「把 TW_XXX 加進 <領域> 的調查清單」
-方式 B（手改）：編輯 00-overview.md 的「調查進度」，照格式加一行：
+方式 B（手改）：編輯該領域目錄 checklist.md 的「調查進度」，照格式加一行：
               - [ ] NN <功能名> `<物件名>` → NN-<物件名>.md
+              （舊領域還沒有 checklist.md 時不用手動搬——
+              下次 /ps-research 會自動遷移）
 之後跑 /ps-research <領域> 就會查它。
 ```
 
@@ -149,4 +151,22 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 □ OpenCode 升版 → 確認 agent（Tab 清單）、command（/ 清單）、
   skill 都有載入；異常先看 frontmatter 格式
 □ PeopleTools 升版 → cookbook 的表名/欄位抽 2~3 條樣板實跑驗證
+```
+
+---
+
+## SOP-9 write 工具 JSON 解析失敗排查
+
+畫面出現 `invalid[tool=write, error=... JSON Parse error expected '}']`：
+
+```text
+□ 這不是檔案被汙染——是模型產生的「工具呼叫 JSON」本身壞掉；
+  最常見原因＝單次寫入內容太長被截斷（大檔整檔覆寫）
+□ 規則側已緩解：進度拆到小檔 checklist.md、00-overview 凍結、
+  單次寫檔約 150 行上限、同檔失敗 2 次標 ⚠ 跳過（不會卡死）
+□ 服務端可做（管理者）：加大模型單次輸出 token 上限；推理伺服器若支援
+  tool-call 約束解碼（vLLM auto tool choice／grammar、Ollama JSON mode 等）
+  → 打開，可大幅降低 JSON 壞格率
+□ 個案收尾：從 checklist.md 找標 ⚠（寫入失敗）的項，重跑 /ps-research
+  讓它補做；反覆失敗的同一檔改用 SOP-5 人工建檔
 ```

@@ -350,6 +350,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   3. [主要] 只有定位、未經 SQL／CHUNK 查證的 finding 最高標 INFERRED
   4. [次要] 主 agent（orchestrator / deep-research）仍未直接呼叫
      PeoplecodeMetadata（deny 維持）
+  5. [主要] PeoplecodeMetadata 回傳為空／稀少時回退 oracleMCP／ES 續查，
+     未把空結果寫成「不存在／沒有畫面使用」的結論
 
 ## G 類：Deep Research（文件生成模式）
 
@@ -361,8 +363,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 ### G1 總覽與 checklist 生成
 - **輸入**：`/ps-research 兵役`（首次，目錄不存在）
 - **檢查點**：
-  1. [主要] 產出 00-overview.md 且五要件齊：功能地圖、批次、核心表、
-     調查進度 checklist（每項含目標檔名）、掃描範圍聲明
+  1. [主要] 產出 00-overview.md（功能地圖、批次、核心表、掃描範圍聲明）
+     ＋ checklist.md（調查進度，每項含目標檔名）
   2. [主要] 盤點走多角度委派（UI / metadata / 程式碼入口），非單一搜尋
   3. [致命] 總覽只含盤點結論與 evidence 參照，沒有大段原始碼
   4. [次要] 領域未命中 map 時：自展同義詞記入聲明、用 CUSTOM_FIRST、
@@ -378,6 +380,7 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   3. [主要] 已完成項的檔案內容未回讀進主 context（context 紀律）
   4. [主要] 只寫 docs/ps-research/** ——未動 .opencode/、src/ 等路徑
   5. [次要] BLOCKED 項照樣寫檔（gaps 顯著）且 checklist 標 ⚠
+  6. [次要] 深查期間只改 checklist.md——00-overview.md 內容零改動
 
 ## H 類：稽核與教訓迴路
 
@@ -389,7 +392,7 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   2. [致命] 稽核判定只依重新取得的證據——transcript 中不得出現
      「文件如此記載，故正確」式推理
   3. [主要] 產出 90-audit.md 記分卡；DISPUTED / FAIL / 遺漏候選
-     回灌 00-overview.md checklist（標「（稽核）」）
+     回灌 checklist.md（標「（稽核）」）
   4. [次要] 同類 FAIL ≥ 2 時主動提議 /ps-lesson
 
 ### H2 教訓登錄即生效（本機套用、PR 把關）

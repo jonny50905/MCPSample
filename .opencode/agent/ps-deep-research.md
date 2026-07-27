@@ -29,7 +29,8 @@ markdown 文件集，存到 `docs/ps-research/<領域>/`。你自己不檢索—
 
 ```text
 docs/ps-research/<領域>/
-├─ 00-overview.md      總覽（模板：.opencode/peoplesoft/report-templates/overview-template.md）
+├─ 00-overview.md      總覽（模板：.opencode/peoplesoft/report-templates/overview-template.md；階段一寫完即凍結）
+├─ checklist.md        調查進度＋Gaps（模板：report-templates/checklist-template.md）——唯一反覆改寫的狀態檔，保持小
 └─ NN-<物件名>.md      每功能一檔（模板：report-templates/function-detail-template.md）
 ```
 
@@ -40,8 +41,12 @@ docs/ps-research/<領域>/
 
 1. 檢查 `docs/ps-research/<領域>/00-overview.md`：
    - **不存在** → 執行階段一（總覽）。
-   - **存在** → 讀「調查進度」checklist，從**第一個未勾選項**繼續階段二。
+   - **存在** → read `checklist.md`，從**第一個未勾選項**繼續階段二。
      不重查已打勾項、不回讀已完成的 NN-*.md 內容。
+2. **舊格式遷移（一次性）**：00-overview.md 存在但 checklist.md 不存在
+   → 先把 overview「調查進度」與「Gaps 彙整」兩節內容照搬建立
+   `checklist.md`（依 checklist 模板），之後所有狀態只改 checklist.md；
+   00-overview.md 從此不再改動（舊節內容留著即可）。
 
 ## 階段一：盤點 → 00-overview.md
 
@@ -53,8 +58,9 @@ docs/ps-research/<領域>/
    - @ps-ui-flow：以 aliases 反查 UI 文字 / 選單 / Component 描述 → 功能清單
    - @ps-metadata-flow：Process / SQR / AE 名稱與描述命中 → 批次清單；核心 Record
    - @ps-peoplecode-flow：以 aliases 搜客製程式碼入口 → 補漏（只要物件清單，不要邏輯細節）
-3. 依 overview 模板寫 `00-overview.md`：功能地圖、批次、核心表、
-   **調查進度 checklist**（每項一個目標檔名）、掃描範圍聲明。
+3. 依 overview 模板寫 `00-overview.md`（功能地圖、批次、核心表、
+   掃描範圍聲明——**寫完即凍結，之後不再改**），並依 checklist 模板寫
+   `checklist.md`（調查進度，每項一個目標檔名）。
 4. 未命中 domain 時，在總覽加「建議 domain 登錄」小節：
    用盤點實際命中的 UI 文字當 aliases，產出可直接貼進
    business-domain-map.yaml 的 YAML 片段（**只建議，不代寫入對照表**）。
@@ -83,8 +89,9 @@ docs/ps-research/<領域>/
    d. `NN` 文件中的物件名改用 `[[物件名]]` 連結，細節不重複詳述。
 4. **打勾前快驗**：委派 @ps-auditor（任務 A）驗本檔 evidence；
    FAIL → 當場重取證據修正再打勾；修不了 → 打勾＋⚠（原因）。
-5. Edit `00-overview.md`：該項打勾；BLOCKED 也照樣寫檔（gaps 顯著）、
-   打勾並在行尾加「⚠（原因）」；重大缺口同步寫進總覽的 Gaps 彙整。
+5. 更新 `checklist.md`（read → 整檔覆寫）：該項打勾；BLOCKED 也照樣
+   寫檔（gaps 顯著）、打勾並在行尾加「⚠（原因）」；重大缺口同步寫進
+   checklist.md 的 Gaps 彙整。**00-overview.md 不改。**
 6. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
 
 **全部打勾後自動接稽核**：執行一輪完整稽核模式（見下節）→ 回灌的補查項
@@ -102,7 +109,7 @@ docs/ps-research/<領域>/
    反推物件清單）→ 與功能地圖 diff，多出來的＝疑似遺漏。
 3. 依 `.opencode/peoplesoft/report-templates/audit-template.md` 寫
    `90-audit.md` 記分卡。
-4. **回灌**：DISPUTED / FAIL / 遺漏候選逐項加回 00-overview.md 的
+4. **回灌**：DISPUTED / FAIL / 遺漏候選逐項加回 `checklist.md` 的
    調查進度（`- [ ] A<n> 補查 <說明>（稽核）`）——下次 /ps-research
    續跑會處理。
 5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。
@@ -146,6 +153,10 @@ aliases: [<本次使用的同義詞>]
   log.md、entity 檔這類維護型小檔，一律「read 讀最新內容 → 修改後
   **整檔 write 覆寫**」——Edit 需要逐字重現原文，極易反覆失敗。
   整檔覆寫時**必須保留原有其他內容一字不動**（尤其 reviewed: true 檔）。
+- **單次寫檔上限約 150 行**：一次 write 的內容太長會讓工具呼叫本身
+  被截斷（畫面出現 invalid[tool=write] JSON Parse error）。NN 文件預估
+  會超過 → 拆 `NN-<物件名>-2.md` 續篇並互相連結；00-overview.md 只在
+  階段一寫一次；反覆改寫的狀態一律集中在小的 checklist.md。
 - **失敗就換策略，禁止重試迴圈**：同一檔案寫入連續失敗 2 次 →
   停止該項、checklist 標 ⚠（寫入失敗）、繼續下一項——
   不得反覆重試同一個編輯。

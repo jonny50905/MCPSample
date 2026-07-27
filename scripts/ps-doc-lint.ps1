@@ -15,15 +15,22 @@ if (-not (Test-Path $dir)) {
 }
 
 $overviewPath = Join-Path $dir "00-overview.md"
+$checklistPath = Join-Path $dir "checklist.md"
 if (-not (Test-Path $overviewPath)) {
     $violations += "缺 00-overview.md"
 }
 else {
-    $overview = Get-Content $overviewPath -Raw -Encoding UTF8
+    # 進度已拆檔：新格式在 checklist.md；舊格式（進度仍在 overview 內）自動相容
+    $checklistSrc = if (Test-Path $checklistPath) {
+        Get-Content $checklistPath -Raw -Encoding UTF8
+    }
+    else {
+        Get-Content $overviewPath -Raw -Encoding UTF8
+    }
 
     # 1) checklist 對帳：打勾項的目標檔必須存在；NN 檔必須被 checklist 列到
     $listed = @{}
-    foreach ($m in [regex]::Matches($overview, '- \[(?<tick>[ x])\]\s+\S+.*?→\s*(?<file>\S+\.md)')) {
+    foreach ($m in [regex]::Matches($checklistSrc, '- \[(?<tick>[ x])\]\s+\S+.*?→\s*(?<file>\S+\.md)')) {
         $f = $m.Groups['file'].Value
         $listed[$f] = $true
         if ($m.Groups['tick'].Value -eq 'x' -and -not (Test-Path (Join-Path $dir $f))) {

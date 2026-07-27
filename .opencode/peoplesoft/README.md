@@ -24,7 +24,8 @@
 │  ├─ oracle-query-cookbook.md         oracleMCP 的 PeopleTools 查詢樣板（SELECT-only）
 │  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
 │  ├─ report-templates/
-│  │  ├─ overview-template.md          Deep research 總覽模板（含調查 checklist）
+│  │  ├─ overview-template.md          Deep research 總覽模板（階段一寫完即凍結）
+│  │  ├─ checklist-template.md         調查進度狀態檔模板（唯一反覆改寫的小檔）
 │  │  ├─ function-detail-template.md   Deep research 單功能細查模板
 │  │  ├─ entity-template.md            Entity wiki 物件檔模板（Observations/Relations）
 │  │  └─ audit-template.md             稽核報告（90-audit）模板
@@ -135,17 +136,17 @@ ps-orchestrator（primary，TUI 中 Tab 切換選用）
 
 ```text
 /ps-research 轉職        ← 或 Tab 切到 ps-deep-research 直接下指令
-  ↓ 階段一：多角度盤點 → docs/ps-research/轉職/00-overview.md
-    （功能地圖、批次、核心表、調查進度 checklist、掃描範圍聲明）
+  ↓ 階段一：多角度盤點 → docs/ps-research/轉職/00-overview.md ＋ checklist.md
+    （總覽：功能地圖、批次、核心表、掃描範圍聲明；進度只在 checklist.md）
   ↓ 階段二：逐項深查（復用問答模式的深度鏈）→ NN-<物件>.md、逐項打勾
 ```
 
 特性：
 
-- **可中斷續跑**：狀態就是 00-overview.md 的 checklist——中斷後重跑
+- **可中斷續跑**：狀態就是 checklist.md——中斷後重跑
   `/ps-research <領域>`，從第一個未勾選項繼續，不重查已完成項。
-- **checklist 可人工編輯**：覺得盤點漏了功能，直接在「調查進度」加一行，
-  系統照著查。
+- **checklist 可人工編輯**：覺得盤點漏了功能，直接在 checklist.md 的
+  「調查進度」加一行，系統照著查。
 - **領域未登錄照樣跑**：未命中 domain map 時自展同義詞＋CUSTOM_FIRST，
   完成後總覽附「建議 domain 登錄」YAML 片段，人工決定是否收錄對照表。
 - **輸出進「內部」git**：`docs/ps-research/` commit 到內部 repo

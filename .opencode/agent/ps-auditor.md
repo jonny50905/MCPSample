@@ -49,9 +49,11 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 
 ### C. 換角度完整性盤點
 
-給定領域核心資料表清單：用 oracleMCP（引用反查）與 ES（table 名搜尋）
+給定領域核心資料表清單：用 oracleMCP（引用反查）、ES（table 名搜尋）
+與 PeoplecodeMetadata（`find_field_usage`／`search_component_metadata`）
 從**資料與引用角度**反推「哪些物件在讀寫這些表」→ 回傳物件清單
-（與功能地圖的 diff 由委派方做）。
+（與功能地圖的 diff 由委派方做）。任一角度**查無 ≠ 不存在**
+（自製索引不保證完整）；列入疑似遺漏前至少兩個角度交叉。
 
 ## 回報格式（最終輸出只有這份 JSON）
 

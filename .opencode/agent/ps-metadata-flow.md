@@ -81,4 +81,6 @@ tools:
   `keyRows`，**沒有 id、也不准自創 id**。
 - **PeoplecodeMetadata 只作定位**：其回傳不得作為 evidence 條目
   （evidence 僅 CHUNK／SQL 兩種）；只有定位線索、未經 SQL／CHUNK 查證的
-  finding 最高只能標 INFERRED。
+  finding 最高只能標 INFERRED。自製索引**不保證完整**：回傳為空／稀少
+  不得當作「不存在」的證據——必回退 cookbook 樣板／ES 正規管道再查，
+  仍查無才寫 gaps；它只用來**增加**候選，不得用它排除候選。
