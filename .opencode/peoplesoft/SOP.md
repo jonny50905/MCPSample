@@ -138,6 +138,11 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 ## SOP-8 環境異動時的對齊檢查
 
 ```text
+□ 新增 MCP server 註冊 → 先在**全部 9 個 agent 檔**的 tools 加
+  "<註冊名>_*": false（tools map 是覆寫表：沒列＝預設全開，主 agent 會
+  直接呼叫繞過 subagent 架構；其回傳也塞不進證據契約，誘發捏造）。
+  之後要用再走正式整合：選定歸屬 subagent → 該檔改 allow ＋補工具
+  對照表＋定義證據格式，其餘 8 檔維持 deny
 □ MCP server 註冊名變了 → 改 agent 檔 tools 的 "<註冊名>_*" 前綴
   （含 deny 項），前綴大小寫須完全一致
 □ 換模型 → 重跑 Smoke Set（test-scenarios.md §5，9 題）確認規則遵循沒退化

@@ -18,6 +18,8 @@ tools:
   # 不屬於本 subagent 的 MCP 明確 deny（OpenCode 沒列出＝預設開啟）：
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
+  "PeoplecodeMetadata_*": false
+  "PeoplecodeMeetadata_*": false
   # UI Semantic Index 專用 MCP 尚未建置（未來上線後取消註解並對齊註冊名）：
   # peoplesoft_ps_search_ui_semantics: true
   # peoplesoft_ps_get_ui_graph: true

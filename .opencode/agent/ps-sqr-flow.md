@@ -17,6 +17,8 @@ tools:
   "PeoplecodeSource_*": true
   # 不屬於本 subagent 的 MCP 明確 deny（OpenCode 沒列出＝預設開啟）：
   "oracleMCP_*": false
+  "PeoplecodeMetadata_*": false
+  "PeoplecodeMeetadata_*": false
   # 契約中的 origin / registry 工具尚未實作（未來）：
   # peoplesoft_ps_get_object_origin: true
 ---

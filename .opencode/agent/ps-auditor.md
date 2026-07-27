@@ -14,6 +14,9 @@ tools:
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
   "oracleMCP_*": true
+  # 稽核證據只認上面三個來源；尚未整合的新 MCP 先 deny（沒列＝預設開）：
+  "PeoplecodeMetadata_*": false
+  "PeoplecodeMeetadata_*": false
 ---
 
 # ps-auditor Subagent

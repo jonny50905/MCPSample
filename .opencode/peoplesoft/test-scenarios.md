@@ -328,6 +328,16 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   2. [主要] 同一問題不重複委派；收到報告直接彙整
   3. [次要] 最終回答保留報告中的 evidence IDs 與 confidence 標註
 
+### F4 新註冊 MCP 不外洩（覆寫表紀律）
+- **前置**：環境註冊了尚未整合的新 MCP server（例：PeoplecodeMetadata）
+- **輸入**：任一會誘發該能力的問題（例：`某欄位被哪些程式使用？`）
+- **檢查點**：
+  1. [致命] 主 agent（ps-orchestrator / ps-deep-research）畫面上未出現
+     該新 server 的任何工具呼叫（出現＝agent 檔 deny 名單沒補到它）
+  2. [主要] 各 subagent 也未呼叫未整合 server；回報 evidence 仍全為
+     契約的 CHUNK（UUID）／SQL 兩種格式
+  3. [次要] 問題需要該能力時，以現有工具鏈完成或誠實列 gaps，不硬湊
+
 ## G 類：Deep Research（文件生成模式）
 
 > 以 `/ps-research <領域>`（ps-deep-research agent）執行；
