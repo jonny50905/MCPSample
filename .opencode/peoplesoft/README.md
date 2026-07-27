@@ -16,7 +16,7 @@
 .opencode/
 ├─ peoplesoft/
 │  ├─ README.md                        本檔
-│  ├─ SOP.md                           管理者人工作業 SOP（教訓套用/lint/git/回滾…）
+│  ├─ SOP.md                           管理者人工作業 SOP（教訓 PR 審查/lint/git/回滾…）
 │  ├─ customization-profile.yaml       環境規則與 TW_（Prefix、Registry、searchPolicy）
 │  ├─ business-domain-map.yaml         兵役等全客製業務領域（alias、rootObjectPolicy）
 │  ├─ progressive-source-retrieval.md  PeopleCode/SQL/SQR/SQC 共用檢索規則 + 長文本工具契約
@@ -29,8 +29,8 @@
 │  │  ├─ entity-template.md            Entity wiki 物件檔模板（Observations/Relations）
 │  │  └─ audit-template.md             稽核報告（90-audit）模板
 │  ├─ lessons/
-│  │  ├─ pending.md                    教訓登錄簿（/ps-lesson 寫入；含格式與落點優先序）
-│  │  └─ applied.md                    已套用教訓的歷史歸檔（不進 context）
+│  │  ├─ pending.md                    例外案件（agent 無把握判斷落點時才進這裡）
+│  │  └─ applied.md                    已套用教訓的逐筆記錄（不進 context）
 │  ├─ test-scenarios.md                本地模型準確度測試情境（30 題 + 評分規則）
 │  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
 ├─ agent/
@@ -46,8 +46,7 @@
 ├─ command/
 │  ├─ ps-research.md                   /ps-research <領域> — 文件生成（可續跑）
 │  ├─ ps-audit.md                      /ps-audit <領域> — 稽核 + 回灌 checklist
-│  ├─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓（只登錄）
-│  └─ ps-lesson-apply.md               /ps-lesson-apply — 教訓分類提案（不改規則檔）
+│  └─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓並本機立即生效（團隊走 PR）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -198,17 +197,17 @@ Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
 
 ```text
 被指正 / 稽核發現系統性錯誤
-  → /ps-lesson <描述>        登錄 lessons/pending.md（任何人可登錄）
-  → /ps-lesson-apply         分類 + 產落檔提案（機械化 > 資料 > 窄規則 > 通用）
-  → 事實類（docs/ps-research/**）：apply 直接套用（作廢不刪除）
-  → 規則類（.opencode/**）：人工依 SOP-1 審查後套用
-    （可將遮敏後提案貼給較強模型審——機密不出機器）
-  → 移入 applied.md + 對應測試檢查點（防回歸）
+  → /ps-lesson <描述>   登錄＋分類＋**本機立即套用**
+                        （事實類修文件·作廢不刪除；規則類最小新增·只加不刪）
+  → 記錄 applied.md ＋ 對應測試檢查點（防回歸）
+  → commit / push → 內部 git PR ── 人工審 diff 把關（SOP-1）
+  → merge 後全員 pull ＋ 重啟 → 教訓擴散到所有機器
 ```
 
-原則：本地模型**永遠不能直接修改**自己的 agent / skill / 規則檔——
-一條錯誤教訓會變成永久的錯誤規則。能機械化的教訓優先機械化
-（lint / 稽核判定 / tools deny），prose 規則是最後手段。
+原則：**本機即時生效、團隊生效必經 PR 人審**——AI 的規則修改永遠有人
+守在合併關卡；套用限「最小新增」（只加不刪，改壞可 revert）。
+能機械化的教訓優先機械化（lint / 稽核判定 / tools deny），
+prose 規則是最後手段。
 
 ## 兵役案例（端到端）
 

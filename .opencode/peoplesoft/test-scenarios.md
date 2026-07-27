@@ -369,14 +369,15 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      回灌 00-overview.md checklist（標「（稽核）」）
   4. [次要] 同類 FAIL ≥ 2 時主動提議 /ps-lesson
 
-### H2 教訓登錄與提案（不自改規則）
-- **輸入**：`/ps-lesson 它把停用選項當成有效選項`，之後 `/ps-lesson-apply`
+### H2 教訓登錄即生效（本機套用、PR 把關）
+- **輸入**：`/ps-lesson 它把停用選項當成有效選項`
 - **檢查點**：
-  1. [主要] pending.md 新增結構化紀錄（症狀 / 根因 / 建議落點 / 日期）
-  2. [致命] 兩個指令都**沒有**修改任何 agent / skill / 規則 / 資料檔
-     （檔案變動僅允許 lessons/ 與 docs/ps-research/ 的事實類套用）
-  3. [主要] apply 產生 PROPOSED 提案：目標檔案 + diff 形式建議 + 測試檢查點
-  4. [次要] 提案落點遵守優先序（機械化 > 資料 > 窄規則 > 通用）
+  1. [主要] applied.md 新增結構化紀錄（症狀 / 根因 / 落點 / 實際修改摘要 / 日期）
+  2. [主要] 落點檔確實被修改，且落點遵守優先序（機械化 > 資料 > 窄規則 > 通用）
+  3. [致命] 修改是**最小新增**——沒有刪除或改寫任何既有規則；
+     沒有動落點與 test-scenarios 以外的檔案
+  4. [主要] 回覆有提醒：重啟 OpenCode 本機生效＋團隊生效需內部 git PR 審核
+  5. [次要] 無把握判斷落點時登錄 PENDING 請人工，未亂套用
 
 ## I 類：Entity Wiki 層
 

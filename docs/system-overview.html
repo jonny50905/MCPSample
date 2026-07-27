@@ -258,7 +258,7 @@
         <div class="sc-body">
           <div class="sc-step"><span class="n">1</span><span>直接指正——它會<b>重新查證</b>，不會盲目附和</span></div>
           <div class="sc-step"><span class="n">2</span><span>確認真的錯 → 打 <code>/ps-lesson 一句話描述</code> 登錄教訓</span></div>
-          <div class="sc-step"><span class="n">3</span><span>管理者批准後，全系統之後不再犯同類錯</span></div>
+          <div class="sc-step"><span class="n">3</span><span>本機立即生效；PR 合併後全團隊不再犯同類錯</span></div>
           <div class="sc-out"><b>得到：</b>當下的更正答案＋長期的系統改善（跨 session 記取教訓）</div>
         </div>
       </div>
@@ -284,8 +284,7 @@
         <tr><td><code>Tab</code> → PS MODE</td><td>問業務問題（最常用，打字就好，不用指令）</td><td><span class="role user">所有人</span></td></tr>
         <tr><td><code>/ps-research 領域</code></td><td>產出領域完整文件；中斷後重打即續跑</td><td><span class="role user">所有人</span></td></tr>
         <tr><td><code>/ps-audit 領域</code></td><td>稽核已產出文件：重查證據、抓遺漏、產記分卡</td><td><span class="role user">所有人</span></td></tr>
-        <tr><td><code>/ps-lesson 描述</code></td><td>登錄一條「它答錯了」的教訓（只登錄，不改規則）</td><td><span class="role user">所有人</span></td></tr>
-        <tr><td><code>/ps-lesson-apply</code></td><td>把累積的教訓分類、產生修改提案</td><td><span class="role admin">管理者</span></td></tr>
+        <tr><td><code>/ps-lesson 描述</code></td><td>登錄「它答錯了」的教訓並本機立即生效（團隊生效走內部 git PR 審核）</td><td><span class="role user">所有人</span></td></tr>
         <tr><td><code>ps-doc-lint.ps1</code></td><td>文件格式健檢腳本（終端機執行）</td><td><span class="role admin">管理者</span></td></tr>
       </tbody>
     </table>
@@ -300,7 +299,7 @@
       <div class="arr">→</div>
       <div class="gate"><div class="g-ic">🔍</div><b>2. 獨立稽核</b><span>稽核員 AI 不看推理過程，自己重新取證，專門找碴反駁</span></div>
       <div class="arr">→</div>
-      <div class="gate"><div class="g-ic">📋</div><b>3. 教訓機制</b><span>答錯→登錄→提案→<b>人工批准</b>才改規則；AI 不能自改自己的憲法</span></div>
+      <div class="gate"><div class="g-ic">📋</div><b>3. 教訓機制</b><span>答錯→<code style="font-family:Consolas,monospace;font-size:11.5px">/ps-lesson</code> 本機立即修正；團隊生效走內部 git <b>PR 人審</b>把關</span></div>
       <div class="arr">→</div>
       <div class="gate"><div class="g-ic">✅</div><b>4. 回歸測試</b><span>34 個測試情境守住歷史教訓，改版必跑，不走回頭路</span></div>
     </div>
@@ -332,7 +331,7 @@
       <div class="value"><b>唯讀為預設</b><span>問答模式零寫入權限；資料庫僅允許 SELECT，附列數上限與逾時保護</span></div>
       <div class="value"><b>權限白名單</b><span>每個 AI 專家只拿得到自己需要的工具，越權在物理上不可能</span></div>
       <div class="value"><b>版控與回滾</b><span>產出進「內部」git（嚴禁外部遠端），任何損壞可回滾</span></div>
-      <div class="value"><b>人在關鍵環節</b><span>規則變更、檔名變更、教訓生效——一律人工批准</span></div>
+      <div class="value"><b>人在關鍵環節</b><span>規則變更以內部 git PR 人審把關；檔名變更一律人工確認</span></div>
     </div>
   </section>
 

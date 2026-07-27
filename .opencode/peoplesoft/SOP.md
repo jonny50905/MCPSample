@@ -6,32 +6,33 @@
 
 ---
 
-## SOP-1 教訓套用（Promotion）——最重要的一份
+## SOP-1 教訓 PR 審查——最重要的一份
 
-**時機**：`lessons/pending.md` 累積了幾筆 PROPOSED 提案後，批次處理（不必即時）。
-**原則**：規則檔是系統憲法——**本地模型永遠不能自己改**；你的角色是蓋章，不是寫規則。
+**流程**：同事 `/ps-lesson` → **該機立即生效**（agent 直接修落點檔＋記錄
+applied.md）→ 同事 commit ＋ push → 內部 git 開 **PR** → 你審 diff →
+merge（全隊採納）或退回。把關點在合併，不在事前。
 
 ```text
-□ 1. 打開 .opencode/peoplesoft/lessons/pending.md，逐筆看 PROPOSED 提案
-     （或在 OpenCode 對話請模型唸摘要）
-□ 2. 逐筆審查，問三個問題：
-     - 落點對嗎？優先序：機械化檢查 > 資料修正 > 窄規則 > AGENTS.md
-       （能用 lint / 格式判定 / tools deny 解決的，不要寫成 prose 規則）
-     - 措辭會不會太寬、誤傷正常行為？
-     - 有沒有附測試檢查點？沒有就補
-□ 3. 沒把握 → 把提案文字「遮蔽機密後」貼給較強模型審
-     （只貼提案文字，物件名可用 XXX 代替；機密不出機器）
-□ 4. 同意 → 用文字編輯器打開目標檔，照提案 diff 修改
-     （提案已把字寫好，你是搬運＋把關）
-□ 5. 測試檢查點貼進 .opencode/peoplesoft/test-scenarios.md 對應題
-□ 6. 該筆從 pending.md 剪下 → 貼到 applied.md，補日期與實際落點
-□ 7. 重啟 OpenCode（規則檔重新載入）
-□ 8. 拿原本出錯的問題重問一次，驗證教訓生效
-□ 9. 內部 git commit（見 SOP-3，前綴 kb(rule):）
+【審 PR 時看五件事（看 diff 即可，單筆 2~5 分鐘）】
+□ 1. 落點優先序對嗎？機械化檢查 > 資料修正 > 窄規則 > AGENTS.md
+     （能用 lint / 格式判定 / tools deny 解決的，不該寫成 prose 規則）
+□ 2. 是「最小新增」嗎？——只加不刪；有任何既有規則被改寫/移除 → 退回
+□ 3. 措辭會不會太寬、誤傷正常行為？
+□ 4. 測試檢查點有跟著加進 test-scenarios.md 嗎？
+□ 5. 沒把握 → 把 diff 遮敏後貼給較強模型審（物件名可代稱；機密不出機器）
+
+【merge 後】
+□ 通知全員 pull ＋ 重啟 OpenCode（教訓才會到每台機器）
+
+【退回時】
+□ PR reject ＋ 註明理由
+□ 通知該同事在本機 revert 該 commit（他的機器退回原狀）
+□ 若教訓本身有價值只是落點/措辭不對 → 修改後重新提交
 ```
 
-單筆約 5～10 分鐘。**事實類**教訓（落點在 docs/ps-research/，含 wiki entity 檔）
-不需要走本 SOP——`/ps-lesson-apply` 會直接套用，你只需事後在 git diff 抽查。
+**節奏**：教訓 PR 隨到隨審或每日批次；會導致嚴重錯誤決策的緊急教訓即時處理。
+**例外案件**：`pending.md` 裡狀態 PENDING 的（agent 沒把握自動套用的）——
+人工判斷落點後自行修改、記錄 applied.md、照常走 PR。
 
 ---
 
