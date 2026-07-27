@@ -93,6 +93,7 @@
   td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
   td code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:0 6px;font-size:12px;
     font-family:Consolas,"Courier New",monospace;white-space:nowrap}
+  tr.cat td{background:var(--soft);font-weight:600;color:var(--ink2);font-size:12.5px;letter-spacing:.03em}
   .role{font-size:11px;font-weight:600;border-radius:99px;padding:1px 10px;white-space:nowrap}
   .role.user{background:var(--accent-bg);color:var(--accent)}
   .role.admin{background:var(--warn-bg);color:var(--warn)}
@@ -358,7 +359,7 @@
       <thead><tr><th style="width:140px">角色</th><th>做什麼</th><th>依據</th></tr></thead>
       <tbody>
         <tr><td><span class="role user">一般使用者</span></td><td>對話問答、產文件、跑稽核、登錄教訓——全部在 OpenCode 內完成</td><td>本頁情境 A–D</td></tr>
-        <tr><td><span class="role admin">管理者</span></td><td>批准教訓套用、lint 健檢、內部 git 版控、回滾、人工修正標記</td><td><code>SOP.md</code>（8 份核取清單）</td></tr>
+        <tr><td><span class="role admin">管理者</span></td><td>批准教訓套用、lint 健檢、內部 git 版控、回滾、人工修正標記</td><td><code>SOP.md</code>（9 份核取清單）</td></tr>
       </tbody>
     </table>
     <div class="values" style="margin-top:16px">
@@ -367,6 +368,82 @@
       <div class="value"><b>版控與回滾</b><span>產出進「內部」git（嚴禁外部遠端），任何損壞可回滾</span></div>
       <div class="value"><b>人在關鍵環節</b><span>規則變更以內部 git PR 人審把關；檔名變更一律人工確認</span></div>
     </div>
+  </section>
+
+  <!-- ================= KNOWLEDGE ================= -->
+  <section>
+    <div class="sec-kicker">KNOWLEDGE ─ Entity Wiki 知識庫</div>
+    <h2>查過的知識不重查：一物一檔、連結成網、越用越聰明</h2>
+    <p style="margin-top:8px">深查過程中，每個核心物件（畫面、資料表、程式）都會「歸戶」成
+      <code>docs/ps-research/wiki/</code> 裡的一個檔案。之後問答<b>先查 wiki</b>——
+      命中已驗證的條目就直接引用，不必重新翻百萬行程式。
+      這套做法源自「互連知識網勝過扁平搜尋」的研究結論，落地成六條紀律：</p>
+    <div class="values" style="margin-top:16px">
+      <div class="value"><b>一物一檔，檔名即身分</b><span>如 wiki/TW_MILITARY_DATA.md；建檔前先查重（檔名＋別名），同一物件永遠只有一份檔案</span></div>
+      <div class="value"><b>觀察＋關聯</b><span>條列事實（Observations）＋帶型別的 [[連結]]（Relations）——問答沿著連結追出完整業務脈絡</span></div>
+      <div class="value"><b>作廢不刪除</b><span>事實變更寫進「Invalidated」節留下痕跡；人工蓋過 reviewed 章的檔只能追加、不能改寫</span></div>
+      <div class="value"><b>確定性檢索，不用向量</b><span>index.md 目錄＋精確比對——面對精確的 ERP 物件名，比語意搜尋可靠且可驗證</span></div>
+      <div class="value"><b>寫的人 ≠ 審的人</b><span>研究員 AI 寫、稽核員 AI 重新取證驗、人工蓋章——三方分立，互相制衡</span></div>
+      <div class="value"><b>lint 當編譯器</b><span>欄位格式、90 天過期警示、斷鏈與孤兒檔——機器逐項健檢，壞了就亮紅燈</span></div>
+    </div>
+    <div class="meta" style="margin-top:12px">流程：深查完成一項 → 歸戶 wiki → 稽核驗證 → 問答 wiki-first（目錄 → 條目 → 沿連結）→ verified 條目可直接引用</div>
+  </section>
+
+  <!-- ================= APPENDIX ================= -->
+  <section>
+    <div class="sec-kicker">APPENDIX ─ 36 個回歸測試情境</div>
+    <h2>驗收清單：每一題都守著一個踩過的坑</h2>
+    <p style="margin-top:8px">完整定義（檢查點與評分）見 <code>test-scenarios.md</code>；日常快速健檢用其中 9 題的 Smoke Set。</p>
+    <table style="margin-top:14px">
+      <thead><tr><th style="width:60px">編號</th><th style="width:36%">情境</th><th>測試輸入／驗證重點</th></tr></thead>
+      <tbody>
+        <tr class="cat"><td colspan="3">A 類 ─ 業務發現與客製政策（7 題）</td></tr>
+        <tr><td>A1</td><td>兵役根物件定位（基本盤）</td><td>兵役資料在哪裡維護？</td></tr>
+        <tr><td>A2</td><td>Alias 變形</td><td>役男的資料要去哪個畫面改？</td></tr>
+        <tr><td>A3</td><td>原生描述相似陷阱</td><td>Military Service Tracking 是不是兵役用的？</td></tr>
+        <tr><td>A4</td><td>CUSTOM_FIRST 與 fallback 回報</td><td>員工中英文姓名是怎麼同步的？</td></tr>
+        <tr><td>A5</td><td>無前綴客製（Registry）</td><td>HR_NAME_SYNC 沒有 TW_ 開頭，是原生的嗎？</td></tr>
+        <tr><td>A6</td><td>被修改的原生物件</td><td>PERSONAL_DATA 是標準功能嗎？升級會有影響嗎？</td></tr>
+        <tr><td>A7</td><td>未命中 domain 用預設政策</td><td>請假加班的資料在哪裡維護？（未登錄領域不拒答）</td></tr>
+        <tr class="cat"><td colspan="3">B 類 ─ UI 語意與選項（5 題）</td></tr>
+        <tr><td>B1</td><td>選項清單</td><td>兵役狀態這個欄位有哪些選項？</td></tr>
+        <tr><td>B2</td><td>Label 反查儲存值</td><td>免役在資料庫裡存什麼值？在哪個欄位？</td></tr>
+        <tr><td>B3</td><td>顯示文字 → Record.Field</td><td>畫面上「兵役狀態」綁哪個 Record？</td></tr>
+        <tr><td>B4</td><td>高基數 Prompt 陷阱</td><td>承辦人可以選哪些人？把清單給我。（不得全量列人）</td></tr>
+        <tr><td>B5</td><td>動態 Label</td><td>「免役原因」的標題是固定的嗎？</td></tr>
+        <tr class="cat"><td colspan="3">C 類 ─ 長文本漸進檢索（6 題）</td></tr>
+        <tr><td>C1</td><td>PeopleCode 分支分析＋證據紀律</td><td>在畫面上選了免役之後，系統會做什麼？</td></tr>
+        <tr><td>C2</td><td>SQR 先看 Outline</td><td>TW_MIL001 這支 SQR 在做什麼？</td></tr>
+        <tr><td>C3</td><td>SQC 定向展開</td><td>GET-MIL-DESC 在哪裡定義？做什麼用？</td></tr>
+        <tr><td>C4</td><td>SQL 讀寫分類</td><td>TW_MIL_UPD_SQL 動到哪些 table？讀還是寫？</td></tr>
+        <tr><td>C5</td><td>Context Budget</td><td>把 TW_MIL001 所有邏輯完整列出來。（不得爆量塞 context）</td></tr>
+        <tr><td>C6</td><td>截斷接續與分頁</td><td>存檔之後系統到底做了哪些事？（跨 chunk 要接完）</td></tr>
+        <tr class="cat"><td colspan="3">D 類 ─ DYNAMIC_RUNTIME 動態行為（3 題）</td></tr>
+        <tr><td>D1</td><td>動態 SQL</td><td>免役核准後會更新哪個 table？（動態組字串要標示、不得猜）</td></tr>
+        <tr><td>D2</td><td>SQR 動態 Table</td><td>LOAD-HISTORY 從哪個 table 讀資料？</td></tr>
+        <tr><td>D3</td><td>動態選項</td><td>免役原因下拉有哪些選項？（程式動態塞值要標示）</td></tr>
+        <tr class="cat"><td colspan="3">E 類 ─ 端到端整合（4 題）</td></tr>
+        <tr><td>E1</td><td>兵役旗艦案例</td><td>免役這個選項在哪裡維護？選了以後會執行什麼？</td></tr>
+        <tr><td>E2</td><td>資料血緣</td><td>MIL_STATUS 這個欄位的值會被哪些程式更新？</td></tr>
+        <tr><td>E3</td><td>執行方式</td><td>TW_MIL001 什麼時候會跑？誰去啟動它？</td></tr>
+        <tr><td>E4</td><td>安全性</td><td>誰可以進兵役資料維護的畫面？</td></tr>
+        <tr class="cat"><td colspan="3">F 類 ─ Context 紀律／Subagent 架構（5 題）</td></tr>
+        <tr><td>F1</td><td>Subagent 回報紀律</td><td>回報不得夾大段原始碼（單段 ≤5 行、全報告 ≤20 行）</td></tr>
+        <tr><td>F2</td><td>Orchestrator 不越權取段</td><td>主 agent 不得自己呼叫檢索工具，必須委派</td></tr>
+        <tr><td>F3</td><td>委派路由正確</td><td>SQR 問題委給 ps-sqr-flow，不錯派、不重複派</td></tr>
+        <tr><td>F4</td><td>新註冊 MCP 不外洩</td><td>新掛上的 server 未整合前，任何 agent 不得呼叫</td></tr>
+        <tr><td>F5</td><td>PeoplecodeMetadata 僅作定位</td><td>定位線索不作證據；查無結果必回退正規管道</td></tr>
+        <tr class="cat"><td colspan="3">G 類 ─ Deep Research 文件生成（2 題）</td></tr>
+        <tr><td>G1</td><td>總覽與 checklist 生成</td><td>/ps-research 兵役（首次）——總覽＋進度檔要件齊全</td></tr>
+        <tr><td>G2</td><td>逐項深查與續跑</td><td>中斷後重跑——不重查已完成項、只改進度小檔</td></tr>
+        <tr class="cat"><td colspan="3">H 類 ─ 稽核與教訓迴路（2 題）</td></tr>
+        <tr><td>H1</td><td>稽核執行與回灌</td><td>/ps-audit 兵役——證據重驗、問題回灌進度清單</td></tr>
+        <tr><td>H2</td><td>教訓登錄即生效</td><td>/ps-lesson ——本機立即套用、留完整紀錄、PR 把關</td></tr>
+        <tr class="cat"><td colspan="3">I 類 ─ Entity Wiki 層（2 題）</td></tr>
+        <tr><td>I1</td><td>歸戶與查重</td><td>深查完成後 wiki 有建檔／更新，同物件不重複建檔</td></tr>
+        <tr><td>I2</td><td>問答 wiki-first 與來源標註</td><td>已驗證條目直接引用，且標明來源出自 wiki</td></tr>
+      </tbody>
+    </table>
   </section>
 
   <footer>
