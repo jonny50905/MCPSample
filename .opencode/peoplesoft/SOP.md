@@ -170,3 +170,36 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 □ 個案收尾：從 checklist.md 找標 ⚠（寫入失敗）的項，重跑 /ps-research
   讓它補做；反覆失敗的同一檔改用 SOP-5 人工建檔
 ```
+
+---
+
+## SOP-10 Serving 端上限與約束解碼檢查（L6 兩疑點）
+
+先認 stack：開 opencode.json 看 provider baseURL 埠號——
+11434＝Ollama／1234＝LM Studio／8000 常見為 vLLM。
+
+```text
+□ 1. OpenCode 端宣告：opencode.json 該 model 的 limit（context／output）
+     ——TUI 的 context % 按這個算；設太小會提早壓縮、看起來「用滿」
+□ 2. Serving 端真實 context：
+     - Ollama：ollama show <model>（含 --parameters）；伺服器日誌 n_ctx；
+       注意 Ollama 超長輸入「靜默截斷」不報錯（日誌 truncating input prompt）
+     - vLLM：curl http://host:8000/v1/models 看 max_model_len；
+       或啟動參數 --max-model-len
+     - LM Studio：載入模型頁 context length 欄位
+     - llama.cpp server：/props 端點 n_ctx；啟動參數 --ctx-size
+□ 3. 萬用探針（會報錯的 stack）：PowerShell 丟超長輸入，錯誤訊息
+     會寫出真實上限（maximum context length is XXXX）：
+       $b=@{model="<名>";messages=@(@{role="user";content=("測 "*200000)})}|ConvertTo-Json -Depth 5
+       Invoke-RestMethod -Uri "http://<host>:<port>/v1/chat/completions" -Method Post -ContentType "application/json" -Body $b
+□ 4. 輸出上限探針：對話叫它「從 1 數到 3000，每行一個數字」，
+     斷點 ≈ 輸出 token 上限；並查 opencode.json 的 maxTokens／limit.output
+□ 5. 約束解碼（治 tool-call JSON 壞格）：
+     - vLLM：--enable-auto-tool-choice ＋ Qwen 系 tool-call parser
+       ＋ guided decoding（xgrammar／outlines）
+     - Ollama：升級新版（原生約束 tool-call JSON／structured outputs）
+     - llama.cpp：grammar（GBNF）／新版 --jinja 工具支援
+□ 6. 建議值：context 不必盲開 262K（KV cache／prefill 代價大）——
+     subagent 隔離下 32K～64K 通常足夠；輸出上限建議 ≥ 8K
+□ 7. 查到的數字回報對話，據以調整規則（如寫檔行數上限）
+```
