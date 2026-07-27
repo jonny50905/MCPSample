@@ -15,7 +15,12 @@ agent: ps-deep-research
 1. 逐一已完成檔案委派 ps-auditor 做證據解引用驗證（任務 A）；
    每檔抽 3~5 條標 CONFIRMED 的重要 claim 做反駁驗證（任務 B）。
 2. 以總覽的核心資料表清單做換角度完整性盤點（任務 C），與功能地圖 diff。
-3. 依 audit 模板產出 `90-audit.md` 記分卡。
-4. DISPUTED / FAIL / 遺漏候選逐項回灌 `checklist.md` 的調查進度
+3. **先回灌**：任何非 PASS 判定（FAIL／DISPUTED／其他一律算）與
+   遺漏候選，逐項加進 `checklist.md` 的調查進度
    （格式：`- [ ] A<n> 補查 <說明>（稽核）`）。
+4. **後寫** `90-audit.md` 記分卡（依 audit 模板；「已回灌」節逐行
+   抄錄步驟 3 加的行）。非 PASS ≥ 1 而 checklist.md 無新 A 行＝
+   流程錯誤，不得寫記分卡。
 5. 出現系統性錯誤（同類 FAIL ≥ 2）→ 提議我執行 `/ps-lesson`。
+6. 結束前最後一個動作：read `checklist.md` 確認回灌行都在——
+   缺就立刻補上再結束。

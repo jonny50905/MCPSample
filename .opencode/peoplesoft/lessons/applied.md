@@ -49,3 +49,16 @@
   (3) 新增 SOP-9 服務端排查（輸出 token 上限、tool-call 約束解碼）。
 - 套用：本 commit；測試情境 G1／H1 對齊、G2 加「00-overview 零改動」
   檢查點。
+
+### L3 稽核只寫記分卡、跳過回灌——交付物完成後尾端步驟被丟（2026-07-27）
+- 症狀：/ps-audit 產出 90-audit.md（PASS 8／FAIL 2／PARTIAL 2）後即
+  結束，checklist 沒有任何 A<n> 補查行；且模型自創契約外狀態
+  partial_pass。
+- 根因：小模型寫完主要交付物即視為任務完成，排在其後的步驟（回灌、
+  自檢）被靜默丟棄——與「複述計畫就停」同族。
+- 落點：機械化順序——回灌**先於**記分卡（非 PASS ≥ 1 而 checklist
+  無新 A 行＝禁止寫 90-audit.md）；回灌對象改「任何非 PASS 判定」
+  （網住自創狀態）；命令加結束前 read checklist.md 自檢；模板加
+  順序約束註記；H1 改致命檢查點＋狀態詞彙檢查。
+- 套用：本 commit（ps-deep-research／ps-audit 命令／audit-template／
+  test-scenarios H1）。

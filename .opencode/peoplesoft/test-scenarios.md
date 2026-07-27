@@ -391,9 +391,12 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      （存在、行號、quote 子字串），SQL 證據被重跑比對
   2. [致命] 稽核判定只依重新取得的證據——transcript 中不得出現
      「文件如此記載，故正確」式推理
-  3. [主要] 產出 90-audit.md 記分卡；DISPUTED / FAIL / 遺漏候選
-     回灌 checklist.md（標「（稽核）」）
-  4. [次要] 同類 FAIL ≥ 2 時主動提議 /ps-lesson
+  3. [致命] 任何非 PASS 判定 ≥ 1 時，checklist.md 必有對應
+     `- [ ] A<n> 補查…（稽核）` 行——回灌先於記分卡、不得省略
+  4. [主要] 產出 90-audit.md 記分卡，「已回灌」節與 checklist.md 一致
+  5. [次要] 判定狀態只用契約詞彙（PASS／FAIL／UNVERIFIABLE／
+     VERIFIED／DISPUTED），不自創（如 partial_pass）
+  6. [次要] 同類 FAIL ≥ 2 時主動提議 /ps-lesson
 
 ### H2 教訓登錄即生效（本機套用、PR 把關）
 - **輸入**：`/ps-lesson 它把停用選項當成有效選項`

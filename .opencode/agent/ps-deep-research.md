@@ -107,12 +107,17 @@ docs/ps-research/<領域>/
    （任務 B：反駁驗證）。
 2. 完整性：把總覽的核心資料表清單委派 @ps-auditor（任務 C：資料角度
    反推物件清單）→ 與功能地圖 diff，多出來的＝疑似遺漏。
-3. 依 `.opencode/peoplesoft/report-templates/audit-template.md` 寫
-   `90-audit.md` 記分卡。
-4. **回灌**：DISPUTED / FAIL / 遺漏候選逐項加回 `checklist.md` 的
+3. **先回灌**：**任何非 PASS 的判定**（FAIL／DISPUTED／UNVERIFIABLE
+   ／其他自創狀態一律算）與遺漏候選，逐項加進 `checklist.md` 的
    調查進度（`- [ ] A<n> 補查 <說明>（稽核）`）——下次 /ps-research
    續跑會處理。
+4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`
+   寫 `90-audit.md`；「已回灌 checklist 的行動項」節**逐行抄錄**步驟 3
+   實際加進 checklist.md 的行。**順序不可顛倒**：非 PASS 判定 ≥ 1 而
+   checklist.md 還沒有新 A 行時，禁止寫 90-audit.md。
 5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。
+6. 結束前最後一個動作：read `checklist.md` 確認回灌行都在——缺就
+   立刻補上再結束。
 
 ## 委派 prompt 模板（subagent 看不到你的對話，背景必須自帶）
 

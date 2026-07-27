@@ -22,6 +22,10 @@
 
 ## 已回灌 checklist 的行動項
 
+<!-- 順序約束：這些行必須「先」實際寫進 checklist.md，再抄錄到本節。
+     任何非 PASS 判定（FAIL／DISPUTED／UNVERIFIABLE／其他）≥ 1 而
+     checklist.md 沒有對應 A<n> 行＝流程錯誤，不得產出本報告。 -->
+
 - [ ] A1 <補查說明>（稽核）
 
 ## 系統性錯誤觀察（同類 FAIL ≥ 2 → 建議 /ps-lesson）
