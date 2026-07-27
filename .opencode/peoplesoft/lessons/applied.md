@@ -26,3 +26,8 @@
   提供該 server 的確切註冊名與完整工具清單。
 - 後續（2026-07-27）：管理者確認註冊名為 `PeoplecodeMetadata`（單 e）→
   已移除九檔的 `PeoplecodeMeetadata_*` 備援項；正式整合仍待完整工具清單。
+- 正式整合（2026-07-27）：工具＝`find_field_usage`（fieldName／pageName／
+  componentName）與 `search_component_metadata`（keyword）。開放給
+  ps-ui-flow／ps-metadata-flow（定位優先步驟）與 ps-auditor（任務 C
+  反查角度）；**定位線索不作 evidence**（契約仍僅 CHUNK／SQL 兩種），
+  其餘 agent 維持 deny。測試情境加 F5。

@@ -18,9 +18,9 @@ tools:
   # PeopleTools metadata（排程 / 授權 / origin / Record 結構）用 oracleMCP 查，
   # 查詢一律照 oracle-query-cookbook.md 的樣板，只准 SELECT：
   "oracleMCP_*": true
-  # 新 MCP「PeoplecodeMetadata」（find_field_usage 等）待確認工具清單後
-  # 最優先整合進本 agent；整合前先 deny（沒列＝預設開）：
-  "PeoplecodeMetadata_*": false
+  # PeoplecodeMetadata：欄位用途反查（find_field_usage）／Component 關鍵字
+  # 搜尋（search_component_metadata）——回傳只作定位線索，證據仍走 SQL／CHUNK：
+  "PeoplecodeMetadata_*": true
   # 契約專用工具尚未實作（未來上線後取消註解並對齊註冊名）：
   # peoplesoft_ps_get_data_lineage: true
   # peoplesoft_ps_get_process_usage: true
@@ -41,19 +41,24 @@ tools:
 ## 執行
 
 1. 依問題類型 Read 對應 SKILL.md 並遵守其中規則。
-2. 排程 / 授權 / origin / Record 結構：**Read
+2. **先用 PeoplecodeMetadata 定位**（免連線）：血緣類先 `find_field_usage`
+   （fieldName／pageName／componentName）縮小「誰用到這欄位」的範圍；
+   找 Component 候選用 `search_component_metadata`（keyword，中英文都試）。
+   回傳**只作定位線索**，不得直接寫成 evidence。
+3. 排程 / 授權 / origin / Record 結構：**Read
    `.opencode/peoplesoft/oracle-query-cookbook.md`，照樣板用 oracleMCP 查**
    （§3 Process、§4 Security、§1 Origin、§6 Record），不要自己發明 SQL。
-3. 血緣邊需要原始碼佐證時，以 table / 欄位名搜 PeoplecodeElasticSearch
+4. 血緣邊需要原始碼佐證時，以 table / 欄位名搜 PeoplecodeElasticSearch
    取 chunk ids，再用 PeoplecodeSource 取段確認（遵守
    `.opencode/peoplesoft/progressive-source-retrieval.md`）。
-4. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
+5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
 
 ## 現況限制
 
-- **血緣**：以 table / Record.Field 名搜 `PeoplecodeElasticSearch` 找引用
-  chunk ids，再用 `PeoplecodeSource` 取段確認讀寫方向；覆蓋不到的
+- **血緣**：先 `PeoplecodeMetadata` 的 `find_field_usage` 縮小範圍，
+  再以 table / Record.Field 名搜 `PeoplecodeElasticSearch` 找引用
+  chunk ids，用 `PeoplecodeSource` 取段確認讀寫方向；覆蓋不到的
   （如 Component 存檔的隱含寫入）寫進 `gaps`。
 - **排程 / 授權 / origin**：用 `oracleMCP` 照 cookbook 樣板查 PeopleTools
   metadata 表；查到的表 / 欄位與樣板不符時記入 `gaps`，**不得**瞎改表名
@@ -74,3 +79,6 @@ tools:
   血緣的原始碼 evidence（`kind: "CHUNK"`）之 `filePath` / id / lines
   **逐字複製**工具回傳；oracleMCP 證據用 `kind: "SQL"` ＋ `sql` ＋
   `keyRows`，**沒有 id、也不准自創 id**。
+- **PeoplecodeMetadata 只作定位**：其回傳不得作為 evidence 條目
+  （evidence 僅 CHUNK／SQL 兩種）；只有定位線索、未經 SQL／CHUNK 查證的
+  finding 最高只能標 INFERRED。

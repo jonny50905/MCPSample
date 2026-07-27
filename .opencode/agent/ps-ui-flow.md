@@ -15,10 +15,12 @@ tools:
   # PeopleTools metadata（translate values、label、Page/Component 對映、prompt）
   # 用 oracleMCP 查，一律照 oracle-query-cookbook.md 樣板，只准 SELECT：
   "oracleMCP_*": true
+  # PeoplecodeMetadata：欄位用途反查／Component 關鍵字搜尋——免連線、最便宜，
+  # 但回傳只作「定位線索」，證據仍走 oracleMCP（SQL）：
+  "PeoplecodeMetadata_*": true
   # 不屬於本 subagent 的 MCP 明確 deny（OpenCode 沒列出＝預設開啟）：
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
-  "PeoplecodeMetadata_*": false
   # UI Semantic Index 專用 MCP 尚未建置（未來上線後取消註解並對齊註冊名）：
   # peoplesoft_ps_search_ui_semantics: true
   # peoplesoft_ps_get_ui_graph: true
@@ -35,11 +37,17 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 
 1. Read `.opencode/skills/ps-ui-flow/SKILL.md`，遵守其中全部規則
    （UI 文字第一級語意、choice 類型、高基數不全量、DYNAMIC_RUNTIME 標記）。
-2. **Read `.opencode/peoplesoft/oracle-query-cookbook.md`**，用 oracleMCP
-   照 §2 樣板查：translate values（含 ZHT）、由選項文字 / label 反查欄位、
-   Page ↔ Record.Field ↔ Component 對映、prompt table 與基數。
-3. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
-4. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
+2. **先用 PeoplecodeMetadata 定位**（免連線，優先於開 oracleMCP）：
+   - `find_field_usage`（參數 fieldName／pageName／componentName，依實際
+     schema 填）：欄位出現在哪些 Page／Component、被誰使用——先縮小目標。
+   - `search_component_metadata`（keyword）：以領域關鍵字找候選 Component；
+     中英文關鍵字都試（如 batch、eAssignment）。
+   回傳**只作定位線索**，不得直接寫成 evidence。
+3. **Read `.opencode/peoplesoft/oracle-query-cookbook.md`**，用 oracleMCP
+   照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
+   label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數。
+4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
+5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
 
 ## 現況限制
@@ -47,6 +55,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **可用（oracleMCP + cookbook §2）**：translate values 與其中文、欄位 label、
   選項文字 / label 反查欄位、Page ↔ Component ↔ Record.Field 對映、
   prompt record 與基數。
+- **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查、
+  `search_component_metadata` Component 關鍵字搜尋。
 - **尚缺（UI Semantic Index 未建）**：跨全部 UI 文字的語意（非精確）搜尋、
   Page Field 覆寫 label 的最終文字解析、Grid/Tab/GroupBox 專屬 label。
   查不到時記入 `gaps`，**不得**改用猜測或從物件命名腦補畫面文字。
@@ -61,6 +71,9 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **oracle 證據格式**：`kind: "SQL"` ＋ `sql` ＋ `keyRows`（關鍵列摘要）；
   **沒有 id、也不准自創 id**（`SQL-XLAT-1` 這種自編字串＝報告不合格）。
   只有真的取了 source chunk 才有 id / filePath，且必須逐字來自工具回傳。
+- **PeoplecodeMetadata 只作定位**：其回傳不得作為 evidence 條目
+  （evidence 僅 SQL／CHUNK 兩種）；只有定位線索、未經 oracleMCP 查證的
+  finding 最高只能標 INFERRED。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。

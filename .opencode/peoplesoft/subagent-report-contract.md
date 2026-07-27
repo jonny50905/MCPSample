@@ -28,6 +28,9 @@ orchestrator 主 context 只累積小而結構化的報告。
      給人看的引用寫「filePath:行號」，id 供機器重取。
    - `SQL`（來自 oracleMCP）：附 `sql` 與 `keyRows`（關鍵列摘要），
      **沒有 id、也不准自創 id**——`SQL-XLAT-1` 這種自編字串＝報告不合格。
+   - **只有這兩種**。`PeoplecodeMetadata` 的回傳＝定位線索（地位同 ES
+     搜尋結果），不得寫成 evidence 條目；只有定位、未經 CHUNK／SQL 查證
+     的 finding 最高標 INFERRED。
 8. **禁止捏造識別碼**：id / filePath / lines 只能來自工具回傳；
    工具沒提供的欄位一律省略，不得補一個「看起來像」的值。
 9. 長文本分析必附 `coverage`：本次分析的程式單位、其**結構行號範圍**、

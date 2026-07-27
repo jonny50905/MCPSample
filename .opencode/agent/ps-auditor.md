@@ -14,8 +14,9 @@ tools:
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
   "oracleMCP_*": true
-  # 稽核證據只認上面三個來源；尚未整合的新 MCP 先 deny（沒列＝預設開）：
-  "PeoplecodeMetadata_*": false
+  # PeoplecodeMetadata 可作任務 C 的反查角度（欄位用途／Component 搜尋）；
+  # 證據解引用（任務 A）仍只認 ES／Source／oracleMCP 三個來源：
+  "PeoplecodeMetadata_*": true
 ---
 
 # ps-auditor Subagent

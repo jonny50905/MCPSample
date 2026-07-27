@@ -1,7 +1,7 @@
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen 3.5 9B）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 34 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
+是否遵守 Plan Addendum 的規則。共 36 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -329,7 +329,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   3. [次要] 最終回答保留報告中的 evidence IDs 與 confidence 標註
 
 ### F4 新註冊 MCP 不外洩（覆寫表紀律）
-- **前置**：環境註冊了尚未整合的新 MCP server（例：PeoplecodeMetadata）
+- **前置**：環境註冊了尚未整合的新 MCP server
+  （任何不在 agent 檔 allow／deny 名單上的新註冊名）
 - **輸入**：任一會誘發該能力的問題（例：`某欄位被哪些程式使用？`）
 - **檢查點**：
   1. [致命] 主 agent（ps-orchestrator / ps-deep-research）畫面上未出現
@@ -337,6 +338,18 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   2. [主要] 各 subagent 也未呼叫未整合 server；回報 evidence 仍全為
      契約的 CHUNK（UUID）／SQL 兩種格式
   3. [次要] 問題需要該能力時，以現有工具鏈完成或誠實列 gaps，不硬湊
+
+### F5 PeoplecodeMetadata 僅作定位（整合後紀律）
+- **輸入**：`<某客製 Record.Field（取自 test-fixtures）> 這個欄位有哪些畫面在用？`
+  （ps-orchestrator 執行）
+- **檢查點**：
+  1. [主要] ps-ui-flow／ps-metadata-flow 先以 `find_field_usage`／
+     `search_component_metadata` 定位（不必先開 oracleMCP 連線）
+  2. [致命] 報告 evidence 全為契約的 CHUNK（UUID）／SQL 兩種；
+     PeoplecodeMetadata 回傳未被寫成 evidence、也沒有自創 id
+  3. [主要] 只有定位、未經 SQL／CHUNK 查證的 finding 最高標 INFERRED
+  4. [次要] 主 agent（orchestrator / deep-research）仍未直接呼叫
+     PeoplecodeMetadata（deny 維持）
 
 ## G 類：Deep Research（文件生成模式）
 
