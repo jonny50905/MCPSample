@@ -135,7 +135,7 @@
     <div class="tile"><div class="num">2</div><div class="lbl">工作模式（問答／文件生成）</div></div>
     <div class="tile"><div class="num">8</div><div class="lbl">分工 AI Agent（含稽核員）</div></div>
     <div class="tile"><div class="num">4</div><div class="lbl">資料源 MCP（搜尋／原始碼／中繼資料／DB）</div></div>
-    <div class="tile"><div class="num">36</div><div class="lbl">回歸測試情境（品質驗收）</div></div>
+    <div class="tile"><div class="num">37</div><div class="lbl">回歸測試情境（品質驗收）</div></div>
   </div>
 
   <!-- ================= WHY ================= -->
@@ -316,7 +316,7 @@
       <div class="arr">→</div>
       <div class="gate"><div class="g-ic">📋</div><b>3. 教訓機制</b><span>答錯→<code style="font-family:Consolas,monospace;font-size:11.5px">/ps-lesson</code> 本機立即修正；團隊生效走內部 git <b>PR 人審</b>把關</span></div>
       <div class="arr">→</div>
-      <div class="gate"><div class="g-ic">✅</div><b>4. 回歸測試</b><span>36 個測試情境守住歷史教訓，改版必跑，不走回頭路</span></div>
+      <div class="gate"><div class="g-ic">✅</div><b>4. 回歸測試</b><span>37 個測試情境守住歷史教訓，改版必跑，不走回頭路</span></div>
     </div>
 
     <div class="loop" style="margin-top:26px">
@@ -391,7 +391,7 @@
 
   <!-- ================= APPENDIX ================= -->
   <section>
-    <div class="sec-kicker">APPENDIX ─ 36 個回歸測試情境</div>
+    <div class="sec-kicker">APPENDIX ─ 37 個回歸測試情境</div>
     <h2>驗收清單：每一題都守著一個踩過的坑</h2>
     <p style="margin-top:8px">完整定義（檢查點與評分）見 <code>test-scenarios.md</code>；日常快速健檢用其中 9 題的 Smoke Set。</p>
     <p style="margin-top:6px">題目多以「兵役」為題材——它出自原始需求文件的完整範例，<b>正確答案已知才能評分</b>。
@@ -430,12 +430,13 @@
         <tr><td>E2</td><td>資料血緣</td><td>MIL_STATUS 這個欄位的值會被哪些程式更新？</td></tr>
         <tr><td>E3</td><td>執行方式</td><td>TW_MIL001 什麼時候會跑？誰去啟動它？</td></tr>
         <tr><td>E4</td><td>安全性</td><td>誰可以進兵役資料維護的畫面？</td></tr>
-        <tr class="cat"><td colspan="3">F 類 ─ Context 紀律／Subagent 架構（5 題）</td></tr>
+        <tr class="cat"><td colspan="3">F 類 ─ Context 紀律／Subagent 架構（6 題）</td></tr>
         <tr><td>F1</td><td>Subagent 回報紀律</td><td>回報不得夾大段原始碼（單段 ≤5 行、全報告 ≤20 行）</td></tr>
         <tr><td>F2</td><td>Orchestrator 不越權取段</td><td>主 agent 不得自己呼叫檢索工具，必須委派</td></tr>
         <tr><td>F3</td><td>委派路由正確</td><td>SQR 問題委給 ps-sqr-flow，不錯派、不重複派</td></tr>
         <tr><td>F4</td><td>新註冊 MCP 不外洩</td><td>新掛上的 server 未整合前，任何 agent 不得呼叫</td></tr>
         <tr><td>F5</td><td>PeoplecodeMetadata 僅作定位</td><td>定位線索不作證據；查無結果必回退正規管道</td></tr>
+        <tr><td>F6</td><td>委派 prompt 瘦身</td><td>委派只傳檔案路徑＋聚焦問題，不貼檔案全文</td></tr>
         <tr class="cat"><td colspan="3">G 類 ─ Deep Research 文件生成（2 題）</td></tr>
         <tr><td>G1</td><td>總覽與 checklist 生成</td><td>/ps-research 兵役（首次）——總覽＋進度檔要件齊全</td></tr>
         <tr><td>G2</td><td>逐項深查與續跑</td><td>中斷後重跑——不重查已完成項、只改進度小檔</td></tr>

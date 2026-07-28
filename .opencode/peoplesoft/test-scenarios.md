@@ -2,7 +2,7 @@
 
 用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
 程序紀律屬小模型等級）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 36 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
+是否遵守 Plan Addendum 的規則。共 37 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -356,6 +356,16 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   6. [主要] 未把 Page／Record 名帶入 find_field_usage／
      search_component_metadata（輸入類型限定：只吃欄位名／Component
      關鍵字）——Page 類問題先走 cookbook §2 對映換出欄位名
+
+### F6 委派 prompt 瘦身（task JSON 不截斷）
+- **輸入**：任一深查／稽核流程（觀察 task 委派的參數內容）
+- **檢查點**：
+  1. [致命] 委派 prompt 不含檔案全文／報告全文／大段程式碼——
+     驗檔類委派傳「檔案路徑＋聚焦問題」，由 subagent 自行 read
+  2. [主要] 委派 prompt ≤ 約 30 行：背景（domain／searchMode／
+     已知物件）＋單一問題＋回覆要求
+  3. [次要] task 呼叫 JSON 解析失敗時：縮短 prompt 重委派；
+     同一委派失敗 2 次標 ⚠ 跳過，未原樣重試
 
 ## G 類：Deep Research（文件生成模式）
 

@@ -87,7 +87,8 @@ docs/ps-research/<領域>/
       寫進該檔「Invalidated」節（作廢不刪除）並在對話中提醒管理者。
    c. 更新 `wiki/index.md` 物件目錄（字母序一行，不重複）。
    d. `NN` 文件中的物件名改用 `[[物件名]]` 連結，細節不重複詳述。
-4. **打勾前快驗**：委派 @ps-auditor（任務 A）驗本檔 evidence；
+4. **打勾前快驗**：委派 @ps-auditor（任務 A）驗本檔 evidence——
+   **只傳檔案路徑，不貼檔案內容**（auditor 自己 read）；
    FAIL → 當場重取證據修正再打勾；修不了 → 打勾＋⚠（原因）。
 5. 更新 `checklist.md`（read → 整檔覆寫）：該項打勾；BLOCKED 也照樣
    寫檔（gaps 顯著）、打勾並在行尾加「⚠（原因）」；重大缺口同步寫進
@@ -115,8 +116,8 @@ docs/ps-research/<領域>/
 的 A 項**。一次一檔，oracle 類委派依序：
 
 1. 每檔委派 @ps-auditor（任務 A：證據解引用——ChunkId 重查、quote 子字串
-   比對、SQL 重跑）；每檔抽 3~5 條標 CONFIRMED 的重要 claim 再委派
-   （任務 B：反駁驗證）。
+   比對、SQL 重跑）——**委派只傳檔案路徑，不貼內容**；每檔抽 3~5 條
+   標 CONFIRMED 的重要 claim 再委派（任務 B：反駁驗證）。
 2. 完整性：把總覽的核心資料表清單委派 @ps-auditor（任務 C：資料角度
    反推物件清單）→ 與功能地圖 diff，多出來的＝疑似遺漏。
 3. **先回灌＋輪次遞增**：read `checklist.md` 的「稽核輪次：N」行
@@ -154,6 +155,15 @@ aliases: [<本次使用的同義詞>]
 [任務] <單一、聚焦的問題>
 [回覆要求] 依 .opencode/peoplesoft/subagent-report-contract.md 回覆單一 JSON 報告
 ```
+
+**委派瘦身（防 task JSON 截斷）**：
+- 委派 prompt 上限約 30 行；**禁止貼入檔案內容、報告全文或大段程式碼**。
+- 驗檔類委派（快驗／稽核任務 A）只傳**檔案路徑**：
+  `[任務] read docs/ps-research/<領域>/<檔名> 執行任務 A（證據解引用）`
+  ——auditor 有 read 權限，自己讀檔。
+- task 呼叫出現 invalid／JSON 解析失敗 → **縮短 prompt 再委派**
+  （砍到只剩背景數行＋路徑＋單一問題）；同一委派失敗 2 次 →
+  標 ⚠ 跳過，**不得原樣重試**。
 
 ## 操作日誌（log.md）
 
