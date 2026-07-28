@@ -176,6 +176,7 @@ reviewed；內容：Observations ＋ typed Relations `[[wikilink]]`）。
 問答：orchestrator 先讀 wiki/index.md → 命中 entity 檔直接引用
       （verified 免重查）→ wiki 沒有才委派現查 → 回答標註來源
 修正：答錯的事實修在 entity 檔（作廢不刪除）→ 之後每次問答都對
+CR：系統改版上線 → 重建 ES 索引 → audit 找出失效證據 → research 更新（SOP-11）
 ```
 
 設計依據（2026-07 研究結論）：編譯過的互連 wiki 對多跳檢索勝過

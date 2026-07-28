@@ -206,3 +206,30 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
      subagent 隔離下 32K～64K 通常足夠；輸出上限建議 ≥ 8K
 □ 7. 查到的數字回報對話，據以調整規則（如寫檔行數上限）
 ```
+
+---
+
+## SOP-11 系統 CR 上線後的知識庫對齊
+
+前提觀念：ES 索引是程式碼**快照**——索引沒更新，稽核驗的是舊
+code，全部白驗。oracleMCP 查線上 DB，CR 後立即反映、不需此步；
+所以 chunk 證據與 SQL 證據的時效是**不同步**的。
+
+```text
+□ 1. CR 上線 → 先依既有索引維護程序重建／增量更新 ES 索引
+□ 2. 從 CR 單取「動到的物件清單」（Component / Record / 程式名）
+□ 3. 定位受影響知識：對每個物件 grep docs/ps-research/
+     （wiki 檔名、aliases、[[物件名]] 反連結都是純文字）
+     → 得到受影響的 entity 檔與 NN-*.md 清單
+□ 4. 快速標記（二選一）：
+     A. 人工：受影響 entity 檔 frontmatter status 改 stale（SOP-5）
+     B. 對話：切 PS-DEEP-RESEARCH 說「CR-<編號> 修改了 <物件清單>：
+        把對應 entity 檔標 stale，事實變更寫進 Invalidated 節」
+□ 5. 重驗更新：對受影響領域 /ps-audit <領域>——被 CR 改掉的 chunk
+     會 FAIL／查無 → 自動回灌 A 項 → /ps-research <領域> 消化
+     → 文件與 wiki 就地更新（作廢不刪除；reviewed 檔只追加）
+□ 6. 不知道影響範圍：跳過 2~4，對可能相關的領域直接 /ps-audit
+     ——證據解引用會自己找出變掉的地方（較慢但完備）
+□ 7. 兜底：lint 的 90 天過期警示點名久未驗證的 entity；
+     大型改版後全領域輪流 /ps-audit 一輪
+```
