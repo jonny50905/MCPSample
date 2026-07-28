@@ -54,5 +54,9 @@
 
 | # | 位置 | 說明 | 機器參照 |
 |---|---|---|---|
-| 1 | `peoplecode/TW_XXX/.../FieldChange.pcode:12-24` | E 分支條件 | ChunkId `<uuid>` |
+| 1 | `peoplecode/TW_XXX/.../FieldChange.pcode:12-24` | E 分支條件 | ChunkId `3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d` |
+
+<!-- ChunkId 一律逐字複製「完整 36 字元 UUID」（如上例長度）——
+     它不是 git SHA，**禁止縮寫成前 8 碼**；縮寫會被稽核判
+     FAIL(TRUNCATED_ID)、lint 也會抓。 -->
 | 2 | SQL：`SELECT … FROM PSXLATITEM …` | 選項清單 | keyRows：E=免役… |

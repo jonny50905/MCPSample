@@ -164,9 +164,10 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
   最常見原因＝單次寫入內容太長被截斷（大檔整檔覆寫）
 □ 規則側已緩解：進度拆到小檔 checklist.md、00-overview 凍結、
   單次寫檔約 150 行上限、同檔失敗 2 次標 ⚠ 跳過（不會卡死）
-□ 服務端可做（管理者）：加大模型單次輸出 token 上限；推理伺服器若支援
-  tool-call 約束解碼（vLLM auto tool choice／grammar、Ollama JSON mode 等）
-  → 打開，可大幅降低 JSON 壞格率
+□ 服務端可做（管理者）：推理伺服器若支援 tool-call 約束解碼
+  （vLLM auto tool choice／grammar、Ollama JSON mode 等）→ 打開，
+  可大幅降低 JSON 壞格率（**本環境 2026-07 探針已確認輸出上限充足
+  ——數到 3000 能完成——故約束解碼是唯一高價值槓桿**）
 □ 個案收尾：從 checklist.md 找標 ⚠（寫入失敗）的項，重跑 /ps-research
   讓它補做；反覆失敗的同一檔改用 SOP-5 人工建檔
 □ invalid[tool=task] 同根因——委派 prompt 過長（常見：把整份檔案

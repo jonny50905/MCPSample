@@ -97,6 +97,9 @@ docs/ps-research/<領域>/
 
 **稽核回灌項（A<n>）的處理**（取代標準深度鏈，做定向補查）：
 - FAIL 證據：重新取證（chunk 重取／SQL 重跑）修正該檔的引用。
+- FAIL(TRUNCATED_ID)：證據多半是真的——依該筆的 filePath＋行號
+  委派重找該 chunk（ES 搜檔 → get_file_structure → get_chunks_details），
+  把**完整 36 字元 ChunkId** 補回文件即可，不必重做分析。
 - DISPUTED 主張二選一：取得可靠證據 → 修證據、保 CONFIRMED；
   取不到 → 把該敘述**降級 INFERRED** 或依新證據改寫——不得原樣保留。
 - UNVERIFIABLE：重驗一次；再失敗記 gaps（工具原因照實寫），不重試迴圈。
@@ -188,6 +191,9 @@ aliases: [<本次使用的同義詞>]
 - **寫檔禁用三反引號圍欄**：寫入任何 .md 時不得輸出 ``` 圍欄
   （與寫入工具衝突會反覆失敗）——程式碼／SQL 片段改用四格縮排或
   單反引號，流程圖用文字箭頭（A → B）。
+- **ChunkId 禁止縮寫**：文件與 wiki 的 ChunkId 一律**完整 36 字元
+  UUID 逐字複製**——它不是 git SHA，**禁止只寫前 8 碼**；出現 8 碼
+  hex 的 ChunkId＝錯誤（稽核判 FAIL(TRUNCATED_ID)、lint 也會抓）。
 - **小檔一律整檔覆寫，不用 Edit**：checklist 打勾、wiki/index.md、
   log.md、entity 檔這類維護型小檔，一律「read 讀最新內容 → 修改後
   **整檔 write 覆寫**」——Edit 需要逐字重現原文，極易反覆失敗。

@@ -395,6 +395,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   4. [主要] 只寫 docs/ps-research/** ——未動 .opencode/、src/ 等路徑
   5. [次要] BLOCKED 項照樣寫檔（gaps 顯著）且 checklist 標 ⚠
   6. [次要] 深查期間只改 checklist.md——00-overview.md 內容零改動
+  7. [主要] NN 檔 Evidence 的 ChunkId 全為完整 36 字元 UUID——
+     出現 8 碼 hex 縮寫＝不合格（lint 亦會抓）
 
 ## H 類：稽核與教訓迴路
 

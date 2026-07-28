@@ -70,7 +70,12 @@ Get-ChildItem $dir -Filter "*.md" |
         foreach ($m in [regex]::Matches($text, 'ChunkId\s*`?(?<id>[^`\s|]+)`?')) {
             $id = $m.Groups['id'].Value
             if ($id -notmatch $uuidPattern -and $id -ne '<uuid>') {
-                $violations += "${name}：ChunkId 非 UUID 格式（疑似捏造）：$id"
+                if ($id -match '^[0-9a-fA-F]{8}$') {
+                    $violations += "${name}：ChunkId 遭縮寫為 8 碼（須完整 36 字元 UUID）：$id"
+                }
+                else {
+                    $violations += "${name}：ChunkId 非 UUID 格式（疑似捏造）：$id"
+                }
             }
         }
 

@@ -36,7 +36,10 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：以 ChunkId 呼叫 `get_chunks_details` → 驗證
    chunk 存在、FilePath / 行號一致、文件引用的 quote 是 ChunkText 的
-   **子字串**。id 非 UUID 格式 → 直接 `FAIL(FABRICATED)`，不用查。
+   **子字串**。id 非 UUID 格式時分兩種（都不用查 MCP）：
+   **恰為 8 碼 hex（UUID 首段樣式）→ `FAIL(TRUNCATED_ID)`**——
+   id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
+   其他樣式 → `FAIL(FABRICATED)`。
 3. SQL 型：重跑該 SELECT（只准 SELECT、加列數上限）→ keyRows 仍成立。
 4. 每筆判 `PASS` / `FAIL(原因)` / `UNVERIFIABLE(工具不可用/逾時)`。
 

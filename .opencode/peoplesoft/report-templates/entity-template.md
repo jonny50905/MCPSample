@@ -15,7 +15,9 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 ## Observations
 
 <!-- 一行一個事實：- [分類] 事實 (evidence)。分類例：結構 / 行為 / 資料 / 選項 / 排程 / 權限 -->
-- [結構] MIL_STATUS 為 Translate value，共 5 值（chunk `<uuid>` / SQL）
+- [結構] MIL_STATUS 為 Translate value，共 5 值（chunk `3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d` / SQL）
+
+<!-- chunk id 一律完整 36 字元 UUID（如上例），禁止縮寫成前 8 碼 -->
 - [行為] 值 'E' 時開放 EXEMPT_RSN 並帶入日期（`<filePath>:<行號>`）
 
 ## Relations
