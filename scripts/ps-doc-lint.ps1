@@ -49,11 +49,13 @@ else {
 # 2) 每個 NN 檔的內容檢查
 $requiredSections = @('## 功能定位', '## 行為邏輯', '## 資料流', '## 未解事項', '## Evidence 附錄')
 $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+$nnNames = @()
 
 Get-ChildItem $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
     ForEach-Object {
         $name = $_.Name
+        $nnNames += $name
         $text = Get-Content $_.FullName -Raw -Encoding UTF8
 
         foreach ($sec in $requiredSections) {
@@ -102,6 +104,11 @@ if (Test-Path $auditPath) {
     }
     if ($auditText -notmatch '稽核輪次') {
         $warnings += "90-audit.md：表頭缺「稽核輪次」（無法判斷是否為最新一輪重驗）"
+    }
+    # 全量對帳：每個 NN 檔都必須出現在稽核報告內文（記分卡一檔一列）
+    $missingRows = @($nnNames | Where-Object { $auditText -notmatch [regex]::Escape($_) })
+    if ($missingRows.Count -gt 0) {
+        $warnings += "90-audit.md：記分卡缺 $($missingRows.Count) 個檔案列（範圍塌縮跡象——稽核未全量重驗）：$($missingRows -join '、')"
     }
 }
 
