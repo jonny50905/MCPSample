@@ -67,7 +67,9 @@ docs/ps-research/<領域>/
 
 ## 階段二：逐項深查（迴圈直到 checklist 全勾）
 
-對每個未勾選項，**一次只處理一項**：
+對每個未勾選項，**一次只處理一項**；**單次 run 至多處理 6 項**
+（含 A 項）——達 6 即停止，結束總結提示使用者開新 session 重跑
+續作（長對話尾端品質劣化＝紙上修復的溫床；checklist 自會接手進度）：
 
 1. 委派標準深度鏈（同 ps-orchestrator 的委派表與深度規則）：
    ui-flow（欄位/選項）→ peoplecode-flow（帶 Record.Field＋stored values 找邏輯）
@@ -100,6 +102,10 @@ docs/ps-research/<領域>/
 - FAIL(TRUNCATED_ID)：證據多半是真的——依該筆的 filePath＋行號
   委派重找該 chunk（ES 搜檔 → get_file_structure → get_chunks_details），
   把**完整 36 字元 ChunkId** 補回文件即可，不必重做分析。
+  補全的 id **必須逐字取自本次 get_chunks_details 回傳**——
+  **禁止憑記憶或推測補尾巴**（無工具回傳佐證的 id＝捏造）。
+- FAIL(WRONG_KIND)：程式內 SQL 語句被誤標 `SQL` 證據——改以該語句
+  所在的 chunk（`CHUNK` 證據：id＋filePath＋行號）重新引用。
 - DISPUTED 主張二選一：取得可靠證據 → 修證據、保 CONFIRMED；
   取不到 → 把該敘述**降級 INFERRED** 或依新證據改寫——不得原樣保留。
 - UNVERIFIABLE：重驗一次；再失敗記 gaps（工具原因照實寫），不重試迴圈。

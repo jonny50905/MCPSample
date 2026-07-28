@@ -28,6 +28,9 @@ orchestrator 主 context 只累積小而結構化的報告。
      給人看的引用寫「filePath:行號」，id 供機器重取。
    - `SQL`（來自 oracleMCP）：附 `sql` 與 `keyRows`（關鍵列摘要），
      **沒有 id、也不准自創 id**——`SQL-XLAT-1` 這種自編字串＝報告不合格。
+     **僅限本次實際執行過的 SELECT 與其結果**——程式碼裡的 SQL 語句
+     （AE_SQL Action、SQR 段、PeopleCode 內嵌 SQL）屬**原始碼**，
+     一律用 `CHUNK` 證據引用，不得標成 `SQL`。
    - **只有這兩種**。`PeoplecodeMetadata` 的回傳＝定位線索（地位同 ES
      搜尋結果），不得寫成 evidence 條目；只有定位、未經 CHUNK／SQL 查證
      的 finding 最高標 INFERRED。

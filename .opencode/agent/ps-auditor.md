@@ -41,6 +41,9 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。
 3. SQL 型：重跑該 SELECT（只准 SELECT、加列數上限）→ keyRows 仍成立。
+   `sql` 欄**非 SELECT**（如 AE 的 UPDATE、程式內語句）→
+   `FAIL(WRONG_KIND)`（程式碼語句應改用 CHUNK 證據）——**不執行**、
+   也不判 UNVERIFIABLE。
 4. 每筆判 `PASS` / `FAIL(原因)` / `UNVERIFIABLE(工具不可用/逾時)`。
 
 ### B. Claim 反駁驗證（抽樣）

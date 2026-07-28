@@ -189,3 +189,20 @@
   必須出現在 90-audit 內文，缺列＝範圍塌縮警告；(3) 13 筆全過
   亦證明 TRUNCATED_ID 廉價修法有效。
 - 套用：本 commit（agent／command／README／lint）。
+
+### L11 輪次 5 全量重驗的三類指紋：紙上修復＋證據類型誤用＋環境噪音（2026-07-27）
+- 症狀：FAIL 13／UNVERIFIABLE 8 的原因分布＝「chunk 又是 8 碼截斷」
+  （多數）＋「AE SQL 無 SELECT 可重跑」＋「task JSON 失敗／空結果」。
+  無「chunk 查無」→ 模型未憑記憶編假 UUID（假說 B 未發生）。
+- 根因：(1) 紙上修復——A16~A28 的修復輪發生在 13 項馬拉松 session
+  的劣化 context（與稽核塌縮同病灶）；(2) 契約缺口——程式內 SQL
+  語句（AE_SQL 等）被標成 `kind: SQL`，稽核員無法重跑非 SELECT；
+  (3) 稽核執行期的工具噪音被正確記錄於原因欄（隔離成功）。
+- 落點：機械化——(1) 處理端對稱門檻：單次 run 至多處理 6 項，達標
+  即停換 session；(2) 契約明文：`SQL` 證據僅限實際執行過的 SELECT，
+  程式內 SQL 一律 CHUNK；auditor 新判定 FAIL(WRONG_KIND)（不執行、
+  不判 UNVERIFIABLE）；A 項處理加 WRONG_KIND 改引用規則；
+  (3) id 補全防造假：必須逐字取自本次 get_chunks_details 回傳，
+  禁止憑記憶補尾巴；(4) lint 的 8 碼清單＝截斷修復的確定性工單
+  （不依賴稽核計數）。
+- 套用：本 commit。
