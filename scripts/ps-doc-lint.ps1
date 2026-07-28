@@ -84,9 +84,9 @@ Get-ChildItem $dir -Filter "*.md" |
 $auditPath = Join-Path $dir "90-audit.md"
 if (Test-Path $auditPath) {
     $auditText = Get-Content $auditPath -Raw -Encoding UTF8
-    $auditSections = @('## 總覽記分卡', '## FAIL / DISPUTED 明細',
-        '## 完整性（換角度 diff）', '## 已回灌 checklist 的行動項',
-        '## 系統性錯誤觀察')
+    $auditSections = @('## 總覽記分卡', '## FAIL / DISPUTED / UNVERIFIABLE 明細',
+        '## 上輪回灌項覆核', '## 完整性（換角度 diff）',
+        '## 已回灌 checklist 的行動項', '## 系統性錯誤觀察')
     foreach ($sec in $auditSections) {
         if ($auditText -notmatch [regex]::Escape($sec)) {
             $warnings += "90-audit.md：缺模板章節「$sec」（報告偏離模板，對帳會失準）"

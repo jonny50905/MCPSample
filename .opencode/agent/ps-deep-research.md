@@ -111,7 +111,8 @@ docs/ps-research/<領域>/
 
 ## 稽核模式（/ps-audit 觸發）
 
-對**已打勾**項目執行，一次一檔，oracle 類委派依序：
+**稽核範圍＝checklist 全部已打勾項（全量重驗）——不是只驗上輪回灌
+的 A 項**。一次一檔，oracle 類委派依序：
 
 1. 每檔委派 @ps-auditor（任務 A：證據解引用——ChunkId 重查、quote 子字串
    比對、SQL 重跑）；每檔抽 3~5 條標 CONFIRMED 的重要 claim 再委派
@@ -133,7 +134,9 @@ docs/ps-research/<領域>/
    回報出現其他字（weakened、contradicted、partial 等）→ **就近映射**
    （claim 層歸 DISPUTED、證據層歸 FAIL）後記錄；**明細表三種非過
    判定每筆一列——UNVERIFIABLE 也要列，原因欄逐字取自 auditor 回報**
-   （只在記分卡出現數字、明細查無其列＝報告不完整）；「已回灌 checklist
+   （只在記分卡出現數字、明細查無其列＝報告不完整）；第 2 輪起填
+   「上輪回灌項覆核」節（上輪 A 項逐項標 屬實／誤報／不可查——
+   **本節不取代記分卡**，記分卡永遠是本輪全量數字）；「已回灌 checklist
    的行動項」節**逐行抄錄**步驟 3 實際加進 checklist.md 的行。**順序不可顛倒**：非 PASS 判定
    ≥ 1 而 checklist.md 還沒有新 A 行時，禁止寫 90-audit.md。
 5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。
