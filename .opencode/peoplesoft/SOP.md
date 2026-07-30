@@ -89,7 +89,13 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 
 ---
 
-## SOP-4 回滾（文件被 agent 弄壞時）
+## SOP-4 回滾（文件被 agent 弄壞時；含「部分還原」）
+
+**部分損壞**（如 lint 報缺章節——覆寫時被寫掉）不必整檔回滾：
+`git log --oneline -- <檔路徑>` 找舊版 → `git show <commit>:<檔路徑>`
+確認舊版章節完整 → 人工把缺的章節貼回（或貼給 deep-research 合併，
+註明「僅補回缺章節，其他內容不動」）。git 裡也沒有 → 該項回
+checklist 重查。
 
 ```text
 □ 1. 先確認災情範圍：git status / git diff（未 commit 的變更）
