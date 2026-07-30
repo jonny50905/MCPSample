@@ -45,7 +45,9 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
      powershell -ExecutionPolicy Bypass -File "<repo路徑>\scripts\ps-doc-lint.ps1" -Domain "<領域>"
 □ 1a. 上行被 GPO 擋（PSSecurityException 仍出現）→ 記憶體免疫跑法
       （執行原則只管 .ps1 檔案、不管記憶體），同樣一行：
-     & ([scriptblock]::Create((Get-Content "<repo路徑>\scripts\ps-doc-lint.ps1" -Raw))) -Domain "<領域>"
+     & ([scriptblock]::Create((Get-Content "<repo路徑>\scripts\ps-doc-lint.ps1" -Raw -Encoding UTF8))) -Domain "<領域>"
+     （指令全部適用舊版 Windows PowerShell 5.1／powershell.exe；
+       script 已帶 UTF-8 BOM，5.1 可正確解析中文）
 □ 1b. 嫌每次打路徑麻煩：可「自行在本機」建 lint.cmd 捷徑
       （內容一行＝上面 1. 的指令、%* 接參數）——但**嚴禁 commit 進
       repo**（公司安控會擋含可執行檔的 git 下載，見 SOP-3）

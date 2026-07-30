@@ -1,4 +1,4 @@
-# ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
+﻿# ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
 # 檢查：checklist 對帳、必要章節、confidence 標註、ChunkId UUID 格式、可疑自編 id
 param(
