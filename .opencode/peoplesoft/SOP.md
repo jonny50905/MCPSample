@@ -41,16 +41,14 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 **時機**：每個領域 `/ps-research` 跑完後；`/ps-audit` 前；懷疑格式壞掉時。
 
 ```text
-□ 1. 終端機執行（repo 根目錄）：.\scripts\ps-doc-lint.ps1 -Domain <領域>
-□ 1a. 出現 PSSecurityException / UnauthorizedAccess（執行原則擋 .ps1）
-      → 依序試：
-      (1) powershell -ExecutionPolicy Bypass -File scripts\ps-doc-lint.ps1 -Domain <領域>
-      (2) Unblock-File scripts\ps-doc-lint.ps1 後重跑
-      (3) GPO 強制時的免疫跑法（原則只管檔案、不管記憶體）：
-          $code = Get-Content scripts\ps-doc-lint.ps1 -Raw
+□ 1. 終端機執行（cmd 或 PowerShell、任何目錄皆可）：
+       <repo路徑>\scripts\ps-doc-lint.cmd <領域>
+     （.cmd 包裝自帶執行原則 Bypass，一行搞定；
+       直接跑 .ps1 亦可：.\scripts\ps-doc-lint.ps1 -Domain <領域>）
+□ 1a. .cmd 也被擋（極罕見的 GPO 全鎖）→ 免疫跑法
+      （原則只管檔案、不管記憶體）：
+          $code = Get-Content <repo路徑>\scripts\ps-doc-lint.ps1 -Raw
           & ([scriptblock]::Create($code)) -Domain <領域>
-      判斷：Get-ExecutionPolicy -List 的 MachinePolicy/UserPolicy
-      有值＝GPO 強制，直接用 (3)
 □ 2. 綠色 PASS → 結束
 □ 3. 紅色 FAIL → 逐項處理：
      - 「checklist 已打勾但檔案不存在」「檔案未列於清單」

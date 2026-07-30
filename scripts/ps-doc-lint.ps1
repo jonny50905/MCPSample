@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory = $true)][string]$Domain
 )
 
-$dir = Join-Path "docs/ps-research" $Domain
+# 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑
+$root = Split-Path $PSScriptRoot -Parent
+$dir = Join-Path $root (Join-Path "docs/ps-research" $Domain)
 $violations = @()
 $warnings = @()
 
@@ -113,9 +115,9 @@ if (Test-Path $auditPath) {
 }
 
 # 3) Entity Wiki 檢查（wiki/ 為跨領域共用層，存在才檢）
-$wikiDir = "docs/ps-research/wiki"
+$wikiDir = Join-Path $root "docs/ps-research/wiki"
 if (Test-Path $wikiDir) {
-    $allMd = Get-ChildItem "docs/ps-research" -Recurse -Filter "*.md"
+    $allMd = Get-ChildItem (Join-Path $root "docs/ps-research") -Recurse -Filter "*.md"
     $noteNames = @{}
     $allMd | ForEach-Object {
         $noteNames[[IO.Path]::GetFileNameWithoutExtension($_.Name)] = $true
