@@ -224,6 +224,11 @@ checklist 重查。
        ＋ guided decoding（xgrammar／outlines）
      - Ollama：升級新版（原生約束 tool-call JSON／structured outputs）
      - llama.cpp：grammar（GBNF）／新版 --jinja 工具支援
+□ 5a. thinking 標記洩漏（輸出出現 </think>、<|im_end|> 等）＝
+     chat template／reasoning parser 未對齊：對齊 model card 的模板
+     （vLLM 開對應 reasoning parser）；工具密集用途可評估**關閉
+     thinking**（enable_thinking=false／prompt 加 /no_think）——
+     通常 tool-call 更穩、更快；lint 會抓漏進文件的髒標記
 □ 6. 建議值：context 不必盲開 262K（KV cache／prefill 代價大）——
      subagent 隔離下 32K～64K 通常足夠；輸出上限建議 ≥ 8K
 □ 7. 查到的數字回報對話，據以調整規則（如寫檔行數上限）

@@ -87,6 +87,11 @@ Get-ChildItem $dir -Filter "*.md" |
         foreach ($m in [regex]::Matches($text, '\b(SQL-[A-Z]+-\d+|CHK-[A-Z]+-\d+)\b')) {
             $violations += "${name}：出現自編 id 樣式：$($m.Value)"
         }
+
+        # 模型內部標記洩漏（chat template 未對齊時會漏進輸出）
+        foreach ($m in [regex]::Matches($text, '</?think(ing)?>|<\|im_(start|end)\|>')) {
+            $violations += "${name}：模型內部標記洩漏（污染）：$($m.Value)"
+        }
     }
 
 # 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋）
