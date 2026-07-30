@@ -41,14 +41,14 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 **時機**：每個領域 `/ps-research` 跑完後；`/ps-audit` 前；懷疑格式壞掉時。
 
 ```text
-□ 1. 終端機執行（cmd 或 PowerShell、任何目錄皆可）：
-       <repo路徑>\scripts\ps-doc-lint.cmd <領域>
-     （.cmd 包裝自帶執行原則 Bypass，一行搞定；
-       直接跑 .ps1 亦可：.\scripts\ps-doc-lint.ps1 -Domain <領域>）
-□ 1a. .cmd 也被擋（極罕見的 GPO 全鎖）→ 免疫跑法
-      （原則只管檔案、不管記憶體）：
-          $code = Get-Content <repo路徑>\scripts\ps-doc-lint.ps1 -Raw
-          & ([scriptblock]::Create($code)) -Domain <領域>
+□ 1. PowerShell 貼「一行」執行（絕對路徑，任何目錄皆可、不用 cd）：
+     powershell -ExecutionPolicy Bypass -File "<repo路徑>\scripts\ps-doc-lint.ps1" -Domain "<領域>"
+□ 1a. 上行被 GPO 擋（PSSecurityException 仍出現）→ 記憶體免疫跑法
+      （執行原則只管 .ps1 檔案、不管記憶體），同樣一行：
+     & ([scriptblock]::Create((Get-Content "<repo路徑>\scripts\ps-doc-lint.ps1" -Raw))) -Domain "<領域>"
+□ 1b. 嫌每次打路徑麻煩：可「自行在本機」建 lint.cmd 捷徑
+      （內容一行＝上面 1. 的指令、%* 接參數）——但**嚴禁 commit 進
+      repo**（公司安控會擋含可執行檔的 git 下載，見 SOP-3）
 □ 2. 綠色 PASS → 結束
 □ 3. 紅色 FAIL → 逐項處理：
      - 「checklist 已打勾但檔案不存在」「檔案未列於清單」
@@ -66,6 +66,9 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 
 **原則**：產出（docs/ps-research/）與框架（.opencode/）都 commit 到**內部** git；
 **嚴禁推到任何外部 remote**。
+**repo 禁放可執行檔**（.cmd／.bat／.exe／.vbs 等——公司安控會擋含
+可執行檔的 git 下載，2026-07 實測）；自動化一律 .ps1＋SOP 教跑法，
+捷徑檔只准使用者自建於本機、不入版控。
 
 ```text
 □ 何時 commit：
