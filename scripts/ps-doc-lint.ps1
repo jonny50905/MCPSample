@@ -52,6 +52,7 @@ else {
 $requiredSections = @('## 功能定位', '## 行為邏輯', '## 資料流', '## 未解事項', '## Evidence 附錄')
 $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 $nnNames = @()
+$truncatedIds = @()
 
 Get-ChildItem $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
@@ -76,6 +77,7 @@ Get-ChildItem $dir -Filter "*.md" |
             if ($id -notmatch $uuidPattern -and $id -ne '<uuid>') {
                 if ($id -match '^[0-9a-fA-F]{8}$') {
                     $violations += "${name}：ChunkId 遭縮寫為 8 碼（須完整 36 字元 UUID）：$id"
+                    $truncatedIds += [pscustomobject]@{ File = $name; Id = $id }
                 }
                 else {
                     $violations += "${name}：ChunkId 非 UUID 格式（疑似捏造）：$id"
@@ -168,6 +170,26 @@ if (Test-Path $wikiDir) {
             $warnings += "wiki/$($n.Name)：孤兒 entity（沒有任何 [[${entity}]] 入鏈）"
         }
     }
+}
+
+# 縮寫 id 存在時，自動產生可直接貼用的手術式修復指令
+if ($truncatedIds.Count -gt 0) {
+    Write-Host ""
+    Write-Host "=== 手術式修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
+    Write-Host "以下是 lint 確認的縮寫 ChunkId 清單，逐筆修復、一次一筆、一筆都不准跳："
+    $i = 0
+    foreach ($t in $truncatedIds) {
+        $i++
+        Write-Host "$i. $($t.File)：$($t.Id)"
+    }
+    Write-Host "每筆固定流程：read 該檔找到該筆 evidence 的 filePath 與行號"
+    Write-Host "→ 委派對應 flow subagent 用 filePath 重取該段"
+    Write-Host "（搜檔 → get_file_structure → get_chunks_details）"
+    Write-Host "→ 用「工具回傳的完整 ChunkId」更新該筆（僅改該 id，其他一字不動）。"
+    Write-Host "全部完成後輸出收據：每筆一行「舊8碼 → 新完整UUID」對照表。"
+    Write-Host "沒有收據＝沒完成。現在從第 1 筆開始。"
+    Write-Host "=== 指令結束 ===" -ForegroundColor Cyan
+    Write-Host ""
 }
 
 # 輸出
