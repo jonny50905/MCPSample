@@ -94,6 +94,16 @@ Get-ChildItem $dir -Filter "*.md" |
         foreach ($m in [regex]::Matches($text, '</?think(ing)?>|<\|im_(start|end)\|>')) {
             $violations += "${name}：模型內部標記洩漏（污染）：$($m.Value)"
         }
+
+        # 廣域截斷偵測：不限「ChunkId」前綴——任何位置的獨立 8 碼 hex
+        # （含至少一個字母、且非完整 UUID 的一部分）都視為縮寫嫌疑
+        foreach ($m in [regex]::Matches($text, '(?<![0-9a-fA-F-])[0-9a-fA-F]{8}(?![0-9a-fA-F-])')) {
+            $v = $m.Value
+            if ($v -match '[a-fA-F]') {
+                $violations += "${name}：疑似縮寫 chunk id（8 碼 hex，廣域偵測）：$v"
+                $truncatedIds += [pscustomobject]@{ File = $name; Id = $v }
+            }
+        }
     }
 
 # 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋）

@@ -195,6 +195,23 @@
   新檔持續乾淨才可宣告根除。原則：**修好存量 ≠ 堵住流量，
   兩者要分開驗證**。
 
+### L13 輪次 7 FAIL 16 的三家族——lint 盲區、稽核過嚴、手術缺驗貨（2026-07-30）
+- 症狀分類：(A) 截斷 id 仍現身稽核＝**lint 盲區**（只掃「ChunkId」
+  前綴寫法，表格等其他位置的 8 碼漏抓，手術只修了看得見的）；
+  (B) case mismatch／wrong_line／count_mismatch＝**稽核過嚴＋時效**
+  （程式碼大小寫不敏感；quote 命中行號漂移；線上 DB 筆數本來會變）；
+  (C) data flow 表無 chunk id、修復 id 內容不符 claim＝**真缺陷**
+  （證據義務未履行；手術重取抓錯 chunk 仍硬填——缺「回傳必含原
+  quote」的驗貨步驟）。
+- 落點：機械化——(1) lint 廣域截斷偵測（任何位置的獨立 8 碼 hex
+  含字母者）；(2) auditor 比對正規化（大小寫不分、空白摺疊）＋
+  PASS(LINE_DRIFT)＋FAIL(STALE_DATA)（時效與造假分流）；
+  (3) 修復前驗貨：重取 ChunkText 必含原 quote 才准寫入，抓錯禁止
+  硬填；(4) STALE_DATA 修法＝更新數字。
+- 待決：ES 查無那批取決於「索引近期是否重建」（是→SOP-11 正常
+  死亡重取；否→id 本身有誤）。
+- 套用：本 commit。
+
 ### L9 ChunkId 被縮寫成 8 碼 hex——git SHA 習慣汙染 UUID（2026-07-27）
 - 症狀：輪次 3 證據層 FAIL 10 的大宗是「非 UUID 格式」——實際是
   文件裡 ChunkId 只剩前 8 碼 hex（縮寫習慣同 git SHA），證據本體

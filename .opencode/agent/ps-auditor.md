@@ -36,7 +36,10 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：以 ChunkId 呼叫 `get_chunks_details` → 驗證
    chunk 存在、FilePath / 行號一致、文件引用的 quote 是 ChunkText 的
-   **子字串**。id 非 UUID 格式時分兩種（都不用查 MCP）：
+   **子字串**。**比對前先正規化：大小寫不分、連續空白視為一個**
+   （程式碼大小寫不敏感——只差大小寫／空白＝命中，不是 FAIL）。
+   quote 命中但行號不符 → `PASS(LINE_DRIFT)` 並回報實際行號
+   （文件行號過期，非證據問題）。id 非 UUID 格式時分兩種（都不用查 MCP）：
    **恰為 8 碼 hex（UUID 首段樣式）→ `FAIL(TRUNCATED_ID)`**——
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。
@@ -44,6 +47,9 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
    `sql` 欄**非 SELECT**（如 AE 的 UPDATE、程式內語句）→
    `FAIL(WRONG_KIND)`（程式碼語句應改用 CHUNK 證據）——**不執行**、
    也不判 UNVERIFIABLE。
+   結構成立但**數值不同**（筆數、統計——線上 DB 會變動）→
+   `FAIL(STALE_DATA)` 並附新值（時效問題，修法＝更新文件數字，
+   非證據造假）。
 4. 每筆判 `PASS` / `FAIL(原因)` / `UNVERIFIABLE(工具不可用/逾時)`。
 
 ### B. Claim 反駁驗證（抽樣）
