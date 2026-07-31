@@ -34,9 +34,10 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 過期 → 回報建議標 `stale`）。
 
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
-2. CHUNK 型：以 ChunkId 呼叫 `get_chunks_details` → 驗證
-   chunk 存在、FilePath / 行號一致、文件引用的 quote 是 ChunkText 的
-   **子字串**。**比對前先正規化：大小寫不分、連續空白視為一個**
+2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**
+   ——禁止用 search_chunks 的結果有無、或結構瀏覽「看到與否」代替
+   解引用（那不是解引用，是抽樣）。驗證 chunk 存在、FilePath / 行號
+   一致、文件引用的 quote 是 ChunkText 的**子字串**。**比對前先正規化：大小寫不分、連續空白視為一個**
    （程式碼大小寫不敏感——只差大小寫／空白＝命中，不是 FAIL）。
    quote 命中但行號不符 → `PASS(LINE_DRIFT)` 並回報實際行號
    （文件行號過期，非證據問題）。
@@ -46,7 +47,11 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
    結構挑單元 → get_chunks_details」重找——找到且 quote 命中
    （正規化比對）→ `FAIL(ID_RELINK)` 並附新 id（id 失聯但證據為真，
    修法＝換 id）；重找仍無 → 才判 `FAIL(NOT_FOUND)`。
-   **禁止拿事件名（PreBuild 等）當全庫搜尋詞。**id 非 UUID 格式時分兩種（都不用查 MCP）：
+   **禁止拿事件名（PreBuild 等）當全庫搜尋詞。**
+   **二次定位全程遵守分頁紀律**（progressive-source-retrieval §5.1）：
+   search 結果達 10 筆＝可能有下一頁，必須 offset 續翻到完；
+   結構單元多於一批要逐批取完——**單頁／第一批未見 ≠ 查無**
+   （一個 event 可有 10+ chunks，只看第一頁必漏尾巴）。id 非 UUID 格式時分兩種（都不用查 MCP）：
    **恰為 8 碼 hex（UUID 首段樣式）→ `FAIL(TRUNCATED_ID)`**——
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。

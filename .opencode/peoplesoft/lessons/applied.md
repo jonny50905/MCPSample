@@ -219,6 +219,14 @@
   Component 事件定位鍵規則；auditor 判 NOT_FOUND 前強制「二次定位」
   （用 evidence 自帶的 filePath／ObjectName／EventName 重找），
   找回→FAIL(ID_RELINK) 附新 id（修法＝換 id，最便宜）。
+- 再深挖（2026-07-30，管理者抽查）：被喊查無的 id **本身有效**
+  （確為該 event 13 個 chunk 之一）→ 稽核員根本沒直接解引用，
+  而是用搜尋／瀏覽「看到與否」代替——ES 一頁 10 筆、event 有 13
+  chunk，尾巴 3 顆永遠不在第一頁。**分頁紀律（單頁 ≠ 全部）當年
+  教了研究 flows，稽核員漏打疫苗**。落點：auditor 明文「解引用
+  一律直接 get_chunks_details(ChunkId)，禁止以搜尋有無代替」＋
+  二次定位全程綁分頁紀律（§5.1）。原則：**新 agent 上線時，共用
+  檢索紀律要逐一確認有綁，不會自動繼承**。
 
 ### L9 ChunkId 被縮寫成 8 碼 hex——git SHA 習慣汙染 UUID（2026-07-27）
 - 症狀：輪次 3 證據層 FAIL 10 的大宗是「非 UUID 格式」——實際是
