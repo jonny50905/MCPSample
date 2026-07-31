@@ -55,7 +55,12 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
 □ 3. 紅色 FAIL → 逐項處理：
      - 「checklist 已打勾但檔案不存在」「檔案未列於清單」
        → 對話叫 deep-research 修（或人工補 checklist 行）
-     - 「ChunkId 非 UUID / 自編 id」→ 證據捏造，跑 /ps-audit 該領域
+     - 「ChunkId 遭縮寫為 8 碼」→ **lint 清單驅動的手術式修復**：
+       把 lint 列的 檔×id 清單直接貼給 PS-DEEP-RESEARCH 逐筆修
+       （每筆委派重取 chunk、必附「舊→新」收據）；修復波前後各
+       commit 一次內部 git（快照可回滾）
+     - 「ChunkId 非 UUID / 自編 id」（非 8 碼樣式）→ 證據捏造，
+       跑 /ps-audit 該領域
      - 「缺章節 / 無 confidence 標註」→ 對話叫 deep-research 重寫該檔該節
      - wiki 類警告（斷鏈 / 孤兒 / 過期 / frontmatter 缺欄）
        → 斷鏈孤兒叫 deep-research 修；stale 排入下次 /ps-research
