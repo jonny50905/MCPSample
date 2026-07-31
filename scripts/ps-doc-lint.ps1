@@ -74,7 +74,10 @@ Get-ChildItem $dir -Filter "*.md" |
         # ChunkId 必須是 UUID（非 UUID = 捏造）
         foreach ($m in [regex]::Matches($text, 'ChunkId\s*`?(?<id>[^`\s|]+)`?')) {
             $id = $m.Groups['id'].Value
-            if ($id -notmatch $uuidPattern -and $id -ne '<uuid>') {
+            if ($id -notmatch '^[0-9A-Za-z]') {
+                # 標點開頭＝「ChunkId」被當普通名詞寫在散文裡，非 id 引用——略過
+            }
+            elseif ($id -notmatch $uuidPattern -and $id -ne '<uuid>') {
                 if ($id -match '^[0-9a-fA-F]{8}$') {
                     $violations += "${name}：ChunkId 遭縮寫為 8 碼（須完整 36 字元 UUID）：$id"
                     $truncatedIds += [pscustomobject]@{ File = $name; Id = $id }
