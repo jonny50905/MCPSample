@@ -53,6 +53,12 @@ skill 內文的協定工具名對映到實際 MCP 如下：
 ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 必須經 PeoplecodeSource 取回完整段落才能作為 Evidence。
 
+**Component 事件定位鍵**：PreBuild／PostBuild／SavePreChange 這類
+Component 層級 PeopleCode **沒有 Record.Field**——定位一律用
+**Component 名**搜檔 → `get_file_structure` → 按 Event 名挑單元；
+**禁止拿事件名（PreBuild 等）當全庫搜尋關鍵字**（滿庫都是，
+等於沒搜）。
+
 ## 硬規則
 
 - Raw chunks 留在你的 context，**不放進報告**：單一 quote ≤ 5 行，

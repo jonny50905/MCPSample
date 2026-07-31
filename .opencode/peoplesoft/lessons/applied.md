@@ -211,6 +211,14 @@
 - 待決：ES 查無那批取決於「索引近期是否重建」（是→SOP-11 正常
   死亡重取；否→id 本身有誤）。
 - 套用：本 commit。
+- 抽查解謎（2026-07-30）：「ES 查無」實為**假死**——程式碼存在，
+  是 Component 事件（PreBuild／PostBuild）。死因＝定位鍵用錯：
+  Component 層級 PeopleCode **沒有 Record.Field**，正確路徑＝
+  Component 名搜檔 → get_file_structure → 按 Event 挑單元；拿事件名
+  當全庫關鍵字＝滿庫都是、等於沒搜。落點：peoplecode-flow 加
+  Component 事件定位鍵規則；auditor 判 NOT_FOUND 前強制「二次定位」
+  （用 evidence 自帶的 filePath／ObjectName／EventName 重找），
+  找回→FAIL(ID_RELINK) 附新 id（修法＝換 id，最便宜）。
 
 ### L9 ChunkId 被縮寫成 8 碼 hex——git SHA 習慣汙染 UUID（2026-07-27）
 - 症狀：輪次 3 證據層 FAIL 10 的大宗是「非 UUID 格式」——實際是

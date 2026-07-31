@@ -112,6 +112,8 @@ docs/ps-research/<領域>/
   **禁止硬填**，該筆標「需重查」留在收據上。
 - FAIL(STALE_DATA)：SQL 數值時效過期——重跑 cookbook 樣板取新值、
   更新文件中的數字即可，不必重做分析。
+- FAIL(ID_RELINK)：id 失聯但稽核已重找到（附新 id）——直接把新 id
+  寫回該筆（驗貨：ChunkText 含原 quote），最便宜的一類。
 - FAIL(WRONG_KIND)：程式內 SQL 語句被誤標 `SQL` 證據——改以該語句
   所在的 chunk（`CHUNK` 證據：id＋filePath＋行號）重新引用。
 - DISPUTED 主張二選一：取得可靠證據 → 修證據、保 CONFIRMED；

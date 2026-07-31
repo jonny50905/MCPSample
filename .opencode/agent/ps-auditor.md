@@ -39,7 +39,14 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
    **子字串**。**比對前先正規化：大小寫不分、連續空白視為一個**
    （程式碼大小寫不敏感——只差大小寫／空白＝命中，不是 FAIL）。
    quote 命中但行號不符 → `PASS(LINE_DRIFT)` 並回報實際行號
-   （文件行號過期，非證據問題）。id 非 UUID 格式時分兩種（都不用查 MCP）：
+   （文件行號過期，非證據問題）。
+   **id 解引用查無時，判 FAIL 前必做一次「二次定位」**：用該筆
+   evidence 自帶的 filePath／ObjectName／EventName 走
+   「Component（或物件）名搜檔 → get_file_structure → 按 Event／
+   結構挑單元 → get_chunks_details」重找——找到且 quote 命中
+   （正規化比對）→ `FAIL(ID_RELINK)` 並附新 id（id 失聯但證據為真，
+   修法＝換 id）；重找仍無 → 才判 `FAIL(NOT_FOUND)`。
+   **禁止拿事件名（PreBuild 等）當全庫搜尋詞。**id 非 UUID 格式時分兩種（都不用查 MCP）：
    **恰為 8 碼 hex（UUID 首段樣式）→ `FAIL(TRUNCATED_ID)`**——
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。
