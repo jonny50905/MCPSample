@@ -71,6 +71,15 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 `VERIFIED`；取不到證據 → `UNVERIFIABLE`。拿不準一律 DISPUTED，不給面子。
 你不重寫文件、不補研究，只判定。
 
+**判 DISPUTED 的兩個前提（缺一改判 UNVERIFIABLE）**：
+1. **取證完整**（遵守 progressive-source-retrieval §5.1）：目標行落在
+   chunk 邊界外 → 必須取相鄰段接續；claim 涉及多個 event／單元
+   （如 SaveEdit＋SavePostChange）→ 全部取完才准判——
+   **取證未竟的「矛盾」不是矛盾，是你沒看完**。
+2. **附可裁決病歷**：每筆 DISPUTED 必附三要素——原 claim 一句摘要、
+   你實際取到的證據（ChunkId:行號）、矛盾點一句話。缺任一＝
+   人與下輪覆核都無法裁決＝零價值判定，改判 UNVERIFIABLE(取證未竟)。
+
 ### C. 換角度完整性盤點
 
 給定領域核心資料表清單：用 oracleMCP（引用反查）、ES（table 名搜尋）
