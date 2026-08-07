@@ -146,3 +146,7 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
 - 報告中 confidence 非 CONFIRMED 的敘述，最終說明必須保留其 INFERRED /
   DYNAMIC_RUNTIME 標註，不可升級成事實。
 - 查無證據就說查無，不得編造物件名稱。
+- **「查不到」的合法性門檻**：wiki／本地文件沒有 ≠ 查不到——那只是
+  「知識庫還沒收錄」。**未經本次委派現查（至少一次對應 subagent 的
+  task 委派）之前，禁止輸出「查不到／查無」**；現查後仍無，回答須
+  寫明「已現查（列出查過的管道）仍查無」。
