@@ -114,6 +114,12 @@ docs/ps-research/<領域>/
   更新文件中的數字即可，不必重做分析。
 - FAIL(ID_RELINK)：id 失聯但稽核已重找到（附新 id）——直接把新 id
   寫回該筆（驗貨：ChunkText 含原 quote），最便宜的一類。
+- LINE_DRIFT（不論標 PASS 註記或 FAIL）：依稽核回報的實際行號更新
+  該筆行號即可，內容不動。
+- FAIL(MISSING_CHUNK_ID／NO_CHUNK_ID)：檔案行號型證據補 id——依
+  filePath＋行號重取 chunk（同手術流程、含驗貨），寫入完整 id。
+- FAIL(INCOMPLETE_CHUNK)：quote 跨 chunk 邊界——取相鄰 chunk，
+  該筆證據併記兩個 id（或拆成兩筆各附 id）。
 - FAIL(WRONG_KIND)：程式內 SQL 語句被誤標 `SQL` 證據——改以該語句
   所在的 chunk（`CHUNK` 證據：id＋filePath＋行號）重新引用。
 - DISPUTED 主張二選一：取得可靠證據 → 修證據、保 CONFIRMED；

@@ -107,6 +107,21 @@ Get-ChildItem $dir -Filter "*.md" |
                 $truncatedIds += [pscustomobject]@{ File = $name; Id = $v }
             }
         }
+
+        # Evidence 義務：檔案行號型（xxx:12-24 樣式）的表格列必附
+        # chunk id（UUID）或標明 SQL——兩者皆無＝MISSING_CHUNK_ID
+        $evIdx = $text.IndexOf('## Evidence 附錄')
+        if ($evIdx -ge 0) {
+            $evText = $text.Substring($evIdx)
+            foreach ($line in ($evText -split "`n")) {
+                if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and
+                    $line -match '[:：]\d+' -and
+                    $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
+                    $line -notmatch '(?i)\bSQL\b') {
+                    $violations += "${name}：Evidence 列為檔案行號型但缺 chunk id：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
+                }
+            }
+        }
     }
 
 # 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋）
