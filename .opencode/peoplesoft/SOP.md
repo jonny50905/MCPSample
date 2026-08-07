@@ -174,6 +174,10 @@ checklist 重查。
 □ 換模型 → 重跑 Smoke Set（test-scenarios.md §5，9 題）確認規則遵循沒退化
 □ OpenCode 升版 → 確認 agent（Tab 清單）、command（/ 清單）、
   skill 都有載入；異常先看 frontmatter 格式
+□ OpenCode 升版 → 檢查是否**新增內建 agent／subagent**（如 general／
+  explore／scout）——內建不吃本專案的封鎖，須在 .opencode/agent/
+  放**同名覆寫檔**補封 4 個 MCP（2026-08 實測：委派會漏到內建
+  explore 直呼 MCP）
 □ PeopleTools 升版 → cookbook 的表名/欄位抽 2~3 條樣板實跑驗證
 ```
 

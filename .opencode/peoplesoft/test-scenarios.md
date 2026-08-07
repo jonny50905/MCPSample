@@ -328,6 +328,8 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   1. [主要] 委派給 ps-sqr-flow（不是 ps-sql-flow、也不是 orchestrator 自己做）
   2. [主要] 同一問題不重複委派；收到報告直接彙整
   3. [次要] 最終回答保留報告中的 evidence IDs 與 confidence 標註
+  4. [致命] 未把檢索委派給內建 general／explore／scout（它們只探索
+     本機檔案，查不到 PeopleSoft；其 MCP 已由同名覆寫檔封鎖）
 
 ### F4 新註冊 MCP 不外洩（覆寫表紀律）
 - **前置**：環境註冊了尚未整合的新 MCP server

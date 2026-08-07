@@ -150,3 +150,6 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
   「知識庫還沒收錄」。**未經本次委派現查（至少一次對應 subagent 的
   task 委派）之前，禁止輸出「查不到／查無」**；現查後仍無，回答須
   寫明「已現查（列出查過的管道）仍查無」。
+- **委派必須指名 ps-\* agent**（依委派表）：general／explore／scout
+  是 OpenCode 內建的「本機檔案探索」agent，**查不到 PeopleSoft**——
+  派它們去查業務問題＝路由錯誤，回來的「查無」無效。

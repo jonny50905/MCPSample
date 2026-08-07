@@ -178,6 +178,10 @@ aliases: [<本次使用的同義詞>]
 [回覆要求] 依 .opencode/peoplesoft/subagent-report-contract.md 回覆單一 JSON 報告
 ```
 
+**委派對象限定**：一律指名 ps-\* agent——general／explore／scout 是
+OpenCode 內建的本機檔案探索 agent，查不到 PeopleSoft，禁止作為
+檢索委派對象。
+
 **委派瘦身（防 task JSON 截斷）**：
 - 委派 prompt 上限約 30 行；**禁止貼入檔案內容、報告全文或大段程式碼**。
 - 驗檔類委派（快驗／稽核任務 A）只傳**檔案路徑**：
