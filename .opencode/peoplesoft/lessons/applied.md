@@ -228,6 +228,22 @@
   二次定位全程綁分頁紀律（§5.1）。原則：**新 agent 上線時，共用
   檢索紀律要逐一確認有綁，不會自動繼承**。
 
+### L16 新增 /ps-correct——資深同事指正業務知識的一鍵入庫（2026-08）
+- 動機：最高頻的真實修正場景＝資深同事指正業務邏輯（資料病，非
+  行為病）——原路徑（/ps-research 全跑或 SOP-5 人工改檔）太重。
+- 設計：/ps-correct <正確知識> → 查重 → 作廢不刪除更新 entity →
+  來源標 `human:<日期>`、status verified＋reviewed: true（**本機立即
+  生效；人審＝內部 git PR 看 diff**，流程內不設額外蓋章步驟，與
+  /ps-lesson 同治理）。
+- 配套機制：auditor 新約定——human 型來源＋reviewed: true 免解引用
+  （PASS(HUMAN_VERIFIED)）；claim 層不得僅因「查無程式證據」反駁
+  human 已驗知識（需明確矛盾證據）。堵住「人教的知識被稽核反覆
+  質疑標 stale」的缺口。
+- 落點：新 command／auditor 兩處／entity 模板 sources 註記／
+  orchestrator 指正協定／AGENTS.md／README／簡報／H3 測試情境
+  （總數 38）。
+- 套用：本 commit。
+
 ### L15 OpenCode 內建 subagent 側門——同名覆寫補鎖（2026-08）
 - 症狀：問答（orchestrator）主畫面出現直呼 PeoplecodeMetadata 等
   MCP、以及「EXPLORE TASK」；同題最終回「查不到」。

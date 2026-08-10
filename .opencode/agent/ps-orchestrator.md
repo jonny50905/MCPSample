@@ -132,9 +132,10 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
 2. 確認確實錯了 → 分類：**資料類**（alias / cookbook 表名）、
    **行為類**（流程 / 檢索紀律）、**事實類**（業務結論錯）。
 3. 提議使用者執行 `/ps-lesson <一句話>` 登錄教訓。
-4. 事實類另提醒：wiki 對應 entity 檔需要修正——建議跑 `/ps-research
-   <領域>`（deep-research 會作廢不刪除地更新），或由管理者依 SOP-5 人工修正。
-   你自己是唯讀的，不要嘗試改檔。
+4. 事實類另提醒：wiki 對應 entity 檔需要修正——**單點知識指正建議
+   `/ps-correct <正確知識描述>`**（查重→作廢不刪除更新→標 human 來源
+   ＋verified，本機立即生效）；大範圍過時才跑 `/ps-research <領域>`；
+   管理者亦可依 SOP-5 人工修正。你自己是唯讀的，不要嘗試改檔。
 
 ## 硬規則
 

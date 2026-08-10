@@ -135,7 +135,7 @@
     <div class="tile"><div class="num">2</div><div class="lbl">工作模式（問答／文件生成）</div></div>
     <div class="tile"><div class="num">8</div><div class="lbl">分工 AI Agent（含稽核員）</div></div>
     <div class="tile"><div class="num">4</div><div class="lbl">資料源 MCP（搜尋／原始碼／中繼資料／DB）</div></div>
-    <div class="tile"><div class="num">37</div><div class="lbl">回歸測試情境（品質驗收）</div></div>
+    <div class="tile"><div class="num">38</div><div class="lbl">回歸測試情境（品質驗收）</div></div>
   </div>
 
   <!-- ================= WHY ================= -->
@@ -259,7 +259,7 @@
         <div class="sc-head"><span class="tag">情境 D</span><b>它答錯了</b></div>
         <div class="sc-body">
           <div class="sc-step"><span class="n">1</span><span>直接指正——它會<b>重新查證</b>，不會盲目附和</span></div>
-          <div class="sc-step"><span class="n">2</span><span>確認真的錯 → 打 <code>/ps-lesson 一句話描述</code> 登錄教訓</span></div>
+          <div class="sc-step"><span class="n">2</span><span>確認真的錯 → 知識錯打 <code>/ps-correct 正確知識</code>；行為錯打 <code>/ps-lesson 描述</code></span></div>
           <div class="sc-step"><span class="n">3</span><span>本機立即生效；PR 合併後全團隊不再犯同類錯</span></div>
           <div class="sc-out"><b>得到：</b>當下的更正答案＋長期的系統改善（跨 session 記取教訓）</div>
         </div>
@@ -286,7 +286,8 @@
         <tr><td><code>Tab</code> → PS MODE</td><td>問業務問題（最常用，打字就好，不用指令）</td><td><span class="role user">所有人</span></td></tr>
         <tr><td><code>/ps-research 領域</code></td><td>產出領域完整文件；中斷後重打即續跑</td><td><span class="role user">所有人</span></td></tr>
         <tr><td><code>/ps-audit 領域</code></td><td>稽核已產出文件：重查證據、抓遺漏、產記分卡</td><td><span class="role user">所有人</span></td></tr>
-        <tr><td><code>/ps-lesson 描述</code></td><td>登錄「它答錯了」的教訓並本機立即生效（團隊生效走內部 git PR 審核）</td><td><span class="role user">所有人</span></td></tr>
+        <tr><td><code>/ps-lesson 描述</code></td><td>登錄「它做錯了」的行為教訓並本機立即生效（團隊生效走內部 git PR 審核）</td><td><span class="role user">所有人</span></td></tr>
+        <tr><td><code>/ps-correct 正確知識</code></td><td>資深同事指正業務邏輯時：更新 wiki 知識（標 human 來源、立即生效；團隊走 PR）</td><td><span class="role user">所有人</span></td></tr>
         <tr><td><code>ps-doc-lint.ps1</code></td><td>文件格式健檢腳本（終端機執行）</td><td><span class="role admin">管理者</span></td></tr>
       </tbody>
     </table>
@@ -316,7 +317,7 @@
       <div class="arr">→</div>
       <div class="gate"><div class="g-ic">📋</div><b>3. 教訓機制</b><span>答錯→<code style="font-family:Consolas,monospace;font-size:11.5px">/ps-lesson</code> 本機立即修正；團隊生效走內部 git <b>PR 人審</b>把關</span></div>
       <div class="arr">→</div>
-      <div class="gate"><div class="g-ic">✅</div><b>4. 回歸測試</b><span>37 個測試情境守住歷史教訓，改版必跑，不走回頭路</span></div>
+      <div class="gate"><div class="g-ic">✅</div><b>4. 回歸測試</b><span>38 個測試情境守住歷史教訓，改版必跑，不走回頭路</span></div>
     </div>
 
     <div class="loop" style="margin-top:26px">
@@ -340,7 +341,7 @@
     <div class="flow-h" style="margin-top:14px">
       <div class="step"><b>1. 直接指正</b><span>AI 會<b>重新查證</b>而非附和——你說的內容也會被驗證</span></div>
       <div class="arr">→</div>
-      <div class="step"><b>2. 確認真錯 → /ps-lesson</b><span>一句話描述錯誤；AI 自動分類落點並<b>本機立即修正</b>（規則只加不刪、事實留作廢紀錄）</span></div>
+      <div class="step"><b>2. 確認真錯 → 分兩型</b><span>業務知識錯 → <b>/ps-correct</b> 直寫 wiki（標人工來源）；系統行為錯 → <b>/ps-lesson</b> 改規則——都本機立即生效</span></div>
       <div class="arr">→</div>
       <div class="step"><b>3. 內部 git PR</b><span>修改以 PR 送審，管理者看 diff 把關；不合格退回 revert</span></div>
       <div class="arr">→</div>
@@ -391,7 +392,7 @@
 
   <!-- ================= APPENDIX ================= -->
   <section>
-    <div class="sec-kicker">APPENDIX ─ 37 個回歸測試情境</div>
+    <div class="sec-kicker">APPENDIX ─ 38 個回歸測試情境</div>
     <h2>驗收清單：每一題都守著一個踩過的坑</h2>
     <p style="margin-top:8px">完整定義（檢查點與評分）見 <code>test-scenarios.md</code>；日常快速健檢用其中 9 題的 Smoke Set。</p>
     <p style="margin-top:6px">題目多以「兵役」為題材——它出自原始需求文件的完整範例，<b>正確答案已知才能評分</b>。
@@ -440,9 +441,10 @@
         <tr class="cat"><td colspan="3">G 類 ─ Deep Research 文件生成（2 題）</td></tr>
         <tr><td>G1</td><td>總覽與 checklist 生成</td><td>/ps-research 兵役（首次）——總覽＋進度檔要件齊全</td></tr>
         <tr><td>G2</td><td>逐項深查與續跑</td><td>中斷後重跑——不重查已完成項、只改進度小檔</td></tr>
-        <tr class="cat"><td colspan="3">H 類 ─ 稽核與教訓迴路（2 題）</td></tr>
+        <tr class="cat"><td colspan="3">H 類 ─ 稽核與教訓迴路（3 題）</td></tr>
         <tr><td>H1</td><td>稽核執行與回灌</td><td>/ps-audit 兵役——證據重驗、問題回灌進度清單</td></tr>
         <tr><td>H2</td><td>教訓登錄即生效</td><td>/ps-lesson ——本機立即套用、留完整紀錄、PR 把關</td></tr>
+        <tr><td>H3</td><td>人工指正知識更新</td><td>/ps-correct ——查重、作廢不刪除、標 human 來源＋verified</td></tr>
         <tr class="cat"><td colspan="3">I 類 ─ Entity Wiki 層（2 題）</td></tr>
         <tr><td>I1</td><td>歸戶與查重</td><td>深查完成後 wiki 有建檔／更新，同物件不重複建檔</td></tr>
         <tr><td>I2</td><td>問答 wiki-first 與來源標註</td><td>已驗證條目直接引用，且標明來源出自 wiki</td></tr>

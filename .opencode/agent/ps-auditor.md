@@ -32,6 +32,10 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 適用於 `NN-*.md` 與 **wiki entity 檔**（`docs/ps-research/wiki/*.md`——
 驗 Observations 的 evidence 與 frontmatter `sources` 的 chunk hash 是否仍成立；
 過期 → 回報建議標 `stale`）。
+**human 型來源**：sources 含 `human:<日期>`（人工指正知識）且
+frontmatter `reviewed: true` → 該筆**免解引用**，判
+`PASS(HUMAN_VERIFIED)`——人教的知識沒有 chunk 可驗，
+內部 git PR 人審就是它的驗證。
 
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**
@@ -71,7 +75,11 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 `VERIFIED`；取不到證據 → `UNVERIFIABLE`。拿不準一律 DISPUTED，不給面子。
 你不重寫文件、不補研究，只判定。
 
-**判 DISPUTED 的兩個前提（缺一改判 UNVERIFIABLE）**：
+**human 已驗知識不因「查無程式證據」被反駁**：claim 對應的 wiki
+entity 為 `reviewed: true` 且來源 human 型 → 需找到**明確矛盾的
+程式證據**才可 DISPUTED；查無僅得 UNVERIFIABLE。
+
+**判 DISPUTED 的前提（缺一改判 UNVERIFIABLE）**：
 1. **取證完整**（遵守 progressive-source-retrieval §5.1）：目標行落在
    chunk 邊界外 → 必須取相鄰段接續；claim 涉及多個 event／單元
    （如 SaveEdit＋SavePostChange）→ 全部取完才准判——

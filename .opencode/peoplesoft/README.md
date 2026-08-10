@@ -47,7 +47,8 @@
 ├─ command/
 │  ├─ ps-research.md                   /ps-research <領域> — 文件生成（可續跑）
 │  ├─ ps-audit.md                      /ps-audit <領域> — 稽核 + 回灌 checklist
-│  └─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓並本機立即生效（團隊走 PR）
+│  ├─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓並本機立即生效（團隊走 PR）
+│  └─ ps-correct.md                    /ps-correct <正確知識> — 人工指正的業務知識更新 wiki（human 來源＋verified）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -204,7 +205,8 @@ Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
 
 ```text
 被指正 / 稽核發現系統性錯誤
-  → /ps-lesson <描述>   登錄＋分類＋**本機立即套用**
+  → /ps-lesson <描述>   登錄＋分類＋**本機立即套用**（行為類錯誤）
+  → /ps-correct <正確知識>   業務知識指正直寫 wiki（human 來源＋verified）
                         （事實類修文件·作廢不刪除；規則類最小新增·只加不刪）
   → 記錄 applied.md ＋ 對應測試檢查點（防回歸）
   → commit / push → 內部 git PR ── 人工審 diff 把關（SOP-1）

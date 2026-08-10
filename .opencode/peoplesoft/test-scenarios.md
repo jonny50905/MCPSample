@@ -2,7 +2,7 @@
 
 用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
 程序紀律屬小模型等級）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 37 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
+是否遵守 Plan Addendum 的規則。共 38 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -433,6 +433,18 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      沒有動落點與 test-scenarios 以外的檔案
   4. [主要] 回覆有提醒：重啟 OpenCode 本機生效＋團隊生效需內部 git PR 審核
   5. [次要] 無把握判斷落點時登錄 PENDING 請人工，未亂套用
+
+### H3 人工指正知識更新（/ps-correct）
+- **輸入**：`/ps-correct [[TW_XXX]] 的免役判定除 MIL_STATUS 外還需生效日期（資深同事指正）`
+- **檢查點**：
+  1. [主要] 先查重（wiki 檔名＋aliases）——已有檔就地更新，不另開新檔
+  2. [致命] 作廢不刪除：矛盾舊敘述移入 Invalidated 節（含日期），
+     未被刪除或改寫
+  3. [主要] 新 Observation 來源標 `human:<日期>`；frontmatter
+     status: verified、reviewed: true、last_verified 更新
+  4. [次要] 回覆提醒 commit 走內部 git PR（diff 審核＝人審把關）
+  5. [次要] 重啟後同題問答直接引用該條目（來源標 wiki 已驗證）；
+     稽核對該筆判 PASS(HUMAN_VERIFIED) 不再質疑
 
 ## I 類：Entity Wiki 層
 

@@ -5,7 +5,7 @@ origin: CUSTOM_PREFIX      # CUSTOM_PREFIX | CUSTOM_REGISTRY | MODIFIED_DELIVERE
 status: draft              # draft（未驗證）| verified（稽核通過）| stale（來源已變/逾期）
 confidence: 0.5            # 0.0 ~ 1.0
 last_verified: YYYY-MM-DD
-sources: []                # 依據的 chunk UUID / SQL 摘要（時效偵測鍵）
+sources: []                # 依據的 chunk UUID / SQL 摘要 / human:<日期>（人工指正）（時效偵測鍵）
 reviewed: false            # true = 人工審定——agent 不得覆寫既有內容，只能追加
 ---
 # <物件名>
