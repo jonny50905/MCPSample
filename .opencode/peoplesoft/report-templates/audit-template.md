@@ -19,7 +19,11 @@
      記分卡數字——原因欄逐字取自 auditor 回報（逾時／連線失敗／
      chunk 查無／工具不可用…），這是判斷環境問題 vs 資料問題的依據。
      DISPUTED 列的原因欄必含三要素：原 claim 一句、稽核取到的證據
-     （ChunkId:行號）、矛盾點一句——缺任一＝不可裁決＝不合格判定。 -->
+     （ChunkId:行號）、矛盾點一句——缺任一＝不可裁決＝不合格判定。
+     FAIL 類型詞彙表（原因欄使用）：TRUNCATED_ID／FABRICATED／
+     WRONG_KIND／STALE_DATA／ID_RELINK／NOT_FOUND／MISSING_CHUNK_ID／
+     INCOMPLETE_CHUNK；行號漂移但 quote 命中＝PASS(LINE_DRIFT) 附
+     新行號，不是 FAIL。 -->
 
 | 檔案 | 類型 | 內容 | 原因 | 處置 |
 |---|---|---|---|---|

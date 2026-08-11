@@ -34,6 +34,10 @@ orchestrator 主 context 只累積小而結構化的報告。
    - **只有這兩種**。`PeoplecodeMetadata` 的回傳＝定位線索（地位同 ES
      搜尋結果），不得寫成 evidence 條目；只有定位、未經 CHUNK／SQL 查證
      的 finding 最高標 INFERRED。
+   - **證據格式三鐵律**（缺一該筆不得列入 findings，改放 gaps）：
+     (1) CHUNK 型必附**完整 36 字元** ChunkId；(2) 行號必須對應
+     **當前**取回內容（引用時同步更新）；(3) **任何欄位禁止縮寫**
+     （id、路徑、quote 皆逐字取自工具回傳）。
 8. **禁止捏造識別碼**：id / filePath / lines 只能來自工具回傳；
    工具沒提供的欄位一律省略，不得補一個「看起來像」的值。
 9. 長文本分析必附 `coverage`：本次分析的程式單位、其**結構行號範圍**、

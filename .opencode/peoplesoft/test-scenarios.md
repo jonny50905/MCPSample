@@ -2,7 +2,7 @@
 
 用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
 程序紀律屬小模型等級）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 38 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
+是否遵守 Plan Addendum 的規則。共 39 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
@@ -358,6 +358,15 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   6. [主要] 未把 Page／Record 名帶入 find_field_usage／
      search_component_metadata（輸入類型限定：只吃欄位名／Component
      關鍵字）——Page 類問題先走 cookbook §2 對映換出欄位名
+
+### F7 證據格式三鐵律（寫入端遵循）
+- **輸入**：任一深查／補查流程產出的 subagent 報告與 NN 檔
+- **檢查點**：
+  1. [致命] CHUNK 型證據全數附**完整 36 字元** ChunkId（無縮寫、
+     無檔案行號型裸引）
+  2. [主要] 行號對應當前取回內容（引用時同步更新，非沿用舊值）
+  3. [主要] id／路徑／quote 逐字取自工具回傳（無任何縮寫或改寫）
+  4. [次要] 不合三鐵律的候選放 gaps 而非 findings
 
 ### F6 委派 prompt 瘦身（task JSON 不截斷）
 - **輸入**：任一深查／稽核流程（觀察 task 委派的參數內容）
