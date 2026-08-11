@@ -248,12 +248,15 @@ checklist 重查。
 
 ## SOP-12 oracleMCP 單通道操作紀律
 
-oracleMCP＝VS Code SQL Developer extension 的 SQLcl，**單一有狀態
-連線**。規則只能管單一 session 內的排隊，**跨視窗搶用要靠人**。
+oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
+**輕量查詢可並發**（3 subagent 同呼成功）；問題出在**重載**：
+稽核 SQL 風暴期間並行查詢會排隊逾時（>30s → BLOCKED），
+且各 session 的 disconnect 可能互拆共用連線。
 
 ```text
-□ 鐵則：一次只有一個「oracle 使用者」——audit／research 跑 SQL 段
-  期間，不在其他視窗問需要查 DB 的問題（wiki 已有／純程式碼題不限）
+□ 原則：**重載期間不並行**——audit／research 跑 SQL 重驗段時，
+  避免在其他視窗問需要查 DB 的問題（wiki 已有／純程式碼題不限）；
+  平時輕量查詢並行無妨
 □ 常見症狀：問答說「DB 通道忙碌／逾時」、稽核出現成批
   UNVERIFIABLE(逾時／view 不可用)——先想「是不是兩個視窗在搶」
 □ 快篩三步：(1) VS Code 與 SQL Developer extension 活著？
