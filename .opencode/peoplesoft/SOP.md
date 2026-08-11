@@ -246,6 +246,24 @@ checklist 重查。
 
 ---
 
+## SOP-12 oracleMCP 單通道操作紀律
+
+oracleMCP＝VS Code SQL Developer extension 的 SQLcl，**單一有狀態
+連線**。規則只能管單一 session 內的排隊，**跨視窗搶用要靠人**。
+
+```text
+□ 鐵則：一次只有一個「oracle 使用者」——audit／research 跑 SQL 段
+  期間，不在其他視窗問需要查 DB 的問題（wiki 已有／純程式碼題不限）
+□ 常見症狀：問答說「DB 通道忙碌／逾時」、稽核出現成批
+  UNVERIFIABLE(逾時／view 不可用)——先想「是不是兩個視窗在搶」
+□ 快篩三步：(1) VS Code 與 SQL Developer extension 活著？
+  (2) 無並發時 build 模式直通測試（叫它用 oracleMCP 查 SELECT 1）
+  (3) 只有並發時失敗＝搶用確認，錯開時間即可
+□ 通道死透（無並發也失敗）→ 重啟 VS Code／extension 再測
+```
+
+---
+
 ## SOP-11 系統 CR 上線後的知識庫對齊
 
 前提觀念：ES 索引是程式碼**快照**——索引沒更新，稽核驗的是舊

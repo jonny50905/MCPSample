@@ -154,3 +154,7 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
 - **委派必須指名 ps-\* agent**（依委派表）：general／explore／scout
   是 OpenCode 內建的「本機檔案探索」agent，**查不到 PeopleSoft**——
   派它們去查業務問題＝路由錯誤，回來的「查無」無效。
+- **oracle 類委派回 BLOCKED／逾時的轉譯**：不得說成「無法執行 SQL」
+  這類能力性否定——照實說「**DB 通道忙碌或逾時**（單一連線；常見
+  原因＝另一個視窗的稽核／研究正在用），稍後重試即可」；
+  非 DB 的部分照常作答，並標明哪部分因此缺料。
