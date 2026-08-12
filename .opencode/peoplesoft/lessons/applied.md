@@ -228,6 +228,18 @@
   二次定位全程綁分頁紀律（§5.1）。原則：**新 agent 上線時，共用
   檢索紀律要逐一確認有綁，不會自動繼承**。
 
+### L20 checklist 熱檔會隨輪次肥大——已勾項歸檔（2026-08）
+- 症狀（管理者預警）：調查進度隨每輪稽核回灌累積 A 項、已勾項
+  永留 → 整檔覆寫的 JSON 隨歷史變長，走回 L2 截斷老路；找
+  「第一個未勾項」的掃描噪音也隨之增加。
+- 落點：機械化——每輪稽核回灌時把所有已打勾項 append 到
+  `checklist-archive.md`（冷檔，永不回讀），checklist.md 常態只留
+  輪次行＋未勾項＋Gaps；lint 對帳改「checklist＋archive 合併」。
+  現存肥檔於下輪稽核首次歸檔時自動瘦身。
+- 原則：**熱檔（反覆整檔覆寫）必須有歸檔機制，否則終將肥死**
+  ——log.md／applied.md 的「冷熱分離」哲學套用到 checklist。
+- 套用：本 commit。
+
 ### L19 oracle 裸表名查不到——CURRENT_SCHEMA 機械化（2026-08）
 - 症狀：稽核 FAIL 7 筆「view 不存在」；管理者實測加 [schema].TABLE
   前綴即查到＝cookbook 樣板用裸表名、登入帳號不是 PeopleTools 表的

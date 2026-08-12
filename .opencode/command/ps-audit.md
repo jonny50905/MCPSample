@@ -21,7 +21,8 @@ agent: ps-deep-research
    自創詞一律算）與遺漏候選，**以檔為單位彙整、一檔一行**加進
    `checklist.md` 的調查進度（格式：`- [ ] A<n> 補查 <NN-檔名>：
    FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`；禁止逐筆開項），
-   輪次行更新為 N+1。
+   輪次行更新為 N+1；同時把所有**已打勾**項 append 到
+   `checklist-archive.md` 後從 checklist.md 移除（熱檔保持小）。
 4. **後寫** `90-audit.md`：**整檔重寫**，表頭「稽核輪次：N+1」＋本日
    日期；判定只准來自本輪 auditor 回報，**禁止 read 舊 90-audit.md、
    禁止沿用其數字或內容**；記分卡＝本輪**全量**數字（第 2 輪起另填
