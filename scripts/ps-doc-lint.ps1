@@ -118,6 +118,11 @@ Get-ChildItem $dir -Filter "*.md" |
         $evIdx = $text.IndexOf('## Evidence 附錄')
         if ($evIdx -ge 0) {
             $evText = $text.Substring($evIdx)
+            # 章節存在但「內容空白」也是違規（有標題沒證據＝沒證據）
+            if ($evText -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
+                $evText -notmatch '(?i)\bSQL\b') {
+                $violations += "${name}：Evidence 附錄空白（有章節標題但無任何 chunk id／SQL 證據）"
+            }
             foreach ($line in ($evText -split "`n")) {
                 if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and
                     $line -match '[:：]\d+' -and

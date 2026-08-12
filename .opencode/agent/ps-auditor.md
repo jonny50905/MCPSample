@@ -95,6 +95,10 @@ entity 為 `reviewed: true` 且來源 human 型 → 需找到**明確矛盾的
 給定領域核心資料表清單：用 oracleMCP（引用反查）、ES（table 名搜尋）
 與 PeoplecodeMetadata 從**資料與引用角度**反推「哪些物件在讀寫這些表」
 → 回傳物件清單（與功能地圖的 diff 由委派方做）。
+**對比前必先正規化**：SQL 表名去 `PS_` 前綴＝Record 名
+（`PS_TW_X` ↔ `TW_X` 是同一物件）、大小寫不分、`[[連結]]` 內文字
+也算出現——**未正規化的「未覆蓋」清單無效**（會把整份文件誤判成
+沒寫）。
 PeoplecodeMetadata **只吃欄位名／Component 關鍵字**——以 Record 反查
 時，帶該表的**關鍵欄位名**進 `find_field_usage`，不得帶 Record 名或
 Page 名（帶錯必查空，屬方法錯誤）。任一角度**查無 ≠ 不存在**

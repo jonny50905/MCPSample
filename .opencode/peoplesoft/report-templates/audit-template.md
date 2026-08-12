@@ -10,6 +10,9 @@
 | 檔案 | 證據 PASS | FAIL | UNVERIFIABLE | Claim VERIFIED | DISPUTED | 燈號 |
 |---|---|---|---|---|---|---|
 | 01-… | 8 | 0 | 1 | 4 | 0 | 🟡 |
+| **合計** | **8** | **0** | **1** | **4** | **0** | 🟢x／🟡y／🔴z |
+
+<!-- 最後一列必為「合計」：各欄加總＋燈號分佈——趨勢追蹤靠它。 -->
 
 燈號：🟢 無 FAIL / DISPUTED；🟡 僅 UNVERIFIABLE；🔴 有 FAIL 或 DISPUTED
 
