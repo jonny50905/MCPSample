@@ -16,6 +16,11 @@
    先驗證（查不到表 / 欄位時記入 gaps，不要瞎改表名硬湊）。
 7. oracleMCP 的實際工具名（query / execute_sql…）以 OpenCode /mcp 清單為準，
    一律使用唯讀查詢工具。
+8. **查詢前欄位驗證（治 wrong-column 慢性病）**：要用「樣板裡沒有的
+   欄位名」或不確定欄位存不存在時，先跑
+   SELECT column_name FROM all_tab_columns WHERE table_name='<大寫表名>'
+   確認後再查——**禁止憑記憶寫欄位名**；驗證後仍無該欄位 →
+   記 gaps，不要換個猜法再試。
 ```
 
 ## 連線生命週期（每次任務照此順序，硬性）
