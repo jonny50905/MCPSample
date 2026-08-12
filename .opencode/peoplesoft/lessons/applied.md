@@ -242,6 +242,9 @@
   不可讀）——固定格式「文件說／實際取到／差異」。
 - 本輪其餘三類系統性（LINE_DRIFT／ID_RELINK／QUOTE 類）已由 L18
   三鐵律與修法選單覆蓋，未重複開 lesson。
+- 修正（管理者）：本案 schema 名**非機敏** → 淘汰 local-env.yaml
+  機制，設定移入 customization-profile.yaml 的 oracle.currentSchema
+  （隨 repo 搬運、免額外人工步驟）。
 - 套用：本 commit。
 
 ### L18 證據格式三鐵律——本機 /ps-lesson 首次自主產出、PR 收編（2026-08）

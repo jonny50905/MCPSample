@@ -1,7 +1,0 @@
-# 本機環境設定「範本」——複製一份改名為 local-env.yaml 後填入實際值。
-# local-env.yaml 含機敏環境資訊：只留本機／內部 git，嚴禁進外部 repo
-# （.gitignore 已擋）。人工搬運檔案時也不要覆蓋它。
-oracle:
-  # PeopleTools 表的擁有者 schema（登入帳號查裸表名會 not found 時填）。
-  # 連線生命週期第 3 步會執行 ALTER SESSION SET CURRENT_SCHEMA=<此值>
-  currentSchema: "FILL_ME"

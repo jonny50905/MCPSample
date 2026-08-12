@@ -16,6 +16,3 @@ x86/
 
 # markitdown skill — tenant-specific AIP label GUIDs
 .claude/skills/markitdown/config.json
-
-# 本機環境機敏設定（schema 名等）——只留本機/內部 git
-.opencode/peoplesoft/local-env.yaml

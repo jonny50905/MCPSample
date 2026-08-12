@@ -52,6 +52,13 @@ searchPolicy:
   allowDeliveredFallback: true
   allowDeliveredDependencies: true
 
+oracle:
+  # PeopleTools 表的擁有者 schema——登入帳號非擁有者時，裸表名會
+  # view/table not found。連線生命週期第 3 步執行：
+  # ALTER SESSION SET CURRENT_SCHEMA=<此值>（唯一准許的非 SELECT）。
+  # 值為 FILL_ME 則跳過該步。
+  currentSchema: FILL_ME
+
 # 業務領域定義（Domain alias、rootObjectPolicy、fallback 政策）
 # 見同目錄 business-domain-map.yaml
 businessDomainMap: business-domain-map.yaml

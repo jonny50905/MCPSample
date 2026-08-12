@@ -263,9 +263,8 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
   (2) 無並發時 build 模式直通測試（叫它用 oracleMCP 查 SELECT 1）
   (3) 只有並發時失敗＝搶用確認，錯開時間即可
 □ 通道死透（無並發也失敗）→ 重啟 VS Code／extension 再測
-□ view/table not found → 檢查 local-env.yaml 的 oracle.currentSchema
-  已填（cookbook 生命週期第 3 步；範本＝local-env.example.yaml，
-  實名機敏、不入外部 repo、搬運勿覆蓋）
+□ view/table not found → 檢查 customization-profile.yaml 的
+  oracle.currentSchema 已填（cookbook 生命週期第 3 步）
 ```
 
 ---

@@ -73,9 +73,10 @@ tools:
 - **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；每個查詢都要有列數上限
   （FETCH FIRST 200 ROWS ONLY）。
 - **oracleMCP 連線生命週期**：先 `list-connections` 取連線名 → `connect` →
-  **設 CURRENT_SCHEMA**（read local-env.yaml 的 oracle.currentSchema，
-  執行一次 ALTER SESSION SET CURRENT_SCHEMA=<值>——唯一准許的非
-  SELECT；檔案沒有就跳過）→ 查完 → `disconnect`；connect 或查詢逾時
+  **設 CURRENT_SCHEMA**（read customization-profile.yaml 的
+  oracle.currentSchema，執行一次 ALTER SESSION SET CURRENT_SCHEMA=<值>
+  ——唯一准許的非 SELECT；值為 FILL_ME 就跳過）→ 查完 →
+  `disconnect`；connect 或查詢逾時
   （~30 秒）→ 停手回報 `status: BLOCKED`，**不准重試迴圈**。
   view/table not found 先想「schema 步驟做了沒」。
 
