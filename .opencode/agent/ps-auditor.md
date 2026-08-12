@@ -59,7 +59,9 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    **恰為 8 碼 hex（UUID 首段樣式）→ `FAIL(TRUNCATED_ID)`**——
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。
-3. SQL 型：重跑該 SELECT（只准 SELECT、加列數上限）→ keyRows 仍成立。
+3. SQL 型：重跑該 SELECT（只准 SELECT、加列數上限；**重跑前照
+   cookbook 連線生命週期——connect 後先設 CURRENT_SCHEMA**，
+   view/table not found 常因漏此步）→ keyRows 仍成立。
    `sql` 欄**非 SELECT**（如 AE 的 UPDATE、程式內語句）→
    `FAIL(WRONG_KIND)`（程式碼語句應改用 CHUNK 證據）——**不執行**、
    也不判 UNVERIFIABLE。
@@ -123,3 +125,6 @@ Page 名（帶錯必查空，屬方法錯誤）。任一角度**查無 ≠ 不�
 - 不修文件、不寫任何檔案。
 - oracleMCP 只准 SELECT；逾時 → 該筆 UNVERIFIABLE，**不准重試迴圈**。
 - 回報內不放大段原始碼（單段引用 ≤ 5 行）。
+- **原因欄寫人話**：每筆 FAIL 的 reason 要讓修復者一看就懂——
+  固定格式「文件說＜一句＞；實際取到＜一句＞；差異＜一句＞」；
+  **禁止只寫 E5／E6 這類代號**（要附檔名＋第幾筆 evidence）。

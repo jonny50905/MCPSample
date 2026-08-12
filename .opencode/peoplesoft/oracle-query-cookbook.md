@@ -25,8 +25,16 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
 ```text
 1. list-connections     → 取得可用的已儲存連線名（不要自己編連線名）
 2. connect（帶連線名）   → 切換本行程的目前連線
-3. 查詢                 → 本次任務的查詢全部做完
-4. disconnect           → 用完必斷，不要佔住單工 server
+3. 設 schema            → read .opencode/peoplesoft/local-env.yaml 取
+                          oracle.currentSchema，執行一次
+                          ALTER SESSION SET CURRENT_SCHEMA=<該值>
+                          （**唯一准許的非 SELECT 語句**；檔案不存在
+                          或值為 FILL_ME → 跳過此步）
+4. 查詢                 → 本次任務的查詢全部做完（裸表名即可，
+                          schema 已由第 3 步解決——PeopleTools 表
+                          不屬於登入帳號的 schema，漏這步會
+                          view/table not found）
+5. disconnect           → 用完必斷，不要佔住單工 server
 ```
 
 逾時與平行規則：

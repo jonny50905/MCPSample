@@ -73,8 +73,11 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；查詢一律加列數上限，
   高基數先 COUNT（cookbook 使用規則）。
 - **oracleMCP 連線生命週期**：先 `list-connections` 取連線名 → `connect` →
-  查完 → `disconnect`；connect 或查詢逾時（~30 秒）→ 停手回報
-  `status: BLOCKED`，**不准重試迴圈**。
+  **設 CURRENT_SCHEMA**（read local-env.yaml 的 oracle.currentSchema，
+  執行一次 ALTER SESSION SET CURRENT_SCHEMA=<值>——唯一准許的非
+  SELECT；檔案沒有就跳過）→ 查完 → `disconnect`；connect 或查詢逾時
+  （~30 秒）→ 停手回報 `status: BLOCKED`，**不准重試迴圈**。
+  view/table not found 先想「schema 步驟做了沒」。
 - **oracle 證據格式**：`kind: "SQL"` ＋ `sql` ＋ `keyRows`（關鍵列摘要）；
   **沒有 id、也不准自創 id**（`SQL-XLAT-1` 這種自編字串＝報告不合格）。
   只有真的取了 source chunk 才有 id / filePath，且必須逐字來自工具回傳。

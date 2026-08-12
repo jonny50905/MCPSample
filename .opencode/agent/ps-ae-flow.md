@@ -61,7 +61,10 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 ## 硬規則
 
 - 不可展開整支 AE 的所有 Section；只追必要的 Call Section 鏈。
-- **oracleMCP 規則**：只准 SELECT；先 `list-connections` → `connect` →
+- **oracleMCP 規則**：只准 SELECT（唯一例外＝生命週期的
+  CURRENT_SCHEMA 設定）；先 `list-connections` → `connect` →
+  **設 CURRENT_SCHEMA**（read local-env.yaml，ALTER SESSION SET
+  CURRENT_SCHEMA=<oracle.currentSchema>；檔案沒有就跳過）→
   查完 → `disconnect`；connect 或查詢逾時（~30 秒）→ 停手回報
   `status: BLOCKED`，**不准重試迴圈**。
 - **定位後切換檔案模式**（協定 §5.1）：命中後 `get_file_structure(fileId)`

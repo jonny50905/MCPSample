@@ -228,6 +228,22 @@
   二次定位全程綁分頁紀律（§5.1）。原則：**新 agent 上線時，共用
   檢索紀律要逐一確認有綁，不會自動繼承**。
 
+### L19 oracle 裸表名查不到——CURRENT_SCHEMA 機械化（2026-08）
+- 症狀：稽核 FAIL 7 筆「view 不存在」；管理者實測加 [schema].TABLE
+  前綴即查到＝cookbook 樣板用裸表名、登入帳號不是 PeopleTools 表的
+  擁有者。可能同時解釋歷史部分 UNVERIFIABLE(view 不可用)。
+- 落點：機械化——連線生命週期插入第 3 步「ALTER SESSION SET
+  CURRENT_SCHEMA=<local-env.yaml 的 oracle.currentSchema>」
+  （唯一准許的非 SELECT；一次設定、全程裸表名照舊——遠優於要求
+  小模型每句加前綴）。schema 實名屬機敏 → local-env.yaml 本機檔
+  （.gitignore 擋、人工搬運不覆蓋；example 範本入 repo）。
+  三個 flow agent＋auditor 生命週期同步更新。
+- 另修：auditor 原因欄「寫人話」標準（管理者反映 E5/E6 類代號
+  不可讀）——固定格式「文件說／實際取到／差異」。
+- 本輪其餘三類系統性（LINE_DRIFT／ID_RELINK／QUOTE 類）已由 L18
+  三鐵律與修法選單覆蓋，未重複開 lesson。
+- 套用：本 commit。
+
 ### L18 證據格式三鐵律——本機 /ps-lesson 首次自主產出、PR 收編（2026-08）
 - 來源：地端模型執行 /ps-lesson（稽核三類系統性 FAIL：無 id 檔案
   行號型／行號飄移／8 碼縮寫）自主分類並套用——落點選擇正確
