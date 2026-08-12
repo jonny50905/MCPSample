@@ -81,6 +81,11 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 entity 為 `reviewed: true` 且來源 human 型 → 需找到**明確矛盾的
 程式證據**才可 DISPUTED；查無僅得 UNVERIFIABLE。
 
+**「過簡」不是反駁**：claim 有證據支撐、只是描述不夠深／不完整
+（提不出**事實矛盾點**）→ verdict 判 `VERIFIED`，把「建議補充什麼」
+寫進 gaps——**不得判 DISPUTED**（深度是編輯建議，不是品質缺陷；
+不染紅、不生成強制工單）。
+
 **判 DISPUTED 的前提（缺一改判 UNVERIFIABLE）**：
 1. **取證完整**（遵守 progressive-source-retrieval §5.1）：目標行落在
    chunk 邊界外 → 必須取相鄰段接續；claim 涉及多個 event／單元
