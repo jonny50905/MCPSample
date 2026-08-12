@@ -210,7 +210,22 @@ if (Test-Path $wikiDir) {
     }
 }
 
-# 縮寫 id 存在時，自動產生可直接貼用的手術式修復指令
+# 輸出
+if ($warnings.Count -gt 0) {
+    Write-Host "WARN：$($warnings.Count) 項警告（不擋通過）" -ForegroundColor Yellow
+    $warnings | ForEach-Object { Write-Host " - $_" }
+}
+if ($violations.Count -eq 0) {
+    Write-Host "PASS：$Domain 全部檢查通過" -ForegroundColor Green
+    $exitCode = 0
+}
+else {
+    Write-Host "FAIL：$($violations.Count) 項違規" -ForegroundColor Red
+    $violations | ForEach-Object { Write-Host " - $_" }
+    $exitCode = 1
+}
+
+# 縮寫 id 的手術式修復指令——放「最後」印，才不會被警告牆洗出畫面
 if ($truncatedIds.Count -gt 0) {
     Write-Host ""
     Write-Host "=== 手術式修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
@@ -230,17 +245,4 @@ if ($truncatedIds.Count -gt 0) {
     Write-Host ""
 }
 
-# 輸出
-if ($warnings.Count -gt 0) {
-    Write-Host "WARN：$($warnings.Count) 項警告（不擋通過）" -ForegroundColor Yellow
-    $warnings | ForEach-Object { Write-Host " - $_" }
-}
-if ($violations.Count -eq 0) {
-    Write-Host "PASS：$Domain 全部檢查通過" -ForegroundColor Green
-    exit 0
-}
-else {
-    Write-Host "FAIL：$($violations.Count) 項違規" -ForegroundColor Red
-    $violations | ForEach-Object { Write-Host " - $_" }
-    exit 1
-}
+exit $exitCode
