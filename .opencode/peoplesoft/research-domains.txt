@@ -6,8 +6,10 @@
 #   - 本檔只回答「要研究什麼」，不記錄進度——進度真相在各領域的
 #     checklist.md 與 graduation.json（收據由 ps-auto-loop 畢業時寫入）
 #   - 領域名不可用：wiki（共用 Entity Wiki 目錄）、Windows 裝置名
-#     （CON/PRN/AUX/NUL/COM1-9/LPT1-9）、含 < > : " / \ | ? * & % ^
-#     或「..」的名稱——preflight 會整批拒絕
+#     （CON/PRN/AUX/NUL/COM1-9/LPT1-9，含帶副檔名形）、含 < > : " / \ | ? * & % ^
+#     或「..」、以「-」或「.」開頭、超過 50 字元——preflight 會整批拒絕
+#   - 領域「畢業」後請把該行註解移出佇列（SOP-14）——維運期的月度 audit 會
+#     使收據失效，留在佇列會被 batch 自動重跑（永動工單機）
 #
 # 用法：.\scripts\ps-auto-all.ps1
 #       （選配熔絲：-MaxDomains 10 -MaxBatchHours 8 -MaxConsecutiveFailures 3）

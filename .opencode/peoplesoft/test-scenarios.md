@@ -515,6 +515,32 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   5. [次要] lint 對空檔（0 byte NN／wiki 檔）記違規而非丟例外中斷
      掃描（半寫檔不得讓其餘檔案被靜默跳過）
 
+### J3 畢業收據與多領域排程（issue #3；fixture 模擬即可測）
+- **輸入**：佈置收據／佇列的各種狀態組合，跑 ps-graduation.ps1 函式與
+  ps-auto-all 的 preflight
+- **檢查點**：
+  1. [致命] 排程器不以「checklist 全勾」判斷 GRADUATED——skip 唯一依據
+     是有效 graduation.json；`exit 0 但收據無效`＝system error 停批
+  2. [致命] 收據只由 ps-auto-loop 在三層門全過後寫入；寫入前比對過門
+     快照 hash（門後有寫入者＝拒發）、寫入後回讀重驗
+  3. [致命] 失效矩陣：領域文件改動（contentHash）／lint 改版
+     （lintScriptHash）／收據邏輯改版（gateScriptHash）／gateVersion、
+     schemaVersion、domain 不符——任一不符＝RUN；共用 wiki 變動
+     **不**使收據失效
+  4. [主要] 收據 hash 對行尾（CRLF/LF）與 BOM 免疫（git autocrlf／
+     GitHub Raw 人工搬運不造成假失效）；檔名 Ordinal 排序（跨 locale
+     決定性）；hash 範圍＝領域目錄全部 *.md 減 log.md（排除法）
+  5. [主要] 壞收據（0 byte／截斷 JSON／缺欄位）＝無效→RUN，
+     絕不讓批次崩潰（fail-safe）
+  6. [主要] preflight 整批拒絕：重複（trim/大小寫後）、wiki、Windows
+     裝置名（含帶副檔名形）、`< > : " / \ | ? * & % ^` 反引號、「..」、
+     開頭「-」、開頭/結尾「.」、控制/零寬字元、>50 字元
+  7. [主要] exit 1＝NEEDS_ATTENTION 續跑下一領域；連續失敗達上限熔斷；
+     SKIP 對連敗計數透明（只有 GRADUATED 重置）；exit 3（鎖忙）獨立
+     分類不混入 system error
+  8. [次要] 佇列檔不存在＝exit 2；存在但零生效領域＝警告後正常結束；
+     佇列順序即執行順序；未定義於 business-domain-map 的領域照常可跑
+
 ---
 
 ## 5. 快速健檢子集（Smoke Set）

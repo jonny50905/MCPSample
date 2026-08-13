@@ -286,6 +286,9 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 □ 原則：**重載期間不並行**——audit／research 跑 SQL 重驗段時，
   避免在其他視窗問需要查 DB 的問題（wiki 已有／純程式碼題不限）；
   平時輕量查詢並行無妨
+□ 批次（ps-auto-all，SOP-14）執行時段**整段視同重載期間**——期間禁止
+  手動 /ps-research、/ps-audit 與需查 DB 的問答（相位不可預測，且手動
+  寫入會落在批次的畢業門與收據之間，讓收據認證未驗證的內容）
 □ 常見症狀：問答說「DB 通道忙碌／逾時」、稽核出現成批
   UNVERIFIABLE(逾時／view 不可用)——先想「是不是兩個視窗在搶」
 □ 快篩三步：(1) VS Code 與 SQL Developer extension 活著？
@@ -321,4 +324,37 @@ code，全部白驗。oracleMCP 查線上 DB，CR 後立即反映、不需此步
      ——證據解引用會自己找出變掉的地方（較慢但完備）
 □ 7. 兜底：lint 的 90 天過期警示點名久未驗證的 entity；
      大型改版後全領域輪流 /ps-audit 一輪
+```
+
+---
+
+## SOP-14 批次多領域研究（ps-auto-all）
+
+佇列 `.opencode/peoplesoft/research-domains.txt`（人工維護、一行一領域、
+`#` 註解；只回答「要研究什麼」，不存進度）。收據
+`docs/ps-research/<領域>/graduation.json` 只由 ps-auto-loop 畢業時寫入，
+排程器只驗不寫；**收據＝單機事實**——不進 git（.gitignore 已擋），
+各機各自畢業，batch 只在管理機跑。
+
+```text
+□ 啟動前：Unblock-File 四支腳本（auto-all／auto-loop／doc-lint／graduation
+  ——auto-all 用子 powershell 跑 auto-loop，執行原則須四支都放行）
+□ 跑批：powershell -File "<repo>\scripts\ps-auto-all.ps1"
+  （選配熔絲 -MaxDomains 10 -MaxBatchHours 8 -MaxConsecutiveFailures 3；
+  -Force＝忽略收據全部重驗；-MaxCyclesPerDomain 可縮單領域天花板。
+  注意 MaxBatchHours 只在領域之間檢查——單領域最壞時長
+  ＝MaxCycles×(audit 45m＋surgery 30m)，要硬圍欄就縮 MaxCyclesPerDomain）
+□ 批次時段＝重載期間（SOP-12）：禁手動 /ps-research、/ps-audit、查 DB 問答
+□ 領域畢業後：從佇列**註解移出**——維運期月度 audit 會使收據失效，
+  留在佇列＝batch 每次自動重跑（SOP-13 明文要避免的永動工單機）；
+  重新排入時機由人決定（CR 後、要清消 A 項時）
+□ 早上看 auto-loop-logs\batch-*.log 的 Summary：
+  GRADUATED＝畢業（收據已驗）；NEEDS_ATTENTION＝該領域卡住（看
+  auto-loop-logs\<領域>\ 的 GATE 行與 strict-cycle*.txt），不擋其他領域；
+  MUTEX_BUSY＝鎖被外部持有（錯開重跑即可，非損壞）；
+  SYSTEM_ERROR＝automation 不可信（環境級，修完才准重跑）
+□ 批次被 Ctrl+C 中斷：對當時進行中的領域跑一次 lint（SOP-2）確認無半寫
+  損壞再重啟批次；收據不會半寫誤判（寫入後回讀重驗＋壞 JSON 一律當無效）
+□ exit 0 但收據無效＝兩端判準不一致（版本歪斜？）——停批屬設計行為，
+  先核對四支腳本是否同版（gateVersion／schemaVersion 常數在 ps-graduation.ps1）
 ```

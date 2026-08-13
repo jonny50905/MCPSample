@@ -19,3 +19,7 @@ x86/
 
 # ps-auto-loop 駕駛腳本的本機 session log（不入庫）
 auto-loop-logs/
+
+# 畢業收據＝單機事實（跨機 lint/gate 腳本 hash 必不同→乒乓失效）；
+# 各機各自畢業、batch 只在管理機跑（SOP-14）
+docs/ps-research/*/graduation.json

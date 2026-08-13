@@ -42,6 +42,17 @@ $ocCmd = Get-Command opencode -ErrorAction SilentlyContinue
 if (-not $ocCmd) { Write-Error "PATH 找不到 opencode"; exit 2 }
 $ocPath = $ocCmd.Source
 
+# ── 畢業收據共用邏輯（issue #3）——缺檔／版本不符要在取鎖前快炸，
+#    不能拖到數小時後畢業瞬間才發現人工搬運不完整
+$gradLibPath = Join-Path $PSScriptRoot "ps-graduation.ps1"
+if (-not (Test-Path -LiteralPath $gradLibPath)) {
+    Write-Error "缺 scripts/ps-graduation.ps1（人工搬運不完整？）"; exit 2
+}
+. $gradLibPath
+if ($GraduationSchemaVersion -ne 1) {
+    Write-Error "ps-graduation.ps1 版本不符（schemaVersion=$GraduationSchemaVersion）"; exit 2
+}
+
 function Write-Log([string]$msg) {
     $line = "[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $msg
     Add-Content -Path $logFile -Value $line -Encoding UTF8
@@ -186,6 +197,27 @@ function Invoke-Lint {
     return @{ Exit = $code; Surgical = $surgical; Raw = $raw }
 }
 
+# ── 自動化互斥鎖（issue #3）──────────────────────────────────
+# 擋「兩個自動迴圈同時跑」（共享 wiki／oracleMCP／working tree）。
+# 批次由 ps-auto-all 以**子行程**逐領域呼叫本腳本——行程死亡時 OS 自動
+# 回收鎖（前任死亡＝AbandonedMutexException＝視為取得），無 stale lock。
+# 互動式 OpenCode 問答不經此鎖，靠 SOP-12／SOP-14 操作紀律。
+# exit code 語意：0 畢業（收據已寫）／1 未畢業／2 環境或收據錯誤／3 鎖被占用
+$mutex = $null
+$mutexHeld = $false
+try {
+    $mutex = New-Object System.Threading.Mutex($false, 'Global\MCPSample-PeopleSoftResearch')
+    try { $mutexHeld = $mutex.WaitOne(0) }
+    catch [System.Threading.AbandonedMutexException] { $mutexHeld = $true }
+}
+catch { $mutexHeld = $false }   # UnauthorizedAccessException 等一律歸「拿不到」
+if (-not $mutexHeld) {
+    Write-Log "自動化互斥鎖被占用——另一個 ps-auto-loop／批次正在執行，本次拒跑（exit 3）"
+    Write-Error "自動化互斥鎖被占用：錯開時間再跑（不是環境損壞）"
+    if ($null -ne $mutex) { $mutex.Dispose() }
+    exit 3
+}
+
 # ── 主迴圈 ──────────────────────────────────────────────────
 Write-Log "=== auto-loop 啟動：領域=$Domain MaxCycles=$MaxCycles Model=$(if($Model){$Model}else{'(全域預設)'}) ==="
 $timeoutStreak = 0
@@ -193,6 +225,8 @@ $errorStreak = 0
 $noProgress = 0
 $auditStall = 0
 $graduated = $false
+$gradContentHash = $null
+$gradAuditRound = 0
 $stopReason = "圈數上限（$MaxCycles）"
 
 for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
@@ -284,6 +318,8 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     $after = Get-ChecklistState
     if ($phase -eq "audit") {
         # 三層畢業門（issue #2）——外環保證「有沒有做」，內層約束「怎麼做」
+        # ★ 改動本門判定＝必須 bump ps-graduation.ps1 的 GraduationGateVersion，
+        #   否則舊門發的收據對新門永久有效（門邏輯不在任何 hash 覆蓋內）
         # 第 2 層：輪次比對用 -gt 不用嚴格 +1（research 圈的當場稽核也會 +1、
         # 模型可能跳號——遞增即可證明「本 session 寫過」，嚴格等號只會誤殺）
         $transitionOk = $false
@@ -310,6 +346,10 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         if ($sessionOk -and $transitionOk -and $after.Unticked -eq 0 -and
             $lint.Exit -eq 0 -and $validationOk) {
             $graduated = $true
+            # 過門當下快照 contentHash——寫收據時重算比對（TOCTOU 防護）；
+            # auditRound 用轉移快照的正規化輪次，不在寫收據時重讀 checklist
+            $gradContentHash = Get-DomainContentHash -DomainDir $dir
+            $gradAuditRound = $auditAfter.Round
             $stopReason = "畢業：三層門全過（稽核輪次 $($auditAfter.Round)、無新 A 項、lint＋StrictAudit 全過）"
             break
         }
@@ -345,4 +385,20 @@ $final = Get-ChecklistState
 Write-Log "=== auto-loop 停機：$stopReason ==="
 Write-Log "最終狀態：未勾=$($final.Unticked) 已勾=$($final.Ticked) 稽核輪次=$($final.Round) 畢業=$graduated"
 Write-Log "人工待辦：看本檔上方各 session 的 out/err、lint-cycle*.txt、strict-cycle*.txt（畢業門明細）；lesson 建議與卡住項在 90-audit.md 與 checklist.md"
+
+# 畢業收據（issue #3）：只在三層門全過後寫；寫入失敗＝automation 不可信（exit 2）
+if ($graduated) {
+    $rcResult = Write-GraduationReceipt -DomainDir $dir -Domain $Domain `
+        -AuditRound $gradAuditRound -LintScriptPath $lintPath `
+        -GateScriptPath $gradLibPath -ExpectedContentHash $gradContentHash
+    if ($rcResult.Ok) {
+        Write-Log "畢業收據已寫入 graduation.json（auditRound=$gradAuditRound）"
+    }
+    else {
+        Write-Log "畢業收據寫入失敗：$($rcResult.Reason)——exit 2（system error）"
+        $mutex.ReleaseMutex(); $mutex.Dispose()
+        exit 2
+    }
+}
+$mutex.ReleaseMutex(); $mutex.Dispose()
 if ($graduated) { exit 0 } else { exit 1 }
