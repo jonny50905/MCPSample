@@ -174,6 +174,10 @@ checklist 重查。
 □ 換模型 → 重跑 Smoke Set（test-scenarios.md §5，9 題）確認規則遵循沒退化
 □ OpenCode 升版 → 確認 agent（Tab 清單）、command（/ 清單）、
   skill 都有載入；異常先看 frontmatter 格式
+□ OpenCode 升版 → 驗 tools 圍堵仍生效：agent 檔的 tools 布林表自
+  v1.1.1 起屬 deprecated（併入 permission 設定）——升版後抽測主
+  agent 是否仍不碰檢索 MCP；失效即把各 agent 的 deny 改寫成
+  permission 格式（圍堵牆騎在 deprecated 機制上，升版是唯一風險點）
 □ OpenCode 升版 → 檢查是否**新增內建 agent／subagent**（如 general／
   explore／scout）——內建不吃本專案的封鎖，須在 .opencode/agent/
   放**同名覆寫檔**補封 4 個 MCP（2026-08 實測：委派會漏到內建
