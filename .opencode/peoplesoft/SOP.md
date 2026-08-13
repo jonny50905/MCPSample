@@ -179,6 +179,10 @@ checklist 重查。
   放**同名覆寫檔**補封 4 個 MCP（2026-08 實測：委派會漏到內建
   explore 直呼 MCP）
 □ PeopleTools 升版 → cookbook 的表名/欄位抽 2~3 條樣板實跑驗證
+□ MCP server **程式修改**（bug fix／功能變更）→ 至少直通測試該
+  server 的每個 tool；修的是檢索類 server → 歷史「查無」判定與
+  文件 gaps 全帶嫌疑，下輪 audit 的二次定位會自動平反，**不必**
+  專案式重查；若涉及**重建索引** → chunk id 輪換，走 SOP-11
 ```
 
 ---
