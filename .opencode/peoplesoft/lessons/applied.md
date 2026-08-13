@@ -476,3 +476,18 @@
   合併 `checklist-archive*.md` 全部分片。原則：**真 append＝開新檔**；
   任何「只追加」規則都必須附分片條件，否則就是下一個卡死點。
 - 套用：本 commit（agent／command／lint／checklist-template）。
+
+### L26 全文 exact 查無假象——物件名／事件名是 metadata，不在程式內文（2026-08）
+- 症狀：輪次 15 稽核實測：某 Component 事件的 chunk 確實存在——
+  `search_chunks(ObjectName=<物件名>, eventName=SavePostChange)`
+  結構化過濾查得到；同工具 `query=<物件名> <事件名>`＋exactPhrases
+  ＋searchMode=exact 全文查**不到**。
+- 根因：物件名／事件名住在 chunk 的 **metadata 欄位**，不保證出現在
+  ChunkText 內文（程式碼不會逐字寫自己的 Component 名）；全文搜尋
+  搜的是內文——用全文 exact 查「物件＋事件」＝方法錯誤，查無是
+  假象（與 PeoplecodeMetadata 拿 Page 名查空同族：**錯 key 必空**）。
+- 落點：機械化——檢索聖經 §5.1、auditor 二次定位與 FALSE_NEGATIVE
+  重測、A 項 MISSING_CHUNK_ID 修法，一律「物件＋事件定位首選
+  ObjectName＋eventName 結構化參數」；全文 exact 查無不得作結論、
+  不構成合格查無收據。
+- 套用：本 commit。

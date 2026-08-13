@@ -216,6 +216,12 @@ maxChunksPerExpansion: 4
 - 小檔案（結構 ≤ 6 段）可全取；大檔案依結構選段。Budget（§5）照常適用。
 - 宣告「查無」前：翻頁到最後一頁（回傳數 < limit），或已進 file-mode
   以結構確認不存在——只看第一頁就說「ES 沒有」是錯誤結論。
+- **物件＋事件定位優先用結構化參數**：找「某物件某事件」的程式，
+  第一選擇是 `search_chunks(ObjectName=<物件名>, eventName=<事件名>)`
+  直接過濾（實測可直達），其次才是關鍵字搜檔 → get_file_structure。
+  物件名／事件名是 **metadata 欄位，不保證出現在程式內文**——
+  全文 `query`／`exactPhrases`（searchMode=exact）查不到 ≠ 不存在，
+  這類查無**不得作結論、也不構成合格的查無收據**。
 - 不准回報「程式碼截斷、無法確認」而不嘗試 file-mode 接續。
 
 ## 6. MCP Tool Contract（長文本共用）

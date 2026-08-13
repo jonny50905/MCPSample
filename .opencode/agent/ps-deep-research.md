@@ -117,7 +117,9 @@ docs/ps-research/<領域>/
 - LINE_DRIFT（不論標 PASS 註記或 FAIL）：依稽核回報的實際行號更新
   該筆行號即可，內容不動。
 - FAIL(MISSING_CHUNK_ID／NO_CHUNK_ID)：檔案行號型證據補 id——依
-  filePath＋行號重取 chunk（同手術流程、含驗貨），寫入完整 id。
+  filePath＋行號重取 chunk（同手術流程、含驗貨），寫入完整 id；
+  物件＋事件類證據可先 `search_chunks(ObjectName=<物件名>,
+  eventName=<事件名>)` 結構化過濾直達。
 - FAIL(INCOMPLETE_CHUNK)：quote 跨 chunk 邊界——取相鄰 chunk，
   該筆證據併記兩個 id（或拆成兩筆各附 id）。
 - FAIL(WRONG_KIND)：程式內 SQL 語句被誤標 `SQL` 證據——改以該語句

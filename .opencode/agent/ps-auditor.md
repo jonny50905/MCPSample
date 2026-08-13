@@ -46,9 +46,11 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    quote 命中但行號不符 → `PASS(LINE_DRIFT)` 並回報實際行號
    （文件行號過期，非證據問題）。
    **id 解引用查無時，判 FAIL 前必做一次「二次定位」**：用該筆
-   evidence 自帶的 filePath／ObjectName／EventName 走
-   「Component（或物件）名搜檔 → get_file_structure → 按 Event／
-   結構挑單元 → get_chunks_details」重找——找到且 quote 命中
+   evidence 自帶的 filePath／ObjectName／EventName——**首選
+   `search_chunks(ObjectName=<物件名>, eventName=<事件名>)`
+   結構化過濾直達**，其次走「Component（或物件）名搜檔 →
+   get_file_structure → 按 Event／結構挑單元 → get_chunks_details」
+   重找——找到且 quote 命中
    （正規化比對）→ `FAIL(ID_RELINK)` 並附新 id（id 失聯但證據為真，
    修法＝換 id）；重找仍無 → 才判 `FAIL(NOT_FOUND)`。
    **禁止拿事件名（PreBuild 等）當全庫搜尋詞。**
@@ -70,7 +72,9 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    非證據造假）。
 4. **查無宣告抽驗**：掃描該檔內文與 gaps 中的「查無／不存在／
    無～邏輯」類負面宣告，每檔抽 1~2 筆**用當前工具重跑該查詢**
-   （照宣告附的查法收據；沒收據就依上下文推查法）——
+   （照宣告附的查法收據；沒收據就依上下文推查法；物件＋事件類
+   宣告**必用 ObjectName＋eventName 結構化參數重測**——
+   全文 exact 查無不算數）——
    **查得到 → `FAIL(FALSE_NEGATIVE)`**（附找到的 chunk id；
    負面結論失效，該項需回灌補查）；仍查無 → PASS。
    工具鏈修復後的首輪稽核，此步**全量**做（歷史查無平反）。
