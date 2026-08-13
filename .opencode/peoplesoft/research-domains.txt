@@ -1,0 +1,23 @@
+# research-domains.txt — 批次研究的領域佇列（issue #3）
+#
+# 規則：
+#   - 一行一個領域；順序就是研究順序（人工決定，模型不得增刪重排）
+#   - 空行與 # 開頭是註解；暫停某領域直接在行首加 # 即可
+#   - 本檔只回答「要研究什麼」，不記錄進度——進度真相在各領域的
+#     checklist.md 與 graduation.json（收據由 ps-auto-loop 畢業時寫入）
+#   - 領域名不可用：wiki（共用 Entity Wiki 目錄）、Windows 裝置名
+#     （CON/PRN/AUX/NUL/COM1-9/LPT1-9）、含 < > : " / \ | ? * & % ^
+#     或「..」的名稱——preflight 會整批拒絕
+#
+# 用法：.\scripts\ps-auto-all.ps1
+#       （選配熔絲：-MaxDomains 10 -MaxBatchHours 8 -MaxConsecutiveFailures 3）
+#
+# 範例（拿掉 # 即生效）：
+# 招募
+# 任用
+# 轉職
+# 試用期
+# 考勤
+# 薪資
+# 績效
+# 離職
