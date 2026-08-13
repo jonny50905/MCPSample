@@ -240,6 +240,13 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         $errorStreak++
         Write-Log "SESSION 非零 exit（$errorStreak/2）——看 err 檔"
         if ($errorStreak -ge 2) { $stopReason = "連續 2 次 session 錯誤（需人工看 err log）"; break }
+        # session 自行異常結束也可能留半寫檔（crash mid-write）——同樣驗一致性
+        $fsProblems = Test-FsConsistency -HadChecklist $preHadChecklist -PreItemTotal $preItemTotal
+        if ($fsProblems.Count -gt 0) {
+            foreach ($pb in $fsProblems) { Write-Log "CONSISTENCY FAIL（session 錯誤後）：$pb" }
+            $stopReason = "session 錯誤後一致性檢查 FAIL（$($fsProblems.Count) 項）——人工處理後再啟動"
+            break
+        }
     }
     else { $errorStreak = 0 }
 
