@@ -357,4 +357,8 @@ code，全部白驗。oracleMCP 查線上 DB，CR 後立即反映、不需此步
   損壞再重啟批次；收據不會半寫誤判（寫入後回讀重驗＋壞 JSON 一律當無效）
 □ exit 0 但收據無效＝兩端判準不一致（版本歪斜？）——停批屬設計行為，
   先核對四支腳本是否同版（gateVersion／schemaVersion 常數在 ps-graduation.ps1）
+□ lint／收據腳本的修改要**攢批**（2026-08 管理者裁決）：ps-doc-lint.ps1
+  或 ps-graduation.ps1 任何改動（含純措辭）＝全部已畢業領域收據失效、
+  下次 batch 每領域重燒一輪 audit session——措辭類小改不單獨上，
+  攢到 CR 後／月度 audit 等本來就要全面重驗的時點一起改
 ```
