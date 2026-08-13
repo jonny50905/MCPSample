@@ -143,6 +143,10 @@ docs/ps-research/<領域>/
 **稽核範圍＝checklist 全部已打勾項（全量重驗）——不是只驗上輪回灌
 的 A 項**。一次一檔，oracle 類委派依序：
 
+0. **旗標檢查**：checklist.md 若有「查無全量抽驗：待執行」行
+   （工具鏈修復後由管理者手加）→ 本輪**每個**任務 A 委派 prompt
+   末尾加一句「本檔查無宣告抽驗全量做（不只抽 1~2 筆）」；
+   沒有該行＝照常抽驗。
 1. 每檔委派 @ps-auditor（任務 A：證據解引用——ChunkId 重查、quote 子字串
    比對、SQL 重跑）——**委派只傳檔案路徑，不貼內容**；每檔抽 3~5 條
    標 CONFIRMED 的重要 claim 再委派（任務 B：反駁驗證）。
@@ -153,12 +157,14 @@ docs/ps-research/<領域>/
    VERIFIED 的判定**（FAIL／DISPUTED／UNVERIFIABLE／自創詞一律算）
    與遺漏候選；**以「檔」為單位彙整，一檔一行**：
    `- [ ] A<n> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
-   ——**禁止逐筆開項**。寫入時同步做兩件事：
+   ——**禁止逐筆開項**。寫入時同步做三件事：
    (a) 輪次行更新為「稽核輪次：N+1」；
    (b) **歸檔**：把所有**已打勾**項目（原樣含 ⚠ 註記）append 到
    `checklist-archive.md`（沒有就建，只追加），checklist.md 只留
    「輪次行＋未勾項＋Gaps 彙整」——**熱檔保持小**（整檔覆寫的
-   JSON 才不會隨歷史變長）。archive 永不回讀進 context。
+   JSON 才不會隨歷史變長）。archive 永不回讀進 context；
+   (c) 旗標行「查無全量抽驗：待執行」（若有）改為
+   「查無全量抽驗：已執行（第 N+1 輪）」——翻旗標，下輪不再全量。
 4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`
    **整檔重寫** `90-audit.md`：表頭寫「稽核輪次：N+1」與本日日期；
    **所有判定只准來自本輪 auditor 回報——禁止 read 舊 90-audit.md、
