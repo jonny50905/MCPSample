@@ -159,10 +159,12 @@ docs/ps-research/<領域>/
    `- [ ] A<n> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
    ——**禁止逐筆開項**。寫入時同步做三件事：
    (a) 輪次行更新為「稽核輪次：N+1」；
-   (b) **歸檔**：把所有**已打勾**項目（原樣含 ⚠ 註記）append 到
-   `checklist-archive.md`（沒有就建，只追加），checklist.md 只留
-   「輪次行＋未勾項＋Gaps 彙整」——**熱檔保持小**（整檔覆寫的
-   JSON 才不會隨歷史變長）。archive 永不回讀進 context；
+   (b) **歸檔（每輪寫新檔）**：把所有**已打勾**項目（原樣含 ⚠ 註記）
+   寫成**新檔** `checklist-archive-r<N+1>.md`（單次小 write），
+   checklist.md 只留「輪次行＋旗標行＋未勾項＋Gaps 彙整」。
+   **禁止 read 或改寫任何既有 checklist-archive*.md**——工具層沒有
+   append，「追加舊檔」實為整檔重寫，archive 隨輪次變大必撐爆
+   write（卡死根因）；每輪一個新檔＝真追加。archive 永不回讀進 context；
    (c) 旗標行「查無全量抽驗：待執行」（若有）改為
    「查無全量抽驗：已執行（第 N+1 輪）」——翻旗標，下輪不再全量。
 4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`

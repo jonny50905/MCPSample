@@ -462,3 +462,17 @@
   wikilink 斷鏈＝歸戶欠課。處置：缺章節優先走**內部 git 考古還原**
   （SOP-4，零重跑、零捏造）；縮寫 id 走 A 項工單；斷鏈另開分批
   補課（一次 10 個、先查重）。
+
+### L25 「追加」在工具層是整檔重寫——append 目標檔是隱形的無界熱檔（2026-08）
+- 症狀：輪次 15 稽核在「歸檔＋寫 log」步驟 Preparing write 卡死
+  20 分鐘無輸出。回灌 A 項已先落檔（該步驟前完成），損失僅記帳。
+- 根因：write 工具只有整檔覆寫——規則寫「append 到
+  checklist-archive.md」，執行上是 read 全檔＋重寫全檔；archive
+  每輪成長，第 15 輪已超出單次 write 可靠上限（L2 同族），
+  且被迫回讀違反「archive 永不回讀」本意。L20 替 checklist 瘦身時，
+  肥大被**搬進 archive 而非消滅**——熱檔問題換了地址。
+- 落點：機械化——歸檔改**每輪寫新檔** `checklist-archive-r<N>.md`
+  （單次小 write；禁止 read／改寫既有 archive 檔）；lint 對帳改
+  合併 `checklist-archive*.md` 全部分片。原則：**真 append＝開新檔**；
+  任何「只追加」規則都必須附分片條件，否則就是下一個卡死點。
+- 套用：本 commit（agent／command／lint／checklist-template）。

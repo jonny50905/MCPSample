@@ -29,10 +29,10 @@ else {
     else {
         Get-Content $overviewPath -Raw -Encoding UTF8
     }
-    # 已打勾項會歸檔到 checklist-archive.md——對帳時合併看
-    $archivePath = Join-Path $dir "checklist-archive.md"
-    if (Test-Path $archivePath) {
-        $checklistSrc += "`n" + (Get-Content $archivePath -Raw -Encoding UTF8)
+    # 已打勾項會歸檔到 checklist-archive*.md（每輪一個分片檔）——對帳時全部合併看
+    $archiveFiles = @(Get-ChildItem -Path $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
+    foreach ($af in $archiveFiles) {
+        $checklistSrc += "`n" + (Get-Content $af.FullName -Raw -Encoding UTF8)
     }
 
     # 1) checklist 對帳：打勾項的目標檔必須存在；NN 檔必須被 checklist 列到
