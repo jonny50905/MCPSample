@@ -478,6 +478,43 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      （有現查確認或如實標註）
   4. [次要] wiki 查無時，回答末尾建議對該領域跑 /ps-research 歸戶
 
+## J 類：auto-loop 外環畢業門（確定性——不需模型，fixture 模擬即可測）
+
+> issue #2：外環保證「有沒有做」。以下檢查點對 `scripts/ps-auto-loop.ps1`
+> 與 `scripts/ps-doc-lint.ps1 -StrictAudit`；用假領域目錄佈置狀態直接驗，
+> 不用跑真 session。
+
+### J1 三層畢業門（session／transition／validation）
+- **輸入**：模擬 audit 圈的各種前後狀態組合
+- **檢查點**：
+  1. [致命] audit session exit 0 但稽核輪次未遞增 → 不得畢業
+     （transition 門；輪次比對為 `-gt`、缺行正規化為 0）
+  2. [致命] audit session exit 0 但 90-audit.md hash 未變（或不存在）
+     → 不得畢業
+  3. [致命] checklist 全勾＋lint PASS 但 90-audit.md 記分卡章節內
+     缺任一 NN 檔列 → StrictAudit FAIL → 不得畢業（檔名僅出現在
+     明細／回灌節不算覆蓋；檔名含/不含 .md 皆算覆蓋）
+  4. [主要] 手動 lint（不帶 -StrictAudit）行為與歷史一致：上述問題
+     僅警告、exit 0——人工逐步流程不受畢業門影響
+  5. [主要] 轉移快照緊貼 audit session 前後取——手術 session 改動
+     90-audit.md 不得影響本圈 transition 判定；手術 prompt 含
+     「禁改 checklist.md／90-audit.md、禁執行稽核」禁令
+  6. [主要] audit 相位連續 2 圈零回灌且未畢業 → 熔斷停機
+     （活鎖保險絲；GATE log 逐圈記錄三層判定與擋下原因）
+
+### J2 強殺後檔案一致性檢查（唯讀）
+- **輸入**：模擬逾時強殺留下的檔案狀態
+- **檢查點**：
+  1. [致命] checklist＋archive 勾選項總數較圈前減少、或出現 0 byte
+     .md 檔 → 一致性 FAIL → 停機進人工，不進下一圈
+  2. [致命] 一致性檢查為純唯讀——任何情況下不得觸發修復 session
+  3. [主要] 新領域首圈逾時（圈前無 checklist）→ vacuous PASS，
+     維持既有重試邏輯（單次逾時是常態不是異常）
+  4. [主要] 手術 session 的逾時同樣觸發一致性檢查（強殺守備範圍
+     涵蓋全部三種 session：research／audit／surgery）
+  5. [次要] lint 對空檔（0 byte NN／wiki 檔）記違規而非丟例外中斷
+     掃描（半寫檔不得讓其餘檔案被靜默跳過）
+
 ---
 
 ## 5. 快速健檢子集（Smoke Set）

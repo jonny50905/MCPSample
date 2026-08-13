@@ -10,9 +10,16 @@
 #     agent tools 圍堵照常生效。本腳本刻意不用 --auto
 #   - exit code：0＝正常收場、1＝session 錯誤；最終回覆進 stdout、裝飾與錯誤進 stderr
 #
-# 停機條件（五保險絲）：
-#   畢業（audit 後無新 A 項且 lint 全過）／連續 2 圈無進度／連續 2 次逾時／
-#   連續 2 次 session 錯誤／圈數上限
+# 停機條件（七保險絲）：
+#   畢業（三層門全過，見下）／連續 2 圈無進度／連續 2 次逾時／
+#   連續 2 次 session 錯誤／強殺後檔案一致性 FAIL／
+#   audit 相位連續 2 圈零回灌未畢業（活鎖熔斷）／圈數上限
+# 畢業三層門（issue #2：模型說自己做完不算，只有 observable state transition 才算）：
+#   SESSION_OK＝audit session 正常收場（exit 0）
+#   WORK_TRANSITION_OK＝稽核輪次遞增＋90-audit.md hash 改變
+#     （快照緊貼 audit session 前後——不得跨過手術 session：ps-deep-research
+#      在 checklist 全勾時可能於手術 session 內自行接跑稽核，跨步驟比對會污染）
+#   VALIDATION_OK＝lint 全過＋StrictAudit 全過（結果落 strict-cycle<N>.txt）
 # 人的位置：lesson、correct、PR 審核照舊人工；本腳本只驅動內容生產，早上看 log 摘要即可。
 param(
     [Parameter(Mandatory = $true)][string]$Domain,
@@ -57,6 +64,78 @@ function Get-ChecklistState {
     return @{ Exists = $true; Unticked = $unticked; Ticked = $ticked; Round = $round }
 }
 
+# ── audit 狀態轉移快照（畢業門第 2 層：WORK_TRANSITION_OK）──────
+# Round 正規化：checklist 缺「稽核輪次」行視為 0（與 ps-audit 契約「沒有該行
+# 視為 N=0」對齊——外環用 -1 哨兵會造成首輪 off-by-one 誤判）；取「最後一個」
+# 匹配（防模型追加新行未刪舊行時撈到舊值）；只認半形數字（全形數字 cast 會炸）。
+# Hash：90-audit.md 不存在＝空字串（首輪合法狀態）；只用內容 hash、不用
+# mtime（工具重存同內容、殭屍進程觸碰都會動 mtime）。
+function Get-AuditTransition {
+    $round = 0
+    $clPath = Join-Path $dir "checklist.md"
+    if (Test-Path $clPath) {
+        foreach ($l in (Get-Content $clPath -Encoding UTF8)) {
+            if ($l -match '稽核輪次[：:]\s*([0-9]+)') { $round = [int]$Matches[1] }
+        }
+    }
+    $hash = ""
+    $auditPath = Join-Path $dir "90-audit.md"
+    if (Test-Path $auditPath) {
+        $hash = (Get-FileHash -Path $auditPath -Algorithm SHA256).Hash
+    }
+    return @{ Round = $round; Hash = $hash }
+}
+
+# ── checklist＋歸檔分片的勾選項總數（一致性檢查用）──────────────
+# 打勾項歸檔只會「移動」到 checklist-archive-r<N>.md、不會消失——
+# 合併總數變少＝有項目在強殺中遺失。
+function Get-ItemTotal {
+    $total = 0
+    $files = @()
+    $clPath = Join-Path $dir "checklist.md"
+    if (Test-Path $clPath) { $files += $clPath }
+    $files += @(Get-ChildItem -Path $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName })
+    foreach ($f in $files) {
+        $total += @(Get-Content $f -Encoding UTF8 | Where-Object { $_ -match '^\s*-\s*\[' }).Count
+    }
+    return $total
+}
+
+# ── 檔案一致性檢查（強殺後執行；純唯讀，絕不觸發修復 session）────
+# 原則：只驗「圈前存在的東西沒變壞」——新領域缺檔屬合法狀態（vacuous PASS），
+# 首圈逾時不因此誤停。啟發式只採高置信訊號（缺檔／0 byte／項目總數減少／
+# lint 無法執行）——「檔尾像截斷」這類過敏判定一律不做。
+function Test-FsConsistency {
+    param([bool]$HadChecklist, [int]$PreItemTotal)
+    $problems = @()
+    $clPath = Join-Path $dir "checklist.md"
+    if ($HadChecklist) {
+        if (-not (Test-Path $clPath)) { $problems += "checklist.md 消失" }
+        elseif ((Get-Item $clPath).Length -eq 0) { $problems += "checklist.md 變成空檔（0 byte）" }
+        else {
+            $postTotal = Get-ItemTotal
+            if ($postTotal -lt $PreItemTotal) {
+                $problems += "checklist＋archive 勾選項總數減少（$PreItemTotal → $postTotal）——強殺疑似吃掉內容"
+            }
+        }
+    }
+    if (Test-Path $dir) {
+        foreach ($z in @(Get-ChildItem $dir -Filter "*.md" -File | Where-Object { $_.Length -eq 0 })) {
+            $problems += "空檔（0 byte）：$($z.Name)"
+        }
+        # lint 以「僅回報」身分跑一次驗證它自己能執行——exit 0/1 都算可執行
+        # （FAIL 內容交給正常迴圈處理）；這裡絕不接手術路徑
+        if (Test-Path (Join-Path $dir "00-overview.md")) {
+            & $lintPath -Domain $Domain *> $null
+            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1) {
+                $problems += "lint 無法正常執行（exit=$LASTEXITCODE）"
+            }
+        }
+    }
+    return , $problems
+}
+
 # ── 開一個新鮮 opencode session（逾時整樹強殺）────────────
 # $ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'
 # 注意：prompt 走 cmd.exe 命令列——內容禁用半形雙引號與 cmd 特殊字元
@@ -85,12 +164,18 @@ function Invoke-Opencode {
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
+# -Strict＝畢業門專用（ps-doc-lint.ps1 -StrictAudit）：90-audit 結構性問題升 FAIL
 function Invoke-Lint {
+    param([switch]$Strict)
     if (-not (Test-Path (Join-Path $dir "00-overview.md"))) {
         return @{ Exit = -1; Surgical = @(); Raw = "（領域尚未建立，略過 lint）" }
     }
-    $raw = & $lintPath -Domain $Domain 2>&1 | Out-String
+    if ($Strict) { $raw = & $lintPath -Domain $Domain -StrictAudit 2>&1 | Out-String }
+    else { $raw = & $lintPath -Domain $Domain 2>&1 | Out-String }
     $code = $LASTEXITCODE
+    # 防呆：lint 若中途死亡未跑到 exit，$LASTEXITCODE 是上一個原生命令的殘值
+    # ——exit 0 但輸出無 PASS 標記＝不得當通過
+    if ($code -eq 0 -and $raw -notmatch 'PASS：') { $code = 3 }
     # 擷取手術清單（=== 標記之間的編號行）
     $surgical = @()
     if ($raw -match '(?s)=== 手術式修復指令.*?===(.*?)=== 指令結束 ===') {
@@ -106,12 +191,20 @@ Write-Log "=== auto-loop 啟動：領域=$Domain MaxCycles=$MaxCycles Model=$(if
 $timeoutStreak = 0
 $errorStreak = 0
 $noProgress = 0
+$auditStall = 0
 $graduated = $false
 $stopReason = "圈數上限（$MaxCycles）"
 
 for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     $before = Get-ChecklistState
     Write-Log "── 第 $cycle 圈：未勾=$($before.Unticked) 已勾=$($before.Ticked) 稽核輪次=$($before.Round)"
+
+    # 一致性檢查的圈前基準（強殺後用「圈前存在的東西沒變壞」判定）
+    $preHadChecklist = Test-Path (Join-Path $dir "checklist.md")
+    $preItemTotal = if ($preHadChecklist) { Get-ItemTotal } else { 0 }
+    # audit 轉移快照——每圈重算的區域值（跨圈黏著旗標會讓舊圈證據放行新圈畢業）
+    $auditBefore = $null
+    $auditAfter = $null
 
     # 相位決定：有未勾項→research；全勾→audit；領域不存在→research（階段一建檔）
     if (-not $before.Exists -or $before.Unticked -gt 0) {
@@ -121,18 +214,29 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     }
     else {
         $phase = "audit"
+        $auditBefore = Get-AuditTransition
         $r = Invoke-Opencode -ExtraArgs '--command ps-audit' -PromptText $Domain `
             -TimeoutMin $AuditTimeoutMin -Tag "audit"
     }
 
-    # 保險絲：逾時／session 錯誤
+    # 保險絲：逾時（強殺後先驗檔案一致性——FAIL 即停機進人工，不進下一圈）
     if ($r.TimedOut) {
+        $fsProblems = Test-FsConsistency -HadChecklist $preHadChecklist -PreItemTotal $preItemTotal
+        if ($fsProblems.Count -gt 0) {
+            foreach ($pb in $fsProblems) { Write-Log "CONSISTENCY FAIL：$pb" }
+            $stopReason = "強殺後一致性檢查 FAIL（$($fsProblems.Count) 項，見上方 CONSISTENCY 行）——人工處理後再啟動"
+            break
+        }
+        Write-Log "強殺後一致性檢查 PASS（唯讀）——維持既有重試邏輯"
         $timeoutStreak++
         if ($timeoutStreak -ge 2) { $stopReason = "連續 2 次逾時（需人工看 session log）"; break }
         continue
     }
     $timeoutStreak = 0
-    if ($r.ExitCode -ne 0) {
+    # 轉移快照的 after 點：緊貼 audit session 返回、在 lint／手術之前
+    if ($phase -eq "audit") { $auditAfter = Get-AuditTransition }
+    $sessionOk = ($r.ExitCode -eq 0)
+    if (-not $sessionOk) {
         $errorStreak++
         Write-Log "SESSION 非零 exit（$errorStreak/2）——看 err 檔"
         if ($errorStreak -ge 2) { $stopReason = "連續 2 次 session 錯誤（需人工看 err log）"; break }
@@ -147,9 +251,23 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         $batch = @($lint.Surgical | Select-Object -First 7)
         if ($lint.Surgical.Count -gt 7) { Write-Log "手術清單 $($lint.Surgical.Count) 筆，本圈先修 7 筆（分批紀律）" }
         $flat = ($batch -join "；") -replace '"', "'"
-        $sPrompt = "lint 手術清單逐筆修復（規則照 A 項 TRUNCATED_ID 修法：filePath 重取、驗貨、收據）：$flat"
+        # 禁令必要：ps-deep-research 在 checklist 全勾時會自行接跑稽核（agent 啟動
+        # 規則），改寫 90-audit.md／輪次會污染本圈的畢業判定與下圈的轉移基準
+        $sPrompt = "lint 手術清單逐筆修復（規則照 A 項 TRUNCATED_ID 修法：filePath 重取、驗貨、收據）；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
         $sr = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $sPrompt `
             -TimeoutMin $ResearchTimeoutMin -Tag "surgery"
+        # 手術 session 也在保險絲與一致性檢查的守備範圍（原本 $sr 沒人看＝
+        # 強殺後半寫狀態恰好發生在唯一沒人看的路徑上）
+        if ($sr.TimedOut) {
+            $fsProblems = Test-FsConsistency -HadChecklist $preHadChecklist -PreItemTotal $preItemTotal
+            if ($fsProblems.Count -gt 0) {
+                foreach ($pb in $fsProblems) { Write-Log "CONSISTENCY FAIL（手術後）：$pb" }
+                $stopReason = "手術 session 強殺後一致性檢查 FAIL（$($fsProblems.Count) 項）——人工處理後再啟動"
+                break
+            }
+            Write-Log "手術 session 逾時強殺——一致性檢查 PASS，續跑"
+        }
+        elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 errorStreak）" }
         $lint2 = Invoke-Lint
         Write-Log "LINT(術後) exit=$($lint2.Exit) 手術清單=$($lint2.Surgical.Count) 筆"
         $lint = $lint2
@@ -158,12 +276,51 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     # 進度與畢業判定
     $after = Get-ChecklistState
     if ($phase -eq "audit") {
+        # 三層畢業門（issue #2）——外環保證「有沒有做」，內層約束「怎麼做」
+        # 第 2 層：輪次比對用 -gt 不用嚴格 +1（research 圈的當場稽核也會 +1、
+        # 模型可能跳號——遞增即可證明「本 session 寫過」，嚴格等號只會誤殺）
+        $transitionOk = $false
+        if ($null -ne $auditAfter) {
+            $transitionOk = ($auditAfter.Round -gt $auditBefore.Round) -and
+                            ($auditAfter.Hash -ne "") -and
+                            ($auditAfter.Hash -ne $auditBefore.Hash)
+        }
+        # 第 3 層：基礎 lint 過了才值得跑 strict（否則擋下原因已在基礎 lint）
+        $strictDesc = "未評（基礎條件未過）"
+        $validationOk = $false
         if ($after.Unticked -eq 0 -and $lint.Exit -eq 0) {
+            $strict = Invoke-Lint -Strict
+            Add-Content -Path (Join-Path $logRoot ("strict-cycle{0}.txt" -f $cycle)) `
+                -Value $strict.Raw -Encoding UTF8
+            $validationOk = ($strict.Exit -eq 0)
+            $strictDesc = if ($validationOk) { "OK" } else { "StrictAudit FAIL（見 strict-cycle$cycle.txt）" }
+        }
+        $tDesc = if ($null -ne $auditAfter) {
+            "輪次 $($auditBefore.Round)→$($auditAfter.Round)、hash$(if ($auditAfter.Hash -ne $auditBefore.Hash -and $auditAfter.Hash -ne '') {'已變'} else {'未變'})"
+        }
+        else { "無快照" }
+        Write-Log "GATE：session=$(if ($sessionOk) {'OK'} else {'exit≠0'}) transition=$(if ($transitionOk) {'OK'} else {'FAIL'})（$tDesc） validation=$strictDesc"
+        if ($sessionOk -and $transitionOk -and $after.Unticked -eq 0 -and
+            $lint.Exit -eq 0 -and $validationOk) {
             $graduated = $true
-            $stopReason = "畢業：稽核輪次 $($after.Round) 無新 A 項、lint 全過"
+            $stopReason = "畢業：三層門全過（稽核輪次 $($auditAfter.Round)、無新 A 項、lint＋StrictAudit 全過）"
             break
         }
-        Write-Log "audit 回灌 $($after.Unticked) 項，續跑"
+        if ($after.Unticked -gt 0) {
+            Write-Log "audit 回灌 $($after.Unticked) 項，續跑"
+            $auditStall = 0
+        }
+        else {
+            # 零回灌又未畢業＝被門擋下（transition／strict／session）——這種圈沒有
+            # 自動修復管道（strict 違規不產手術清單、audit prompt 也收不到 lint 結果），
+            # 連續發生只會空轉活鎖，熔斷進人工
+            $auditStall++
+            Write-Log "audit 圈零回灌且未畢業（$auditStall/2）——擋下原因見上方 GATE 行"
+            if ($auditStall -ge 2) {
+                $stopReason = "audit 相位連續 2 圈零回灌未畢業（門檻擋下、無自動修復管道）——看 GATE 行與 strict-cycle*.txt 後人工處理"
+                break
+            }
+        }
         $noProgress = 0
     }
     else {
@@ -180,5 +337,5 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
 $final = Get-ChecklistState
 Write-Log "=== auto-loop 停機：$stopReason ==="
 Write-Log "最終狀態：未勾=$($final.Unticked) 已勾=$($final.Ticked) 稽核輪次=$($final.Round) 畢業=$graduated"
-Write-Log "人工待辦：看本檔上方各 session 的 out/err、lint-cycle*.txt；lesson 建議與卡住項在 90-audit.md 與 checklist.md"
+Write-Log "人工待辦：看本檔上方各 session 的 out/err、lint-cycle*.txt、strict-cycle*.txt（畢業門明細）；lesson 建議與卡住項在 90-audit.md 與 checklist.md"
 if ($graduated) { exit 0 } else { exit 1 }

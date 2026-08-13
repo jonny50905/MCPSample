@@ -66,6 +66,9 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
      - wiki 類警告（斷鏈 / 孤兒 / 過期 / frontmatter 缺欄）
        → 斷鏈孤兒叫 deep-research 修；stale 排入下次 /ps-research
 □ 4. 修完重跑 lint 確認
+□ 5. 附註：-StrictAudit 參數是 auto-loop 畢業門專用（issue #2——
+     90-audit.md 的結構性警告升為 FAIL，擋「稽核沒真的做完」的誤畢業）；
+     人工執行**不加**此參數，行為與以往完全相同
 ```
 
 ---

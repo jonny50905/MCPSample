@@ -1,8 +1,14 @@
 ﻿# ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
+#       .\scripts\ps-doc-lint.ps1 -Domain 轉職 -StrictAudit
+# -StrictAudit＝auto-loop 畢業門專用（issue #2）：90-audit.md 的結構性問題
+# （缺檔／缺模板章節／缺輪次表頭／記分卡範圍塌縮）由警告升為 FAIL。
+# 手動執行不加此開關——維持警告不擋（SOP-2）。wiki 類警告任何模式都不升級
+# （跨領域共用層，會讓 A 領域的畢業被 B 領域的斷鏈鎖死）。
 # 檢查：checklist 對帳、必要章節、confidence 標註、ChunkId UUID 格式、可疑自編 id
 param(
-    [Parameter(Mandatory = $true)][string]$Domain
+    [Parameter(Mandatory = $true)][string]$Domain,
+    [switch]$StrictAudit
 )
 
 # 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑
@@ -29,6 +35,7 @@ else {
     else {
         Get-Content $overviewPath -Raw -Encoding UTF8
     }
+    if ($null -eq $checklistSrc) { $checklistSrc = "" }   # 空檔防護（同 NN 檔）
     # 已打勾項會歸檔到 checklist-archive*.md（每輪一個分片檔）——對帳時全部合併看
     $archiveFiles = @(Get-ChildItem -Path $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
     foreach ($af in $archiveFiles) {
@@ -65,6 +72,12 @@ Get-ChildItem $dir -Filter "*.md" |
         $name = $_.Name
         $nnNames += $name
         $text = Get-Content $_.FullName -Raw -Encoding UTF8
+        # 空檔防護：0 byte 檔 Get-Content -Raw 回 null，[regex]::Matches 會丟例外
+        # 中斷整條掃描 pipeline（其餘檔案被靜默跳過）——強殺半寫正是這個樣子
+        if ([string]::IsNullOrEmpty($text)) {
+            $violations += "${name}：空檔（0 byte／無內容）——疑似寫入中斷，無法檢查"
+            return
+        }
 
         foreach ($sec in $requiredSections) {
             if ($text -notmatch [regex]::Escape($sec)) {
@@ -134,29 +147,57 @@ Get-ChildItem $dir -Filter "*.md" |
         }
     }
 
-# 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋）
+# 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋；
+#      -StrictAudit 時本節的結構性問題升為違規——僅限本節，wiki 類不升級）
 $auditPath = Join-Path $dir "90-audit.md"
 if (Test-Path $auditPath) {
     $auditText = Get-Content $auditPath -Raw -Encoding UTF8
+    if ($null -eq $auditText) { $auditText = "" }   # 空檔＝全部章節缺（不炸例外）
     $auditSections = @('## 總覽記分卡', '## FAIL / DISPUTED / UNVERIFIABLE 明細',
         '## 上輪回灌項覆核', '## 完整性（換角度 diff）',
         '## 已回灌 checklist 的行動項', '## 系統性錯誤觀察')
     foreach ($sec in $auditSections) {
         if ($auditText -notmatch [regex]::Escape($sec)) {
-            $warnings += "90-audit.md：缺模板章節「$sec」（報告偏離模板，對帳會失準）"
+            $msg = "90-audit.md：缺模板章節「$sec」（報告偏離模板，對帳會失準）"
+            if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
         }
     }
+    # 契約外詞彙任何模式都只警告——散文合法引用歷史判定（如「上輪 contradicted
+    # 已更正」）會誤中，升 FAIL 會製造無修復管道的畢業活鎖
     foreach ($bad in [regex]::Matches($auditText, '(?i)\b(partial[_ ]?pass|weakened|contradicted)\b')) {
         $warnings += "90-audit.md：出現契約外狀態「$($bad.Value)」（合法詞彙：PASS/FAIL/UNVERIFIABLE/VERIFIED/DISPUTED；自創詞應就近映射）"
     }
     if ($auditText -notmatch '稽核輪次') {
-        $warnings += "90-audit.md：表頭缺「稽核輪次」（無法判斷是否為最新一輪重驗）"
+        $msg = "90-audit.md：表頭缺「稽核輪次」（無法判斷是否為最新一輪重驗）"
+        if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
     }
     # 全量對帳：每個 NN 檔都必須出現在稽核報告內文（記分卡一檔一列）
     $missingRows = @($nnNames | Where-Object { $auditText -notmatch [regex]::Escape($_) })
     if ($missingRows.Count -gt 0) {
         $warnings += "90-audit.md：記分卡缺 $($missingRows.Count) 個檔案列（範圍塌縮跡象——稽核未全量重驗）：$($missingRows -join '、')"
     }
+    if ($StrictAudit) {
+        # 畢業門版全量對帳：只認「## 總覽記分卡」章節內的列——檔名出現在
+        # FAIL 明細／回灌節不算覆蓋（防塌縮漏判）；檔名接受含/不含 .md（防誤殺）
+        $scIdx = $auditText.IndexOf('## 總覽記分卡')
+        if ($scIdx -ge 0) {
+            $scText = $auditText.Substring($scIdx)
+            $nextIdx = $scText.IndexOf("`n## ", 1)
+            if ($nextIdx -gt 0) { $scText = $scText.Substring(0, $nextIdx) }
+            $scMissing = @($nnNames | Where-Object {
+                    $scText -notmatch [regex]::Escape([IO.Path]::GetFileNameWithoutExtension($_))
+                })
+            if ($scMissing.Count -gt 0) {
+                $violations += "90-audit.md：總覽記分卡章節內缺 $($scMissing.Count) 個檔案列（StrictAudit——記分卡＝本輪全量重驗）：$($scMissing -join '、')"
+            }
+        }
+        # 缺「## 總覽記分卡」章節本身已在上方升為違規，不重複記
+    }
+}
+elseif ($StrictAudit) {
+    # 檔案整個不存在＝最嚴重的塌縮——非 strict 模式整節跳過（零警告）是刻意的
+    # 歷史行為，但畢業門必須把「從未稽核」擋下
+    $violations += "90-audit.md 不存在（StrictAudit：畢業門要求稽核報告存在）"
 }
 
 # 3) Entity Wiki 檢查（wiki/ 為跨領域共用層，存在才檢）
@@ -172,6 +213,10 @@ if (Test-Path $wikiDir) {
 
     foreach ($n in $wikiNotes) {
         $t = Get-Content $n.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($t)) {
+            $violations += "wiki/$($n.Name)：空檔（0 byte／無內容）——疑似寫入中斷"
+            continue
+        }
         foreach ($key in @('aliases', 'status', 'last_verified')) {
             if ($t -notmatch "(?m)^${key}\s*:") {
                 $violations += "wiki/$($n.Name)：frontmatter 缺 $key"
@@ -194,6 +239,7 @@ if (Test-Path $wikiDir) {
     $referenced = @{}
     foreach ($f in $allMd) {
         $t = Get-Content $f.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($t)) { continue }   # 空檔已於前段記違規，斷鏈掃描跳過
         foreach ($m in [regex]::Matches($t, '\[\[([^\]|#]+)')) {
             $target = $m.Groups[1].Value.Trim()
             $referenced[$target] = $true
