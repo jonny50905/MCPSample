@@ -141,6 +141,7 @@ $requiredSections = @('## 功能定位', '## 行為邏輯', '## 資料流', '## 
 $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 $nnNames = @()
 $truncatedIds = @()
+$missingIds = @()   # 檔案行號型缺 chunk id——與縮寫 id 同進手術單（修法同形）
 
 Get-ChildItem $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
@@ -218,6 +219,11 @@ Get-ChildItem $dir -Filter "*.md" |
                     $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
                     $line -notmatch '(?i)\bSQL\b') {
                     $violations += "${name}：Evidence 列為檔案行號型但缺 chunk id：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
+                    # 手術單項目只帶 filePath:行號（不帶列原文——表格 | 等字元
+                    # 流入 auto-loop 的 cmd prompt 會炸引號/重導）
+                    $ref = [regex]::Match($line, '[A-Za-z0-9_./\\-]+[:：][0-9]+(?:-[0-9]+)?').Value
+                    if ($ref -eq '') { $ref = '（無路徑線索——read 該檔該列）' }
+                    $missingIds += [pscustomobject]@{ File = $name; Ref = $ref }
                 }
             }
         }
@@ -357,21 +363,27 @@ else {
     $exitCode = 1
 }
 
-# 縮寫 id 的手術式修復指令——放「最後」印，才不會被警告牆洗出畫面
-if ($truncatedIds.Count -gt 0) {
+# 證據 id 手術式修復指令（縮寫 id＋檔案行號缺 id 同一張單——修法同形：
+# 重取、驗貨、只動 id、收據）——放「最後」印，才不會被警告牆洗出畫面
+if (($truncatedIds.Count + $missingIds.Count) -gt 0) {
     Write-Host ""
     Write-Host "=== 手術式修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
-    Write-Host "以下是 lint 確認的縮寫 ChunkId 清單，逐筆修復、一次一筆、一筆都不准跳："
+    Write-Host "以下是 lint 確認的證據 id 手術清單（縮寫 id／檔案行號缺 id），逐筆修復、一次一筆、一筆都不准跳："
     $i = 0
     foreach ($t in $truncatedIds) {
         $i++
-        Write-Host "$i. $($t.File)：$($t.Id)"
+        Write-Host "$i. $($t.File)：縮寫 $($t.Id)"
     }
-    Write-Host "每筆固定流程：read 該檔找到該筆 evidence 的 filePath 與行號"
+    foreach ($t in $missingIds) {
+        $i++
+        Write-Host "$i. $($t.File)：缺id＠$($t.Ref)"
+    }
+    Write-Host "每筆固定流程：read 該檔找到該筆 evidence 的 filePath 與行號（缺id項已附在＠後）"
     Write-Host "→ 委派對應 flow subagent 用 filePath 重取該段"
     Write-Host "（搜檔 → get_file_structure → get_chunks_details）"
-    Write-Host "→ 用「工具回傳的完整 ChunkId」更新該筆（僅改該 id，其他一字不動）。"
-    Write-Host "全部完成後輸出收據：每筆一行「舊8碼 → 新完整UUID」對照表。"
+    Write-Host "→ 驗貨：回傳 ChunkText 必須包含該列原引文——抓錯禁止硬填"
+    Write-Host "→ 用「工具回傳的完整 ChunkId」更新／補上該筆 id（其他一字不動）。"
+    Write-Host "全部完成後輸出收據：每筆一行「舊值 → 新完整UUID」對照表。"
     Write-Host "沒有收據＝沒完成。現在從第 1 筆開始。"
     Write-Host "=== 指令結束 ===" -ForegroundColor Cyan
     Write-Host ""
