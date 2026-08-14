@@ -166,6 +166,21 @@ Get-ChildItem $dir -Filter "*.md" |
             $violations += "${name}：行為邏輯無任何 confidence 標註"
         }
 
+        # 章節空心檢查（L33）：「缺章節」只驗標題存在——空殼檔（有標題
+        # 無內容）會安靜通過；行為邏輯還有 confidence 代理間接抓到，
+        # 資料流完全漏網。實案：劣化 session 寫出雙空節的空殼檔。
+        foreach ($sec in @('## 行為邏輯', '## 資料流')) {
+            $secIdx = $text.IndexOf($sec)
+            if ($secIdx -ge 0) {
+                $after = $text.Substring($secIdx + $sec.Length)
+                $nextIdx = $after.IndexOf("`n## ")
+                $body = if ($nextIdx -ge 0) { $after.Substring(0, $nextIdx) } else { $after }
+                if ($body.Trim() -eq '') {
+                    $violations += "${name}：章節「$sec」空白（有標題無內容——寫入中斷或空殼檔；git 考古或開重查工單）"
+                }
+            }
+        }
+
         # ChunkId 必須是 UUID（非 UUID = 捏造）
         foreach ($m in [regex]::Matches($text, 'ChunkId\s*`?(?<id>[^`\s|]+)`?')) {
             $id = $m.Groups['id'].Value
