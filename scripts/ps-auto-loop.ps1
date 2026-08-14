@@ -29,6 +29,20 @@ param(
     [string]$Model = ""            # 留空＝opencode 全域預設；填 provider/model-id 可覆寫本次
 )
 
+# ── 參數消毒（L28）：尾部空白/點＝Win32 假缺檔陷阱；隱形字元直接拒跑 ──
+$rawDomain = $Domain
+$Domain = $Domain.Trim().TrimEnd('.', ' ')
+if ($Domain -cne $rawDomain) {
+    Write-Host "WARN：-Domain 參數頭尾含空白/點，已自動修剪" -ForegroundColor Yellow
+}
+foreach ($ch in $Domain.ToCharArray()) {
+    $cp = [int]$ch
+    if ($cp -lt 32 -or $cp -eq 127 -or $cp -eq 0x00A0 -or
+        ($cp -ge 0x200B -and $cp -le 0x200F) -or $cp -eq 0xFEFF) {
+        Write-Error "-Domain 參數含隱形字元（字元碼 $cp）——用鍵盤重新輸入"; exit 2
+    }
+}
+
 # ── 環境解析 ────────────────────────────────────────────────
 $root = Split-Path $PSScriptRoot -Parent
 $dir = Join-Path $root (Join-Path "docs/ps-research" $Domain)

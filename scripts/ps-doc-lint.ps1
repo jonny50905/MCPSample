@@ -11,6 +11,23 @@ param(
     [switch]$StrictAudit
 )
 
+# 參數消毒（L28）：-Domain 尾部空白/點會觸發 Win32 尾字元正規化不對稱——
+# 「目錄」查得到（最後一段的尾空白被正規化剝掉）、其下「檔案」全查無
+# （空白變成中間段、按字面查找）→ 完美的假缺檔。貼上指令最容易夾帶。
+$rawDomain = $Domain
+$Domain = $Domain.Trim().TrimEnd('.', ' ')
+if ($Domain -cne $rawDomain) {
+    Write-Host "WARN：-Domain 參數頭尾含空白/點，已自動修剪（貼上指令易夾帶，建議手打）" -ForegroundColor Yellow
+}
+foreach ($ch in $Domain.ToCharArray()) {
+    $cp = [int]$ch
+    if ($cp -lt 32 -or $cp -eq 127 -or $cp -eq 0x00A0 -or
+        ($cp -ge 0x200B -and $cp -le 0x200F) -or $cp -eq 0xFEFF) {
+        Write-Error "-Domain 參數含隱形字元（字元碼 $cp）——用鍵盤重新輸入，或跑 ps-fs-doctor 健檢"
+        exit 2
+    }
+}
+
 # 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑
 $root = Split-Path $PSScriptRoot -Parent
 $dir = Join-Path $root (Join-Path "docs/ps-research" $Domain)
@@ -25,21 +42,59 @@ if (-not (Test-Path $dir)) {
 $overviewPath = Join-Path $dir "00-overview.md"
 $checklistPath = Join-Path $dir "checklist.md"
 if (-not (Test-Path $overviewPath)) {
-    $violations += "缺 00-overview.md"
-}
-else {
-    # 進度已拆檔：新格式在 checklist.md；舊格式（進度仍在 overview 內）自動相容
-    $checklistSrc = if (Test-Path $checklistPath) {
-        Get-Content $checklistPath -Raw -Encoding UTF8
+    # 缺檔違規必附近似檔名收據（L24「查無必附查法收據」用回 lint 自己身上）：
+    # 假缺（檔名污染/雙副檔名）與真缺（SOP-4 還原）給出可分辨的訊息
+    $near = @(Get-ChildItem -LiteralPath $dir -Force -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like "*overview*" })
+    if ($near.Count -gt 0) {
+        $violations += "缺 00-overview.md（但找到近似檔名：$(($near | ForEach-Object { $_.Name }) -join '、')——檔名污染？跑 ps-fs-doctor）"
     }
     else {
-        Get-Content $overviewPath -Raw -Encoding UTF8
+        $violations += "缺 00-overview.md（近似檔名掃描也無——真缺檔，走 SOP-4 還原）"
     }
-    if ($null -eq $checklistSrc) { $checklistSrc = "" }   # 空檔防護（同 NN 檔）
-    # 已打勾項會歸檔到 checklist-archive*.md（每輪一個分片檔）——對帳時全部合併看
+}
+
+# 進度已拆檔：新格式在 checklist.md；舊格式（進度仍在 overview 內）自動相容。
+# 對帳不再包在「overview 存在」分支裡（L28：一項缺檔違規不得遮蔽其餘檢查——
+# 假缺 overview 曾讓「無遺失」整輪不可證）
+$checklistOnly = $null
+if (Test-Path $checklistPath) {
+    $checklistOnly = Get-Content $checklistPath -Raw -Encoding UTF8
+    if ($null -eq $checklistOnly) { $checklistOnly = "" }   # 空檔防護：0 byte 也要進對帳
+}
+elseif (Test-Path $overviewPath) {
+    $checklistOnly = Get-Content $overviewPath -Raw -Encoding UTF8
+    if ($null -eq $checklistOnly) { $checklistOnly = "" }
+}
+$clRound = -1
+if ($null -ne $checklistOnly) {
+    foreach ($m in [regex]::Matches($checklistOnly, '稽核輪次[：:]\s*([0-9]+)')) {
+        $clRound = [int]$m.Groups[1].Value
+    }
+}
+if (Test-Path $checklistPath) {
+    # checklist 模板節標題必須存在——標題整個消失＝破壞性覆寫指紋
+    # （row 清空可以是合法歸檔後狀態，節標題消失不是）
+    $clHead = if ($null -eq $checklistOnly) { "" } else { $checklistOnly }
+    foreach ($sec in @('## 調查進度', '## Gaps 彙整')) {
+        if ($clHead -notmatch [regex]::Escape($sec)) {
+            $violations += "checklist.md：缺節標題「$sec」（破壞性覆寫指紋——row 清空可為歸檔後合法狀態，節標題消失不是）"
+        }
+    }
+}
+if ($null -ne $checklistOnly) {
+    $checklistSrc = $checklistOnly
+    # 已打勾項會歸檔到 checklist-archive*.md（每輪一個分片檔）——對帳時全部合併看；
+    # archive 只准收已打勾項——未勾項被搬走＝進度隱形消失（L28）
     $archiveFiles = @(Get-ChildItem -Path $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
     foreach ($af in $archiveFiles) {
-        $checklistSrc += "`n" + (Get-Content $af.FullName -Raw -Encoding UTF8)
+        $afText = Get-Content $af.FullName -Raw -Encoding UTF8
+        if ($null -eq $afText) { $afText = "" }
+        $untickedInArchive = @([regex]::Matches($afText, '(?m)^\s*-\s*\[ \]')).Count
+        if ($untickedInArchive -gt 0) {
+            $violations += "$($af.Name)：含 $untickedInArchive 個未打勾項——歸檔只准搬已勾項（未勾項被搬走＝調查進度隱形消失）"
+        }
+        $checklistSrc += "`n" + $afText
     }
 
     # 1) checklist 對帳：打勾項的目標檔必須存在；NN 檔必須被 checklist 列到
@@ -169,6 +224,16 @@ if (Test-Path $auditPath) {
     }
     if ($auditText -notmatch '稽核輪次') {
         $msg = "90-audit.md：表頭缺「稽核輪次」（無法判斷是否為最新一輪重驗）"
+        if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
+    }
+    # 輪次一致性（L28）：報告輪次 ≠ checklist 輪次＝報告可能是舊輪——
+    # 「稽核沒跑過但看到全綠」的正解就是這個檢查
+    $auditRoundNum = -1
+    foreach ($m in [regex]::Matches($auditText, '稽核輪次[：:]\s*([0-9]+)')) {
+        $auditRoundNum = [int]$m.Groups[1].Value
+    }
+    if ($clRound -ge 0 -and $auditRoundNum -ge 0 -and $auditRoundNum -ne $clRound) {
+        $msg = "90-audit.md 輪次（$auditRoundNum）與 checklist 輪次（$clRound）不一致——報告可能是舊輪重驗前的殘留，綠燈不可信"
         if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
     }
     # 全量對帳：每個 NN 檔都必須出現在稽核報告內文（記分卡一檔一列）

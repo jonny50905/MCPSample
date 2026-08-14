@@ -541,6 +541,24 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   8. [次要] 佇列檔不存在＝exit 2；存在但零生效領域＝警告後正常結束；
      佇列順序即執行順序；未定義於 business-domain-map 的領域照常可跑
 
+### J4 假缺檔防線（L28；fixture 模擬即可測）
+- **輸入**：污染的 -Domain 參數與各種 checklist/archive/報告狀態
+- **檢查點**：
+  1. [致命] -Domain 尾部空白/點被自動修剪後照常執行（Win32 尾字元
+     正規化不對稱＝「目錄在、檔案全缺」假象的根源）；含隱形字元
+     （FEFF/零寬/控制字元）→ exit 2 拒跑，不得帶病組路徑
+  2. [致命] 缺 00-overview.md 不遮蔽其餘檢查——checklist 對帳、
+     NN 檢查照常執行（單點假缺不得讓「無遺失」不可證）
+  3. [主要] 缺檔違規附近似檔名收據（找到 *overview* 變體列出檔名；
+     連變體都無才標「真缺檔走 SOP-4」）
+  4. [主要] checklist-archive*.md 含未打勾項＝違規（歸檔只准搬已勾）
+  5. [主要] checklist.md 缺「## 調查進度」或「## Gaps 彙整」節標題
+     ＝違規（破壞性覆寫指紋；row 清空屬歸檔後合法狀態、不違規）
+  6. [主要] checklist 輪次與 90-audit.md 表頭輪次不一致 → 警告
+     「報告可能是舊輪、綠燈不可信」；StrictAudit 下升違規
+  7. [次要] ps-fs-doctor：唯讀、結論代號可複選、-FixBom 只修
+     .ps1 內文開頭 FEFF、其餘一律不寫
+
 ---
 
 ## 5. 快速健檢子集（Smoke Set）
