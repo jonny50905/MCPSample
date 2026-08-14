@@ -72,6 +72,10 @@ if ($null -ne $checklistOnly) {
         $clRound = [int]$m.Groups[1].Value
     }
 }
+# 00-overview 是凍結快照（L2）——歷多輪稽核後提醒讀者別當現況讀（L30）
+if ($clRound -ge 3 -and (Test-Path $overviewPath)) {
+    $warnings += "00-overview.md：凍結快照已歷 $clRound 輪稽核——閱讀請以 checklist／NN 檔／wiki 為準；要刷新走 SOP-15 換版"
+}
 if (Test-Path $checklistPath) {
     # checklist 模板節標題必須存在——標題整個消失＝破壞性覆寫指紋
     # （row 清空可以是合法歸檔後狀態，節標題消失不是）

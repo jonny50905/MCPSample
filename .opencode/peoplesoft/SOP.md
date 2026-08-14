@@ -362,3 +362,24 @@ code，全部白驗。oracleMCP 查線上 DB，CR 後立即反映、不需此步
   下次 batch 每領域重燒一輪 audit session——措辭類小改不單獨上，
   攢到 CR 後／月度 audit 等本來就要全面重驗的時點一起改
 ```
+
+---
+
+## SOP-15 00-overview 換版（凍結快照的刷新程序）
+
+00-overview 階段一寫完即凍結（L2：防大檔覆寫截斷與破壞性覆寫），
+從此**不隨輪次更新**——它是「盤點快照」不是現況；現況真相在
+checklist／NN 檔／wiki。lint 會在領域歷 3 輪稽核後開始提醒落後。
+
+```text
+□ 1. 時機：畢業收尾、CR 對齊後、或 lint 落後提醒且你覺得導航頁已失真
+□ 2. 開 fresh session 對 PS-DEEP-RESEARCH 說：
+     「依 checklist-archive、NN 檔與 wiki 現況，重製 00-overview 的
+      內容草稿，寫到 00-overview-draft.md——不要動 00-overview.md」
+     （agent 對凍結檔維持零寫入；草稿是新檔＝真 append 哲學）
+□ 3. 人工審草稿 → 滿意就人工把內容覆蓋進 00-overview.md：
+     產生日期改當天、標「第 N 版（於稽核輪次 R 換版）」→ 刪草稿檔
+□ 4. lint 確認 → commit（kb(fix): 00-overview 換版）
+□ 5. 換版使 graduation 收據 contentHash 失效＝下次 batch 重驗——
+     屬預期行為（文件變了本該重驗）；想省成本就攢在 CR 後一起做
+```

@@ -1,6 +1,9 @@
 # <領域顯示名> 業務總覽
 
 > 產生日期：<YYYY-MM-DD>　（進度與狀態見同目錄 checklist.md；本檔階段一寫完後凍結）
+> 本檔是「階段一盤點快照」——凍結後**不隨輪次更新**（L2 防覆寫截斷）；
+> 現況一律以 checklist.md／NN 檔／wiki 為準。落後多輪想刷新走 SOP-15
+> 換版程序（agent 對本檔零寫入，換版由人主導）。
 > 搜尋政策：<CUSTOM_FIRST | CUSTOM_ONLY_ROOTS>（domain <命中 domainId | 未命中，使用預設政策>）
 > Delivered fallback：<未使用 | 已使用於：…>
 
