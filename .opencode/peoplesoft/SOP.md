@@ -377,6 +377,9 @@ checklist／NN 檔／wiki。lint 會在領域歷 3 輪稽核後開始提醒落�
      「依 checklist-archive、NN 檔與 wiki 現況，重製 00-overview 的
       內容草稿，寫到 00-overview-draft.md——不要動 00-overview.md」
      （agent 對凍結檔維持零寫入；草稿是新檔＝真 append 哲學）
+□ 2a. 併入清單：lint 的「功能地圖缺 N 個後續發現的項目」警告就是
+      換版必併清單（機械 diff，checklist＋archive 對 overview 內文）
+      ——換版後重跑 lint 該警告應消失，否則草稿漏抄
 □ 3. 人工審草稿 → 滿意就人工把內容覆蓋進 00-overview.md：
      產生日期改當天、標「第 N 版（於稽核輪次 R 換版）」→ 刪草稿檔
 □ 4. lint 確認 → commit（kb(fix): 00-overview 換版）

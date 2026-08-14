@@ -119,6 +119,23 @@ if ($null -ne $checklistOnly) {
         }
 }
 
+# 功能地圖覆蓋 diff（L31）：後續輪發現的「新大陸」會進 checklist→NN→wiki，
+# 但凍結的 overview 功能地圖不會自動入圖；歸檔後 checklist 活頁也看不到。
+# 機械 diff 補可見性（零新寫入路徑）——這份清單同時是 SOP-15 換版的併入清單。
+if ((Test-Path $overviewPath) -and $null -ne $checklistOnly) {
+    $ovText = Get-Content $overviewPath -Raw -Encoding UTF8
+    if ($null -eq $ovText) { $ovText = "" }
+    $unmapped = @()
+    foreach ($m in [regex]::Matches($checklistSrc, '- \[[ x]\]\s+\S+\s+[^`\r\n]*`(?<obj>[^`\r\n]+)`[^\r\n]*?→\s*\S+\.md')) {
+        $obj = $m.Groups['obj'].Value.Trim()
+        if ($obj -ne '' -and $ovText.IndexOf($obj) -lt 0) { $unmapped += $obj }
+    }
+    $unmapped = @($unmapped | Sort-Object -Unique)
+    if ($unmapped.Count -gt 0) {
+        $warnings += "00-overview.md：功能地圖缺 $($unmapped.Count) 個後續發現的項目（$($unmapped -join '、')）——新發現不會自動入凍結快照，SOP-15 換版時依此清單併入"
+    }
+}
+
 # 2) 每個 NN 檔的內容檢查
 $requiredSections = @('## 功能定位', '## 行為邏輯', '## 資料流', '## 未解事項', '## Evidence 附錄')
 $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'

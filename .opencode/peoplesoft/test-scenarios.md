@@ -562,6 +562,10 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      「報告可能是舊輪、綠燈不可信」；StrictAudit 下升違規
   7. [次要] ps-fs-doctor：唯讀、結論代號可複選、-FixBom 只修
      .ps1 內文開頭 FEFF、其餘一律不寫
+  8. [次要] 功能地圖覆蓋 diff（L31）：checklist＋archive 標準列的
+     物件名未出現在 00-overview 內文 → 警告列缺頁清單（任何模式
+     不升違規）；物件已在圖 → 無警告；凍結快照落後提醒（L30）
+     於稽核輪次 ≥ 3 出現、< 3 安靜
 
 ---
 
