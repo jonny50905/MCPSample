@@ -570,6 +570,9 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      物件名未出現在 00-overview 內文 → 警告列缺頁清單（任何模式
      不升違規）；物件已在圖 → 無警告；凍結快照落後提醒（L30）
      於稽核輪次 ≥ 3 出現、< 3 安靜
+  9. [主要] 章節空心檢查（L33）：行為邏輯／資料流有標題無內容
+     ＝違規（空殼檔不得帶病進稽核）；手術單擴收「檔案行號缺 id」
+     項（缺id＠filePath:行號 格式、附驗貨要求）
 
 ---
 
