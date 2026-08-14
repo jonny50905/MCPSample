@@ -408,6 +408,10 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   6. [次要] 深查期間只改 checklist.md——00-overview.md 內容零改動
   7. [主要] NN 檔 Evidence 的 ChunkId 全為完整 36 字元 UUID——
      出現 8 碼 hex 縮寫＝不合格（lint 亦會抓）
+  8. [致命] 全勾收尾的當場稽核**規模門**（L29）：已完成 NN 檔總數 > 5
+     → 不當場稽核（不論本 run 打勾幾項、含新 session 重跑路徑），
+     結束語提示開新 session /ps-audit——違者記分卡必塌縮
+     （lint「記分卡缺列」警告可對帳）
 
 ## H 類：稽核與教訓迴路
 
