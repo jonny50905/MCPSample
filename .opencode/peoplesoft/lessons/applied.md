@@ -593,3 +593,25 @@
 - 原則：**凍結檔的「現況可見性」用確定性 diff 從活資料推導，
   不用新寫入路徑去維護第二份帳**。
 - 套用：本 commit（lint／SOP-15 步驟 2a）。
+
+### L32 寫入鏈不可修——手術升級梯；exactPhrases 假查無（L26 家族第三例）（2026-08）
+- 症狀：id 手術波（fresh session）跑完 lint 零減項；前波壞寫實錘——
+  UUID 後黏「(36字元UUID)」（指令說明文字迴流進資料欄）、
+  「ChunkIds」拼字使 lint 誤抓 id=s。切「模型查、人工貼」後
+  5 筆 3 修；2 筆「無法重現」中至少 1 筆為假查無：真實存在的 AE
+  用 exactPhrases 查零筆，管理者實測 `query=<AE 名>`＋
+  `searchMode: semantic` 精準命中全部 59 chunk。
+- 根因：(1) 寫入鏈不可靠且**不可修**——tool-call 約束解碼
+  （SOP-10 第 5 步、L8 認定的唯一高價值槓桿）經公司政策否決；
+  (2) ES 查法模式誤用（L26 家族第三例）：`exactPhrases`＝ChunkText
+  **字面包含**過濾、`exact`＝精確字串匹配——被當定位工具用在
+  物件/AE 名上必假查無（metadata 名不保證出現在內文）；
+  `semantic`＋`query`＋`offset` 才是名稱定位的正解。
+- 落點：(1) SOP-2 第 6 步手術升級梯（fresh 重試一次 → 切模型查
+  人工貼：委派只回對照表、禁止寫檔）；(2) 檢索聖經 §5.1 補 ES
+  參數語意表與定位優先序（結構化參數 → semantic；exact 家族只作
+  引文驗證）；(3) auditor 二次定位加 semantic 第三管道、查無宣告
+  抽驗加 semantic 重測；H1 加檢查點 11。
+- 原則：**環境修不了的病，把程序降級到環境可靠的層**（寫入交人工，
+  模型只做非它不可的檢索）；**查無判定前必窮盡鍵型正確的查法**。
+- 套用：本 commit（SOP-2／檢索聖經／ps-auditor／test-scenarios H1）。

@@ -436,6 +436,10 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      上輪回灌項的覆核結果、無全量記分卡＝不合格
   10. [次要] 第 2 輪起含「上輪回灌項覆核」節（屬實／誤報／不可查），
       誤報數可長期追蹤稽核員品質
+  11. [主要] 二次定位含 semantic 第三管道（L32）：結構化參數與搜檔
+      皆無後，改 `query=<物件/AE 名>`＋`searchMode: semantic` 全量
+      翻頁再判 NOT_FOUND；exactPhrases／exact 只用於引文驗證、
+      不作定位——用錯 mode 的查無＝方法錯誤
 
 ### H2 教訓登錄即生效（本機套用、PR 把關）
 - **輸入**：`/ps-lesson 它把停用選項當成有效選項`

@@ -52,7 +52,10 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    get_file_structure → 按 Event／結構挑單元 → get_chunks_details」
    重找——找到且 quote 命中
    （正規化比對）→ `FAIL(ID_RELINK)` 並附新 id（id 失聯但證據為真，
-   修法＝換 id）；重找仍無 → 才判 `FAIL(NOT_FOUND)`。
+   修法＝換 id）；重找仍無 → **最後以 `query=<物件/AE 名>`＋
+   `searchMode: semantic`＋offset 全量翻頁做第三管道**（L32：物件/AE
+   名的 exactPhrases／exact 查無是假象——那是內文字面過濾，
+   metadata 名不保證在內文）——三管道皆無才判 `FAIL(NOT_FOUND)`。
    **禁止拿事件名（PreBuild 等）當全庫搜尋詞。**
    **二次定位全程遵守分頁紀律**（progressive-source-retrieval §5.1）：
    search 結果達 10 筆＝可能有下一頁，必須 offset 續翻到完；
@@ -73,7 +76,8 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 4. **查無宣告抽驗**：掃描該檔內文與 gaps 中的「查無／不存在／
    無～邏輯」類負面宣告，每檔抽 1~2 筆**用當前工具重跑該查詢**
    （照宣告附的查法收據；沒收據就依上下文推查法；物件＋事件類
-   宣告**必用 ObjectName＋eventName 結構化參數重測**——
+   宣告**必用 ObjectName＋eventName 結構化參數重測**；物件/AE 名類
+   宣告另以 `searchMode: semantic` 重測一次（L32）——
    全文 exact 查無不算數）——
    **查得到 → `FAIL(FALSE_NEGATIVE)`**（附找到的 chunk id；
    負面結論失效，該項需回灌補查）；仍查無 → PASS。

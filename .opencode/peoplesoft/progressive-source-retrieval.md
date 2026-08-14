@@ -222,6 +222,16 @@ maxChunksPerExpansion: 4
   物件名／事件名是 **metadata 欄位，不保證出現在程式內文**——
   全文 `query`／`exactPhrases`（searchMode=exact）查不到 ≠ 不存在，
   這類查無**不得作結論、也不構成合格的查無收據**。
+- **ES 查法語意與定位優先序（L32，管理者實測）**：
+  `exactPhrases`＝強制 ChunkText **字面包含**該字串；`searchMode: exact`
+  ＝精確字串匹配；`searchMode: semantic`＝語意搜尋（`query` 帶關鍵字、
+  `offset` 翻頁）。以物件名／AE 名**定位**時的優先序：
+  (1) 結構化參數（ObjectName／eventName）→ (2) `query=<物件/AE 名>`＋
+  `searchMode: semantic`＋offset 翻到全量。實測：AE 名用 semantic 精準
+  命中全部 59 chunk，同名用 exactPhrases 查零筆（假查無）。
+  `exactPhrases`／`exact` 只准用於「已知該字串必出現在內文」的
+  **引文驗證**（如手術驗貨比對原 quote），禁止當定位工具；
+  用錯 mode 的查無＝方法錯誤，不是「不存在」。
 - 不准回報「程式碼截斷、無法確認」而不嘗試 file-mode 接續。
 
 ## 6. MCP Tool Contract（長文本共用）
