@@ -615,3 +615,14 @@
 - 原則：**環境修不了的病，把程序降級到環境可靠的層**（寫入交人工，
   模型只做非它不可的檢索）；**查無判定前必窮盡鍵型正確的查法**。
 - 套用：本 commit（SOP-2／檢索聖經／ps-auditor／test-scenarios H1）。
+- 追記（2026-08，管理者實測第三例）：模型宣稱「證據性質本身產不出
+  chunk」（sql view metadata／MD cross-ref／ES 0 命中）——其中 AE step
+  的 SQL 經實測 **ES 有 chunk**，`search_chunks(objectName=<AE名>,
+  componentType=ApplicationEngineProgram)` 精準命中。藉口分流表入庫：
+  程式內 SQL（AE step／SQL definition）一律有 chunk 可取（sourceTypes
+  含 SQL_DEFINITION、componentType 可過濾）；真執行過的 SELECT＝SQL 型
+  證據本就免 chunk id；MD 交叉引用不是證據列（契約只認 CHUNK/SQL，
+  改正文 wikilink）；只有結構化＋semantic 皆空才准移除。原則：
+  **模型的「本質上做不到」一律當待驗主張**——本輪已三連誤
+  （exactPhrases 查無、驗證正確不附 id、產不出 chunk）。
+  檢索聖經 §5.1 與 auditor 二次定位補 componentType 鍵。

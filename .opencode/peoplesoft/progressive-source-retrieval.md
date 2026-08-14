@@ -226,9 +226,12 @@ maxChunksPerExpansion: 4
   `exactPhrases`＝強制 ChunkText **字面包含**該字串；`searchMode: exact`
   ＝精確字串匹配；`searchMode: semantic`＝語意搜尋（`query` 帶關鍵字、
   `offset` 翻頁）。以物件名／AE 名**定位**時的優先序：
-  (1) 結構化參數（ObjectName／eventName）→ (2) `query=<物件/AE 名>`＋
-  `searchMode: semantic`＋offset 翻到全量。實測：AE 名用 semantic 精準
-  命中全部 59 chunk，同名用 exactPhrases 查零筆（假查無）。
+  (1) 結構化參數（ObjectName／eventName／**componentType**——AE 定位
+  實測 `objectName=<AE名>＋componentType=ApplicationEngineProgram`
+  精準命中；SQL definition 類用對應 componentType）→
+  (2) `query=<物件/AE 名>`＋`searchMode: semantic`＋offset 翻到全量。
+  實測：AE 名用 semantic 精準命中全部 59 chunk，同名用 exactPhrases
+  查零筆（假查無）。
   `exactPhrases`／`exact` 只准用於「已知該字串必出現在內文」的
   **引文驗證**（如手術驗貨比對原 quote），禁止當定位工具；
   用錯 mode 的查無＝方法錯誤，不是「不存在」。

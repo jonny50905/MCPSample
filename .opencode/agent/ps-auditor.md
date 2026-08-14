@@ -48,7 +48,8 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    **id 解引用查無時，判 FAIL 前必做一次「二次定位」**：用該筆
    evidence 自帶的 filePath／ObjectName／EventName——**首選
    `search_chunks(ObjectName=<物件名>, eventName=<事件名>)`
-   結構化過濾直達**，其次走「Component（或物件）名搜檔 →
+   結構化過濾直達**（AE 類加 `componentType=ApplicationEngineProgram`
+   ——L32 實測精準命中），其次走「Component（或物件）名搜檔 →
    get_file_structure → 按 Event／結構挑單元 → get_chunks_details」
    重找——找到且 quote 命中
    （正規化比對）→ `FAIL(ID_RELINK)` 並附新 id（id 失聯但證據為真，
