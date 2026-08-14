@@ -626,3 +626,10 @@
   **模型的「本質上做不到」一律當待驗主張**——本輪已三連誤
   （exactPhrases 查無、驗證正確不附 id、產不出 chunk）。
   檢索聖經 §5.1 與 auditor 二次定位補 componentType 鍵。
+- 追記二（2026-08）：第四例「判定不用做」——委派模型完成檢索後回
+  「無須更動」（缺 id 列照舊缺）、另一筆排程 SQL 拒查 Oracle。
+  SOP-2 升級梯補第 4 階：**個位數殘項人工直通**——chunk 類直通測試
+  呼叫 search_chunks（結構化參數）從回傳原文抄 UUID；oracle 類自己
+  開 SQL Developer 跑 cookbook 樣板（先設 CURRENT_SCHEMA）。原則：
+  收尾殘項的經濟學會翻轉——與模型纏鬥的成本超過人工自取時，
+  模型的「完成／不用做」判斷退出迴圈，lint 是唯一裁判。

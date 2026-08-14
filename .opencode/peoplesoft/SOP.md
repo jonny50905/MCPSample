@@ -77,6 +77,12 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
      (3) 環境事實：tool-call 約束解碼（SOP-10 第 5 步）經公司政策
          否決（2026-08）——寫入不可靠是**永久條件**，本升級梯是
          標準程序不是例外
+     (4) 個位數殘項＋模型持續「判定不用做」→ **人工直通**，不再纏鬥：
+         chunk 類＝build/直通測試直接呼叫 search_chunks（結構化參數），
+         從工具回傳原文抄 UUID；oracle 類＝自己開 SQL Developer 跑
+         cookbook 樣板（記得先 ALTER SESSION SET CURRENT_SCHEMA），
+         keyRows 逐字抄——模型的「無須更動」判斷不參與，lint 說缺
+         就是缺
 ```
 
 ---
