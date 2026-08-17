@@ -26,7 +26,8 @@ param(
     [int]$MaxCycles = 20,
     [int]$ResearchTimeoutMin = 30,
     [int]$AuditTimeoutMin = 45,
-    [string]$Model = ""            # 留空＝opencode 全域預設；填 provider/model-id 可覆寫本次
+    [string]$Model = "",           # 留空＝opencode 全域預設；填 provider/model-id 可覆寫本次
+    [switch]$Preflight             # 只檢查環境／相位／lint／收據並列印，不啟動 session、不取鎖
 )
 
 # ── 參數消毒（L28）：尾部空白/點＝Win32 假缺檔陷阱；隱形字元直接拒跑 ──
@@ -195,20 +196,54 @@ function Invoke-Lint {
     if (-not (Test-Path (Join-Path $dir "00-overview.md"))) {
         return @{ Exit = -1; Surgical = @(); Raw = "（領域尚未建立，略過 lint）" }
     }
-    if ($Strict) { $raw = & $lintPath -Domain $Domain -StrictAudit 2>&1 | Out-String }
-    else { $raw = & $lintPath -Domain $Domain 2>&1 | Out-String }
+    # L44：必須 *>&1（全流合併）——lint 用 Write-Host 輸出（information stream），
+    # 2>&1 抓不到 → $raw 空 → 下方 PASS 防呆把每次成功誤判成 exit 3
+    # （VALIDATION_OK 永遠假＝永遠畢不了業），工單擷取也永遠落空
+    if ($Strict) { $raw = & $lintPath -Domain $Domain -StrictAudit *>&1 | Out-String }
+    else { $raw = & $lintPath -Domain $Domain *>&1 | Out-String }
     $code = $LASTEXITCODE
     # 防呆：lint 若中途死亡未跑到 exit，$LASTEXITCODE 是上一個原生命令的殘值
     # ——exit 0 但輸出無 PASS 標記＝不得當通過
     if ($code -eq 0 -and $raw -notmatch 'PASS：') { $code = 3 }
     # 擷取手術清單（=== 標記之間的編號行）
     $surgical = @()
-    if ($raw -match '(?s)=== 手術式修復指令.*?===(.*?)=== 指令結束 ===') {
+    # 標題兩版都認（L44：改 lint 輸出標題時漏改此處＝工單永遠擷取不到）
+    if ($raw -match '(?s)=== (?:證據|手術式)修復指令.*?===(.*?)=== 指令結束 ===') {
         $block = $Matches[1]
         $surgical = @($block -split "`r?`n" | Where-Object { $_ -match '^\s*\d+\.\s' } |
             ForEach-Object { $_.Trim() })
     }
     return @{ Exit = $code; Surgical = $surgical; Raw = $raw }
+}
+
+# ── 啟動前檢查（-Preflight：唯讀、不啟動 session、不取鎖）────────
+# 第一次跑或搬運後用它確認管線，10 秒內把「跑到一半才爆」的問題前移
+if ($Preflight) {
+    Write-Host "=== auto-loop 啟動前檢查（唯讀）===" -ForegroundColor Cyan
+    Write-Host "領域目錄  ：$dir"
+    Write-Host "opencode  ：$ocPath"
+    Write-Host "收據邏輯  ：$gradLibPath（schema=$GraduationSchemaVersion gate=$GraduationGateVersion）"
+    $st = Get-ChecklistState
+    if (-not $st.Exists) {
+        Write-Host "checklist ：不存在（新領域——首圈會走 research 建檔）" -ForegroundColor Yellow
+        $ph = "research（階段一建檔）"
+    }
+    else {
+        Write-Host "checklist ：未勾=$($st.Unticked) 已勾=$($st.Ticked) 稽核輪次=$($st.Round)"
+        $ph = if ($st.Unticked -gt 0) { "research（消化 $($st.Unticked) 個未勾項）" } else { "audit（全勾→直接進稽核）" }
+    }
+    Write-Host "起始相位  ：$ph" -ForegroundColor Green
+    $l = Invoke-Lint
+    Write-Host "lint      ：exit=$($l.Exit)（0=全過 1=有違規 -1=領域未建立）｜工單 $($l.Surgical.Count) 筆"
+    $ls = Invoke-Lint -Strict
+    Write-Host "StrictAudit：exit=$($ls.Exit)（畢業門用；現在紅不影響 research 相位）"
+    $rc = Test-GraduationReceipt -DomainDir $dir -Domain $Domain `
+        -LintScriptPath $lintPath -GateScriptPath $gradLibPath
+    Write-Host "現有收據  ：$(if ($rc.Valid) { '有效（本領域已畢業，跑下去會重驗）' } else { $rc.Reason })"
+    Write-Host "熔絲設定  ：MaxCycles=$MaxCycles｜research 逾時 $ResearchTimeoutMin 分｜audit 逾時 $AuditTimeoutMin 分"
+    Write-Host "log 位置  ：$logRoot"
+    Write-Host "=== 檢查結束（未啟動任何 session）===" -ForegroundColor Cyan
+    exit 0
 }
 
 # ── 自動化互斥鎖（issue #3）──────────────────────────────────
