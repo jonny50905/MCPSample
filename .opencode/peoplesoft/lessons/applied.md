@@ -646,3 +646,21 @@
 - 原則：**「存在檢查」要驗到內容層——標題是骨架不是知識，
   驗骨架不驗血肉的檢查會養出空殼檔**。
 - 套用：本 commit（lint／test-scenarios J4）。
+
+### L34 subagent 退化迴圈——逾時熔絲是它的自動解，中斷零損失（2026-08）
+- 症狀：research 消化 A 項時卡在 auditor subagent——不斷重複相同
+  產出、無盡頭；管理者中斷後開新 session 重跑，一次通過。
+- 定性：小模型退化重複迴圈（degenerate loop）＝**抽樣事故，非
+  確定性障礙**——fresh session 通常一次就過；與 auto-compact、
+  長 run 劣化同屬「session 壽命」病族，但發作點在單一生成內。
+- 對應（已存在，本課記錄對應關係）：auto-loop 的逾時熔絲鏈＝
+  人工「中斷→新 session 重跑」的自動版——session 逾時→taskkill
+  整樹→唯讀一致性檢查→下一圈 fresh session 重跑同相位→連續
+  2 次逾時才熔斷給人工。checklist 打勾只在完成後發生＝中斷零
+  進度損失（檔案是狀態、session 是耗材）。
+- 落點：SOP-9 加症狀處置（互動模式：見鬼打牆直接中斷重跑，不用等；
+  自動模式：信任熔絲；timeout 可依領域常態調短加快反應）。
+- 代價入帳：自動模式一次鬼打牆＝白燒一個 timeout slot（30~45 分）
+  ——overnight batch 可接受；不做「重複輸出偵測」的提前熔斷
+  （啟發式誤殺風險 > 省下的時間，L21 過敏教訓同理）。
+- 套用：本 commit（SOP-9）。
