@@ -207,7 +207,19 @@ function Invoke-Opencode {
         if ($p.WaitForExit(30000)) { $done = $true; break }
         if (((Get-Date) - $lastBeat).TotalMinutes -ge 5) {
             $mins = [int]((Get-Date) - $sessStart).TotalMinutes
-            Write-Log "SESSION($Tag) 進行中…已 $mins 分（逾時上限 $TimeoutMin 分）；輸出在 $outFile"
+            # 沉默停滯偵測（確定性、只警告不強殺）：輸出檔多久沒長大——
+            # 「持續吐字」＝模型在生成；「久無新輸出」＝多半卡在工具呼叫
+            # （實案：auditor 逐檔委派後靜止 30 分，疑 oracleMCP 通道死）
+            $lastOut = $sessStart
+            foreach ($lf in @($outFile, $errFile)) {
+                if (Test-Path -LiteralPath $lf) {
+                    $wt = (Get-Item -LiteralPath $lf).LastWriteTime
+                    if ($wt -gt $lastOut) { $lastOut = $wt }
+                }
+            }
+            $silent = [int]((Get-Date) - $lastOut).TotalMinutes
+            $note = if ($silent -ge 10) { "；**輸出已靜止 $silent 分**（疑卡在工具呼叫——SOP-12 檢查 oracleMCP 通道）" } else { "" }
+            Write-Log "SESSION($Tag) 進行中…已 $mins 分（逾時上限 $TimeoutMin 分）$note"
             $lastBeat = Get-Date
         }
     }
