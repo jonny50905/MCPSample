@@ -197,13 +197,27 @@ function Invoke-Opencode {
     Write-Log "SESSION($Tag) 啟動：$ExtraArgs ｜ $PromptText"
     $p = Start-Process -FilePath "cmd.exe" -ArgumentList ('/d /s /c "' + $inner + '"') `
         -WorkingDirectory $root -NoNewWindow -PassThru
-    $done = $p.WaitForExit($TimeoutMin * 60 * 1000)
+    # 心跳（L46 附帶）：session 期間 opencode 輸出全被重導到檔案，console 會
+    # 完全安靜——每 5 分鐘印一行「還活著＋已耗時」，同時累積真實耗時數據
+    # 供調整 timeout（逾時是熔絲不是效能參數，要照實測值設）
+    $sessStart = Get-Date
+    $lastBeat = $sessStart
+    $done = $false
+    while (((Get-Date) - $sessStart).TotalMinutes -lt $TimeoutMin) {
+        if ($p.WaitForExit(30000)) { $done = $true; break }
+        if (((Get-Date) - $lastBeat).TotalMinutes -ge 5) {
+            $mins = [int]((Get-Date) - $sessStart).TotalMinutes
+            Write-Log "SESSION($Tag) 進行中…已 $mins 分（逾時上限 $TimeoutMin 分）；輸出在 $outFile"
+            $lastBeat = Get-Date
+        }
+    }
+    if (-not $done) { $done = $p.WaitForExit(1000) }
     if (-not $done) {
         & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
         Write-Log "SESSION($Tag) 逾時 $TimeoutMin 分，已整樹強制結束（狀態在檔案，無損）"
         return @{ TimedOut = $true; ExitCode = -1 }
     }
-    Write-Log "SESSION($Tag) 結束 exit=$($p.ExitCode)，輸出：$outFile"
+    Write-Log "SESSION($Tag) 結束 exit=$($p.ExitCode) 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
     return @{ TimedOut = $false; ExitCode = $p.ExitCode }
 }
 
