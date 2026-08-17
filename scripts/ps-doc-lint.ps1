@@ -288,9 +288,30 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $violations += "${name}：出現自編 id 樣式：$($m.Value)"
         }
 
-        # 模型內部標記洩漏（chat template 未對齊時會漏進輸出）
-        foreach ($m in [regex]::Matches($text, '</?think(ing)?>|<\|im_(start|end)\|>')) {
-            $violations += "${name}：模型內部標記洩漏（污染）：$($m.Value)——**手工刪除該標記即可**，不需重取證據（故不列入手術單）"
+        # 模型內部標記洩漏（chat template 未對齊時會漏進輸出）。
+        # L41：洩漏常伴隨**寫入脫軌**——表格寫到一半斷掉、接著思考文字與
+        # tool_call 灌進檔案、下一節才恢復。只刪標記會留下半截表格，
+        # 所以訊息要求檢查「該標記前後整個區塊」。
+        foreach ($m in [regex]::Matches($text, '</?think(ing)?>|<\|im_(start|end)\|>|<\|endoftext\|>|</?tool_call>|<function=')) {
+            $line = 1 + @($text.Substring(0, $m.Index) -split "`n").Count - 1
+            $violations += "${name}:${line}：模型內部標記洩漏（寫入脫軌）：$($m.Value)——檢查該行**前後整個區塊**（常見：表格斷在半路＋思考文字），刪污染並補回被截斷的內容；補不回就開重查工單"
+        }
+
+        # 表格列欄位數不一致（L41）：寫入中斷的指紋——最後一列少了欄位。
+        # 只在連續表格區塊內比對，警告不擋（跳脫的 | 可能造成偽陽）
+        $tblLines = $text -split "`n"
+        $blockStart = -1
+        $blockPipes = -1
+        for ($li = 0; $li -lt $tblLines.Count; $li++) {
+            $isRow = $tblLines[$li] -match '^\s*\|' -and $tblLines[$li] -notmatch '^\s*\|[\s:|-]+\|?\s*$'
+            if ($isRow) {
+                $pipes = ([regex]::Matches($tblLines[$li], '\|')).Count
+                if ($blockStart -lt 0) { $blockStart = $li; $blockPipes = $pipes }
+                elseif ($pipes -ne $blockPipes) {
+                    $warnings += "${name}:$($li + 1)：表格列欄位數與表頭不一致（$pipes vs $blockPipes 個分隔符——疑似寫入中斷）"
+                }
+            }
+            elseif ($tblLines[$li].Trim() -eq '') { $blockStart = -1; $blockPipes = -1 }
         }
 
         # 廣域截斷偵測：不限「ChunkId」前綴——任何位置的獨立 8 碼 hex
@@ -308,6 +329,8 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         $evIdx = $text.IndexOf('## Evidence 附錄')
         if ($evIdx -ge 0) {
             $evText = $text.Substring($evIdx)
+            # 絕對行號（L41）：讓人能直接跳到該列人工確認，不必自己搜
+            $evStartLine = @($text.Substring(0, $evIdx) -split "`n").Count
             # 章節存在但「內容空白」也是違規（有標題沒證據＝沒證據）
             if ($evText -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
                 $evText -notmatch '(?i)\bSQL\b') {
@@ -318,17 +341,19 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             # 派給模型「去找不存在的 chunk」的無解工單（實案：排程 SQL 證據）。
             # 豁免同時認 SELECT——SQL 型證據（查 DB 的 metadata）本就免 chunk id。
             $fileLinePattern = '[A-Za-z0-9_./\\-]*[A-Za-z][A-Za-z0-9_./\\-]*[:：][0-9]+(?:-[0-9]+)?'
+            $evLineNo = $evStartLine - 1
             foreach ($line in ($evText -split "`n")) {
+                $evLineNo++
                 if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and
                     $line -match $fileLinePattern -and
                     $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
                     $line -notmatch '(?i)\b(SQL|SELECT)\b') {
-                    $violations += "${name}：Evidence 列為檔案行號型但缺 chunk id：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
+                    $violations += "${name}:${evLineNo}：Evidence 列為檔案行號型但缺 chunk id：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
                     # 手術單項目只帶 filePath:行號（不帶列原文——表格 | 等字元
                     # 流入 auto-loop 的 cmd prompt 會炸引號/重導）
                     $ref = [regex]::Match($line, $fileLinePattern).Value
                     if ($ref -eq '') { $ref = '（無路徑線索——read 該檔該列）' }
-                    $missingIds += [pscustomobject]@{ File = $name; Ref = $ref }
+                    $missingIds += [pscustomobject]@{ File = "${name}:${evLineNo}"; Ref = $ref }
                 }
             }
         }
