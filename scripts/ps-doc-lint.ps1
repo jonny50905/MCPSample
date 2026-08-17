@@ -344,11 +344,19 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $evLineNo = $evStartLine - 1
             foreach ($line in ($evText -split "`n")) {
                 $evLineNo++
+                # 失敗查詢當證據（L42）：機器參照寫「schema 不存在／查無／ORA-」
+                # 之類＝該證據**不可重現**，稽核重跑必然失敗。只在無 chunk id 的
+                # 列上判（有 id 的列講「不存在」多半是在描述內容，不是查詢失敗）
+                if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and
+                    $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
+                    $line -match '(schema\s*不存在|table\s+not\s+found|不存在該表|查無此表|ORA-\d|查詢失敗)') {
+                    $violations += "${name}:${evLineNo}：以**失敗查詢**當機器參照（證據必須可重現）——多半是表名寫錯（PeopleTools 表禁自行加 PS_ 前綴，見 cookbook 規則 8a），改用正確表名重查後貼「SQL：<SELECT>」＋keyRows"
+                }
                 if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and
                     $line -match $fileLinePattern -and
                     $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
                     $line -notmatch '(?i)\b(SQL|SELECT)\b') {
-                    $violations += "${name}:${evLineNo}：Evidence 列為檔案行號型但缺 chunk id：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
+                    $violations += "${name}:${evLineNo}：機器參照無效（既非 36 字元 ChunkId、也非可重跑 SELECT）——CHUNK 型補 id；SQL／metadata 型改寫「SQL：<SELECT>」：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
                     # 手術單項目只帶 filePath:行號（不帶列原文——表格 | 等字元
                     # 流入 auto-loop 的 cmd prompt 會炸引號/重導）
                     $ref = [regex]::Match($line, $fileLinePattern).Value
