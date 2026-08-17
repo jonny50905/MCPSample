@@ -115,6 +115,10 @@ foreach ($f in $scanFiles) {
     if ($ix -ge 0) {
         $dFound = $true
         Write-Host ("  !! 內文含 FEFF：" + $f.Name + "（位置 " + $ix + "）") -ForegroundColor Red
+        if ($f.Extension -eq '.ps1' -and $ix -eq 0) {
+            Write-Host "     ↑ 雙 BOM：症狀依檔案結構而異——檔首是註解→執行期「'#' 不是 cmdlet」；" -ForegroundColor Yellow
+            Write-Host "       檔首註解後接 param()→**解析期 InvalidLeftHandSide**（param 不再是第一個語句）。加 -FixBom 修" -ForegroundColor Yellow
+        }
         $findings += 'D'
         if ($FixBom -and $f.Extension -eq '.ps1' -and $ix -eq 0) {
             [System.IO.File]::WriteAllText($f.FullName, $t.TrimStart([char]0xFEFF),
