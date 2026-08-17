@@ -294,15 +294,20 @@ Get-ChildItem $dir -Filter "*.md" |
                 $evText -notmatch '(?i)\bSQL\b') {
                 $violations += "${name}：Evidence 附錄空白（有章節標題但無任何 chunk id／SQL 證據）"
             }
+            # 檔案行號樣式（L37 收緊）：冒號前必須是**含字母的檔名 token**——
+            # 舊規則「任何 冒號+數字」會把時間（23:00）、比例（1:3）當行號，
+            # 派給模型「去找不存在的 chunk」的無解工單（實案：排程 SQL 證據）。
+            # 豁免同時認 SELECT——SQL 型證據（查 DB 的 metadata）本就免 chunk id。
+            $fileLinePattern = '[A-Za-z0-9_./\\-]*[A-Za-z][A-Za-z0-9_./\\-]*[:：][0-9]+(?:-[0-9]+)?'
             foreach ($line in ($evText -split "`n")) {
                 if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and
-                    $line -match '[:：]\d+' -and
+                    $line -match $fileLinePattern -and
                     $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
-                    $line -notmatch '(?i)\bSQL\b') {
+                    $line -notmatch '(?i)\b(SQL|SELECT)\b') {
                     $violations += "${name}：Evidence 列為檔案行號型但缺 chunk id：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
                     # 手術單項目只帶 filePath:行號（不帶列原文——表格 | 等字元
                     # 流入 auto-loop 的 cmd prompt 會炸引號/重導）
-                    $ref = [regex]::Match($line, '[A-Za-z0-9_./\\-]+[:：][0-9]+(?:-[0-9]+)?').Value
+                    $ref = [regex]::Match($line, $fileLinePattern).Value
                     if ($ref -eq '') { $ref = '（無路徑線索——read 該檔該列）' }
                     $missingIds += [pscustomobject]@{ File = $name; Ref = $ref }
                 }
@@ -449,6 +454,9 @@ if (($truncatedIds.Count + $missingIds.Count) -gt 0) {
     Write-Host "→ 委派對應 flow subagent 用 filePath 重取該段"
     Write-Host "（搜檔 → get_file_structure → get_chunks_details）"
     Write-Host "→ 驗貨：回傳 ChunkText 必須包含該列原引文——抓錯禁止硬填"
+    Write-Host "例外（唯一）：該列若是 SQL／metadata 型證據（查 DB 表而非程式碼，"
+    Write-Host "如排程 PS_PRCSRECUR、頁面定義 PSPNLDEFN）＝**本就免 chunk id**，"
+    Write-Host "不要去找 chunk：把機器參照欄改寫成「SQL：<可重跑的 SELECT>」即完成該筆。"
     Write-Host "→ 用「工具回傳的完整 ChunkId」更新／補上該筆 id（其他一字不動）。"
     Write-Host "全部完成後輸出收據：每筆一行「舊值 → 新完整UUID」對照表。"
     Write-Host "沒有收據＝沒完成。現在從第 1 筆開始。"
