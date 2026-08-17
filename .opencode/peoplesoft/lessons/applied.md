@@ -735,3 +735,21 @@
   還要寫「查了哪裡、看到什麼」**——否定結論的可診斷性來自現場資訊，
   不是來自措辭。
 - 套用：本 commit（lint；測試 T24/T25）。
+
+### L39 Test-Path 的萬用字元陷阱＋腳本位置即設定（2026-08）
+- 症狀：ps-fs-doctor 判 **A（檔案精確存在）**，同一台機器同一領域
+  lint 仍報「缺 00-overview.md」。
+- 根因（兩個都修）：(1) **`Test-Path -Path` 會把路徑當萬用字元樣式
+  解析**——路徑或領域名含 `[` `]` 時，存在的檔案照樣判不存在；
+  doctor 用 `[IO.File]::Exists()`（字面）故找得到，兩者結論相反。
+  本課撰寫時連測試腳本自己的 `Set-Content -Path` 都中同一陷阱，
+  可見其普遍性。(2) **腳本位置是設定**：`$root` 由 `$PSScriptRoot`
+  反推，腳本沒放在 `<repo>\scripts\` 就整棵樹歪掉，且以前完全無聲。
+- 落點：機械化——(1) lint 全面改 `-LiteralPath`／`Get-Content
+  -LiteralPath`（11 處）；(2) 開頭加位置護欄：非 `scripts\` 底下
+  發警告、`docs\ps-research` 不存在直接 exit 2 並印出反推的 root；
+  (3) 目錄不存在的錯誤訊息附「該 research 根下現有領域清單」
+  （拼字/雙胞胎一眼可見）。
+- 原則：**路徑一律 LiteralPath**——PowerShell 的 `-Path` 是樣式
+  不是路徑；以及**由位置推導的設定必須自我驗證**。
+- 套用：本 commit（lint；含含 `[]` 領域名的迴歸驗證）。

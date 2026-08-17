@@ -80,20 +80,32 @@ function Get-ScorecardCoverage {
     return $best
 }
 
-# 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑
+# 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑。
+# **腳本位置是設定**（L39）：放錯資料夾＝整棵樹反推歪掉，且以前完全無聲
+# ——實案：doctor 找得到 overview、lint 說缺檔，差別只在兩者跑的起點不同。
 $root = Split-Path $PSScriptRoot -Parent
-$dir = Join-Path $root (Join-Path "docs/ps-research" $Domain)
+if ((Split-Path $PSScriptRoot -Leaf) -ne 'scripts') {
+    Write-Host "WARN：本腳本不在 <repo>\scripts\ 底下（目前位置：$PSScriptRoot）——repo 根反推為 $root，可能指向錯誤的樹" -ForegroundColor Yellow
+}
+$researchRoot = Join-Path $root (Join-Path "docs" "ps-research")
+if (-not (Test-Path -LiteralPath $researchRoot)) {
+    Write-Error "找不到 $researchRoot——腳本應放在 <repo>\scripts\ 底下（目前位置：$PSScriptRoot）"
+    exit 2
+}
+$dir = Join-Path $researchRoot $Domain
 $violations = @()
 $warnings = @()
 
-if (-not (Test-Path $dir)) {
-    Write-Error "目錄不存在：$dir"
+if (-not (Test-Path -LiteralPath $dir)) {
+    $siblings = @(Get-ChildItem -LiteralPath $researchRoot -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.Name })
+    Write-Error "目錄不存在：$dir｜該 research 根下現有領域：$($siblings -join '、')"
     exit 2
 }
 
 $overviewPath = Join-Path $dir "00-overview.md"
 $checklistPath = Join-Path $dir "checklist.md"
-if (-not (Test-Path $overviewPath)) {
+if (-not (Test-Path -LiteralPath $overviewPath)) {
     # 缺檔違規必附近似檔名收據（L24「查無必附查法收據」用回 lint 自己身上）：
     # 假缺（檔名污染/雙副檔名）與真缺（SOP-4 還原）給出可分辨的訊息
     $allInDir = @(Get-ChildItem -LiteralPath $dir -Force -File -ErrorAction SilentlyContinue)
@@ -117,12 +129,12 @@ if (-not (Test-Path $overviewPath)) {
 # 對帳不再包在「overview 存在」分支裡（L28：一項缺檔違規不得遮蔽其餘檢查——
 # 假缺 overview 曾讓「無遺失」整輪不可證）
 $checklistOnly = $null
-if (Test-Path $checklistPath) {
-    $checklistOnly = Get-Content $checklistPath -Raw -Encoding UTF8
+if (Test-Path -LiteralPath $checklistPath) {
+    $checklistOnly = Get-Content -LiteralPath $checklistPath -Raw -Encoding UTF8
     if ($null -eq $checklistOnly) { $checklistOnly = "" }   # 空檔防護：0 byte 也要進對帳
 }
-elseif (Test-Path $overviewPath) {
-    $checklistOnly = Get-Content $overviewPath -Raw -Encoding UTF8
+elseif (Test-Path -LiteralPath $overviewPath) {
+    $checklistOnly = Get-Content -LiteralPath $overviewPath -Raw -Encoding UTF8
     if ($null -eq $checklistOnly) { $checklistOnly = "" }
 }
 $clRound = -1
@@ -132,10 +144,10 @@ if ($null -ne $checklistOnly) {
     }
 }
 # 00-overview 是凍結快照（L2）——歷多輪稽核後提醒讀者別當現況讀（L30）
-if ($clRound -ge 3 -and (Test-Path $overviewPath)) {
+if ($clRound -ge 3 -and (Test-Path -LiteralPath $overviewPath)) {
     $warnings += "00-overview.md：凍結快照已歷 $clRound 輪稽核——閱讀請以 checklist／NN 檔／wiki 為準；要刷新走 SOP-15 換版"
 }
-if (Test-Path $checklistPath) {
+if (Test-Path -LiteralPath $checklistPath) {
     # checklist 模板節標題必須存在——標題整個消失＝破壞性覆寫指紋
     # （row 清空可以是合法歸檔後狀態，節標題消失不是）
     $clHead = if ($null -eq $checklistOnly) { "" } else { $checklistOnly }
@@ -163,7 +175,7 @@ if ($null -ne $checklistOnly) {
     $checklistSrc = $checklistOnly
     # 已打勾項會歸檔到 checklist-archive*.md（每輪一個分片檔）——對帳時全部合併看；
     # archive 只准收已打勾項——未勾項被搬走＝進度隱形消失（L28）
-    $archiveFiles = @(Get-ChildItem -Path $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
+    $archiveFiles = @(Get-ChildItem -LiteralPath $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
     foreach ($af in $archiveFiles) {
         $afText = Get-Content $af.FullName -Raw -Encoding UTF8
         if ($null -eq $afText) { $afText = "" }
@@ -179,11 +191,11 @@ if ($null -ne $checklistOnly) {
     foreach ($m in [regex]::Matches($checklistSrc, '- \[(?<tick>[ x])\]\s+\S+.*?→\s*(?<file>\S+\.md)')) {
         $f = $m.Groups['file'].Value
         $listed[$f] = $true
-        if ($m.Groups['tick'].Value -eq 'x' -and -not (Test-Path (Join-Path $dir $f))) {
+        if ($m.Groups['tick'].Value -eq 'x' -and -not (Test-Path -LiteralPath (Join-Path $dir $f))) {
             $violations += "checklist 已打勾但檔案不存在：$f"
         }
     }
-    Get-ChildItem $dir -Filter "*.md" |
+    Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
         ForEach-Object {
             if (-not $listed.ContainsKey($_.Name)) {
@@ -195,8 +207,8 @@ if ($null -ne $checklistOnly) {
 # 功能地圖覆蓋 diff（L31）：後續輪發現的「新大陸」會進 checklist→NN→wiki，
 # 但凍結的 overview 功能地圖不會自動入圖；歸檔後 checklist 活頁也看不到。
 # 機械 diff 補可見性（零新寫入路徑）——這份清單同時是 SOP-15 換版的併入清單。
-if ((Test-Path $overviewPath) -and $null -ne $checklistOnly) {
-    $ovText = Get-Content $overviewPath -Raw -Encoding UTF8
+if ((Test-Path -LiteralPath $overviewPath) -and $null -ne $checklistOnly) {
+    $ovText = Get-Content -LiteralPath $overviewPath -Raw -Encoding UTF8
     if ($null -eq $ovText) { $ovText = "" }
     $unmapped = @()
     foreach ($m in [regex]::Matches($checklistSrc, '- \[[ x]\]\s+\S+\s+[^`\r\n]*`(?<obj>[^`\r\n]+)`[^\r\n]*?→\s*\S+\.md')) {
@@ -216,7 +228,7 @@ $nnNames = @()
 $truncatedIds = @()
 $missingIds = @()   # 檔案行號型缺 chunk id——與縮寫 id 同進手術單（修法同形）
 
-Get-ChildItem $dir -Filter "*.md" |
+Get-ChildItem -LiteralPath $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
     ForEach-Object {
         $name = $_.Name
@@ -325,8 +337,8 @@ Get-ChildItem $dir -Filter "*.md" |
 # 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋；
 #      -StrictAudit 時本節的結構性問題升為違規——僅限本節，wiki 類不升級）
 $auditPath = Join-Path $dir "90-audit.md"
-if (Test-Path $auditPath) {
-    $auditText = Get-Content $auditPath -Raw -Encoding UTF8
+if (Test-Path -LiteralPath $auditPath) {
+    $auditText = Get-Content -LiteralPath $auditPath -Raw -Encoding UTF8
     if ($null -eq $auditText) { $auditText = "" }   # 空檔＝全部章節缺（不炸例外）
     $auditSections = @('## 總覽記分卡', '## FAIL / DISPUTED / UNVERIFIABLE 明細',
         '## 上輪回灌項覆核', '## 完整性（換角度 diff）',
