@@ -129,6 +129,29 @@ foreach ($f in $scanFiles) {
 }
 if (-not $dFound) { Write-Host "  全部乾淨" -ForegroundColor Green }
 
+# S) 腳本語法與行數（搬運完整性）——貼上被截斷／中文字串壞掉會在這裡現形
+Write-Host "[檢查 S] scripts\*.ps1 語法解析與行數（搬運完整性）"
+$sBad = $false
+foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $root "scripts") -Filter "*.ps1" -File)) {
+    $lineCount = @([System.IO.File]::ReadAllLines($f.FullName)).Count
+    $errs = $null
+    $toks = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$toks, [ref]$errs)
+    if ($errs.Count -gt 0) {
+        $sBad = $true
+        $findings += 'S'
+        Write-Host ("  !! " + $f.Name + "（" + $lineCount + " 行）解析失敗 " + $errs.Count + " 項：") -ForegroundColor Red
+        foreach ($e in ($errs | Select-Object -First 3)) {
+            Write-Host ("     行 " + $e.Extent.StartLineNumber + " 欄 " + $e.Extent.StartColumnNumber + "：" + $e.Message)
+        }
+        Write-Host "     → 搬運不完整／貼上被截斷或中文字串壞掉：重新從 GitHub Raw 複製整檔（存 UTF-8 with BOM）" -ForegroundColor Yellow
+    }
+    else {
+        Write-Host ("  OK  " + $f.Name + "（" + $lineCount + " 行——對照維護 session 給的搬運清單行數）")
+    }
+}
+if (-not $sBad) { Write-Host "  全部可解析" -ForegroundColor Green }
+
 # 結論
 $codes = @($findings | Sort-Object -Unique)
 if ($codes.Count -eq 0) { $codes = @('G') }
@@ -136,6 +159,7 @@ Write-Host ""
 Write-Host "代號說明：A=00-overview 其實存在（假缺：當時 lint 的 -Domain 輸入被污染，手打參數重跑）"
 Write-Host "          B=檔名異常（變體/隱形字元，照上面列的檔改名）  C=資料夾雙胞胎/資料夾名異常"
 Write-Host "          D=內文 FEFF 污染（.ps1 可加 -FixBom 自動修）  E=真缺檔或路徑對不上（SOP-4）"
-Write-Host "          F=這次輸入的參數含隱形字元  G=全部正常（另有原因，回報後續查）"
+Write-Host "          F=這次輸入的參數含隱形字元  S=腳本語法解析失敗（搬運不完整，重新複製整檔）"
+Write-Host "          G=全部正常（另有原因，回報後續查）"
 Write-Host ("結論代號：" + ($codes -join '+')) -ForegroundColor Cyan
 Write-Host "（回報維護 session 只需要這一行的代號，其他內容不用貼出來）"
