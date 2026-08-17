@@ -52,10 +52,28 @@ $logRoot = Join-Path $root (Join-Path "auto-loop-logs" $Domain)
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 $logFile = Join-Path $logRoot "auto-loop.log"
 
-# opencode 可執行檔（npm shim 是 .cmd，經 cmd.exe 呼叫最穩）
-$ocCmd = Get-Command opencode -ErrorAction SilentlyContinue
-if (-not $ocCmd) { Write-Error "PATH 找不到 opencode"; exit 2 }
-$ocPath = $ocCmd.Source
+# opencode 可執行檔（L46）：**必須挑 .cmd/.exe/.bat 型 shim**。
+# npm 同時裝 opencode / opencode.cmd / opencode.ps1；PowerShell 的 Get-Command
+# 會優先回 **.ps1**（它把 .ps1 當一等公民）——把 .ps1 丟給 cmd.exe 不會執行，
+# Windows 會用「檔案關聯」開啟它＝**跳出記事本並阻塞**，關掉後 cmd 回 exit 0，
+# 外環誤判 session 正常結束 → 整圈空轉、完全沒有 session 真的跑過。
+function Select-OpencodeShim {
+    param($Candidates)
+    foreach ($ext in @('.cmd', '.exe', '.bat')) {
+        foreach ($c in $Candidates) {
+            if ($c.Source -and $c.Source.ToLowerInvariant().EndsWith($ext)) { return $c.Source }
+        }
+    }
+    return $null
+}
+$ocAll = @(Get-Command opencode -All -ErrorAction SilentlyContinue)
+if ($ocAll.Count -eq 0) { Write-Error "PATH 找不到 opencode"; exit 2 }
+$ocPath = Select-OpencodeShim -Candidates $ocAll
+if (-not $ocPath) {
+    Write-Error ("PATH 上的 opencode 是 " + $ocAll[0].Source + "（非 .cmd/.exe/.bat）——" +
+        "cmd.exe 會用檔案關聯開啟它（記事本）而不是執行它。請確認 npm 的 opencode.cmd 在 PATH 上")
+    exit 2
+}
 
 # ── 畢業收據共用邏輯（issue #3）——缺檔／版本不符要在取鎖前快炸，
 #    不能拖到數小時後畢業瞬間才發現人工搬運不完整
@@ -221,7 +239,7 @@ function Invoke-Lint {
 if ($Preflight) {
     Write-Host "=== auto-loop 啟動前檢查（唯讀）===" -ForegroundColor Cyan
     Write-Host "領域目錄  ：$dir"
-    Write-Host "opencode  ：$ocPath"
+    Write-Host "opencode  ：$ocPath$(if ($ocAll.Count -gt 1) { "（PATH 上共 $($ocAll.Count) 個候選，已選 .cmd/.exe/.bat 型）" })"
     Write-Host "收據邏輯  ：$gradLibPath（schema=$GraduationSchemaVersion gate=$GraduationGateVersion）"
     $st = Get-ChecklistState
     if (-not $st.Exists) {

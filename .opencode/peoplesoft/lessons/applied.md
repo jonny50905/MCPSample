@@ -890,3 +890,26 @@
 - 原則：**每個人工步驟都要有對應的機械驗收**——人工搬運是本框架
   最大的非確定性環節，它的驗收不能靠「跑跑看會不會爆」。
 - 套用：本 commit（ps-fs-doctor；以壞檔 fixture 驗證）。
+
+### L46 記事本之謎——PowerShell 挑 .ps1 shim，cmd.exe 用檔案關聯把它「開啟」（2026-08）
+- 症狀：loop 開跑後**每圈跳出記事本**、關掉才繼續；管理者觀察
+  「看起來沒找 opencode，直接就走完流程」。
+- 根因（在外環不在模型）：npm 同時裝 `opencode`／`opencode.cmd`／
+  `opencode.ps1`，而 **PowerShell 的 `Get-Command` 優先回 .ps1**
+  （它把 .ps1 當一等公民）。auto-loop 把該路徑交給 `cmd.exe` 執行——
+  **Windows 對 .ps1 的預設「開啟」動作是記事本**（防止雙擊誤執行的
+  安全設計）→ 記事本開啟並**阻塞**；關掉後 cmd 回 **exit 0** →
+  外環判定「session 正常結束」→ 整圈空轉、模型從未被呼叫。
+  腳本註解早寫著「npm shim 是 .cmd，經 cmd.exe 呼叫最穩」，
+  **解析卻沒挑 .cmd**——註解寫對、程式沒做。
+- 落點：機械化——`Select-OpencodeShim`：`Get-Command -All` 後
+  **按 .cmd → .exe → .bat 優先序挑**；一個都沒有就 exit 2 並明說
+  「cmd.exe 會用檔案關聯開啟它（記事本）而不是執行它」；
+  Preflight 印出解析結果與候選數。
+- 附帶硬化（同 L1 覆寫表原則）：內建 agent 覆寫檔（general／explore／
+  scout）只封了 4 個 MCP，**bash 沒列＝預設開**——委派漏到內建時
+  仍可執行 shell。已補 `bash/write/edit/webfetch: false`
+  （本案非此因，但同族側門要一起封）。
+- 原則：**exit 0 只代表「那個東西結束了」，不代表「那個東西是你以為的
+  東西」**——外環驗收要驗「做了什麼」，連「呼叫到誰」都要先驗對。
+- 套用：本 commit（auto-loop／三個內建覆寫檔）。
