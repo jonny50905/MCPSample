@@ -218,7 +218,10 @@ function Invoke-Opencode {
                 }
             }
             $silent = [int]((Get-Date) - $lastOut).TotalMinutes
-            $note = if ($silent -ge 10) { "；**輸出已靜止 $silent 分**（疑卡在工具呼叫——SOP-12 檢查 oracleMCP 通道）" } else { "" }
+            # 門檻照**實測基線**設（L48）：委派期間 subagent 輸出不流到父行程
+            # stderr，實測健康的 audit 沉默可達 30 分（總計 35 分完成）——
+            # 門檻設 10 分會每次都叫，把真訊號淹掉。20 分才提、且措辭中性
+            $note = if ($silent -ge 20) { "；輸出已靜止 $silent 分（委派期間長時間無輸出屬常態，實測健康可達 30 分；接近逾時上限仍無輸出才需依 SOP-12 查 oracleMCP 通道）" } else { "" }
             Write-Log "SESSION($Tag) 進行中…已 $mins 分（逾時上限 $TimeoutMin 分）$note"
             $lastBeat = Get-Date
         }
