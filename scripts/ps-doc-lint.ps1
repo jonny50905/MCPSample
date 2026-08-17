@@ -42,6 +42,44 @@ function Test-SectionHollow {
     return $false
 }
 
+# 記分卡定位（L36）：**以結構找表，不綁章節名**——模型會自創標題
+# （實例：「本輪已完成檔案總覽」取代「總覽記分卡」，資料完整只是換了格子）。
+# 畢業門要驗的是「全量覆蓋」這個事實，不是標題字串；標題飄移留警告即可
+# （L23：資料在就不追殺），否則純命名問題＝無修復管道的畢業活鎖。
+# 候選章節優先取標題含記分卡類關鍵字者；都沒有才退回「排除明細類」全表掃描。
+function Get-ScorecardCoverage {
+    param([string]$AuditText, $NnNames)
+    $best = @{ Covered = -1; Missing = @($NnNames); Heading = '(無章節)' }
+    if ([string]::IsNullOrEmpty($AuditText) -or $NnNames.Count -eq 0) { return $best }
+    $sections = @()
+    $curHead = '(表頭前)'
+    $buf = New-Object System.Text.StringBuilder
+    foreach ($ln in ($AuditText -split "`r?`n")) {
+        if ($ln -match '^##\s') {
+            $sections += [pscustomobject]@{ Heading = $curHead; Body = $buf.ToString() }
+            $curHead = $ln.Trim()
+            $buf = New-Object System.Text.StringBuilder
+        }
+        else { [void]$buf.AppendLine($ln) }
+    }
+    $sections += [pscustomobject]@{ Heading = $curHead; Body = $buf.ToString() }
+    $cands = @($sections | Where-Object { $_.Heading -match '(記分卡|總覽|檔案清單|scorecard)' })
+    if ($cands.Count -eq 0) {
+        $cands = @($sections | Where-Object { $_.Heading -notmatch '(明細|回灌|系統性|完整性|覆核)' })
+    }
+    if ($cands.Count -eq 0) { $cands = $sections }
+    foreach ($sec in $cands) {
+        $miss = @($NnNames | Where-Object {
+                $sec.Body -notmatch [regex]::Escape([IO.Path]::GetFileNameWithoutExtension($_))
+            })
+        $cov = $NnNames.Count - $miss.Count
+        if ($cov -gt $best.Covered) {
+            $best = @{ Covered = $cov; Missing = $miss; Heading = $sec.Heading }
+        }
+    }
+    return $best
+}
+
 # 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑
 $root = Split-Path $PSScriptRoot -Parent
 $dir = Join-Path $root (Join-Path "docs/ps-research" $Domain)
@@ -283,8 +321,9 @@ if (Test-Path $auditPath) {
         '## 已回灌 checklist 的行動項', '## 系統性錯誤觀察')
     foreach ($sec in $auditSections) {
         if ($auditText -notmatch [regex]::Escape($sec)) {
-            $msg = "90-audit.md：缺模板章節「$sec」（報告偏離模板，對帳會失準）"
-            if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
+            # 標題飄移只留警告（L36）——畢業門改驗「結構化全量覆蓋」的事實，
+            # 綁標題字串會讓純命名問題變成無修復管道的活鎖
+            $warnings += "90-audit.md：缺模板章節「$sec」（報告偏離模板；若記分卡改名，覆蓋檢查仍會驗全量）"
         }
     }
     # 契約外詞彙任何模式都只警告——散文合法引用歷史判定（如「上輪 contradicted
@@ -306,27 +345,12 @@ if (Test-Path $auditPath) {
         $msg = "90-audit.md 輪次（$auditRoundNum）與 checklist 輪次（$clRound）不一致——報告可能是舊輪重驗前的殘留，綠燈不可信"
         if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
     }
-    # 全量對帳：每個 NN 檔都必須出現在稽核報告內文（記分卡一檔一列）
-    $missingRows = @($nnNames | Where-Object { $auditText -notmatch [regex]::Escape($_) })
-    if ($missingRows.Count -gt 0) {
-        $warnings += "90-audit.md：記分卡缺 $($missingRows.Count) 個檔案列（範圍塌縮跡象——稽核未全量重驗）：$($missingRows -join '、')"
-    }
-    if ($StrictAudit) {
-        # 畢業門版全量對帳：只認「## 總覽記分卡」章節內的列——檔名出現在
-        # FAIL 明細／回灌節不算覆蓋（防塌縮漏判）；檔名接受含/不含 .md（防誤殺）
-        $scIdx = $auditText.IndexOf('## 總覽記分卡')
-        if ($scIdx -ge 0) {
-            $scText = $auditText.Substring($scIdx)
-            $nextIdx = $scText.IndexOf("`n## ", 1)
-            if ($nextIdx -gt 0) { $scText = $scText.Substring(0, $nextIdx) }
-            $scMissing = @($nnNames | Where-Object {
-                    $scText -notmatch [regex]::Escape([IO.Path]::GetFileNameWithoutExtension($_))
-                })
-            if ($scMissing.Count -gt 0) {
-                $violations += "90-audit.md：總覽記分卡章節內缺 $($scMissing.Count) 個檔案列（StrictAudit——記分卡＝本輪全量重驗）：$($scMissing -join '、')"
-            }
-        }
-        # 缺「## 總覽記分卡」章節本身已在上方升為違規，不重複記
+    # 全量對帳（L36 結構化）：找「涵蓋最多 NN 檔」的章節當記分卡，驗是否覆蓋
+    # 全部——標題叫什麼不重要，覆蓋率才是塌縮判準（自創標題不再擋畢業）
+    $cover = Get-ScorecardCoverage -AuditText $auditText -NnNames $nnNames
+    if ($nnNames.Count -gt 0 -and $cover.Missing.Count -gt 0) {
+        $msg = "90-audit.md：記分卡未涵蓋 $($cover.Missing.Count) 個檔案（最佳章節「$($cover.Heading)」覆蓋 $($cover.Covered)/$($nnNames.Count)；範圍塌縮跡象——稽核未全量重驗）：$($cover.Missing -join '、')"
+        if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
     }
 }
 elseif ($StrictAudit) {

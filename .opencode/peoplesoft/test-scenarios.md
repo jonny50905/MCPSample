@@ -576,6 +576,10 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      帶病進稽核）；checklist「Gaps 彙整」實質空白→警告（真無 gaps
      須明寫「（無）」，調查進度不檢查）；手術單擴收「檔案行號缺
      id」項（缺id＠filePath:行號 格式、附驗貨要求）
+  10. [致命] 記分卡覆蓋以**結構**判定（L36）：自創標題（如「本輪已
+      完成檔案總覽」）只要涵蓋全部 NN 檔＝strict 通過（僅留標題飄移
+      警告）；檔名只出現在 FAIL 明細節＝未覆蓋→strict 違規。
+      畢業門驗事實不驗措辭
 
 ---
 
