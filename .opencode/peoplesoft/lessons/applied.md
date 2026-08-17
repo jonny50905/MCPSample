@@ -753,3 +753,26 @@
 - 原則：**路徑一律 LiteralPath**——PowerShell 的 `-Path` 是樣式
   不是路徑；以及**由位置推導的設定必須自我驗證**。
 - 套用：本 commit（lint；含含 `[]` 領域名的迴歸驗證）。
+
+### L40 表名前綴憑記憶／metadata MCP 當證據／AE step 參照被當檔案行號（2026-08）
+- 三個同時發生的現場問題：
+  (a) 模型把 `PSPRCSRQST` 寫成 `PS_PRCSRQST` → 必然查無 → 誤以為
+      「查不到排程」。cookbook 樣板本來就寫對（PeopleTools 系統表
+      **不一定**有 PS_ 前綴，樣板即並存兩型），是模型自行加前綴；
+      規則 8 只管欄位不管表名，留了缺口。
+  (b) 查不到後改用 PeoplecodeMetadata 的 **get_process_schedule_list**
+      （L1 只記載三個工具，這是第四個）回傳當證據 → lint 判證據有問題
+      ——判得對：契約只認 CHUNK／SQL，metadata 回傳只作定位線索。
+  (c) lint 手術單出現「缺id＠AENAME:2」看似無解，實為 **AE 名:step 序號**
+      被當成 `檔案:行號`——但該工單**確實可完成**：AE step 的 SQL 在 ES
+      有 chunk（`objectName=<AE名>＋componentType=ApplicationEngineProgram`
+      實測可取），修法是取回該 step 的 chunk 補 id。
+- 落點：資料修正＋機械化——(1) cookbook 規則 8a：表名同理禁憑記憶、
+  **禁止自行加減 PS_ 前綴**，樣板沒有的表先 `all_tables` 查證；
+  (2) cookbook 規則 9：明列 metadata MCP 四個工具一律不作 evidence；
+  (3) lint 手術指令加 AE step 判讀提示（`<名>:<數字>` 若名字是 AE／物件名
+  → 用 componentType 取 chunk）；(4) thinking 標記污染的違規訊息附處置
+  「手工刪除即可，不需重取證據」（故不列入手術單，避免誤以為缺工法）。
+- 原則：**「加了前綴查不到」不是資料不存在，是表名寫錯**——查無結論前
+  先驗物件名本身的正確性（同 L26／L32 的鍵型錯必空家族）。
+- 套用：本 commit（cookbook／lint）。

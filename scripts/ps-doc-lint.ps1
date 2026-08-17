@@ -290,7 +290,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
 
         # 模型內部標記洩漏（chat template 未對齊時會漏進輸出）
         foreach ($m in [regex]::Matches($text, '</?think(ing)?>|<\|im_(start|end)\|>')) {
-            $violations += "${name}：模型內部標記洩漏（污染）：$($m.Value)"
+            $violations += "${name}：模型內部標記洩漏（污染）：$($m.Value)——**手工刪除該標記即可**，不需重取證據（故不列入手術單）"
         }
 
         # 廣域截斷偵測：不限「ChunkId」前綴——任何位置的獨立 8 碼 hex
@@ -470,6 +470,9 @@ if (($truncatedIds.Count + $missingIds.Count) -gt 0) {
         Write-Host "$i. $($t.File)：缺id＠$($t.Ref)"
     }
     Write-Host "每筆固定流程：read 該檔找到該筆 evidence 的 filePath 與行號（缺id項已附在＠後）"
+    Write-Host "＠後若是「<名>:<數字>」但那個名字是 AE／物件名（非檔案），代表是 AE step"
+    Write-Host "參照——改用 search_chunks(objectName=<AE名>, componentType=ApplicationEngineProgram)"
+    Write-Host "取回該 step 的 chunk（AE step 的 SQL 在 ES 有 chunk，不是無解工單）。"
     Write-Host "→ 委派對應 flow subagent 用 filePath 重取該段"
     Write-Host "（搜檔 → get_file_structure → get_chunks_details）"
     Write-Host "→ 驗貨：回傳 ChunkText 必須包含該列原引文——抓錯禁止硬填"

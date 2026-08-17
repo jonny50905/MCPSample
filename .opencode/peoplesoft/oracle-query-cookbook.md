@@ -21,6 +21,18 @@
    SELECT column_name FROM all_tab_columns WHERE table_name='<大寫表名>'
    確認後再查——**禁止憑記憶寫欄位名**；驗證後仍無該欄位 →
    記 gaps，不要換個猜法再試。
+8a. **表名同理，且禁止自行加減 `PS_` 前綴（L40）**：PeopleTools 系統表
+   **不一定**有 PS_ 前綴——本 cookbook 樣板即並存兩型
+   （`PSPRCSRQST` 無前綴、`PS_PRCSRECUR` 有前綴）。**樣板怎麼寫就怎麼查**；
+   樣板沒有的表先跑
+   SELECT table_name FROM all_tables WHERE table_name LIKE '%<關鍵字>%'
+   確認實際表名。實案：模型把 PSPRCSRQST 寫成 PS_PRCSRQST → 必然查無 →
+   誤判「查不到」。**「加了前綴查不到」不是資料不存在，是表名寫錯。**
+9. **metadata MCP 不得作 evidence（L1 鐵律，L40 重申）**：
+   PeoplecodeMetadata 的工具（find_field_usage／search_component_metadata／
+   get_ae_sql_metadata／**get_process_schedule_list**）回傳一律只作
+   **定位線索**——證據契約只認 CHUNK 與 SQL 兩種。排程／metadata 類事實
+   要當證據，就得用本 cookbook 的 SELECT 取得並附「SQL＋關鍵列」。
 ```
 
 ## 連線生命週期（每次任務照此順序，硬性）
