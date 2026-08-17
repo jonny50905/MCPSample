@@ -227,10 +227,10 @@ function Invoke-Opencode {
     if (-not $done) {
         & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
         Write-Log "SESSION($Tag) 逾時 $TimeoutMin 分，已整樹強制結束（狀態在檔案，無損）"
-        return @{ TimedOut = $true; ExitCode = -1 }
+        return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile }
     }
     Write-Log "SESSION($Tag) 結束 exit=$($p.ExitCode) 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
-    return @{ TimedOut = $false; ExitCode = $p.ExitCode }
+    return @{ TimedOut = $false; ExitCode = $p.ExitCode; ErrFile = $errFile; OutFile = $outFile }
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
@@ -365,7 +365,15 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     $sessionOk = ($r.ExitCode -eq 0)
     if (-not $sessionOk) {
         $errorStreak++
-        Write-Log "SESSION 非零 exit（$errorStreak/2）——看 err 檔"
+        Write-Log "SESSION 非零 exit（$errorStreak/2）——err 檔：$($r.ErrFile)"
+        # 錯誤原因直接摘進主 log（否則「早上看 log 摘要即可」不成立——
+        # 停機原因只寫「連續 2 次 session 錯誤」，真因還埋在 err 檔裡）
+        if ($r.ErrFile -and (Test-Path -LiteralPath $r.ErrFile)) {
+            $tail = @(Get-Content -LiteralPath $r.ErrFile -Tail 5 -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Trim() -ne '' })
+            foreach ($tl in $tail) { Write-Log "  err> $tl" }
+            if ($tail.Count -eq 0) { Write-Log "  err> （err 檔為空——session 可能在啟動階段就死，檢查 opencode 與模型服務）" }
+        }
         if ($errorStreak -ge 2) { $stopReason = "連續 2 次 session 錯誤（需人工看 err log）"; break }
         # session 自行異常結束也可能留半寫檔（crash mid-write）——同樣驗一致性
         $fsProblems = Test-FsConsistency -HadChecklist $preHadChecklist -PreItemTotal $preItemTotal
