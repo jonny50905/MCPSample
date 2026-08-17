@@ -96,13 +96,20 @@ $checklistPath = Join-Path $dir "checklist.md"
 if (-not (Test-Path $overviewPath)) {
     # 缺檔違規必附近似檔名收據（L24「查無必附查法收據」用回 lint 自己身上）：
     # 假缺（檔名污染/雙副檔名）與真缺（SOP-4 還原）給出可分辨的訊息
-    $near = @(Get-ChildItem -LiteralPath $dir -Force -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -like "*overview*" })
+    $allInDir = @(Get-ChildItem -LiteralPath $dir -Force -File -ErrorAction SilentlyContinue)
+    $near = @($allInDir | Where-Object { $_.Name -like "*overview*" })
+    # 查無收據必附「查了哪裡、看到什麼」（L38）——只說「缺檔」時，人無法
+    # 分辨「真缺」與「掃錯目錄」（雙胞胎資料夾／repo 副本／檔名藏隱形字元）
+    $mdCount = @($allInDir | Where-Object { $_.Extension -eq '.md' }).Count
+    $scanReceipt = "掃描目錄：$dir｜該目錄 $mdCount 個 .md"
     if ($near.Count -gt 0) {
-        $violations += "缺 00-overview.md（但找到近似檔名：$(($near | ForEach-Object { $_.Name }) -join '、')——檔名污染？跑 ps-fs-doctor）"
+        $violations += "缺 00-overview.md（但找到近似檔名：$(($near | ForEach-Object { $_.Name }) -join '、')——檔名污染？跑 ps-fs-doctor）｜$scanReceipt"
+    }
+    elseif ($mdCount -eq 0) {
+        $violations += "缺 00-overview.md（且該目錄一個 .md 都沒有——極可能掃錯目錄：雙胞胎資料夾／repo 副本，跑 ps-fs-doctor 查代號 C）｜$scanReceipt"
     }
     else {
-        $violations += "缺 00-overview.md（近似檔名掃描也無——真缺檔，走 SOP-4 還原）"
+        $violations += "缺 00-overview.md（近似檔名掃描也無——真缺檔走 SOP-4 還原；若你看得到該檔，就是掃錯目錄或檔名藏隱形字元，跑 ps-fs-doctor）｜$scanReceipt"
     }
 }
 
