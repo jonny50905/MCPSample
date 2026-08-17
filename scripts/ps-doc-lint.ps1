@@ -28,6 +28,20 @@ foreach ($ch in $Domain.ToCharArray()) {
     }
 }
 
+# 章節實質內容判定（L35）：剝掉 HTML 註解與模板佔位符後是否為空。
+# 兩種「假內容」：(1) HTML 註解渲染後不可見——讀者看到的是空章節；
+# (2)「同前」類省略語在**只有整檔覆寫**的工具層沒有指涉對象
+# （寫入當下前一版已被自己蓋掉），是偷懶省略不是內容。
+function Test-SectionHollow {
+    param([string]$Body)
+    $t = [regex]::Replace($Body, '(?s)<!--.*?-->', '')
+    $t = [regex]::Replace($t, '(?m)^\s*[-*]?\s*<[^>]+>\s*$', '')
+    $t = $t.Trim()
+    if ($t -eq '') { return $true }
+    if ($t -match '^[-*]?\s*(同前|同上|如前|如上|略|不變|未變|unchanged|same as before|same as above)\s*[。．.]?$') { return $true }
+    return $false
+}
+
 # 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑
 $root = Split-Path $PSScriptRoot -Parent
 $dir = Join-Path $root (Join-Path "docs/ps-research" $Domain)
@@ -83,6 +97,20 @@ if (Test-Path $checklistPath) {
     foreach ($sec in @('## 調查進度', '## Gaps 彙整')) {
         if ($clHead -notmatch [regex]::Escape($sec)) {
             $violations += "checklist.md：缺節標題「$sec」（破壞性覆寫指紋——row 清空可為歸檔後合法狀態，節標題消失不是）"
+        }
+    }
+    # Gaps 彙整實質空白（L35）：深查未回填的訊號。「真的沒有 gaps」是合法
+    # 狀態但要明寫「（無）」——留註解＝渲染後看起來是空章節，人讀不到差別。
+    # （調查進度不檢查：全勾歸檔後本來就該是空的）
+    $gIdx = $clHead.IndexOf('## Gaps 彙整')
+    if ($gIdx -ge 0) {
+        $gAfter = $clHead.Substring($gIdx)
+        $gNext = $gAfter.IndexOf("`n## ")
+        $gBody = if ($gNext -ge 0) { $gAfter.Substring(0, $gNext) } else { $gAfter }
+        $gHeadEnd = $gBody.IndexOf("`n")
+        $gBody = if ($gHeadEnd -ge 0) { $gBody.Substring($gHeadEnd) } else { '' }
+        if (Test-SectionHollow $gBody) {
+            $warnings += "checklist.md：Gaps 彙整實質空白（僅註解／佔位符／「同前」——深查未回填；真無 gaps 請明寫「（無）」）"
         }
     }
 }
@@ -175,8 +203,8 @@ Get-ChildItem $dir -Filter "*.md" |
                 $after = $text.Substring($secIdx + $sec.Length)
                 $nextIdx = $after.IndexOf("`n## ")
                 $body = if ($nextIdx -ge 0) { $after.Substring(0, $nextIdx) } else { $after }
-                if ($body.Trim() -eq '') {
-                    $violations += "${name}：章節「$sec」空白（有標題無內容——寫入中斷或空殼檔；git 考古或開重查工單）"
+                if (Test-SectionHollow $body) {
+                    $violations += "${name}：章節「$sec」空白（有標題無實質內容——空殼／僅註解／「同前」類省略語；git 考古或開重查工單）"
                 }
             }
         }
