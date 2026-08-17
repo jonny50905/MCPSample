@@ -487,33 +487,42 @@ else {
     $exitCode = 1
 }
 
-# 證據 id 手術式修復指令（縮寫 id＋檔案行號缺 id 同一張單——修法同形：
-# 重取、驗貨、只動 id、收據）——放「最後」印，才不會被警告牆洗出畫面
+# 證據修復指令（縮寫 id＋機器參照無效同一張單）——放「最後」印，
+# 才不會被警告牆洗出畫面。L42：工單**先判型別再給修法**，不預設「去找 chunk」
+# （失敗查詢／SQL 型證據被寫成「缺 id」會逼模型去做無解的事）。
 if (($truncatedIds.Count + $missingIds.Count) -gt 0) {
     Write-Host ""
-    Write-Host "=== 手術式修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
-    Write-Host "以下是 lint 確認的證據 id 手術清單（縮寫 id／檔案行號缺 id），逐筆修復、一次一筆、一筆都不准跳："
+    Write-Host "=== 證據修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
+    Write-Host "以下是 lint 確認的證據問題清單，逐筆修復、一次一筆、一筆都不准跳："
     $i = 0
     foreach ($t in $truncatedIds) {
         $i++
-        Write-Host "$i. $($t.File)：縮寫 $($t.Id)"
+        Write-Host "$i. $($t.File)：縮寫 id $($t.Id)"
     }
     foreach ($t in $missingIds) {
         $i++
-        Write-Host "$i. $($t.File)：缺id＠$($t.Ref)"
+        Write-Host "$i. $($t.File)：機器參照無效＠$($t.Ref)"
     }
-    Write-Host "每筆固定流程：read 該檔找到該筆 evidence 的 filePath 與行號（缺id項已附在＠後）"
-    Write-Host "＠後若是「<名>:<數字>」但那個名字是 AE／物件名（非檔案），代表是 AE step"
-    Write-Host "參照——改用 search_chunks(objectName=<AE名>, componentType=ApplicationEngineProgram)"
-    Write-Host "取回該 step 的 chunk（AE step 的 SQL 在 ES 有 chunk，不是無解工單）。"
-    Write-Host "→ 委派對應 flow subagent 用 filePath 重取該段"
-    Write-Host "（搜檔 → get_file_structure → get_chunks_details）"
-    Write-Host "→ 驗貨：回傳 ChunkText 必須包含該列原引文——抓錯禁止硬填"
-    Write-Host "例外（唯一）：該列若是 SQL／metadata 型證據（查 DB 表而非程式碼，"
-    Write-Host "如排程 PS_PRCSRECUR、頁面定義 PSPNLDEFN）＝**本就免 chunk id**，"
-    Write-Host "不要去找 chunk：把機器參照欄改寫成「SQL：<可重跑的 SELECT>」即完成該筆。"
-    Write-Host "→ 用「工具回傳的完整 ChunkId」更新／補上該筆 id（其他一字不動）。"
-    Write-Host "全部完成後輸出收據：每筆一行「舊值 → 新完整UUID」對照表。"
+    Write-Host ""
+    Write-Host "每筆**先判型別再動手（判錯型別＝白做）**："
+    Write-Host " A. CHUNK 型（程式碼：PeopleCode／AE step／SQR／SQL definition）"
+    Write-Host "    → read 該檔該行取得 filePath／物件名 → 委派對應 flow subagent 重取"
+    Write-Host "      （搜檔 → get_file_structure → get_chunks_details）；＠後若是"
+    Write-Host "      「名:數字」而該名是 AE／物件名，用 search_chunks(objectName=該名,"
+    Write-Host "      componentType=ApplicationEngineProgram) 取該 step 的 chunk"
+    Write-Host "    → 驗貨：回傳 ChunkText 必須包含該列原引文，抓錯禁止硬填"
+    Write-Host "    → 用工具回傳的完整 36 字元 ChunkId 更新該列（其他一字不動）"
+    Write-Host " B. SQL／metadata 型（查 DB 表：排程 PSPRCSRQST／PS_PRCSRECUR、"
+    Write-Host "    頁面 PSPNLDEFN…）＝**本就免 chunk id，不要去找 chunk**"
+    Write-Host "    → 照 cookbook 樣板重跑正確查詢（**表名禁自行加減 PS_ 前綴**）"
+    Write-Host "    → 機器參照欄改寫成「SQL：可重跑的 SELECT」，說明欄放 keyRows"
+    Write-Host "    → 機器參照原本寫著 schema 不存在／查無此表／ORA- 之類＝失敗查詢，"
+    Write-Host "      那不是證據，必須重查到可重現為止"
+    Write-Host " C. A 與 B 都取不到 → 該列移除、主張降級 INFERRED、"
+    Write-Host "    未解事項記一行查法收據（查了什麼、怎麼查、結果）"
+    Write-Host ""
+    Write-Host "全部完成後輸出收據，每筆一行：「舊值 → 新完整UUID」或"
+    Write-Host "「舊值 → SQL：SELECT…」或「舊值 → 移除入 gaps」。"
     Write-Host "沒有收據＝沒完成。現在從第 1 筆開始。"
     Write-Host "=== 指令結束 ===" -ForegroundColor Cyan
     Write-Host ""
