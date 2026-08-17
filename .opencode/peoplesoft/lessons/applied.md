@@ -913,3 +913,22 @@
 - 原則：**exit 0 只代表「那個東西結束了」，不代表「那個東西是你以為的
   東西」**——外環驗收要驗「做了什麼」，連「呼叫到誰」都要先驗對。
 - 套用：本 commit（auto-loop／三個內建覆寫檔）。
+
+### L47 subagent 契約 JSON 原樣洩漏進交付物——原料未加工就出貨（2026-08）
+- 症狀（首次 auto-loop 實跑後檢查 90-audit.md）：「上輪回灌項覆核」
+  之後直接接**模型的推理獨白**（自創標題 `## I have to give solution
+  based on the reasoning…`）＋**整段 subagent 回報 JSON**（contract
+  格式：agent／searchScope／findings／coverage…）。
+- 定性：與 L41 同族（寫入脫軌）但簽名不同——L41 是「寫到一半斷掉」，
+  本課是**「把原料當成品交出去」**：委派回來的契約 JSON 應由主 agent
+  **消化成報告文字**，它卻整段貼進交付物，並把自己的思考當章節標題。
+- 落點：機械化——lint 新增檢查：90-audit.md 與 NN 檔命中 ≥3 個契約鍵
+  （`"agent"`／`"searchScope"`／`"findings"`／`"coverage"`／
+  `"deliveredFallbackUsed"`／`"structureLines"` 等）＝JSON 洩漏違規，
+  訊息附行號並說明「契約 JSON 是原料，必須消化成報告文字；同段常伴
+  推理獨白，一併清」。門檻設 3 個鍵避免誤傷正常引用單一欄位名的散文。
+- 處置：90-audit.md 每輪 audit **整檔重寫**——下一輪稽核會自然覆蓋，
+  不必人工修（要現在乾淨才手動刪該段）。
+- 原則：**交付物只能裝成品**——工具回傳、subagent 回報、模型自己的
+  推理都是原料，出現在交付物裡就是製程沒走完。
+- 套用：本 commit（lint；fixture 驗證命中且乾淨檔不誤報）。

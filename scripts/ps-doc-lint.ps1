@@ -367,6 +367,33 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         }
     }
 
+# 2.4) subagent 回報 JSON 洩漏（L47）：主 agent 應把 subagent 的契約 JSON
+# **消化成報告**，不是原樣貼進交付物。實案：90-audit.md 的「上輪回灌項覆核」
+# 之後直接接模型的推理獨白＋整段 subagent JSON。與 L41 同族（寫入脫軌），
+# 但簽名不同——這裡是「原料未加工就出貨」。掃 90-audit 與 NN 檔。
+$rawJsonTargets = @()
+if (Test-Path -LiteralPath (Join-Path $dir "90-audit.md")) { $rawJsonTargets += (Join-Path $dir "90-audit.md") }
+foreach ($n in $nnNames) { $rawJsonTargets += (Join-Path $dir $n) }
+foreach ($tf in $rawJsonTargets) {
+    $tt = Get-Content -LiteralPath $tf -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($tt)) { continue }
+    $tname = Split-Path $tf -Leaf
+    # 契約 JSON 的指紋：同時出現多個契約鍵，且以 JSON 形式（"key":）書寫
+    $keyHits = 0
+    foreach ($k in @('"agent"', '"searchScope"', '"deliveredFallbackUsed"', '"findings"',
+            '"coverage"', '"dynamicRuntimeWarnings"', '"structureLines"', '"analyzedLines"')) {
+        if ($tt.Contains($k)) { $keyHits++ }
+    }
+    if ($keyHits -ge 3) {
+        $ln = 1
+        foreach ($m in [regex]::Matches($tt, '"(agent|searchScope|findings|coverage)"\s*:')) {
+            $ln = @($tt.Substring(0, $m.Index) -split "`n").Count
+            break
+        }
+        $violations += "${tname}:${ln}：subagent 回報 JSON 原樣洩漏進文件（命中 $keyHits 個契約鍵）——契約 JSON 是**原料**，必須消化成報告文字；刪除該段並依契約內容重寫（同段常伴模型推理獨白，一併清）"
+    }
+}
+
 # 2.5) 90-audit.md 模板符合度（每輪稽核會重寫，偏離記警告不擋；
 #      -StrictAudit 時本節的結構性問題升為違規——僅限本節，wiki 類不升級）
 $auditPath = Join-Path $dir "90-audit.md"
