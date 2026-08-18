@@ -587,6 +587,24 @@ if (Test-Path -LiteralPath $dir) {
     }
 }
 
+# 宣稱環境受限卻零列走出口（L56）：真的查不到就標「待人工SQL」——那是
+# 申報。只在散文裡寫「無法連線／連線限制」而一列都沒標，等於用一句話
+# 免除整批舉證責任，而且事後無法分辨「真的不通」與「沒去查」。
+# 實案：Gaps 寫「OracleMCP 連線限制…Unverifiable」，但管理者確認 Oracle
+# 從未中斷，且全域零列標待人工SQL——30 列機器參照全是標籤。
+$limitClaimPattern = '(無法連線|連線限制|無資料庫連線|連線不可用|通道(不通|中斷)|MCP\s*(不可用|無法使用))'
+if ($pendingSqlRows.Count -eq 0 -and (Test-Path -LiteralPath $dir)) {
+    foreach ($cf in (Get-ChildItem -LiteralPath $dir -Filter "*.md" -File | Sort-Object Name)) {
+        $ctext = Get-Content -LiteralPath $cf.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($ctext)) { continue }
+        $cm = [regex]::Match($ctext, $limitClaimPattern)
+        if ($cm.Success) {
+            $cline = 1 + @($ctext.Substring(0, $cm.Index) -split "`n").Count - 1
+            $warnings += "$($cf.Name):${cline}：宣稱環境受限（「$($cm.Value)」）但**全領域零列標『待人工SQL』**——真受限就在受影響的證據列走合法出口（那才是申報）；通道其實正常就把這句宣稱刪掉，否則無法分辨『真的不通』與『沒去查』"
+            break
+        }
+    }
+}
 # 待人工SQL：合法的終止出口（L43／L53），不算違規——但要點名，否則
 # 「這份文件有幾條主張還沒被機器驗過」就沒有人知道
 if ($pendingSqlRows.Count -gt 0) {

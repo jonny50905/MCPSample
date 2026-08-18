@@ -60,3 +60,18 @@
      它不是 git SHA，**禁止縮寫成前 8 碼**；縮寫會被稽核判
      FAIL(TRUNCATED_ID)、lint 也會抓。 -->
 | 2 | SQL：`SELECT … FROM PSXLATITEM …` | 選項清單 | keyRows：E=免役… |
+| 3 | `PS_PRCSRECUR`（RECURNAME='X'） | 排程週期 | 待人工SQL |
+
+<!-- 機器參照欄只准放三種東西之一（lint 逐列檢查，L55）：
+     (a) 完整 36 字元 ChunkId
+     (b) 可重跑的 SELECT … FROM …
+     (c) 待人工SQL ← **查不到時的合法出口**
+     「ChunkId」「PeopleCode chunk」「OracleMCP SQL」這類**只是標籤不是證據**
+     ——稽核重跑時跑不了任何東西，一律判違規。
+     取不到證據時**照型別走對應出口**，不要用敘述搪塞：
+       · SQL／metadata 型（查 DB 表）查不到 → 機器參照寫 `待人工SQL`
+         （管理者自跑 SQL 後回填）
+       · CHUNK 型（程式碼）取不到 → **移除該列**、把該主張降級 INFERRED
+       兩者都要在「未解事項」記一行查法收據（查了什麼、怎麼查、結果如何）
+     **更不要在 gaps 寫「環境限制」當跳過理由**——宣稱受限卻沒有任何一列
+     走出口，lint 會直接點名（L56）；真的受限就走出口，那才叫申報。 -->
