@@ -189,14 +189,27 @@ function Invoke-Opencode {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $outFile = Join-Path $logRoot ("{0}-{1}.out.txt" -f $stamp, $Tag)
     $errFile = Join-Path $logRoot ("{0}-{1}.err.txt" -f $stamp, $Tag)
+    # 結束碼落檔（L49）：**不相信 Process 物件的 .ExitCode**——PowerShell 的
+    # -PassThru 物件在只用 WaitForExit(ms) 等待時 .ExitCode 常為 $null，而
+    # $null -eq 0 為 false ＝ 每個正常 session 都被判成錯誤（假的「連續 2 次
+    # session 錯誤」停機、SESSION_OK 恆假＝永不畢業）。改讓 cmd 把 ERRORLEVEL
+    # 寫進檔案——同框架哲學：**要可觀測的事實，不要 API 承諾**。
+    $rcFile = Join-Path $logRoot ("{0}-{1}.rc.txt" -f $stamp, $Tag)
     $inner = '"' + $ocPath + '" run '
     if ($Model -ne "") { $inner += '--model "' + $Model + '" ' }
     if ($ExtraArgs -ne "") { $inner += $ExtraArgs + ' ' }
     $inner += '--title "auto-' + $Tag + '" '
     $inner += '"' + $PromptText + '" 1> "' + $outFile + '" 2> "' + $errFile + '"'
+    # %^ERRORLEVEL% ＋ call：延後展開，取得的才是 opencode 的真實結束碼
+    $inner += ' & call echo %^ERRORLEVEL% > "' + $rcFile + '"'
     Write-Log "SESSION($Tag) 啟動：$ExtraArgs ｜ $PromptText"
     $p = Start-Process -FilePath "cmd.exe" -ArgumentList ('/d /s /c "' + $inner + '"') `
         -WorkingDirectory $root -NoNewWindow -PassThru
+    # L49：**必須先取用 .Handle** 把行程 handle 快取住，否則 -PassThru 物件在
+    # 只用 WaitForExit(ms) 等待時，.ExitCode 會是 $null（PowerShell 已知行為）
+    # ——而 $null -eq 0 為 false，等於「每個正常結束的 session 都被判成錯誤」，
+    # 導致假的「連續 2 次 session 錯誤」停機，且 SESSION_OK 永遠假＝永不畢業。
+    try { $null = $p.Handle } catch { }
     # 心跳（L46 附帶）：session 期間 opencode 輸出全被重導到檔案，console 會
     # 完全安靜——每 5 分鐘印一行「還活著＋已耗時」，同時累積真實耗時數據
     # 供調整 timeout（逾時是熔絲不是效能參數，要照實測值設）
@@ -227,13 +240,37 @@ function Invoke-Opencode {
         }
     }
     if (-not $done) { $done = $p.WaitForExit(1000) }
+    if ($done) {
+        # 無參數版：確保行程狀態與 ExitCode 完全就緒（配合上方 .Handle 快取）
+        try { $p.WaitForExit() } catch { }
+        try { $p.Refresh() } catch { }
+    }
     if (-not $done) {
         & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
         Write-Log "SESSION($Tag) 逾時 $TimeoutMin 分，已整樹強制結束（狀態在檔案，無損）"
         return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile }
     }
-    Write-Log "SESSION($Tag) 結束 exit=$($p.ExitCode) 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
-    return @{ TimedOut = $false; ExitCode = $p.ExitCode; ErrFile = $errFile; OutFile = $outFile }
+    # 優先讀落檔的結束碼（可觀測事實），讀不到才退回 Process 物件
+    $code = $null
+    if (Test-Path -LiteralPath $rcFile) {
+        $rcTxt = (Get-Content -LiteralPath $rcFile -Raw -ErrorAction SilentlyContinue)
+        if ($rcTxt) {
+            $rcTxt = $rcTxt.Trim()
+            $parsed = 0
+            if ([int]::TryParse($rcTxt, [ref]$parsed)) { $code = $parsed }
+        }
+    }
+    if ($null -eq $code) {
+        try { $code = $p.ExitCode } catch { $code = $null }
+    }
+    if ($null -eq $code) {
+        # 仍讀不到＝環境層面拿不到結束碼；**視為 0（正常）並大聲記錄**——
+        # 反向（視為錯誤）已實證會把健康的 run 誤停（L49）
+        Write-Log "SESSION($Tag) 警告：ExitCode 讀不到，視為 0（正常結束）——若後續行為異常請回報此行"
+        $code = 0
+    }
+    Write-Log "SESSION($Tag) 結束 exit=$code 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
+    return @{ TimedOut = $false; ExitCode = $code; ErrFile = $errFile; OutFile = $outFile }
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
@@ -372,7 +409,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         # 錯誤原因直接摘進主 log（否則「早上看 log 摘要即可」不成立——
         # 停機原因只寫「連續 2 次 session 錯誤」，真因還埋在 err 檔裡）
         if ($r.ErrFile -and (Test-Path -LiteralPath $r.ErrFile)) {
-            $tail = @(Get-Content -LiteralPath $r.ErrFile -Tail 5 -ErrorAction SilentlyContinue |
+            # -Encoding UTF8 必要（L49）：opencode 輸出 UTF-8，PS 5.1 預設用 ANSI
+            # 解碼 → 中文全亂碼，錯誤訊息等於讀不到
+            $tail = @(Get-Content -LiteralPath $r.ErrFile -Tail 5 -Encoding UTF8 -ErrorAction SilentlyContinue |
                     Where-Object { $_.Trim() -ne '' })
             foreach ($tl in $tail) { Write-Log "  err> $tl" }
             if ($tail.Count -eq 0) { Write-Log "  err> （err 檔為空——session 可能在啟動階段就死，檢查 opencode 與模型服務）" }
