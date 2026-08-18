@@ -439,7 +439,11 @@ checklist／NN 檔／wiki。lint 會在領域歷 3 輪稽核後開始提醒落�
       換版必併清單（機械 diff，checklist＋archive 對 overview 內文）
       ——換版後重跑 lint 該警告應消失，否則草稿漏抄
 □ 3. 人工審草稿 → 滿意就人工把內容覆蓋進 00-overview.md：
-     產生日期改當天、標「第 N 版（於稽核輪次 R 換版）」→ 刪草稿檔
+     產生日期改當天，並在檔頭引言區加一行**照這串字寫**：
+       > 第 2 版（於稽核輪次 20 換版）
+     R＝換版當下 checklist.md 的稽核輪次。lint 用這串字算「落後幾輪」——
+     寫成別的格式（缺輪次數字、換句話說）會被判成沒換版而繼續提醒（L54）。
+     → 刪草稿檔
 □ 4. lint 確認 → commit（kb(fix): 00-overview 換版）
 □ 5. 換版使 graduation 收據 contentHash 失效＝下次 batch 重驗——
      屬預期行為（文件變了本該重驗）；想省成本就攢在 CR 後一起做

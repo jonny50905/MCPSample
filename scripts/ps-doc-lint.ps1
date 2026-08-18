@@ -151,9 +151,32 @@ if ($null -ne $checklistOnly) {
         $clRound = [int]$m.Groups[1].Value
     }
 }
-# 00-overview 是凍結快照（L2）——歷多輪稽核後提醒讀者別當現況讀（L30）
-if ($clRound -ge 3 -and (Test-Path -LiteralPath $overviewPath)) {
-    $warnings += "00-overview.md：凍結快照已歷 $clRound 輪稽核——閱讀請以 checklist／NN 檔／wiki 為準；要刷新走 SOP-15 換版"
+# 00-overview 是凍結快照（L2）——歷多輪稽核後提醒讀者別當現況讀（L30）。
+# L54：落後程度要從**上次換版的輪次**起算，不是從 0 起算——原本只看
+# $clRound >= 3，等於做完 SOP-15 換版也永遠消不掉，是不可滿足的警告
+# （L48：滅不掉的警告只會訓練人忽略警告）。標記讀不到時訊息要**明講
+# 要寫哪一串字**，否則使用者標了卻不生效，只會更困惑。
+if (Test-Path -LiteralPath $overviewPath) {
+    $ovText = Get-Content -LiteralPath $overviewPath -Raw -Encoding UTF8
+    if ($null -eq $ovText) { $ovText = "" }
+    $canonical = '第 <N> 版（於稽核輪次 <R> 換版）'
+    $ovRound = -1
+    # 容忍全形／半形括號、有無「於」、冒號與空白差異：只要「稽核輪次<數字>…換版」
+    $mv = [regex]::Match($ovText, '稽核輪次\s*[：:]?\s*([0-9]+)\s*[^0-9]{0,6}?換版')
+    if ($mv.Success) { $ovRound = [int]$mv.Groups[1].Value }
+    $hasVerMark = [regex]::IsMatch($ovText, '第\s*[0-9]+\s*版')
+    if ($ovRound -ge 0) {
+        $behind = $clRound - $ovRound
+        if ($behind -ge 3) {
+            $warnings += "00-overview.md：上次換版在稽核輪次 $ovRound，之後又歷 $behind 輪——導航頁可能再度失真，考慮再走一次 SOP-15 換版"
+        }
+    }
+    elseif ($hasVerMark) {
+        $warnings += "00-overview.md：偵測到版次標記但讀不到換版輪次——請把整串寫成「$canonical」（R＝換版當下的稽核輪次），否則落後程度無法機械判定"
+    }
+    elseif ($clRound -ge 3) {
+        $warnings += "00-overview.md：凍結快照已歷 $clRound 輪稽核且無換版標記——閱讀請以 checklist／NN 檔／wiki 為準；要刷新走 SOP-15 換版，換版後在檔頭引言區寫「$canonical」本提醒才會消"
+    }
 }
 if (Test-Path -LiteralPath $checklistPath) {
     # checklist 模板節標題必須存在——標題整個消失＝破壞性覆寫指紋
