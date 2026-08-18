@@ -2,7 +2,9 @@
 
 用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
 程序紀律屬小模型等級）掛上 `.opencode/` 的 ps-* Skill 後，
-是否遵守 Plan Addendum 的規則。共 39 題，分 9 類（F 類需 subagent 架構、G/H/I 類需 deep-research / wiki 模式），全部基於
+是否遵守 Plan Addendum 的規則。共 45 題，分 10 類（A~I 為業務題：F 類需 subagent
+架構、G/H/I 類需 deep-research / wiki 模式；**J 類是框架機制檢查點**，測外環／
+lint／畢業門本身，不測業務），全部基於
 `test-fixtures.yaml` 的假想環境（TW_MILITARY_DATA 兵役案例）。
 
 ---
