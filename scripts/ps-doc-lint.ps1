@@ -258,6 +258,8 @@ $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
 $nnNames = @()
 $truncatedIds = @()
 $missingIds = @()   # 檔案行號型缺 chunk id——與縮寫 id 同進手術單（修法同形）
+$pendingSqlRows = @()   # 明寫「待人工SQL」的列＝合法待辦出口，不算違規但要點名
+$misplacedRefRows = @()  # 同列有證據、但機器參照欄放的是標籤（欄位錯放，非缺證據）
 
 Get-ChildItem -LiteralPath $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
@@ -353,9 +355,16 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $evText = $text.Substring($evIdx)
             # 絕對行號（L41）：讓人能直接跳到該列人工確認，不必自己搜
             $evStartLine = @($text.Substring(0, $evIdx) -split "`n").Count
-            # 章節存在但「內容空白」也是違規（有標題沒證據＝沒證據）
-            if ($evText -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
-                $evText -notmatch '(?i)\bSQL\b') {
+            # 章節存在但「內容空白」也是違規（有標題沒證據＝沒證據）。
+            # L55：判定要看**可重跑的東西**，不是看有沒有出現「SQL」三個字母
+            # ——舊版用 \bSQL\b 當豁免，於是整份附錄只要寫著「OracleMCP SQL」
+            # 就算有證據。合格只有三種：完整 36 字元 UUID／真的 SELECT／
+            # 待人工SQL（合法待辦出口）。
+            $fullUuid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+            $realSelect = '(?i)\bSELECT\b[\s\S]{0,400}?\bFROM\b'
+            $pendingMark = '待人工SQL'
+            if ($evText -notmatch $fullUuid -and $evText -notmatch $realSelect -and
+                $evText -notmatch $pendingMark) {
                 $violations += "${name}：Evidence 附錄空白（有章節標題但無任何 chunk id／SQL 證據）"
             }
             # 檔案行號樣式（L37 收緊）：冒號前必須是**含字母的檔名 token**——
@@ -374,16 +383,47 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
                     $line -match '(schema\s*不存在|table\s+not\s+found|不存在該表|查無此表|ORA-\d|查詢失敗)') {
                     $violations += "${name}:${evLineNo}：以**失敗查詢**當機器參照（證據必須可重現）——多半是表名寫錯（PeopleTools 表禁自行加 PS_ 前綴，見 cookbook 規則 8a），改用正確表名重查後貼「SQL：<SELECT>」＋keyRows"
                 }
-                if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and
-                    $line -match $fileLinePattern -and
-                    $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
-                    $line -notmatch '(?i)\b(SQL|SELECT)\b') {
-                    $violations += "${name}:${evLineNo}：機器參照無效（既非 36 字元 ChunkId、也非可重跑 SELECT）——CHUNK 型補 id；SQL／metadata 型改寫「SQL：<SELECT>」：$($line.Trim().Substring(0, [Math]::Min(60, $line.Trim().Length)))…"
-                    # 手術單項目只帶 filePath:行號（不帶列原文——表格 | 等字元
-                    # 流入 auto-loop 的 cmd prompt 會炸引號/重導）
-                    $ref = [regex]::Match($line, $fileLinePattern).Value
-                    if ($ref -eq '') { $ref = '（無路徑線索——read 該檔該列）' }
-                    $missingIds += [pscustomobject]@{ File = "${name}:${evLineNo}"; Ref = $ref }
+                # L55：改成**正面表列**——每一列證據都必須自己帶得出可重跑的東西。
+                # 舊版是反面表列（「長得像 檔名:行號 且沒有 SQL 字樣」才判違規），
+                # 於是兩類列完全逃過檢查：
+                #   (a) 機器參照只寫「PeopleCode chunk」——沒有冒號數字，
+                #       不符 fileLinePattern，整列不進判定
+                #   (b) 機器參照只寫「OracleMCP SQL」——含「SQL」三字母就被豁免
+                # 兩者都不是證據，是標籤：稽核重跑時什麼都跑不了。
+                # 表頭列不驗（欄名不是證據）——但**不能靠「看到分隔列才開始」**：
+                # 缺分隔列的表格會讓整段一列都不驗（與 L51 同型的範圍錯誤，
+                # 自己的測試抓到）。改成直接認表頭欄名，缺分隔列時仍照驗
+                # ——fail-safe 方向：判不出來就驗，不要略過。
+                $isEvHeader = ($line -match '機器參照') -or ($line -match '^\|\s*編號\s*\|')
+                if ($line -match '^\|' -and $line -notmatch '^\|[\s:|-]+$' -and -not $isEvHeader) {
+                    $okUuid = ($line -match $fullUuid)
+                    $okSelect = ($line -match $realSelect)
+                    $okPending = ($line -match $pendingMark)
+                    # 欄位錯放（管理者實測）：證據其實在「位置」欄，機器參照欄
+                    # 只寫「PeopleCode chunk」這種標籤。整列有可重跑的東西＝
+                    # 證據沒丟，稽核追得到——**降為警告**，不擋門也不進手術單；
+                    # 但要點名，否則表格會一路歪下去。
+                    if ($okUuid -or $okSelect) {
+                        $cells = @($line -split '\|' | Where-Object { $_.Trim() -ne '' })
+                        if ($cells.Count -ge 2) {
+                            $lastCell = $cells[$cells.Count - 1]
+                            if ($lastCell -notmatch $fullUuid -and $lastCell -notmatch $realSelect -and
+                                $lastCell -notmatch $pendingMark) {
+                                $misplacedRefRows += "${name}:${evLineNo}"
+                            }
+                        }
+                    }
+                    if ($okPending -and -not ($okUuid -or $okSelect)) {
+                        $pendingSqlRows += "${name}:${evLineNo}"
+                    }
+                    elseif (-not ($okUuid -or $okSelect)) {
+                        $shown = $line.Trim()
+                        if ($shown.Length -gt 60) { $shown = $shown.Substring(0, 60) }
+                        $violations += "${name}:${evLineNo}：機器參照無效（既非 36 字元 ChunkId、也非可重跑 SELECT）——「OracleMCP SQL」「PeopleCode chunk」這類**只是標籤不是證據**，稽核重跑時跑不了；CHUNK 型補完整 id、SQL 型貼可重跑 SELECT、都不可得就寫「待人工SQL」：$shown…"
+                        $ref = [regex]::Match($line, $fileLinePattern).Value
+                        if ($ref -eq '') { $ref = '（無路徑線索——read 該檔該列）' }
+                        $missingIds += [pscustomobject]@{ File = "${name}:${evLineNo}"; Ref = $ref }
+                    }
                 }
             }
         }
@@ -545,6 +585,16 @@ if (Test-Path -LiteralPath $dir) {
             $leaks += @{ File = $lf.Name; Line = $lline; Marker = $m.Value; Delegable = $delegable }
         }
     }
+}
+
+# 待人工SQL：合法的終止出口（L43／L53），不算違規——但要點名，否則
+# 「這份文件有幾條主張還沒被機器驗過」就沒有人知道
+if ($pendingSqlRows.Count -gt 0) {
+    $warnings += "Evidence：$($pendingSqlRows.Count) 列標「待人工SQL」（合法待辦，非違規）——這些主張尚未經機器驗證，管理者照 SOP-2 第 4 階自跑 SQL 後回填：$($pendingSqlRows -join '、')"
+}
+# 欄位錯放：證據在別欄、機器參照欄放標籤——證據沒丟，只是表格不一致
+if ($misplacedRefRows.Count -gt 0) {
+    $warnings += "Evidence：$($misplacedRefRows.Count) 列的機器參照欄放的是標籤（如「PeopleCode chunk」「OracleMCP SQL」），真正的 ChunkId／SELECT 在同列其他欄——證據追得到故不擋，但機器參照欄應放可重跑的那一份：$($misplacedRefRows -join '、')"
 }
 
 # ── 覆蓋畢業門（tier 1）分類：美工類白名單 ──────────────────
