@@ -314,6 +314,44 @@ tier 2＝精修畢業（100 分）
 
 ---
 
+## SOP-17 無人看管排程（衝刺期夜間跑批）
+
+**目標不是「讓它一直跑」，是「讓它跑到全部畢業為止」。** 全部 tier 2 畢業
+之後就該切維運節奏（SOP-13），不再夜夜開跑——連續迴圈＝永動工單機。
+
+用 Windows 工作排程器叫 `ps-auto-all.ps1`，不要自己寫 sleep 迴圈守著
+（那需要一個行程永遠活著，當機沒人重啟，也沒有 OS 層的重疊保護）。
+
+```text
+□ 1. 觸發：每日一次，挑**下班後的離峰時段**起跑
+     （批次期間＝重載期，SOP-12：禁手動 /ps-research、/ps-audit、查 DB 問答）
+□ 2. 動作：powershell.exe
+     引數：-NoProfile -ExecutionPolicy Bypass -File "<repo>\scripts\ps-auto-all.ps1"
+           -MaxCyclesPerDomain 6 -MaxBatchHours 9 -MaxConsecutiveFailures 3
+     起始於：<repo>（工作目錄一定要設，腳本用相對路徑找 docs/ 與 .opencode/）
+□ 3. 設定頁勾「如果工作已在執行，不要啟動新的執行個體」
+     （雙保險：ps-auto-loop 自己也有互斥鎖，重疊會 exit 3 停批）
+□ 4. **不要**加 -Force（那是忽略收據全部重驗，夜跑用它等於每晚重跑全部領域）
+□ 5. 圍欄要用 -MaxCyclesPerDomain 收斂：MaxBatchHours 只在**領域之間**檢查，
+     攔不住進行中的領域（單領域最壞＝MaxCycles×120 分）
+□ 6. 環境前提（沒滿足就不是無人看管，是每晚失敗一次）：
+     · 地端模型服務必須是**常駐服務**，不是登入才啟動的東西
+     · opencode 必須在該排程帳號的 PATH 上（.cmd 型，L46）
+     · 若勾「不論使用者是否登入都執行」，先手動用該帳號跑一次 -Preflight 驗證
+□ 7. 早上只看一行：auto-loop-logs\batch-*.log 的 Summary
+     GRADUATED／NEEDS_ATTENTION／MUTEX_BUSY／SYSTEM_ERROR／SKIPPED
+□ 8. 退場：領域 tier 2 畢業後從 research-domains.txt **註解移出**
+     ——留在佇列＝每晚重驗，正是 SOP-13 要避免的永動工單機
+```
+
+**已知缺口（現階段靠人看，不做自動化）**：某個領域若每晚都
+NEEDS_ATTENTION，排程會每晚重燒它幾小時而沒有人知道。要不要加「連敗
+N 晚自動除役」得先有實測基線（L48：門檻照實測設，不照直覺設）——
+目前領域數與夜跑次數都不足以定那個 N。**在此之前，每天早上看 Summary
+那一行就是這條熔絲**。
+
+---
+
 ## SOP-13 維運節奏（領域畢業後的營運模式）
 
 領域完成衝刺（畢業）後，**不再**「每次 research 後緊接 audit」——
