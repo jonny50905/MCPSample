@@ -36,13 +36,18 @@ param(
     # 一圈最多連跑幾批手術（L58）：只要每批都讓手術清單變短就繼續，
     # 免得每修 7 筆就先燒一個稽核 session
     [int]$MaxSurgeryPerCycle = 3,
-    # 逾時＝熔絲不是效能參數，照實測基線設（L48）：實測 audit 34 分正常完成、
-    # research 曾在 30 分上限被強殺（＝上限訂太緊，把健康的 session 砍掉）。
-    # 兩者統一 60 分——留 ~2× 餘裕，讓「逾時」重新代表「真的卡死」而非「跑得久」。
+    # 逾時＝熔絲不是效能參數，照實測基線設（L48）：research 曾在 30 分上限被
+    # 強殺（＝上限訂太緊，把健康的 session 砍掉），放寬到 60 分後未再撞上限。
     # 注意手術 session 沿用 ResearchTimeoutMin，改這個值等於同步放寬手術上限；
-    # 批次的單領域最壞時長＝MaxCycles×(60＋60) 分，要硬圍欄改用 -MaxCyclesPerDomain。
+    # 批次單領域最壞＝MaxCycles×(AuditTimeoutMin＋ResearchTimeoutMin×
+    # MaxSurgeryPerCycle) 分，要硬圍欄改用 -MaxCyclesPerDomain。
     [int]$ResearchTimeoutMin = 60,
-    [int]$AuditTimeoutMin = 60,
+    # audit 上限刻意設寬（L59）：實測 34 分→>60 分被強殺，且**強殺當下輸出
+    # 仍在增加**＝不是卡死，是稽核量隨檔案數成長。真實時長目前**不知道**
+    # （被殺掉了量不到），所以先設 120 分**把它跑完、量出來**，拿到完成
+    # 時長之後再照實測 ×1.5 收斂。設寬的成本是「壞掉時多等一小時」，
+    # 設窄的成本是「永遠不知道要多久，而且每輪白燒」。
+    [int]$AuditTimeoutMin = 120,
     [string]$Model = "",           # 留空＝opencode 全域預設；填 provider/model-id 可覆寫本次
     [switch]$Preflight             # 只檢查環境／相位／lint／收據並列印，不啟動 session、不取鎖
 )
@@ -264,7 +269,28 @@ function Invoke-Opencode {
     }
     if (-not $done) {
         & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
+        # 強殺當下就下判讀（L59）：使用者事後翻心跳行才能拼出「卡死 vs 跑得久」，
+        # 而那兩種的處置完全相反——一個要查通道、一個要調上限。輸出檔的
+        # mtime 是現成的可觀測事實，判讀寫在強殺那一行，不必事後考古。
+        $killSilent = -1
+        $lastOutK = $sessStart
+        foreach ($lf in @($outFile, $errFile)) {
+            if (Test-Path -LiteralPath $lf) {
+                $wt = (Get-Item -LiteralPath $lf).LastWriteTime
+                if ($wt -gt $lastOutK) { $lastOutK = $wt }
+            }
+        }
+        $killSilent = [int]((Get-Date) - $lastOutK).TotalMinutes
         Write-Log "SESSION($Tag) 逾時 $TimeoutMin 分，已整樹強制結束（狀態在檔案，無損）"
+        if ($killSilent -le 5) {
+            Write-Log "SESSION($Tag) 判讀：強殺當下輸出仍在增加（靜止僅 $killSilent 分）＝**上限太短，不是卡死**——把 -$(if ($Tag -eq 'audit') { 'AuditTimeoutMin' } else { 'ResearchTimeoutMin' }) 調高後重跑，不要去查 MCP 通道"
+        }
+        elseif ($killSilent -ge 20) {
+            Write-Log "SESSION($Tag) 判讀：輸出已靜止 $killSilent 分才被強殺＝**疑似卡在工具呼叫**——依 SOP-12 查 oracleMCP／模型服務通道，調高上限沒有用"
+        }
+        else {
+            Write-Log "SESSION($Tag) 判讀：強殺當下靜止 $killSilent 分（介於兩者之間）——先看 out 檔尾端停在哪個步驟再決定調上限或查通道"
+        }
         return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile }
     }
     # 優先讀落檔的結束碼（可觀測事實），讀不到才退回 Process 物件

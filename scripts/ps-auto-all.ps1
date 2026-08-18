@@ -18,9 +18,9 @@
 #       全部跑完再開第二趟做 tier 2（精修）。理由：單領域追求完美會吃掉全部
 #       時間、其餘領域停在零分——wiki 的價值在「每個領域都查得到」，不在
 #       「一個領域完美」。要只跑一趟用 -Tier 1 或 -Tier 2。
-#       timeout 自 2026-08 起 research／audit 皆 60 分（手術沿用 research），
-#       單領域最壞＝MaxCycles×120 分；預設 MaxCycles 20＝40 小時，跑批務必
-#       用 -MaxCyclesPerDomain 收斂（MaxBatchHours 攔不住進行中的領域）。
+#       timeout 自 2026-08 起 research 60 分、audit 120 分（手術沿用 research），
+#       單領域最壞＝MaxCycles×(120＋60×MaxSurgeryPerCycle) 分；跑批務必用
+#       -MaxCyclesPerDomain 收斂（MaxBatchHours 攔不住進行中的領域）。
 # exit：0＝批次完成（可含 NEEDS_ATTENTION）／2＝停批（system error／鎖被占用／
 #       preflight 失敗）
 param(
