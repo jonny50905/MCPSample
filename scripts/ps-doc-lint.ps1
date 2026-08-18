@@ -682,14 +682,26 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplaced
     Write-Host ""
     Write-Host "=== 證據修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
     Write-Host "以下是 lint 確認的問題清單，逐筆修復、一次一筆、一筆都不准跳："
+    Write-Host "（[欄位] 型已按檔合併＝一個檔一個任務；[洩漏]／[證據] 型逐列）"
     $i = 0
     foreach ($t in $leakDelegable) {
         $i++
         Write-Host "$i. [洩漏] $($t.File):$($t.Line)：$($t.Marker)"
     }
+    # [欄位] 型按**檔**合併成一個任務：對調欄位是純編輯，一個檔一次改完最省
+    # ——逐列開單會把 30 列變成 30 個任務，而 auto-loop 一圈只吃 7 筆（實案：
+    # 錯放 30 餘列，逐列開單要 5 圈、每圈還先燒一個稽核 session）
+    $swapByFile = @{}
     foreach ($t in $misplacedRefRows) {
+        $fn = ($t -split ':')[0]
+        $ln = ($t -split ':')[1]
+        if (-not $swapByFile.ContainsKey($fn)) { $swapByFile[$fn] = @() }
+        $swapByFile[$fn] += $ln
+    }
+    foreach ($fn in ($swapByFile.Keys | Sort-Object)) {
         $i++
-        Write-Host "$i. [欄位] $t：證據在位置欄，機器參照欄放的是標籤"
+        $lns = @($swapByFile[$fn])
+        Write-Host "$i. [欄位] ${fn}：$($lns.Count) 列欄位錯放（行 $($lns -join '、')）"
     }
     foreach ($t in $truncatedIds) {
         $i++
