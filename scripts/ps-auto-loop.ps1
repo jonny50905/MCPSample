@@ -483,7 +483,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         # 規則），改寫 90-audit.md／輪次會污染本圈的畢業判定與下圈的轉移基準
         # L43：prompt 與 lint 工單同步——先判型別再動手，B 型委派 oracle flow、
         # 禁 peoplecode 代償、有合法終止出口（否則 B 型項目＝無限迴圈）
-        $sPrompt = "lint 證據修復清單逐筆處理，先判型別再動手：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
+        # L53：清單現在混有兩種型別——prompt 必須先分流，否則洩漏型會被
+        # 套上證據型的修法（去找 chunk id）而做無解的事（L43 同族）
+        $sPrompt = "lint 修復清單逐筆處理，先看方括號型別再動手。[洩漏] 型＝模型內部標記寫進交付物：read 該檔看標記前後整個區塊有無被截斷（表格斷半路、章節缺下半段、混進推理獨白或工具回傳原文），刪標記與所有非交付內容，補回被截斷的內容（證據照原有 chunk id 或 SQL 重取，禁止憑印象重寫）；補不回＝該段已遺失，在該檔未解事項記一行「章節因寫入脫軌遺失待重查」後停止該筆，不得編造。[證據] 型＝先判 CHUNK 或 SQL：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
         $sr = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $sPrompt `
             -TimeoutMin $ResearchTimeoutMin -Tag "surgery"
         # 手術 session 也在保險絲與一致性檢查的守備範圍（原本 $sr 沒人看＝

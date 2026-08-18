@@ -505,6 +505,7 @@ if (Test-Path $wikiDir) {
 # 洩漏常伴隨**寫入脫軌**——表格寫到一半斷掉、接著思考文字與 tool_call
 # 灌進檔案、下一節才恢復。只刪標記會留下半截表格，所以訊息要求檢查
 # 「該標記前後整個區塊」。
+$leaks = @()
 $leakPattern = '</?think(ing)?>|<\|im_(start|end)\|>|<\|endoftext\|>|</?tool_call>|<function='
 if (Test-Path -LiteralPath $dir) {
     foreach ($lf in (Get-ChildItem -LiteralPath $dir -Filter "*.md" -File | Sort-Object Name)) {
@@ -513,6 +514,12 @@ if (Test-Path -LiteralPath $dir) {
         foreach ($m in [regex]::Matches($ltext, $leakPattern)) {
             $lline = 1 + @($ltext.Substring(0, $m.Index) -split "`n").Count - 1
             $violations += "$($lf.Name):${lline}：模型內部標記洩漏（寫入脫軌）：$($m.Value)——檢查該行**前後整個區塊**（常見：表格斷在半路＋思考文字），刪污染並補回被截斷的內容；補不回就開重查工單"
+            # 工單素材（L53）：洩漏原本只產違規、不產工單＝擋得住門卻沒有修復
+            # 管道，自動迴圈必然活鎖（L43 同族）。可委派的只有 NN 檔——
+            # checklist／archive 是熱檔（整檔重寫會吃掉未勾項）、00-overview 已凍結
+            # （agent 零寫入）、90-audit 下輪稽核整檔重寫會自然消失。
+            $delegable = ($lf.Name -match '^\d\d-' -and $lf.Name -notmatch '^(00|90)-')
+            $leaks += @{ File = $lf.Name; Line = $lline; Marker = $m.Value; Delegable = $delegable }
         }
     }
 }
@@ -575,21 +582,39 @@ else {
 # 證據修復指令（縮寫 id＋機器參照無效同一張單）——放「最後」印，
 # 才不會被警告牆洗出畫面。L42：工單**先判型別再給修法**，不預設「去找 chunk」
 # （失敗查詢／SQL 型證據被寫成「缺 id」會逼模型去做無解的事）。
-if (($truncatedIds.Count + $missingIds.Count) -gt 0) {
+$leakDelegable = @($leaks | Where-Object { $_.Delegable })
+$leakManual = @($leaks | Where-Object { -not $_.Delegable })
+if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count) -gt 0) {
     Write-Host ""
     Write-Host "=== 證據修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
-    Write-Host "以下是 lint 確認的證據問題清單，逐筆修復、一次一筆、一筆都不准跳："
+    Write-Host "以下是 lint 確認的問題清單，逐筆修復、一次一筆、一筆都不准跳："
     $i = 0
+    foreach ($t in $leakDelegable) {
+        $i++
+        Write-Host "$i. [洩漏] $($t.File):$($t.Line)：$($t.Marker)"
+    }
     foreach ($t in $truncatedIds) {
         $i++
-        Write-Host "$i. $($t.File)：縮寫 id $($t.Id)"
+        Write-Host "$i. [證據] $($t.File)：縮寫 id $($t.Id)"
     }
     foreach ($t in $missingIds) {
         $i++
-        Write-Host "$i. $($t.File)：機器參照無效＠$($t.Ref)"
+        Write-Host "$i. [證據] $($t.File)：機器參照無效＠$($t.Ref)"
     }
     Write-Host ""
-    Write-Host "每筆**先判型別再動手（判錯型別＝白做）**："
+    if ($leakDelegable.Count -gt 0) {
+        Write-Host "【洩漏】型（模型內部標記寫進了交付物）——**不是刪掉標記就好**："
+        Write-Host "  1) read 該檔，看標記**前後整個區塊**：表格是否斷在半路、"
+        Write-Host "     章節是否缺了下半段、有沒有跟著混進推理獨白或工具呼叫文字"
+        Write-Host "  2) 刪掉標記與所有非交付內容（推理獨白、契約 JSON、工具回傳原文）"
+        Write-Host "  3) **補回被截斷的內容**——原本該有的表格列／段落要寫回來；"
+        Write-Host "     補得回就補（證據照原有 chunk id／SQL 重取，不得憑印象重寫）"
+        Write-Host "  4) 補不回＝該段內容已遺失：在該檔「未解事項」記一行"
+        Write-Host "     「<章節> 因寫入脫軌遺失，待重查」，並**停止該筆**（不要編造）"
+        Write-Host "  5) 只准改清單所列的檔，一個字都不要動其他檔"
+        Write-Host ""
+    }
+    Write-Host "【證據】型每筆**先判型別再動手（判錯型別＝白做）**："
     Write-Host " A. CHUNK 型（程式碼：PeopleCode／AE step／SQR／SQL definition）"
     Write-Host "    → read 該檔該行取得 filePath／物件名 → 委派對應 flow subagent 重取"
     Write-Host "      （搜檔 → get_file_structure → get_chunks_details）；＠後若是"
@@ -610,10 +635,25 @@ if (($truncatedIds.Count + $missingIds.Count) -gt 0) {
     Write-Host " C. A 與 B 都取不到 → 該列移除、主張降級 INFERRED、"
     Write-Host "    未解事項記一行查法收據（查了什麼、怎麼查、結果）"
     Write-Host ""
-    Write-Host "全部完成後輸出收據，每筆一行：「舊值 → 新完整UUID」或"
-    Write-Host "「舊值 → SQL：SELECT…」或「舊值 → 移除入 gaps」或「舊值 → 待人工SQL」。"
+    Write-Host "全部完成後輸出收據，每筆一行：洩漏型「檔:行 → 已清除＋補回<內容>」或"
+    Write-Host "「檔:行 → 已清除，<章節>內容遺失已記未解事項」；證據型「舊值 → 新完整UUID」"
+    Write-Host "或「舊值 → SQL：SELECT…」或「舊值 → 移除入 gaps」或「舊值 → 待人工SQL」。"
     Write-Host "沒有收據＝沒完成。現在從第 1 筆開始。"
     Write-Host "=== 指令結束 ===" -ForegroundColor Cyan
+    Write-Host ""
+}
+# 不可委派的洩漏：印在工單之外，避免被自動迴圈餵進去做無解的事（L43）
+if ($leakManual.Count -gt 0) {
+    Write-Host "=== 洩漏：人工處理清單（**不要**貼給模型）===" -ForegroundColor Yellow
+    foreach ($t in $leakManual) {
+        $why = "熱檔／凍結檔，模型整檔重寫風險高"
+        if ($t.File -like 'checklist*') { $why = "checklist 類是熱檔：模型整檔重寫可能吃掉未勾項——手動刪標記最安全" }
+        elseif ($t.File -like '00-*') { $why = "00-overview 已凍結（agent 零寫入）：手動刪，或併進 SOP-15 換版一起處理" }
+        elseif ($t.File -like '90-*') { $why = "90-audit 下一輪稽核會整檔重寫、自然消失；要現在乾淨就手動刪該段" }
+        Write-Host (" - " + $t.File + ":" + $t.Line + "：" + $t.Marker + "  → " + $why)
+    }
+    Write-Host "共通做法：刪標記前先看**前後整個區塊**有沒有被截斷；內容補不回就在該處明寫遺失。" -ForegroundColor Yellow
+    Write-Host "=== 人工清單結束 ===" -ForegroundColor Yellow
     Write-Host ""
 }
 
