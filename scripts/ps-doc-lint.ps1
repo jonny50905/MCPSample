@@ -404,8 +404,11 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
                     # 證據沒丟，稽核追得到——**降為警告**，不擋門也不進手術單；
                     # 但要點名，否則表格會一路歪下去。
                     if ($okUuid -or $okSelect) {
+                        # 只在**四欄制**（編號｜位置｜說明｜機器參照）判錯放——
+                        # 舊三欄列根本沒有機器參照欄，拿最後一欄當它會誤判
+                        # （自己的回歸測試 T15 抓到）
                         $cells = @($line -split '\|' | Where-Object { $_.Trim() -ne '' })
-                        if ($cells.Count -ge 2) {
+                        if ($cells.Count -ge 4) {
                             $lastCell = $cells[$cells.Count - 1]
                             if ($lastCell -notmatch $fullUuid -and $lastCell -notmatch $realSelect -and
                                 $lastCell -notmatch $pendingMark) {
@@ -675,7 +678,7 @@ else {
 # （失敗查詢／SQL 型證據被寫成「缺 id」會逼模型去做無解的事）。
 $leakDelegable = @($leaks | Where-Object { $_.Delegable })
 $leakManual = @($leaks | Where-Object { -not $_.Delegable })
-if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count) -gt 0) {
+if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplacedRefRows.Count) -gt 0) {
     Write-Host ""
     Write-Host "=== 證據修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
     Write-Host "以下是 lint 確認的問題清單，逐筆修復、一次一筆、一筆都不准跳："
@@ -683,6 +686,10 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count) -gt 0) {
     foreach ($t in $leakDelegable) {
         $i++
         Write-Host "$i. [洩漏] $($t.File):$($t.Line)：$($t.Marker)"
+    }
+    foreach ($t in $misplacedRefRows) {
+        $i++
+        Write-Host "$i. [欄位] $t：證據在位置欄，機器參照欄放的是標籤"
     }
     foreach ($t in $truncatedIds) {
         $i++
@@ -703,6 +710,18 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count) -gt 0) {
         Write-Host "  4) 補不回＝該段內容已遺失：在該檔「未解事項」記一行"
         Write-Host "     「<章節> 因寫入脫軌遺失，待重查」，並**停止該筆**（不要編造）"
         Write-Host "  5) 只准改清單所列的檔，一個字都不要動其他檔"
+        Write-Host ""
+    }
+    if ($misplacedRefRows.Count -gt 0) {
+        Write-Host "【欄位】型（**最便宜：純編輯，不要重查、不要呼叫任何工具**）："
+        Write-Host "  現象：位置欄放了完整 ChunkId 或可重跑 SELECT，機器參照欄卻只寫"
+        Write-Host "        「ChunkId」「PeopleCode chunk」「OracleMCP」「SQL」這類標籤。"
+        Write-Host "  修法：把**可重跑的那一份搬到機器參照欄**，位置欄改放它該放的東西："
+        Write-Host "        · CHUNK 型：位置欄＝filePath:行號，機器參照欄＝完整 36 字元 ChunkId"
+        Write-Host "        · SQL 型：位置欄＝表名與鍵值，機器參照欄＝SQL：SELECT … FROM …"
+        Write-Host "  鐵律：**證據內容一個字都不要改**——只搬欄位。id 或 SELECT 若在搬運中"
+        Write-Host "        被改短、改寫、憑印象重打，就是捏造，稽核會判 FAIL。"
+        Write-Host "  同一檔內其他列若已是正確格式，照那個格式對齊即可。"
         Write-Host ""
     }
     Write-Host "【證據】型每筆**先判型別再動手（判錯型別＝白做）**："
@@ -726,7 +745,8 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count) -gt 0) {
     Write-Host " C. A 與 B 都取不到 → 該列移除、主張降級 INFERRED、"
     Write-Host "    未解事項記一行查法收據（查了什麼、怎麼查、結果）"
     Write-Host ""
-    Write-Host "全部完成後輸出收據，每筆一行：洩漏型「檔:行 → 已清除＋補回<內容>」或"
+    Write-Host "全部完成後輸出收據，每筆一行：欄位型「檔:行 → 已對調（機器參照欄現為 <id 或 SELECT 前 20 字>）」；"
+    Write-Host "洩漏型「檔:行 → 已清除＋補回<內容>」或"
     Write-Host "「檔:行 → 已清除，<章節>內容遺失已記未解事項」；證據型「舊值 → 新完整UUID」"
     Write-Host "或「舊值 → SQL：SELECT…」或「舊值 → 移除入 gaps」或「舊值 → 待人工SQL」。"
     Write-Host "沒有收據＝沒完成。現在從第 1 筆開始。"
