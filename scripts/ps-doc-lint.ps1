@@ -296,15 +296,6 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $violations += "${name}：出現自編 id 樣式：$($m.Value)"
         }
 
-        # 模型內部標記洩漏（chat template 未對齊時會漏進輸出）。
-        # L41：洩漏常伴隨**寫入脫軌**——表格寫到一半斷掉、接著思考文字與
-        # tool_call 灌進檔案、下一節才恢復。只刪標記會留下半截表格，
-        # 所以訊息要求檢查「該標記前後整個區塊」。
-        foreach ($m in [regex]::Matches($text, '</?think(ing)?>|<\|im_(start|end)\|>|<\|endoftext\|>|</?tool_call>|<function=')) {
-            $line = 1 + @($text.Substring(0, $m.Index) -split "`n").Count - 1
-            $violations += "${name}:${line}：模型內部標記洩漏（寫入脫軌）：$($m.Value)——檢查該行**前後整個區塊**（常見：表格斷在半路＋思考文字），刪污染並補回被截斷的內容；補不回就開重查工單"
-        }
-
         # 表格列欄位數不一致（L41）：寫入中斷的指紋——最後一列少了欄位。
         # 只在連續表格區塊內比對，警告不擋（跳脫的 | 可能造成偽陽）
         $tblLines = $text -split "`n"
@@ -503,6 +494,25 @@ if (Test-Path $wikiDir) {
         $entity = [IO.Path]::GetFileNameWithoutExtension($n.Name)
         if (-not $referenced.ContainsKey($entity)) {
             $warnings += "wiki/$($n.Name)：孤兒 entity（沒有任何 [[${entity}]] 入鏈）"
+        }
+    }
+}
+
+# ── 模型內部標記洩漏：**領域內全部 .md 統一掃描**（L41／L51）─────────
+# L51：原本只掃 NN 檔，於是 checklist.md／00-overview.md／90-audit.md 的
+# 洩漏完全沒人看——實案：checklist 的「Gaps 彙整」節混進 <think>，而該領域
+# 照樣通過 tier 1 畢業門。模型寫得到的檔就掃得到，不要挑檔。
+# 洩漏常伴隨**寫入脫軌**——表格寫到一半斷掉、接著思考文字與 tool_call
+# 灌進檔案、下一節才恢復。只刪標記會留下半截表格，所以訊息要求檢查
+# 「該標記前後整個區塊」。
+$leakPattern = '</?think(ing)?>|<\|im_(start|end)\|>|<\|endoftext\|>|</?tool_call>|<function='
+if (Test-Path -LiteralPath $dir) {
+    foreach ($lf in (Get-ChildItem -LiteralPath $dir -Filter "*.md" -File | Sort-Object Name)) {
+        $ltext = Get-Content -LiteralPath $lf.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($ltext)) { continue }
+        foreach ($m in [regex]::Matches($ltext, $leakPattern)) {
+            $lline = 1 + @($ltext.Substring(0, $m.Index) -split "`n").Count - 1
+            $violations += "$($lf.Name):${lline}：模型內部標記洩漏（寫入脫軌）：$($m.Value)——檢查該行**前後整個區塊**（常見：表格斷在半路＋思考文字），刪污染並補回被截斷的內容；補不回就開重查工單"
         }
     }
 }

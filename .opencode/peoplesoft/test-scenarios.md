@@ -622,6 +622,10 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
      `-Tier 1`／`-Tier 2` 可只跑一趟
   8. [次要] 同一檔同時有缺料與美工違規時，`-CoverageOnly` 保留缺料、
      降級美工（分類以訊息為單位，不是以檔為單位）
+  9. [致命] 模型內部標記洩漏（`<think>`／`<|im_start|>`／`</tool_call>` 等）
+     的掃描範圍＝**領域目錄下全部 `*.md`**，不只 NN 檔（L51：原本只掃
+     NN 檔，checklist.md 的洩漏因此活過 tier 1 畢業門）；每個標記只報
+     一次、乾淨領域不誤報
 
 ---
 
