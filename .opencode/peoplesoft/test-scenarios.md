@@ -599,6 +599,28 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   5. [次要] 逾時強殺路徑不讀 rc 檔（結束碼固定 -1），避免把
      半寫入的 rc 檔當成正常結束
 
+### J6 兩段式畢業（L50／SOP-16；fixture 模擬即可測）
+- **輸入**：同一份領域檔案分別以 lint 基礎／`-CoverageOnly`／
+  `-StrictAudit` 三種模式跑，以及各等級的收據組合
+- **檢查點**：
+  1. [致命] 美工類（證據 id 格式、機器參照、**Evidence 附錄空白**、
+     confidence 標註、wiki frontmatter）在 `-CoverageOnly` 下降為警告
+     且標 `[美工／不擋覆蓋畢業]`，exit 0；基礎模式仍 exit 1
+  2. [致命] 缺料類（缺檔／空檔／缺章節／空殼章節／checklist 對帳／
+     模型標記或契約 JSON 洩漏）在 `-CoverageOnly` 下**仍是違規**
+  3. [致命] 未列在白名單的訊息一律算缺料（fail-safe：分類漏掉只會
+     讓門更嚴，不會放水）
+  4. [致命] tier 1 相位與進度熔絲**不以未勾數判定**——改看缺料違規數；
+     否則「勾 2 個、回灌 3 個」的圈會被判成卡住，且永遠進不了 audit
+  5. [主要] 收據帶 `tier`：tier 1 收據對 `-RequiredTier 2` 無效
+     （第二趟重跑）、tier 2 收據對 `-RequiredTier 1` 有效
+  6. [主要] tier 分級不得破壞既有失效機制——改 lint 腳本後收據仍應
+     因 `lintScriptHash` 不符而失效
+  7. [主要] 排程器預設兩趟（全領域 tier 1 → 全領域 tier 2），
+     `-Tier 1`／`-Tier 2` 可只跑一趟
+  8. [次要] 同一檔同時有缺料與美工違規時，`-CoverageOnly` 保留缺料、
+     降級美工（分類以訊息為單位，不是以檔為單位）
+
 ---
 
 ## 5. 快速健檢子集（Smoke Set）

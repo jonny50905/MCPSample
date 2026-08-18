@@ -1,6 +1,13 @@
 ﻿# ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
 #       .\scripts\ps-doc-lint.ps1 -Domain 轉職 -StrictAudit
+#       .\scripts\ps-doc-lint.ps1 -Domain 轉職 -CoverageOnly
+# -CoverageOnly＝auto-loop 覆蓋畢業門（tier 1／可用 80 分）專用：只把「缺料類」
+# 當違規（缺檔／空檔／缺章節／空殼章節／checklist 對帳／寫入脫軌污染），把
+# 「美工類」（證據 id 格式、機器參照、confidence 標註、wiki frontmatter）降為
+# 警告。**這不是新增檢查，是把既有檢查分類**——標準沒有變嚴，只是分成兩段收。
+# 分類採白名單：只有明確列在 $polishPatterns 的訊息算美工，**其餘一律算缺料**
+# （fail-safe：分類漏掉只會讓門更嚴，不會放水）。
 # -StrictAudit＝auto-loop 畢業門專用（issue #2）：90-audit.md 的結構性問題
 # （缺檔／缺模板章節／缺輪次表頭／記分卡範圍塌縮）由警告升為 FAIL。
 # 手動執行不加此開關——維持警告不擋（SOP-2）。wiki 類警告任何模式都不升級
@@ -8,7 +15,8 @@
 # 檢查：checklist 對帳、必要章節、confidence 標註、ChunkId UUID 格式、可疑自編 id
 param(
     [Parameter(Mandatory = $true)][string]$Domain,
-    [switch]$StrictAudit
+    [switch]$StrictAudit,
+    [switch]$CoverageOnly
 )
 
 # 參數消毒（L28）：-Domain 尾部空白/點會觸發 Win32 尾字元正規化不對稱——
@@ -497,6 +505,46 @@ if (Test-Path $wikiDir) {
             $warnings += "wiki/$($n.Name)：孤兒 entity（沒有任何 [[${entity}]] 入鏈）"
         }
     }
+}
+
+# ── 覆蓋畢業門（tier 1）分類：美工類白名單 ──────────────────
+# 分界線：**整個 Evidence／驗證層算美工，內容層算缺料**。
+#   缺料＝讀者讀不到或讀到壞東西：缺檔、空檔、缺章節、空殼章節、
+#         checklist 對帳不符、模型標記或契約 JSON 洩漏（疑似被截斷）。
+#   美工＝內容讀得懂，但「無法逐條回溯驗證」或少了機器欄位：證據 id 格式、
+#         機器參照、Evidence 附錄空白、confidence 標註、wiki frontmatter。
+# 「Evidence 附錄空白」必須同列美工，否則分類失效：id 格式壞掉的檔會被判成
+# 「附錄無有效證據」而同時觸發兩類，美工降級形同虛設（實案：該領域 uuid
+# 問題為大宗）。代價要講明：**tier 1 只保證讀得懂、查得到、沒被截斷，
+# 不保證每句話都能回溯驗證**——回溯驗證是 tier 2 精修的工作。
+$polishPatterns = @(
+    'Evidence 附錄空白',
+    'ChunkId 遭縮寫為 8 碼',
+    'ChunkId 非 UUID 格式',
+    '出現自編 id 樣式',
+    '疑似縮寫 chunk id',
+    '當機器參照',
+    '機器參照無效',
+    '行為邏輯無任何 confidence 標註',
+    'frontmatter 缺 ',
+    'status 值非法'
+)
+function Test-IsPolishViolation {
+    param([string]$Msg)
+    foreach ($pat in $polishPatterns) {
+        if ($Msg.Contains($pat)) { return $true }
+    }
+    return $false
+}
+if ($CoverageOnly) {
+    $kept = @()
+    $downgraded = 0
+    foreach ($v in $violations) {
+        if (Test-IsPolishViolation $v) { $warnings += "[美工／不擋覆蓋畢業] $v"; $downgraded++ }
+        else { $kept += $v }
+    }
+    $violations = $kept
+    Write-Host "CoverageOnly：$downgraded 項美工類違規降為警告（tier 1 只收缺料類）" -ForegroundColor Cyan
 }
 
 # 輸出

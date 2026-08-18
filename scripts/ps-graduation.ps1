@@ -15,8 +15,14 @@
 #   舊收據作廢／存活」的語意升版——**改動 ps-auto-loop 三層畢業門判定時，
 #   必須手動 bump GateVersion**（門邏輯不在任何 hash 覆蓋內）。
 
-$script:GraduationSchemaVersion = 1
-$script:GraduationGateVersion = 1
+# - 兩段式畢業（tier）：tier 1＝覆蓋畢業（可用／80 分：結構完整、無明顯錯誤，
+#   容許證據品質未精修）；tier 2＝精修畢業（現行三層門）。收據記 tier，
+#   驗收據時以 -RequiredTier 比對：tier 1 收據不足以放行 tier 2 的批次。
+#   排程改廣度優先（所有領域先到 tier 1，再回頭做 tier 2）——單領域追求完美
+#   會吃掉全部時間，其餘領域停在零；wiki 要的是「每個領域都可用」。
+
+$script:GraduationSchemaVersion = 2
+$script:GraduationGateVersion = 2
 
 # 單檔正規化 hash：BOM 剝除（ReadAllText 依 BOM 解碼並丟棄）＋剝 \r 後
 # 以 UTF-8 bytes 算 SHA256（大寫十六進位）
@@ -63,7 +69,8 @@ function Get-GraduationReceiptPath {
 # 任何解析失敗一律 Valid=false（fail-safe → 排程器照常 RUN，絕不因壞收據停批）。
 function Test-GraduationReceipt {
     param([string]$DomainDir, [string]$Domain,
-        [string]$LintScriptPath, [string]$GateScriptPath)
+        [string]$LintScriptPath, [string]$GateScriptPath,
+        [int]$RequiredTier = 1)
     $rcPath = Get-GraduationReceiptPath -DomainDir $DomainDir
     if (-not (Test-Path -LiteralPath $rcPath)) {
         return @{ Valid = $false; Reason = "無收據" }
@@ -78,6 +85,13 @@ function Test-GraduationReceipt {
         if ([int]$rc.gateVersion -ne $script:GraduationGateVersion) {
             return @{ Valid = $false; Reason = "gateVersion 不符（$($rc.gateVersion)——畢業門已改版）" }
         }
+        # tier：收據等級低於本次要求＝要重跑（tier 1 收據放不了 tier 2 的行）。
+        # 缺 tier 欄位視為 0（schemaVersion 已擋掉舊收據，這裡只是不信任預設）
+        $rcTier = 0
+        if ($null -ne $rc.tier) { $rcTier = [int]$rc.tier }
+        if ($rcTier -lt $RequiredTier) {
+            return @{ Valid = $false; Reason = "收據等級不足（tier $rcTier，本次要求 tier $RequiredTier）" }
+        }
         if ([string]$rc.domain -cne $Domain) {
             return @{ Valid = $false; Reason = "domain 不符（$($rc.domain)）" }
         }
@@ -90,7 +104,7 @@ function Test-GraduationReceipt {
         if ([string]$rc.gateScriptHash -cne (Get-NormalizedFileHash -LiteralPath $GateScriptPath)) {
             return @{ Valid = $false; Reason = "gateScriptHash 不符（收據邏輯已改版）" }
         }
-        return @{ Valid = $true; Reason = "有效" }
+        return @{ Valid = $true; Reason = "有效（tier $rcTier）" }
     }
     catch {
         return @{ Valid = $false; Reason = "收據損壞（$($_.Exception.Message)）" }
@@ -102,7 +116,8 @@ function Test-GraduationReceipt {
 # 寫入者（TOCTOU），拒發收據。寫入後回讀重驗。回 @{ Ok = bool; Reason = string }。
 function Write-GraduationReceipt {
     param([string]$DomainDir, [string]$Domain, [int]$AuditRound,
-        [string]$LintScriptPath, [string]$GateScriptPath, [string]$ExpectedContentHash)
+        [string]$LintScriptPath, [string]$GateScriptPath, [string]$ExpectedContentHash,
+        [int]$Tier = 1)
     try {
         $nowContent = Get-DomainContentHash -DomainDir $DomainDir
         if ($nowContent -cne $ExpectedContentHash) {
@@ -111,6 +126,7 @@ function Write-GraduationReceipt {
         $rc = [ordered]@{
             schemaVersion  = $script:GraduationSchemaVersion
             gateVersion    = $script:GraduationGateVersion
+            tier           = $Tier
             domain         = $Domain
             graduatedAt    = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssK")
             auditRound     = $AuditRound

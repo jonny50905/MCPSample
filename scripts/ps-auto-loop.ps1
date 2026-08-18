@@ -14,6 +14,13 @@
 #   畢業（三層門全過，見下）／連續 2 圈無進度／連續 2 次逾時／
 #   連續 2 次 session 錯誤／強殺後檔案一致性 FAIL／
 #   audit 相位連續 2 圈零回灌未畢業（活鎖熔斷）／圈數上限
+# 兩段式畢業（tier）——廣度優先，避免「一個領域追完美、其餘領域停在零」：
+#   -Tier 1（預設）＝**覆蓋畢業／可用（80 分）**：功能查得到、每份文件有實質
+#     內容、無明顯錯誤。門＝SESSION_OK＋WORK_TRANSITION_OK＋COVERAGE_OK
+#     （lint -CoverageOnly 全過）。**不要求未勾=0、不要求 StrictAudit**——
+#     稽核回灌的補強項留著（SOP-13：A 項是建議不是債），不擋出貨。
+#   -Tier 2＝**精修畢業（100 分）**：現行三層門原封不動（未勾=0＋lint 全綠＋
+#     StrictAudit 全綠）。批次先讓所有領域到 tier 1，再回頭做 tier 2。
 # 畢業三層門（issue #2：模型說自己做完不算，只有 observable state transition 才算）：
 #   SESSION_OK＝audit session 正常收場（exit 0）
 #   WORK_TRANSITION_OK＝稽核輪次遞增＋90-audit.md hash 改變
@@ -23,6 +30,8 @@
 # 人的位置：lesson、correct、PR 審核照舊人工；本腳本只驅動內容生產，早上看 log 摘要即可。
 param(
     [Parameter(Mandatory = $true)][string]$Domain,
+    # 1＝覆蓋畢業（可用／80 分，預設）；2＝精修畢業（現行三層門）
+    [ValidateSet(1, 2)][int]$Tier = 1,
     [int]$MaxCycles = 20,
     # 逾時＝熔絲不是效能參數，照實測基線設（L48）：實測 audit 34 分正常完成、
     # research 曾在 30 分上限被強殺（＝上限訂太緊，把健康的 session 砍掉）。
@@ -87,8 +96,8 @@ if (-not (Test-Path -LiteralPath $gradLibPath)) {
     Write-Error "缺 scripts/ps-graduation.ps1（人工搬運不完整？）"; exit 2
 }
 . $gradLibPath
-if ($GraduationSchemaVersion -ne 1) {
-    Write-Error "ps-graduation.ps1 版本不符（schemaVersion=$GraduationSchemaVersion）"; exit 2
+if ($GraduationSchemaVersion -ne 2) {
+    Write-Error "ps-graduation.ps1 版本不符（schemaVersion=$GraduationSchemaVersion，本腳本要求 2）——人工搬運不完整？"; exit 2
 }
 
 function Write-Log([string]$msg) {
@@ -280,8 +289,10 @@ function Invoke-Opencode {
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
 # -Strict＝畢業門專用（ps-doc-lint.ps1 -StrictAudit）：90-audit 結構性問題升 FAIL
+# -Coverage＝覆蓋畢業門（tier 1）專用（ps-doc-lint.ps1 -CoverageOnly）：
+#   只收缺料類違規，美工類（證據 id／機器參照／confidence／frontmatter）降警告
 function Invoke-Lint {
-    param([switch]$Strict)
+    param([switch]$Strict, [switch]$Coverage)
     if (-not (Test-Path (Join-Path $dir "00-overview.md"))) {
         return @{ Exit = -1; Surgical = @(); Raw = "（領域尚未建立，略過 lint）" }
     }
@@ -289,6 +300,7 @@ function Invoke-Lint {
     # 2>&1 抓不到 → $raw 空 → 下方 PASS 防呆把每次成功誤判成 exit 3
     # （VALIDATION_OK 永遠假＝永遠畢不了業），工單擷取也永遠落空
     if ($Strict) { $raw = & $lintPath -Domain $Domain -StrictAudit *>&1 | Out-String }
+    elseif ($Coverage) { $raw = & $lintPath -Domain $Domain -CoverageOnly *>&1 | Out-String }
     else { $raw = & $lintPath -Domain $Domain *>&1 | Out-String }
     $code = $LASTEXITCODE
     # 防呆：lint 若中途死亡未跑到 exit，$LASTEXITCODE 是上一個原生命令的殘值
@@ -321,14 +333,22 @@ if ($Preflight) {
         Write-Host "checklist ：未勾=$($st.Unticked) 已勾=$($st.Ticked) 稽核輪次=$($st.Round)"
         $ph = if ($st.Unticked -gt 0) { "research（消化 $($st.Unticked) 個未勾項）" } else { "audit（全勾→直接進稽核）" }
     }
+    $lc = Invoke-Lint -Coverage
+    # tier 1 的相位不看未勾數，看「缺料還在不在」——未勾項成長不再阻止進稽核
+    if ($Tier -eq 1) {
+        $ph = if ($lc.Exit -eq 0) { "audit（缺料已清→可爭取覆蓋畢業）" } else { "research（尚有缺料，見下方 CoverageOnly）" }
+        if (-not $st.Exists) { $ph = "research（階段一建檔）" }
+    }
+    Write-Host "目標等級  ：tier $Tier（$(if ($Tier -eq 1) { '覆蓋畢業／可用 80 分' } else { '精修畢業／100 分' })）" -ForegroundColor Green
     Write-Host "起始相位  ：$ph" -ForegroundColor Green
     $l = Invoke-Lint
     Write-Host "lint      ：exit=$($l.Exit)（0=全過 1=有違規 -1=領域未建立）｜工單 $($l.Surgical.Count) 筆"
+    Write-Host "CoverageOnly：exit=$($lc.Exit)（tier 1 畢業門用：0=缺料已清）"
     $ls = Invoke-Lint -Strict
-    Write-Host "StrictAudit：exit=$($ls.Exit)（畢業門用；現在紅不影響 research 相位）"
+    Write-Host "StrictAudit：exit=$($ls.Exit)（tier 2 畢業門用；tier 1 不看）"
     $rc = Test-GraduationReceipt -DomainDir $dir -Domain $Domain `
-        -LintScriptPath $lintPath -GateScriptPath $gradLibPath
-    Write-Host "現有收據  ：$(if ($rc.Valid) { '有效（本領域已畢業，跑下去會重驗）' } else { $rc.Reason })"
+        -LintScriptPath $lintPath -GateScriptPath $gradLibPath -RequiredTier $Tier
+    Write-Host "現有收據  ：$(if ($rc.Valid) { "有效（本領域已達 tier $Tier，跑下去會重驗）" } else { $rc.Reason })"
     Write-Host "熔絲設定  ：MaxCycles=$MaxCycles｜research 逾時 $ResearchTimeoutMin 分｜audit 逾時 $AuditTimeoutMin 分"
     Write-Host "log 位置  ：$logRoot"
     Write-Host "=== 檢查結束（未啟動任何 session）===" -ForegroundColor Cyan
@@ -378,8 +398,27 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     $auditBefore = $null
     $auditAfter = $null
 
-    # 相位決定：有未勾項→research；全勾→audit；領域不存在→research（階段一建檔）
-    if (-not $before.Exists -or $before.Unticked -gt 0) {
+    # 相位決定
+    #   tier 2（精修）：有未勾項→research；全勾→audit（＝原本的規則）
+    #   tier 1（覆蓋）：**不看未勾數，看缺料還在不在**——lint -CoverageOnly
+    #     FAIL→research 補料；PASS→audit 爭取覆蓋畢業。
+    #     理由：稽核每輪回灌補強項，若照未勾數決定相位，未勾數只會越積越多、
+    #     永遠進不了 audit＝永遠畢不了業（實案：一輪就回灌 11 項）。補強項是
+    #     建議不是債（SOP-13），不該擋出貨。
+    # 領域不存在一律 research（階段一建檔）。
+    $coverBefore = $null
+    $goResearch = (-not $before.Exists)
+    if (-not $goResearch) {
+        if ($Tier -eq 1) {
+            $coverBefore = Invoke-Lint -Coverage
+            $goResearch = ($coverBefore.Exit -ne 0)
+            Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)（0=缺料已清）→ 相位 $(if ($goResearch) { 'research' } else { 'audit' })"
+        }
+        else {
+            $goResearch = ($before.Unticked -gt 0)
+        }
+    }
+    if ($goResearch) {
         $phase = "research"
         $r = Invoke-Opencode -ExtraArgs '--command ps-research' -PromptText $Domain `
             -TimeoutMin $ResearchTimeoutMin -Tag "research"
@@ -478,10 +517,19 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
                             ($auditAfter.Hash -ne "") -and
                             ($auditAfter.Hash -ne $auditBefore.Hash)
         }
-        # 第 3 層：基礎 lint 過了才值得跑 strict（否則擋下原因已在基礎 lint）
+        # 第 3 層：驗收檢查——依 tier 換一把尺（其餘兩層兩個 tier 共用）
+        #   tier 1：lint -CoverageOnly 全過＝缺料已清（美工類降警告，不擋）
+        #   tier 2：未勾=0＋基礎 lint 全過＋StrictAudit 全過（原判定，一字未改）
         $strictDesc = "未評（基礎條件未過）"
         $validationOk = $false
-        if ($after.Unticked -eq 0 -and $lint.Exit -eq 0) {
+        if ($Tier -eq 1) {
+            $coverAfter = Invoke-Lint -Coverage
+            Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}.txt" -f $cycle)) `
+                -Value $coverAfter.Raw -Encoding UTF8
+            $validationOk = ($coverAfter.Exit -eq 0)
+            $strictDesc = if ($validationOk) { "CoverageOnly OK（缺料已清）" } else { "CoverageOnly FAIL（見 coverage-cycle$cycle.txt）" }
+        }
+        elseif ($after.Unticked -eq 0 -and $lint.Exit -eq 0) {
             $strict = Invoke-Lint -Strict
             Add-Content -Path (Join-Path $logRoot ("strict-cycle{0}.txt" -f $cycle)) `
                 -Value $strict.Raw -Encoding UTF8
@@ -492,15 +540,22 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             "輪次 $($auditBefore.Round)→$($auditAfter.Round)、hash$(if ($auditAfter.Hash -ne $auditBefore.Hash -and $auditAfter.Hash -ne '') {'已變'} else {'未變'})"
         }
         else { "無快照" }
-        Write-Log "GATE：session=$(if ($sessionOk) {'OK'} else {'exit≠0'}) transition=$(if ($transitionOk) {'OK'} else {'FAIL'})（$tDesc） validation=$strictDesc"
-        if ($sessionOk -and $transitionOk -and $after.Unticked -eq 0 -and
-            $lint.Exit -eq 0 -and $validationOk) {
+        Write-Log "GATE(tier $Tier)：session=$(if ($sessionOk) {'OK'} else {'exit≠0'}) transition=$(if ($transitionOk) {'OK'} else {'FAIL'})（$tDesc） validation=$strictDesc"
+        # 基礎條件：tier 1 不看未勾數與基礎 lint（那是美工；補強項留給 tier 2）
+        $baseOk = $true
+        if ($Tier -eq 2) { $baseOk = ($after.Unticked -eq 0 -and $lint.Exit -eq 0) }
+        if ($sessionOk -and $transitionOk -and $baseOk -and $validationOk) {
             $graduated = $true
             # 過門當下快照 contentHash——寫收據時重算比對（TOCTOU 防護）；
             # auditRound 用轉移快照的正規化輪次，不在寫收據時重讀 checklist
             $gradContentHash = Get-DomainContentHash -DomainDir $dir
             $gradAuditRound = $auditAfter.Round
-            $stopReason = "畢業：三層門全過（稽核輪次 $($auditAfter.Round)、無新 A 項、lint＋StrictAudit 全過）"
+            if ($Tier -eq 1) {
+                $stopReason = "覆蓋畢業（tier 1／可用）：稽核輪次 $($auditAfter.Round)、缺料已清；未勾 $($after.Unticked) 項屬補強類，留待 tier 2"
+            }
+            else {
+                $stopReason = "精修畢業（tier 2）：三層門全過（稽核輪次 $($auditAfter.Round)、無新 A 項、lint＋StrictAudit 全過）"
+            }
             break
         }
         if ($after.Unticked -gt 0) {
@@ -521,10 +576,34 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         $noProgress = 0
     }
     else {
-        if ($before.Exists -and $after.Unticked -ge $before.Unticked -and $before.Unticked -gt 0) {
+        # 進度量測也要換尺（否則 tier 1 會被自己的成功誤殺）：
+        #   tier 1 量「缺料違規數有沒有變少」——未勾數在補料期本來就會長大
+        #     （勾掉 2 個、稽核回灌 3 個＝未勾淨增，但實際做了 5 項的工），
+        #     照未勾數量進度＝把正在推進的 run 判成卡住。
+        #   tier 2 量未勾數（原判定）——該階段不再有新覆蓋，未勾只該往下走。
+        $stalled = $false
+        $howDesc = ""
+        if ($Tier -eq 1) {
+            if ($null -ne $coverBefore) {
+                $coverAfterR = Invoke-Lint -Coverage
+                $cb = @([regex]::Matches($coverBefore.Raw, '(?m)^FAIL：(\d+) 項違規'))
+                $ca = @([regex]::Matches($coverAfterR.Raw, '(?m)^FAIL：(\d+) 項違規'))
+                $nb = if ($cb.Count -gt 0) { [int]$cb[0].Groups[1].Value } else { 0 }
+                $na = if ($ca.Count -gt 0) { [int]$ca[0].Groups[1].Value } else { 0 }
+                $stalled = ($na -ge $nb -and $nb -gt 0)
+                $howDesc = "缺料違規 $nb→$na"
+            }
+        }
+        else {
+            $stalled = ($before.Exists -and $after.Unticked -ge $before.Unticked -and $before.Unticked -gt 0)
+            $howDesc = "未勾 $($before.Unticked)→$($after.Unticked)"
+        }
+        # 供人工判讀：未勾數的走向照樣記，只是 tier 1 不拿它當熔絲
+        Write-Log "research 圈進度：$howDesc｜未勾 $($before.Unticked)→$($after.Unticked)（tier 1 不以未勾數判進度）"
+        if ($stalled) {
             $noProgress++
-            Write-Log "research 圈未減少未勾數（$noProgress/2）"
-            if ($noProgress -ge 2) { $stopReason = "連續 2 圈無進度（卡住的項需人工裁決）"; break }
+            Write-Log "research 圈無進度（$noProgress/2）：$howDesc"
+            if ($noProgress -ge 2) { $stopReason = "連續 2 圈無進度（$howDesc；卡住的項需人工裁決）"; break }
         }
         else { $noProgress = 0 }
     }
@@ -533,16 +612,20 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
 # ── 收場摘要 ────────────────────────────────────────────────
 $final = Get-ChecklistState
 Write-Log "=== auto-loop 停機：$stopReason ==="
-Write-Log "最終狀態：未勾=$($final.Unticked) 已勾=$($final.Ticked) 稽核輪次=$($final.Round) 畢業=$graduated"
-Write-Log "人工待辦：看本檔上方各 session 的 out/err、lint-cycle*.txt、strict-cycle*.txt（畢業門明細）；lesson 建議與卡住項在 90-audit.md 與 checklist.md"
+Write-Log "最終狀態：未勾=$($final.Unticked) 已勾=$($final.Ticked) 稽核輪次=$($final.Round) tier=$Tier 畢業=$graduated"
+if ($graduated -and $Tier -eq 1) {
+    Write-Log "本領域已達 tier 1（可用／80 分）：未勾 $($final.Unticked) 項屬補強類，可留待 tier 2 精修圈處理（SOP-13：建議不是債）"
+}
+Write-Log "人工待辦：看本檔上方各 session 的 out/err、lint-cycle*.txt、coverage-cycle*.txt（tier 1 門）、strict-cycle*.txt（tier 2 門）；lesson 建議與卡住項在 90-audit.md 與 checklist.md"
 
-# 畢業收據（issue #3）：只在三層門全過後寫；寫入失敗＝automation 不可信（exit 2）
+# 畢業收據（issue #3）：只在畢業門全過後寫；寫入失敗＝automation 不可信（exit 2）
+# 收據記 tier——tier 1 收據放不了 tier 2 的行（Test-GraduationReceipt -RequiredTier）
 if ($graduated) {
     $rcResult = Write-GraduationReceipt -DomainDir $dir -Domain $Domain `
         -AuditRound $gradAuditRound -LintScriptPath $lintPath `
-        -GateScriptPath $gradLibPath -ExpectedContentHash $gradContentHash
+        -GateScriptPath $gradLibPath -ExpectedContentHash $gradContentHash -Tier $Tier
     if ($rcResult.Ok) {
-        Write-Log "畢業收據已寫入 graduation.json（auditRound=$gradAuditRound）"
+        Write-Log "畢業收據已寫入 graduation.json（tier=$Tier auditRound=$gradAuditRound）"
     }
     else {
         Write-Log "畢業收據寫入失敗：$($rcResult.Reason)——exit 2（system error）"

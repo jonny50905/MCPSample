@@ -14,6 +14,10 @@
 #       .\scripts\ps-auto-all.ps1 -Force        # 忽略收據，全部重新驗證
 # 注意：MaxBatchHours 只在「領域之間」檢查，不強殺進行中的領域——單領域最壞
 #       時長由 ps-auto-loop 的 MaxCycles×timeout 決定，要縮小圍欄用透傳參數。
+# 廣度優先（兩趟）：預設先讓**所有領域**跑到 tier 1（覆蓋畢業／可用 80 分），
+#       全部跑完再開第二趟做 tier 2（精修）。理由：單領域追求完美會吃掉全部
+#       時間、其餘領域停在零分——wiki 的價值在「每個領域都查得到」，不在
+#       「一個領域完美」。要只跑一趟用 -Tier 1 或 -Tier 2。
 #       timeout 自 2026-08 起 research／audit 皆 60 分（手術沿用 research），
 #       單領域最壞＝MaxCycles×120 分；預設 MaxCycles 20＝40 小時，跑批務必
 #       用 -MaxCyclesPerDomain 收斂（MaxBatchHours 攔不住進行中的領域）。
@@ -25,7 +29,8 @@ param(
     [int]$MaxConsecutiveFailures = 3,    # 連續 exit 1 熔斷（SKIP 透明不重置；GRADUATED 才重置）
     [switch]$Force,                      # 忽略有效收據、全部重新進 ps-auto-loop
     [string]$Model = "",                 # 透傳 ps-auto-loop -Model
-    [int]$MaxCyclesPerDomain = 0         # >0 時透傳 ps-auto-loop -MaxCycles（縮小單領域天花板）
+    [int]$MaxCyclesPerDomain = 0,        # >0 時透傳 ps-auto-loop -MaxCycles（縮小單領域天花板）
+    [ValidateSet(0, 1, 2)][int]$Tier = 0 # 0＝兩趟（tier 1 全跑完再 tier 2）；1／2＝只跑該趟
 )
 
 $root = Split-Path $PSScriptRoot -Parent
@@ -88,7 +93,7 @@ foreach ($dep in @($autoLoopPath, $lintPath, $gradLibPath)) {
     }
 }
 . $gradLibPath
-if ($GraduationSchemaVersion -ne 1) {
+if ($GraduationSchemaVersion -ne 2) {
     Write-BatchLog "SYSTEM ERROR：ps-graduation.ps1 版本不符（schemaVersion=$GraduationSchemaVersion）"
     exit 2
 }
@@ -123,11 +128,17 @@ $ranCount = 0
 $stopBatch = $false
 $stopWhy = ''
 $idx = 0
-Write-BatchLog "=== PeopleSoft Research Batch：$($domains.Count) 個領域 ｜ Force=$Force MaxDomains=$MaxDomains MaxBatchHours=$MaxBatchHours ==="
+$passes = if ($Tier -eq 0) { @(1, 2) } else { @($Tier) }
+Write-BatchLog "=== PeopleSoft Research Batch：$($domains.Count) 個領域 ｜ 趟次 $($passes -join '→') ｜ Force=$Force MaxDomains=$MaxDomains MaxBatchHours=$MaxBatchHours ==="
 
+foreach ($pass in $passes) {
+if ($stopBatch) { break }
+Write-BatchLog "--- 第 $pass 趟：tier $pass（$(if ($pass -eq 1) { '覆蓋畢業／可用 80 分——先讓所有領域都到這一級' } else { '精修畢業／100 分' })）---"
+$idx = 0
+$consecFail = 0
 foreach ($d in $domains) {
     $idx++
-    $tag = "[$idx/$($domains.Count)] $d"
+    $tag = "[趟$pass $idx/$($domains.Count)] $d"
     if ($stopBatch) { $counts.NOT_RUN++; continue }
 
     # 領域之間的批次熔絲（不強殺進行中）
@@ -143,7 +154,7 @@ foreach ($d in $domains) {
     $domainDir = Join-Path $researchRoot $d
     if (-not $Force) {
         $rc = Test-GraduationReceipt -DomainDir $domainDir -Domain $d `
-            -LintScriptPath $lintPath -GateScriptPath $gradLibPath
+            -LintScriptPath $lintPath -GateScriptPath $gradLibPath -RequiredTier $pass
         if ($rc.Valid) {
             Write-BatchLog "$tag 收據有效 → SKIP"
             $counts.SKIPPED++; continue    # SKIP 對連敗計數透明（不加不重置）
@@ -156,7 +167,7 @@ foreach ($d in $domains) {
 
     $ranCount++
     # 子行程呼叫：領域名已過 preflight（無 " 與 cmd 特殊字元），雙引號包裹安全
-    $argStr = '-NoProfile -File "{0}" -Domain "{1}"' -f $autoLoopPath, $d
+    $argStr = '-NoProfile -File "{0}" -Domain "{1}" -Tier {2}' -f $autoLoopPath, $d, $pass
     if ($Model -ne '') { $argStr += ' -Model "{0}"' -f $Model }
     if ($MaxCyclesPerDomain -gt 0) { $argStr += ' -MaxCycles {0}' -f $MaxCyclesPerDomain }
     $code = $null
@@ -167,18 +178,20 @@ foreach ($d in $domains) {
     }
     catch { $code = $null }
 
-    if ($code -eq 0) {
-        # exit 0 仍不能直接當 GRADUATED——必須重驗收據（issue #3 核心規則）
-        $rc2 = Test-GraduationReceipt -DomainDir $domainDir -Domain $d `
-            -LintScriptPath $lintPath -GateScriptPath $gradLibPath
-        if ($rc2.Valid) {
-            Write-BatchLog "$tag exit 0＋收據有效 → GRADUATED"
-            $counts.GRADUATED++; $consecFail = 0
+    # 結果判定**以收據為先**（L49 原則：收據是磁碟上的事實，exit code 是宣稱；
+    # Start-Process 的 .ExitCode 在某些情況會是 $null，不能拿它當唯一裁判）
+    $rc2 = Test-GraduationReceipt -DomainDir $domainDir -Domain $d `
+        -LintScriptPath $lintPath -GateScriptPath $gradLibPath -RequiredTier $pass
+    if ($rc2.Valid) {
+        if ($code -ne 0) {
+            Write-BatchLog "$tag 收據有效但 exit=$(if ($null -eq $code) {'（讀不到）'} else {$code})——以收據為準判 GRADUATED，請回報此行"
         }
-        else {
-            Write-BatchLog "$tag exit 0 但收據無效（$($rc2.Reason)）→ SYSTEM ERROR，停批"
-            $counts.SYSTEM_ERROR++; $stopBatch = $true; $stopWhy = "exit 0 但收據無效：$d"
-        }
+        Write-BatchLog "$tag 收據有效（tier $pass）→ GRADUATED"
+        $counts.GRADUATED++; $consecFail = 0
+    }
+    elseif ($code -eq 0) {
+        Write-BatchLog "$tag exit 0 但收據無效（$($rc2.Reason)）→ SYSTEM ERROR，停批"
+        $counts.SYSTEM_ERROR++; $stopBatch = $true; $stopWhy = "exit 0 但收據無效：$d"
     }
     elseif ($code -eq 1) {
         $consecFail++
@@ -198,6 +211,7 @@ foreach ($d in $domains) {
         Write-BatchLog "$tag exit=$(if ($null -eq $code) {'（啟動失敗／崩潰）'} else {$code}) → SYSTEM ERROR，停批"
         $counts.SYSTEM_ERROR++; $stopBatch = $true; $stopWhy = "system error（exit=$code）：$d"
     }
+}
 }
 
 # ── Summary ─────────────────────────────────────────────────
