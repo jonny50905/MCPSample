@@ -552,6 +552,18 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             $gradAuditRound = $auditAfter.Round
             if ($Tier -eq 1) {
                 $stopReason = "覆蓋畢業（tier 1／可用）：稽核輪次 $($auditAfter.Round)、缺料已清；未勾 $($after.Unticked) 項屬補強類，留待 tier 2"
+                # 畢業收尾提醒（L52）：00-overview 是**凍結快照**，不隨輪次更新
+                # ——畢業當下它多半已經落後好幾輪。SOP-15 的第一個觸發時機就是
+                # 「畢業收尾」，但那需要人記得；把 lint 的機械 diff 結果在這裡
+                # 講出來，換版才不會靠人自己想到（實案：領域畢業後導航頁仍停在
+                # 一個月前，且畢業訊息完全沒提這件事）。
+                $mapWarn = [regex]::Match($coverAfter.Raw, '功能地圖缺 (\d+) 個後續發現的項目')
+                if ($mapWarn.Success) {
+                    Write-Log "畢業收尾待辦：00-overview 功能地圖缺 $($mapWarn.Groups[1].Value) 個後續發現的項目——凍結快照已落後，照 SOP-15 換版（人工程序；換版會使本收據 contentHash 失效，屬預期）"
+                }
+                else {
+                    Write-Log "畢業收尾檢查：00-overview 功能地圖無缺頁（機械 diff）——但產生日期仍是階段一那天，內容是否需要換版由人判斷（SOP-15）"
+                }
             }
             else {
                 $stopReason = "精修畢業（tier 2）：三層門全過（稽核輪次 $($auditAfter.Round)、無新 A 項、lint＋StrictAudit 全過）"
