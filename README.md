@@ -63,6 +63,91 @@ docs/ps-research/<領域>/           研究產出（機密，見下方資安邊�
 docs/ps-research/wiki/             已歸戶的已驗證知識——問答一律先查這裡
 ```
 
+## 三層構件：command / agent / skill
+
+三者常被混為一談，但職責完全不同：
+
+```text
+command  決定「誰上場」   使用者打的 /指令，frontmatter 指定交給哪個 agent
+agent    決定「能碰什麼」 獨立 context ＋ 工具白名單（圍堵單位）
+skill    決定「怎麼做」   載入當下 context 的作業程序（查法、判準、寫法）
+```
+
+### Command（`.opencode/command/`）
+
+使用者的四個入口。指令本身只是一段 prompt ＋ 指定執行的 agent。
+
+四個指令的 frontmatter 都是 `agent: ps-deep-research`——因為只有它有寫檔權限。
+
+| 指令 | 做什麼 |
+|---|---|
+| `/ps-research <領域>` | 產完整業務文件：總覽 ＋ 逐功能深查 → `docs/ps-research/<領域>/`。中斷後重跑即續跑 |
+| `/ps-audit <領域>` | 稽核：逐檔委派 `ps-auditor` 做證據解引用、claim 反駁抽驗、完整性 diff → 產 `90-audit.md`，問題回灌 checklist |
+| `/ps-lesson <描述>` | 模型答錯時登錄教訓：自動分類落點、套用最小修改、記進 `applied.md` |
+| `/ps-correct <正確知識>` | 業務知識被指正時更新 wiki entity（作廢不刪除、來源標 human、標 verified） |
+
+後兩者「本機立即生效」，團隊生效走內部 git PR 審核。
+
+純問答不要用這些指令——問答走 `ps-orchestrator`（Tab 切換），它不產文件。
+
+### Agent（`.opencode/agent/`）
+
+分三類。**primary** 可以直接對話，**subagent** 只能被委派，**覆寫檔**是把
+OpenCode 內建 agent 重新上鎖。
+
+| Agent | 類型 | 職責 |
+|---|---|---|
+| `ps-orchestrator` | primary | 業務問答主流程：解析領域與客製政策，把重檢索委派出去，彙整 JSON 報告後產出業務說明 |
+| `ps-deep-research` | primary | 文件生成：總覽 ＋ 調查 checklist ＋ 逐功能深查，可中斷續跑 |
+| `ps-auditor` | subagent | 稽核：證據解引用驗證（chunk／SQL 重查比對）、claim 反駁、換角度完整性盤點 |
+| `ps-ui-flow` | subagent | 畫面顯示文字、選項 label↔儲存值、Component/Page/Record.Field 對映 |
+| `ps-peoplecode-flow` | subagent | 事件與分支邏輯（FieldChange／SaveEdit／SavePre/PostChange…），漸進式取段 |
+| `ps-sql-flow` | subagent | SQL Definition／View SQL／AE SQL，table 讀寫分類、Meta-SQL、動態 SQL |
+| `ps-sqr-flow` | subagent | SQR/SQC：先 outline 再定向取段，procedure call graph、SQC include |
+| `ps-ae-flow` | subagent | Application Engine：Section/Step/Action 結構、Call Section 鏈、State Record |
+| `ps-metadata-flow` | subagent | 資料血緣、Process Scheduler 執行方式、授權路徑（Menu→Component→PL→Role） |
+| `explore`／`general`／`scout` | 覆寫 | OpenCode 內建 agent 的同名覆寫——**唯一目的是補鎖** |
+
+**兩條非讀不可的設計規則：**
+
+1. **`tools` 是覆寫表，沒列出的工具一律預設開啟。** 所以不屬於某個 subagent 的
+   MCP 必須**明確寫 `false`**，不能靠「不列」。內建的 explore／general／scout
+   不在本專案的封鎖體系內，因此要同名覆寫補鎖——否則委派漏到內建 agent 時，
+   檢索 MCP 與 bash 全是開的。
+2. **主 context 絕不取 source chunk。** `ps-orchestrator` 把三個檢索 MCP 全部
+   deny，長文本與 metadata 一律委派給 subagent，subagent 回傳壓縮過的 JSON
+   報告。這不是效能考量——是防止主 context 被長文本撐爆而觸發自動壓縮，
+   把已經驗證過的證據悄悄丟掉。
+
+subagent 回報一律遵守 `subagent-report-contract.md`：單一 JSON、單段引用 ≤ 5 行、
+必附 evidence IDs。
+
+### Skill（`.opencode/skills/`）
+
+作業程序。agent 是「誰去做」，skill 是「怎麼做」——在一般 agent 底下處理
+PeopleSoft 問題時，載入對應 skill 就能照同一套流程走。
+
+| Skill | 內容 |
+|---|---|
+| `ps-business-discovery` | **業務問題入口**：解析 business domain 與客製政策（CUSTOM_ONLY_ROOTS／CUSTOM_FIRST），定位業務根物件 |
+| `ps-business-explain` | **最終彙整**：把各 flow 的證據轉成業務說明；畫面文字與儲存值分開、標 CONFIRMED／INFERRED／DYNAMIC_RUNTIME、原生物件僅列 Dependency |
+| `ps-ui-flow` | 畫面顯示文字、選項 label↔儲存值、由文字反查 Component/Page/Record.Field |
+| `ps-peoplecode-flow` | PeopleCode 事件與分支邏輯，漸進式取段、不整支載入 |
+| `ps-sql-flow` | SQL Definition／View／AE SQL：table 讀寫分類、Meta-SQL、動態 SQL |
+| `ps-sqr-flow` | SQR/SQC：outline 優先、procedure call graph、SQC include、報表輸出 |
+| `ps-ae-flow` | Application Engine 結構與 Call Section 鏈 |
+| `ps-process-flow` | 批次執行方式：Process Definition／Job／Recurrence／Run Control |
+| `ps-security-flow` | 授權路徑：Menu → Component → Permission List → Role 與 Row-level Security |
+| `ps-data-lineage` | Record.Field 資料血緣：上下游誰讀誰寫（READ／UPDATE／…／DYNAMIC_RUNTIME） |
+| `ps-impact-analysis` | （選配）物件變更影響盤點：UI/PeopleCode/SQL/SQR/AE/Process/Security 引用面與嚴重度分級 |
+
+多數 flow 類 skill 有**同名 subagent**——那不是重複：skill 是流程規則本身，
+同名 agent 是「把這套流程包進獨立 context」的委派對象。輕量查詢直接載 skill
+在當下 context 做；重檢索（會拉大量原始碼）就委派給同名 agent，讓長文本
+留在它自己的 context 裡。
+
+典型串法：`ps-business-discovery`（定位）→ 各 flow（取證）→ `ps-business-explain`（彙整）。
+
 ## 日常操作
 
 ### 問答
