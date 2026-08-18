@@ -14,6 +14,9 @@
 #       .\scripts\ps-auto-all.ps1 -Force        # 忽略收據，全部重新驗證
 # 注意：MaxBatchHours 只在「領域之間」檢查，不強殺進行中的領域——單領域最壞
 #       時長由 ps-auto-loop 的 MaxCycles×timeout 決定，要縮小圍欄用透傳參數。
+#       timeout 自 2026-08 起 research／audit 皆 60 分（手術沿用 research），
+#       單領域最壞＝MaxCycles×120 分；預設 MaxCycles 20＝40 小時，跑批務必
+#       用 -MaxCyclesPerDomain 收斂（MaxBatchHours 攔不住進行中的領域）。
 # exit：0＝批次完成（可含 NEEDS_ATTENTION）／2＝停批（system error／鎖被占用／
 #       preflight 失敗）
 param(

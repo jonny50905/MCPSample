@@ -24,8 +24,13 @@
 param(
     [Parameter(Mandatory = $true)][string]$Domain,
     [int]$MaxCycles = 20,
-    [int]$ResearchTimeoutMin = 30,
-    [int]$AuditTimeoutMin = 45,
+    # 逾時＝熔絲不是效能參數，照實測基線設（L48）：實測 audit 34 分正常完成、
+    # research 曾在 30 分上限被強殺（＝上限訂太緊，把健康的 session 砍掉）。
+    # 兩者統一 60 分——留 ~2× 餘裕，讓「逾時」重新代表「真的卡死」而非「跑得久」。
+    # 注意手術 session 沿用 ResearchTimeoutMin，改這個值等於同步放寬手術上限；
+    # 批次的單領域最壞時長＝MaxCycles×(60＋60) 分，要硬圍欄改用 -MaxCyclesPerDomain。
+    [int]$ResearchTimeoutMin = 60,
+    [int]$AuditTimeoutMin = 60,
     [string]$Model = "",           # 留空＝opencode 全域預設；填 provider/model-id 可覆寫本次
     [switch]$Preflight             # 只檢查環境／相位／lint／收據並列印，不啟動 session、不取鎖
 )

@@ -363,7 +363,8 @@ code，全部白驗。oracleMCP 查線上 DB，CR 後立即反映、不需此步
   （選配熔絲 -MaxDomains 10 -MaxBatchHours 8 -MaxConsecutiveFailures 3；
   -Force＝忽略收據全部重驗；-MaxCyclesPerDomain 可縮單領域天花板。
   注意 MaxBatchHours 只在領域之間檢查——單領域最壞時長
-  ＝MaxCycles×(audit 45m＋surgery 30m)，要硬圍欄就縮 MaxCyclesPerDomain）
+  ＝MaxCycles×(audit 60m＋surgery 60m)＝預設 20 圈約 40 小時，
+  要硬圍欄就縮 MaxCyclesPerDomain，別指望 MaxBatchHours）
 □ 批次時段＝重載期間（SOP-12）：禁手動 /ps-research、/ps-audit、查 DB 問答
 □ 領域畢業後：從佇列**註解移出**——維運期月度 audit 會使收據失效，
   留在佇列＝batch 每次自動重跑（SOP-13 明文要避免的永動工單機）；
