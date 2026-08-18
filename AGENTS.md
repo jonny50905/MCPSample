@@ -2,9 +2,12 @@
 
 ## 這個 repo 是什麼
 
-- `src/`：HanshinChat MCP + OData 範例（.NET 8），詳見根目錄 README.md。
-- `.opencode/`：PeopleSoft 分析框架——skills（ps-*）、subagent 定義（agent/）、
+- 根目錄 `README.md`：PeopleSoft 知識庫分析框架的入口（做什麼、怎麼跑、
+  兩段式畢業、環境紀律、資安邊界）。
+- `.opencode/`：框架本體——skills（ps-*）、subagent 定義（agent/）、
   環境設定與協定（peoplesoft/）。架構總覽：`.opencode/peoplesoft/README.md`。
+- `scripts/`：確定性外環（lint／auto-loop／auto-all／收據／fs-doctor）。
+- `src/`：與本框架無關的舊有 .NET 範例，不維護、不在文件範圍。
 
 ## PeopleSoft 問題的處理方式
 
