@@ -342,14 +342,21 @@ tier 2＝精修畢業（100 分）
      在**本機全域** `~/.config/opencode/opencode.json`（就是已經註冊 MCP
      的那份；內含公司內部主機名，**不進 repo**）加：
      ```json
-     "permission": { "doom_loop": "allow", "external_directory": "deny" }
+     "permission": { "doom_loop": "allow", "external_directory": "allow" }
      ```
+     · `external_directory: allow`——**opencode 自己會把過長的工具回傳寫進
+       `%TEMP%` 再讓模型讀回來**（管理者實測觀察）。那個路徑在專案目錄外，
+       設 deny 會讓 subagent 讀不到自己剛存的資料；設 ask 就是現在這個
+       永遠阻塞的死鎖。這也最能解釋「為什麼偏偏卡在第 14 檔」——
+       那個檔的證據量大到觸發暫存機制。
      · `doom_loop: allow`——稽核會對同一個 chunk id 重複取用（不同檔引用
-       同一段程式碼），那是正當行為；設 deny 會擋掉真的驗證。放行後由
-       **外環逾時**當跑飛的熔絲（框架本來就是這個分工）。
-     · `external_directory: deny`——研究只在 repo 內，真有東西要跨出去
-       應該**明確失敗**而不是靜默阻塞。
+       同一段程式碼），那是正當行為；設 deny 會擋掉真的驗證。
+     · 兩個都放行後，跑飛由**外環逾時／一致性檢查**熔斷（框架本來就是
+       這個分工）；agent 的 `tools` 白名單照常生效，subagent 的 bash／
+       write／edit 仍然是封的，權限放寬的只是「路徑範圍」與「重複呼叫」。
      · **不要用 `--auto`**：那是把所有非 deny 的 ask 一次放行，範圍過大。
+     · 原則：**無人環境只有 allow 或 deny 兩種安全狀態，沒有第三種**——
+       "ask" 在沒有 TTY 的地方一律等於死鎖。
      改完**重啟 opencode**，先手動跑一次 `/ps-audit <領域>` 確認不再跳提示。
 □ 6. 環境前提（沒滿足就不是無人看管，是每晚失敗一次）：
      · 地端模型服務必須是**常駐服務**，不是登入才啟動的東西
