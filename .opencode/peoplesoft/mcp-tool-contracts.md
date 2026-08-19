@@ -4,6 +4,13 @@
 **不一定需要全部放在同一個 MCP Server，但 Tool Contract（名稱、輸入、輸出結構）應保持一致**；
 既有的 PeopleCode MCP / SQL MCP / SQR MCP 可各做 Adapter 對齊本契約。
 
+> **工具身分＝server 前綴＋工具名（L61）**：兩個都對才叫對。已知混淆——
+> `get_chunk_by_id` 屬於 **`PeoplecodeElasticSearch`**，**不是** `PeoplecodeSource`；
+> `PeoplecodeSource` 的解引用工具叫 `get_chunks_details`。掛錯 server 會得到
+> `Model tried to call unavailable tool`，與「名字打錯」「本 agent 對該 server
+> 是 deny」三者訊息完全相同，都**不是暫時故障**（重試必然再失敗）。
+> 另：ES 的任何回傳一律是**候選**，不得當證據——解引用只能走 Source。
+
 > **現況共三個 MCP**：`PeoplecodeElasticSearch`（搜 chunk ids）、
 > `PeoplecodeSource`（chunk id → 完整上下文）、`oracleMCP`（PeopleTools
 > metadata，通用 SQL 查詢——§1 / §2 / §4 的角色由它照

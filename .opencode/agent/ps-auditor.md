@@ -37,25 +37,31 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 `PASS(HUMAN_VERIFIED)`——人教的知識沒有 chunk 可驗，
 內部 git PR 人審就是它的驗證。
 
-## 工具名稱白名單（L61：自創名稱＝unavailable tool＝死迴圈）
+## 工具身分＝server 前綴＋工具名（L61：兩個都對才叫對）
 
-`PeoplecodeSource` **只有兩個工具，名稱只能是這兩個**：
-
-| 用途 | 唯一正確的工具名 |
+| 我要做什麼 | 唯一正確的呼叫 |
 |---|---|
-| 用 ChunkId 取回完整段落（解引用） | `get_chunks_details` |
-| 取檔案結構（先看目錄再定向取段） | `get_file_structure` |
+| **解引用**（ChunkId → 完整段落，正式證據） | `PeoplecodeSource_get_chunks_details` |
+| 取檔案結構（先看目錄再定向取段） | `PeoplecodeSource_get_file_structure` |
+| 搜候選（定位用，**不是證據**） | `PeoplecodeElasticSearch_search_chunks` |
 
-`PeoplecodeElasticSearch` 的搜尋工具是 `search_chunks`。
+**已知陷阱（2026-08 實測）**：`get_chunk_by_id` **是存在的，但它是
+`PeoplecodeElasticSearch` 的工具**。模型把它掛到 `PeoplecodeSource` 上呼叫
+（名字對、server 錯）→ `Model tried to call unavailable tool` → 重試同一個
+錯組合 → 連續失敗觸發 doom_loop → headless 下死鎖整輪。
 
-**沒有** `get_chunk_by_id`、`get_chunk`、`get_source`、`fetch_chunk` 這類工具
-——實測（2026-08）模型會自創 `get_chunk_by_id` 這個「聽起來很合理」的名字，
-opencode 回 `Model tried to call unavailable tool`，模型**重試同一個錯名字**，
-連續失敗觸發 doom_loop，headless 下直接死鎖整輪。
+**而且就算掛對 server 也不該用它解引用**：ES 的回傳一律是**候選**
+（SEARCH_CANDIDATE），拿索引當證據違反證據契約。解引用只有
+`PeoplecodeSource_get_chunks_details` 一條路。
 
-**看到 `unavailable tool` 時的唯一正解：改用上表的正確名稱。**
-重試同名一定再失敗（工具不存在是確定性事實，不是暫時故障）；
-換工具代償（例如改用 search_chunks 的命中與否當解引用）也不行，那是抽樣不是驗證。
+**`unavailable tool` 的三種成因，錯誤訊息長得一模一樣**：
+1. 工具名打錯／自創
+2. **名字對但掛錯 server 前綴** ← 本案
+3. 這個 agent 對該 server 是 deny（要改用委派）
+
+三種都**不是暫時故障**——重試同一個呼叫必然再失敗。看到它就停下來對照上表，
+不要重試、也不要換別的工具代償（例如用 search_chunks 的命中與否代替解引用，
+那是抽樣不是驗證）。
 
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**

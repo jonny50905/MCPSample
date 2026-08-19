@@ -1331,35 +1331,44 @@
 - 套用：本 commit（auto-loop 註解／SOP-17）；設定本身在管理者本機，
   repo 不放（含內部主機名）。
 
-### L61 模型自創了一個「聽起來很合理」的工具名——確定性失敗被當成暫時故障重試（2026-08）
-- 症狀（管理者在互動式重跑時看到的實際錯誤文字）：
+### L61 名字對、server 錯——工具身分是「前綴＋名稱」，錯一半就等於不存在（2026-08）
+- 症狀（管理者互動式重跑時看到的實際錯誤文字）：
   `PeoplecodeSource get_chunk_by_id error=Model tried to call unavailable tool`。
-- 根因：**`get_chunk_by_id` 這個工具不存在**。`PeoplecodeSource` 只有
-  `get_chunks_details`（用 ChunkId 解引用）與 `get_file_structure` 兩個。
-  模型自創了一個語意上完全合理的名字，opencode 回 unavailable tool，
-  模型**重試同一個錯名字**——而工具不存在是**確定性事實**，重試一萬次
-  也一樣——連續失敗觸發 doom_loop 詢問，headless 沒有 TTY 可答＝死鎖整輪。
-- 這修正了 L60 的診斷層次：L60 把 doom_loop 當結論，其實它只是**第三層**。
-  完整鏈：**自創工具名 → unavailable tool（invalid）→ 重試同名 → doom_loop
-  → ask → headless 死鎖**。設 `doom_loop: allow` 只解掉最後一環（不死鎖），
-  模型還是會一直呼叫一個不存在的工具直到逾時。**根因在第一層。**
-- 為什麼「build 模式測起來正常」不能反證：build agent 沒有被同名覆寫
-  （L1：tools 是覆寫表，沒列＝預設開），而且人工測試時用的是**正確的
-  工具名**——測的根本不是同一件事。**「我另外測過是好的」必須先確認
-  測的是同一個呼叫。**
-- 為什麼偏偏是某一個檔：這是抽樣事故（L34 同族），不是那個檔特殊。
-  13 檔正常、第 14 檔自創名字，換 fresh session 重跑多半就過了。
-- 落點：機械化不可能（執行期行為），改用**最強的 prose 手段——把錯誤答案
-  寫出來**：ps-auditor 與 ps-deep-research 各加一段「工具名稱白名單」，
-  正面列出唯三正確名稱，並**指名 `get_chunk_by_id`／`get_chunk`／
-  `get_source`／`fetch_chunk` 這些不存在**，附上「看到 unavailable tool
-  ＝名字錯了，重試同名一定再失敗」的判讀。ps-deep-research 另加一句：
-  本 agent 對 `PeoplecodeSource_*` 是 deny（主 context 不取 chunk），
-  自己直接呼叫同樣會得到 unavailable tool，要解引用一律委派。
-- 原則一：**對小模型，指名錯誤答案比描述正確答案有效**。「只有這兩個工具」
-  防不住自創；「沒有 get_chunk_by_id 這個東西」才擋得住——因為它要犯的
-  錯就長那樣。
-- 原則二：**確定性失敗不該被重試**。工具不存在、表名不存在、欄位不存在
-  ——這些重試一次和一萬次結果相同。規則要教模型**分辨「暫時故障」與
-  「事實錯誤」**：前者可重試，後者只能改做法。
-- 套用：本 commit（ps-auditor／ps-deep-research）。
+- **第一版診斷是錯的**：維護 session 查了 repo，發現全專案沒有
+  `get_chunk_by_id`，就判定「模型自創工具名」，還寫進 agent 檔「沒有
+  `get_chunk_by_id` 這種東西」。**管理者當場更正：它存在，是
+  `PeoplecodeElasticSearch` 的工具**——`PeoplecodeSource` 的解引用工具才叫
+  `get_chunks_details`。那句錯誤的規則若照搬進去，會教模型一件假的事。
+  （repo 查無，是因為 `mcp-tool-contracts.md` 自稱「全部 MCP Tool 契約總覽」
+  卻**漏列了 ES 的這個工具**——文件不全，於是「查無」被誤讀成「不存在」。）
+- 真正的根因：**模型把對的工具名掛到錯的 server 前綴上**。工具身分是
+  「server 前綴＋工具名」，錯一半就等於不存在 → `unavailable tool` →
+  模型**重試同一個錯組合** → 連續失敗觸發 doom_loop → headless 死鎖整輪。
+- 三層診斷鏈（L60 只看到第三層）：
+  **掛錯 server → unavailable tool（invalid）→ 重試同名 → doom_loop → ask →
+  headless 死鎖**。設 `doom_loop: allow` 只解最後一環。
+- 一個訊息、三種成因，長得完全一樣：(1) 名字打錯／自創；(2) **名字對但
+  掛錯 server**；(3) **本 agent 對該 server 是 deny**（要改成委派）。
+  三者都**不是暫時故障**——重試必然再失敗。
+- 附帶的協定澄清：就算掛對 server，**ES 的 `get_chunk_by_id` 也不該用來
+  解引用**——ES 回傳一律是候選（SEARCH_CANDIDATE），拿索引當證據違反證據
+  契約。解引用只有 `PeoplecodeSource_get_chunks_details` 一條路。
+- 為什麼「build 模式測起來正常」不能反證：build agent 沒被同名覆寫
+  （L1：tools 是覆寫表，沒列＝預設開），而且人工測的是**掛對 server 的
+  那個呼叫**——測的不是同一件事。**「我另外測過是好的」必須先確認測的是
+  同一個呼叫（含前綴）。**
+- 為什麼偏偏是某一個檔：抽樣事故（L34 同族），不是該檔特殊；fresh session
+  重跑多半就過。
+- 落點：ps-auditor／ps-deep-research 各加「工具身分＝前綴＋名稱」對照表，
+  **指名這個混淆**（`get_chunk_by_id` 是 ES 的、不是 Source 的），並附
+  「unavailable tool 三種成因、都不可重試」的判讀；`mcp-tool-contracts.md`
+  補上同一段（文件漏列正是這次誤判的來源）。
+- 原則一：**指出「你可能會弄混的那兩個」比列出正確清單有效**。純白名單
+  防不住「名字對、前綴錯」——因為模型自認為在用清單上的東西。
+- 原則二：**確定性失敗不該被重試**。工具不存在、掛錯 server、權限被 deny、
+  表名不存在——重試一次和一萬次結果相同。規則要教模型分辨「暫時故障」
+  與「事實錯誤」：前者可重試，後者只能改做法。
+- 原則三（給維護者自己，本課第二次踩）：**「我 grep 不到」不等於「不存在」**
+  ——先確認那份文件是否本來就完整。這次是拿不完整的契約總覽當事實來源，
+  推出一條假規則，差點寫進 agent 檔。
+- 套用：本 commit（ps-auditor／ps-deep-research／mcp-tool-contracts）。
