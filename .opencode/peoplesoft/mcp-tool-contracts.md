@@ -21,7 +21,8 @@
 > 3. **解引用一律走 `PeoplecodeSource_get_chunks_details`**（索引是副本，
 >    CR 上線後會落後；走 Source 才能讓證據失效在稽核時現形）。ES 的
 >    `get_chunk_by_id` 只用於**交叉檢查**：Source 查無時以同一 id 再查——
->    ES 有＝該 id 曾存在但來源已變（判 stale）；ES 也無＝較可能捏造。
+>    ES 有＝該 id 曾存在但來源已變（判 stale）；ES 也無＝較可能捏造——
+>    **但同輪 ≥3 檔成批查無＝索引重建訊號，一律判 stale，不判捏造**（L64）。
 
 > **現況共三個 MCP**：`PeoplecodeElasticSearch`（搜 chunk ids）、
 > `PeoplecodeSource`（chunk id → 完整上下文）、`oracleMCP`（PeopleTools
