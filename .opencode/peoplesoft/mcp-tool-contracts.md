@@ -4,6 +4,21 @@
 **不一定需要全部放在同一個 MCP Server，但 Tool Contract（名稱、輸入、輸出結構）應保持一致**；
 既有的 PeopleCode MCP / SQL MCP / SQR MCP 可各做 Adapter 對齊本契約。
 
+> **各 server 的完整工具清單（2026-08 管理者實測確認）**：
+>
+> | Server | 工具 | 用途 |
+> |---|---|---|
+> | `PeoplecodeElasticSearch` | `search_chunks` | 搜候選（定位用） |
+> | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取索引副本——**框架一律封鎖，見下** |
+> | `PeoplecodeSource` | `get_chunks_details` | **解引用（唯一的正式證據來源）** |
+> | `PeoplecodeSource` | `get_file_structure` | 檔案結構，先看目錄再定向取段 |
+>
+> ES 的 `get_chunk_by_id` **能用、且回傳看起來就像證據**——但那是索引副本，
+> 不是 DB 原文。用它解引用會產生**靜默的假 PASS**（稽核宣稱驗過、其實只驗
+> 了索引），比報錯危險得多。因此在**所有** agent 的 tools map 明確設
+> `"PeoplecodeElasticSearch_get_chunk_by_id": false`——誤用會變成看得見的
+> `unavailable tool`，而不是看不見的假通過。
+>
 > **工具身分＝server 前綴＋工具名（L61）**：兩個都對才叫對。已知混淆——
 > `get_chunk_by_id` 屬於 **`PeoplecodeElasticSearch`**，**不是** `PeoplecodeSource`；
 > `PeoplecodeSource` 的解引用工具叫 `get_chunks_details`。掛錯 server 會得到

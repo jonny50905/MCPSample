@@ -1363,6 +1363,14 @@
   **指名這個混淆**（`get_chunk_by_id` 是 ES 的、不是 Source 的），並附
   「unavailable tool 三種成因、都不可重試」的判讀；`mcp-tool-contracts.md`
   補上同一段（文件漏列正是這次誤判的來源）。
+- **附帶發現，比死鎖更嚴重**：`get_chunk_by_id` 不只是「掛錯 server」——
+  它掛**對** server 時**能用，而且回傳看起來就像證據**。但那是索引副本、
+  不是 DB 原文。稽核若用它解引用，會產生**靜默的假 PASS**（報告宣稱驗過，
+  其實只驗了索引），**比報錯危險得多**：死鎖你看得到，假 PASS 看不到。
+  六個有 ES 權限的 agent 全部加上
+  `"PeoplecodeElasticSearch_get_chunk_by_id": false` ——把「能用但不該用」
+  變成看得見的 `unavailable tool`。這是 L0 的直接應用：**光寫規則擋不住
+  一個「用起來很順、結果也很像對的」工具，要用 tools map 機械封掉**。
 - 原則一：**指出「你可能會弄混的那兩個」比列出正確清單有效**。純白名單
   防不住「名字對、前綴錯」——因為模型自認為在用清單上的東西。
 - 原則二：**確定性失敗不該被重試**。工具不存在、掛錯 server、權限被 deny、
@@ -1371,4 +1379,8 @@
 - 原則三（給維護者自己，本課第二次踩）：**「我 grep 不到」不等於「不存在」**
   ——先確認那份文件是否本來就完整。這次是拿不完整的契約總覽當事實來源，
   推出一條假規則，差點寫進 agent 檔。
-- 套用：本 commit（ps-auditor／ps-deep-research／mcp-tool-contracts）。
+- 附帶修補：`mcp-tool-contracts.md` 補上**兩個 server 的完整工具清單**
+  （管理者實測確認 ES 只有 `search_chunks` 與 `get_chunk_by_id` 兩個）——
+  這份文件自稱「全部 MCP Tool 契約總覽」卻漏列，正是本次誤判的來源。
+- 套用：本 commit（ps-auditor／ps-deep-research／六個 flow agent 的
+  tools map／mcp-tool-contracts）。

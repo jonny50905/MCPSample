@@ -14,6 +14,12 @@ tools:
   webfetch: false
   # 實際環境兩個 MCP：ES 搜 chunk ids（候選）；Source 以 chunk id 取完整上下文（Evidence）
   "PeoplecodeElasticSearch_*": true
+  # ES 的 get_chunk_by_id 明確封鎖（L61）：它**能用**，回傳看起來就像證據——
+  # 但那是**索引副本**，不是 DB 原文。證據契約硬規則：ES 回傳一律是候選
+  # （SEARCH_CANDIDATE），解引用只能走 PeoplecodeSource_get_chunks_details。
+  # 不封的話會產生**靜默的假 PASS**（稽核宣稱驗過，其實只驗了索引）——
+  # 那比報錯危險得多。封掉後誤用會得到 unavailable tool（看得見的錯）。
+  "PeoplecodeElasticSearch_get_chunk_by_id": false
   "PeoplecodeSource_*": true
   # 不屬於本 subagent 的 MCP 明確 deny（OpenCode 沒列出＝預設開啟）：
   "oracleMCP_*": false

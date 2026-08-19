@@ -12,6 +12,12 @@ tools:
   bash: false
   webfetch: false
   "PeoplecodeElasticSearch_*": true
+  # ES 的 get_chunk_by_id 明確封鎖（L61）：它**能用**，回傳看起來就像證據——
+  # 但那是**索引副本**，不是 DB 原文。證據契約硬規則：ES 回傳一律是候選
+  # （SEARCH_CANDIDATE），解引用只能走 PeoplecodeSource_get_chunks_details。
+  # 不封的話會產生**靜默的假 PASS**（稽核宣稱驗過，其實只驗了索引）——
+  # 那比報錯危險得多。封掉後誤用會得到 unavailable tool（看得見的錯）。
+  "PeoplecodeElasticSearch_get_chunk_by_id": false
   "PeoplecodeSource_*": true
   "oracleMCP_*": true
   # PeoplecodeMetadata 可作任務 C 的反查角度（欄位用途／Component 搜尋）；
