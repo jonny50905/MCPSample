@@ -45,30 +45,14 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 | 取檔案結構（先看目錄再定向取段） | `PeoplecodeSource_get_file_structure` |
 | 搜候選（定位用，**不是證據**） | `PeoplecodeElasticSearch_search_chunks` |
 
-**已知陷阱（2026-08 實測）**：`get_chunk_by_id` **是存在的，但它是
-`PeoplecodeElasticSearch` 的工具**。模型把它掛到 `PeoplecodeSource` 上呼叫
-（名字對、server 錯）→ `Model tried to call unavailable tool` → 重試同一個
-錯組合 → 連續失敗觸發 doom_loop → headless 下死鎖整輪。
-
-**掛對 server 之後它是能用的**（兩邊資料源一致、欄位相同），但**解引用仍固定走
-Source**：索引依定義是副本，CR 上線到索引重建之間會落後——固定走 Source 才能
-讓「證據失效」在稽核時現形。
-
-它的**正當用途是交叉檢查**：`get_chunks_details` 查無時，用
-`PeoplecodeElasticSearch_get_chunk_by_id` 拿同一個 id 再查一次——
-· ES 有、Source 無 → 該 id 曾真實存在但來源已變：判 stale／走二次定位，
-  **不要判 FABRICATED**
-· 兩邊都無 → 該 id 較可能是捏造，照原規則判
-這一步只用來**分辨兩種不同的失敗**，不取代解引用。
-
-**`unavailable tool` 的三種成因，錯誤訊息長得一模一樣**：
-1. 工具名打錯／自創
-2. **名字對但掛錯 server 前綴** ← 本案
-3. 這個 agent 對該 server 是 deny（要改用委派）
-
-三種都**不是暫時故障**——重試同一個呼叫必然再失敗。看到它就停下來對照上表，
-不要重試、也不要換別的工具代償（例如用 search_chunks 的命中與否代替解引用，
-那是抽樣不是驗證）。
+- `get_chunk_by_id` 是 **ES** 的工具——掛到 `PeoplecodeSource` 上＝`unavailable tool`。
+- `unavailable tool` 三種成因（名字錯／掛錯 server／本 agent 對該 server 是
+  deny）訊息完全相同，**都不是暫時故障**——重試必然再失敗，對照上表改做法，
+  也不得換工具代償（用 search_chunks 的命中與否代替解引用＝抽樣不是驗證）。
+- 解引用**固定走 Source**（索引是副本，CR 上線後會落後）。ES 的
+  `get_chunk_by_id` 只用於**交叉檢查**：`get_chunks_details` 查無時以同一
+  id 再查——ES 有＝該 id 曾存在但來源已變（判 stale／走二次定位，**不判
+  FABRICATED**）；ES 也無＝較可能捏造，照原規則判。此步驟不取代解引用。
 
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**

@@ -124,18 +124,12 @@ docs/ps-research/<領域>/
   該筆證據併記兩個 id（或拆成兩筆各附 id）。
 - FAIL(WRONG_KIND)：程式內 SQL 語句被誤標 `SQL` 證據——改以該語句
   所在的 chunk（`CHUNK` 證據：id＋filePath＋行號）重新引用。
-- **工具身分＝server 前綴＋工具名，兩個都對才叫對（L61）**：解引用是
-  `PeoplecodeSource_get_chunks_details`、結構是 `PeoplecodeSource_get_file_structure`、
-  搜候選是 `PeoplecodeElasticSearch_search_chunks`。**已知陷阱**：
-  `get_chunk_by_id` 存在，但它是 **ES** 的工具——實測模型把它掛到
-  `PeoplecodeSource` 上呼叫（名字對、server 錯），得到
-  `Model tried to call unavailable tool` 後重試同一個錯組合，連續失敗觸發
-  doom_loop，headless 下死鎖整輪。`unavailable tool` 有三種成因（名字錯／
-  掛錯 server／本 agent 對該 server 是 deny），訊息長得一樣，但**都不是暫時
-  故障**，重試同一個呼叫必然再失敗。
-  另注意：本 agent 對**四個 MCP 全部 deny**（主 context 不取 chunk 也不查 DB）
-  ——任何檢索一律**委派**給 ps-auditor 或對應 flow，自己直接呼叫必得
-  unavailable tool。
+- **工具身分＝server 前綴＋工具名（L61）**：解引用＝
+  `PeoplecodeSource_get_chunks_details`、結構＝`PeoplecodeSource_get_file_structure`、
+  搜候選＝`PeoplecodeElasticSearch_search_chunks`；`get_chunk_by_id` 是 ES 的
+  工具、不是 Source 的。`unavailable tool`（名字錯／掛錯 server／本 agent 對
+  該 server 是 deny）**不是暫時故障**，重試必然再失敗。本 agent 對四個 MCP
+  **全部 deny**——任何檢索一律**委派**，自己直接呼叫必得 unavailable tool。
 - **查不到時的合法出口（L56）**：機器參照欄只准放三種東西——完整 36 字元
   ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。取不到證據時
   **照型別走對應出口**：SQL／metadata 型（查 DB 表）→ 寫 `待人工SQL`

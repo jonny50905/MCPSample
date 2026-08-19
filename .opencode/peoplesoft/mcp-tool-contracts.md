@@ -8,32 +8,20 @@
 >
 > | Server | 工具 | 用途 |
 > |---|---|---|
-> | `PeoplecodeElasticSearch` | `search_chunks` | 搜候選（定位用） |
-> | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取回，欄位與 Source 版相同——**非解引用正規路徑，見下** |
+> | `PeoplecodeElasticSearch` | `search_chunks` | 搜候選（定位用；回傳是候選不是證據） |
+> | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取回（欄位同 Source 版）——**僅供交叉檢查，非解引用路徑** |
 > | `PeoplecodeSource` | `get_chunks_details` | **解引用（唯一的正式證據來源）** |
-> | `PeoplecodeSource` | `get_file_structure` | 檔案結構，先看目錄再定向取段 |
+> | `PeoplecodeSource` | `get_file_structure` | 檔案結構（先看目錄再定向取段） |
 >
-> **`get_chunk_by_id` 不封鎖，但它不是解引用的正規路徑。** 管理者實測確認
-> 兩邊資料源一致、回傳欄位相同（`ChunkText`／`FilePath`／`StartLine` 等）。
-> 之所以仍規定解引用走 `PeoplecodeSource_get_chunks_details`：**索引依定義
-> 是副本，CR 上線到索引重建之間會落後**（SOP-11 的整個對齊流程就建立在
-> 這個時間差上）——固定走 Source 才能讓「證據失效」在稽核時現形。
->
-> 它的**正當用途是交叉檢查**：Source 解引用查無時，用 ES 版同一個 id 再查
-> 一次——ES 有、Source 無 ＝ 該 id 曾經真實存在但來源已變（判 stale／
-> 重新定位），ES 也無 ＝ 該 id 較可能是捏造。兩種的處置不同，值得分辨。
->
-> **不封鎖的理由本身也是一課（L61）**：維護 session 一度把它加進 tools map
-> 的 deny，但**deny 一個實際可用的工具＝製造 `unavailable tool` → 重試 →
-> doom_loop → headless 死鎖**，那正是本次事故的成因。**封鎖只留給真正有害
-> 的東西；「非正規但無害」用規則講，不用封鎖擋。**
->
-> **工具身分＝server 前綴＋工具名（L61）**：兩個都對才叫對。已知混淆——
-> `get_chunk_by_id` 屬於 **`PeoplecodeElasticSearch`**，**不是** `PeoplecodeSource`；
-> `PeoplecodeSource` 的解引用工具叫 `get_chunks_details`。掛錯 server 會得到
-> `Model tried to call unavailable tool`，與「名字打錯」「本 agent 對該 server
-> 是 deny」三者訊息完全相同，都**不是暫時故障**（重試必然再失敗）。
-> 另：ES 的任何回傳一律是**候選**，不得當證據——解引用只能走 Source。
+> 三條硬規則（L61）：
+> 1. **工具身分＝server 前綴＋工具名，兩個都對才叫對**——`get_chunk_by_id`
+>    是 ES 的工具，掛到 `PeoplecodeSource` 上呼叫＝`unavailable tool`。
+> 2. `unavailable tool` 三種成因（名字錯／掛錯 server／本 agent 對該 server
+>    是 deny）**訊息完全相同，都不是暫時故障**——重試必然再失敗，改做法。
+> 3. **解引用一律走 `PeoplecodeSource_get_chunks_details`**（索引是副本，
+>    CR 上線後會落後；走 Source 才能讓證據失效在稽核時現形）。ES 的
+>    `get_chunk_by_id` 只用於**交叉檢查**：Source 查無時以同一 id 再查——
+>    ES 有＝該 id 曾存在但來源已變（判 stale）；ES 也無＝較可能捏造。
 
 > **現況共三個 MCP**：`PeoplecodeElasticSearch`（搜 chunk ids）、
 > `PeoplecodeSource`（chunk id → 完整上下文）、`oracleMCP`（PeopleTools
