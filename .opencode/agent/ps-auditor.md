@@ -12,12 +12,6 @@ tools:
   bash: false
   webfetch: false
   "PeoplecodeElasticSearch_*": true
-  # ES 的 get_chunk_by_id 明確封鎖（L61）：它**能用**，回傳看起來就像證據——
-  # 但那是**索引副本**，不是 DB 原文。證據契約硬規則：ES 回傳一律是候選
-  # （SEARCH_CANDIDATE），解引用只能走 PeoplecodeSource_get_chunks_details。
-  # 不封的話會產生**靜默的假 PASS**（稽核宣稱驗過，其實只驗了索引）——
-  # 那比報錯危險得多。封掉後誤用會得到 unavailable tool（看得見的錯）。
-  "PeoplecodeElasticSearch_get_chunk_by_id": false
   "PeoplecodeSource_*": true
   "oracleMCP_*": true
   # PeoplecodeMetadata 可作任務 C 的反查角度（欄位用途／Component 搜尋）；
@@ -56,9 +50,16 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 （名字對、server 錯）→ `Model tried to call unavailable tool` → 重試同一個
 錯組合 → 連續失敗觸發 doom_loop → headless 下死鎖整輪。
 
-**而且就算掛對 server 也不該用它解引用**：ES 的回傳一律是**候選**
-（SEARCH_CANDIDATE），拿索引當證據違反證據契約。解引用只有
-`PeoplecodeSource_get_chunks_details` 一條路。
+**掛對 server 之後它是能用的**（兩邊資料源一致、欄位相同），但**解引用仍固定走
+Source**：索引依定義是副本，CR 上線到索引重建之間會落後——固定走 Source 才能
+讓「證據失效」在稽核時現形。
+
+它的**正當用途是交叉檢查**：`get_chunks_details` 查無時，用
+`PeoplecodeElasticSearch_get_chunk_by_id` 拿同一個 id 再查一次——
+· ES 有、Source 無 → 該 id 曾真實存在但來源已變：判 stale／走二次定位，
+  **不要判 FABRICATED**
+· 兩邊都無 → 該 id 較可能是捏造，照原規則判
+這一步只用來**分辨兩種不同的失敗**，不取代解引用。
 
 **`unavailable tool` 的三種成因，錯誤訊息長得一模一樣**：
 1. 工具名打錯／自創

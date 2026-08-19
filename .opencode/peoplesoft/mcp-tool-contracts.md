@@ -9,15 +9,24 @@
 > | Server | 工具 | 用途 |
 > |---|---|---|
 > | `PeoplecodeElasticSearch` | `search_chunks` | 搜候選（定位用） |
-> | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取索引副本——**框架一律封鎖，見下** |
+> | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取回，欄位與 Source 版相同——**非解引用正規路徑，見下** |
 > | `PeoplecodeSource` | `get_chunks_details` | **解引用（唯一的正式證據來源）** |
 > | `PeoplecodeSource` | `get_file_structure` | 檔案結構，先看目錄再定向取段 |
 >
-> ES 的 `get_chunk_by_id` **能用、且回傳看起來就像證據**——但那是索引副本，
-> 不是 DB 原文。用它解引用會產生**靜默的假 PASS**（稽核宣稱驗過、其實只驗
-> 了索引），比報錯危險得多。因此在**所有** agent 的 tools map 明確設
-> `"PeoplecodeElasticSearch_get_chunk_by_id": false`——誤用會變成看得見的
-> `unavailable tool`，而不是看不見的假通過。
+> **`get_chunk_by_id` 不封鎖，但它不是解引用的正規路徑。** 管理者實測確認
+> 兩邊資料源一致、回傳欄位相同（`ChunkText`／`FilePath`／`StartLine` 等）。
+> 之所以仍規定解引用走 `PeoplecodeSource_get_chunks_details`：**索引依定義
+> 是副本，CR 上線到索引重建之間會落後**（SOP-11 的整個對齊流程就建立在
+> 這個時間差上）——固定走 Source 才能讓「證據失效」在稽核時現形。
+>
+> 它的**正當用途是交叉檢查**：Source 解引用查無時，用 ES 版同一個 id 再查
+> 一次——ES 有、Source 無 ＝ 該 id 曾經真實存在但來源已變（判 stale／
+> 重新定位），ES 也無 ＝ 該 id 較可能是捏造。兩種的處置不同，值得分辨。
+>
+> **不封鎖的理由本身也是一課（L61）**：維護 session 一度把它加進 tools map
+> 的 deny，但**deny 一個實際可用的工具＝製造 `unavailable tool` → 重試 →
+> doom_loop → headless 死鎖**，那正是本次事故的成因。**封鎖只留給真正有害
+> 的東西；「非正規但無害」用規則講，不用封鎖擋。**
 >
 > **工具身分＝server 前綴＋工具名（L61）**：兩個都對才叫對。已知混淆——
 > `get_chunk_by_id` 屬於 **`PeoplecodeElasticSearch`**，**不是** `PeoplecodeSource`；
