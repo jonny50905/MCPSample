@@ -1295,6 +1295,20 @@
   設 `"permission": { "doom_loop": "allow", "external_directory": "deny" }`。
   · doom_loop 設 allow：稽核會對同一個 chunk id 重複取用（不同檔引用同一段
     程式碼）＝正當行為，設 deny 會擋掉真驗證；跑飛由**外環逾時**熔斷。
+  · **【實測確認】觸發的是 `doom_loop`**：提示文字「continue after repeated
+    failures?」、pattern 顯示 `invalid`。`invalid` ＝工具呼叫 JSON 被截斷
+    （SOP-9 的老病），模型重試、再截斷，連續失敗即觸發 doom_loop 詢問。
+    **因果鏈是：證據列變多 → 稽核回報 JSON 變長 → 截斷 invalid → 重試 →
+    doom_loop → ask → headless 死鎖。** 這也解釋為什麼偏偏是那一個檔
+    （該檔證據列最多），以及為什麼「證據補完整之後」才開始發生。
+    **權限只是最後一環，根因在寫入長度**——設 allow 只是不要死鎖，
+    真正的緩解仍在 SOP-9。
+  · 判斷過程的曲折要記下來：維護 session 先猜 doom_loop（對），被
+    管理者的「subagent 會用暫存檔」觀察一講就改口 external_directory
+    （**過度修正**），最後由管理者實際看到提示文字才定案。**兩次都是
+    在沒有直接證據時用推理決定設定值**——正確做法是把兩個都設成不會
+    死鎖的值，然後等實證。管理者那個觀察沒有白費：external_directory
+    設 deny 確實會擋掉暫存檔讀取，那個故障是真的，只是不是這次的元兇。
   · external_directory 設 **allow**（初版寫 deny，管理者當場擋下——**那會
     造成故障**）：opencode 自己會把過長的工具回傳寫進 `%TEMP%` 再讓模型
     讀回來，那個路徑在專案目錄外；設 deny＝subagent 讀不到自己剛存的資料。

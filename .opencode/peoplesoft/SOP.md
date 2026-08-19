@@ -229,6 +229,13 @@ checklist 重查。
   ——不需處理。要介入的只有：同一呼叫紅字堆疊不前進（人工標
   BLOCKED 續下一項）、紅字後整個停住（回「做」推一下）、
   幾乎每呼叫都紅（找管理者開約束解碼）
+□ **【L60】headless 下多了一個致命環節**：連續 invalid 重試會觸發
+  opencode 的 `doom_loop` 保護，跳出「continue after repeated failures?」
+  詢問（pattern 顯示為 `invalid`）。該權限**預設是 "ask"**，而 headless
+  沒有 TTY 可以回答＝**永遠阻塞**，提示還畫在 TTY 上、log 裡看不到。
+  症狀只剩「輸出靜止」，逾時上限開多大都一樣撞滿、產出為零。
+  → 跑 auto-loop 前**必須**先照 SOP-17 第 0 條把 `doom_loop` 設 "allow"，
+    本行的「逾時熔絲自動處理」才成立。沒設＝每次都燒滿整個上限。
 □ subagent 鬼打牆（不斷重複相同產出、沒有盡頭）＝退化迴圈（L34）：
   **不用等，直接中斷、開新 session 重跑**——checklist 未勾＝進度
   不會丟，fresh session 通常一次就過（抽樣事故非確定性障礙）。
@@ -344,6 +351,12 @@ tier 2＝精修畢業（100 分）
      ```json
      "permission": { "doom_loop": "allow", "external_directory": "allow" }
      ```
+     · `doom_loop: allow` ← **實測確認就是這個**（2026-08）：提示文字是
+       「continue after repeated failures?」、pattern 顯示 `invalid`。
+       `invalid` ＝工具呼叫 JSON 被截斷（SOP-9），模型重試、再截斷，
+       連續失敗就觸發 doom_loop。**根因在寫入長度，權限只是最後一環**
+       ——所以設 allow 只是讓它不要死鎖，真正的緩解仍在 SOP-9
+       （單次寫檔上限、委派只傳路徑、同檔失敗 2 次標 ⚠ 跳過）。
      · `external_directory: allow`——**opencode 自己會把過長的工具回傳寫進
        `%TEMP%` 再讓模型讀回來**（管理者實測觀察）。那個路徑在專案目錄外，
        設 deny 會讓 subagent 讀不到自己剛存的資料；設 ask 就是現在這個
