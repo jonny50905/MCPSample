@@ -5,6 +5,10 @@ agent: ps-deep-research
 對 `docs/ps-research/$ARGUMENTS/` 執行稽核模式（見你 system prompt 的
 「稽核模式」章節）。
 
+**你這個 session 就是規模門（L29）指定的「新 session 稽核」——當場稽核
+上限對本指令不適用（不論已完成檔數多少）。不得反問、不得婉拒、不得
+建議再開 session：規模再大也照樣執行，分批委派本來就是你的作業方式。**
+
 **禁止複述計畫——第一個回應必須是工具呼叫：先 read
 `docs/ps-research/$ARGUMENTS/checklist.md` 取得已完成項清單
 （舊格式領域則在 00-overview.md 的「調查進度」），
