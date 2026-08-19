@@ -124,6 +124,15 @@ docs/ps-research/<領域>/
   該筆證據併記兩個 id（或拆成兩筆各附 id）。
 - FAIL(WRONG_KIND)：程式內 SQL 語句被誤標 `SQL` 證據——改以該語句
   所在的 chunk（`CHUNK` 證據：id＋filePath＋行號）重新引用。
+- **工具名稱只有這幾個（L61）**：`PeoplecodeSource_get_chunks_details`／
+  `PeoplecodeSource_get_file_structure`／`PeoplecodeElasticSearch_search_chunks`。
+  **沒有 `get_chunk_by_id`／`get_chunk`／`get_source`**——實測模型會自創
+  `get_chunk_by_id`，得到 `Model tried to call unavailable tool` 後重試同名、
+  連續失敗觸發 doom_loop，headless 下死鎖整輪。看到 unavailable tool 就是
+  **名字錯了**，改用正確名稱，重試同名一定再失敗。
+  另注意：本 agent 對 `PeoplecodeSource_*` 是 **deny**（主 context 不取 chunk）
+  ——要解引用一律**委派** ps-auditor 或對應 flow，自己直接呼叫同樣會得到
+  unavailable tool。
 - **查不到時的合法出口（L56）**：機器參照欄只准放三種東西——完整 36 字元
   ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。取不到證據時
   **照型別走對應出口**：SQL／metadata 型（查 DB 表）→ 寫 `待人工SQL`

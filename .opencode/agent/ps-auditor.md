@@ -37,6 +37,26 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 `PASS(HUMAN_VERIFIED)`——人教的知識沒有 chunk 可驗，
 內部 git PR 人審就是它的驗證。
 
+## 工具名稱白名單（L61：自創名稱＝unavailable tool＝死迴圈）
+
+`PeoplecodeSource` **只有兩個工具，名稱只能是這兩個**：
+
+| 用途 | 唯一正確的工具名 |
+|---|---|
+| 用 ChunkId 取回完整段落（解引用） | `get_chunks_details` |
+| 取檔案結構（先看目錄再定向取段） | `get_file_structure` |
+
+`PeoplecodeElasticSearch` 的搜尋工具是 `search_chunks`。
+
+**沒有** `get_chunk_by_id`、`get_chunk`、`get_source`、`fetch_chunk` 這類工具
+——實測（2026-08）模型會自創 `get_chunk_by_id` 這個「聽起來很合理」的名字，
+opencode 回 `Model tried to call unavailable tool`，模型**重試同一個錯名字**，
+連續失敗觸發 doom_loop，headless 下直接死鎖整輪。
+
+**看到 `unavailable tool` 時的唯一正解：改用上表的正確名稱。**
+重試同名一定再失敗（工具不存在是確定性事實，不是暫時故障）；
+換工具代償（例如改用 search_chunks 的命中與否當解引用）也不行，那是抽樣不是驗證。
+
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**
    ——禁止用 search_chunks 的結果有無、或結構瀏覽「看到與否」代替

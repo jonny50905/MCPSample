@@ -1330,3 +1330,36 @@
   在 log 上只差一個「輸出靜止」欄位——我先接受了模糊描述才去蓋解釋。
 - 套用：本 commit（auto-loop 註解／SOP-17）；設定本身在管理者本機，
   repo 不放（含內部主機名）。
+
+### L61 模型自創了一個「聽起來很合理」的工具名——確定性失敗被當成暫時故障重試（2026-08）
+- 症狀（管理者在互動式重跑時看到的實際錯誤文字）：
+  `PeoplecodeSource get_chunk_by_id error=Model tried to call unavailable tool`。
+- 根因：**`get_chunk_by_id` 這個工具不存在**。`PeoplecodeSource` 只有
+  `get_chunks_details`（用 ChunkId 解引用）與 `get_file_structure` 兩個。
+  模型自創了一個語意上完全合理的名字，opencode 回 unavailable tool，
+  模型**重試同一個錯名字**——而工具不存在是**確定性事實**，重試一萬次
+  也一樣——連續失敗觸發 doom_loop 詢問，headless 沒有 TTY 可答＝死鎖整輪。
+- 這修正了 L60 的診斷層次：L60 把 doom_loop 當結論，其實它只是**第三層**。
+  完整鏈：**自創工具名 → unavailable tool（invalid）→ 重試同名 → doom_loop
+  → ask → headless 死鎖**。設 `doom_loop: allow` 只解掉最後一環（不死鎖），
+  模型還是會一直呼叫一個不存在的工具直到逾時。**根因在第一層。**
+- 為什麼「build 模式測起來正常」不能反證：build agent 沒有被同名覆寫
+  （L1：tools 是覆寫表，沒列＝預設開），而且人工測試時用的是**正確的
+  工具名**——測的根本不是同一件事。**「我另外測過是好的」必須先確認
+  測的是同一個呼叫。**
+- 為什麼偏偏是某一個檔：這是抽樣事故（L34 同族），不是那個檔特殊。
+  13 檔正常、第 14 檔自創名字，換 fresh session 重跑多半就過了。
+- 落點：機械化不可能（執行期行為），改用**最強的 prose 手段——把錯誤答案
+  寫出來**：ps-auditor 與 ps-deep-research 各加一段「工具名稱白名單」，
+  正面列出唯三正確名稱，並**指名 `get_chunk_by_id`／`get_chunk`／
+  `get_source`／`fetch_chunk` 這些不存在**，附上「看到 unavailable tool
+  ＝名字錯了，重試同名一定再失敗」的判讀。ps-deep-research 另加一句：
+  本 agent 對 `PeoplecodeSource_*` 是 deny（主 context 不取 chunk），
+  自己直接呼叫同樣會得到 unavailable tool，要解引用一律委派。
+- 原則一：**對小模型，指名錯誤答案比描述正確答案有效**。「只有這兩個工具」
+  防不住自創；「沒有 get_chunk_by_id 這個東西」才擋得住——因為它要犯的
+  錯就長那樣。
+- 原則二：**確定性失敗不該被重試**。工具不存在、表名不存在、欄位不存在
+  ——這些重試一次和一萬次結果相同。規則要教模型**分辨「暫時故障」與
+  「事實錯誤」**：前者可重試，後者只能改做法。
+- 套用：本 commit（ps-auditor／ps-deep-research）。
