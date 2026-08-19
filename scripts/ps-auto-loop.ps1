@@ -6,8 +6,16 @@
 # opencode headless 事實（v1.17.15 原始碼確認）：
 #   - run 訊息裡的 "/指令" 不展開（slash 只在互動編輯器）——用 --command <名> 帶入，
 #     訊息成為 $ARGUMENTS；command frontmatter 的 agent/model 生效
-#   - 不加 --auto：ask 類權限自動拒絕（doom loop 之類會被自動擋下＝特性）；
-#     agent tools 圍堵照常生效。本腳本刻意不用 --auto
+#   - 【L60 更正，原註解是錯的】不加 --auto **不會**自動拒絕 ask 類權限——
+#     headless 沒有 TTY 可以回答，權限詢問會**永遠阻塞**直到逾時強殺，
+#     而且提示畫在 TTY 上、stdout/stderr 重導後在 log 裡完全看不到。
+#     opencode 只有兩個權限預設是 "ask"：doom_loop（重複的相同工具呼叫）
+#     與 external_directory（專案目錄外的路徑），其餘預設 "allow"。
+#     TUI 上點「always allow」**只在該互動 session 內有效、不落檔**，
+#     所以 headless 每次開新 session 都會再撞一次。
+#     → 無人看管的前提：在**本機全域** opencode.json 的 permission 區塊
+#       把這兩個明確設成 allow／deny（見 SOP-17）；不要用 --auto 一次全開，
+#       那會連 agent tools 以外的 ask 類一併放行。
 #   - exit code：0＝正常收場、1＝session 錯誤；最終回覆進 stdout、裝飾與錯誤進 stderr
 #
 # 停機條件（七保險絲）：

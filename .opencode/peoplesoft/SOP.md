@@ -334,6 +334,23 @@ tier 2＝精修畢業（100 分）
 □ 4. **不要**加 -Force（那是忽略收據全部重驗，夜跑用它等於每晚重跑全部領域）
 □ 5. 圍欄要用 -MaxCyclesPerDomain 收斂：MaxBatchHours 只在**領域之間**檢查，
      攔不住進行中的領域（單領域最壞＝MaxCycles×120 分）
+□ 0. **【必要前提】headless 權限設定**（L60；不設就會每晚卡死一次）：
+     opencode 有兩個權限預設是 "ask"——`doom_loop`（重複的相同工具呼叫）
+     與 `external_directory`（專案目錄外的路徑）。headless 沒有 TTY 可以
+     回答，"ask" ＝**永遠阻塞**到逾時強殺，而且提示在 log 裡看不到。
+     TUI 點「always allow」只在該互動 session 內有效、**不落檔**。
+     在**本機全域** `~/.config/opencode/opencode.json`（就是已經註冊 MCP
+     的那份；內含公司內部主機名，**不進 repo**）加：
+     ```json
+     "permission": { "doom_loop": "allow", "external_directory": "deny" }
+     ```
+     · `doom_loop: allow`——稽核會對同一個 chunk id 重複取用（不同檔引用
+       同一段程式碼），那是正當行為；設 deny 會擋掉真的驗證。放行後由
+       **外環逾時**當跑飛的熔絲（框架本來就是這個分工）。
+     · `external_directory: deny`——研究只在 repo 內，真有東西要跨出去
+       應該**明確失敗**而不是靜默阻塞。
+     · **不要用 `--auto`**：那是把所有非 deny 的 ask 一次放行，範圍過大。
+     改完**重啟 opencode**，先手動跑一次 `/ps-audit <領域>` 確認不再跳提示。
 □ 6. 環境前提（沒滿足就不是無人看管，是每晚失敗一次）：
      · 地端模型服務必須是**常駐服務**，不是登入才啟動的東西
      · opencode 必須在該排程帳號的 PATH 上（.cmd 型，L46）
