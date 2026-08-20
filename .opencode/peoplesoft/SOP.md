@@ -349,14 +349,19 @@ tier 2＝精修畢業（100 分）
      在**本機全域** `~/.config/opencode/opencode.json`（就是已經註冊 MCP
      的那份；內含公司內部主機名，**不進 repo**）加：
      ```json
-     "permission": { "doom_loop": "allow", "external_directory": "allow" }
+     "permission": { "doom_loop": "deny", "external_directory": "allow" }
      ```
-     · `doom_loop: allow` ← **實測確認就是這個**（2026-08）：提示文字是
-       「continue after repeated failures?」、pattern 顯示 `invalid`。
-       `invalid` ＝工具呼叫 JSON 被截斷（SOP-9），模型重試、再截斷，
-       連續失敗就觸發 doom_loop。**根因在寫入長度，權限只是最後一環**
-       ——所以設 allow 只是讓它不要死鎖，真正的緩解仍在 SOP-9
-       （單次寫檔上限、委派只傳路徑、同檔失敗 2 次標 ⚠ 跳過）。
+     · `doom_loop: **deny**`（L60 二次修正，2026-08 實測定案）：提示原文是
+       「continue after **repeated failures**?」——它管的是**反覆失敗的呼叫**，
+       不是「反覆呼叫同一個東西」。三種設定的實際行為：
+         `ask`（預設）＝跳提示、headless 無人可答 → 卡死，**但看得見**；
+         `allow`＝**無限重試失敗的呼叫** → 卡死，**完全看不見**（實測：
+           subagent 讀一個不存在的 tool-output 檔，靜止 30 分以上、零輸出、
+           零提示）；
+         `deny`＝停止重試 → **快速失敗、看得見**。
+       確定性失敗（檔不存在、工具名錯、掛錯 server）重試一萬次結果相同
+       ——L61 已立此原則，`allow` 等於在設定層打開無限重試，與該原則相反。
+       **無人環境的判準：看得見的失敗 ＞ 看不見的重試。**
      · `external_directory: allow`——**opencode 自己會把過長的工具回傳寫進
        `%TEMP%` 再讓模型讀回來**（管理者實測觀察）。那個路徑在專案目錄外，
        設 deny 會讓 subagent 讀不到自己剛存的資料；設 ask 就是現在這個
@@ -364,9 +369,9 @@ tier 2＝精修畢業（100 分）
        那個檔的證據量大到觸發暫存機制。
      · `doom_loop: allow`——稽核會對同一個 chunk id 重複取用（不同檔引用
        同一段程式碼），那是正當行為；設 deny 會擋掉真的驗證。
-     · 兩個都放行後，跑飛由**外環逾時／一致性檢查**熔斷（框架本來就是
-       這個分工）；agent 的 `tools` 白名單照常生效，subagent 的 bash／
-       write／edit 仍然是封的，權限放寬的只是「路徑範圍」與「重複呼叫」。
+     · 這兩個設定放行／封鎖的只是「路徑範圍」與「失敗後續試」；agent 的
+       `tools` 白名單照常生效，subagent 的 bash／write／edit 仍然是封的。
+       跑飛仍由**外環逾時／一致性檢查**熔斷（框架本來就是這個分工）。
      · **不要用 `--auto`**：那是把所有非 deny 的 ask 一次放行，範圍過大。
      · 原則：**無人環境只有 allow 或 deny 兩種安全狀態，沒有第三種**——
        "ask" 在沒有 TTY 的地方一律等於死鎖。
