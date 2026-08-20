@@ -426,10 +426,11 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 □ 批次（ps-auto-all，SOP-14）執行時段**整段視同重載期間**——期間禁止
   手動 /ps-research、/ps-audit 與需查 DB 的問答（相位不可預測，且手動
   寫入會落在批次的畢業門與收據之間，讓收據認證未驗證的內容）
-□ **同一 session 內也不准並行委派（L66）**：本節原本只管「跨視窗」，
-  但稽核自己一次派多個 subagent（任務 A 多批＋任務 C 多批）同樣會在單一
-  連線上互拆 connect／disconnect——實測全體靜止、零輸出零錯誤。
-  規則已寫進 ps-audit.md 與 ps-deep-research.md：**委派一律循序**
+□ **稽核自己的併發也算在內（L67）**：本節原本只管「跨視窗」。稽核 session
+  自己同時派多個 subagent 一樣佔用同一條單工連線——**上限比照本節實測值
+  3 個**，不要一次派 6 個以上。但**不要改成全循序**：subagent 卡死是機率性
+  的（L34），循序會把單點故障放大成整輪停擺。規則寫在 ps-audit.md 與
+  ps-deep-research.md（併發上限 ＋ 一個委派只做一件事）
 □ 常見症狀：問答說「DB 通道忙碌／逾時」、稽核出現成批
   UNVERIFIABLE(逾時／view 不可用)——先想「是不是兩個視窗在搶」
 □ 快篩三步：(1) VS Code 與 SQL Developer extension 活著？
