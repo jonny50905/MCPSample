@@ -7,10 +7,8 @@ PeopleCode、SQL、SQR、SQC 全部採用**同一套**「搜尋候選 → 精確
 核心原則：
 
 - **Search Index 只負責定位**（結果只能是 `SEARCH_CANDIDATE`），
-  **來源系統的完整分段（Chunk）才是正式 Evidence**。
-  （「來源系統」不等於資料庫：PeopleCode／AE 存在 PeopleTools 表裡，
-  **SQR／SQC 是檔案系統上的獨立檔**——兩者都由 `PeoplecodeSource` 取段，
-  證據位階完全相同，不得以「不是 DB chunk」為由降級 SQR／SQC 證據。）
+  **來源系統的完整分段（Chunk）才是正式 Evidence**；
+  `PeoplecodeSource` 取回的每一型（PeopleCode／AE／SQR／SQC）證據位階相同。
 - 不可預設載入完整 PeopleCode / SQL / SQR / SQC 原始碼。
 - 動態組出的名稱、SQL、路徑一律標記 `DYNAMIC_RUNTIME`，不可猜測執行期結果。
 
@@ -232,22 +230,18 @@ maxChunksPerExpansion: 4
   (1) 結構化參數（ObjectName／eventName／**componentType**——AE 定位
   實測 `objectName=<AE名>＋componentType=ApplicationEngineProgram`
   精準命中；**SQR 帶 `componentType=sqr`、SQC 帶 `componentType=sqc`**
-  （2026-08 起可用，完整值表見 §6.0）；SQL definition 類用對應
-  componentType）→
+  （值表見 §6.0）；SQL definition 類用對應 componentType）→
   (2) `query=<物件/AE 名>`＋`searchMode: semantic`＋offset 翻到全量。
   實測：AE 名用 semantic 精準命中全部 59 chunk，同名用 exactPhrases
   查零筆（假查無）。
   `exactPhrases`／`exact` 只准用於「已知該字串必出現在內文」的
   **引文驗證**（如手術驗貨比對原 quote），禁止當定位工具；
   用錯 mode 的查無＝方法錯誤，不是「不存在」。
-- **componentType 值錯＝靜默回空，不會報錯**（同 L61 的形狀：錯的識別字
-  不會拋錯，只會安靜地什麼都不回）。以 componentType 過濾得到零筆時
-  **不得直接下「查無」**，必先做兩件事：
-  (a) 換大小寫寫法重試一次（表中值的大小寫尚未逐一實測）；
-  (b) 拿掉 componentType，只留 `query=<程式/物件名>`＋`searchMode: semantic`
-  翻頁到全量。兩者皆空才算查無——**只試過 componentType 一種寫法的查無
-  不構成合格的查無收據**。§6.0 表中未列的 componentType 值一律視為
-  **未確認**，禁止自行臆造（臆造值的後果不是報錯，是假查無）。
+- **componentType 過濾回零筆時不得下「查無」**，必先：
+  (a) 換大小寫寫法重試一次；(b) 拿掉 componentType，只留
+  `query=<程式/物件名>`＋`searchMode: semantic` 翻頁到全量。
+  兩者皆空才算查無——**只試過一種寫法的查無不構成合格的查無收據**。
+  §6.0 表中未列的 componentType 值禁止使用。
 - 不准回報「程式碼截斷、無法確認」而不嘗試 file-mode 接續。
 
 ## 6. MCP Tool Contract（長文本共用）
@@ -267,22 +261,18 @@ maxChunksPerExpansion: 4
 | `PeoplecodeSource`（tool `get_file_structure(fileId)`） | `ps_get_source_outline` — 以 fileId 取該檔完整結構（回傳 `File.FilePath` 與段落清單）；file-mode 的核心工具 |
 | `oracleMCP` | metadata 類角色（origin / choices / label / process / security / AE 結構）——查詢樣板見 `oracle-query-cookbook.md`，只准 SELECT |
 
-**`search_chunks` 的 `componentType` 已確認值**（未列＝未確認，處置見 §5.1；
-日後新增值必須回填本表，這是唯一權威來源）：
+**`search_chunks` 的 `componentType` 值**（未列的值禁止使用；新增值回填本表）：
 
-| componentType | 涵蓋 | 來源形態 |
-|---|---|---|
-| `ApplicationEngineProgram` | AE 程式（step / action） | PeopleTools 表（DB） |
-| `sqr` | SQR 報表／批次程式 | **檔案系統上的獨立檔** |
-| `sqc` | SQC include 檔 | **檔案系統上的獨立檔** |
+| componentType | 涵蓋 |
+|---|---|
+| `ApplicationEngineProgram` | AE 程式（step / action） |
+| `sqr` | SQR 報表／批次程式 |
+| `sqc` | SQC include 檔 |
 
-SQR／SQC 是 PeopleSoft 裡**不存在於資料庫**的程式類型（放在 `$PS_HOME/sqr`
-與客製 SQR 目錄，由 Process Scheduler 呼叫），**2026-08 才首次進索引**。
-在那之前這兩型的 `search_chunks` 一律回空——**歷史上任何 SQR／SQC 的
-「查無」都是能力缺口造成的假象，不是事實**（重查義務見 SOP-8）。
-oracleMCP 對這兩型只查得到 Process 定義／排程／Run Control，
-**查不到一行程式內容**；要內容一律走 ES＋Source。
-取段路徑與其他型別完全相同：chunk id → `PeoplecodeSource_get_chunks_details`。
+SQR／SQC 的程式內容只在 ES＋Source 取得（oracleMCP 對這兩型只有 Process
+定義／排程／Run Control）。取段路徑同其他型別：chunk id →
+`PeoplecodeSource_get_chunks_details`。**文件中既有的 SQR／SQC「查無」
+結論一律重查，不得沿用。**
 
 `ps_expand_source_context`、`ps_find_source_references` 尚未實作，過渡做法：
 以符號、程式名或鄰近關鍵字再搜 ES 取得 chunk ids，再用 PeoplecodeSource 取段；

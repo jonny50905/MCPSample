@@ -31,16 +31,13 @@ searchMode / customPrefixes、已知物件與聚焦問題。
 
 1. Read `.opencode/skills/ps-sqr-flow/SKILL.md` 與
    `.opencode/peoplesoft/progressive-source-retrieval.md`，全程遵守。
-2. **定位一律先用結構化過濾**：`search_chunks` 帶
-   `componentType=sqr`（SQC 用 `componentType=sqc`）＋程式名，
-   **不要一開始就拿程式名做全文搜**——程式名可能只存在 metadata、
-   不在程式內文，全文查無是假象（L26）。回零筆時照
-   `progressive-source-retrieval.md` §5.1 的 componentType fail-safe
-   處理（換大小寫、拿掉 componentType 走 semantic），**不得直接判查無**。
-3. 命中後若拿得到 `fileId`，**`get_file_structure(fileId)` 取完整程式結構**
-   （Section / Procedure 清單）。該工具對 SQR／SQC **尚未實測**：
-   取不到結構時，退而以命中 chunk 的 `StartLine`/`EndLine` 拼出覆蓋範圍，
-   並把「無結構視圖」寫進 `gaps`（不是失敗，是已知限制）。
+2. **定位先用結構化過濾**：`search_chunks` 帶 `componentType=sqr`
+   （SQC 用 `componentType=sqc`）＋程式名，不要一開始就拿程式名做全文搜。
+   回零筆時照 `progressive-source-retrieval.md` §5.1 處理，
+   **不得直接判查無**。
+3. 命中後取 `fileId` → **`get_file_structure(fileId)` 取程式結構**
+   （Section / Procedure 清單）；取不到結構時，以命中 chunk 的
+   `StartLine`/`EndLine` 拼出覆蓋範圍，並把缺結構視圖寫進 `gaps`。
    之後**只取**回答問題必要的 Procedure / SQL Block / SQC Include
    （以 `get_chunks_details` 取段）。仍不可整支載入
    （大檔依結構選段；小檔 ≤ 6 段可全取）。
@@ -59,12 +56,8 @@ searchMode / customPrefixes、已知物件與聚焦問題。
 ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 必須經 PeoplecodeSource 取回完整段落才能作為 Evidence。
 
-**SQR／SQC 的來源形態**：這兩型是 PeopleSoft 裡**檔案系統上的獨立檔**
-（`$PS_HOME/sqr` 與客製 SQR 目錄），不在 PeopleTools 表裡，
-由 Process Scheduler 呼叫。因此 oracleMCP 只查得到它的 Process 定義／
-排程／Run Control，**查不到一行程式內容**——內容一律走 ES＋Source。
-這兩型是 **2026-08 才首次進索引**的：文件中既有的 SQR／SQC「查無」結論
-**一律視為過期，必須重查**，不得沿用。
+SQR／SQC 的程式內容只在 ES＋Source 取得（oracleMCP 對這兩型只有 Process
+定義／排程／Run Control）。文件中既有的 SQR／SQC「查無」結論一律重查。
 
 ## 硬規則
 

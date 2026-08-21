@@ -62,19 +62,14 @@ referencedTables / referencedFields
 | 工具 | 用途 |
 |---|---|
 | `ps_get_source_outline` | 先取程式骨架（Section / Procedure / Include 清單） |
-| `ps_search_source` | hybrid 搜尋。**現行環境真參數是 `componentType="sqr"`／`"sqc"`**（`sourceTypes` 只是協定角色名，照抄呼叫會無聲失效） |
+| `ps_search_source` | hybrid 搜尋；`componentType="sqr"` / `"sqc"` 過濾 |
 | `ps_get_source_chunks` | 取精確 Procedure / SQL Block（正式 Evidence） |
 | `ps_expand_source_context` | 追蹤必要 DO Call / #include（CALLEE / INCLUDE 模式） |
 | `ps_find_source_references` | 反查 Procedure / Table 被誰引用 |
 
-> 表中五個是**協定角色名，不是真工具名**。現行環境對映（含 `componentType`
-> 已確認值表與值錯時的 fail-safe）見 `progressive-source-retrieval.md`
-> §6.0 與 §5.1；`ps_expand_source_context` / `ps_find_source_references`
-> 尚未實作，補不到的一律寫進報告 `gaps`。
->
-> **SQR／SQC 是檔案系統上的獨立檔**（`$PS_HOME/sqr` 與客製目錄），
-> 不存在於資料庫，**2026-08 才首次進索引**——此前的「查無」全是能力缺口
-> 造成的假象，既有文件中該類結論一律重查。
+> 實際工具對映與 `componentType` 值表見 `progressive-source-retrieval.md`
+> §6.0；`ps_expand_source_context` / `ps_find_source_references` 尚未實作，
+> 補不到的寫進報告 `gaps`。既有的 SQR／SQC「查無」結論一律重查。
 
 ## Skill Rules
 

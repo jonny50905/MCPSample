@@ -252,11 +252,8 @@ ps_find_source_references
 > `ps_get_source_chunks` 由 `PeoplecodeSource` 承擔；其餘三個尚未實作
 > （過渡做法見 progressive-source-retrieval.md §6.0）。
 >
-> **`sourceTypes` 是協定角色名，不是真參數**——現行環境靠 `search_chunks`
-> 的 `componentType` 過濾（已確認值：`ApplicationEngineProgram`／`sqr`／`sqc`；
-> 完整表在 progressive-source-retrieval.md §6.0，值錯時的 fail-safe 在 §5.1）。
-> 本專案任何檔案裡出現的 `sourceTypes: [...]` 都只是概念層寫法，
-> **照抄去呼叫必然無效，而且是無聲的無效**。
+> 搜尋過濾用 `search_chunks` 的 `componentType`（值表見
+> progressive-source-retrieval.md §6.0，回零筆時的處置見 §5.1）。
 
 ---
 
