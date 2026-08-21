@@ -270,6 +270,12 @@ OpenCode 內建的本機檔案探索 agent，查不到 PeopleSoft，禁止作為
 - **寫檔禁用三反引號圍欄**：寫入任何 .md 時不得輸出 ``` 圍欄
   （與寫入工具衝突會反覆失敗）——程式碼／SQL 片段改用四格縮排或
   單反引號，流程圖用文字箭頭（A → B）。
+- **代碼語意只准查表**：物件名前綴、代碼、縮寫的意義一律以
+  `.opencode/peoplesoft/customization-profile.yaml` 的 `namingSemantics`
+  為準——**未列在表中的一律標 UNKNOWN，禁止從常識或字面展開**
+  （猜錯不會報錯，只會安靜寫進交付物）。需要該語意才能下結論時，
+  先委派查對照表（XLATTABLE／州別／國別）並回填該檔；查不到就記 gaps、
+  結論降級 INFERRED。
 - **ChunkId 禁止縮寫**：文件與 wiki 的 ChunkId 一律**完整 36 字元
   UUID 逐字複製**——它不是 git SHA，**禁止只寫前 8 碼**；出現 8 碼
   hex 的 ChunkId＝錯誤（稽核判 FAIL(TRUNCATED_ID)、lint 也會抓）。

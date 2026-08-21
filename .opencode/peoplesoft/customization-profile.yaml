@@ -52,6 +52,25 @@ searchPolicy:
   allowDeliveredFallback: true
   allowDeliveredDependencies: true
 
+# 代碼語意對照（本環境專屬）——**只准查表，不准從常識推測**。
+# 代碼是環境設定不是通用縮寫：同一組字母在不同環境、不同欄位可以是完全
+# 不同的東西，而猜錯**不會報錯**，只會安靜地寫進交付物。
+namingSemantics:
+  # 物件名前綴（與上方 customPrefixes 對應；此處記語意）
+  prefixes:
+    TW_: 台灣在地化客製——強烈的客製訊號（判定仍以 objectOrigins 為準）
+
+  # 代碼／縮寫（可能出現在物件名、欄位值、Translate 值、資料內容）
+  codes:
+    AZ: 美國亞利桑那州（Arizona，US state）——**不是澳洲**；澳洲是 AU／AUS
+
+  # 未列在本表的代碼一律 UNKNOWN：
+  #  1) 交付物裡**不得寫出推測的展開**（「AZ 應該是…」「看起來像…」）；
+  #  2) 需要它的語意才能下結論 → 先查來源（oracleMCP 照 cookbook 樣板查
+  #     XLATTABLE／州別／國別等對照表），查到就**回填本表**；
+  #  3) 查不到 → 該處標 UNKNOWN 並記進 gaps，結論降級 INFERRED。
+  unlistedCodePolicy: UNKNOWN_MUST_VERIFY
+
 oracle:
   # PeopleTools 表的擁有者 schema——登入帳號非擁有者時，裸表名會
   # view/table not found。連線生命週期第 3 步執行：
