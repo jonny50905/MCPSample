@@ -676,6 +676,13 @@ else {
     Write-Host "FAIL：$($violations.Count) 項違規" -ForegroundColor Red
     $violations | ForEach-Object { Write-Host " - $_" }
     $exitCode = 1
+    # 相位提示（L72）：90-audit.md 類違規只有 **audit 相位**重寫得了，research
+    # 再跑幾輪也不會動到它。auto-loop 讀這個數字決定相位——否則「唯一能修它的
+    # 相位被它自己擋在門外」＝活鎖（L63 同族）。畢業門仍看全部違規，標準沒放寬。
+    $auditOnlyViolations = @($violations | Where-Object { $_ -like '90-audit.md*' })
+    if ($auditOnlyViolations.Count -gt 0) {
+        Write-Host "AUDIT_ONLY：$($auditOnlyViolations.Count) 項只有 audit 相位修得了（90-audit.md 類）——research 再跑幾輪也不會動到它" -ForegroundColor Yellow
+    }
 }
 
 # 證據修復指令（縮寫 id＋機器參照無效同一張單）——放「最後」印，

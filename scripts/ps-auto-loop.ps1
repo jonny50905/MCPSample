@@ -454,7 +454,20 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     if (-not $goResearch) {
         if ($Tier -eq 1) {
             $coverBefore = Invoke-Lint -Coverage
-            $goResearch = ($coverBefore.Exit -ne 0)
+            # 相位只看「research 修得動」的缺料（L72）：90-audit.md 類
+            # （記分卡塌縮、輪次不一致…）只有 audit 相位重寫得了。把它算進
+            # 相位判斷＝唯一能修它的相位被它自己擋住＝活鎖（L63 同族）。
+            # 畢業門仍看**全部**缺料，標準一點都沒放寬。
+            $cvTotal = 0
+            $cvAuditOnly = 0
+            $mCvT = [regex]::Match($coverBefore.Raw, '(?m)^FAIL：(\d+) 項違規')
+            if ($mCvT.Success) { $cvTotal = [int]$mCvT.Groups[1].Value }
+            $mCvA = [regex]::Match($coverBefore.Raw, '(?m)^AUDIT_ONLY：(\d+) 項')
+            if ($mCvA.Success) { $cvAuditOnly = [int]$mCvA.Groups[1].Value }
+            $goResearch = (($cvTotal - $cvAuditOnly) -gt 0)
+            if ($cvAuditOnly -gt 0) {
+                Write-Log "COVERAGE(圈前) 缺料 $cvTotal 項，其中 $cvAuditOnly 項僅 audit 可修——相位不受那 $cvAuditOnly 項影響"
+            }
             # 落檔（L71）：畢業門的 coverage-cycle*.txt 只在 audit 相位寫——
             # 卡在 research 相位時完全不會產生，而那正是最需要看缺料清單的時候。
             Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-pre.txt" -f $cycle)) `
