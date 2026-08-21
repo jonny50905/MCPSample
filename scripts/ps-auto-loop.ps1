@@ -460,13 +460,27 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             # 畢業門仍看**全部**缺料，標準一點都沒放寬。
             $cvTotal = 0
             $cvAuditOnly = 0
+            $cvManualOnly = 0
             $mCvT = [regex]::Match($coverBefore.Raw, '(?m)^FAIL：(\d+) 項違規')
             if ($mCvT.Success) { $cvTotal = [int]$mCvT.Groups[1].Value }
             $mCvA = [regex]::Match($coverBefore.Raw, '(?m)^AUDIT_ONLY：(\d+) 項')
             if ($mCvA.Success) { $cvAuditOnly = [int]$mCvA.Groups[1].Value }
-            $goResearch = (($cvTotal - $cvAuditOnly) -gt 0)
-            if ($cvAuditOnly -gt 0) {
-                Write-Log "COVERAGE(圈前) 缺料 $cvTotal 項，其中 $cvAuditOnly 項僅 audit 可修——相位不受那 $cvAuditOnly 項影響"
+            $mCvM = [regex]::Match($coverBefore.Raw, '(?m)^MANUAL_ONLY：(\d+) 項')
+            if ($mCvM.Success) { $cvManualOnly = [int]$mCvM.Groups[1].Value }
+            $cvAuto = $cvTotal - $cvAuditOnly - $cvManualOnly
+            $goResearch = ($cvAuto -gt 0)
+            if ($cvAuditOnly -gt 0 -or $cvManualOnly -gt 0) {
+                Write-Log "COVERAGE(圈前) 缺料 $cvTotal 項＝自動 $cvAuto／僅 audit 可修 $cvAuditOnly／需人工 $cvManualOnly——相位只看自動那 $cvAuto 項"
+            }
+            # 沒有任何自動路徑可走時，**立刻**停機並指名待辦（L74）——
+            # 讓它跑滿兩圈再報「無進度」＝燒兩個 session 講一句本來就知道的話，
+            # 而且停機理由完全沒提到人要做什麼。
+            if ($cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
+                $stopReason = "剩 $cvManualOnly 項需人工（歸檔類，agent 禁止改寫 checklist-archive*.md）——清單見 coverage-cycle$cycle-pre.txt 的 MANUAL_ONLY 段；處理完再啟動"
+                Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-pre.txt" -f $cycle)) `
+                    -Value $coverBefore.Raw -Encoding UTF8
+                Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)｜無自動路徑可走 → 直接停機"
+                break
             }
             # 落檔（L71）：畢業門的 coverage-cycle*.txt 只在 audit 相位寫——
             # 卡在 research 相位時完全不會產生，而那正是最需要看缺料清單的時候。

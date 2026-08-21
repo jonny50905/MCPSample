@@ -712,6 +712,19 @@ else {
     if ($auditOnlyViolations.Count -gt 0) {
         Write-Host "AUDIT_ONLY：$($auditOnlyViolations.Count) 項只有 audit 相位修得了（90-audit.md 類）——research 再跑幾輪也不會動到它" -ForegroundColor Yellow
     }
+    # 沒有任何相位修得掉的（L74）：agent 被明令禁止改寫 checklist-archive*.md
+    # （ps-deep-research 硬規則），所以牽涉歸檔內容的一律只能人工。
+    # 白名單制——沒列到的預設「research 修得動」，讓迴圈去試（fail-safe：
+    # 分類漏掉只是多跑一圈，分類過頭會讓真的能自動修的項目被判成要人工）。
+    $manualPatterns = @('個未打勾項', '與歸檔重複', '稽核流程標籤')
+    $manualOnlyViolations = @($violations | Where-Object {
+            $v = $_
+            ($manualPatterns | Where-Object { $v.Contains($_) }).Count -gt 0
+        })
+    if ($manualOnlyViolations.Count -gt 0) {
+        Write-Host "MANUAL_ONLY：$($manualOnlyViolations.Count) 項沒有任何相位修得掉，需人工處理（歸檔類——agent 禁止改寫 checklist-archive*.md）" -ForegroundColor Yellow
+        $manualOnlyViolations | ForEach-Object { Write-Host "   · $_" -ForegroundColor Yellow }
+    }
 }
 
 # 證據修復指令（縮寫 id＋機器參照無效同一張單）——放「最後」印，
