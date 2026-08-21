@@ -174,6 +174,8 @@ powershell -File .\scripts\ps-doc-lint.ps1 -Domain <領域>
 30 秒、不經模型、可重複。任何寫入波之後都該跑一次。有違規時會在最後印出
 **手術式修復指令**——整段複製貼給模型，逐筆修完再跑一次。
 
+檢查項、三種模式、工單型別與 exit code 見下方[腳本](#腳本)章節。
+
 ### 自動迴圈
 
 ```powershell
@@ -235,13 +237,236 @@ tier 1 **不保證每句話能回溯驗證**——證據 id 格式、機器參�
 
 ## 腳本
 
-| 腳本 | 用途 |
+五個是框架本體，兩個是前一個專案的遺留。全部 PowerShell 5.1、**UTF-8 with
+BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` 反推 repo 根；
+放錯資料夾會印 WARN）。
+
+| 腳本 | 一句話 | 寫檔 |
+|---|---|---|
+| `ps-doc-lint.ps1` | 文件格式與證據的確定性稽核 ＋ 產手術工單 | 唯讀 |
+| `ps-auto-loop.ps1` | 單領域自動迴圈駕駛 | log、收據 |
+| `ps-auto-all.ps1` | 多領域批次排程 | log |
+| `ps-graduation.ps1` | 收據的寫入與驗證（函式庫，不直接執行） | 收據 |
+| `ps-fs-doctor.ps1` | 檔案系統健檢 | 唯讀（`-FixBom` 例外） |
+| `test-mcp-tools-list.ps1`<br>`test-elasticsearch-mcp-tools-list.ps1` | **遺留**，與本框架無關 | — |
+
+---
+
+### `ps-doc-lint.ps1` — 第一層稽核
+
+```powershell
+powershell -File .\scripts\ps-doc-lint.ps1 -Domain <領域>
+powershell -File .\scripts\ps-doc-lint.ps1 -Domain <領域> -CoverageOnly
+powershell -File .\scripts\ps-doc-lint.ps1 -Domain <領域> -StrictAudit
+```
+
+**定位**：這是**確定性**那一層——不經模型、30 秒、同樣輸入永遠同樣輸出。
+第二層是 `/ps-audit`（模型重新取證）。兩層職責不重疊：lint 只判**機械上可
+判定**的事（欄位格式、檔案是否存在、章節是否空殼），不判內容對不對。
+
+任何一波寫入之後都該跑一次。
+
+#### 三種模式
+
+| 模式 | 誰在用 | 差別 |
+|---|---|---|
+| 無開關 | 人工（SOP-2） | 結構性問題只警告不擋——手動檢查不該被格式問題卡住 |
+| `-CoverageOnly` | **tier 1 畢業門** | 美工類違規降為警告；記分卡塌縮升為違規；工單只出 `[洩漏]` 型 |
+| `-StrictAudit` | **tier 2 畢業門** | `90-audit.md` 的結構性問題由警告升為 FAIL |
+
+`-CoverageOnly` **不是新增檢查，是把既有檢查分兩段收**。標準沒有變嚴。
+
+分類採**白名單**：只有明確列在 `$polishPatterns` 的訊息算美工，**其餘一律算
+缺料**。這是 fail-safe——分類漏掉只會讓門更嚴，不會放水。
+
+#### exit code
+
+```text
+0  全部通過
+1  有違規（違規清單與手術工單印在最後）
+2  環境錯誤：領域目錄不存在，或 -Domain 參數含隱形字元
+```
+
+#### 檢查項
+
+**缺料類**（tier 1 就擋——「有沒有東西可讀」）
+
+| 類別 | 檢查 |
 |---|---|
-| `ps-doc-lint.ps1` | 文件格式與證據稽核。`-CoverageOnly`＝tier 1 門，`-StrictAudit`＝tier 2 門 |
-| `ps-auto-loop.ps1` | 單領域自動迴圈駕駛。`-Preflight` 唯讀驗環境，`-Tier 1\|2` 選目標等級 |
-| `ps-auto-all.ps1` | 多領域批次排程（兩趟、驗收據、熔絲） |
-| `ps-graduation.ps1` | 收據的寫入與驗證邏輯（唯一真相，不得他處抄寫） |
-| `ps-fs-doctor.ps1` | 檔案系統健檢（唯讀）：隱形字元、雙胞胎資料夾、雙 BOM、腳本語法 |
+| 檔案存在 | 缺 `00-overview.md`（附近似檔名收據，分辨假缺／真缺／掃錯目錄）、空檔（0 byte） |
+| 章節完整 | 缺必要章節、章節空殼（有標題無實質內容：僅 HTML 註解、佔位符、「同前」類省略語） |
+| checklist 對帳 | 已打勾但檔案不存在、檔案未列於調查進度、歸檔檔含未打勾項、缺節標題（破壞性覆寫指紋） |
+| 寫入脫軌 | 模型內部標記洩漏進交付物、subagent 回報 JSON 原樣洩漏 |
+| 稽核報告 | `90-audit.md` 不存在、缺「稽核輪次」表頭、輪次與 checklist 不一致、**記分卡未逐檔列出檔名** |
+
+**美工類**（tier 1 降警告，tier 2 才擋——「每句話能不能回溯驗證」）
+
+| 檢查 |
+|---|
+| ChunkId 遭縮寫為 8 碼 / 非 UUID 格式 / 自編 id 樣式 / 廣域偵測到的縮寫 id |
+| Evidence 附錄空白 |
+| 機器參照無效（既非 36 字元 ChunkId、也非可重跑 SELECT） |
+| 機器參照欄放的是標籤（如「PeopleCode chunk」「OracleMCP」）而證據其實在位置欄 |
+| 以**失敗查詢**（ORA- 錯誤、查無此表）當機器參照 |
+| 行為邏輯無任何 confidence 標註 |
+| wiki frontmatter 缺 key、`status` 值非法 |
+
+**只警告，任何模式都不升級**
+
+wiki 層（`docs/ps-research/wiki/`）是**跨領域共用**的——把它升為違規，會讓
+A 領域的畢業被 B 領域的斷鏈鎖死。所以 wikilink 斷鏈、孤兒 entity、
+`last_verified` 超過 90 天一律只警告。
+
+同一類的還有：`00-overview.md` 換版落後（SOP-15）、功能地圖缺後續發現項目、
+表格欄位數與表頭不一致、「待人工SQL」列數統計（合法待辦，非違規）。
+
+#### 手術工單
+
+有違規時，**最後**會印出一段 `=== 證據修復指令 ===`（印在最後才不會被警告牆
+洗掉）。整段複製貼給 `ps-deep-research`，或由 `ps-auto-loop` 自動餵。
+
+工單分三型，**先判型別再動手，判錯型別等於白做**：
+
+| 型別 | 現象 | 修法 |
+|---|---|---|
+| `[洩漏]` | 模型內部標記寫進了交付物 | **不是刪掉標記就好**——要看標記前後整個區塊有沒有被截斷（表格斷半路、章節缺下半段），補回內容；補不回就記「因寫入脫軌遺失，待重查」 |
+| `[欄位]` | 證據在位置欄，機器參照欄放的是標籤 | **純編輯，不重查、不呼叫任何工具**——把可重跑的那一份搬到機器參照欄。證據內容一個字都不准改 |
+| `[證據]` | 缺 id、壞 id、或失敗查詢當證據 | 先分 CHUNK 型（委派檢索 flow 重取）或 SQL 型（委派具 oracleMCP 權限的 flow 重跑），都取不到就降級 INFERRED 入 gaps |
+
+`[欄位]` 型**按檔合併**成一個任務（對調欄位是純編輯，一個檔一次改完最省）；
+`[洩漏]`／`[證據]` 型逐列開單。
+
+另有一份 **人工處理清單**印在工單之外，**不要貼給模型**——`checklist.md`
+（熱檔，整檔重寫可能吃掉未勾項）、`00-overview.md`（已凍結）、`90-audit.md`
+（下一輪會整檔重寫）這三類的洩漏，手動刪最安全。
+
+#### `-Domain` 參數消毒
+
+`-Domain` 尾部的空白或點會觸發 Windows 尾字元正規化不對稱：**目錄查得到、
+其下檔案全查無**——一個完美的假缺檔。所以參數會先 `Trim()` 並印 WARN；
+含隱形字元（FEFF、零寬空格、NBSP）直接 exit 2 並要你跑 `ps-fs-doctor`。
+
+**領域名請用鍵盤手打，不要從別處貼上。**
+
+---
+
+### `ps-auto-loop.ps1` — 單領域自動迴圈
+
+```powershell
+# 唯讀驗環境，不取鎖、不啟動任何 session
+powershell -File .\scripts\ps-auto-loop.ps1 -Domain <領域> -Preflight
+
+# 開跑
+powershell -File .\scripts\ps-auto-loop.ps1 -Domain <領域>
+```
+
+每圈：決定相位（research 還是 audit）→ 跑一個 session → lint → 有工單就餵
+手術 session → 驗畢業門 → 過了發收據停機，沒過進下一圈。
+
+| 參數 | 預設 | 說明 |
+|---|---|---|
+| `-Domain` | 必填 | 領域名（手打） |
+| `-Tier 1\|2` | 1 | 目標等級。1＝覆蓋畢業，2＝精修畢業 |
+| `-MaxCycles` | 20 | 圈數上限（熔絲） |
+| `-MaxSurgeryPerCycle` | 3 | 一圈最多連跑幾批手術。真正的收斂煞車是「本批沒讓清單變短就停」，這個只是時間圍欄 |
+| `-SurgeryBatchSize` | 7 | 一批塞幾筆工單。本圈最多處理 = 兩者相乘 |
+| `-ResearchTimeoutMin` | 60 | research 與**手術** session 的逾時 |
+| `-AuditTimeoutMin` | 120 | audit session 的逾時 |
+| `-Model` | （空） | 覆寫本次用的模型；留空吃 opencode 全域預設 |
+| `-Preflight` | — | 只檢查並列印，不啟動任何 session |
+
+```text
+exit 0  畢業（收據已寫）
+     1  未畢業
+     2  環境或收據錯誤
+     3  互斥鎖被占用（另一個迴圈在跑）
+```
+
+**逾時是熔絲不是效能參數**，要照實測值設。log 在 `auto-loop-logs\<領域>\`。
+
+`-Preflight` 會印：checklist 未勾／已勾／稽核輪次、起始相位、三個 lint 的
+exit、tier 1 的工單數、現有收據有效與否、熔絲設定。**要判斷「現在該不該再
+跑一輪」，看這個就夠了。**
+
+---
+
+### `ps-auto-all.ps1` — 多領域批次
+
+```powershell
+powershell -File .\scripts\ps-auto-all.ps1 -MaxCyclesPerDomain 8
+```
+
+佇列讀 `.opencode/peoplesoft/research-domains.txt`（一行一領域，`#` 註解）。
+職責只有：讀佇列 → preflight → 驗收據 → 逐一以**子行程**呼叫 `ps-auto-loop`
+→ 記錄。**它不呼叫模型、不寫 checklist、永不寫收據。**
+
+| 參數 | 預設 | 說明 |
+|---|---|---|
+| `-Tier 0\|1\|2` | 0 | 0＝兩趟（所有領域先到 tier 1，再全部做 tier 2） |
+| `-MaxDomains` | 0 | 0＝不限；只計實際 RUN，SKIP 不消耗 |
+| `-MaxBatchHours` | 0 | 0＝不限。**只在領域之間檢查，攔不住進行中的領域** |
+| `-MaxCyclesPerDomain` | 0 | >0 時透傳給 loop 的 `-MaxCycles`——**跑批務必設這個** |
+| `-MaxConsecutiveFailures` | 3 | 連續失敗熔斷 |
+| `-Force` | — | 忽略有效收據，全部重驗 |
+| `-Model` | （空） | 透傳 |
+
+嚴格循序：領域之間共享 Entity Wiki／oracleMCP／working tree，禁止並行。
+子行程呼叫代表**行程死亡時 OS 自動回收互斥鎖**，不會留下 stale lock。
+
+---
+
+### `ps-graduation.ps1` — 收據函式庫
+
+**不直接執行**，由 `ps-auto-loop`（寫收據）與 `ps-auto-all`（驗收據）
+dot-source。hash 計算與收據驗證**只有這一份真相**，禁止在別處各抄一份。
+
+三個設計決策值得知道：
+
+- hash 範圍用**排除法**（領域目錄全部 `*.md` 減 `log.md`），不是列舉法——
+  列舉法漏掉散檔就會漏出範圍，而 `-Filter` 不支援 `[0-9]` 字元類、會靜默
+  匹配失敗。
+- 內容先**剝 BOM 與 `\r` 再 hash**——人工搬運與 git autocrlf 不會造成假失效。
+- 檔名以 **Ordinal 排序**——`Sort-Object` 是 culture-sensitive，中文檔名跨機
+  不定序。
+
+改動 `ps-auto-loop` 的畢業門判定時，**必須手動 bump `GraduationGateVersion`**
+——門邏輯不在任何 hash 覆蓋內。
+
+---
+
+### `ps-fs-doctor.ps1` — 檔案系統健檢
+
+```powershell
+powershell -File .\scripts\ps-fs-doctor.ps1 -Domain <領域>
+powershell -File .\scripts\ps-fs-doctor.ps1 -Domain <領域> -FixBom
+```
+
+**每次人工搬運之後都要跑。** 專治「Explorer 看得到、程式找不到」——在
+Windows 上這幾乎都是隱形字元或雙副檔名。
+
+輸出最後一行是**結論代號**（可複選，例 `A+D`）：
+
+```text
+A  00-overview 其實存在（假缺——當時 lint 的 -Domain 輸入被污染，手打重跑）
+B  檔名異常（變體／隱形字元）
+C  資料夾雙胞胎或資料夾名異常
+D  內文 FEFF 污染（雙 BOM 病；.ps1 可加 -FixBom 自動修）
+E  真缺檔或路徑對不上（走 SOP-4 還原）
+F  這次輸入的參數含隱形字元
+S  腳本語法解析失敗（搬運不完整，重新複製整檔）
+G  全部正常
+```
+
+**資安設計**：實際路徑與檔名只印在你自己螢幕上。回報維護 session 時
+**只需要講代號那一行**，不必貼任何輸出。
+
+---
+
+### 遺留腳本
+
+`test-mcp-tools-list.ps1` 與 `test-elasticsearch-mcp-tools-list.ps1` 是前一個
+.NET 專案（`src\HanshinChat.Mcp.Server`）的 MCP smoke test，與本框架無關，
+也不會被任何流程呼叫。留著只是還沒清。
 
 ## 環境紀律
 
