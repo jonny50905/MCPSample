@@ -42,8 +42,13 @@ param(
     [ValidateSet(1, 2)][int]$Tier = 1,
     [int]$MaxCycles = 20,
     # 一圈最多連跑幾批手術（L58）：只要每批都讓手術清單變短就繼續，
-    # 免得每修 7 筆就先燒一個稽核 session
+    # 免得每修 7 筆就先燒一個稽核 session。真正的收斂煞車是下方「本批沒讓
+    # 清單變短就停」；本上限只是時間圍欄（最壞 MaxSurgeryPerCycle×
+    # ResearchTimeoutMin 分）。
     [int]$MaxSurgeryPerCycle = 3,
+    # 一批塞幾筆工單（L70）：原本硬編碼 7——44 筆工單＝7 批，一圈只給 3 批，
+    # 要 3 圈才清得完，而圈 2／圈 3 的前置 session 對清工單零貢獻。
+    [int]$SurgeryBatchSize = 7,
     # 逾時＝熔絲不是效能參數，照實測基線設（L48）：research 曾在 30 分上限被
     # 強殺（＝上限訂太緊，把健康的 session 砍掉），放寬到 60 分後未再撞上限。
     # 注意手術 session 沿用 ResearchTimeoutMin，改這個值等於同步放寬手術上限；
@@ -380,13 +385,14 @@ if ($Preflight) {
     Write-Host "起始相位  ：$ph" -ForegroundColor Green
     $l = Invoke-Lint
     Write-Host "lint      ：exit=$($l.Exit)（0=全過 1=有違規 -1=領域未建立）｜工單 $($l.Surgical.Count) 筆"
-    Write-Host "CoverageOnly：exit=$($lc.Exit)（tier 1 畢業門用：0=缺料已清）"
+    Write-Host "CoverageOnly：exit=$($lc.Exit)（tier 1 畢業門用：0=缺料已清）｜tier 1 工單 $($lc.Surgical.Count) 筆"
     $ls = Invoke-Lint -Strict
     Write-Host "StrictAudit：exit=$($ls.Exit)（tier 2 畢業門用；tier 1 不看）"
     $rc = Test-GraduationReceipt -DomainDir $dir -Domain $Domain `
         -LintScriptPath $lintPath -GateScriptPath $gradLibPath -RequiredTier $Tier
     Write-Host "現有收據  ：$(if ($rc.Valid) { "有效（本領域已達 tier $Tier，跑下去會重驗）" } else { $rc.Reason })"
     Write-Host "熔絲設定  ：MaxCycles=$MaxCycles｜research 逾時 $ResearchTimeoutMin 分｜audit 逾時 $AuditTimeoutMin 分"
+    Write-Host "手術節流  ：一批 $SurgeryBatchSize 筆 × 一圈 $MaxSurgeryPerCycle 批＝本圈最多 $($SurgeryBatchSize * $MaxSurgeryPerCycle) 筆"
     Write-Host "log 位置  ：$logRoot"
     Write-Host "=== 檢查結束（未啟動任何 session）===" -ForegroundColor Cyan
     exit 0
@@ -508,8 +514,11 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     }
     else { $errorStreak = 0 }
 
-    # 每個 session 後跑 lint；FAIL 且有手術清單→自動餵一個修復 session（一圈最多一次、≤7 筆）
-    $lint = Invoke-Lint
+    # 每個 session 後跑 lint；FAIL 且有手術清單→自動餵修復 session。
+    # **手術用的尺必須跟 tier 一致**（L70）：tier 1 用 CoverageOnly——它的工單
+    # 只出缺料類（[洩漏] 型）。用基礎 lint 會讓 tier 1 燒好幾個 session 去修
+    # [欄位]／[證據] 這些不擋覆蓋畢業的美工類工單，那是 tier 2 的工作。
+    $lint = if ($Tier -eq 1) { Invoke-Lint -Coverage } else { Invoke-Lint }
     Add-Content -Path (Join-Path $logRoot ("lint-cycle{0}.txt" -f $cycle)) -Value $lint.Raw -Encoding UTF8
     Write-Log "LINT exit=$($lint.Exit) 手術清單=$($lint.Surgical.Count) 筆"
     # L58：一圈可連跑多批手術（預設 3），條件是**上一批確實讓清單變短**。
@@ -521,8 +530,8 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     while ($lint.Exit -eq 1 -and $lint.Surgical.Count -gt 0 -and $surgeryRound -lt $MaxSurgeryPerCycle) {
         $surgeryRound++
         $beforeSurgical = $lint.Surgical.Count
-        $batch = @($lint.Surgical | Select-Object -First 7)
-        if ($lint.Surgical.Count -gt 7) { Write-Log "手術清單 $($lint.Surgical.Count) 筆，本批先修 7 筆（第 $surgeryRound/$MaxSurgeryPerCycle 批）" }
+        $batch = @($lint.Surgical | Select-Object -First $SurgeryBatchSize)
+        if ($lint.Surgical.Count -gt $SurgeryBatchSize) { Write-Log "手術清單 $($lint.Surgical.Count) 筆，本批先修 $SurgeryBatchSize 筆（第 $surgeryRound/$MaxSurgeryPerCycle 批；本圈最多處理 $($SurgeryBatchSize * $MaxSurgeryPerCycle) 筆，其餘交下一圈）" }
         $flat = ($batch -join "；") -replace '"', "'"
         # 禁令必要：ps-deep-research 在 checklist 全勾時會自行接跑稽核（agent 啟動
         # 規則），改寫 90-audit.md／輪次會污染本圈的畢業判定與下圈的轉移基準
@@ -546,7 +555,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             Write-Log "手術 session 逾時強殺——一致性檢查 PASS，續跑"
         }
         elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 errorStreak）" }
-        $lint2 = Invoke-Lint
+        $lint2 = if ($Tier -eq 1) { Invoke-Lint -Coverage } else { Invoke-Lint }
         Write-Log "LINT(術後第 $surgeryRound 批) exit=$($lint2.Exit) 手術清單=$($lint2.Surgical.Count) 筆"
         $lint = $lint2
         if ($lint.Surgical.Count -ge $beforeSurgical) {

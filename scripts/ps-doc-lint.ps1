@@ -683,7 +683,16 @@ else {
 # （失敗查詢／SQL 型證據被寫成「缺 id」會逼模型去做無解的事）。
 $leakDelegable = @($leaks | Where-Object { $_.Delegable })
 $leakManual = @($leaks | Where-Object { -not $_.Delegable })
-if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplacedRefRows.Count) -gt 0) {
+# tier 1（-CoverageOnly）的工單只出「缺料類」＝[洩漏] 型（寫入脫軌會讓章節
+# 真的缺內容）。[欄位]／[證據] 型對應的違規訊息全在 $polishPatterns 白名單內
+# ——CoverageOnly 已把它們降為警告不擋門，工單卻照出，等於 auto-loop 在 tier 1
+# 燒好幾個 session 修不擋門的東西，與廣度優先（L50：tier 1 不保證回溯驗證，
+# 回溯驗證是 tier 2 的工作）直接牴觸。
+$polishOrderCount = $truncatedIds.Count + $missingIds.Count + $misplacedRefRows.Count
+$emitPolish = (-not $CoverageOnly)
+$orderTotal = $leakDelegable.Count
+if ($emitPolish) { $orderTotal += $polishOrderCount }
+if ($orderTotal -gt 0) {
     Write-Host ""
     Write-Host "=== 證據修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
     Write-Host "以下是 lint 確認的問題清單，逐筆修復、一次一筆、一筆都不准跳："
@@ -697,6 +706,7 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplaced
     # ——逐列開單會把 30 列變成 30 個任務，而 auto-loop 一圈只吃 7 筆（實案：
     # 錯放 30 餘列，逐列開單要 5 圈、每圈還先燒一個稽核 session）
     $swapByFile = @{}
+    if ($emitPolish) {
     foreach ($t in $misplacedRefRows) {
         $fn = ($t -split ':')[0]
         $ln = ($t -split ':')[1]
@@ -716,6 +726,7 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplaced
         $i++
         Write-Host "$i. [證據] $($t.File)：機器參照無效＠$($t.Ref)"
     }
+    }
     Write-Host ""
     if ($leakDelegable.Count -gt 0) {
         Write-Host "【洩漏】型（模型內部標記寫進了交付物）——**不是刪掉標記就好**："
@@ -729,7 +740,7 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplaced
         Write-Host "  5) 只准改清單所列的檔，一個字都不要動其他檔"
         Write-Host ""
     }
-    if ($misplacedRefRows.Count -gt 0) {
+    if ($emitPolish -and $misplacedRefRows.Count -gt 0) {
         Write-Host "【欄位】型（**最便宜：純編輯，不要重查、不要呼叫任何工具**）："
         Write-Host "  現象：位置欄放了完整 ChunkId 或可重跑 SELECT，機器參照欄卻只寫"
         Write-Host "        「ChunkId」「PeopleCode chunk」「OracleMCP」「SQL」這類標籤。"
@@ -741,6 +752,7 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplaced
         Write-Host "  同一檔內其他列若已是正確格式，照那個格式對齊即可。"
         Write-Host ""
     }
+    if ($emitPolish) {
     Write-Host "【證據】型每筆**先判型別再動手（判錯型別＝白做）**："
     Write-Host " A. CHUNK 型（程式碼：PeopleCode／AE step／SQR／SQL definition）"
     Write-Host "    → read 該檔該行取得 filePath／物件名 → **委派**下列其中一個重取"
@@ -771,12 +783,18 @@ if (($truncatedIds.Count + $missingIds.Count + $leakDelegable.Count + $misplaced
     Write-Host " C. A 與 B 都取不到 → 該列移除、主張降級 INFERRED、"
     Write-Host "    未解事項記一行查法收據（查了什麼、怎麼查、結果）"
     Write-Host ""
+    }
     Write-Host "全部完成後輸出收據，每筆一行：欄位型「檔:行 → 已對調（機器參照欄現為 <id 或 SELECT 前 20 字>）」；"
     Write-Host "洩漏型「檔:行 → 已清除＋補回<內容>」或"
     Write-Host "「檔:行 → 已清除，<章節>內容遺失已記未解事項」；證據型「舊值 → 新完整UUID」"
     Write-Host "或「舊值 → SQL：SELECT…」或「舊值 → 移除入 gaps」或「舊值 → 待人工SQL」。"
     Write-Host "沒有收據＝沒完成。現在從第 1 筆開始。"
     Write-Host "=== 指令結束 ===" -ForegroundColor Cyan
+    Write-Host ""
+}
+# 抑制要講出來——無聲截斷會讀成「已經沒事了」
+if ($CoverageOnly -and $polishOrderCount -gt 0) {
+    Write-Host "（另有 $polishOrderCount 筆美工類工單未列出——[欄位]／[證據] 型不擋覆蓋畢業，留待 tier 2 精修）" -ForegroundColor DarkGray
     Write-Host ""
 }
 # 不可委派的洩漏：印在工單之外，避免被自動迴圈餵進去做無解的事（L43）
