@@ -31,7 +31,8 @@ oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
 
 適用於 `NN-*.md` 與 **wiki entity 檔**（`docs/ps-research/wiki/*.md`——
 驗 Observations 的 evidence 與 frontmatter `sources` 的 chunk hash 是否仍成立；
-過期 → 回報建議標 `stale`）。
+過期 → 在 reason 建議把該 entity 的 frontmatter `status` 改 `stale`；
+**該筆 verdict 仍須落在下列三值域之一**）。
 **human 型來源**：sources 含 `human:<日期>`（人工指正知識）且
 frontmatter `reviewed: true` → 該筆**免解引用**，判
 `PASS(HUMAN_VERIFIED)`——人教的知識沒有 chunk 可驗，
@@ -51,14 +52,16 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
   也不得換工具代償（用 search_chunks 的命中與否代替解引用＝抽樣不是驗證）。
 - 解引用**固定走 Source**（索引是副本，CR 上線後會落後）。ES 的
   `get_chunk_by_id` 只用於**交叉檢查**：`get_chunks_details` 查無時以同一
-  id 再查——ES 有＝該 id 曾存在但來源已變（判 stale／走二次定位，**不判
-  FABRICATED**）；ES 也無＝較可能捏造，照原規則判。此步驟不取代解引用。
+  id 再查——ES 有＝該 id 曾存在但來源已變，**走二次定位、不判
+  FABRICATED**；ES 也無＝較可能捏造，照原規則判。此步驟不取代解引用。
 - **成批查無＝環境訊號，不是成批捏造（L64，優先於上一條）**：本輪已有
   **≥3 檔**出現 id 查無（含 ES 也無）＝索引重建／chunk id 輪替的訊號——
-  捏造是零星的，不會 15 檔同時全滅。此時**全部判 stale、逐筆走二次定位**
+  捏造是零星的，不會 15 檔同時全滅。此時**逐筆走二次定位**
   （ObjectName＋事件名結構化搜尋取新 id），一律不判 FABRICATED，並在
   90-audit.md 表頭下加一行「⚠ 本輪成批查無 N 檔——疑似索引已重建，
-  舊 id 全面失效」。
+  舊 id 全面失效」。**每一筆仍須落位，不得因「舊 id 全面失效」而略過**：
+  二次定位找到新 id → `FAIL(ID_RELINK)`＋附新 id；三管道皆無 →
+  `UNVERIFIABLE(INDEX_REBUILT)`。
 
 1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**
@@ -108,7 +111,8 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    **查得到 → `FAIL(FALSE_NEGATIVE)`**（附找到的 chunk id；
    負面結論失效，該項需回灌補查）；仍查無 → PASS。
    工具鏈修復後的首輪稽核，此步**全量**做（歷史查無平反）。
-5. 每筆判 `PASS` / `FAIL(原因)` / `UNVERIFIABLE(工具不可用/逾時)`。
+5. 每筆判 `PASS` / `FAIL(原因)` / `UNVERIFIABLE(原因)`——**值域只有這三個，
+   沒有第四種**。任何情境（含索引重建、舊 id 全面失效）都必須落在其中之一。
 
 ### B. Claim 反駁驗證（抽樣）
 
@@ -172,6 +176,10 @@ Page 名（帶錯必查空，屬方法錯誤）。任一角度**查無 ≠ 不�
 
 ## 硬規則
 
+- **計分卡逐筆落位**：目標檔 Evidence 的每一筆都要在計分卡佔一列，
+  判定只能是 PASS／FAIL／UNVERIFIABLE。「無適用判定」不是選項——
+  歸不了類就判 `UNVERIFIABLE(原因)`。**計分卡列數少於 Evidence 筆數
+  ＝本次稽核無效**，不得以「該筆情況特殊」省略。
 - 判定只依據重新取得的證據；「文件這樣寫」不構成理由。
 - quote 比對失敗照實 FAIL——不腦補「大概是後來改版了」。
 - 不修文件、不寫任何檔案。

@@ -499,7 +499,10 @@ if (Test-Path -LiteralPath $auditPath) {
     $cover = Get-ScorecardCoverage -AuditText $auditText -NnNames $nnNames
     if ($nnNames.Count -gt 0 -and $cover.Missing.Count -gt 0) {
         $msg = "90-audit.md：記分卡未涵蓋 $($cover.Missing.Count) 個檔案（最佳章節「$($cover.Heading)」覆蓋 $($cover.Covered)/$($nnNames.Count)；範圍塌縮跡象——稽核未全量重驗）：$($cover.Missing -join '、')"
-        if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
+        # 塌縮＝稽核沒跑完，屬「有沒有做完」不是「證據精不精修」——tier 1 門
+        # （CoverageOnly）必須看得見，否則只驗兩檔的稽核也能拿覆蓋畢業。
+        # 手動執行（無開關）仍維持警告不擋（SOP-2）。
+        if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
 }
 elseif ($StrictAudit) {

@@ -1638,3 +1638,37 @@
 - 套用：本 commit（progressive-source-retrieval §核心原則／§3／§5.1／§6.0、
   mcp-tool-contracts §3、ps-sqr-flow agent＋SKILL、ps-auditor 二次定位、
   ps-doc-lint 工單 A 路線、SOP-8）。
+
+### L69 值域外的判定會讓整批從計分卡蒸發——塌縮且零 FAIL 是「照做」不是「放水」（2026-08）
+- 事件：索引重建後第一輪 audit，管理者回報「計分卡嚴重塌縮，且沒顯示
+  FAIL，但底下系統性錯誤有正確報出 index 重建的問題」。
+- 根因：auditor 在三個地方被明文要求「判 stale」（wiki entity 過期、
+  ES 有 Source 無、L64 成批查無），但——
+  · 步驟 5 的值域只有 `PASS` / `FAIL(原因)` / `UNVERIFIABLE(原因)`；
+  · JSON 回報格式的 verdict 範例只有 PASS；
+  · 90-audit.md 模板章節叫「## FAIL / DISPUTED / UNVERIFIABLE 明細」。
+  **`stale` 在整條輸出鏈上零定義。** 模型被要求做一個計分卡沒有欄位的
+  判定，又被明文禁止判 FABRICATED——那些筆數無處可放，直接消失。
+  而「系統性錯誤」那行照樣寫出來了，因為 L64 明文要求加那行、模板也有
+  「## 系統性錯誤觀察」章節。**有位置的就寫了，沒位置的就蒸發了。**
+- 這不是模型偷懶：它嚴格照規則走，是規則的值域有洞。同一個形狀在
+  design review 已被記為 fatal（`待人工SQL` 在稽核端零定義）——
+  **同一種洞出現第二次，代表這是類別問題不是個案**：凡是規則裡出現的
+  判定字面，都必須在值域、JSON schema、報告模板三處都有落點。
+- 第二個洞（外環）：lint 有 `Get-ScorecardCoverage` 專門測塌縮，但那條
+  只在 `-StrictAudit`（tier 2 門）升為違規，`-CoverageOnly`（tier 1 門）
+  看不到它。**tier 1 因此可以在「稽核只驗了兩檔」的情況下覆蓋畢業**——
+  塌縮屬「有沒有做完」，不是「證據精不精修」，分錯段了。
+- 落點：
+  1. 值域封閉：明寫「只有這三個，沒有第四種」；stale 改映射到既有值域
+     （找到新 id → `FAIL(ID_RELINK)`；三管道皆無 →
+     `UNVERIFIABLE(INDEX_REBUILT)`）。**不新增第四種 verdict**——新增就要
+     同步改 lint、模板、計分卡三處，那正是這個洞的成因。
+  2. 硬規則「計分卡逐筆落位」：Evidence 每筆佔一列，計分卡列數少於
+     Evidence 筆數＝本次稽核無效。
+  3. lint：記分卡塌縮在 `-CoverageOnly` 下升為違規（手動執行仍不擋，SOP-2）。
+  4. mcp-tool-contracts 與 SOP-11 的 stale 說法同步改掉。
+- 原則：**規則裡的每一個判定字面，都要能指出它在輸出上的落點。**
+  指不出來的判定＝指示模型產生一個沒有容器的東西，結果不是報錯，
+  是安靜地不見——與 L68 的「靜默空回傳」同族。
+- 套用：本 commit（ps-auditor、ps-doc-lint、mcp-tool-contracts、SOP-11）。
