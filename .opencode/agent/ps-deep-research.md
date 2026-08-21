@@ -213,6 +213,8 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    「查無全量抽驗：已執行（第 N+1 輪）」——翻旗標，下輪不再全量。
 4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`
    **整檔重寫** `90-audit.md`：表頭寫「稽核輪次：N+1」與本日日期；
+   記分卡的檔案欄一律寫**完整檔名**（`01-TW_XXX.md`），不要只寫編號
+   （「01」）——編號代稱讀的人要回頭對照才知道是哪一檔；
    **所有判定只准來自本輪 auditor 回報——禁止 read 舊 90-audit.md、
    禁止沿用其數字或內容**；判定詞彙只准契約五詞（證據層 PASS／FAIL／
    UNVERIFIABLE；claim 層 VERIFIED／DISPUTED／UNVERIFIABLE），auditor
