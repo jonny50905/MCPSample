@@ -498,10 +498,12 @@ if (Test-Path -LiteralPath $auditPath) {
     # 全部——標題叫什麼不重要，覆蓋率才是塌縮判準（自創標題不再擋畢業）
     $cover = Get-ScorecardCoverage -AuditText $auditText -NnNames $nnNames
     if ($nnNames.Count -gt 0 -and $cover.Missing.Count -gt 0) {
-        $msg = "90-audit.md：記分卡未涵蓋 $($cover.Missing.Count) 個檔案（最佳章節「$($cover.Heading)」覆蓋 $($cover.Covered)/$($nnNames.Count)；範圍塌縮跡象——稽核未全量重驗）：$($cover.Missing -join '、')"
-        # 塌縮＝稽核沒跑完，屬「有沒有做完」不是「證據精不精修」——tier 1 門
-        # （CoverageOnly）必須看得見，否則只驗兩檔的稽核也能拿覆蓋畢業。
-        # 手動執行（無開關）仍維持警告不擋（SOP-2）。
+        $msg = "90-audit.md：記分卡未逐檔列出 $($cover.Missing.Count) 個檔名（最佳章節「$($cover.Heading)」列出 $($cover.Covered)/$($nnNames.Count)）——本項只量『記分卡有沒有逐檔列』，不推論稽核有沒有跑；成批問題寫成彙總句也會觸發。修法＝逐檔逐筆列回計分卡：$($cover.Missing -join '、')"
+        # 本檢查只量「記分卡有沒有逐檔列出檔名」——量不到「稽核跑了沒」，
+        # 訊息不得代為推因（L69：舊訊息寫「稽核未全量重驗」，實案是稽核跑完
+        # 但把成批問題寫成彙總句，該推論誤導了排查方向）。
+        # 仍須擋 tier 1：塌縮的報告無法回灌——不知道哪一檔哪一筆要修，
+        # 下一輪 research 拿不到可執行工單。手動執行維持警告不擋（SOP-2）。
         if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
 }
