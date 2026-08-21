@@ -207,6 +207,9 @@ if ($null -ne $checklistOnly) {
     # 已打勾項會歸檔到 checklist-archive*.md（每輪一個分片檔）——對帳時全部合併看；
     # archive 只准收已打勾項——未勾項被搬走＝進度隱形消失（L28）
     $archiveFiles = @(Get-ChildItem -LiteralPath $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
+    # 稽核流程標籤（L73）：任務 A／B／C 的委派切分、批次編號是 auditor 自己的
+    # 流程紀錄，寫進 checklist＝製造永遠做不完的假項目。逐檔報（L74）。
+    $procLabelPattern = '(?m)^\s*-\s*\[[ x]\]\s*(?=.*(?:任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+))(.+?)\s*$'
     # 活頁的列文字（去掉勾選框——勾選狀態本來就會變，比對只看內容）
     $clLiveRows = @{}
     foreach ($m in [regex]::Matches($checklistOnly, '(?m)^\s*-\s*\[[ x]\]\s*(.+?)\s*$')) {
@@ -226,6 +229,12 @@ if ($null -ne $checklistOnly) {
                 $dupRows += ("{0}｜{1}" -f $af.Name, $m.Groups[1].Value)
             }
         }
+        # 流程標籤逐檔數（L74）：合併報一個數字，人不知道該開哪個檔改
+        $afProc = @([regex]::Matches($afText, $procLabelPattern))
+        if ($afProc.Count -gt 0) {
+            $procSample = (@($afProc | Select-Object -First 2 | ForEach-Object { $_.Groups[1].Value }) -join '；')
+            $violations += "$($af.Name)：含 $($afProc.Count) 列稽核流程標籤（如「$procSample」）——那是 auditor 的委派切分不是調查項，**整列刪除**（不要搬回 checklist，那會變成永遠做不完的假項目）"
+        }
         $checklistSrc += "`n" + $afText
     }
     if ($dupRows.Count -gt 0) {
@@ -234,11 +243,11 @@ if ($null -ne $checklistOnly) {
         if ($dupRows.Count -gt 3) { $dupMore = "…等 $($dupRows.Count) 列" }
         $violations += "checklist.md 與歸檔重複 $($dupRows.Count) 列——歸檔是搬移不是複製，已寫進 archive 的列必須從 checklist.md 移除：$dupSample$dupMore"
     }
-    # 稽核流程標籤不是調查項（L73）：任務 A／B／C 的委派切分、批次編號是
-    # auditor 自己的流程紀錄，寫進 checklist＝製造永遠做不完的假項目。
-    $procLabelRows = @([regex]::Matches($checklistSrc, '(?m)^\s*-\s*\[[ x]\]\s*(?=.*(?:任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+))(.+?)\s*$'))
-    if ($procLabelRows.Count -gt 0) {
-        $violations += "checklist／歸檔含 $($procLabelRows.Count) 列稽核流程標籤（如「任務C批次 1/3」）——那是 auditor 的委派切分不是調查項，逐列刪除；回灌只准寫「A<n> 補查 <NN-檔名>：FAIL x／DISPUTED y／UNVERIFIABLE z（稽核）」"
+    # 活頁的流程標籤（歸檔那份在上面的迴圈裡逐檔報）
+    $clProc = @([regex]::Matches($checklistOnly, $procLabelPattern))
+    if ($clProc.Count -gt 0) {
+        $clProcSample = (@($clProc | Select-Object -First 2 | ForEach-Object { $_.Groups[1].Value }) -join '；')
+        $violations += "checklist.md：含 $($clProc.Count) 列稽核流程標籤（如「$clProcSample」）——那是 auditor 的委派切分不是調查項，**整列刪除**；回灌只准寫「A<n> 補查 <NN-檔名>：FAIL x／DISPUTED y／UNVERIFIABLE z（稽核）」"
     }
 
     # 1) checklist 對帳：打勾項的目標檔必須存在；NN 檔必須被 checklist 列到
