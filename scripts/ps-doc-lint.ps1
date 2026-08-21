@@ -50,14 +50,37 @@ function Test-SectionHollow {
     return $false
 }
 
-# 記分卡定位（L36）：**以結構找表，不綁章節名**——模型會自創標題
-# （實例：「本輪已完成檔案總覽」取代「總覽記分卡」，資料完整只是換了格子）。
-# 畢業門要驗的是「全量覆蓋」這個事實，不是標題字串；標題飄移留警告即可
-# （L23：資料在就不追殺），否則純命名問題＝無修復管道的畢業活鎖。
-# 候選章節優先取標題含記分卡類關鍵字者；都沒有才退回「排除明細類」全表掃描。
+# 覆蓋判定（L36／L76／L77）：**驗事實，不驗字面**。要驗的事實是
+# 「每個 NN 檔都被這輪稽核驗到了」，不是「它被寫在哪一節、用什麼寫法」。
+# 三次誤報都出在這裡：綁章節名（模型自創標題）→ 綁完整檔名（模型寫「01」）
+# → 綁記分卡章節（模型把逐檔資料放明細、記分卡只留統計）。
+# 所以：**違規判定掃整份報告**；記分卡那一節自己有沒有逐檔列只發警告
+# （L23：資料在就不追殺，但講出來）。純命名／版面問題不得擋畢業——
+# audit 每輪都會照自己的習慣重寫，擋下去就是無修復管道的活鎖。
+function Test-NnMentioned {
+    param([string]$Body, [string]$Name, [bool]$AllowPrefix)
+    if ([string]::IsNullOrEmpty($Body)) { return 'NONE' }
+    $base = [IO.Path]::GetFileNameWithoutExtension($Name)
+    if ($Body -match [regex]::Escape($base)) { return 'FULL' }
+    if ($AllowPrefix) {
+        # 編號代稱須帶錨點——行號、日期（2026-08-01）、chunk id 裡也有兩位數：
+        #   (1) 列首／清單項／第一個儲存格開頭：「01…」「- 01…」「| 01…」
+        #   (2) 任一儲存格**恰為**該編號：「| 1 | 01 | 12 |」（有流水號欄）
+        $p = $Name.Substring(0, 2)
+        $patHead = '(?m)^[^\S\r\n]*(?:[-*][^\S\r\n]*|\|[^\S\r\n]*)?(?:\*\*)?' +
+            [regex]::Escape($p) + '(?![0-9])'
+        $patCell = '\|[^\S\r\n|]*(?:\*\*)?' + [regex]::Escape($p) +
+            '(?:\*\*)?[^\S\r\n|]*\|'
+        if (($Body -match $patHead) -or ($Body -match $patCell)) { return 'PREFIX' }
+    }
+    return 'NONE'
+}
+
 function Get-ScorecardCoverage {
     param([string]$AuditText, $NnNames)
-    $best = @{ Covered = -1; Missing = @($NnNames); Heading = '(無章節)'; PrefixOnly = @() }
+    $best = @{ Covered = -1; Missing = @($NnNames); Heading = '(無章節)'
+        PrefixOnly = @(); OutsideScorecard = @()
+    }
     if ([string]::IsNullOrEmpty($AuditText) -or $NnNames.Count -eq 0) { return $best }
     $sections = @()
     $curHead = '(表頭前)'
@@ -71,51 +94,51 @@ function Get-ScorecardCoverage {
         else { [void]$buf.AppendLine($ln) }
     }
     $sections += [pscustomobject]@{ Heading = $curHead; Body = $buf.ToString() }
-    $cands = @($sections | Where-Object { $_.Heading -match '(記分卡|總覽|檔案清單|scorecard)' })
-    if ($cands.Count -eq 0) {
-        $cands = @($sections | Where-Object { $_.Heading -notmatch '(明細|回灌|系統性|完整性|覆核)' })
-    }
-    if ($cands.Count -eq 0) { $cands = $sections }
-    # 編號代稱（L76）：模型常把記分卡的檔案欄寫成「01」「02」而非完整檔名，
-    # 資料是全的，只是換了寫法——那是命名變體不是塌縮（L23：資料在就不追殺；
-    # 純命名問題會變成無修復管道的畢業活鎖，因為 audit 每輪都這樣寫）。
-    # 只在「該編號唯一對應一個檔」時才准用：NN-X.md 與續篇 NN-X-2.md 共用
-    # 前綴，此時一個「01」證明不了兩個都列到。
+    # 編號代稱只在「該編號唯一對應一個檔」時才准用：NN-X.md 與續篇
+    # NN-X-2.md 共用前綴，此時一個「01」證明不了兩個都列到。
     $prefixCount = @{}
     foreach ($n in $NnNames) {
         $p = $n.Substring(0, 2)
         if ($prefixCount.ContainsKey($p)) { $prefixCount[$p]++ } else { $prefixCount[$p] = 1 }
     }
-    foreach ($sec in $cands) {
-        $miss = @()
-        $prefixOnly = @()
-        foreach ($n in $NnNames) {
-            $base = [IO.Path]::GetFileNameWithoutExtension($n)
-            if ($sec.Body -match [regex]::Escape($base)) { continue }
-            $p = $n.Substring(0, 2)
-            if ($prefixCount[$p] -eq 1) {
-                # 兩種合格寫法（皆須錨點——行號、日期、chunk id 裡也有兩位數，
-                # 不加錨點會把它們誤判成「檔案列到了」）：
-                #   (1) 列首／清單項／第一個儲存格開頭：「01…」「- 01…」「| 01…」
-                #   (2) 任一儲存格**恰為**該編號：「| 1 | 01 | 12 |」（有流水號欄）
-                $patHead = '(?m)^[^\S\r\n]*(?:[-*][^\S\r\n]*|\|[^\S\r\n]*)?(?:\*\*)?' +
-                    [regex]::Escape($p) + '(?![0-9])'
-                $patCell = '\|[^\S\r\n|]*(?:\*\*)?' + [regex]::Escape($p) +
-                    '(?:\*\*)?[^\S\r\n|]*\|'
-                if (($sec.Body -match $patHead) -or ($sec.Body -match $patCell)) {
-                    $prefixOnly += $n; continue
-                }
+    # 1) 違規判定＝整份報告有沒有提到該檔
+    $miss = @()
+    $prefixOnly = @()
+    foreach ($n in $NnNames) {
+        $ap = ($prefixCount[$n.Substring(0, 2)] -eq 1)
+        $r = Test-NnMentioned -Body $AuditText -Name $n -AllowPrefix $ap
+        if ($r -eq 'NONE') { $miss += $n }
+        elseif ($r -eq 'PREFIX') { $prefixOnly += $n }
+    }
+    # 2) 記分卡那一節自己有沒有逐檔列——只發警告（版面建議，不擋門）
+    $scHeading = '(無記分卡章節)'
+    $outside = @()
+    $cands = @($sections | Where-Object { $_.Heading -match '(記分卡|總覽|檔案清單|scorecard)' })
+    if ($cands.Count -gt 0) {
+        $bestSec = $null
+        $bestN = -1
+        foreach ($sec in $cands) {
+            $c = 0
+            foreach ($n in $NnNames) {
+                $ap = ($prefixCount[$n.Substring(0, 2)] -eq 1)
+                if ((Test-NnMentioned -Body $sec.Body -Name $n -AllowPrefix $ap) -ne 'NONE') { $c++ }
             }
-            $miss += $n
+            if ($c -gt $bestN) { $bestN = $c; $bestSec = $sec }
         }
-        $cov = $NnNames.Count - $miss.Count
-        if ($cov -gt $best.Covered) {
-            $best = @{ Covered = $cov; Missing = @($miss); Heading = $sec.Heading
-                PrefixOnly = @($prefixOnly)
+        if ($null -ne $bestSec) {
+            $scHeading = $bestSec.Heading
+            foreach ($n in $NnNames) {
+                if ($miss -contains $n) { continue }
+                $ap = ($prefixCount[$n.Substring(0, 2)] -eq 1)
+                if ((Test-NnMentioned -Body $bestSec.Body -Name $n -AllowPrefix $ap) -eq 'NONE') {
+                    $outside += $n
+                }
             }
         }
     }
-    return $best
+    return @{ Covered = ($NnNames.Count - $miss.Count); Missing = @($miss); Heading = $scHeading
+        PrefixOnly = @($prefixOnly); OutsideScorecard = @($outside)
+    }
 }
 
 # 以 script 所在位置反推 repo 根目錄——任何工作目錄都能跑。
@@ -567,15 +590,20 @@ if (Test-Path -LiteralPath $auditPath) {
     $cover = Get-ScorecardCoverage -AuditText $auditText -NnNames $nnNames
     if ($cover.PrefixOnly.Count -gt 0) {
         $poSample = (@($cover.PrefixOnly | Select-Object -First 3) -join '、')
-        $warnings += "90-audit.md：記分卡有 $($cover.PrefixOnly.Count) 個檔案以編號代稱（如「01」）而非完整檔名——**覆蓋算數、不擋門**，但完整檔名才讓「哪一檔沒被驗」一眼可讀：$poSample"
+        $warnings += "90-audit.md：$($cover.PrefixOnly.Count) 個檔案以編號代稱（如「01」）而非完整檔名——**覆蓋算數、不擋門**，但完整檔名才讓「哪一檔沒被驗」一眼可讀：$poSample"
+    }
+    if ($cover.OutsideScorecard.Count -gt 0) {
+        $osSample = (@($cover.OutsideScorecard | Select-Object -First 3) -join '、')
+        $warnings += "90-audit.md：記分卡章節「$($cover.Heading)」沒有逐檔列出 $($cover.OutsideScorecard.Count) 個檔（逐檔資料在明細等其他章節）——**覆蓋算數、不擋門**，但記分卡逐檔一列最好讀：$osSample"
     }
     if ($nnNames.Count -gt 0 -and $cover.Missing.Count -gt 0) {
-        $msg = "90-audit.md：記分卡未逐檔列出 $($cover.Missing.Count) 個檔名（最佳章節「$($cover.Heading)」列出 $($cover.Covered)/$($nnNames.Count)）——本項只量『記分卡有沒有逐檔列』，不推論稽核有沒有跑；成批問題寫成彙總句也會觸發。修法＝逐檔逐筆列回計分卡：$($cover.Missing -join '、')"
-        # 本檢查只量「記分卡有沒有逐檔列出檔名」——量不到「稽核跑了沒」，
-        # 訊息不得代為推因（L69：舊訊息寫「稽核未全量重驗」，實案是稽核跑完
-        # 但把成批問題寫成彙總句，該推論誤導了排查方向）。
-        # 仍須擋 tier 1：塌縮的報告無法回灌——不知道哪一檔哪一筆要修，
-        # 下一輪 research 拿不到可執行工單。手動執行維持警告不擋（SOP-2）。
+        $msg = "90-audit.md 整份報告未提及 $($cover.Missing.Count) 個檔名（提及 $($cover.Covered)/$($nnNames.Count)）——本項只量『報告有沒有提到這些檔』，不推論稽核跑了沒；成批問題寫成彙總句也會觸發。修法＝在記分卡或明細逐檔列出：$($cover.Missing -join '、')"
+        # 只量「報告有沒有提到這些檔」——量不到「稽核跑了沒」，訊息不得代為
+        # 推因（L69：舊訊息寫「稽核未全量重驗」，實案是稽核跑完但寫成彙總句）。
+        # 掃**整份報告**不限章節（L77）：逐檔資料放記分卡或明細由模型決定，
+        # 綁章節＝把版面偏好升級成畢業門，而 audit 每輪都照自己的習慣重寫
+        # ＝無修復管道的活鎖。仍須擋 tier 1：真的整份都沒提到某檔，
+        # 那份報告回灌不了。手動執行維持警告不擋（SOP-2）。
         if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
 }

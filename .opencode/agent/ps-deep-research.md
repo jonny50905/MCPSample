@@ -213,6 +213,15 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    「查無全量抽驗：已執行（第 N+1 輪）」——翻旗標，下輪不再全量。
 4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`
    **整檔重寫** `90-audit.md`：表頭寫「稽核輪次：N+1」與本日日期；
+   **兩張表分工照模板，不得混用**——
+   `## 總覽記分卡`＝**一檔一列**（檔案／證據 PASS／FAIL／UNVERIFIABLE／
+   Claim VERIFIED／DISPUTED／燈號），**每個 NN 檔都要有一列**（記分卡就是
+   全量覆蓋的證明），最後一列必為「合計」；
+   `## FAIL/DISPUTED/UNVERIFIABLE 明細`＝**每筆非 PASS 判定一列**
+   （UNVERIFIABLE 也要列，不得只在記分卡出現數字）。
+   **不要把逐筆判定塞進記分卡**——那會變成幾百列、失去可讀性，
+   最後退化成純統計表而逐檔列消失（實案：記分卡只剩 PASS/FAIL/
+   UNVERIFIABLE 三個數字，逐檔資料全跑到明細）。
    記分卡的檔案欄一律寫**完整檔名**（`01-TW_XXX.md`），不要只寫編號
    （「01」）——編號代稱讀的人要回頭對照才知道是哪一檔；
    **所有判定只准來自本輪 auditor 回報——禁止 read 舊 90-audit.md、
