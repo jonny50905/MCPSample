@@ -80,8 +80,11 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    NOT_FOUND），其次走「Component（或物件）名搜檔 →
    get_file_structure → 按 Event／結構挑單元 → get_chunks_details」
    重找——找到且 quote 命中
-   （正規化比對）→ `FAIL(ID_RELINK)` 並附新 id（id 失聯但證據為真，
-   修法＝換 id）；重找仍無 → **最後以 `query=<物件/AE 名>`＋
+   （正規化比對）→ `FAIL(ID_RELINK)`，**新 id 一律放進結構化欄位
+   `newRef`**（完整 36 字元逐字複製，不要只寫在 reason 自由文字裡——
+   委派方要靠這個欄位產下一輪的機械修復工單，寫在敘述裡等於丟掉）；
+   `ref` 欄保持**舊 id** 不動（換 id 要靠舊值定位文件中該列）。
+   id 失聯但證據為真，修法＝換 id；重找仍無 → **最後以 `query=<物件/AE 名>`＋
    `searchMode: semantic`＋offset 全量翻頁做第三管道**（L32：物件/AE
    名的 exactPhrases／exact 查無是假象——那是內文字面過濾，
    metadata 名不保證在內文）——三管道皆無才判 `FAIL(NOT_FOUND)`。
@@ -164,7 +167,9 @@ Page 名（帶錯必查空，屬方法錯誤）。任一角度**查無 ≠ 不�
   "taskType": "EVIDENCE_DEREF | CLAIM_VERIFY | COVERAGE_SWEEP",
   "target": "01-TW_XXX.md",
   "evidence": [
-    { "ref": "<ChunkId 或 SQL 摘要>", "verdict": "PASS", "reason": "" }
+    { "ref": "<ChunkId 或 SQL 摘要>", "verdict": "PASS", "reason": "" },
+    { "ref": "<舊 ChunkId>", "verdict": "FAIL(ID_RELINK)", "reason": "<人話>",
+      "newRef": "<二次定位取得的完整 36 字元新 ChunkId>" }
   ],
   "claims": [
     { "claim": "<原文一句>", "verdict": "DISPUTED", "reason": "chunk 內無此條件" }

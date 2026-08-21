@@ -30,7 +30,9 @@
 
 <!-- 「處置」欄＝下一輪的可執行工單。稽核已經查到答案的類型，答案
      必須寫在這一欄，否則下一輪只拿得到 A 行的計數、要再付一次檢索成本：
-       ID_RELINK  → `換 id → <完整 36 字元 UUID>`
+       ID_RELINK  → `換 id：<完整舊 UUID> → <完整新 UUID>`（**兩個都要完整
+                    36 字元**；lint 會機械解析這一欄開成 [回灌] 工單，
+                    舊值是修復者定位「哪一列」的唯一線索）
        LINE_DRIFT → `更新行號 → <新行號>`
        STALE_DATA → `更新數值 → <新值>`
      其餘（NOT_FOUND／FABRICATED／WRONG_KIND…）才寫「回灌補查」。 -->
@@ -39,7 +41,7 @@
 |---|---|---|---|---|
 | 01-… | 證據 FAIL | ChunkId … | quote 非 ChunkText 子字串 | 回灌補查 |
 | 02-… | 證據 UNVERIFIABLE | SQL … | oracleMCP 逾時（~30s） | 回灌重驗 |
-| 03-… | 證據 FAIL(ID_RELINK) | 舊 ChunkId … | id 失聯，二次定位已取得新 id | 換 id → 7f3a…（完整 36 字元） |
+| 03-… | 證據 FAIL(ID_RELINK) | 舊 ChunkId | id 失聯，二次定位已取得新 id | 換 id：<完整舊 UUID> → <完整新 UUID> |
 
 ## 上輪回灌項覆核（第 2 輪起必填；首輪寫「無上輪」）
 

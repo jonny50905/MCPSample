@@ -346,6 +346,8 @@ $truncatedIds = @()
 $missingIds = @()   # 檔案行號型缺 chunk id——與縮寫 id 同進手術單（修法同形）
 $pendingSqlRows = @()   # 明寫「待人工SQL」的列＝合法待辦出口，不算違規但要點名
 $misplacedRefRows = @()  # 同列有證據、但機器參照欄放的是標籤（欄位錯放，非缺證據）
+$nnText = @{}            # 檔名 → 內容（回灌工單要查「新 id 是否已套用」）
+$relinkOrders = @()      # [回灌]：90-audit.md 明細「處置」欄帶的機械修復指令
 
 Get-ChildItem -LiteralPath $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
@@ -353,6 +355,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         $name = $_.Name
         $nnNames += $name
         $text = Get-Content $_.FullName -Raw -Encoding UTF8
+        $nnText[$name] = $text
         # 空檔防護：0 byte 檔 Get-Content -Raw 回 null，[regex]::Matches 會丟例外
         # 中斷整條掃描 pipeline（其餘檔案被靜默跳過）——強殺半寫正是這個樣子
         if ([string]::IsNullOrEmpty($text)) {
@@ -606,6 +609,69 @@ if (Test-Path -LiteralPath $auditPath) {
         # 那份報告回灌不了。手動執行維持警告不擋（SOP-2）。
         if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
+
+    # ── 回灌工單（L79）───────────────────────────────────────────
+    # 稽核已經查到答案的類型（ID_RELINK／LINE_DRIFT／STALE_DATA），答案寫在
+    # 明細的「處置」欄。那是**純編輯**：不需要任何檢索，照抄即可。
+    # 不套用的代價是複利：稽核是**全量重驗**，同一個失聯 id 每輪都要重做一次
+    # 二次定位（Source deref → ES 結構化 → file-mode → semantic 翻頁）。
+    # 只掃「明細」章節，且處置欄須符合嚴格格式；**新 id 已在該檔＝已套用，
+    # 不重複開單**（否則報告沒重寫前每圈都會再開一次）。
+    $detailBody = ""
+    $inDetail = $false
+    foreach ($ln in ($auditText -split "`r?`n")) {
+        if ($ln -match '^##\s') { $inDetail = ($ln -match '明細'); continue }
+        if ($inDetail) { $detailBody += ($ln + "`n") }
+    }
+    $relinkByFile = @{}
+    if ($detailBody -ne "") {
+        foreach ($row in [regex]::Matches($detailBody, '(?m)^[^\S\r\n]*\|(?<c>.+)\|[^\S\r\n]*$')) {
+            $cells = @($row.Groups['c'].Value -split '\|' | ForEach-Object { $_.Trim() })
+            if ($cells.Count -lt 3) { continue }
+            $fCell = $cells[0]
+            $act = $cells[$cells.Count - 1]
+            if ($fCell -match '^[-: ]+$' -or $fCell -eq '檔案') { continue }
+            # 檔名欄可能寫完整檔名，也可能只寫編號（「03」）——兩種都要對得回來
+            $target = $null
+            foreach ($n in $nnNames) {
+                $b = [IO.Path]::GetFileNameWithoutExtension($n)
+                if ($fCell -match [regex]::Escape($b)) { $target = $n; break }
+            }
+            if ($null -eq $target) {
+                # 編號代稱：只在該編號**唯一**對應一個檔時採用
+                # （NN-X.md 與續篇 NN-X-2.md 共用前綴時無法判別，寧可不開單）
+                $mNn = [regex]::Match($fCell, '(?<nn>\d\d)(?![0-9])')
+                if ($mNn.Success) {
+                    $cand = @($nnNames | Where-Object { $_.Substring(0, 2) -eq $mNn.Groups['nn'].Value })
+                    if ($cand.Count -eq 1) { $target = $cand[0] }
+                }
+            }
+            if ($null -eq $target) { continue }
+            $ord = $null
+            $mR = [regex]::Match($act, '換\s*id\s*[：:]?\s*(?<old>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\s*(?:→|->|—>)\s*(?<new>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})')
+            if ($mR.Success) {
+                $newId = $mR.Groups['new'].Value
+                # 已套用就不開單
+                if ($nnText.ContainsKey($target) -and $nnText[$target] -and
+                    $nnText[$target].IndexOf($newId, [StringComparison]::OrdinalIgnoreCase) -ge 0) { continue }
+                $ord = "換 id $($mR.Groups['old'].Value) → $newId"
+            }
+            else {
+                $mL = [regex]::Match($act, '更新行號\s*[：:]?\s*(?:→|->)?\s*(?<v>\S+)')
+                $mS = [regex]::Match($act, '更新數值\s*[：:]?\s*(?:→|->)?\s*(?<v>\S+)')
+                if ($mL.Success) { $ord = "更新行號 → $($mL.Groups['v'].Value)（原列見明細）" }
+                elseif ($mS.Success) { $ord = "更新數值 → $($mS.Groups['v'].Value)（原列見明細）" }
+            }
+            if ($null -ne $ord) {
+                if (-not $relinkByFile.ContainsKey($target)) { $relinkByFile[$target] = @() }
+                $relinkByFile[$target] += $ord
+            }
+        }
+    }
+    foreach ($f in ($relinkByFile.Keys | Sort-Object)) {
+        $items = @($relinkByFile[$f])
+        $relinkOrders += ("{0}｜{1}" -f $f, ($items -join '；'))
+    }
 }
 elseif ($StrictAudit) {
     # 檔案整個不存在＝最嚴重的塌縮——非 strict 模式整節跳過（零警告）是刻意的
@@ -810,8 +876,11 @@ $leakManual = @($leaks | Where-Object { -not $_.Delegable })
 # 回溯驗證是 tier 2 的工作）直接牴觸。
 $polishOrderCount = $truncatedIds.Count + $missingIds.Count + $misplacedRefRows.Count
 $emitPolish = (-not $CoverageOnly)
-$orderTotal = $leakDelegable.Count
+$orderTotal = $leakDelegable.Count + $relinkOrders.Count
 if ($emitPolish) { $orderTotal += $polishOrderCount }
+# [回灌] 兩個 tier 都出（L79）：它不需要任何檢索（答案已在明細），而每不做
+# 一次，下一輪全量重驗就要對同一筆重付一次二次定位——與 [欄位]／[證據]
+# 的經濟性完全不同，不套用 tier 1 的美工抑制。
 if ($orderTotal -gt 0) {
     Write-Host ""
     Write-Host "=== 證據修復指令（複製整段貼給 PS-DEEP-RESEARCH；超過 7 筆請分批貼）===" -ForegroundColor Cyan
@@ -821,6 +890,11 @@ if ($orderTotal -gt 0) {
     foreach ($t in $leakDelegable) {
         $i++
         Write-Host "$i. [洩漏] $($t.File):$($t.Line)：$($t.Marker)"
+    }
+    foreach ($r in $relinkOrders) {
+        $i++
+        $parts = $r -split '｜', 2
+        Write-Host "$i. [回灌] $($parts[0])：$($parts[1])"
     }
     # [欄位] 型按**檔**合併成一個任務：對調欄位是純編輯，一個檔一次改完最省
     # ——逐列開單會把 30 列變成 30 個任務，而 auto-loop 一圈只吃 7 筆（實案：
@@ -858,6 +932,19 @@ if ($orderTotal -gt 0) {
         Write-Host "  4) 補不回＝該段內容已遺失：在該檔「未解事項」記一行"
         Write-Host "     「<章節> 因寫入脫軌遺失，待重查」，並**停止該筆**（不要編造）"
         Write-Host "  5) 只准改清單所列的檔，一個字都不要動其他檔"
+        Write-Host ""
+    }
+    if ($relinkOrders.Count -gt 0) {
+        Write-Host "【回灌】型（**最便宜：純字串替換，不要重查、不要呼叫檢索工具**）："
+        Write-Host "  來源：90-audit.md 明細的「處置」欄——稽核**已經查到答案**了，照抄即可。"
+        Write-Host "  換 id：read 該檔 → 找出**舊 UUID 的所有出現處** → 全部換成新 UUID"
+        Write-Host "        （同一 chunk 可能被多列引用，漏換等於下輪再開一次單）"
+        Write-Host "    → 驗貨：用**新 id** 呼叫 get_chunks_details 一次，"
+        Write-Host "      回傳 ChunkText 必須包含該列原引文；不含＝抓錯，**禁止硬填**，"
+        Write-Host "      該筆記收據跳過（下一輪稽核會重新定位）"
+        Write-Host "    → 舊 UUID 在該檔找不到＝該列已被改過或已刪除：記收據跳過，不要硬塞"
+        Write-Host "  更新行號／更新數值：依明細所給的新值改該列，內容一個字都不動。"
+        Write-Host "  收據格式：「檔:舊值 → 新值」逐筆一行。"
         Write-Host ""
     }
     if ($emitPolish -and $misplacedRefRows.Count -gt 0) {
