@@ -455,7 +455,11 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         if ($Tier -eq 1) {
             $coverBefore = Invoke-Lint -Coverage
             $goResearch = ($coverBefore.Exit -ne 0)
-            Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)（0=缺料已清）→ 相位 $(if ($goResearch) { 'research' } else { 'audit' })"
+            # 落檔（L71）：畢業門的 coverage-cycle*.txt 只在 audit 相位寫——
+            # 卡在 research 相位時完全不會產生，而那正是最需要看缺料清單的時候。
+            Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-pre.txt" -f $cycle)) `
+                -Value $coverBefore.Raw -Encoding UTF8
+            Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)（0=缺料已清）→ 相位 $(if ($goResearch) { 'research' } else { 'audit' })｜清單見 coverage-cycle$cycle-pre.txt"
         }
         else {
             $goResearch = ($before.Unticked -gt 0)
@@ -665,7 +669,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
                 $nb = if ($cb.Count -gt 0) { [int]$cb[0].Groups[1].Value } else { 0 }
                 $na = if ($ca.Count -gt 0) { [int]$ca[0].Groups[1].Value } else { 0 }
                 $stalled = ($na -ge $nb -and $nb -gt 0)
-                $howDesc = "缺料違規 $nb→$na"
+                Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-post.txt" -f $cycle)) `
+                    -Value $coverAfterR.Raw -Encoding UTF8
+                $howDesc = "缺料違規 $nb→$na（清單見 coverage-cycle$cycle-post.txt）"
             }
         }
         else {
@@ -690,7 +696,7 @@ Write-Log "最終狀態：未勾=$($final.Unticked) 已勾=$($final.Ticked) 稽�
 if ($graduated -and $Tier -eq 1) {
     Write-Log "本領域已達 tier 1（可用／80 分）：未勾 $($final.Unticked) 項屬補強類，可留待 tier 2 精修圈處理（SOP-13：建議不是債）"
 }
-Write-Log "人工待辦：看本檔上方各 session 的 out/err、lint-cycle*.txt、coverage-cycle*.txt（tier 1 門）、strict-cycle*.txt（tier 2 門）；lesson 建議與卡住項在 90-audit.md 與 checklist.md"
+Write-Log "人工待辦：缺料清單→跑 ps-doc-lint.ps1 -Domain $Domain -CoverageOnly（現況，不是快照）；歷程→coverage-cycle*-pre/post.txt 與 lint-cycle*.txt；session 細節→同目錄 out/err；tier 2 門→strict-cycle*.txt；卡住項與 lesson 建議→90-audit.md 與 checklist.md"
 
 # 畢業收據（issue #3）：只在畢業門全過後寫；寫入失敗＝automation 不可信（exit 2）
 # 收據記 tier——tier 1 收據放不了 tier 2 的行（Test-GraduationReceipt -RequiredTier）
