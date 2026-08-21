@@ -108,6 +108,13 @@ docs/ps-research/<領域>/
 6. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
 
 **稽核回灌項（A<n>）的處理**（取代標準深度鏈，做定向補查）：
+- **第一步永遠是 read `90-audit.md` 的明細表，取出該檔的逐筆判定**
+  （類型／內容／原因／處置）。**A 行只有計數**
+  （`FAIL 3／DISPUTED 1／UNVERIFIABLE 2`），它不告訴你哪一筆是什麼、
+  更沒有稽核已經找到的新 id——**明細才是工單**。
+  此處讀取是**必要動作**，與步驟 4「寫報告時禁止 read 舊 90-audit.md」
+  **不衝突**：那條防的是寫新報告時沿用舊數字，這裡是取**本輪**的工單。
+  明細裡沒有該檔的列＝該 A 項無可執行細節，記 gaps 後打勾附 ⚠。
 - FAIL 證據：重新取證（chunk 重取／SQL 重跑）修正該檔的引用。
 - FAIL(TRUNCATED_ID)：證據多半是真的——依該筆的 filePath＋行號
   委派重找該 chunk（ES 搜檔 → get_file_structure → get_chunks_details），
@@ -122,8 +129,11 @@ docs/ps-research/<領域>/
   **禁止硬填**，該筆標「需重查」留在收據上。
 - FAIL(STALE_DATA)：SQL 數值時效過期——重跑 cookbook 樣板取新值、
   更新文件中的數字即可，不必重做分析。
-- FAIL(ID_RELINK)：id 失聯但稽核已重找到（附新 id）——直接把新 id
-  寫回該筆（驗貨：ChunkText 含原 quote），最便宜的一類。
+- FAIL(ID_RELINK)：id 失聯但稽核**已經重找到了**——新 id 就在
+  `90-audit.md` 明細該列的「處置」欄（格式：`換 id → <完整 36 字元 UUID>`）。
+  **直接抄過來寫回該筆**（驗貨：以新 id 取回的 ChunkText 需含原 quote），
+  **不必重做二次定位**——稽核已經付過那個成本了。
+  這是最便宜的一類；抄不到（明細沒寫新 id）才退回自己重找。
 - LINE_DRIFT（不論標 PASS 註記或 FAIL）：依稽核回報的實際行號更新
   該筆行號即可，內容不動。
 - FAIL(MISSING_CHUNK_ID／NO_CHUNK_ID)：檔案行號型證據補 id——依
@@ -219,6 +229,11 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    全量覆蓋的證明），最後一列必為「合計」；
    `## FAIL/DISPUTED/UNVERIFIABLE 明細`＝**每筆非 PASS 判定一列**
    （UNVERIFIABLE 也要列，不得只在記分卡出現數字）。
+   **明細就是下一輪的工單**——`FAIL(ID_RELINK)` 列的「處置」欄一律寫成
+   `換 id → <完整 36 字元 UUID>`（逐字抄 auditor 回報的新 id）；
+   `LINE_DRIFT` 寫 `更新行號 → <新行號>`；`FAIL(STALE_DATA)` 寫
+   `更新數值 → <新值>`。**稽核已經查到的答案不要丟掉**——丟掉等於下一輪
+   要再付一次同樣的檢索成本，而 A 行只有計數、傳不了這些。
    **不要把逐筆判定塞進記分卡**——那會變成幾百列、失去可讀性，
    最後退化成純統計表而逐檔列消失（實案：記分卡只剩 PASS/FAIL/
    UNVERIFIABLE 三個數字，逐檔資料全跑到明細）。

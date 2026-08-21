@@ -28,10 +28,18 @@
      INCOMPLETE_CHUNK；行號漂移但 quote 命中＝PASS(LINE_DRIFT) 附
      新行號，不是 FAIL。 -->
 
+<!-- 「處置」欄＝下一輪的可執行工單。稽核已經查到答案的類型，答案
+     必須寫在這一欄，否則下一輪只拿得到 A 行的計數、要再付一次檢索成本：
+       ID_RELINK  → `換 id → <完整 36 字元 UUID>`
+       LINE_DRIFT → `更新行號 → <新行號>`
+       STALE_DATA → `更新數值 → <新值>`
+     其餘（NOT_FOUND／FABRICATED／WRONG_KIND…）才寫「回灌補查」。 -->
+
 | 檔案 | 類型 | 內容 | 原因 | 處置 |
 |---|---|---|---|---|
 | 01-… | 證據 FAIL | ChunkId … | quote 非 ChunkText 子字串 | 回灌補查 |
 | 02-… | 證據 UNVERIFIABLE | SQL … | oracleMCP 逾時（~30s） | 回灌重驗 |
+| 03-… | 證據 FAIL(ID_RELINK) | 舊 ChunkId … | id 失聯，二次定位已取得新 id | 換 id → 7f3a…（完整 36 字元） |
 
 ## 上輪回灌項覆核（第 2 輪起必填；首輪寫「無上輪」）
 
