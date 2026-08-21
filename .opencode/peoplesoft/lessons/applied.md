@@ -1839,3 +1839,26 @@
   「一開始就知道沒事可做」在結果上都是停機，但前者多燒兩個 session，
   而且把「需要你動手」講成了「無進度」。
 - 套用：本 commit（ps-doc-lint 印 MANUAL_ONLY、ps-auto-loop 三分類與早停）。
+
+### L75 外環自己說謊——相位判斷有兩份實作，我只改了一份（2026-08）
+- 事件：管理者依 L74 搬完新版，`-CoverageOnly` 正確印出
+  `FAIL 3／AUDIT_ONLY 2／MANUAL_ONLY 1`（自動＝0，照設計相位該走 audit），
+  但 `-Preflight` 顯示「起始相位：research」。
+- 根因：相位判斷寫了兩次——迴圈裡一份、Preflight 顯示一份。L72／L74 把
+  迴圈那份改成三分類（自動／僅 audit／需人工），**Preflight 那份還停在
+  兩分法**（`CoverageOnly exit -eq 0` 就 audit，否則 research）。
+- 為什麼特別糟：`-Preflight` 的存在理由就是「不啟動 session 也能知道會發生
+  什麼」。它一旦與實際行為不符，**外環從「保證有沒有做」變成「謊報將要做
+  什麼」**——比沒有 Preflight 更糟，因為人會照它做決定。
+- 我改迴圈時完全沒想到顯示端也在算同一件事。**同一個判斷寫兩次，就是
+  遲早會漂；漂掉的那一次不會報錯，只會安靜地說錯話。**
+- 落點：
+  1. 抽出 `Get-CoverageBreakdown`（Total／AuditOnly／ManualOnly／Auto），
+     Preflight 與迴圈**共用這一份**，解析不到分類行時皆為 0＝退回舊行為。
+  2. Preflight 多印「缺料分類：共 N 項＝自動 x／僅 audit y／需人工 z
+     （相位只看『自動』那份）」，讓顯示的數字與判斷的數字是同一組。
+  3. 只剩人工項時 Preflight 直接顯示「**不會啟動**」，與迴圈的早停一致。
+- 原則：**判斷與顯示必須讀同一份計算。** 顯示端自己重算一次，等於在系統裡
+  種一個永遠不會被測到的分身——它只在「兩邊剛好不同」的那天現身，
+  而那天你正在拿它做決定。
+- 套用：本 commit（ps-auto-loop 抽出 Get-CoverageBreakdown，兩處共用）。

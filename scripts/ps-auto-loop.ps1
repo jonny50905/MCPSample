@@ -330,6 +330,24 @@ function Invoke-Opencode {
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
+# ── 缺料分類（L75）：Preflight 與迴圈**共用這一份**───────────────
+# 相位判斷曾經有兩份實作（迴圈改成三分類後 Preflight 還停在兩分法，
+# 於是 Preflight 印 research、實際會走 audit——外環自己說謊）。
+# 解析不到分類行時 AuditOnly／ManualOnly 皆為 0＝退回舊行為（fail-safe）。
+function Get-CoverageBreakdown {
+    param([string]$Raw)
+    $total = 0; $auditOnly = 0; $manualOnly = 0
+    $m = [regex]::Match($Raw, '(?m)^FAIL：(\d+) 項違規')
+    if ($m.Success) { $total = [int]$m.Groups[1].Value }
+    $m = [regex]::Match($Raw, '(?m)^AUDIT_ONLY：(\d+) 項')
+    if ($m.Success) { $auditOnly = [int]$m.Groups[1].Value }
+    $m = [regex]::Match($Raw, '(?m)^MANUAL_ONLY：(\d+) 項')
+    if ($m.Success) { $manualOnly = [int]$m.Groups[1].Value }
+    return @{ Total = $total; AuditOnly = $auditOnly; ManualOnly = $manualOnly
+        Auto = ($total - $auditOnly - $manualOnly)
+    }
+}
+
 # -Strict＝畢業門專用（ps-doc-lint.ps1 -StrictAudit）：90-audit 結構性問題升 FAIL
 # -Coverage＝覆蓋畢業門（tier 1）專用（ps-doc-lint.ps1 -CoverageOnly）：
 #   只收缺料類違規，美工類（證據 id／機器參照／confidence／frontmatter）降警告
@@ -376,16 +394,22 @@ if ($Preflight) {
         $ph = if ($st.Unticked -gt 0) { "research（消化 $($st.Unticked) 個未勾項）" } else { "audit（全勾→直接進稽核）" }
     }
     $lc = Invoke-Lint -Coverage
-    # tier 1 的相位不看未勾數，看「缺料還在不在」——未勾項成長不再阻止進稽核
+    # tier 1 的相位不看未勾數，看「缺料還在不在」——且只看**自動修得動**的那份
+    # （L72／L74：僅 audit 可修的與需人工的都不該把相位鎖在 research）
+    $bd = Get-CoverageBreakdown -Raw $lc.Raw
     if ($Tier -eq 1) {
-        $ph = if ($lc.Exit -eq 0) { "audit（缺料已清→可爭取覆蓋畢業）" } else { "research（尚有缺料，見下方 CoverageOnly）" }
         if (-not $st.Exists) { $ph = "research（階段一建檔）" }
+        elseif ($bd.Auto -gt 0) { $ph = "research（尚有 $($bd.Auto) 項自動可修的缺料）" }
+        elseif ($bd.AuditOnly -gt 0) { $ph = "audit（自動項已清，剩 $($bd.AuditOnly) 項僅 audit 修得了）" }
+        elseif ($bd.ManualOnly -gt 0) { $ph = "**不會啟動**（剩 $($bd.ManualOnly) 項需人工——見下方 MANUAL_ONLY，處理完再跑）" }
+        else { $ph = "audit（缺料已清→可爭取覆蓋畢業）" }
     }
     Write-Host "目標等級  ：tier $Tier（$(if ($Tier -eq 1) { '覆蓋畢業／可用 80 分' } else { '精修畢業／100 分' })）" -ForegroundColor Green
     Write-Host "起始相位  ：$ph" -ForegroundColor Green
     $l = Invoke-Lint
     Write-Host "lint      ：exit=$($l.Exit)（0=全過 1=有違規 -1=領域未建立）｜工單 $($l.Surgical.Count) 筆"
     Write-Host "CoverageOnly：exit=$($lc.Exit)（tier 1 畢業門用：0=缺料已清）｜tier 1 工單 $($lc.Surgical.Count) 筆"
+    Write-Host "缺料分類  ：共 $($bd.Total) 項＝自動 $($bd.Auto)／僅 audit 可修 $($bd.AuditOnly)／需人工 $($bd.ManualOnly)（相位只看『自動』那份）"
     $ls = Invoke-Lint -Strict
     Write-Host "StrictAudit：exit=$($ls.Exit)（tier 2 畢業門用；tier 1 不看）"
     $rc = Test-GraduationReceipt -DomainDir $dir -Domain $Domain `
@@ -458,16 +482,11 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             # （記分卡塌縮、輪次不一致…）只有 audit 相位重寫得了。把它算進
             # 相位判斷＝唯一能修它的相位被它自己擋住＝活鎖（L63 同族）。
             # 畢業門仍看**全部**缺料，標準一點都沒放寬。
-            $cvTotal = 0
-            $cvAuditOnly = 0
-            $cvManualOnly = 0
-            $mCvT = [regex]::Match($coverBefore.Raw, '(?m)^FAIL：(\d+) 項違規')
-            if ($mCvT.Success) { $cvTotal = [int]$mCvT.Groups[1].Value }
-            $mCvA = [regex]::Match($coverBefore.Raw, '(?m)^AUDIT_ONLY：(\d+) 項')
-            if ($mCvA.Success) { $cvAuditOnly = [int]$mCvA.Groups[1].Value }
-            $mCvM = [regex]::Match($coverBefore.Raw, '(?m)^MANUAL_ONLY：(\d+) 項')
-            if ($mCvM.Success) { $cvManualOnly = [int]$mCvM.Groups[1].Value }
-            $cvAuto = $cvTotal - $cvAuditOnly - $cvManualOnly
+            $cv = Get-CoverageBreakdown -Raw $coverBefore.Raw
+            $cvTotal = $cv.Total
+            $cvAuditOnly = $cv.AuditOnly
+            $cvManualOnly = $cv.ManualOnly
+            $cvAuto = $cv.Auto
             $goResearch = ($cvAuto -gt 0)
             if ($cvAuditOnly -gt 0 -or $cvManualOnly -gt 0) {
                 Write-Log "COVERAGE(圈前) 缺料 $cvTotal 項＝自動 $cvAuto／僅 audit 可修 $cvAuditOnly／需人工 $cvManualOnly——相位只看自動那 $cvAuto 項"
