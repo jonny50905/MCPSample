@@ -72,7 +72,11 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    evidence 自帶的 filePath／ObjectName／EventName——**首選
    `search_chunks(ObjectName=<物件名>, eventName=<事件名>)`
    結構化過濾直達**（AE 類加 `componentType=ApplicationEngineProgram`
-   ——L32 實測精準命中），其次走「Component（或物件）名搜檔 →
+   ——L32 實測精準命中；**SQR 加 `componentType=sqr`、SQC 加
+   `componentType=sqc`**——這兩型 2026-08 才進索引，**此前的 SQR／SQC
+   查無全是能力缺口造成的假象，一律重查再判，不得沿用舊結論**；
+   componentType 回零筆時照協定 §5.1 fail-safe，不得直接判 NOT_FOUND），
+   其次走「Component（或物件）名搜檔 →
    get_file_structure → 按 Event／結構挑單元 → get_chunks_details」
    重找——找到且 quote 命中
    （正規化比對）→ `FAIL(ID_RELINK)` 並附新 id（id 失聯但證據為真，
