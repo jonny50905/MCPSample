@@ -52,9 +52,10 @@ searchPolicy:
   allowDeliveredFallback: true
   allowDeliveredDependencies: true
 
-# 代碼語意對照（本環境專屬）——**只准查表，不准從常識推測**。
-# 代碼是環境設定不是通用縮寫：同一組字母在不同環境、不同欄位可以是完全
-# 不同的東西，而猜錯**不會報錯**，只會安靜地寫進交付物。
+# 代碼語意對照（本環境專屬）。
+# 表中**已列**的值是確定事實，**不得改寫或另作解釋**（AZ 就是亞利桑那州，
+# 不准再讀成澳洲）。表中**沒有**的可以推測——不要卡住——但要標記，
+# 管理者才找得到來糾正、回填。
 namingSemantics:
   # 物件名前綴（與上方 customPrefixes 對應；此處記語意）
   prefixes:
@@ -64,12 +65,13 @@ namingSemantics:
   codes:
     AZ: 美國亞利桑那州（Arizona，US state）——**不是澳洲**；澳洲是 AU／AUS
 
-  # 未列在本表的代碼一律 UNKNOWN：
-  #  1) 交付物裡**不得寫出推測的展開**（「AZ 應該是…」「看起來像…」）；
-  #  2) 需要它的語意才能下結論 → 先查來源（oracleMCP 照 cookbook 樣板查
-  #     XLATTABLE／州別／國別等對照表），查到就**回填本表**；
-  #  3) 查不到 → 該處標 UNKNOWN 並記進 gaps，結論降級 INFERRED。
-  unlistedCodePolicy: UNKNOWN_MUST_VERIFY
+  # 未列在本表的代碼：**照最合理的解讀寫下去，不要卡住**，但要留下痕跡——
+  #  1) 該處標「(推測)」，例如「AZ（推測：亞利桑那州）」；
+  #  2) 該檔 gaps 記一行「代碼 <X> 語意為推測，未經對照表確認」；
+  #  3) 手邊剛好有對照表（XLATTABLE／州別／國別）就順手查，查到直接寫確定值；
+  #  4) 管理者糾正後回填本表 codes——之後它就是確定值，不再是推測。
+  # 標記的用途：讓「猜錯了再糾正」這條路可以用 grep 找，不必整份重讀。
+  unlistedCodePolicy: GUESS_BUT_MARK
 
 oracle:
   # PeopleTools 表的擁有者 schema——登入帳號非擁有者時，裸表名會
