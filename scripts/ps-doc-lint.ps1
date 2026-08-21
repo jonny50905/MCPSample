@@ -207,14 +207,38 @@ if ($null -ne $checklistOnly) {
     # 已打勾項會歸檔到 checklist-archive*.md（每輪一個分片檔）——對帳時全部合併看；
     # archive 只准收已打勾項——未勾項被搬走＝進度隱形消失（L28）
     $archiveFiles = @(Get-ChildItem -LiteralPath $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
+    # 活頁的列文字（去掉勾選框——勾選狀態本來就會變，比對只看內容）
+    $clLiveRows = @{}
+    foreach ($m in [regex]::Matches($checklistOnly, '(?m)^\s*-\s*\[[ x]\]\s*(.+?)\s*$')) {
+        $clLiveRows[$m.Groups[1].Value] = $true
+    }
+    $dupRows = @()
     foreach ($af in $archiveFiles) {
         $afText = Get-Content $af.FullName -Raw -Encoding UTF8
         if ($null -eq $afText) { $afText = "" }
         $untickedInArchive = @([regex]::Matches($afText, '(?m)^\s*-\s*\[ \]')).Count
         if ($untickedInArchive -gt 0) {
-            $violations += "$($af.Name)：含 $untickedInArchive 個未打勾項——歸檔只准搬已勾項（未勾項被搬走＝調查進度隱形消失）"
+            $violations += "$($af.Name)：含 $untickedInArchive 個未打勾項——歸檔只准搬已勾項（未勾項被搬走＝調查進度隱形消失）。修法：真調查項搬回 checklist.md、稽核流程標籤整列刪除——**本項 loop 修不掉，需人工**"
+        }
+        # 歸檔是「搬移」不是「複製」（L73）：兩邊都留＝下輪重複計算、兩個檔一起長大
+        foreach ($m in [regex]::Matches($afText, '(?m)^\s*-\s*\[[ x]\]\s*(.+?)\s*$')) {
+            if ($clLiveRows.ContainsKey($m.Groups[1].Value)) {
+                $dupRows += ("{0}｜{1}" -f $af.Name, $m.Groups[1].Value)
+            }
         }
         $checklistSrc += "`n" + $afText
+    }
+    if ($dupRows.Count -gt 0) {
+        $dupSample = (@($dupRows | Select-Object -First 3) -join '；')
+        $dupMore = ""
+        if ($dupRows.Count -gt 3) { $dupMore = "…等 $($dupRows.Count) 列" }
+        $violations += "checklist.md 與歸檔重複 $($dupRows.Count) 列——歸檔是搬移不是複製，已寫進 archive 的列必須從 checklist.md 移除：$dupSample$dupMore"
+    }
+    # 稽核流程標籤不是調查項（L73）：任務 A／B／C 的委派切分、批次編號是
+    # auditor 自己的流程紀錄，寫進 checklist＝製造永遠做不完的假項目。
+    $procLabelRows = @([regex]::Matches($checklistSrc, '(?m)^\s*-\s*\[[ x]\]\s*(?=.*(?:任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+))(.+?)\s*$'))
+    if ($procLabelRows.Count -gt 0) {
+        $violations += "checklist／歸檔含 $($procLabelRows.Count) 列稽核流程標籤（如「任務C批次 1/3」）——那是 auditor 的委派切分不是調查項，逐列刪除；回灌只准寫「A<n> 補查 <NN-檔名>：FAIL x／DISPUTED y／UNVERIFIABLE z（稽核）」"
     }
 
     # 1) checklist 對帳：打勾項的目標檔必須存在；NN 檔必須被 checklist 列到
@@ -482,7 +506,8 @@ if (Test-Path -LiteralPath $auditPath) {
     }
     if ($auditText -notmatch '稽核輪次') {
         $msg = "90-audit.md：表頭缺「稽核輪次」（無法判斷是否為最新一輪重驗）"
-        if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
+        # 同下方輪次不一致：判不出是不是本輪的報告＝綠燈不可信，tier 1 也要擋
+        if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
     # 輪次一致性（L28）：報告輪次 ≠ checklist 輪次＝報告可能是舊輪——
     # 「稽核沒跑過但看到全綠」的正解就是這個檢查
@@ -492,7 +517,11 @@ if (Test-Path -LiteralPath $auditPath) {
     }
     if ($clRound -ge 0 -and $auditRoundNum -ge 0 -and $auditRoundNum -ne $clRound) {
         $msg = "90-audit.md 輪次（$auditRoundNum）與 checklist 輪次（$clRound）不一致——報告可能是舊輪重驗前的殘留，綠燈不可信"
-        if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
+        # L73：畢業門的轉移層讀的是 checklist 的輪次＋90-audit 的 hash，
+        # 「輪次遞增且 hash 變了」對一份**沒寫完**的報告照樣成立——轉移層
+        # 只證明「動過」，證明不了「寫完」。這條是唯一識破的訊號，
+        # 訊息自己都寫「綠燈不可信」了，就不該只在 tier 2 擋。
+        if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
     # 全量對帳（L36 結構化）：找「涵蓋最多 NN 檔」的章節當記分卡，驗是否覆蓋
     # 全部——標題叫什麼不重要，覆蓋率才是塌縮判準（自創標題不再擋畢業）

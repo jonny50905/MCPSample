@@ -196,10 +196,16 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    與遺漏候選；**以「檔」為單位彙整，一檔一行**：
    `- [ ] A<n> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
    ——**禁止逐筆開項**。寫入時同步做三件事：
-   (a) 輪次行更新為「稽核輪次：N+1」；
+   (a) 輪次行更新為「稽核輪次：N+1」——**90-audit.md 表頭的稽核輪次
+   必須寫同一個 N+1**；兩邊不一致＝報告是舊輪殘留，稽核結果不可信（lint 擋）；
    (b) **歸檔（每輪寫新檔）**：把所有**已打勾**項目（原樣含 ⚠ 註記）
    寫成**新檔** `checklist-archive-r<N+1>.md`（單次小 write），
    checklist.md 只留「輪次行＋旗標行＋未勾項＋Gaps 彙整」。
+   **歸檔是搬移不是複製**：寫進 archive 的每一列都要從 checklist.md 移除，
+   兩邊都留＝下輪重複計算、兩個檔一起長大。
+   **只有調查項與 A 項可以是 checklist 列**——任務 A／B／C 的委派切分、
+   批次編號（如「任務C批次 1/3」）是你自己的流程紀錄，寫 log.md，
+   **不得寫成 checklist 列**，更不得跟著歸檔（那是永遠做不完的假項目）。
    **禁止 read 或改寫任何既有 checklist-archive*.md**——工具層沒有
    append，「追加舊檔」實為整檔重寫，archive 隨輪次變大必撐爆
    write（卡死根因）；每輪一個新檔＝真追加。archive 永不回讀進 context；
