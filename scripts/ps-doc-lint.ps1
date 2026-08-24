@@ -16,7 +16,12 @@
 param(
     [Parameter(Mandatory = $true)][string]$Domain,
     [switch]$StrictAudit,
-    [switch]$CoverageOnly
+    [switch]$CoverageOnly,
+    # 唯一會寫檔的開關（循 ps-fs-doctor -FixBom 前例）：修歸檔裡的未打勾列。
+    # agent 被硬規則禁止改寫 checklist-archive*.md，理由是**模型的 write 工具
+    # 沒有 append、重寫大檔會撐爆**——那是工具層限制，不是語意禁令；
+    # PowerShell 沒有這個限制，所以這件事只有這裡做得到。
+    [switch]$FixArchive
 )
 
 # 參數消毒（L28）：-Domain 尾部空白/點會觸發 Win32 尾字元正規化不對稱——
@@ -1063,6 +1068,86 @@ if ($leakManual.Count -gt 0) {
     }
     Write-Host "共通做法：刪標記前先看**前後整個區塊**有沒有被截斷；內容補不回就在該處明寫遺失。" -ForegroundColor Yellow
     Write-Host "=== 人工清單結束 ===" -ForegroundColor Yellow
+    Write-Host ""
+}
+
+# ── -FixArchive（L82）：歸檔裡的未打勾列自動處置 ────────────────
+# 歸檔契約只收已打勾項，所以未勾列一定是三種成因之一，而修法完全不同：
+#   · 明示未完成（「未完成／須重派／無回應／⚠」）且是**批次類流程標籤**
+#     → 從歸檔刪除，並把該事實改寫進 checklist.md 的「## Gaps 彙整」。
+#       批次不是調查項，搬回「## 調查進度」會變成沒有 NN 對象的假項目；
+#       但**直接刪掉會湮滅一次真實的委派失敗**，所以資訊要落到 Gaps。
+#   · 明示未完成、但**不是**批次類（正常調查項／A 項）
+#     → 搬回「## 調查進度」（保持未勾）——它自己說了沒做完。
+#   · 純批次類、無未完成字樣 → 刪除（純噪音，下輪 audit 重做）。
+#   · 其餘未勾列 → **不動**：「本來就沒做完」與「打勾在寫檔時掉了」
+#     機械上分不出，誤打勾會讓真的漏掉的項目永遠消失。留 MANUAL_ONLY。
+# 判定**先看內容再看外形**（L81）：含未完成字樣的批次列不是噪音，是紀錄。
+if ($FixArchive) {
+    Write-Host ""
+    Write-Host "=== -FixArchive：歸檔未打勾列處置 ===" -ForegroundColor Cyan
+    $incompletePattern = '(未完成|須重派|重派|無回應|失敗|⚠)'
+    $toGaps = @()
+    $toProgress = @()
+    $touched = 0
+    foreach ($af in $archiveFiles) {
+        $afRaw = Get-Content $af.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($afRaw)) { continue }
+        $keep = @()
+        $changed = $false
+        foreach ($ln in ($afRaw -split "`r?`n")) {
+            if ($ln -notmatch '^\s*-\s*\[ \]') { $keep += $ln; continue }
+            $isProc = ($ln -match '(任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+)')
+            $isIncomplete = ($ln -match $incompletePattern)
+            if ($isProc -and $isIncomplete) {
+                $toGaps += ($ln -replace '^\s*-\s*\[ \]\s*', '')
+                Write-Host "  [刪除→Gaps] $($af.Name)：$($ln.Trim())" -ForegroundColor Yellow
+                $changed = $true; continue
+            }
+            if ($isIncomplete) {
+                $toProgress += $ln.TrimEnd()
+                Write-Host "  [搬回進度] $($af.Name)：$($ln.Trim())" -ForegroundColor Yellow
+                $changed = $true; continue
+            }
+            if ($isProc) {
+                Write-Host "  [刪除] $($af.Name)：$($ln.Trim())（純批次標籤，下輪 audit 重做）" -ForegroundColor Yellow
+                $changed = $true; continue
+            }
+            Write-Host "  [不動] $($af.Name)：$($ln.Trim())（判不出『沒做完』或『掉了勾』，留人工）" -ForegroundColor DarkGray
+            $keep += $ln
+        }
+        if ($changed) {
+            [System.IO.File]::WriteAllText($af.FullName, ($keep -join "`r`n"),
+                (New-Object System.Text.UTF8Encoding($true)))
+            $touched++
+        }
+    }
+    if (($toGaps.Count + $toProgress.Count) -gt 0 -and (Test-Path -LiteralPath $checklistPath)) {
+        $clRaw = Get-Content $checklistPath -Raw -Encoding UTF8
+        if ($null -eq $clRaw) { $clRaw = "" }
+        $out = @()
+        $doneG = $false
+        $doneP = $false
+        foreach ($ln in ($clRaw -split "`r?`n")) {
+            $out += $ln
+            if (-not $doneP -and $toProgress.Count -gt 0 -and $ln -match '^##\s*調查進度') {
+                foreach ($r in $toProgress) { $out += $r }
+                $doneP = $true
+            }
+            if (-not $doneG -and $toGaps.Count -gt 0 -and $ln -match '^##\s*Gaps') {
+                foreach ($r in $toGaps) { $out += ("- （自歸檔回收，稽核輪次 $clRound）" + $r) }
+                $doneG = $true
+            }
+        }
+        if ($toProgress.Count -gt 0 -and -not $doneP) { Write-Host "  WARN：找不到「## 調查進度」節，$($toProgress.Count) 列未搬回" -ForegroundColor Red }
+        if ($toGaps.Count -gt 0 -and -not $doneG) { Write-Host "  WARN：找不到「## Gaps 彙整」節，$($toGaps.Count) 列未回收" -ForegroundColor Red }
+        if ($doneG -or $doneP) {
+            [System.IO.File]::WriteAllText($checklistPath, ($out -join "`r`n"),
+                (New-Object System.Text.UTF8Encoding($true)))
+            Write-Host "  checklist.md：搬回進度 $($toProgress.Count) 列、回收進 Gaps $($toGaps.Count) 列" -ForegroundColor Green
+        }
+    }
+    Write-Host "=== 處置結束：改動 $touched 個歸檔檔；請重跑 lint 確認 ===" -ForegroundColor Cyan
     Write-Host ""
 }
 

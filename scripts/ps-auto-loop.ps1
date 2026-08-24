@@ -495,10 +495,28 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             # 讓它跑滿兩圈再報「無進度」＝燒兩個 session 講一句本來就知道的話，
             # 而且停機理由完全沒提到人要做什麼。
             if ($cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
-                $stopReason = "剩 $cvManualOnly 項需人工（歸檔類，agent 禁止改寫 checklist-archive*.md）——清單見 coverage-cycle$cycle-pre.txt 的 MANUAL_ONLY 段；處理完再啟動"
+                # 停機前先試一次自動處置（L82）：歸檔未勾列多半是失敗的委派
+                # 紀錄或純批次標籤，lint -FixArchive 判得出來也改得動——
+                # **agent 做不到**（它的 write 沒有 append，重寫大檔會撐爆），
+                # 但那是模型工具層的限制，PowerShell 沒有。本分支一圈只走一次。
+                Write-Log "剩 $cvManualOnly 項需人工 → 先試 lint -FixArchive 自動處置"
+                $fx = & $lintPath -Domain $Domain -FixArchive *>&1 | Out-String
+                Add-Content -Path (Join-Path $logRoot ("fixarchive-cycle{0}.txt" -f $cycle)) `
+                    -Value $fx -Encoding UTF8
+                $coverBefore = Invoke-Lint -Coverage
+                $cv = Get-CoverageBreakdown -Raw $coverBefore.Raw
+                $cvTotal = $cv.Total
+                $cvAuditOnly = $cv.AuditOnly
+                $cvManualOnly = $cv.ManualOnly
+                $cvAuto = $cv.Auto
+                $goResearch = ($cvAuto -gt 0)
+                Write-Log "FixArchive 後：缺料 $cvTotal 項＝自動 $cvAuto／僅 audit $cvAuditOnly／需人工 $cvManualOnly（處置明細見 fixarchive-cycle$cycle.txt）"
+            }
+            if ($cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
+                $stopReason = "剩 $cvManualOnly 項需人工（-FixArchive 也判不出來：可能是『沒做完』與『打勾掉了』分不出的列）——清單見 coverage-cycle$cycle-pre.txt 的 MANUAL_ONLY 段、處置紀錄見 fixarchive-cycle$cycle.txt；處理完再啟動"
                 Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-pre.txt" -f $cycle)) `
                     -Value $coverBefore.Raw -Encoding UTF8
-                Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)｜無自動路徑可走 → 直接停機"
+                Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)｜自動處置後仍無路可走 → 停機"
                 break
             }
             # 落檔（L71）：畢業門的 coverage-cycle*.txt 只在 audit 相位寫——
