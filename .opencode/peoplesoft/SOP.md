@@ -361,6 +361,14 @@ tier 2＝精修畢業（100 分）
      ```json
      "permission": { "doom_loop": "deny", "external_directory": "allow" }
      ```
+□ 0a.【建議】同一份 opencode.json 加 `"default_agent": "ps-orchestrator"`：
+     TAB 順序＝default 排第一、其餘按字母序（無排序選項），預設是
+     build → plan → ps-deep-research → ps-orchestrator。設了之後變成
+     **ps-orchestrator → build → plan → ps-deep-research**——一般使用者
+     開站直接落在問答 agent，deep-research 沉到最後。headless 不受影響
+     （/ps-research、/ps-audit 的 frontmatter 與手術的 --agent 都明指
+     agent，優先於 default）。設完開新 session 驗證起始 agent 是
+     ps-orchestrator；若版本不支援此鍵＝靜默無效，維持原排序
      · `doom_loop: **deny**`（L60 二次修正，2026-08 實測定案）：提示原文是
        「continue after **repeated failures**?」——它管的是**反覆失敗的呼叫**，
        不是「反覆呼叫同一個東西」。三種設定的實際行為：
