@@ -38,7 +38,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 `PASS(HUMAN_VERIFIED)`——人教的知識沒有 chunk 可驗，
 內部 git PR 人審就是它的驗證。
 
-## 工具身分＝server 前綴＋工具名（L61：兩個都對才叫對）
+## 工具身分＝server 前綴＋工具名（兩個都對才叫對）
 
 | 我要做什麼 | 唯一正確的呼叫 |
 |---|---|
@@ -54,7 +54,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
   `get_chunk_by_id` 只用於**交叉檢查**：`get_chunks_details` 查無時以同一
   id 再查——ES 有＝該 id 曾存在但來源已變，**走二次定位、不判
   FABRICATED**；ES 也無＝較可能捏造，照原規則判。此步驟不取代解引用。
-- **成批查無＝環境訊號，不是成批捏造（L64，優先於上一條）**：本輪已有
+- **成批查無＝環境訊號，不是成批捏造（優先於上一條）**：本輪已有
   **≥3 檔**出現 id 查無（含 ES 也無）＝索引重建／chunk id 輪替的訊號——
   捏造是零星的，不會 15 檔同時全滅。此時**逐筆走二次定位**
   （ObjectName＋事件名結構化搜尋取新 id），一律不判 FABRICATED，並在
@@ -74,8 +74,8 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    **id 解引用查無時，判 FAIL 前必做一次「二次定位」**：用該筆
    evidence 自帶的 filePath／ObjectName／EventName——**首選
    `search_chunks(ObjectName=<物件名>, eventName=<事件名>)`
-   結構化過濾直達**（AE 類加 `componentType=ApplicationEngineProgram`
-   ——L32 實測精準命中；**SQR 加 `componentType=sqr`、SQC 加
+   結構化過濾直達**（AE 類加 `componentType=ApplicationEngineProgram`；
+   **SQR 加 `componentType=sqr`、SQC 加
    `componentType=sqc`**，回零筆時照協定 §5.1 處理，不得直接判
    NOT_FOUND），其次走「Component（或物件）名搜檔 →
    get_file_structure → 按 Event／結構挑單元 → get_chunks_details」
@@ -85,9 +85,8 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    委派方要靠這個欄位產下一輪的機械修復工單，寫在敘述裡等於丟掉）；
    `ref` 欄保持**舊 id** 不動（換 id 要靠舊值定位文件中該列）。
    id 失聯但證據為真，修法＝換 id；重找仍無 → **最後以 `query=<物件/AE 名>`＋
-   `searchMode: semantic`＋offset 全量翻頁做第三管道**（L32：物件/AE
-   名的 exactPhrases／exact 查無是假象——那是內文字面過濾，
-   metadata 名不保證在內文）——三管道皆無才判 `FAIL(NOT_FOUND)`。
+   `searchMode: semantic`＋offset 全量翻頁做第三管道**（物件/AE 名
+   不保證出現在內文，exact 查無是假象）——三管道皆無才判 `FAIL(NOT_FOUND)`。
    **禁止拿事件名（PreBuild 等）當全庫搜尋詞。**
    **二次定位全程遵守分頁紀律**（progressive-source-retrieval §5.1）：
    search 結果達 10 筆＝可能有下一頁，必須 offset 續翻到完；
@@ -109,7 +108,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    無～邏輯」類負面宣告，每檔抽 1~2 筆**用當前工具重跑該查詢**
    （照宣告附的查法收據；沒收據就依上下文推查法；物件＋事件類
    宣告**必用 ObjectName＋eventName 結構化參數重測**；物件/AE 名類
-   宣告另以 `searchMode: semantic` 重測一次（L32）——
+   宣告另以 `searchMode: semantic` 重測一次——
    全文 exact 查無不算數）——
    **查得到 → `FAIL(FALSE_NEGATIVE)`**（附找到的 chunk id；
    負面結論失效，該項需回灌補查）；仍查無 → PASS。
