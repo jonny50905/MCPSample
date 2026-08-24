@@ -621,6 +621,25 @@ if (Test-Path -LiteralPath $auditPath) {
         if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
 
+    # ── 完整性節的假陰性（L81）─────────────────────────────────
+    # 任務 C 是**分批委派**的，而委派會失敗（subagent 只回報「已讀取契約」
+    # 就結束＝委派卡死的指紋）。模板只有一格「發現的物件：<清單，或無>」，
+    # 於是「查了沒發現遺漏」與「根本沒查成」共用同一格——全部委派失敗時
+    # 寫「無」，讀的人看到的是一個**假陰性的完整性宣稱**。
+    # 只在 -StrictAudit（tier 2）升為違規：完整性盤點不在 tier 1 的承諾範圍
+    # （tier 1＝功能查得到、文件有實質內容），提早擋只會拖慢覆蓋畢業。
+    $intBody = ""
+    $inInt = $false
+    foreach ($ln in ($auditText -split "`r?`n")) {
+        if ($ln -match '^##\s') { $inInt = ($ln -match '完整性'); continue }
+        if ($inInt) { $intBody += ($ln + "`n") }
+    }
+    if ($intBody.Trim() -ne "" -and
+        $intBody -notmatch '(?m)^.*任務\s*C\s*覆蓋.*(\d+.*\d+|全部完成|全數完成)') {
+        $msg = "90-audit.md 完整性節缺「任務 C 覆蓋：完成 N／共 M 批」宣告——任務 C 分批委派且委派會失敗；沒有覆蓋率時，本節的「無」分不清『查了沒發現遺漏』與『根本沒查成』＝假陰性的完整性宣稱"
+        if ($StrictAudit) { $violations += $msg } else { $warnings += $msg }
+    }
+
     # ── 回灌工單（L79）───────────────────────────────────────────
     # 稽核已經查到答案的類型（ID_RELINK／LINE_DRIFT／STALE_DATA），答案寫在
     # 明細的「處置」欄。那是**純編輯**：不需要任何檢索，照抄即可。
