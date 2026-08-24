@@ -347,6 +347,9 @@ $missingIds = @()   # 檔案行號型缺 chunk id——與縮寫 id 同進手術
 $pendingSqlRows = @()   # 明寫「待人工SQL」的列＝合法待辦出口，不算違規但要點名
 $misplacedRefRows = @()  # 同列有證據、但機器參照欄放的是標籤（欄位錯放，非缺證據）
 $nnText = @{}            # 檔名 → 內容（回灌工單要查「新 id 是否已套用」）
+$bogusIds = @()          # 非 UUID／自編樣式的 id——不可信，須重新取證或降級移除
+$failedQueryRows = @()   # 以失敗查詢當機器參照的列（SQL 型，改表名重查）
+$jsonLeaks = @()         # subagent 契約 JSON 原樣洩漏（缺料類：內容可能被截斷）
 $relinkOrders = @()      # [回灌]：90-audit.md 明細「處置」欄帶的機械修復指令
 
 Get-ChildItem -LiteralPath $dir -Filter "*.md" |
@@ -401,6 +404,9 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
                 }
                 else {
                     $violations += "${name}：ChunkId 非 UUID 格式（疑似捏造）：$id"
+                    # L80：原本只記違規、不開工單＝有門檻沒出口（tier 2 的 lint
+                    # 全綠條件過不了，而沒有任何管道會去修它）
+                    $bogusIds += [pscustomobject]@{ File = $name; Id = $id }
                 }
             }
         }
@@ -408,6 +414,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         # 已知的自編 id 樣式（歷史失敗模式）
         foreach ($m in [regex]::Matches($text, '\b(SQL-[A-Z]+-\d+|CHK-[A-Z]+-\d+)\b')) {
             $violations += "${name}：出現自編 id 樣式：$($m.Value)"
+            $bogusIds += [pscustomobject]@{ File = $name; Id = $m.Value }
         }
 
         # 表格列欄位數不一致（L41）：寫入中斷的指紋——最後一列少了欄位。
@@ -471,6 +478,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
                     $line -notmatch '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-' -and
                     $line -match '(schema\s*不存在|table\s+not\s+found|不存在該表|查無此表|ORA-\d|查詢失敗)') {
                     $violations += "${name}:${evLineNo}：以**失敗查詢**當機器參照（證據必須可重現）——多半是表名寫錯（PeopleTools 表禁自行加 PS_ 前綴，見 cookbook 規則 8a），改用正確表名重查後貼「SQL：<SELECT>」＋keyRows"
+                    $failedQueryRows += "${name}:${evLineNo}"
                 }
                 # L55：改成**正面表列**——每一列證據都必須自己帶得出可重跑的東西。
                 # 舊版是反面表列（「長得像 檔名:行號 且沒有 SQL 字樣」才判違規），
@@ -545,6 +553,9 @@ foreach ($tf in $rawJsonTargets) {
             break
         }
         $violations += "${tname}:${ln}：subagent 回報 JSON 原樣洩漏進文件（命中 $keyHits 個契約鍵）——契約 JSON 是**原料**，必須消化成報告文字；刪除該段並依契約內容重寫（同段常伴模型推理獨白，一併清）"
+        # L80：這是**缺料類**（擋 tier 1）卻零出口——與模型內部標記洩漏同形，
+        # 一併開成 [洩漏] 工單（修法一樣：看前後區塊有無截斷、刪除、補回）
+        $jsonLeaks += [pscustomobject]@{ File = $tname; Line = $ln }
     }
 }
 
@@ -874,9 +885,10 @@ $leakManual = @($leaks | Where-Object { -not $_.Delegable })
 # ——CoverageOnly 已把它們降為警告不擋門，工單卻照出，等於 auto-loop 在 tier 1
 # 燒好幾個 session 修不擋門的東西，與廣度優先（L50：tier 1 不保證回溯驗證，
 # 回溯驗證是 tier 2 的工作）直接牴觸。
-$polishOrderCount = $truncatedIds.Count + $missingIds.Count + $misplacedRefRows.Count
+$polishOrderCount = $truncatedIds.Count + $missingIds.Count + $misplacedRefRows.Count +
+    $bogusIds.Count + $failedQueryRows.Count
 $emitPolish = (-not $CoverageOnly)
-$orderTotal = $leakDelegable.Count + $relinkOrders.Count
+$orderTotal = $leakDelegable.Count + $relinkOrders.Count + $jsonLeaks.Count
 if ($emitPolish) { $orderTotal += $polishOrderCount }
 # [回灌] 兩個 tier 都出（L79）：它不需要任何檢索（答案已在明細），而每不做
 # 一次，下一輪全量重驗就要對同一筆重付一次二次定位——與 [欄位]／[證據]
@@ -890,6 +902,10 @@ if ($orderTotal -gt 0) {
     foreach ($t in $leakDelegable) {
         $i++
         Write-Host "$i. [洩漏] $($t.File):$($t.Line)：$($t.Marker)"
+    }
+    foreach ($t in $jsonLeaks) {
+        $i++
+        Write-Host "$i. [洩漏] $($t.File):$($t.Line)：subagent 契約 JSON 原樣寫進文件"
     }
     foreach ($r in $relinkOrders) {
         $i++
@@ -919,6 +935,14 @@ if ($orderTotal -gt 0) {
     foreach ($t in $missingIds) {
         $i++
         Write-Host "$i. [證據] $($t.File)：機器參照無效＠$($t.Ref)"
+    }
+    foreach ($t in $bogusIds) {
+        $i++
+        Write-Host "$i. [證據] $($t.File)：**不可信 id**（非 UUID／自編樣式）：$($t.Id)"
+    }
+    foreach ($t in $failedQueryRows) {
+        $i++
+        Write-Host "$i. [證據] ${t}：以失敗查詢當機器參照（SQL 型，多半表名寫錯）"
     }
     }
     Write-Host ""
@@ -987,6 +1011,10 @@ if ($orderTotal -gt 0) {
     Write-Host "    → 原機器參照寫著 schema 不存在／查無此表／ORA- ＝失敗查詢不是證據；"
     Write-Host "      委派後仍不可得（通道忙／權限）→ 該筆輸出「舊值 → 待人工SQL」"
     Write-Host "      收據並**停止該筆**（管理者照 SOP-2 第 4 階自跑），不得換工具重試"
+    Write-Host "    ※ 標「**不可信 id**」的：那個 id 本身完全不可信，**不要試圖補全它**"
+    Write-Host "      ——依該列的 filePath／物件名走 A 或 B 重新取證；取不到就走 C"
+    Write-Host "    ※ 標「失敗查詢」的：一律走 B（SQL／metadata 型）——表名多半寫錯，"
+    Write-Host "      **禁自行加減 PS_ 前綴**（cookbook 規則 8a），改正後貼可重跑 SELECT"
     Write-Host " C. A 與 B 都取不到 → 該列移除、主張降級 INFERRED、"
     Write-Host "    未解事項記一行查法收據（查了什麼、怎麼查、結果）"
     Write-Host ""

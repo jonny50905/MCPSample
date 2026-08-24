@@ -60,6 +60,24 @@ function Get-DomainContentHash {
     return ([System.BitConverter]::ToString($bytes)) -replace '-', ''
 }
 
+# 逐檔 hash（收據診斷用，L80）：contentHash 不符時要指得出「**哪一個檔**變了」——
+# 「文件已變動」沒有可行動性。選檔規則與正規化 hash **必須與 Get-DomainContentHash
+# 完全相同**，兩邊漂掉會指向錯的檔（比沒有診斷更糟）。
+function Get-DomainFileHashes {
+    param([string]$DomainDir)
+    $map = [ordered]@{}
+    if (-not (Test-Path -LiteralPath $DomainDir)) { return $map }
+    $names = @(Get-ChildItem -LiteralPath $DomainDir -File |
+            Where-Object { $_.Extension -eq '.md' -and $_.Name -ne 'log.md' } |
+            ForEach-Object { $_.Name })
+    if ($names.Count -eq 0) { return $map }
+    [System.Array]::Sort($names, [System.StringComparer]::Ordinal)
+    foreach ($n in $names) {
+        $map[$n] = Get-NormalizedFileHash -LiteralPath (Join-Path $DomainDir $n)
+    }
+    return $map
+}
+
 function Get-GraduationReceiptPath {
     param([string]$DomainDir)
     return (Join-Path $DomainDir "graduation.json")
@@ -96,7 +114,27 @@ function Test-GraduationReceipt {
             return @{ Valid = $false; Reason = "domain 不符（$($rc.domain)）" }
         }
         if ([string]$rc.contentHash -cne (Get-DomainContentHash -DomainDir $DomainDir)) {
-            return @{ Valid = $false; Reason = "contentHash 不符（文件已變動）" }
+            # 指名哪些檔變了；舊收據沒有 files 欄位就退回舊訊息（不炸例外）
+            $detail = "文件已變動"
+            if ($null -ne $rc.files) {
+                $now = Get-DomainFileHashes -DomainDir $DomainDir
+                $was = @{}
+                foreach ($p in $rc.files.PSObject.Properties) { $was[$p.Name] = [string]$p.Value }
+                $changed = @()
+                $added = @()
+                $removed = @()
+                foreach ($k in $now.Keys) {
+                    if (-not $was.ContainsKey($k)) { $added += $k }
+                    elseif ($was[$k] -cne [string]$now[$k]) { $changed += $k }
+                }
+                foreach ($k in $was.Keys) { if (-not $now.Contains($k)) { $removed += $k } }
+                $bits = @()
+                if ($changed.Count -gt 0) { $bits += "已修改：$($changed -join '、')" }
+                if ($added.Count -gt 0) { $bits += "新增：$($added -join '、')" }
+                if ($removed.Count -gt 0) { $bits += "已刪除：$($removed -join '、')" }
+                if ($bits.Count -gt 0) { $detail = ($bits -join '｜') }
+            }
+            return @{ Valid = $false; Reason = "contentHash 不符（$detail）" }
         }
         if ([string]$rc.lintScriptHash -cne (Get-NormalizedFileHash -LiteralPath $LintScriptPath)) {
             return @{ Valid = $false; Reason = "lintScriptHash 不符（lint 已改版）" }
@@ -131,10 +169,11 @@ function Write-GraduationReceipt {
             graduatedAt    = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssK")
             auditRound     = $AuditRound
             contentHash    = $nowContent
+            files          = (Get-DomainFileHashes -DomainDir $DomainDir)
             lintScriptHash = (Get-NormalizedFileHash -LiteralPath $LintScriptPath)
             gateScriptHash = (Get-NormalizedFileHash -LiteralPath $GateScriptPath)
         }
-        $json = $rc | ConvertTo-Json
+        $json = $rc | ConvertTo-Json -Depth 4
         [System.IO.File]::WriteAllText(
             (Get-GraduationReceiptPath -DomainDir $DomainDir),
             $json,
