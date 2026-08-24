@@ -62,7 +62,10 @@ param(
     # 設窄的成本是「永遠不知道要多久，而且每輪白燒」。
     [int]$AuditTimeoutMin = 120,
     [string]$Model = "",           # 留空＝opencode 全域預設；填 provider/model-id 可覆寫本次
-    [switch]$Preflight             # 只檢查環境／相位／lint／收據並列印，不啟動 session、不取鎖
+    [switch]$Preflight,            # 只檢查環境／相位／lint／收據並列印，不啟動 session、不取鎖
+    # 每圈結束 commit 一次該領域目錄（L83）：session 崩在半路是這個系統的
+    # 常態故障，有還原點才敢讓它無人看管。**只 commit、永不 push**。
+    [switch]$GitCommit
 )
 
 # ── 參數消毒（L28）：尾部空白/點＝Win32 假缺檔陷阱；隱形字元直接拒跑 ──
@@ -417,9 +420,35 @@ if ($Preflight) {
     Write-Host "現有收據  ：$(if ($rc.Valid) { "有效（本領域已達 tier $Tier，跑下去會重驗）" } else { $rc.Reason })"
     Write-Host "熔絲設定  ：MaxCycles=$MaxCycles｜research 逾時 $ResearchTimeoutMin 分｜audit 逾時 $AuditTimeoutMin 分"
     Write-Host "手術節流  ：一批 $SurgeryBatchSize 筆 × 一圈 $MaxSurgeryPerCycle 批＝本圈最多 $($SurgeryBatchSize * $MaxSurgeryPerCycle) 筆"
+    Write-Host "git 快照  ：$(if ($GitCommit) { '開（每圈 commit 該領域目錄，永不 push）' } else { '關（加 -GitCommit 開啟）' })"
     Write-Host "log 位置  ：$logRoot"
     Write-Host "=== 檢查結束（未啟動任何 session）===" -ForegroundColor Cyan
     exit 0
+}
+
+# ── git 快照（L83）：每圈一個可回溯的還原點 ─────────────────────
+# **只 commit，永不 push**——研究產出是公司機密，嚴禁外部 remote。
+# 範圍**限定該領域目錄**：工作樹裡常有人工搬運中的腳本，`git add -A` 會掃進去。
+# 收據（graduation.json）與 auto-loop-logs 已在 .gitignore，不會被帶入。
+# git 不可用／未設 user.name／commit 失敗一律**只記 log 不中斷**——
+# 快照是加值，不該變成新的停機原因。
+function Invoke-GitSnapshot {
+    param([string]$Note)
+    if (-not $GitCommit) { return }
+    try {
+        $rel = "docs/ps-research/$Domain"
+        & git -C $root add -- $rel 2>&1 | Out-Null
+        $staged = (& git -C $root diff --cached --name-only -- $rel 2>&1 | Out-String)
+        if ([string]::IsNullOrWhiteSpace($staged)) { return }
+        $n = @($staged -split "`r?`n" | Where-Object { $_.Trim() -ne '' }).Count
+        $msg = "kb(auto): $Domain $Note"
+        $out = (& git -C $root commit -m $msg -- $rel 2>&1 | Out-String)
+        if ($LASTEXITCODE -eq 0) { Write-Log "GIT 快照：$msg（$n 檔）" }
+        else { Write-Log "GIT 快照失敗（不中斷）：$($out.Trim())" }
+    }
+    catch {
+        Write-Log "GIT 快照例外（不中斷）：$($_.Exception.Message)"
+    }
 }
 
 # ── 自動化互斥鎖（issue #3）──────────────────────────────────
@@ -637,6 +666,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
 
     # 進度與畢業判定
     $after = Get-ChecklistState
+    $gitNoteLint = "lint exit=$($lint.Exit) 工單 $($lint.Surgical.Count) 筆"
     if ($phase -eq "audit") {
         # 三層畢業門（issue #2）——外環保證「有沒有做」，內層約束「怎麼做」
         # ★ 改動本門判定＝必須 bump ps-graduation.ps1 的 GraduationGateVersion，
@@ -753,10 +783,14 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         }
         else { $noProgress = 0 }
     }
+    # 每圈一個還原點（L83）：session 崩在半路是常態故障，
+    # 有 commit 才敢讓它無人看管——只 commit、永不 push。
+    Invoke-GitSnapshot -Note "第 $cycle 圈 $phase｜$gitNoteLint｜$(if ($graduated) { "畢業 tier $Tier" } else { '未畢業' })"
 }
 
 # ── 收場摘要 ────────────────────────────────────────────────
 $final = Get-ChecklistState
+Invoke-GitSnapshot -Note "收場｜$stopReason"
 Write-Log "=== auto-loop 停機：$stopReason ==="
 Write-Log "最終狀態：未勾=$($final.Unticked) 已勾=$($final.Ticked) 稽核輪次=$($final.Round) tier=$Tier 畢業=$graduated"
 if ($graduated -and $Tier -eq 1) {

@@ -30,7 +30,8 @@ param(
     [switch]$Force,                      # 忽略有效收據、全部重新進 ps-auto-loop
     [string]$Model = "",                 # 透傳 ps-auto-loop -Model
     [int]$MaxCyclesPerDomain = 0,        # >0 時透傳 ps-auto-loop -MaxCycles（縮小單領域天花板）
-    [ValidateSet(0, 1, 2)][int]$Tier = 0 # 0＝兩趟（tier 1 全跑完再 tier 2）；1／2＝只跑該趟
+    [ValidateSet(0, 1, 2)][int]$Tier = 0, # 0＝兩趟（tier 1 全跑完再 tier 2）；1／2＝只跑該趟
+    [switch]$GitCommit                   # 透傳 ps-auto-loop -GitCommit（每圈快照，永不 push）
 )
 
 $root = Split-Path $PSScriptRoot -Parent
@@ -168,6 +169,7 @@ foreach ($d in $domains) {
     $ranCount++
     # 子行程呼叫：領域名已過 preflight（無 " 與 cmd 特殊字元），雙引號包裹安全
     $argStr = '-NoProfile -File "{0}" -Domain "{1}" -Tier {2}' -f $autoLoopPath, $d, $pass
+    if ($GitCommit) { $argStr += ' -GitCommit' }
     if ($Model -ne '') { $argStr += ' -Model "{0}"' -f $Model }
     if ($MaxCyclesPerDomain -gt 0) { $argStr += ' -MaxCycles {0}' -f $MaxCyclesPerDomain }
     $code = $null
