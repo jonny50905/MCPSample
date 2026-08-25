@@ -351,6 +351,15 @@ function Get-CoverageBreakdown {
     }
 }
 
+# 歸戶儀表（L86）：lint 的 WIKI_MISSING 行——本領域 [[連結]] 無 entity 的數量。
+# 舊版 lint 無此行＝回 0（不觸發提煉，fail-safe）。
+function Get-WikiMissing {
+    $l = Invoke-Lint
+    $m = [regex]::Match($l.Raw, '(?m)^WIKI_MISSING：(\d+)')
+    if ($m.Success) { return [int]$m.Groups[1].Value }
+    return 0
+}
+
 # -Strict＝畢業門專用（ps-doc-lint.ps1 -StrictAudit）：90-audit 結構性問題升 FAIL
 # -Coverage＝覆蓋畢業門（tier 1）專用（ps-doc-lint.ps1 -CoverageOnly）：
 #   只收缺料類違規，美工類（證據 id／機器參照／confidence／frontmatter）降警告
@@ -437,12 +446,13 @@ function Invoke-GitSnapshot {
     if (-not $GitCommit) { return }
     try {
         $rel = "docs/ps-research/$Domain"
-        & git -C $root add -- $rel 2>&1 | Out-Null
-        $staged = (& git -C $root diff --cached --name-only -- $rel 2>&1 | Out-String)
+        $relWiki = "docs/ps-research/wiki"
+        & git -C $root add -- $rel $relWiki 2>&1 | Out-Null
+        $staged = (& git -C $root diff --cached --name-only -- $rel $relWiki 2>&1 | Out-String)
         if ([string]::IsNullOrWhiteSpace($staged)) { return }
         $n = @($staged -split "`r?`n" | Where-Object { $_.Trim() -ne '' }).Count
         $msg = "kb(auto): $Domain $Note"
-        $out = (& git -C $root commit -m $msg -- $rel 2>&1 | Out-String)
+        $out = (& git -C $root commit -m $msg -- $rel $relWiki 2>&1 | Out-String)
         if ($LASTEXITCODE -eq 0) { Write-Log "GIT 快照：$msg（$n 檔）" }
         else { Write-Log "GIT 快照失敗（不中斷）：$($out.Trim())" }
     }
@@ -806,6 +816,29 @@ if ($graduated) {
         -GateScriptPath $gradLibPath -ExpectedContentHash $gradContentHash -Tier $Tier
     if ($rcResult.Ok) {
         Write-Log "畢業收據已寫入 graduation.json（tier=$Tier auditRound=$gradAuditRound）"
+        # ── 歸戶提煉（L86）：wiki 只在畢業後從 NN 提煉。收據**先發**（wiki 在
+        #    領域目錄外，不影響 contentHash）；提煉失敗不撤畢業，餘量下次畢業續跑。
+        #    session 禁委派禁檢索＝純 read NN／write wiki，不佔 MCP。
+        $wm = Get-WikiMissing
+        $distillRound = 0
+        while ($wm -gt 0 -and $distillRound -lt 4) {
+            $distillRound++
+            Write-Log "歸戶提煉第 $distillRound 輪：待歸戶 $wm 個物件"
+            $dPrompt = "歸戶提煉：照你 system prompt 的「提煉模式」處理 docs/ps-research/$Domain/ 的 NN 檔。只 read NN 檔與 wiki、只 write wiki 與 index；禁止委派、禁止任何檢索；evidence 逐字複製 NN 檔既有的 ChunkId 與 SQL。"
+            $dr = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $dPrompt `
+                -TimeoutMin $ResearchTimeoutMin -Tag "distill"
+            $wm2 = Get-WikiMissing
+            Write-Log "歸戶提煉第 $distillRound 輪結束：待歸戶 $wm → $wm2"
+            if ($wm2 -ge $wm) { Write-Log "提煉未收斂——停止（餘 $wm2 個記人工或下次畢業續跑）"; break }
+            $wm = $wm2
+        }
+        if ($Tier -eq 2) {
+            $uPrompt = "entity 升級：照你 system prompt 的「提煉模式」第 3 條處理 docs/ps-research/$Domain/——本領域 NN 檔 [[連結]] 到的 entity 中 status: draft 改 verified（reviewed 與 stale 不動）。只 read／write wiki，禁止委派與檢索。"
+            $ur = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $uPrompt `
+                -TimeoutMin $ResearchTimeoutMin -Tag "distill-upgrade"
+            Write-Log "entity 升級 session 結束（tier 2）"
+        }
+        Invoke-GitSnapshot -Note "歸戶提煉收尾（餘 $wm 待歸戶）"
     }
     else {
         Write-Log "畢業收據寫入失敗：$($rcResult.Reason)——exit 2（system error）"

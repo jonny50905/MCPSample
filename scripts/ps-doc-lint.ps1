@@ -787,6 +787,7 @@ if (Test-Path $wikiDir) {
 
     # 斷鏈與孤兒（[[目標]] 以「檔名（不含副檔名）」解析，跨全部領域）
     $referenced = @{}
+    $domainMissing = @{}   # 本領域檔案連到、但 entity 不存在的物件（歸戶儀表 L86）
     foreach ($f in $allMd) {
         $t = Get-Content $f.FullName -Raw -Encoding UTF8
         if ([string]::IsNullOrEmpty($t)) { continue }   # 空檔已於前段記違規，斷鏈掃描跳過
@@ -795,6 +796,9 @@ if (Test-Path $wikiDir) {
             $referenced[$target] = $true
             if (-not $noteNames.ContainsKey($target)) {
                 $warnings += "$($f.Name)：wikilink 目標不存在：[[${target}]]"
+                if ($f.FullName.StartsWith($dir, [StringComparison]::OrdinalIgnoreCase)) {
+                    $domainMissing[$target] = $true
+                }
             }
         }
     }
@@ -804,6 +808,8 @@ if (Test-Path $wikiDir) {
             $warnings += "wiki/$($n.Name)：孤兒 entity（沒有任何 [[${entity}]] 入鏈）"
         }
     }
+    # 歸戶儀表（L86）：auto-loop 畢業後的提煉相位以此收斂——固定輸出（0 也印）
+    Write-Host "WIKI_MISSING：$($domainMissing.Count) 個本領域物件待歸戶"
 }
 
 # ── 模型內部標記洩漏：**領域內全部 .md 統一掃描**（L41／L51）─────────

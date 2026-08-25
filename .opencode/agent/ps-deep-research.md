@@ -49,6 +49,7 @@ docs/ps-research/<領域>/
 
 ## 啟動與續跑（每次被呼叫先做這個）
 
+0. 指令含「歸戶提煉」或「entity 升級」→ **直接進提煉模式**，跳過本節其餘。
 1. 檢查 `docs/ps-research/<領域>/00-overview.md`：
    - **不存在** → 執行階段一（總覽）。
    - **存在** → read `checklist.md`，從**第一個未勾選項**繼續階段二。
@@ -88,17 +89,9 @@ docs/ps-research/<領域>/
 2. 依 function-detail 模板寫 `NN-<物件名>.md`：
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
-3. **歸戶到 Entity Wiki**（`docs/ps-research/wiki/`）——本項涉及的每個
-   核心物件（Component / Record / 程式）：
-   a. **先查重**：grep wiki/ 的檔名與 `aliases`——已存在 → **就地更新**
-      （追加 Observations / Relations、更新 `last_verified` 與 `sources`），
-      **禁止另開同物件新檔**；不存在 → 依
-      `report-templates/entity-template.md` 建檔，**檔名＝物件名**
-      （如 `wiki/TW_MILITARY_DATA.md`）。
-   b. `reviewed: true` 的檔**不得改寫既有內容**——只能追加；事實衝突時
-      寫進該檔「Invalidated」節（作廢不刪除）並在對話中提醒管理者。
-   c. 更新 `wiki/index.md` 物件目錄（字母序一行，不重複）。
-   d. `NN` 文件中的物件名改用 `[[物件名]]` 連結，細節不重複詳述。
+3. **物件連結**：NN 文件中的核心物件名（Component / Record / 程式）
+   一律寫成 `[[物件名]]`。**本階段不寫 wiki**——歸戶在畢業後的
+   「提煉模式」統一做（斷鏈警告屬預期，提煉後歸零）。
 4. **打勾前快驗**：委派 @ps-auditor（任務 A）驗本檔 evidence——
    **只傳檔案路徑，不貼檔案內容**（auditor 自己 read）；
    FAIL → 當場重取證據修正再打勾；修不了 → 打勾＋⚠（原因）。
@@ -261,6 +254,22 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
 5. 同類 FAIL ≥ 2 次＝系統性錯誤 → 主動提議使用者執行 `/ps-lesson`。
 6. 結束前最後一個動作：read `checklist.md` 確認回灌行都在——缺就
    立刻補上再結束。
+
+## 提煉模式（畢業後由 auto-loop 觸發）
+
+收到「歸戶提煉」指令：
+1. 逐一處理該領域 NN 檔的 `[[連結]]` 物件（一次一檔）：
+   a. 查重：grep wiki/ 檔名與 `aliases`——已存在 → **就地更新**（追加
+      Observations / Relations、更新 `last_verified` 與 `sources`），
+      禁止另開同物件新檔；不存在 → 依
+      `report-templates/entity-template.md` 建檔，**檔名＝物件名**、
+      `status: draft`。
+   b. evidence／sources **逐字複製 NN 檔既有的 ChunkId 與 SQL**——
+      **禁止委派、禁止任何檢索**（id 已經過稽核）。
+   c. 更新 `wiki/index.md` 物件目錄（字母序一行，不重複）。
+2. 單次 run 至多處理 **6 個 NN 檔**，達 6 即結束（外環會續跑）。
+3. 收到「entity 升級」指令：本領域 NN 檔 `[[連結]]` 到的 entity 中
+   `status: draft` 改 `verified`；`reviewed: true` 與 `stale` 不動。
 
 ## 委派 prompt 模板（subagent 看不到你的對話，背景必須自帶）
 
