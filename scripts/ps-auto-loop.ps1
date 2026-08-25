@@ -184,6 +184,30 @@ function Get-ItemTotal {
     return $total
 }
 
+# ── checklist 完整性（L89）：**每個 session 之後都驗，不只強殺後**──
+# 實案：乾淨退場（exit 0）的 session 把「## 調查進度」整節吃掉，第 56 輪
+# 吃、57 輪別的 session 寫回、58 輪又吃——舊檢查只掛在強殺路徑上，
+# 這種腐蝕閃爍了四輪才被人肉發現。判準兩條（皆機械）：
+#   (1) checklist.md 存在則必含「## 調查進度」與「## Gaps」節標題；
+#   (2) checklist＋全部 archive 的合併項目總數不得下降
+#       （歸檔是搬移、FixArchive 刪流程標籤都在基準重取之後，不誤傷）。
+function Test-ChecklistIntegrity {
+    param([int]$PreTotal)
+    $problems = @()
+    $clPath = Join-Path $dir "checklist.md"
+    if (Test-Path $clPath) {
+        $t = Get-Content $clPath -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($t)) { $problems += "checklist.md 空檔" }
+        else {
+            if ($t -notmatch '##\s*調查進度') { $problems += "「## 調查進度」節標題消失" }
+            if ($t -notmatch '##\s*Gaps') { $problems += "「## Gaps 彙整」節標題消失" }
+        }
+        $now = Get-ItemTotal
+        if ($now -lt $PreTotal) { $problems += "項目總數下降 $PreTotal→$now（含歸檔合併計數——列被吃掉）" }
+    }
+    return $problems
+}
+
 # ── 檔案一致性檢查（強殺後執行；純唯讀，絕不觸發修復 session）────
 # 原則：只驗「圈前存在的東西沒變壞」——新領域缺檔屬合法狀態（vacuous PASS），
 # 首圈逾時不因此誤停。啟發式只採高置信訊號（缺檔／0 byte／項目總數減少／
@@ -550,6 +574,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
                 $cvAuto = $cv.Auto
                 $goResearch = ($cvAuto -gt 0)
                 Write-Log "FixArchive 後：缺料 $cvTotal 項＝自動 $cvAuto／僅 audit $cvAuditOnly／需人工 $cvManualOnly（處置明細見 fixarchive-cycle$cycle.txt）"
+                # FixArchive 會合法刪列（流程標籤）——完整性基準必須重取，
+                # 否則本圈 session 後的檢查會拿舊基準誤報「列被吃掉」
+                $preItemTotal = Get-ItemTotal
             }
             if ($cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
                 $stopReason = "剩 $cvManualOnly 項需人工（-FixArchive 也判不出來：可能是『沒做完』與『打勾掉了』分不出的列）——清單見 coverage-cycle$cycle-pre.txt 的 MANUAL_ONLY 段、處置紀錄見 fixarchive-cycle$cycle.txt；處理完再啟動"
@@ -621,6 +648,15 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     }
     else { $errorStreak = 0 }
 
+    # checklist 完整性（L89）：乾淨退場也可能吃列——每 session 必驗，
+    # FAIL 即停（有 -GitCommit 快照可精準單檔回滾，繼續跑只會把腐蝕蓋進歸檔）
+    $ciProblems = Test-ChecklistIntegrity -PreTotal $preItemTotal
+    if ($ciProblems.Count -gt 0) {
+        foreach ($pb in $ciProblems) { Write-Log "CHECKLIST 完整性 FAIL：$pb" }
+        $stopReason = "checklist 完整性 FAIL（$($ciProblems.Count) 項，本 session 寫壞）——回滾指令：git checkout HEAD -- "docs/ps-research/$Domain/checklist.md"（$(if ($GitCommit) { '每圈快照在，HEAD 即上一圈' } else { '未開 -GitCommit——用最近一次人工 commit，或依 checklist-archive 重建' })）；回滾後重啟"
+        break
+    }
+
     # 每個 session 後跑 lint；FAIL 且有手術清單→自動餵修復 session。
     # **手術用的尺必須跟 tier 一致**（L70）：tier 1 用 CoverageOnly——它的工單
     # 只出缺料類（[洩漏] 型）。用基礎 lint 會讓 tier 1 燒好幾個 session 去修
@@ -664,6 +700,13 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             Write-Log "手術 session 逾時強殺——一致性檢查 PASS，續跑"
         }
         elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 errorStreak）" }
+        $ciProblems = Test-ChecklistIntegrity -PreTotal $preItemTotal
+        if ($ciProblems.Count -gt 0) {
+            foreach ($pb in $ciProblems) { Write-Log "CHECKLIST 完整性 FAIL（手術後）：$pb" }
+            $stopReason = "手術 session 寫壞 checklist（$($ciProblems.Count) 項）——回滾 checklist.md 後重啟"
+            $fatalStop = $true
+            break
+        }
         $lint2 = if ($Tier -eq 1) { Invoke-Lint -Coverage } else { Invoke-Lint }
         Write-Log "LINT(術後第 $surgeryRound 批) exit=$($lint2.Exit) 手術清單=$($lint2.Surgical.Count) 筆"
         $lint = $lint2
