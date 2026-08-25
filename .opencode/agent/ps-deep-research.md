@@ -271,6 +271,9 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
       禁止另開同物件新檔；不存在 → 依
       `report-templates/entity-template.md` 建檔，**檔名＝物件名**、
       `status: draft`。
+      **`aliases` 一併補**：NN 檔對該物件用過的業務稱呼（功能名、
+      中文詞、欄位 Label）都加進去，已有的不重複——aliases 是問答
+      命中率的第一道門，缺了就是「有知識卻查不到」。
    b. evidence／sources **逐字複製 NN 檔既有的 ChunkId 與 SQL**——
       **禁止委派、禁止任何檢索**（id 已經過稽核）。
    c. 更新 `wiki/index.md` 物件目錄（字母序一行，不重複）。
