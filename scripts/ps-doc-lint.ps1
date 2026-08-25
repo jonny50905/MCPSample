@@ -305,7 +305,7 @@ if ($null -ne $checklistOnly) {
     $clProc = @([regex]::Matches($checklistOnly, $procLabelPattern))
     if ($clProc.Count -gt 0) {
         $clProcSample = (@($clProc | Select-Object -First 2 | ForEach-Object { $_.Groups[1].Value }) -join '；')
-        $violations += "checklist.md：含 $($clProc.Count) 列稽核流程標籤（如「$clProcSample」）——那是 auditor 的委派切分不是調查項，**整列刪除**；回灌只准寫「A<n> 補查 <NN-檔名>：FAIL x／DISPUTED y／UNVERIFIABLE z（稽核）」"
+        $violations += "checklist.md：含 $($clProc.Count) 列稽核流程標籤（如「$clProcSample」）——那是 auditor 的委派切分不是調查項，**整列刪除**；回灌只准寫「A<輪次>-<序號> 補查 <NN-檔名>：FAIL x／DISPUTED y／UNVERIFIABLE z（稽核）」"
     }
 
     # 1) checklist 對帳：打勾項的目標檔必須存在；NN 檔必須被 checklist 列到

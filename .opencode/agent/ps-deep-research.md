@@ -107,7 +107,7 @@ docs/ps-research/<領域>/
    checklist.md 的 Gaps 彙整。**00-overview.md 不改。**
 6. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
 
-**稽核回灌項（A<n>）的處理**（取代標準深度鏈，做定向補查）：
+**稽核回灌項（A 項）的處理**（取代標準深度鏈，做定向補查）：
 - **第一步先 read `90-audit.md` 的明細表**，取出該檔的逐筆判定
   （類型／內容／原因／處置）——A 行只有計數，**明細才是工單**。
   （稽核模式步驟 4 的「禁止 read 舊 90-audit.md」只限寫新報告時；此處准讀。）
@@ -207,7 +207,9 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    「稽核輪次：N」行（沒有該行視為 N=0）。回灌對象＝**任何非 PASS／
    VERIFIED 的判定**（FAIL／DISPUTED／UNVERIFIABLE／自創詞一律算）
    與遺漏候選；**以「檔」為單位彙整，一檔一行**：
-   `- [ ] A<n> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
+   `- [ ] A<本輪輪次>-<本輪序號> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
+   （例：第 44 輪第 3 項＝`A44-03`。輪次取 checklist 表頭，序號本輪從 01 起——
+   不需要也不准去 archive 找歷史編號）
    ——**禁止逐筆開項**。寫入時同步做三件事：
    (a) 輪次行更新為「稽核輪次：N+1」——90-audit.md 表頭的稽核輪次
    必須寫同一個 N+1；
