@@ -157,6 +157,9 @@ docs/ps-research/<領域>/
   否則 lint 會點出「宣稱受限卻零列走出口」。
 - DISPUTED 主張二選一：取得可靠證據 → 修證據、保 CONFIRMED；
   取不到 → 把該敘述**降級 INFERRED** 或依新證據改寫——不得原樣保留。
+- **修復改動了結論**（DISPUTED 改寫、降級、數值更新——純換 id／行號不算）
+  → 查該物件的 wiki entity 檔：涉及同一事實的 Observation 一併同步
+  （追加或作廢不刪除），更新 `last_verified`。
 - UNVERIFIABLE：重驗一次；再失敗記 gaps（工具原因照實寫），不重試迴圈。
 
 **全部打勾後接稽核（每次 run 最多一輪；長 run 不當場稽核）**：
@@ -191,6 +194,12 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    任務 B（反駁驗證）**另開一個委派**：由**你**從該檔抽 3~5 條標
    CONFIRMED 的重要 claim 放進委派 prompt——**claim 不准讓 subagent
    自選**。**同一個委派禁止同時要求 A＋B**。
+1b. **wiki 抽驗**：收集本領域 NN 檔 `[[連結]]` 到的 entity 檔，
+   依 `last_verified` 最舊優先抽 **5 個**，逐個委派 @ps-auditor（任務 A，
+   只傳 `docs/ps-research/wiki/<檔名>` 路徑）——驗 Observations 的
+   evidence 與 `sources`。非 PASS 判定照常回灌：
+   `- [ ] A<輪次>-<序號> 補查 wiki/<檔名>：FAIL <x>／…（稽核）`，
+   明細表照列（檔案欄寫 `wiki/<檔名>`）。
 2. 完整性：把總覽的核心資料表清單**分批**委派 @ps-auditor（任務 C：
    資料角度反推物件清單）——**每批至多 5 張表、一批一個委派**，
    由你把各批物件清單聯集後與功能地圖 diff，多出來的＝疑似遺漏。

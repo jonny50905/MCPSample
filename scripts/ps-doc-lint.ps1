@@ -664,6 +664,8 @@ if (Test-Path -LiteralPath $auditPath) {
         if ($inDetail) { $detailBody += ($ln + "`n") }
     }
     $relinkByFile = @{}
+    $relinkPairs = @()   # (old,new) 配對——wiki 掃描用（L85：wiki sources 引用
+                         # 同一批 chunk id，NN 換了新 id、wiki 還抱著死的）
     if ($detailBody -ne "") {
         foreach ($row in [regex]::Matches($detailBody, '(?m)^[^\S\r\n]*\|(?<c>.+)\|[^\S\r\n]*$')) {
             $cells = @($row.Groups['c'].Value -split '\|' | ForEach-Object { $_.Trim() })
@@ -671,8 +673,11 @@ if (Test-Path -LiteralPath $auditPath) {
             $fCell = $cells[0]
             $act = $cells[$cells.Count - 1]
             if ($fCell -match '^[-: ]+$' -or $fCell -eq '檔案') { continue }
-            # 檔名欄可能寫完整檔名，也可能只寫編號（「03」）——兩種都要對得回來
+            # 檔名欄可能寫完整檔名、編號（「03」）、或 wiki/<檔名>（wiki 抽驗列）
             $target = $null
+            $mW = [regex]::Match($fCell, 'wiki[/\\](?<w>\S+\.md)')
+            if ($mW.Success) { $target = "docs/ps-research/wiki/" + $mW.Groups['w'].Value }
+            if ($null -eq $target) {
             foreach ($n in $nnNames) {
                 $b = [IO.Path]::GetFileNameWithoutExtension($n)
                 if ($fCell -match [regex]::Escape($b)) { $target = $n; break }
@@ -686,15 +691,22 @@ if (Test-Path -LiteralPath $auditPath) {
                     if ($cand.Count -eq 1) { $target = $cand[0] }
                 }
             }
+            }
             if ($null -eq $target) { continue }
             $ord = $null
             $mR = [regex]::Match($act, '換\s*id\s*[：:]?\s*(?<old>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\s*(?:→|->|—>)\s*(?<new>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})')
             if ($mR.Success) {
                 $newId = $mR.Groups['new'].Value
-                # 已套用就不開單
-                if ($nnText.ContainsKey($target) -and $nnText[$target] -and
-                    $nnText[$target].IndexOf($newId, [StringComparison]::OrdinalIgnoreCase) -ge 0) { continue }
+                # 已套用就不開單（wiki 目標不在 $nnText，就地讀檔判定）
+                $tgtText = $null
+                if ($nnText.ContainsKey($target)) { $tgtText = $nnText[$target] }
+                elseif ($target -like 'docs/ps-research/wiki/*') {
+                    $wp = Join-Path $root $target
+                    if (Test-Path -LiteralPath $wp) { $tgtText = Get-Content $wp -Raw -Encoding UTF8 }
+                }
+                if ($tgtText -and $tgtText.IndexOf($newId, [StringComparison]::OrdinalIgnoreCase) -ge 0) { continue }
                 $ord = "換 id $($mR.Groups['old'].Value) → $newId"
+                $relinkPairs += , @($mR.Groups['old'].Value, $newId)
             }
             else {
                 $mL = [regex]::Match($act, '更新行號\s*[：:]?\s*(?:→|->)?\s*(?<v>\S+)')
@@ -705,6 +717,25 @@ if (Test-Path -LiteralPath $auditPath) {
             if ($null -ne $ord) {
                 if (-not $relinkByFile.ContainsKey($target)) { $relinkByFile[$target] = @() }
                 $relinkByFile[$target] += $ord
+            }
+        }
+    }
+    # wiki 同步（L85）：entity 的 sources 與 NN 引用同一批 chunk——凡有
+    # 「換 id」配對，wiki 檔裡還留著舊 UUID 的一律同單換掉。wiki 沒有
+    # 稽核管道，這是死 id 在問答層唯一的機械修復路。
+    if ($relinkPairs.Count -gt 0) {
+        $wikiDir = Join-Path $researchRoot "wiki"
+        if (Test-Path -LiteralPath $wikiDir) {
+            foreach ($wf in @(Get-ChildItem -LiteralPath $wikiDir -Filter "*.md" -File)) {
+                $wText = Get-Content $wf.FullName -Raw -Encoding UTF8
+                if ([string]::IsNullOrEmpty($wText)) { continue }
+                foreach ($pair in $relinkPairs) {
+                    if ($wText.IndexOf($pair[0], [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                        $wKey = "docs/ps-research/wiki/" + $wf.Name
+                        if (-not $relinkByFile.ContainsKey($wKey)) { $relinkByFile[$wKey] = @() }
+                        $relinkByFile[$wKey] += "換 id $($pair[0]) → $($pair[1])"
+                    }
+                }
             }
         }
     }
