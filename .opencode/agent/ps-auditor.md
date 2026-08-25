@@ -101,6 +101,12 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    `sql` 欄**非 SELECT**（如 AE 的 UPDATE、程式內語句）→
    `FAIL(WRONG_KIND)`（程式碼語句應改用 CHUNK 證據）——**不執行**、
    也不判 UNVERIFIABLE。
+   機器參照＝「**待人工SQL**」的列分兩種：
+   · 內容屬**程式碼**（AE step／PeopleCode／SQR／SQL definition）→
+     `FAIL(WRONG_KIND)`——程式碼證據不得走待人工SQL，
+     修法＝componentType 結構化取 chunk。
+   · 真 DB 查詢待人工執行 → `UNVERIFIABLE(PENDING_MANUAL)`——
+     **已申報的人工待辦，不是新問題**。
    結構成立但**數值不同**（筆數、統計——線上 DB 會變動）→
    `FAIL(STALE_DATA)` 並附新值（時效問題，修法＝更新文件數字，
    非證據造假）。

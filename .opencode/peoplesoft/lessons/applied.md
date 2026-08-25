@@ -2216,3 +2216,39 @@
   畢業是同一個哲學：先讓內層收斂，再往外層供貨。
 - 套用：本 commit（ps-deep-research 階段二／提煉模式／啟動豁免、
   ps-auto-loop 提煉相位＋快照範圍、ps-doc-lint WIKI_MISSING）。
+
+### L87 F1 終於修了——申報過的人工待辦不是新問題，不得每輪重新回灌（2026-08）
+- 現場（tier 2 第 4~6 圈）：未畢業檔數 3→7→3 **震盪不收斂**，lint 工單 0。
+  這個模式**七條熔絲全抓不到**：回灌每輪非零（活鎖熔斷不觸發）、research
+  每輪有進度（無進度熔斷不觸發）——會一路燒到 MaxCycles。
+- 明細確診＝設計審查的 fatal F1（發現至今始終未修）：
+  `待人工SQL` 是 research 端的合法申報出口，但**稽核端沒有它的判定規則**：
+  ```
+  audit 判 UNVERIFIABLE → 回灌 A 項 → research 修不了（本來就在等管理者
+  跑 SQL）→ 再蓋一次待人工SQL → lint 視為合法待辦（工單 0）→ 下輪 audit
+  又判 UNVERIFIABLE → …
+  ```
+  兩端各自「照規則做」，合起來是永動機——與 L69 同族：**一個字面在
+  producer 端有定義、在 consumer 端沒有**。
+- 附帶抓到出口濫用：AE SQL 被標了待人工SQL。**AE step 與程式內 SQL 是
+  CHUNK 型證據**（componentType 結構化就取得到），待人工SQL 是查 DB 表
+  （排程／權限／Run Control）專用——萬用逃生門會把可自動修的事變成
+  永遠的人工債。
+- 落點：
+  1. auditor：機器參照＝待人工SQL 的列分流——程式碼類 → `FAIL(WRONG_KIND)`
+     （回灌，componentType 取 chunk 可自動修）；真 DB 查詢 →
+     `UNVERIFIABLE(PENDING_MANUAL)`。
+  2. 回灌規則：PENDING_MANUAL **不生 A 項**（照常進記分卡與明細）——
+     人工待辦的家在明細清單與 lint 警告計數，不在工作佇列。
+  3. 合法出口規則收窄：明文「AE step 與程式內 SQL 屬 CHUNK 型，
+     不得走待人工SQL」。
+  4. 自創 FAIL 代碼（WRONG_COMPONENT／INCOMPLETE_REF）併入就近映射例。
+- 畢業語意的取捨（刻意）：tier 2 **可以帶著 PENDING_MANUAL 列畢業**。
+  擋它＝畢業門被人工可用性劫持——沒有任何自動相位能清它，那是 L72
+  「門檻必有出口」的直接應用。收據發了、清單留著，管理者照 SOP-2
+  批次自跑後回填，下輪 audit 自然升 PASS。
+- 原則：**佇列裡只放「有人能做」的事。** 機器修不了的進人工清單、
+  人工做完前不重複入列——把「等待」重新入列為「工作」，
+  就是把迴圈變成計時器。
+- 套用：本 commit（ps-auditor 分流、ps-deep-research 回灌排除＋出口收窄
+  ＋映射例、audit-template 註記）。

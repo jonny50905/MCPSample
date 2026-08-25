@@ -140,8 +140,11 @@ docs/ps-research/<領域>/
   **全部 deny**——任何檢索一律**委派**，自己直接呼叫必得 unavailable tool。
 - **查不到時的合法出口**：機器參照欄只准放三種東西——完整 36 字元
   ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。取不到證據時
-  **照型別走對應出口**：SQL／metadata 型（查 DB 表）→ 寫 `待人工SQL`
-  （管理者自跑後回填）；CHUNK 型（程式碼）→ **移除該列**並把該主張降級
+  **照型別走對應出口**：SQL／metadata 型（查 DB 表——排程、權限、
+  Run Control 這類 PeopleTools 表事實）→ 寫 `待人工SQL`
+  （管理者自跑後回填）；CHUNK 型（程式碼——**AE step 與程式內 SQL
+  屬此類**，componentType 取 chunk，不得走待人工SQL）→
+  **移除該列**並把該主張降級
   INFERRED。兩者都要在「未解事項」記一行查法收據（查了什麼、怎麼查、結果）。
   嚴禁三件事：(1) 寫「ChunkId」「PeopleCode chunk」「OracleMCP SQL」這類
   **標籤**充數——那不是證據，稽核重跑時跑不了任何東西，lint 逐列判違規；
@@ -208,7 +211,9 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
 3. **先回灌＋輪次遞增＋歸檔瘦身**：read `checklist.md` 的
    「稽核輪次：N」行（沒有該行視為 N=0）。回灌對象＝**任何非 PASS／
    VERIFIED 的判定**（FAIL／DISPUTED／UNVERIFIABLE／自創詞一律算）
-   與遺漏候選；**以「檔」為單位彙整，一檔一行**：
+   與遺漏候選——**唯 `UNVERIFIABLE(PENDING_MANUAL)` 除外**：那是已申報
+   的人工待辦（管理者自跑後回填），回灌它＝每輪重生同一批修不了的工單。
+   PENDING_MANUAL 列照常進記分卡與明細，只是不生 A 項；**以「檔」為單位彙整，一檔一行**：
    `- [ ] A<本輪輪次>-<本輪序號> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
    （例：第 44 輪第 3 項＝`A44-03`。輪次取 checklist 表頭，序號本輪從 01 起——
    不需要也不准去 archive 找歷史編號）
@@ -244,7 +249,9 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    禁止沿用其數字或內容**；判定詞彙只准契約五詞（證據層 PASS／FAIL／
    UNVERIFIABLE；claim 層 VERIFIED／DISPUTED／UNVERIFIABLE），auditor
    回報出現其他字（weakened、contradicted、partial 等）→ **就近映射**
-   （claim 層歸 DISPUTED、證據層歸 FAIL）後記錄；**明細表三種非過
+   （claim 層歸 DISPUTED、證據層歸 FAIL；WRONG_COMPONENT、
+   INCOMPLETE_REF 這類自創 FAIL 代碼＝證據層 FAIL，原因欄保留原文）
+   後記錄；**明細表三種非過
    判定每筆一列——UNVERIFIABLE 也要列，原因欄逐字取自 auditor 回報**
    （只在記分卡出現數字、明細查無其列＝報告不完整）；第 2 輪起填
    「上輪回灌項覆核」節（上輪 A 項逐項標 屬實／誤報／不可查——

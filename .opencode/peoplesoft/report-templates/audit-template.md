@@ -26,7 +26,9 @@
      FAIL 類型詞彙表（原因欄使用）：TRUNCATED_ID／FABRICATED／
      WRONG_KIND／STALE_DATA／ID_RELINK／NOT_FOUND／MISSING_CHUNK_ID／
      INCOMPLETE_CHUNK；行號漂移但 quote 命中＝PASS(LINE_DRIFT) 附
-     新行號，不是 FAIL。 -->
+     新行號，不是 FAIL。
+     UNVERIFIABLE(PENDING_MANUAL)＝待人工SQL 申報列——照列進明細與
+     記分卡，**不回灌 A 項**（人工待辦不是新問題）。 -->
 
 <!-- 「處置」欄＝下一輪的可執行工單。稽核已經查到答案的類型，答案
      必須寫在這一欄，否則下一輪只拿得到 A 行的計數、要再付一次檢索成本：
