@@ -362,6 +362,11 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
     ForEach-Object {
         $name = $_.Name
         $nnNames += $name
+        # 檔名衛生：雙重編號（12-05-…）＝命名慣例侵蝕，會讓記分卡編號代稱
+        # 的前綴比對變模糊。改名只能人工（改檔名＋checklist 該列），故僅警告。
+        if ($name -match '^\d\d-\d\d-') {
+            $warnings += "${name}：檔名雙重編號——規範是 <兩位數>-<物件或功能名>.md；擇批次空檔改名並同步 checklist 該列（人工）"
+        }
         $text = Get-Content $_.FullName -Raw -Encoding UTF8
         $nnText[$name] = $text
         # 空檔防護：0 byte 檔 Get-Content -Raw 回 null，[regex]::Matches 會丟例外
