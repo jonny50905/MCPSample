@@ -208,6 +208,12 @@ if ($null -ne $checklistOnly) {
     foreach ($m in [regex]::Matches($checklistOnly, '稽核輪次[：:]\s*([0-9]+)')) {
         $clRound = [int]$m.Groups[1].Value
     }
+    # 重複表頭＝「新骨架疊在舊檔上」的腐蝕指紋（實案：56 輪吃節後檔內
+    # 出現兩行稽核輪次）——輪次解析取最後一筆，重複時可能抓到錯的行
+    $roundLines = @([regex]::Matches($checklistOnly, '(?m)^.*稽核輪次[：:].*$'))
+    if ($roundLines.Count -gt 1) {
+        $violations += "checklist.md：出現 $($roundLines.Count) 行「稽核輪次」——腐蝕指紋（新表頭疊上舊檔）；人工保留正確那一行並檢查節標題／列有無重複"
+    }
 }
 # 00-overview 是凍結快照（L2）——歷多輪稽核後提醒讀者別當現況讀（L30）。
 # L54：落後程度要從**上次換版的輪次**起算，不是從 0 起算——原本只看
@@ -320,8 +326,10 @@ if ($null -ne $checklistOnly) {
     Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
         ForEach-Object {
-            if (-not $listed.ContainsKey($_.Name)) {
-                $violations += "檔案未列於調查進度 checklist：$($_.Name)"
+            # 「列到」的事實＝檔名在 checklist＋歸檔任何一行出現——不綁列格式
+            # （腐蝕/重寫會讓 → 箭頭漂掉，格式正規表示式抓不到＝假陽性）
+            if ($checklistSrc.IndexOf($_.Name, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                $violations += "檔案未被 checklist（含歸檔）任何一行提及：$($_.Name)"
             }
         }
 }
@@ -930,7 +938,7 @@ else {
     # （ps-deep-research 硬規則），所以牽涉歸檔內容的一律只能人工。
     # 白名單制——沒列到的預設「research 修得動」，讓迴圈去試（fail-safe：
     # 分類漏掉只是多跑一圈，分類過頭會讓真的能自動修的項目被判成要人工）。
-    $manualPatterns = @('個未打勾項', '與歸檔重複', '稽核流程標籤')
+    $manualPatterns = @('個未打勾項', '與歸檔重複', '稽核流程標籤', '行「稽核輪次」')
     $manualOnlyViolations = @($violations | Where-Object {
             $v = $_
             ($manualPatterns | Where-Object { $v.Contains($_) }).Count -gt 0
