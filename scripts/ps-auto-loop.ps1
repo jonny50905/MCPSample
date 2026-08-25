@@ -193,19 +193,37 @@ function Get-ItemTotal {
 #       （歸檔是搬移、FixArchive 刪流程標籤都在基準重取之後，不誤傷）。
 function Test-ChecklistIntegrity {
     param([int]$PreTotal)
-    $problems = @()
+    $r = @{ Lost = @(); Cosmetic = @() }
     $clPath = Join-Path $dir "checklist.md"
     if (Test-Path $clPath) {
         $t = Get-Content $clPath -Raw -Encoding UTF8
-        if ([string]::IsNullOrEmpty($t)) { $problems += "checklist.md 空檔" }
+        if ([string]::IsNullOrEmpty($t)) { $r.Lost += "checklist.md 空檔" }
         else {
-            if ($t -notmatch '##\s*調查進度') { $problems += "「## 調查進度」節標題消失" }
-            if ($t -notmatch '##\s*Gaps') { $problems += "「## Gaps 彙整」節標題消失" }
+            if ($t -notmatch '##\s*調查進度') { $r.Cosmetic += "「## 調查進度」節標題消失" }
+            if ($t -notmatch '##\s*Gaps') { $r.Cosmetic += "「## Gaps 彙整」節標題消失" }
         }
         $now = Get-ItemTotal
-        if ($now -lt $PreTotal) { $problems += "項目總數下降 $PreTotal→$now（含歸檔合併計數——列被吃掉）" }
+        if ($now -lt $PreTotal) { $r.Lost += "項目總數下降 $PreTotal→$now（含歸檔合併計數）" }
     }
-    return $problems
+    return $r
+}
+
+# 自動復原（L90）：回滾整個領域目錄到上一圈快照＋清掉本圈新生的未追蹤檔
+# ——本圈作廢（含正當寫入），換一圈重來。快照只在完整性通過後才拍，
+# HEAD 恆為乾淨還原點。回 $true＝已回滾。
+function Invoke-ChecklistRecovery {
+    if (-not $GitCommit) { return $false }
+    $tracked = (& git -C $root ls-tree -r HEAD -- "docs/ps-research/$Domain" 2>&1 | Out-String)
+    if ([string]::IsNullOrWhiteSpace($tracked)) { return $false }
+    & git -C $root checkout HEAD -- "docs/ps-research/$Domain" 2>&1 | Out-Null
+    $untracked = @(& git -C $root ls-files --others --exclude-standard -- "docs/ps-research/$Domain" 2>&1 |
+        Where-Object { $_ -and $_.ToString().Trim() -ne '' })
+    foreach ($u in $untracked) {
+        $up = Join-Path $root $u.ToString().Trim()
+        if (Test-Path -LiteralPath $up) { Remove-Item -LiteralPath $up -Force }
+    }
+    Write-Log "已回滾 docs/ps-research/$Domain 至上一圈快照（清除本圈新檔 $($untracked.Count) 個）"
+    return $true
 }
 
 # ── 檔案一致性檢查（強殺後執行；純唯讀，絕不觸發修復 session）────
@@ -508,6 +526,7 @@ if (-not $mutexHeld) {
 
 # ── 主迴圈 ──────────────────────────────────────────────────
 Write-Log "=== auto-loop 啟動：領域=$Domain MaxCycles=$MaxCycles Model=$(if($Model){$Model}else{'(全域預設)'}) ==="
+$corruptStreak = 0
 $timeoutStreak = 0
 $errorStreak = 0
 $noProgress = 0
@@ -648,14 +667,27 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     }
     else { $errorStreak = 0 }
 
-    # checklist 完整性（L89）：乾淨退場也可能吃列——每 session 必驗，
-    # FAIL 即停（有 -GitCommit 快照可精準單檔回滾，繼續跑只會把腐蝕蓋進歸檔）
-    $ciProblems = Test-ChecklistIntegrity -PreTotal $preItemTotal
-    if ($ciProblems.Count -gt 0) {
-        foreach ($pb in $ciProblems) { Write-Log "CHECKLIST 完整性 FAIL：$pb" }
-        $stopReason = "checklist 完整性 FAIL（$($ciProblems.Count) 項，本 session 寫壞）——回滾指令：git checkout HEAD -- "docs/ps-research/$Domain/checklist.md"（$(if ($GitCommit) { '每圈快照在，HEAD 即上一圈' } else { '未開 -GitCommit——用最近一次人工 commit，或依 checklist-archive 重建' })）；回滾後重啟"
+    # checklist 完整性（L90 分級）：每 session 必驗，反應看傷勢——
+    # 節標題消失、項目數未損＝閃爍性腐蝕，下個 session 整檔重寫會自然修復
+    # （實測 57 輪默默修回 56 輪吃掉的節）→ 只記 WARN，不停不滾；
+    # 項目總數下降＝列真的丟了，**不會自癒** → 回滾上一圈快照、本圈作廢
+    # 重來；連續 2 圈仍發才停（系統性）。無人看管優先：能自己救就不叫人。
+    $ci = Test-ChecklistIntegrity -PreTotal $preItemTotal
+    if ($ci.Cosmetic.Count -gt 0 -and $ci.Lost.Count -eq 0) {
+        foreach ($pb in $ci.Cosmetic) { Write-Log "CHECKLIST WARN（可自癒）：$pb——待下個 session 整檔重寫時修復" }
+    }
+    if ($ci.Lost.Count -gt 0) {
+        foreach ($pb in $ci.Lost) { Write-Log "CHECKLIST 完整性 FAIL：$pb" }
+        if (Invoke-ChecklistRecovery) {
+            $corruptStreak++
+            if ($corruptStreak -ge 2) { $stopReason = "連續 2 圈 checklist 列遺失（回滾後仍再發）——系統性問題，人工檢查後重啟"; break }
+            Write-Log "本圈作廢（腐蝕連續計數 $corruptStreak/2），下一圈重來"
+            continue
+        }
+        $stopReason = "checklist 列遺失且無法回滾（未開 -GitCommit 或 HEAD 無此領域）——人工依歸檔／快照修復（參考：git checkout HEAD -- 領域目錄）後重啟"
         break
     }
+    $corruptStreak = 0
 
     # 每個 session 後跑 lint；FAIL 且有手術清單→自動餵修復 session。
     # **手術用的尺必須跟 tier 一致**（L70）：tier 1 用 CoverageOnly——它的工單
@@ -669,6 +701,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     # 一個 60 分的稽核 session（實案：錯放＋缺證據共 60 餘列，逐批要 6 圈
     # ≈12 小時，其中一半是白跑的稽核）。清單沒變短就停，避免空轉活鎖。
     $fatalStop = $false
+    $cycleRedo = $false
     $surgeryRound = 0
     # 有工單就修，不綁 exit（L79）：[回灌] 型是「稽核已查到答案」的機械修復，
     # 本身不是違規——lint 可能 exit 0 卻仍有工單，綁 exit 會讓它永遠不被套用。
@@ -700,11 +733,21 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             Write-Log "手術 session 逾時強殺——一致性檢查 PASS，續跑"
         }
         elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 errorStreak）" }
-        $ciProblems = Test-ChecklistIntegrity -PreTotal $preItemTotal
-        if ($ciProblems.Count -gt 0) {
-            foreach ($pb in $ciProblems) { Write-Log "CHECKLIST 完整性 FAIL（手術後）：$pb" }
-            $stopReason = "手術 session 寫壞 checklist（$($ciProblems.Count) 項）——回滾 checklist.md 後重啟"
-            $fatalStop = $true
+        $ci = Test-ChecklistIntegrity -PreTotal $preItemTotal
+        if ($ci.Cosmetic.Count -gt 0 -and $ci.Lost.Count -eq 0) {
+            foreach ($pb in $ci.Cosmetic) { Write-Log "CHECKLIST WARN（可自癒，手術第 $surgeryRound 批）：$pb" }
+        }
+        if ($ci.Lost.Count -gt 0) {
+            foreach ($pb in $ci.Lost) { Write-Log "CHECKLIST 完整性 FAIL（手術第 $surgeryRound 批）：$pb" }
+            if (Invoke-ChecklistRecovery) {
+                $corruptStreak++
+                if ($corruptStreak -ge 2) { $stopReason = "連續 2 圈 checklist 列遺失——系統性問題，人工檢查後重啟"; $fatalStop = $true }
+                else { $cycleRedo = $true }
+            }
+            else {
+                $stopReason = "checklist 列遺失且無法回滾——人工修復後重啟"
+                $fatalStop = $true
+            }
             break
         }
         $lint2 = if ($Tier -eq 1) { Invoke-Lint -Coverage } else { Invoke-Lint }
@@ -716,6 +759,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         }
     }
     if ($fatalStop) { break }
+    if ($cycleRedo) { Write-Log "本圈作廢（腐蝕連續計數 $corruptStreak/2），下一圈重來"; continue }
 
     # 進度與畢業判定
     $after = Get-ChecklistState
