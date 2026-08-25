@@ -51,7 +51,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    回傳**只作定位線索**，不得直接寫成 evidence。
 3. **Read `.opencode/peoplesoft/oracle-query-cookbook.md`**，用 oracleMCP
    照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
-   label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數。
+   label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數、
+   條件 UI 變異目標解析（§2h～§2j，流程照 SKILL「條件 UI」節）。
 4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
 5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
@@ -60,7 +61,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 
 - **可用（oracleMCP + cookbook §2）**：translate values 與其中文、欄位 label、
   選項文字 / label 反查欄位、Page ↔ Component ↔ Record.Field 對映、
-  prompt record 與基數。
+  prompt record 與基數、條件 UI 變異目標解析
+  （Record.Field → Group Box／Subpage／受影響控制項，§2h～§2j）。
 - **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查
   （只吃欄位名）、`search_component_metadata` Component 關鍵字搜尋
   （只吃 Component 關鍵字）——Page／Record 名帶入必查空。
@@ -102,3 +104,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
   （除非委派 prompt 明說只要清單）——選項清單不等於業務含意的全部。
 - 問題涉及「還在不在用 / 廢棄」時：XLAT 查詢**不要**過濾 EFF_STATUS
   （cookbook §2g），每個值標 ACTIVE / INACTIVE。
+- **條件 UI 解析**（委派任務含 UI 狀態變異目標時）：照 SKILL「條件 UI」節
+  分流與 cookbook §2h～§2j；受影響清單只列業務資料欄位、最多 15 項；
+  幾何包含結論最高 INFERRED；scroll 層級變異判 NOT_APPLICABLE（不是失敗）；
+  每筆 metadata 事實附 SQL 證據（sql＋keyRows）；單次委派最多 8 筆變異，
+  超出退回 gaps。

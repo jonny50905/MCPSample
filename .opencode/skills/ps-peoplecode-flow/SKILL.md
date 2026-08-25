@@ -10,6 +10,8 @@ description: PeopleCode 事件與分支邏輯分析（FieldChange / SaveEdit / S
 - 搜尋客製 PeopleCode（依 Customization Profile 過濾 origin / prefix）
 - 取得精確 Chunk 並分析事件邏輯（如選了某 choice 值後的條件分支）
 - 追蹤 Function / Class / Method 呼叫鏈中「回答問題必要」的部分
+- 辨識 UI 狀態變異（Visible / Hide / Gray / DisplayOnly…）——條件式
+  控制畫面顯示是業務邏輯，寫入 findings，不當雜訊略過
 - 辨識動態 SQL / 動態 Label / 動態 Prompt 指定，標 `DYNAMIC_RUNTIME`
 - 把確認的資料操作交給 `ps-sql-flow` / `ps-data-lineage`
 
@@ -63,6 +65,16 @@ For each analyzed unit, preserve:
 
 If SQL text, labels, prompts, or transfers are built dynamically,
 mark them as DYNAMIC_RUNTIME and keep the PeopleCode evidence.
+
+Treat UI state mutations as findings, not noise.
+UI mutation patterns (closed set):
+  .Visible = / Hide( / UnHide( / HideRow( / HideScroll( /
+  Gray( / UnGray( / .DisplayOnly = / .Enabled = / .Required =
+For each mutation preserve: the governing condition branch,
+the target (RECNAME.FIELDNAME; scroll level for row/scroll mutations),
+the state change, the event location, and evidence IDs.
+Classify each mutation as businessRelevant (the condition references
+a business field or business value) or presentationOnly.
 
 Classify each conclusion as CONFIRMED, INFERRED, or DYNAMIC_RUNTIME.
 ```

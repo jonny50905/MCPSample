@@ -202,6 +202,66 @@ FETCH FIRST 100 ROWS ONLY
 > 程式邏輯（ps-peoplecode-flow 以該值搜尋是否命中）＋ 資料分布
 > （上面的 COUNT 是否為 0）。只有部分證據時標 INFERRED。
 
+**2h. 條件 UI：變異目標解析（Record.Field → 控制項）**
+
+PeopleCode UI 狀態變異（Visible 等）的目標解析入口。**不濾 FIELDTYPE**——
+目標可能是任何控制項，先取回再分流：`FIELDTYPE = 2`（Group Box）→ 2i；
+`FIELDTYPE = 11`（Subpage）→ 2j；其他＝一般控制項，受影響者即其自身，
+毋須後續查詢。
+
+```sql
+SELECT PNLNAME, PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME,
+       RECNAME, FIELDNAME, SUBPNLNAME, LBLTEXT, OCCURSLEVEL,
+       FIELDLEFT, FIELDTOP, FIELDRIGHT, FIELDBOTTOM, PTHIDEFIELDS
+  FROM PSPNLFIELD
+ WHERE RECNAME = :recName AND FIELDNAME = :fieldName
+FETCH FIRST 50 ROWS ONLY
+```
+
+`PTHIDEFIELDS`（Group Box 專用，0/1）：1＝隱藏 Group Box 時框內欄位
+一併隱藏（受影響控制項用 2i 展開）；0＝只隱藏外框（presentationOnly）。
+同一 Record.Field 出現在多個 PNLNAME → 候選全數保留，
+Component 歸屬以 PeopleCode 證據所在者優先。
+
+**2i. Group Box 框內控制項（Classic 幾何範圍）**
+
+參數逐項取自 2h 該 Group Box 列（:pageName←PNLNAME、:groupBoxId←PNLFLDID、
+:groupLeft/Top/Right/Bottom←FIELDLEFT/TOP/RIGHT/BOTTOM）。
+幾何包含是推斷——「框內」結論最高標 **INFERRED**
+（Page 與控制項座標本身仍是 SQL 證據）。
+
+```sql
+SELECT PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME, RECNAME, FIELDNAME,
+       SUBPNLNAME, LBLTEXT, OCCURSLEVEL
+  FROM PSPNLFIELD
+ WHERE PNLNAME = :pageName
+   AND PNLFLDID <> :groupBoxId
+   AND FIELDLEFT >= :groupLeft AND FIELDRIGHT <= :groupRight
+   AND FIELDTOP >= :groupTop AND FIELDBOTTOM <= :groupBottom
+ ORDER BY FIELDNUM
+FETCH FIRST 200 ROWS ONLY
+```
+
+**2j. Subpage 展開與向上解析**
+
+```sql
+-- 展開：Subpage 內有哪些控制項（結果中 FIELDTYPE=11 者以其 SUBPNLNAME 遞迴展開）
+SELECT PNLNAME, PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME,
+       RECNAME, FIELDNAME, SUBPNLNAME, LBLTEXT, OCCURSLEVEL
+  FROM PSPNLFIELD
+ WHERE PNLNAME = :subpageName
+ ORDER BY FIELDNUM
+FETCH FIRST 200 ROWS ONLY;
+-- 向上：這個 Subpage 被哪些 Page 掛載。PSPNLGROUP 只登記真正的 Page——
+-- 變異目標長在 Subpage 上時，先向上找到掛載 Page（必要時遞迴），
+-- 才能用 §2e 對映 Component。
+SELECT PNLNAME FROM PSPNLFIELD
+ WHERE SUBPNLNAME = :subpageName AND FIELDTYPE = 11
+FETCH FIRST 50 ROWS ONLY;
+```
+
+Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 §2c。
+
 ---
 
 ## 3. Process / 排程（協定角色：ps_get_process_usage）

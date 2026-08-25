@@ -26,7 +26,7 @@
 | ps_get_object_origin | Prefix 比對 profile＋cookbook §1（PSPROJECTITEM／LASTUPDOPRID） |
 | ps_search_business_domains | read `business-domain-map.yaml` 的 aliases |
 | ps_search_ui_semantics | cookbook §2（XLAT／Label 反查） |
-| ps_get_ui_graph | cookbook §2d／2e 逐段拼 |
+| ps_get_ui_graph | cookbook §2d／2e 逐段拼；條件 UI（Group Box／Subpage／受影響控制項）§2h～2j |
 | ps_get_field_choices | cookbook §2a／2f／2g |
 | ps_search_source／ps_get_source_chunks | ES `search_chunks`／Source `get_chunks_details`（契約見 progressive-source-retrieval.md §6） |
 | ps_get_source_outline | Source `get_file_structure` |

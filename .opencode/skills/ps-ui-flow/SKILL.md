@@ -83,6 +83,30 @@ CHECKBOX / YES_NO / PAGE_STATIC_CHOICE / DYNAMIC_PROMPT / DYNAMIC_PEOPLECODE / U
 - Dynamic Prompt（Prompt Record / Edit Table / 選項由 PeopleCode 動態指定）：
   標 `DYNAMIC_RUNTIME` 並追蹤相關 PeopleCode Evidence。
 
+## 條件 UI（UI 狀態變異的目標解析）
+
+輸入＝ps-peoplecode-flow 偵測到的 UI 狀態變異（如 `REC.FIELD.Visible = False`
+與其條件式）。解析流程（查詢樣板：cookbook §2h～§2j）：
+
+1. Record.Field → 控制項（§2h，**不濾 FIELDTYPE**），依 FIELDTYPE 分流：
+   - 一般控制項 → 受影響者即其自身，解析完成。
+   - 2（Group Box）→ `PTHIDEFIELDS = 1` 才展開框內控制項（§2i）；
+     `PTHIDEFIELDS = 0` ＝只隱藏外框，標 presentationOnly、不展開。
+   - 11（Subpage）→ 以 SUBPNLNAME 展開（§2j）。
+2. 展開結果含 FIELDTYPE=11 → 遞迴展開；追蹤 `visitedPages`（去重）、
+   `maxSubpageDepth: 8`。
+3. 目標所在 PNLNAME 查 §2e 無 Component（＝它是 Subpage）→ 先向上解析
+   （§2j 第二式）找掛載 Page 再對映 Component；多個 Component 候選
+   全保留，以 PeopleCode 證據所在者優先。
+4. 受影響清單只列**業務資料欄位**（濾掉 static text／frame／純裝飾
+   控制項），最多 15 項＋「其餘 N 項」一句；欄位缺 LBLTEXT → §2c 補 label。
+
+解析結果值域（封閉）：`RESOLVED / NOT_APPLICABLE / UNRESOLVED`。
+scroll 層級變異（HideRow／HideScroll 等，無 Record.Field 可解析）
+＝ `NOT_APPLICABLE`，不是失敗、不寫 gaps。
+幾何包含（§2i）＝推斷：「欄位在框內」的結論最高標 INFERRED；
+座標與 metadata 事實本身仍是 SQL 證據（sql＋keyRows）。
+
 ## 工具
 
 | 工具 | 用途 |
@@ -140,6 +164,9 @@ UI 搜尋首次最多 20 個 UI Semantic Candidates，
 
 Choice Values：低基數最多回傳 100 個；
 高基數只回傳查詢命中的 20～50 個。
+
+條件 UI 解析單次委派最多 8 筆變異；
+超出的逐筆列在 gaps 退回（標「本次未處理」）。
 ```
 
 ## Subagent 模式

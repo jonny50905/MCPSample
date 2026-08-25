@@ -86,9 +86,17 @@ docs/ps-research/<領域>/
    ui-flow（欄位/選項）→ peoplecode-flow（帶 Record.Field＋stored values 找邏輯）
    → 發現批次再派 sqr/ae-flow → metadata-flow（血緣/排程/權限）。
    oracleMCP 類委派一次一個；報告的 suggestedNext 屬深度規則者必須執行。
+   **主角是 Component 的項目**：peoplecode-flow 委派必含一次
+   Activate／PostBuild 定位（ObjectName＋eventName 結構化搜尋——
+   條件 UI 變異多在此）；回報含 businessRelevant UI 變異 →
+   其 suggestedNext（ps-ui-flow 解析）屬深度規則，必須執行
+   （oracleMCP 類，計入同時 ≤ 3）。
 2. 依 function-detail 模板寫 `NN-<物件名>.md`：
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
+   有 businessRelevant 條件 UI → 檔內加「條件 UI」小節：每筆一列
+   「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→
+   業務含意」；幾何包含標 INFERRED（此小節不屬必要章節）。
 3. **物件連結**：NN 文件中的核心物件名（Component / Record / 程式）
    一律寫成 `[[物件名]]`。**本階段不寫 wiki**——歸戶在畢業後的
    「提煉模式」統一做（斷鏈警告屬預期，提煉後歸零）。
@@ -158,6 +166,17 @@ docs/ps-research/<領域>/
   （追加或作廢不刪除），更新 `last_verified`。
 - UNVERIFIABLE：重驗一次；再失敗記 gaps（工具原因照實寫），不重試迴圈。
 
+**條件UI回灌項（U 項）的處理**（取代標準深度鏈，做定向補掃）：
+- 列格式：`- [ ] U<輪次>-<序號> 條件UI回灌 <NN-檔名>：主角 <Component> UI 狀態變異偵測與解析`。
+- 委派 @ps-peoplecode-flow：ObjectName=<Component>＋eventName
+  （Activate／PostBuild）結構化定位，偵測 UI 狀態變異（含條件分支）。
+- 查無變異 → NN 檔不動、該列打勾，收據記「查無＋查法」。
+- 有 businessRelevant 變異 → 依 suggestedNext 委派 @ps-ui-flow 解析
+  （oracleMCP 類，同時 ≤ 3），在該 NN 檔**檔尾追加**「條件 UI」小節
+  （格式同階段二步驟 2；證據照契約 CHUNK＋SQL；只追加，不改寫既有內容）。
+- 打勾前快驗照階段二步驟 4（auditor 任務 A）。
+- 不動 wiki——新知識由畢業後提煉相位歸戶。
+
 **全部打勾後接稽核（每次 run 最多一輪；長 run 不當場稽核）**：
 **本節只管「research run 收尾的自動接跑稽核」。收到明確稽核指令的
 session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定的
@@ -224,8 +243,9 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    寫成**新檔** `checklist-archive-r<N+1>.md`（單次小 write），
    checklist.md 只留「輪次行＋旗標行＋未勾項＋Gaps 彙整」。
    **歸檔是搬移不是複製**：寫進 archive 的每一列都要從 checklist.md 移除。
-   **只有調查項與 A 項可以是 checklist 列**——任務 A／B／C 的委派切分、
-   批次編號寫 log.md，不得寫成 checklist 列、不得歸檔。
+   **只有調查項、A 項與 U 項（條件UI回灌）可以是 checklist 列**——
+   任務 A／B／C 的委派切分、批次編號寫 log.md，
+   不得寫成 checklist 列、不得歸檔。
    **禁止 read 或改寫任何既有 checklist-archive*.md**——每輪只寫
    一個新檔；archive 永不回讀進 context；
    (c) 旗標行「查無全量抽驗：待執行」（若有）改為

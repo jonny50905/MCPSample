@@ -2348,3 +2348,35 @@
   單次遺失就成了登記的永久錯誤。要嘛給登記獨立的家，要嘛讓它可以
   從實物機械重建——本次選後者（檔案系統就是實物）。
 - 套用：本 commit（ps-doc-lint -FixArchive 補登＋MANUAL_ONLY 分類）。
+
+### L92 條件 UI 是看不見的業務邏輯——落地前先對抗驗證，設計稿修四刀（2026-08）
+- 缺口為真：Classic 的 Group Box 顯示/隱藏（`Visible`／`Hide`…）承載
+  業務規則（什麼條件下整塊畫面消失），但管線兩端都看不見它——
+  peoplecode-flow 的 findings 義務清單沒有 UI 狀態變異（小模型讀了就略過）、
+  ui-flow 只有「文字 → 欄位」反查，沒有「欄位 → Group Box → 受影響
+  控制項」正向解析。issue #5 的設計方向正確，但照抄會踩四個坑：
+  1. **解析查詢綁死 `FIELDTYPE = 2` ＝靜默回空**（變異目標大多是普通
+     欄位）——與 componentType 值錯同一類 fail-safe bug。修法：不濾
+     FIELDTYPE，取回再分流（2＝GB／11＝Subpage／其他＝自身）。
+  2. **Page → Component 在 Subpage 上斷頭**：PSPNLGROUP 只登記真 Page，
+     而 HR 模組的 GB 常長在 Subpage 上（issue 自己的驗證例就是）。
+     修法：`SUBPNLNAME 反查 FIELDTYPE=11` 向上遞迴找掛載 Page。
+  3. **coverage 若要求 detected 全數 resolved ＝下一個 F1 乒乓**：
+     HideRow／HideScroll 是 scroll 層級、沒有 Record.Field，永遠解不了。
+     修法：解析結果封閉值域 RESOLVED／NOT_APPLICABLE／UNRESOLVED，
+     scroll 層級＝NOT_APPLICABLE 不是失敗；第一版不加 auditor 覆蓋維度
+     （UI 變異走普通 finding，任務 A 解引用自動涵蓋，稽核零加時）。
+  4. **成本結構倒過來**：先全偵測全解析再分類＝單 component 近百次
+     SQL 打在單工 SQLcl 上。修法：偵測零成本（chunk 反正在讀）、
+     從條件式先判 businessRelevant，只解析這批；受影響清單只列業務
+     欄位 ≤15 項（防 150 行寫檔上限）。
+- 已畢業領域的回灌走 **U 項工單**（`U<輪次>-<序號> 條件UI回灌 <NN-檔名>：…`）：
+  取代標準深度鏈的定向補掃，檔尾追加小節不改寫既有內容；
+  收據 hash 只蓋領域目錄，貼入 U 項那一刻收據失效＝「回灌＝重新開工」
+  的正確語意。「將來再補」不算計畫——工單寫進 checklist 才算。
+- 原則：**新能力落地的第一問不是「加什麼」，是「它的失敗模式會落進
+  哪個既有值域」。** 解析不到、查回空、驗不了——每一種都要在
+  PASS／FAIL／UNVERIFIABLE／NOT_APPLICABLE 裡有家，沒家的那種
+  就是下一個震盪源。
+- 套用：本 commit（cookbook §2h～2j、ui-flow 正向解析、peoplecode-flow
+  偵測義務＋suggestedNext、deep-research 深度鏈＋U 項、契約表一行）。

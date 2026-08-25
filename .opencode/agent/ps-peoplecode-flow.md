@@ -78,3 +78,8 @@ Component 層級 PeopleCode **沒有 Record.Field**——定位一律用
 - 每個 claim 標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME 並附 evidence IDs。
 - 遵守 budget（maxTotalChunks 16 / maxExpansionRounds 3）；到頂就回報
   已分析範圍與 gaps，不硬灌。
+- **UI 狀態變異的報告義務**：findings 含 businessRelevant 的 UI 狀態變異
+  （目標有 Record.Field）→ `suggestedNext` 必附一筆
+  `{ "agent": "ps-ui-flow", "task": "解析 <RECNAME>.<FIELDNAME> 的 UI 目標（Group Box／Subpage／受影響控制項）；條件：<一句>" }`
+  （除非委派 prompt 明說不需要）。scroll 層級變異（HideRow／HideScroll）
+  無 Record.Field＝NOT_APPLICABLE，不生 suggestedNext。
