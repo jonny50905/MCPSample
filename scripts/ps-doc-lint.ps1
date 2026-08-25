@@ -938,7 +938,7 @@ else {
     # （ps-deep-research 硬規則），所以牽涉歸檔內容的一律只能人工。
     # 白名單制——沒列到的預設「research 修得動」，讓迴圈去試（fail-safe：
     # 分類漏掉只是多跑一圈，分類過頭會讓真的能自動修的項目被判成要人工）。
-    $manualPatterns = @('個未打勾項', '與歸檔重複', '稽核流程標籤', '行「稽核輪次」')
+    $manualPatterns = @('個未打勾項', '與歸檔重複', '稽核流程標籤', '行「稽核輪次」', '任何一行提及')
     $manualOnlyViolations = @($violations | Where-Object {
             $v = $_
             ($manualPatterns | Where-Object { $v.Contains($_) }).Count -gt 0
@@ -1172,7 +1172,27 @@ if ($FixArchive) {
             $touched++
         }
     }
-    if (($toGaps.Count + $toProgress.Count) -gt 0 -and (Test-Path -LiteralPath $checklistPath)) {
+    # 補登（L91）：NN 檔未被 checklist＋歸檔任何一行提及＝歷史歸檔寫失的
+    # 孤兒登記（實案：59 輪流水中某次歸檔漏寫，該列永久蒸發、無人察覺）。
+    # 完整檔補已勾列、缺章節檔補未勾列（續查），下輪 audit 照常處理。
+    $toRegister = @()
+    if ($null -ne $checklistOnly) {
+        foreach ($n in $nnNames) {
+            if ($checklistSrc.IndexOf($n, [StringComparison]::OrdinalIgnoreCase) -ge 0) { continue }
+            $title = [IO.Path]::GetFileNameWithoutExtension($n)
+            if ($nnText.ContainsKey($n) -and $nnText[$n] -match '(?m)^#\s+(.+)$') { $title = $Matches[1].Trim() }
+            $complete = $true
+            if ($nnText.ContainsKey($n)) {
+                foreach ($sec in $requiredSections) {
+                    if ($nnText[$n] -notmatch [regex]::Escape($sec)) { $complete = $false; break }
+                }
+            }
+            $tick = if ($complete) { "x" } else { " " }
+            $toRegister += ("- [$tick] " + $title + " → " + $n + "（歸檔遺失補登）")
+            Write-Host "  [補登] ${n}：未被任何一行提及——補$(if ($complete) { '已勾' } else { '未勾（缺章節，續查）' })登記列" -ForegroundColor Yellow
+        }
+    }
+    if (($toGaps.Count + $toProgress.Count + $toRegister.Count) -gt 0 -and (Test-Path -LiteralPath $checklistPath)) {
         $clRaw = Get-Content $checklistPath -Raw -Encoding UTF8
         if ($null -eq $clRaw) { $clRaw = "" }
         $out = @()
@@ -1180,8 +1200,9 @@ if ($FixArchive) {
         $doneP = $false
         foreach ($ln in ($clRaw -split "`r?`n")) {
             $out += $ln
-            if (-not $doneP -and $toProgress.Count -gt 0 -and $ln -match '^##\s*調查進度') {
+            if (-not $doneP -and ($toProgress.Count + $toRegister.Count) -gt 0 -and $ln -match '^##\s*調查進度') {
                 foreach ($r in $toProgress) { $out += $r }
+                foreach ($r in $toRegister) { $out += $r }
                 $doneP = $true
             }
             if (-not $doneG -and $toGaps.Count -gt 0 -and $ln -match '^##\s*Gaps') {
@@ -1189,12 +1210,12 @@ if ($FixArchive) {
                 $doneG = $true
             }
         }
-        if ($toProgress.Count -gt 0 -and -not $doneP) { Write-Host "  WARN：找不到「## 調查進度」節，$($toProgress.Count) 列未搬回" -ForegroundColor Red }
+        if (($toProgress.Count + $toRegister.Count) -gt 0 -and -not $doneP) { Write-Host "  WARN：找不到「## 調查進度」節，$($toProgress.Count + $toRegister.Count) 列未寫入" -ForegroundColor Red }
         if ($toGaps.Count -gt 0 -and -not $doneG) { Write-Host "  WARN：找不到「## Gaps 彙整」節，$($toGaps.Count) 列未回收" -ForegroundColor Red }
         if ($doneG -or $doneP) {
             [System.IO.File]::WriteAllText($checklistPath, ($out -join "`r`n"),
                 (New-Object System.Text.UTF8Encoding($true)))
-            Write-Host "  checklist.md：搬回進度 $($toProgress.Count) 列、回收進 Gaps $($toGaps.Count) 列" -ForegroundColor Green
+            Write-Host "  checklist.md：搬回進度 $($toProgress.Count) 列、補登 $($toRegister.Count) 列、回收進 Gaps $($toGaps.Count) 列" -ForegroundColor Green
         }
     }
     Write-Host "=== 處置結束：改動 $touched 個歸檔檔；請重跑 lint 確認 ===" -ForegroundColor Cyan
