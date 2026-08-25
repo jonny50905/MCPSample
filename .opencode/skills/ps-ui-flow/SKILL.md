@@ -91,7 +91,7 @@ CHECKBOX / YES_NO / PAGE_STATIC_CHOICE / DYNAMIC_PROMPT / DYNAMIC_PEOPLECODE / U
 | `ps_get_ui_graph` | 取 UI 圖（含 controls、display text、choices、languages） |
 | `ps_get_field_choices` | 取某欄位的 choice type 與選項清單（label ↔ stored value） |
 
-圖節點 / 邊定義與參數契約見 `.opencode/peoplesoft/mcp-tool-contracts.md` §2。
+圖節點／邊的詞彙表見 `.opencode/peoplesoft/mcp-tool-contracts.md` §2。
 
 ## Skill Rules
 

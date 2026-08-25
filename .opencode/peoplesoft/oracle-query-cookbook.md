@@ -16,19 +16,18 @@
    先驗證（查不到表 / 欄位時記入 gaps，不要瞎改表名硬湊）。
 7. oracleMCP 的實際工具名（query / execute_sql…）以 OpenCode /mcp 清單為準，
    一律使用唯讀查詢工具。
-8. **查詢前欄位驗證（治 wrong-column 慢性病）**：要用「樣板裡沒有的
+8. **查詢前欄位驗證**：要用「樣板裡沒有的
    欄位名」或不確定欄位存不存在時，先跑
    SELECT column_name FROM all_tab_columns WHERE table_name='<大寫表名>'
    確認後再查——**禁止憑記憶寫欄位名**；驗證後仍無該欄位 →
    記 gaps，不要換個猜法再試。
-8a. **表名同理，且禁止自行加減 `PS_` 前綴（L40）**：PeopleTools 系統表
+8a. **表名同理，且禁止自行加減 `PS_` 前綴**：PeopleTools 系統表
    **不一定**有 PS_ 前綴——本 cookbook 樣板即並存兩型
    （`PSPRCSRQST` 無前綴、`PS_PRCSRECUR` 有前綴）。**樣板怎麼寫就怎麼查**；
    樣板沒有的表先跑
    SELECT table_name FROM all_tables WHERE table_name LIKE '%<關鍵字>%'
-   確認實際表名。實案：模型把 PSPRCSRQST 寫成 PS_PRCSRQST → 必然查無 →
-   誤判「查不到」。**「加了前綴查不到」不是資料不存在，是表名寫錯。**
-9. **metadata MCP 不得作 evidence（L1 鐵律，L40 重申）**：
+   確認實際表名。**「加了前綴查不到」不是資料不存在，是表名寫錯。**
+9. **metadata MCP 不得作 evidence**：
    PeoplecodeMetadata 的工具（find_field_usage／search_component_metadata／
    get_ae_sql_metadata／**get_process_schedule_list**）回傳一律只作
    **定位線索**——證據契約只認 CHUNK 與 SQL 兩種。排程／metadata 類事實

@@ -1,224 +1,47 @@
 # PeopleSoft MCP Tool Contracts（工具契約總覽）
 
-本文件彙整 ps-* Skill 依賴的 MCP Tool 契約。
-**不一定需要全部放在同一個 MCP Server，但 Tool Contract（名稱、輸入、輸出結構）應保持一致**；
-既有的 PeopleCode MCP / SQL MCP / SQR MCP 可各做 Adapter 對齊本契約。
+`ps_*` 名稱一律是**協定角色**，不是可呼叫的工具。呼叫前對照下表與
+「角色 ↔ 現況」——**呼叫任何「尚未實作」的角色名必得 unavailable tool**。
 
-> **各 server 的完整工具清單（2026-08 管理者實測確認）**：
->
-> | Server | 工具 | 用途 |
-> |---|---|---|
-> | `PeoplecodeElasticSearch` | `search_chunks` | 搜候選（定位用；回傳是候選不是證據） |
-> | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取回（欄位同 Source 版）——**僅供交叉檢查，非解引用路徑** |
-> | `PeoplecodeSource` | `get_chunks_details` | **解引用（唯一的正式證據來源）** |
-> | `PeoplecodeSource` | `get_file_structure` | 檔案結構（先看目錄再定向取段） |
->
-> 三條硬規則（L61）：
-> 1. **工具身分＝server 前綴＋工具名，兩個都對才叫對**——`get_chunk_by_id`
->    是 ES 的工具，掛到 `PeoplecodeSource` 上呼叫＝`unavailable tool`。
-> 2. `unavailable tool` 三種成因（名字錯／掛錯 server／本 agent 對該 server
->    是 deny）**訊息完全相同，都不是暫時故障**——重試必然再失敗，改做法。
-> 3. **解引用一律走 `PeoplecodeSource_get_chunks_details`**（索引是副本，
->    CR 上線後會落後；走 Source 才能讓證據失效在稽核時現形）。ES 的
->    `get_chunk_by_id` 只用於**交叉檢查**：Source 查無時以同一 id 再查——
->    ES 有＝該 id 曾存在但來源已變，走二次定位；ES 也無＝較可能捏造——
->    **但同輪 ≥3 檔成批查無＝索引重建訊號，一律走二次定位，不判捏造**（L64）。
->    落位只有三值：找到新 id → `FAIL(ID_RELINK)`；三管道皆無 →
->    `UNVERIFIABLE(INDEX_REBUILT)`；其餘照原規則。
+## 現有工具（唯一可呼叫的清單）
 
-> **現況共三個 MCP**：`PeoplecodeElasticSearch`（搜 chunk ids）、
-> `PeoplecodeSource`（chunk id → 完整上下文）、`oracleMCP`（PeopleTools
-> metadata，通用 SQL 查詢——§1 / §2 / §4 的角色由它照
-> `oracle-query-cookbook.md` 樣板承擔，尚無專用工具）。
+| Server | 工具 | 用途 |
+|---|---|---|
+| `PeoplecodeElasticSearch` | `search_chunks` | 搜候選（定位用；回傳是候選不是證據） |
+| `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取回——僅供稽核交叉檢查，非解引用路徑 |
+| `PeoplecodeSource` | `get_chunks_details` | **解引用（唯一的正式證據來源）** |
+| `PeoplecodeSource` | `get_file_structure` | 檔案結構（先看目錄再定向取段） |
+| `oracleMCP` | （SQLcl 唯讀查詢） | PeopleTools metadata——**一律照 `oracle-query-cookbook.md` 樣板** |
+| `PeoplecodeMetadata` | find_field_usage 等 | 只作定位線索，**不得作 evidence** |
 
-長文本五個工具（`ps_search_source`、`ps_get_source_chunks`、`ps_expand_source_context`、
-`ps_get_source_outline`、`ps_find_source_references`）的完整 I/O 契約見
-`progressive-source-retrieval.md` §6，此處不重複。
+工具身分＝server 前綴＋工具名，兩個都對才叫對；`unavailable tool`
+（名字錯／掛錯 server／本 agent deny）不是暫時故障，重試必然再失敗。
+解引用與 componentType 規則見 `progressive-source-retrieval.md` §6.0／§5.1。
 
-> 標記 *(proposed)* 的 Schema 為本次補充規格提出的最小契約，實作 MCP Server 時可擴充欄位，
-> 但不可改變既有欄位語意。
+## 角色 ↔ 現況
 
----
+| 協定角色 | 現況實作 |
+|---|---|
+| ps_get_customization_profile | 直接 read `customization-profile.yaml`＋`business-domain-map.yaml` |
+| ps_get_object_origin | Prefix 比對 profile＋cookbook §1（PSPROJECTITEM／LASTUPDOPRID） |
+| ps_search_business_domains | read `business-domain-map.yaml` 的 aliases |
+| ps_search_ui_semantics | cookbook §2（XLAT／Label 反查） |
+| ps_get_ui_graph | cookbook §2d／2e 逐段拼 |
+| ps_get_field_choices | cookbook §2a／2f／2g |
+| ps_search_source／ps_get_source_chunks | ES `search_chunks`／Source `get_chunks_details`（契約見 progressive-source-retrieval.md §6） |
+| ps_get_source_outline | Source `get_file_structure` |
+| ps_expand_source_context／ps_find_source_references | 尚未實作——符號名搜 ES → Source 取段，補不到記 gaps |
+| ps_get_object_summary | cookbook §1／§6 |
+| ps_get_ae_graph | cookbook §5（內容另走 ES＋Source） |
+| ps_get_data_lineage | ES table 名搜尋＋cookbook §6 反查交叉 |
+| ps_get_process_usage | cookbook §3 |
+| ps_get_security_path | cookbook §4 |
 
-## 1. 客製化與業務搜尋
+未來實作這些角色的完整 I/O 規格：`docs/mcp-tool-proposals.md`（agent 不讀）。
 
-### 1.1 `ps_get_customization_profile` *(proposed)*
+## 2. UI 分類詞彙表（報告與分析用）
 
-輸入：
-
-```json
-{ "environment": "PROD" }
-```
-
-輸出：`customization-profile.yaml` + `business-domain-map.yaml` 的等價 JSON
-（profileVersion、customPrefixes、customObjectRegistry、objectOrigins、
-searchPolicy、businessDomains）。
-
-### 1.2 `ps_get_object_origin`
-
-輸入：
-
-```json
-{
-  "objectType": "COMPONENT",
-  "objectName": "TW_MILITARY_DATA"
-}
-```
-
-輸出：
-
-```json
-{
-  "objectType": "COMPONENT",
-  "objectName": "TW_MILITARY_DATA",
-  "origin": "CUSTOM_PREFIX",
-  "matchedPrefix": "TW_",
-  "confidence": 1.0,
-  "evidence": []
-}
-```
-
-`origin` ∈ `CUSTOM_PREFIX | CUSTOM_REGISTRY | MODIFIED_DELIVERED | DELIVERED | UNKNOWN`。
-
-### 1.3 `ps_search_business_domains` *(proposed)*
-
-輸入：
-
-```json
-{ "query": "免役有哪些選項？", "topK": 3 }
-```
-
-輸出：命中的 domain 清單（domainId、displayName、matchedAlias、rootObjectPolicy、
-preferredPrefixes、deliveredFallback、score）。
-
----
-
-## 2. UI 語意
-
-### 2.1 `ps_search_ui_semantics`
-
-輸入：
-
-```json
-{
-  "query": "免役",
-  "environment": "PROD",
-  "languageCode": "ZHT",
-  "customizationMode": "CUSTOM_ONLY_ROOTS",
-  "customPrefixes": ["TW_"],
-  "topK": 20
-}
-```
-
-輸出：
-
-```json
-{
-  "results": [
-    {
-      "matchType": "CHOICE_LABEL",
-      "displayText": "免役",
-      "storedValue": "E",
-      "componentName": "TW_MILITARY_DATA",
-      "pageName": "TW_MILITARY_PG",
-      "recordName": "TW_MILITARY",
-      "fieldName": "MIL_STATUS",
-      "objectOrigin": "CUSTOM_PREFIX",
-      "score": 1.0
-    }
-  ]
-}
-```
-
-`matchType` 例：`DISPLAY_TEXT_EXACT | DISPLAY_TEXT_SEMANTIC | CHOICE_LABEL |
-GRID_COLUMN_LABEL | TAB_LABEL | GROUPBOX_LABEL | BUTTON_LABEL | STATIC_TEXT |
-OBJECT_DESCRIPTION`。
-
-### 2.2 `ps_get_ui_graph`
-
-輸入（本次補充新增參數）：
-
-```json
-{
-  "rootType": "COMPONENT",
-  "rootName": "TW_MILITARY_DATA",
-  "includeSubpages": true,
-  "includeControls": true,
-  "includeDisplayText": true,
-  "includeChoices": true,
-  "includeLanguages": ["ZHT", "ENG"],
-  "maxDepth": 10
-}
-```
-
-輸出：節點 + 邊的圖結構。
-
-節點類型：
-
-```text
-COMPONENT
-PAGE
-SUBPAGE
-CONTROL
-DISPLAY_TEXT
-RECORD_FIELD
-CHOICE_SET
-CHOICE_VALUE
-PEOPLECODE_EVENT
-```
-
-邊類型：
-
-```text
-CONTAINS_PAGE
-CONTAINS_CONTROL
-DISPLAYS_TEXT
-BINDS_TO_FIELD
-USES_CHOICE_SET
-CONTAINS_CHOICE
-TRIGGERS_EVENT
-```
-
-### 2.3 `ps_get_field_choices`
-
-輸入：
-
-```json
-{
-  "componentName": "TW_MILITARY_DATA",
-  "pageName": "TW_MILITARY_PG",
-  "recordName": "TW_MILITARY",
-  "fieldName": "MIL_STATUS",
-  "languageCode": "ZHT",
-  "includeInactive": false,
-  "limit": 100
-}
-```
-
-輸出：
-
-```json
-{
-  "field": {
-    "recordName": "TW_MILITARY",
-    "fieldName": "MIL_STATUS",
-    "displayText": "兵役狀態"
-  },
-  "choiceType": "TRANSLATE_VALUE",
-  "choices": [
-    {
-      "storedValue": "E",
-      "displayText": "免役",
-      "languageCode": "ZHT",
-      "status": "ACTIVE"
-    }
-  ],
-  "dynamic": false,
-  "evidence": []
-}
-```
-
-`choiceType` ∈：
+`choiceType`：
 
 ```text
 TRANSLATE_VALUE
@@ -234,59 +57,32 @@ DYNAMIC_PEOPLECODE
 UNKNOWN
 ```
 
-高基數 Prompt Table：**不回傳全部資料**，只回 Prompt Metadata
-（promptRecord、keyFields、displayFields、searchFields、securityRecord），
-值查詢採 on-demand search，並遵守資料權限與敏感資料遮罩。
-
----
-
-## 3. 共用長文本（契約見 progressive-source-retrieval.md §6）
+UI 圖節點：
 
 ```text
-ps_search_source
-ps_get_source_chunks
-ps_expand_source_context
-ps_get_source_outline
-ps_find_source_references
+COMPONENT
+PAGE
+SUBPAGE
+CONTROL
+DISPLAY_TEXT
+RECORD_FIELD
+CHOICE_SET
+CHOICE_VALUE
+PEOPLECODE_EVENT
 ```
 
-> **現況**：`ps_search_source` 由 `PeoplecodeElasticSearch` 承擔、
-> `ps_get_source_chunks` 由 `PeoplecodeSource` 承擔；其餘三個尚未實作
-> （過渡做法見 progressive-source-retrieval.md §6.0）。
->
-> 搜尋過濾用 `search_chunks` 的 `componentType`（值表見
-> progressive-source-retrieval.md §6.0，回零筆時的處置見 §5.1）。
+UI 圖邊：
 
----
+```text
+CONTAINS_PAGE
+CONTAINS_CONTROL
+DISPLAYS_TEXT
+BINDS_TO_FIELD
+USES_CHOICE_SET
+CONTAINS_CHOICE
+TRIGGERS_EVENT
+```
 
-## 4. PeopleSoft Metadata
-
-### 4.1 `ps_get_object_summary` *(proposed)*
-
-輸入：`{ "objectType": "...", "objectName": "..." }`
-輸出：物件描述、origin、關聯物件摘要（不含長文本內容）。
-
-### 4.2 `ps_get_ae_graph` *(proposed)*
-
-輸入：`{ "aeName": "TW_MIL_AE", "maxDepth": 5 }`
-輸出：AE Section → Step → Action（SQL / PeopleCode / Call Section）圖，
-Action 節點附 sourceId 供長文本工具取段。
-
-### 4.3 `ps_get_data_lineage` *(proposed)*
-
-輸入：`{ "recordName": "TW_MILITARY", "fieldName": "MIL_STATUS", "direction": "UPSTREAM | DOWNSTREAM | BOTH", "maxDepth": 5 }`
-輸出：Table/Field 層級的讀寫關係
-（節點：RECORD_FIELD / SOURCE；邊：READ | INSERT | UPDATE | DELETE | MERGE |
-UNKNOWN | DYNAMIC_RUNTIME，附 evidence IDs）。
-
-### 4.4 `ps_get_process_usage` *(proposed)*
-
-輸入：`{ "objectType": "SQR | AE", "objectName": "TW_MIL001" }`
-輸出：Process Definition、Job、Recurrence、Run Control Record、
-觸發來源（頁面 / 排程），附 origin。
-
-### 4.5 `ps_get_security_path` *(proposed)*
-
-輸入：`{ "componentName": "TW_MILITARY_DATA" }`
-輸出：Menu → Component → Permission List → Role（→ User 統計）路徑，
-各節點附 origin。
+`origin` 值域見 `customization-profile.yaml` 的 `objectOrigins`。
+高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
+與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
