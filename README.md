@@ -110,16 +110,19 @@ claude mcp add -s user elasticsearch-skill -- dotnet "D:\TMP\MCPDemo\src\Hanshin
 
 ### 4. Claude Code Skill
 
-兩個 skill 檔目錄：
+Skill 檔目錄：
 
 | Skill | 路徑 | 用途 |
 |---|---|---|
 | `hanshinchat-mcp` | `.claude/skills/hanshinchat-mcp/` | OData 工具選擇指引 |
 | `elasticsearch-mcp` | `.claude/skills/elasticsearch-mcp/` | 第一層全文搜尋工作流（先 ES → 再 hanshinchat 補明細） |
+| `eli5` | `.claude/skills/eli5/` | `/eli5 <主題>` — 用大圖、少量文字產出 HTML 懶人包，把任何主題講到零基礎也懂 |
 
-每個 skill 都包含 `SKILL.md`（觸發條件 + 工具決策表）與 `tool-usage.md`（按需讀取的詳細參數）。
+兩個 MCP skill 都包含 `SKILL.md`（觸發條件 + 工具決策表）與 `tool-usage.md`（按需讀取的詳細參數）；`eli5` 只有一個 `SKILL.md`。
 
-Claude Code 只讀 `~/.claude/skills/`（user-level）。要讓兩個 Skill 都生效，需各建一個 Junction 指向本 repo：
+> `eli5` 來源：Anthropic 官方社群 plugin repo [anthropics/claude-plugins-community](https://github.com/anthropics/claude-plugins-community/tree/main/eli5)（MIT，作者 Thariq Shihipar），原版收錄。
+
+Claude Code 只讀 `~/.claude/skills/`（user-level）。要讓 Skill 生效，需各建一個 Junction 指向本 repo：
 
 ```powershell
 # 建立 user-level skills 目錄
@@ -134,6 +137,11 @@ New-Item -ItemType Junction `
 New-Item -ItemType Junction `
   -Path "$env:USERPROFILE\.claude\skills\elasticsearch-mcp" `
   -Target "D:\TMP\MCPDemo\.claude\skills\elasticsearch-mcp"
+
+# Junction：eli5
+New-Item -ItemType Junction `
+  -Path "$env:USERPROFILE\.claude\skills\eli5" `
+  -Target "D:\TMP\MCPDemo\.claude\skills\eli5"
 ```
 
 驗證：
@@ -141,6 +149,7 @@ New-Item -ItemType Junction `
 ```powershell
 ls "$env:USERPROFILE\.claude\skills\hanshinchat-mcp"
 ls "$env:USERPROFILE\.claude\skills\elasticsearch-mcp"
+ls "$env:USERPROFILE\.claude\skills\eli5"
 ```
 
 ## MCP 工具清單
