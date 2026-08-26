@@ -109,6 +109,9 @@ docs/ps-research/<領域>/
 6. **丟掉本項細節，只留 checklist 狀態**，處理下一項。
 
 **稽核回灌項（A 項）的處理**（取代標準深度鏈，做定向補查）：
+- **前置防呆：目標 NN 檔在磁碟上不存在 → 停，這不是 A 項**。
+  A 項只修既有檔——**禁止在 A 項規則下建新檔**（無模板義務的建檔
+  ＝天生缺章節，L93）。把該列改寫成 D 項（新發現）格式後照 D 項處理。
 - **第一步先 read `90-audit.md` 的明細表**，取出該檔的逐筆判定
   （類型／內容／原因／處置）——A 行只有計數，**明細才是工單**。
   （稽核模式步驟 4 的「禁止 read 舊 90-audit.md」只限寫新報告時；此處准讀。）
@@ -140,6 +143,10 @@ docs/ps-research/<領域>/
   該筆證據併記兩個 id（或拆成兩筆各附 id）。
 - FAIL(WRONG_KIND)：程式內 SQL 語句被誤標 `SQL` 證據——改以該語句
   所在的 chunk（`CHUNK` 證據：id＋filePath＋行號）重新引用。
+- FAIL(NO_EVIDENCE_SECTION)：檔案結構殘缺（無 Evidence 附錄／缺必要
+  章節）——**這不是證據修補，是定向補研究**：委派標準深度鏈針對該檔
+  主角物件補齊所缺章節（含 Evidence 附錄的完整取證）；既有正確內容
+  全部保留，照 function-detail 模板章節就位後快驗再打勾。
 - **工具身分＝server 前綴＋工具名**：解引用＝
   `PeoplecodeSource_get_chunks_details`、結構＝`PeoplecodeSource_get_file_structure`、
   搜候選＝`PeoplecodeElasticSearch_search_chunks`；`get_chunk_by_id` 是 ES 的
@@ -176,6 +183,13 @@ docs/ps-research/<領域>/
   （格式同階段二步驟 2；證據照契約 CHUNK＋SQL；只追加，不改寫既有內容）。
 - 打勾前快驗照階段二步驟 4（auditor 任務 A）。
 - 不動 wiki——新知識由畢業後提煉相位歸戶。
+
+**新發現項（D 項）的處理**（＝標準深度鏈建新檔，不是補查）：
+- 列格式：`- [ ] D<輪次>-<序號> 新發現 <物件名>：<來源>（稽核）`。
+- 處理方式與一般調查項**完全相同**：標準深度鏈（步驟 1）→ 依
+  function-detail 模板建 `NN-<物件名>.md`（檔名取下一個未用的兩位數
+  編號）→ 快驗（步驟 4）→ 打勾。
+- **禁止套 A 項的修復規則**——缺模板義務的建檔＝天生缺章節（L93）。
 
 **全部打勾後接稽核（每次 run 最多一輪；長 run 不當場稽核）**：
 **本節只管「research run 收尾的自動接跑稽核」。收到明確稽核指令的
@@ -228,9 +242,16 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    (iii) **不得寫成 checklist 列**（批次是流程紀錄，寫 log.md）。
    有未完成批次時，完整性節禁止只寫「無」。
 3. **先回灌＋輪次遞增＋歸檔瘦身**：read `checklist.md` 的
-   「稽核輪次：N」行（沒有該行視為 N=0）。回灌對象＝**任何非 PASS／
+   「稽核輪次：N」行（沒有該行視為 N=0）。回灌分兩型——**修復與建檔
+   是不同生命週期，禁止混用（L93）**：
+   **D 項（建新檔）**＝任務 C 的遺漏候選（功能地圖沒有、尚無 NN 檔的
+   物件），一物件一行：
+   `- [ ] D<本輪輪次>-<序號> 新發現 <物件名>：<一句來源>（稽核）`
+   ——**遺漏候選不得寫成 A 項**（A 項處理假設檔案已存在、且無模板
+   義務，拿它建檔＝天生缺章節）。
+   **A 項（修既有檔）**＝**任何非 PASS／
    VERIFIED 的判定**（FAIL／DISPUTED／UNVERIFIABLE／自創詞一律算）
-   與遺漏候選——**唯 `UNVERIFIABLE(PENDING_MANUAL)` 除外**：那是已申報
+   ——**唯 `UNVERIFIABLE(PENDING_MANUAL)` 除外**：那是已申報
    的人工待辦（管理者自跑後回填），回灌它＝每輪重生同一批修不了的工單。
    PENDING_MANUAL 列照常進記分卡與明細，只是不生 A 項；**以「檔」為單位彙整，一檔一行**：
    `- [ ] A<本輪輪次>-<本輪序號> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`
@@ -240,11 +261,14 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    (a) 輪次行更新為「稽核輪次：N+1」——90-audit.md 表頭的稽核輪次
    必須寫同一個 N+1；
    (b) **歸檔（每輪寫新檔）**：把所有**已打勾**項目（原樣含 ⚠ 註記）
-   寫成**新檔** `checklist-archive-r<N+1>.md`（單次小 write），
-   checklist.md 只留「輪次行＋旗標行＋未勾項＋Gaps 彙整」。
+   寫成**新檔** `checklist-archive-r<N+1>.md`（單次小 write）。
+   checklist.md 可移除的**只有**已搬進本輪 archive 的已勾列；
+   固定結構節點——檔頭標題、「稽核輪次：N」行、旗標行、
+   `## 調查進度` 與 `## Gaps 彙整` 節標題及 Gaps 內容——
+   **任何情況不得刪除**（節標題不是裝飾，是狀態檔的骨架；L93）。
    **歸檔是搬移不是複製**：寫進 archive 的每一列都要從 checklist.md 移除。
-   **只有調查項、A 項與 U 項（條件UI回灌）可以是 checklist 列**——
-   任務 A／B／C 的委派切分、批次編號寫 log.md，
+   **只有調查項、A 項、U 項（條件UI回灌）與 D 項（新發現）可以是
+   checklist 列**——任務 A／B／C 的委派切分、批次編號寫 log.md，
    不得寫成 checklist 列、不得歸檔。
    **禁止 read 或改寫任何既有 checklist-archive*.md**——每輪只寫
    一個新檔；archive 永不回讀進 context；

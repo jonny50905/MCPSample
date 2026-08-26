@@ -63,7 +63,13 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
   二次定位找到新 id → `FAIL(ID_RELINK)`＋附新 id；三管道皆無 →
   `UNVERIFIABLE(INDEX_REBUILT)`。
 
-1. Read 目標檔，抽出 Evidence 附錄（或 Observations）的每一筆。
+1. Read 目標檔。**結構前置檢查（L93）**：檔內沒有「## Evidence 附錄」節
+   （或 wiki 檔沒有 Observations），或該節抽不出任何一筆可解引用條目 →
+   回報**單筆** `{ "ref": "<檔名>", "verdict": "FAIL(NO_EVIDENCE_SECTION)",
+   "reason": "無 Evidence 附錄／零證據條目——結構殘缺，需補章節取證" }`
+   後結束本檔——**禁止回空 evidence 陣列**（零筆＝零判定＝vacuous 全過
+   ＝記分卡 0/0/0 綠燈，等於每輪替殘檔背書）。
+   結構完整才繼續：抽出 Evidence 附錄（或 Observations）的每一筆。
 2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**
    ——禁止用 search_chunks 的結果有無、或結構瀏覽「看到與否」代替
    解引用（那不是解引用，是抽樣）。驗證 chunk 存在、FilePath / 行號

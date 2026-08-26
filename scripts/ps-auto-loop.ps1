@@ -208,6 +208,137 @@ function Test-ChecklistIntegrity {
     return $r
 }
 
+# ── checklist 身分清點與確定性調帳（issue #6／L93）──────────────
+# 原則：LLM 可以提出狀態變更，但不能當 durable state 的 transaction manager。
+# 每個 session 前拍身分快照、session 後逐 id 對帳：合法去向只有「還在活頁」
+# 或「已搬進歸檔」；兩邊都沒有＝silent loss，由本層直接補回——不停機、
+# 不等下一個 session 概率性自癒。總數比對抓不到「掉一補一」，身分比對抓得到。
+# 身分錨點優先序：工單編號（A/U/D）→ 列內 NN 檔名 → 正規化文字 hash
+# （hash 是最後手段：列被改寫會誤判成消失＋新增，錨點型不會）。
+function Get-RowIdentity {
+    param([string]$Row)
+    $m = [regex]::Match($Row, '^\s*-\s*\[[ xX]\]\s*([AUDaud]\d+-\d+)')
+    if ($m.Success) { return 'wo:' + $m.Groups[1].Value.ToUpperInvariant() }
+    $m = [regex]::Match($Row, '(\d\d-[^\s（）()：:]+\.md)')
+    if ($m.Success) { return 'nn:' + $m.Groups[1].Value.ToLowerInvariant() }
+    $norm = $Row -replace '^\s*-\s*\[[ xX]\]\s*', ''
+    $norm = $norm -replace '⚠.*$', ''
+    $norm = (($norm -replace '\s+', ' ')).Trim().ToLowerInvariant()
+    $sha = [System.Security.Cryptography.SHA1]::Create()
+    $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($norm))
+    $sha.Dispose()
+    return 'hash:' + ((@($bytes | ForEach-Object { $_.ToString('x2') })) -join '').Substring(0, 16)
+}
+
+function Get-ChecklistInventory {
+    $inv = @{}
+    $files = @()
+    $clPath = Join-Path $dir "checklist.md"
+    if (Test-Path $clPath) { $files += , @{ Path = $clPath; Loc = 'active' } }
+    foreach ($af in @(Get-ChildItem -Path $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)) {
+        $files += , @{ Path = $af.FullName; Loc = $af.Name }
+    }
+    foreach ($f in $files) {
+        $raw = Get-Content $f.Path -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($raw)) { continue }
+        foreach ($m in [regex]::Matches($raw, '(?m)^\s*-\s*\[[ xX]\]\s*.+$')) {
+            $row = $m.Value.TrimEnd()
+            $id = Get-RowIdentity -Row $row
+            if (-not $inv.ContainsKey($id)) { $inv[$id] = @{ Raw = $row; Loc = $f.Loc } }
+        }
+    }
+    return $inv
+}
+
+# session 後調帳＋骨架保證。骨架修復採**最小插入**：既有內容一字不動，
+# 只插回消失的節標題／輪次行；補回的列進「## 調查進度」之後。
+# 流程標籤列（任務 A/B/C、批次 N/M）不補——補回等於復活 lint 違規。
+# checklist.md 整檔消失＝本函式不管（交回滾／停機路徑）。
+function Invoke-ChecklistReconcile {
+    param([hashtable]$PreInv, [int]$PreRound)
+    if ($PreRound -lt 0) { $PreRound = 0 }
+    $result = @{ Restored = 0; Rebuilt = @() }
+    $clPath = Join-Path $dir "checklist.md"
+    if (-not (Test-Path $clPath)) { return $result }
+    $post = Get-ChecklistInventory
+    $lost = @()
+    if ($null -ne $PreInv) {
+        foreach ($id in @($PreInv.Keys)) {
+            if ($post.ContainsKey($id)) { continue }
+            $row = [string]$PreInv[$id].Raw
+            if ($row -match '任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+') { continue }
+            $lost += $row
+        }
+    }
+    $raw = Get-Content $clPath -Raw -Encoding UTF8
+    if ($null -eq $raw) { $raw = "" }
+    $needWrite = $false
+    if ($raw -notmatch '稽核輪次[：:]\s*[0-9]+') {
+        $lines = @($raw -split "`r?`n")
+        if ($lines.Count -gt 1 -and $lines[0] -match '^#\s') {
+            $raw = (@($lines[0], '', ('稽核輪次：' + $PreRound)) + @($lines[1..($lines.Count - 1)])) -join "`r`n"
+        }
+        else {
+            $raw = ('稽核輪次：' + $PreRound + "`r`n`r`n") + $raw
+        }
+        $result.Rebuilt += '稽核輪次行'
+        $needWrite = $true
+    }
+    if ($raw -notmatch '(?m)^##\s*調查進度') {
+        # 插在第一個勾選列之前（列本來就住這節下）；沒有勾選列就插檔尾
+        $lines = @($raw -split "`r?`n")
+        $newLines = @()
+        $inserted = $false
+        foreach ($ln in $lines) {
+            if (-not $inserted -and $ln -match '^\s*-\s*\[[ xX]\]') {
+                $newLines += '## 調查進度'
+                $newLines += ''
+                $inserted = $true
+            }
+            $newLines += $ln
+        }
+        if (-not $inserted) { $newLines += @('', '## 調查進度', '') }
+        $raw = $newLines -join "`r`n"
+        $result.Rebuilt += '調查進度節標題'
+        $needWrite = $true
+    }
+    if ($raw -notmatch '(?m)^##\s*Gaps') {
+        $raw = $raw.TrimEnd() + "`r`n`r`n## Gaps 彙整（隨深查更新）`r`n`r`n- （無）`r`n"
+        $result.Rebuilt += 'Gaps 節標題'
+        $needWrite = $true
+    }
+    if ($lost.Count -gt 0) {
+        $lines = @($raw -split "`r?`n")
+        $newLines = @()
+        $inserted = $false
+        foreach ($ln in $lines) {
+            $newLines += $ln
+            if (-not $inserted -and $ln -match '^##\s*調查進度') {
+                foreach ($rr in $lost) { $newLines += $rr }
+                $inserted = $true
+            }
+        }
+        if ($inserted) {
+            $raw = $newLines -join "`r`n"
+            $result.Restored = $lost.Count
+            $needWrite = $true
+        }
+    }
+    if ($needWrite) {
+        [System.IO.File]::WriteAllText($clPath, $raw, (New-Object System.Text.UTF8Encoding($true)))
+    }
+    return $result
+}
+
+# 統一調帳邊界（P0-4）：任何 session 之後都走這裡——log 有跡可查
+function Invoke-PostSessionReconcile {
+    param([hashtable]$PreInv, [int]$PreRound, [string]$Tag)
+    $rec = Invoke-ChecklistReconcile -PreInv $PreInv -PreRound $PreRound
+    if ($rec.Rebuilt.Count -gt 0) { Write-Log "CHECKLIST 骨架修復（$Tag）：$($rec.Rebuilt -join '、')——確定性重建，不停機不等自癒" }
+    if ($rec.Restored -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：補回 $($rec.Restored) 列 silent loss（身分比對；總數比對抓不到掉一補一）" }
+    return $rec
+}
+
 # 自動復原（L90）：回滾整個領域目錄到上一圈快照＋清掉本圈新生的未追蹤檔
 # ——本圈作廢（含正當寫入），換一圈重來。快照只在完整性通過後才拍，
 # HEAD 恆為乾淨還原點。回 $true＝已回滾。
@@ -543,6 +674,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     # 一致性檢查的圈前基準（強殺後用「圈前存在的東西沒變壞」判定）
     $preHadChecklist = Test-Path (Join-Path $dir "checklist.md")
     $preItemTotal = if ($preHadChecklist) { Get-ItemTotal } else { 0 }
+    # 身分快照（issue #6）：調帳用——比總數多一層「每一筆都還在」的保證
+    $preInv = if ($preHadChecklist) { Get-ChecklistInventory } else { $null }
+    $preRound = if ($before.Round -ge 0) { $before.Round } else { 0 }
     # audit 轉移快照——每圈重算的區域值（跨圈黏著旗標會讓舊圈證據放行新圈畢業）
     $auditBefore = $null
     $auditAfter = $null
@@ -596,6 +730,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
                 # FixArchive 會合法刪列（流程標籤）——完整性基準必須重取，
                 # 否則本圈 session 後的檢查會拿舊基準誤報「列被吃掉」
                 $preItemTotal = Get-ItemTotal
+                $preInv = Get-ChecklistInventory
             }
             if ($cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
                 $stopReason = "剩 $cvManualOnly 項需人工（-FixArchive 也判不出來：可能是『沒做完』與『打勾掉了』分不出的列）——清單見 coverage-cycle$cycle-pre.txt 的 MANUAL_ONLY 段、處置紀錄見 fixarchive-cycle$cycle.txt；處理完再啟動"
@@ -635,6 +770,8 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             break
         }
         Write-Log "強殺後一致性檢查 PASS（唯讀）——維持既有重試邏輯"
+        # 強殺半寫也走調帳（issue #6）：能確定性救回的列不留給下一圈賭
+        $null = Invoke-PostSessionReconcile -PreInv $preInv -PreRound $preRound -Tag "$phase-強殺後"
         $timeoutStreak++
         if ($timeoutStreak -ge 2) { $stopReason = "連續 2 次逾時（需人工看 session log）"; break }
         continue
@@ -666,6 +803,11 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         }
     }
     else { $errorStreak = 0 }
+
+    # 確定性調帳（issue #6／L93）：先調帳再驗完整性——節標題／輪次行由本層
+    # 直接重建、silent loss 列由本層直接補回；下方 L90 檢查降格為最後一道
+    # assertion（調帳修不了的才會走到回滾／停機）。
+    $null = Invoke-PostSessionReconcile -PreInv $preInv -PreRound $preRound -Tag $phase
 
     # checklist 完整性（L90 分級）：每 session 必驗，反應看傷勢——
     # 節標題消失、項目數未損＝閃爍性腐蝕，下個 session 整檔重寫會自然修復
@@ -717,7 +859,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         # 禁 peoplecode 代償、有合法終止出口（否則 B 型項目＝無限迴圈）
         # L53／L57：清單混有三種型別——prompt 必須先分流，否則洩漏型／欄位型
         # 會被套上證據型的修法（去找 chunk id）而做無解的事（L43 同族）
-        $sPrompt = "lint 修復清單逐筆處理，先看方括號型別再動手。[回灌] 型＝稽核已經查到答案（來自 90-audit.md 明細的處置欄）：**純字串替換，不要重查、不要呼叫任何檢索工具**——read 該檔，把工單所給的舊 UUID 的**所有出現處**換成新 UUID（同一 chunk 常被多列引用，漏換等於下輪再開一次單）；只用新 id 呼叫一次 get_chunks_details 驗貨，回傳 ChunkText 必須含該列原引文，不含＝抓錯 chunk，禁止硬填、該筆記收據跳過；舊 UUID 在該檔找不到＝該列已被改過或刪除，記收據跳過不要硬塞；更新行號／更新數值同理，依所給新值改該列，內容一個字都不動。[欄位] 型＝證據其實在位置欄、機器參照欄放的是標籤：**純編輯，不要重查也不要呼叫任何工具**，把可重跑的那一份（完整36字元ChunkId 或 SELECT…FROM…）搬到機器參照欄，位置欄改放 filePath:行號 或表名鍵值；證據內容一個字都不要改，改短或憑印象重打就是捏造。[洩漏] 型＝模型內部標記寫進交付物：read 該檔看標記前後整個區塊有無被截斷（表格斷半路、章節缺下半段、混進推理獨白或工具回傳原文），刪標記與所有非交付內容，補回被截斷的內容（證據照原有 chunk id 或 SQL 重取，禁止憑印象重寫）；補不回＝該段已遺失，在該檔未解事項記一行「章節因寫入脫軌遺失待重查」後停止該筆，不得編造。[證據] 型＝先判 CHUNK 或 SQL：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id，委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者之一（禁 general、explore、scout——四個MCP全封等於零工具，派過去必然轉圈到逾時；CHUNK型也禁 ps-ui-flow，它沒有ES與Source），首選查無時改派 ps-ae-flow 或 ps-metadata-flow（四工具全譜）再試一次、兩個管道都查無才算查無；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
+        $sPrompt = "lint 修復清單逐筆處理，先看方括號型別再動手。[回灌] 型＝稽核已經查到答案（來自 90-audit.md 明細的處置欄）：**純字串替換，不要重查、不要呼叫任何檢索工具**——read 該檔，把工單所給的舊 UUID 的**所有出現處**換成新 UUID（同一 chunk 常被多列引用，漏換等於下輪再開一次單）；只用新 id 呼叫一次 get_chunks_details 驗貨，回傳 ChunkText 必須含該列原引文，不含＝抓錯 chunk，禁止硬填、該筆記收據跳過；舊 UUID 在該檔找不到＝該列已被改過或刪除，記收據跳過不要硬塞；更新行號／更新數值同理，依所給新值改該列，內容一個字都不動。[欄位] 型＝證據其實在位置欄、機器參照欄放的是標籤：**純編輯，不要重查也不要呼叫任何工具**，把可重跑的那一份（完整36字元ChunkId 或 SELECT…FROM…）搬到機器參照欄，位置欄改放 filePath:行號 或表名鍵值；證據內容一個字都不要改，改短或憑印象重打就是捏造。[洩漏] 型＝模型內部標記寫進交付物：read 該檔看標記前後整個區塊有無被截斷（表格斷半路、章節缺下半段、混進推理獨白或工具回傳原文），刪標記與所有非交付內容，補回被截斷的內容（證據照原有 chunk id 或 SQL 重取，禁止憑印象重寫）；補不回＝該段已遺失，在該檔未解事項記一行「章節因寫入脫軌遺失待重查」後停止該筆，不得編造。[章節] 型＝檔案缺必要模板章節：**補研究不是機械修**——read 該檔辨識主角物件，既有內容與既有證據全部保留；所缺章節依 function-detail 模板補寫，內容須經委派檢索取證（委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者），Evidence 附錄要完整36字元ChunkId 且逐字取自工具回傳；取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面。[證據] 型＝先判 CHUNK 或 SQL：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id，委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者之一（禁 general、explore、scout——四個MCP全封等於零工具，派過去必然轉圈到逾時；CHUNK型也禁 ps-ui-flow，它沒有ES與Source），首選查無時改派 ps-ae-flow 或 ps-metadata-flow（四工具全譜）再試一次、兩個管道都查無才算查無；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
+        # 每批手術前重拍身分快照（前批的合法改動不能算進本批的損失）
+        $sPreInv = Get-ChecklistInventory
         $sr = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $sPrompt `
             -TimeoutMin $ResearchTimeoutMin -Tag "surgery"
         # 手術 session 也在保險絲與一致性檢查的守備範圍（原本 $sr 沒人看＝
@@ -733,6 +877,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             Write-Log "手術 session 逾時強殺——一致性檢查 PASS，續跑"
         }
         elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 errorStreak）" }
+        $null = Invoke-PostSessionReconcile -PreInv $sPreInv -PreRound $preRound -Tag "surgery-$surgeryRound"
         $ci = Test-ChecklistIntegrity -PreTotal $preItemTotal
         if ($ci.Cosmetic.Count -gt 0 -and $ci.Lost.Count -eq 0) {
             foreach ($pb in $ci.Cosmetic) { Write-Log "CHECKLIST WARN（可自癒，手術第 $surgeryRound 批）：$pb" }
@@ -912,8 +1057,11 @@ if ($graduated) {
             $distillRound++
             Write-Log "歸戶提煉第 $distillRound 輪：待歸戶 $wm 個物件"
             $dPrompt = "歸戶提煉：照你 system prompt 的「提煉模式」處理 docs/ps-research/$Domain/ 的 NN 檔。只 read NN 檔與 wiki、只 write wiki 與 index；禁止委派、禁止任何檢索；evidence 逐字複製 NN 檔既有的 ChunkId 與 SQL。"
+            $dPreInv = Get-ChecklistInventory
             $dr = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $dPrompt `
                 -TimeoutMin $ResearchTimeoutMin -Tag "distill"
+            # 提煉 session 規則上不碰 checklist——調帳在此是守門不是修復
+            $null = Invoke-PostSessionReconcile -PreInv $dPreInv -PreRound $final.Round -Tag "distill-$distillRound"
             $wm2 = Get-WikiMissing
             Write-Log "歸戶提煉第 $distillRound 輪結束：待歸戶 $wm → $wm2"
             if ($wm2 -ge $wm) { Write-Log "提煉未收斂——停止（餘 $wm2 個記人工或下次畢業續跑）"; break }
@@ -921,8 +1069,10 @@ if ($graduated) {
         }
         if ($Tier -eq 2) {
             $uPrompt = "entity 升級：照你 system prompt 的「提煉模式」第 3 條處理 docs/ps-research/$Domain/——本領域 NN 檔 [[連結]] 到的 entity 中 status: draft 改 verified（reviewed 與 stale 不動）。只 read／write wiki，禁止委派與檢索。"
+            $uPreInv = Get-ChecklistInventory
             $ur = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $uPrompt `
                 -TimeoutMin $ResearchTimeoutMin -Tag "distill-upgrade"
+            $null = Invoke-PostSessionReconcile -PreInv $uPreInv -PreRound $final.Round -Tag "distill-upgrade"
             Write-Log "entity 升級 session 結束（tier 2）"
         }
         Invoke-GitSnapshot -Note "歸戶提煉收尾（餘 $wm 待歸戶）"

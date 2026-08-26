@@ -364,6 +364,9 @@ $bogusIds = @()          # 非 UUID／自編樣式的 id——不可信，須重
 $failedQueryRows = @()   # 以失敗查詢當機器參照的列（SQL 型，改表名重查）
 $jsonLeaks = @()         # subagent 契約 JSON 原樣洩漏（缺料類：內容可能被截斷）
 $relinkOrders = @()      # [回灌]：90-audit.md 明細「處置」欄帶的機械修復指令
+$sectionGapByFile = @{}  # [章節]（L93）：檔名 → 缺的必要章節清單——缺章節曾是
+                         # 「有偵測、無執行者」的死角（16~20 實案：lint 每輪報、
+                         # 工單不出、無 session 被告知，永遠不癒）
 
 Get-ChildItem -LiteralPath $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
@@ -384,11 +387,14 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             return
         }
 
+        $secMissing = @()
         foreach ($sec in $requiredSections) {
             if ($text -notmatch [regex]::Escape($sec)) {
                 $violations += "${name}：缺章節「$sec」"
+                $secMissing += $sec
             }
         }
+        if ($secMissing.Count -gt 0) { $sectionGapByFile[$name] = $secMissing }
 
         if ($text -notmatch 'CONFIRMED|INFERRED|DYNAMIC_RUNTIME') {
             $violations += "${name}：行為邏輯無任何 confidence 標註"
@@ -962,7 +968,8 @@ $leakManual = @($leaks | Where-Object { -not $_.Delegable })
 $polishOrderCount = $truncatedIds.Count + $missingIds.Count + $misplacedRefRows.Count +
     $bogusIds.Count + $failedQueryRows.Count
 $emitPolish = (-not $CoverageOnly)
-$orderTotal = $leakDelegable.Count + $relinkOrders.Count + $jsonLeaks.Count
+# [章節] 兩個 tier 都出（L93）：缺章節是缺料不是美工（CoverageOnly 本來就不降它）
+$orderTotal = $leakDelegable.Count + $relinkOrders.Count + $jsonLeaks.Count + $sectionGapByFile.Count
 if ($emitPolish) { $orderTotal += $polishOrderCount }
 # [回灌] 兩個 tier 都出（L79）：它不需要任何檢索（答案已在明細），而每不做
 # 一次，下一輪全量重驗就要對同一筆重付一次二次定位——與 [欄位]／[證據]
@@ -985,6 +992,13 @@ if ($orderTotal -gt 0) {
         $i++
         $parts = $r -split '｜', 2
         Write-Host "$i. [回灌] $($parts[0])：$($parts[1])"
+    }
+    # [章節]（L93）：一檔一單——缺章節工單沒有這型之前，lint 每輪算出明細
+    # 卻只寫進沒 session 讀的 log，違規永遠不癒
+    foreach ($fn in ($sectionGapByFile.Keys | Sort-Object)) {
+        $i++
+        $secs = (@($sectionGapByFile[$fn]) -join '、')
+        Write-Host "$i. [章節] ${fn}：缺 $secs"
     }
     # [欄位] 型按**檔**合併成一個任務：對調欄位是純編輯，一個檔一次改完最省
     # ——逐列開單會把 30 列變成 30 個任務，而 auto-loop 一圈只吃 7 筆（實案：
@@ -1020,6 +1034,13 @@ if ($orderTotal -gt 0) {
     }
     }
     Write-Host ""
+    if ($sectionGapByFile.Count -gt 0) {
+        Write-Host "【章節】型（檔案缺必要模板章節）——**補研究不是機械修**："
+        Write-Host "  1) read 該檔，辨識主角物件；既有內容與既有證據**全部保留**"
+        Write-Host "  2) 所缺章節依 function-detail 模板補寫——內容須經委派 ps-* flow"
+        Write-Host "     檢索取證（Evidence 附錄要完整 36 字元 ChunkId，逐字取自工具回傳）"
+        Write-Host "  3) 取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面"
+    }
     if ($leakDelegable.Count -gt 0) {
         Write-Host "【洩漏】型（模型內部標記寫進了交付物）——**不是刪掉標記就好**："
         Write-Host "  1) read 該檔，看標記**前後整個區塊**：表格是否斷在半路、"
@@ -1195,6 +1216,16 @@ if ($FixArchive) {
     if (($toGaps.Count + $toProgress.Count + $toRegister.Count) -gt 0 -and (Test-Path -LiteralPath $checklistPath)) {
         $clRaw = Get-Content $checklistPath -Raw -Encoding UTF8
         if ($null -eq $clRaw) { $clRaw = "" }
+        # 節標題消失時自建（issue #6／L93）：修復路徑不得寄生在會消失的節點上
+        # ——標題被吃掉時原本只 WARN「N 列未寫入」，等於 FixArchive 也修不動
+        if (($toProgress.Count + $toRegister.Count) -gt 0 -and $clRaw -notmatch '(?m)^##\s*調查進度') {
+            $clRaw = $clRaw.TrimEnd() + "`r`n`r`n## 調查進度`r`n"
+            Write-Host "  已重建「## 調查進度」節標題（原標題被吃掉）" -ForegroundColor Yellow
+        }
+        if ($toGaps.Count -gt 0 -and $clRaw -notmatch '(?m)^##\s*Gaps') {
+            $clRaw = $clRaw.TrimEnd() + "`r`n`r`n## Gaps 彙整（隨深查更新）`r`n"
+            Write-Host "  已重建「## Gaps 彙整」節標題（原標題被吃掉）" -ForegroundColor Yellow
+        }
         $out = @()
         $doneG = $false
         $doneP = $false
