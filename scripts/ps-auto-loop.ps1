@@ -230,6 +230,26 @@ function Get-RowIdentity {
     return 'hash:' + ((@($bytes | ForEach-Object { $_.ToString('x2') })) -join '').Substring(0, 16)
 }
 
+# 復活防衛（L96）：身分消失 ≠ 列遺失——session 可能把工單列「改寫」成
+# 別的格式（打勾時重寫文字／改編號）。改寫的列，其錨點（工單編號、
+# NN 檔名、物件名）仍會出現在活頁某處；真被吃掉的列什麼都不剩。
+# 只有「所有錨點都消失」才准補回，否則補回＝跟模型拔河＝重複列與
+# 假性無進度（D63 實案：一勾一未勾並存、未勾 3→3 卡死）。
+function Test-RowStillRepresented {
+    param([string]$Row, [string]$ActiveRaw)
+    $anchors = @()
+    $m = [regex]::Match($Row, '([AUDaud]\d+-\d+)')
+    if ($m.Success) { $anchors += $m.Groups[1].Value }
+    $m = [regex]::Match($Row, '(\d\d-[^\s（）()：:]+\.md)')
+    if ($m.Success) { $anchors += $m.Groups[1].Value }
+    $m = [regex]::Match($Row, '新發現\s+([^\s：:（(]+)')
+    if ($m.Success) { $anchors += $m.Groups[1].Value }
+    foreach ($a in $anchors) {
+        if ($a.Length -ge 4 -and $ActiveRaw.IndexOf($a, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
+    }
+    return $false
+}
+
 function Get-ChecklistInventory {
     $inv = @{}
     $files = @()
@@ -257,21 +277,39 @@ function Get-ChecklistInventory {
 function Invoke-ChecklistReconcile {
     param([hashtable]$PreInv, [int]$PreRound)
     if ($PreRound -lt 0) { $PreRound = 0 }
-    $result = @{ Restored = 0; Rebuilt = @() }
+    $result = @{ Restored = 0; Rebuilt = @(); SkippedTransformed = 0; SkippedRepeat = 0; Deduped = 0 }
     $clPath = Join-Path $dir "checklist.md"
     if (-not (Test-Path $clPath)) { return $result }
     $post = Get-ChecklistInventory
+    $raw = Get-Content $clPath -Raw -Encoding UTF8
+    if ($null -eq $raw) { $raw = "" }
     $lost = @()
     if ($null -ne $PreInv) {
+        # 復活斷路器（L96）：同一列補回過一次、又消失＝它在被 session 改寫，
+        # 不是被吃掉——再補回就是無限拔河。台帳跨圈持久（logRoot 下）。
+        $ledgerPath = Join-Path $logRoot "reconcile-restored.txt"
+        $ledger = @{}
+        if (Test-Path -LiteralPath $ledgerPath) {
+            foreach ($l in @(Get-Content -LiteralPath $ledgerPath -Encoding UTF8)) {
+                $t = $l.Trim(); if ($t -ne '') { $ledger[$t] = $true }
+            }
+        }
         foreach ($id in @($PreInv.Keys)) {
             if ($post.ContainsKey($id)) { continue }
             $row = [string]$PreInv[$id].Raw
-            if ($row -match '任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+') { continue }
+            # 垃圾（流程標籤）不復活——但帶 A/U/D 編號或檔名錨點的列是
+            # 合法工單（D 項來源常寫「任務C 反查」），不受此過濾（L96）
+            $isWorkOrder = ($row -match '^\s*-\s*\[[ xX]\]\s*[AUDaud]\d+-\d+' -or
+                            $row -match '\d\d-[^\s（）()：:]+\.md')
+            if ((-not $isWorkOrder) -and ($row -match '任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+')) { continue }
+            if (Test-RowStillRepresented -Row $row -ActiveRaw $raw) { $result.SkippedTransformed++; continue }
+            if ($ledger.ContainsKey($id)) { $result.SkippedRepeat++; continue }
             $lost += $row
         }
+        if ($lost.Count -gt 0) {
+            foreach ($rr in $lost) { Add-Content -Path $ledgerPath -Value (Get-RowIdentity -Row $rr) -Encoding UTF8 }
+        }
     }
-    $raw = Get-Content $clPath -Raw -Encoding UTF8
-    if ($null -eq $raw) { $raw = "" }
     $needWrite = $false
     if ($raw -notmatch '稽核輪次[：:]\s*[0-9]+') {
         $lines = @($raw -split "`r?`n")
@@ -324,6 +362,20 @@ function Invoke-ChecklistReconcile {
             $needWrite = $true
         }
     }
+    # 同文重複列收斂（L96）：勾選列全文（含勾選框）完全相同＝零資訊損失
+    # 才准刪——一勾一未勾、或編號同內容異的列**不動**（可能各有語意，
+    # 留給 D 項防呆／人工裁決）。
+    $dedupSeen = @{}
+    $dedupLines = @()
+    foreach ($ln in @($raw -split "`r?`n")) {
+        if ($ln -match '^\s*-\s*\[[ xX]\]') {
+            $key = $ln.Trim()
+            if ($dedupSeen.ContainsKey($key)) { $result.Deduped++; $needWrite = $true; continue }
+            $dedupSeen[$key] = $true
+        }
+        $dedupLines += $ln
+    }
+    if ($result.Deduped -gt 0) { $raw = $dedupLines -join "`r`n" }
     if ($needWrite) {
         [System.IO.File]::WriteAllText($clPath, $raw, (New-Object System.Text.UTF8Encoding($true)))
     }
@@ -336,6 +388,9 @@ function Invoke-PostSessionReconcile {
     $rec = Invoke-ChecklistReconcile -PreInv $PreInv -PreRound $PreRound
     if ($rec.Rebuilt.Count -gt 0) { Write-Log "CHECKLIST 骨架修復（$Tag）：$($rec.Rebuilt -join '、')——確定性重建，不停機不等自癒" }
     if ($rec.Restored -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：補回 $($rec.Restored) 列 silent loss（身分比對；總數比對抓不到掉一補一）" }
+    if ($rec.SkippedTransformed -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：$($rec.SkippedTransformed) 列身分消失但錨點仍在活頁＝被改寫非遺失——不復活（session 不該改寫工單列文字，見 L96）" }
+    if ($rec.SkippedRepeat -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：$($rec.SkippedRepeat) 列二次消失（上次已補回過）＝持續被改寫——斷路器生效，不再復活" }
+    if ($rec.Deduped -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：收斂 $($rec.Deduped) 列同文重複" }
     return $rec
 }
 

@@ -273,7 +273,11 @@ if ($null -ne $checklistOnly) {
     $archiveFiles = @(Get-ChildItem -LiteralPath $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)
     # 稽核流程標籤（L73）：任務 A／B／C 的委派切分、批次編號是 auditor 自己的
     # 流程紀錄，寫進 checklist＝製造永遠做不完的假項目。逐檔報（L74）。
-    $procLabelPattern = '(?m)^\s*-\s*\[[ x]\]\s*(?=.*(?:任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+))(.+?)\s*$'
+    # L96 修正：D 項來源常寫「任務C 反查」——帶 A/U/D 工單編號開頭的列
+    # 是合法工單，**永遠不是流程標籤**（否則合法 D 列被判「整列刪除」）
+    # lookahead 內自帶 \s*——外層 \s* 回溯到任何位置，lookahead 都能吃掉
+    # 剩餘空白再驗編號（否則回退零格即閃過否定斷言，D 列照樣被誤判）
+    $procLabelPattern = '(?m)^\s*-\s*\[[ x]\]\s*(?!\s*[AUDaud]\d+-\d+)(?=.*(?:任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+))(.+?)\s*$'
     # 活頁的列文字（去掉勾選框——勾選狀態本來就會變，比對只看內容）
     $clLiveRows = @{}
     foreach ($m in [regex]::Matches($checklistOnly, '(?m)^\s*-\s*\[[ x]\]\s*(.+?)\s*$')) {
@@ -1174,7 +1178,9 @@ if ($FixArchive) {
         $changed = $false
         foreach ($ln in ($afRaw -split "`r?`n")) {
             if ($ln -notmatch '^\s*-\s*\[ \]') { $keep += $ln; continue }
-            $isProc = ($ln -match '(任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+)')
+            # L96：帶 A/U/D 工單編號開頭的列是合法工單，不是批次流程標籤
+            $isProc = (($ln -match '(任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+)') -and
+                       ($ln -notmatch '^\s*-\s*\[ \]\s*[AUDaud]\d+-\d+'))
             $isIncomplete = ($ln -match $incompletePattern)
             if ($isProc -and $isIncomplete) {
                 $toGaps += ($ln -replace '^\s*-\s*\[ \]\s*', '')
