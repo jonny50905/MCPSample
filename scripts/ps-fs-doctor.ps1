@@ -13,7 +13,10 @@
 param(
     [string]$Domain = "",
     [switch]$FixBom,
-    [switch]$WriteManifest
+    [switch]$WriteManifest,
+    # 多出檔預設不報（公司機常有內部 git 的非鏡像檔案，屬正常）；
+    # 查「舊版 agent 檔還掛著」這類疑難時才加本開關
+    [switch]$ShowExtras
 )
 
 $root = Split-Path $PSScriptRoot -Parent
@@ -137,12 +140,17 @@ else {
                 $mBomBad++
             }
         }
-        foreach ($f in (Get-TransferFiles)) {
-            $rp = Get-RelPath $f.FullName
-            if (-not $known.ContainsKey($rp)) {
-                Write-Host ("  ?? 未列管的多出檔：" + $rp + "（舊檔未刪或誤放——建議清掉）") -ForegroundColor Yellow
-                $mExtra++
+        # 多出檔只在 -ShowExtras 時列（預設沉默：公司機的非鏡像內部檔案是
+        # 常態，逐檔列出會把「搬檔完整與否」的真訊號淹掉）
+        if ($ShowExtras) {
+            foreach ($f in (Get-TransferFiles)) {
+                $rp = Get-RelPath $f.FullName
+                if (-not $known.ContainsKey($rp)) {
+                    Write-Host ("  ?? 未列管的多出檔：" + $rp) -ForegroundColor Yellow
+                    $mExtra++
+                }
             }
+            if ($mExtra -gt 0) { $findings += 'X' }
         }
         if (($mMissing + $mMismatch + $mBomBad) -gt 0) {
             $findings += 'M'
@@ -151,7 +159,6 @@ else {
         else {
             Write-Host ("  全部 " + @($mf.files).Count + " 檔與基準一致（commit " + $mf.commit + "）") -ForegroundColor Green
         }
-        if ($mExtra -gt 0) { $findings += 'X' }
     }
 }
 
@@ -292,7 +299,7 @@ Write-Host "          B=檔名異常（變體/隱形字元，照上面列的檔�
 Write-Host "          D=內文 FEFF 污染（.ps1 可加 -FixBom 自動修）  E=真缺檔或路徑對不上（SOP-4）"
 Write-Host "          F=這次輸入的參數含隱形字元  S=腳本語法解析失敗（搬運不完整，重新複製整檔）"
 Write-Host "          M=搬運不完整（漏搬/版本不符/搬壞/BOM 缺——照檢查 M 列的檔逐一重搬）"
-Write-Host "          X=多出未列管檔（舊檔未刪或誤放，建議清掉）"
+Write-Host "          X=多出未列管檔（僅 -ShowExtras 時列出；預設不檢查）"
 Write-Host "          G=全部正常（另有原因，回報後續查）"
 Write-Host ("結論代號：" + ($codes -join '+')) -ForegroundColor Cyan
 Write-Host "（回報維護 session 只需要這一行的代號，其他內容不用貼出來）"
