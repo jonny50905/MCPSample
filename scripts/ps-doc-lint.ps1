@@ -277,7 +277,9 @@ if ($null -ne $checklistOnly) {
     # 是合法工單，**永遠不是流程標籤**（否則合法 D 列被判「整列刪除」）
     # lookahead 內自帶 \s*——外層 \s* 回溯到任何位置，lookahead 都能吃掉
     # 剩餘空白再驗編號（否則回退零格即閃過否定斷言，D 列照樣被誤判）
-    $procLabelPattern = '(?m)^\s*-\s*\[[ x]\]\s*(?!\s*[AUDaud]\d+-\d+)(?=.*(?:任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+))(.+?)\s*$'
+    # (?i)＋task 變體（L97）：模型會用英文寫流程標籤（task C batch 1）——
+    # 字樣判定必須雙語＋大小寫不敏感，否則換個語言就逃逸
+    $procLabelPattern = '(?mi)^\s*-\s*\[[ x]\]\s*(?!\s*[AUD]\d+-\d+)(?=.*(?:(?:任務|task)\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+))(.+?)\s*$'
     # 活頁的列文字（去掉勾選框——勾選狀態本來就會變，比對只看內容）
     $clLiveRows = @{}
     foreach ($m in [regex]::Matches($checklistOnly, '(?m)^\s*-\s*\[[ x]\]\s*(.+?)\s*$')) {
@@ -1179,7 +1181,8 @@ if ($FixArchive) {
         foreach ($ln in ($afRaw -split "`r?`n")) {
             if ($ln -notmatch '^\s*-\s*\[ \]') { $keep += $ln; continue }
             # L96：帶 A/U/D 工單編號開頭的列是合法工單，不是批次流程標籤
-            $isProc = (($ln -match '(任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+)') -and
+            # L97：流程標籤判定雙語（模型會寫英文 task C batch）
+            $isProc = (($ln -match '((任務|task)\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+)') -and
                        ($ln -notmatch '^\s*-\s*\[ \]\s*[AUDaud]\d+-\d+'))
             $isIncomplete = ($ln -match $incompletePattern)
             if ($isProc -and $isIncomplete) {

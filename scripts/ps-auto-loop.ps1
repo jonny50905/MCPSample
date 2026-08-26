@@ -301,7 +301,7 @@ function Invoke-ChecklistReconcile {
             # 合法工單（D 項來源常寫「任務C 反查」），不受此過濾（L96）
             $isWorkOrder = ($row -match '^\s*-\s*\[[ xX]\]\s*[AUDaud]\d+-\d+' -or
                             $row -match '\d\d-[^\s（）()：:]+\.md')
-            if ((-not $isWorkOrder) -and ($row -match '任務\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+')) { continue }
+            if ((-not $isWorkOrder) -and ($row -match '(任務|task)\s*[ABC]|批次\s*\d+\s*[/／]\s*\d+')) { continue }
             if (Test-RowStillRepresented -Row $row -ActiveRaw $raw) { $result.SkippedTransformed++; continue }
             if ($ledger.ContainsKey($id)) { $result.SkippedRepeat++; continue }
             $lost += $row
