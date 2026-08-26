@@ -382,6 +382,105 @@ function Invoke-ChecklistReconcile {
     return $result
 }
 
+# ── D 項治理（issue #8／L99）：物件身分層的確定性防重 ─────────────
+# 任務 C 的 diff 基準是凍結的功能地圖——後續新發現永遠不在基準內，
+# 每輪都會被重新「發現」；而查重規則是模型自律（機率性），L98 的 lint
+# 守衛又只是事後偵測。本層把「已知物件集」收進外環：模型寫的 D 列
+# 一律視為**提案**，session 邊界上裁決——同物件已有 NN 檔或已有 D 列
+# ＝重複提案，整列刪除；同號異物件＝重配號。無論模型守不守散文規則，
+# 重複列活不過一個邊界。lint 的 L98 守衛降格為最後 assertion。
+function Get-CanonicalObject {
+    param([string]$Name)
+    $n = $Name.Trim().ToLowerInvariant()
+    $n = $n -replace '^ps_', ''
+    return $n
+}
+
+function Invoke-DItemGovernance {
+    $result = @{ Removed = 0; Renumbered = 0 }
+    $clPath = Join-Path $dir "checklist.md"
+    if (-not (Test-Path $clPath)) { return $result }
+    $dRowPattern = '^\s*-\s*\[([ xX])\]\s*[Dd](\d+)-(\d+)\s[^\r\n]*?新發現\s+([^\s：:（(]+)'
+    # KnownObjects＝NN 檔主物件（去編號、去續篇尾碼、去 PS_ 前綴、
+    # 大小寫不敏感）＋歷史 D 列物件（active 已勾＋全部 archive，勾否皆算
+    # ——歷史 D 列代表該物件已被受理過）
+    $known = @{}
+    $maxSeqByRound = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter "*.md" -File |
+            Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' })) {
+        $m = [regex]::Match($f.Name, '^\d\d-(.+?)(-\d+)?\.md$')
+        if ($m.Success) { $known[(Get-CanonicalObject $m.Groups[1].Value)] = 'NN 檔 ' + $f.Name }
+    }
+    foreach ($af in @(Get-ChildItem -LiteralPath $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)) {
+        $t = Get-Content $af.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($t)) { continue }
+        foreach ($m in [regex]::Matches($t, ('(?m)' + $dRowPattern))) {
+            $k = Get-CanonicalObject $m.Groups[4].Value
+            if (-not $known.ContainsKey($k)) { $known[$k] = '歸檔 D 列' }
+            $rnd = [int]$m.Groups[2].Value
+            $seq = [int]$m.Groups[3].Value
+            if (-not $maxSeqByRound.ContainsKey($rnd) -or $seq -gt $maxSeqByRound[$rnd]) { $maxSeqByRound[$rnd] = $seq }
+        }
+    }
+    $raw = Get-Content $clPath -Raw -Encoding UTF8
+    if ($null -eq $raw) { return $result }
+    $lines = @($raw -split "`r?`n")
+    # 第一遍：活頁全部 D 列的編號上限；已勾 D 列的物件入已知集
+    $seenIds = @{}
+    foreach ($ln in $lines) {
+        $m = [regex]::Match($ln, $dRowPattern)
+        if (-not $m.Success) { continue }
+        $rnd = [int]$m.Groups[2].Value
+        $seq = [int]$m.Groups[3].Value
+        if (-not $maxSeqByRound.ContainsKey($rnd) -or $seq -gt $maxSeqByRound[$rnd]) { $maxSeqByRound[$rnd] = $seq }
+        if ($m.Groups[1].Value -ne ' ') {
+            $rid = 'D' + $m.Groups[2].Value + '-' + $m.Groups[3].Value
+            $seenIds[$rid] = $true
+            $k = Get-CanonicalObject $m.Groups[4].Value
+            if (-not $known.ContainsKey($k)) { $known[$k] = ('已勾 D 列 ' + $rid) }
+        }
+    }
+    # 第二遍：未勾 D 列逐列裁決——重複物件刪、同號異物件重配號
+    $out = @()
+    $seenActive = @{}
+    $changed = $false
+    foreach ($ln in $lines) {
+        $m = [regex]::Match($ln, $dRowPattern)
+        if (-not $m.Success -or $m.Groups[1].Value -ne ' ') { $out += $ln; continue }
+        $rid = 'D' + $m.Groups[2].Value + '-' + $m.Groups[3].Value
+        $obj = $m.Groups[4].Value
+        $k = Get-CanonicalObject $obj
+        if ($known.ContainsKey($k) -or $seenActive.ContainsKey($k)) {
+            $src = if ($known.ContainsKey($k)) { $known[$k] } else { ('本頁 D 列 ' + $seenActive[$k]) }
+            Write-Log "D 項治理：刪除重複提案 $rid（$obj）——同物件已有 $src"
+            $result.Removed++
+            $changed = $true
+            continue
+        }
+        if ($seenIds.ContainsKey($rid)) {
+            $rnd = [int]$m.Groups[2].Value
+            $newSeq = $maxSeqByRound[$rnd] + 1
+            $maxSeqByRound[$rnd] = $newSeq
+            $newId = 'D' + $rnd + '-' + $newSeq.ToString('00')
+            $ln = ([regex]'[Dd]\d+-\d+').Replace($ln, $newId, 1)
+            Write-Log "D 項治理：重號 $rid（$obj）→ $newId（同號異物件，各批未聯集先編）"
+            $seenIds[$newId] = $true
+            $seenActive[$k] = $newId
+            $out += $ln
+            $result.Renumbered++
+            $changed = $true
+            continue
+        }
+        $seenIds[$rid] = $true
+        $seenActive[$k] = $rid
+        $out += $ln
+    }
+    if ($changed) {
+        [System.IO.File]::WriteAllText($clPath, ($out -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+    }
+    return $result
+}
+
 # 統一調帳邊界（P0-4）：任何 session 之後都走這裡——log 有跡可查
 function Invoke-PostSessionReconcile {
     param([hashtable]$PreInv, [int]$PreRound, [string]$Tag)
@@ -391,6 +490,9 @@ function Invoke-PostSessionReconcile {
     if ($rec.SkippedTransformed -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：$($rec.SkippedTransformed) 列身分消失但錨點仍在活頁＝被改寫非遺失——不復活（session 不該改寫工單列文字，見 L96）" }
     if ($rec.SkippedRepeat -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：$($rec.SkippedRepeat) 列二次消失（上次已補回過）＝持續被改寫——斷路器生效，不再復活" }
     if ($rec.Deduped -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：收斂 $($rec.Deduped) 列同文重複" }
+    # D 項治理（issue #8）：調帳之後、下個 session 之前裁決 D 提案——
+    # 重複列活不過這個邊界（明細 log 由治理函式自己寫）
+    $null = Invoke-DItemGovernance
     return $rec
 }
 
