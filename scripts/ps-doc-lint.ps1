@@ -352,7 +352,11 @@ if ((Test-Path -LiteralPath $overviewPath) -and $null -ne $checklistOnly) {
 }
 
 # 2) 每個 NN 檔的內容檢查
-$requiredSections = @('## 功能定位', '## 行為邏輯', '## 資料流', '## 未解事項', '## Evidence 附錄')
+# 相關物件 2026-08 補入（L94）：它是 wiki 層同日加進模板的，門檻定案在前、
+# 沒人回頭同步——存量 NN 檔實測都有（模板出生即帶），入列零回灌成本。
+# 畫面與欄位／執行方式／權限**刻意不入列**：非普適（純批次檔無畫面、
+# 線上功能無排程），門檻只收所有檔型的公約數。
+$requiredSections = @('## 相關物件', '## 功能定位', '## 行為邏輯', '## 資料流', '## 未解事項', '## Evidence 附錄')
 $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 $nnNames = @()
 $truncatedIds = @()
