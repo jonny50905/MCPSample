@@ -320,6 +320,40 @@ if ($null -ne $checklistOnly) {
         $violations += "checklist.md：含 $($clProc.Count) 列稽核流程標籤（如「$clProcSample」）——那是 auditor 的委派切分不是調查項，**整列刪除**；回灌只准寫「A<輪次>-<序號> 補查 <NN-檔名>：FAIL x／DISPUTED y／UNVERIFIABLE z（稽核）」"
     }
 
+    # D 項重複發現守衛（L98）：未勾 D 列的目標物件已有 NN 檔＝重複發現，
+    # 放行會生出第二份同物件檔（實案：21~26 與 27~32 成對重複——D 重複列
+    # ＋無「已存在」出口＋「取下一個未用編號」三者疊加）。自動類：
+    # research 依 D 項規則打勾附註（已存在），不重建檔。
+    foreach ($m in [regex]::Matches($checklistOnly, '(?m)^\s*-\s*\[ \]\s*[Dd]\d+-\d+[^\r\n]*?新發現\s+([^\s：:（(]+)')) {
+        $obj = $m.Groups[1].Value
+        $objPat = '(?i)^\d\d-' + [regex]::Escape($obj) + '(-\d+)?\.md$'
+        $exist = @(Get-ChildItem -LiteralPath $dir -Filter "*.md" |
+                Where-Object { $_.Name -match $objPat })
+        if ($exist.Count -gt 0) {
+            $violations += ("checklist.md：未勾 D 項目標「" + $obj + "」已有 NN 檔（" + $exist[0].Name + "）——重複發現，依 D 項規則打勾附註（已存在），不得重建檔")
+        }
+    }
+    # 同物件多檔守衛（L98）：NN 檔去編號後同物件、編號卻不同＝重複建檔
+    # ——知識分裂成兩份，稽核與提煉都會重工。續篇（同編號 -2）不算。
+    # 擇優合併只有人做得了（比完整度與證據數）→ MANUAL_ONLY。
+    $objSeen = @{}
+    Get-ChildItem -LiteralPath $dir -Filter "*.md" |
+        Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
+        ForEach-Object {
+            $mBase = [regex]::Match($_.Name, '^(\d\d)-(.+?)(-\d+)?\.md$')
+            if (-not $mBase.Success) { return }
+            $key = $mBase.Groups[2].Value.ToLowerInvariant()
+            $num = $mBase.Groups[1].Value
+            if (-not $objSeen.ContainsKey($key)) { $objSeen[$key] = @{} }
+            $objSeen[$key][$num] = $_.Name
+        }
+    foreach ($k in $objSeen.Keys) {
+        if (@($objSeen[$k].Keys).Count -gt 1) {
+            $names = (@($objSeen[$k].Values | Sort-Object) -join '、')
+            $violations += ("同物件重複建檔：" + $names + "——人工擇優（比八節完整度與證據數）留一份、刪另一份並同步 checklist 相關列——**本項 loop 修不掉，需人工**")
+        }
+    }
+
     # 1) checklist 對帳：打勾項的目標檔必須存在；NN 檔必須被 checklist 列到
     $listed = @{}
     foreach ($m in [regex]::Matches($checklistSrc, '- \[(?<tick>[ x])\]\s+\S+.*?→\s*(?<file>\S+\.md)')) {
@@ -956,7 +990,7 @@ else {
     # （ps-deep-research 硬規則），所以牽涉歸檔內容的一律只能人工。
     # 白名單制——沒列到的預設「research 修得動」，讓迴圈去試（fail-safe：
     # 分類漏掉只是多跑一圈，分類過頭會讓真的能自動修的項目被判成要人工）。
-    $manualPatterns = @('個未打勾項', '與歸檔重複', '稽核流程標籤', '行「稽核輪次」', '任何一行提及')
+    $manualPatterns = @('個未打勾項', '與歸檔重複', '稽核流程標籤', '行「稽核輪次」', '任何一行提及', '同物件重複建檔')
     $manualOnlyViolations = @($violations | Where-Object {
             $v = $_
             ($manualPatterns | Where-Object { $v.Contains($_) }).Count -gt 0
