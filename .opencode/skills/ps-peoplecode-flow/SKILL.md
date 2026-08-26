@@ -67,7 +67,9 @@ If SQL text, labels, prompts, or transfers are built dynamically,
 mark them as DYNAMIC_RUNTIME and keep the PeopleCode evidence.
 
 Treat UI state mutations as findings, not noise.
-UI mutation patterns (closed set):
+UI mutation patterns (closed set; each is a literal source-text prefix —
+a trailing "(" is part of the pattern, anchoring a function call,
+and must not be "fixed" or paired):
   .Visible = / Hide( / UnHide( / HideRow( / HideScroll( /
   Gray( / UnGray( / .DisplayOnly = / .Enabled = / .Required =
 For each mutation preserve: the governing condition branch,
