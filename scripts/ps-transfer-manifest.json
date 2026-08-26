@@ -1,0 +1,318 @@
+{
+  "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
+  "commit": "bbff894",
+  "files": [
+    {
+      "path": ".opencode/agent/explore.md",
+      "lines": 25,
+      "sha256": "8ed715aeb40c2c6740fdce1e6156100bcfcc51a98d65b1ba0ec6003cdf6962d6",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/general.md",
+      "lines": 25,
+      "sha256": "36f0e3083e1cc3f66698e4edb193a3d900c07eeef8977ec358444f21ad96459f",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-ae-flow.md",
+      "lines": 86,
+      "sha256": "76a106e1b3798529e82d9291238009613caa6fd7d0b22d523d08d78324b081f5",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-auditor.md",
+      "lines": 212,
+      "sha256": "0e2a1bb50918e239a04c6e445d8e32239a7614837b39cea2d67495a0b90cf1a5",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-deep-research.md",
+      "lines": 405,
+      "sha256": "e946be91feabdff0c4ec44438fa879ad6bd005253a1e3c2021e61064b6a5227d",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-metadata-flow.md",
+      "lines": 98,
+      "sha256": "45349a557de414fb1d0d435e74713f047df0442c21a291e8cc96537b88c2f335",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-orchestrator.md",
+      "lines": 160,
+      "sha256": "ae46ebbd2b7b2b301457774c9973624a9b55385684ea790cf4bb3503bf37599b",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-peoplecode-flow.md",
+      "lines": 85,
+      "sha256": "4a19f7599f4585b65c03533aae4ba04635e5b1c77b5c7ddc6084266dfe02f4af",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-sql-flow.md",
+      "lines": 68,
+      "sha256": "5c50a3330938f8809efc6f72932111ca162fb8da2d5fd10a0c9b7829886e8f12",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-sqr-flow.md",
+      "lines": 76,
+      "sha256": "76ce00a466ddbc7d566e10205d66ea0c80370231caad55e2a30f3d77e009bb7d",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-ui-flow.md",
+      "lines": 111,
+      "sha256": "5a29bd33f0da0e32f074d6316aec6a971ec3fd9aa10161ad7f7599a321bdbddc",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/scout.md",
+      "lines": 24,
+      "sha256": "810f7dbed793b9b3976c16bbac17aae7ddf27029e109c4877b038096769675a6",
+      "bom": false
+    },
+    {
+      "path": ".opencode/command/ps-audit.md",
+      "lines": 62,
+      "sha256": "84573364d9705b3faff2f030c3fbfbfd14695ff47ce0b260bb03ce71f28cecf3",
+      "bom": false
+    },
+    {
+      "path": ".opencode/command/ps-correct.md",
+      "lines": 26,
+      "sha256": "a9e18650c0e241ab1ae4f82a856a65348f7dbb78ae1763a9b00da0fc5d187647",
+      "bom": false
+    },
+    {
+      "path": ".opencode/command/ps-lesson.md",
+      "lines": 26,
+      "sha256": "21f992f7d1add3d3be29a49b57723896ab109d26392ec810184afb2432fdf685",
+      "bom": false
+    },
+    {
+      "path": ".opencode/command/ps-research.md",
+      "lines": 24,
+      "sha256": "cc7e4e2430a81b75a3c3e8487c50ac44080931b15b9570111045ba1a2f87dc32",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/business-domain-map.yaml",
+      "lines": 102,
+      "sha256": "bae85c2ff62c3bcb4aac9682e337e6516914562ad0da444a1c1c0542499ed066",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/customization-profile.yaml",
+      "lines": 85,
+      "sha256": "db8979b64c91b7058e806de1bdb1024bc9f2b6e934e2430b336cc324a8448a6c",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/lessons/applied.md",
+      "lines": 2464,
+      "sha256": "4319fa8fa7c5bf6f294086ace3b132a86b79badb76276d51a6e9b924c5c7f743",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/lessons/pending.md",
+      "lines": 25,
+      "sha256": "9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/mcp-tool-contracts.md",
+      "lines": 88,
+      "sha256": "34fc39fb95f37a41d9b2a59ffa7123c57cb6a9b22f09e6f58be96b867179f89e",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
+      "lines": 338,
+      "sha256": "7ff654ef0e3be9fc14a49944b89cc627097eb67dc2ece49a802383d945aa81e6",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/progressive-source-retrieval.md",
+      "lines": 424,
+      "sha256": "560ac485da77b8b943930602f53d860dc32224c2698821d62747af1d28c3725d",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/README.md",
+      "lines": 304,
+      "sha256": "c914d1cec6a84a79df0373c726b2f64886386e802d1190553beba5cf8d577cf4",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/report-templates/audit-template.md",
+      "lines": 82,
+      "sha256": "1332911f3b15e20acefe68822ffc654999fa0457582d8e7431ef6f740a3b98ba",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/report-templates/checklist-template.md",
+      "lines": 25,
+      "sha256": "366e97a7097a3e6165789d4a8ba5afa918e1a43f35a0d227db9050045a800f92",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/report-templates/entity-template.md",
+      "lines": 34,
+      "sha256": "de2a989eba864ef30cf837956e9b09ac774822fd85522cbb2869c4fd0fdcf34a",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/report-templates/function-detail-template.md",
+      "lines": 77,
+      "sha256": "f80cf40ca610b15e58d1c0feb4f802536308777568e751c6c92f732e880dfb20",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/report-templates/overview-template.md",
+      "lines": 49,
+      "sha256": "e2ccd269668daf8d0f7a059b3d1c8b3b00ca8f69e666439905339a69204a1e74",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/research-domains.txt",
+      "lines": 25,
+      "sha256": "5eac9573894ae5eb17cac39f6dcedc2db013b65e8dddc9b0675b2e2c3bf5c133",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/SOP.md",
+      "lines": 569,
+      "sha256": "783170247fe5291e579d4979bc429588fa139849b7df2becdb2caa37b941da7a",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/subagent-report-contract.md",
+      "lines": 130,
+      "sha256": "9b04a7759636284d848a723dd73402fbfc4383a846e98e3b81b7fedb2fd0b34d",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/test-fixtures.yaml",
+      "lines": 355,
+      "sha256": "193656cae454115ed68731005fbfd64b8dee4446037ee632e545b50e8a940536",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/test-scenarios.md",
+      "lines": 656,
+      "sha256": "7e24b419b5e017e7c1c06febb647b33ed2c69c1a70f86df2eb34ae5f0dd60db9",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-ae-flow/SKILL.md",
+      "lines": 64,
+      "sha256": "9d58c3b75195247916f8e30ca9b006d236c58ce10f475b46754b1dd40f5c01b7",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-business-discovery/SKILL.md",
+      "lines": 183,
+      "sha256": "74dd6c579c7752c086bd56fa161495e94f7761db3d9fde10cd7b16f66fef9c31",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-business-explain/SKILL.md",
+      "lines": 94,
+      "sha256": "80362d736c352a50759cbce3bbb6a11a82877eb9734e0564b41e1de93768bcb4",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-data-lineage/SKILL.md",
+      "lines": 59,
+      "sha256": "c03d64fe10cd788d13b35b37778009f1aefbec152840b7553d8feaf971723847",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-impact-analysis/SKILL.md",
+      "lines": 61,
+      "sha256": "4c1b81fddffbe5d93db32b29494af11cfb2e5b65b0876d0afec97f5e14127b89",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-peoplecode-flow/SKILL.md",
+      "lines": 103,
+      "sha256": "4139bcce9251908a2c7bc6ce49dc721f05b381ec1ebed55ed5980231dd46ad0a",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-process-flow/SKILL.md",
+      "lines": 56,
+      "sha256": "99831b07188695b6f32dd2da4b2036ae7d8900cd7e1e09fdfe3e645639155c98",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-security-flow/SKILL.md",
+      "lines": 53,
+      "sha256": "edc9709b35b4f5f9c46198929887e3787a18572e8008a8d42e736afc1009ca36",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-sql-flow/SKILL.md",
+      "lines": 97,
+      "sha256": "5c16c94136058c8aae670258252fedeafbc530a4f1571339b76c316c472d8e78",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-sqr-flow/SKILL.md",
+      "lines": 116,
+      "sha256": "0ed4dff8255a22888e20afb5ea61be496a8282881e5c754737f0e8964b0f9c48",
+      "bom": false
+    },
+    {
+      "path": ".opencode/skills/ps-ui-flow/SKILL.md",
+      "lines": 182,
+      "sha256": "63b6a4ff4f86ced863b8881a97afe92fefb86fd5a7c571892578c47a83f31b87",
+      "bom": false
+    },
+    {
+      "path": "scripts/ps-auto-all.ps1",
+      "lines": 226,
+      "sha256": "10f07e9fada6f71ca940b0613bd0cf27cd211dff2b12606e8e4ea8f765c4d67d",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-auto-loop.ps1",
+      "lines": 1087,
+      "sha256": "f3e76d6123398c9b11b3ee778bd32d0486400c04f831a6269e1b432d583567f1",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-doc-lint.ps1",
+      "lines": 1262,
+      "sha256": "17b5233ac1dabc5bd521d3dd6bd007f2c189e514f203ddf4be6aadd85a049e54",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-fs-doctor.ps1",
+      "lines": 298,
+      "sha256": "22c4bf3e68d92fbf81d4d47505f15515e91f334fd467b14f44817c6d6fb37f81",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-graduation.ps1",
+      "lines": 191,
+      "sha256": "9c3a9c9fef85d728f619097536b9e994b050e211953112c196bf443d37d3a9ef",
+      "bom": true
+    },
+    {
+      "path": "scripts/test-elasticsearch-mcp-tools-list.ps1",
+      "lines": 59,
+      "sha256": "d0789babdb17d07bb80385fb84ca31356b0f252f431083dea80f010025147d6a",
+      "bom": false
+    },
+    {
+      "path": "scripts/test-mcp-tools-list.ps1",
+      "lines": 59,
+      "sha256": "43c074dfab7760ebca70c18580e201711231e4bb0c4c15d3daa871a6014b750d",
+      "bom": false
+    }
+  ]
+}

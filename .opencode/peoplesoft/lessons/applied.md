@@ -2444,3 +2444,21 @@
   答案在 15 個整齊的檔裡，不在推理裡；同一題連錯兩次（先漏相關物件、
   再漏兩節）都是先驗推理的鍋，都被實證校正。
 - 套用：本 commit（ps-doc-lint requiredSections 八節）。
+
+### L95 搬運完整性改用 manifest 對照——「怕漏搬」不該靠人對清單，該靠雜湊（2026-08）
+- 批次越攢越大（本批 13+ 檔），人工對照搬運清單的漏搬風險隨檔數上升，
+  且「搬到舊版」人眼根本看不出來。doctor 新增檢查 M：
+  `scripts/ps-transfer-manifest.json` 記全框架（scripts＋.opencode 全樹）
+  每檔的正規化雜湊＋行數，公司機跑 doctor 逐檔比對——漏搬／版本不符／
+  搬壞／BOM 缺全部逐檔點名，多出的未列管檔（舊檔未刪）也提示。
+- 正規化＝剝 BOM＋換行統一 LF＋裁檔尾空白後取 SHA256：GitHub Raw 複製到
+  Windows 另存造成的行尾／BOM 差異不誤報，內容差一個字就報。
+- **操作契約（維護端，不可忘）**：每批 push 前必跑
+  `pwsh scripts/ps-fs-doctor.ps1 -WriteManifest` 重生基準並隨批 commit；
+  搬運清單必含 manifest 本檔。公司機**只讀不寫**（-WriteManifest 在
+  公司機跑＝拿本地現況蓋掉基準，檢查失去意義）。
+- doctor 的 -Domain 同時改為選填：搬完檔裸跑＝只做搬運與腳本健檢
+  （M/C/D/S），加 -Domain 才驗領域目錄。
+- 原則：**核對規模一旦超過一屏，核對就要機械化**——清單是給人排程用的，
+  完整性要交給雜湊。
+- 套用：本 commit（ps-fs-doctor 檢查 M＋manifest 生成、初版 manifest 52 檔）。
