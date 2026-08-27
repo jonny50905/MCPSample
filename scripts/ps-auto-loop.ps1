@@ -492,7 +492,12 @@ function Invoke-PostSessionReconcile {
     if ($rec.Deduped -gt 0) { Write-Log "CHECKLIST 調帳（$Tag）：收斂 $($rec.Deduped) 列同文重複" }
     # D 項治理（issue #8）：調帳之後、下個 session 之前裁決 D 提案——
     # 重複列活不過這個邊界（明細 log 由治理函式自己寫）
-    $null = Invoke-DItemGovernance
+    $gov = Invoke-DItemGovernance
+    # 合法刪列記帳（L100）：治理刪提案＋去重收斂都是**外環自己**的合法
+    # 刪除，完整性守衛的基準必須同步下修——否則守衛把自家清潔工的
+    # работу當竊案報（實案：第一圈治理刪重複 D 提案 → 總數下降 →
+    # 誤判「列遺失」停機）。FixArchive 的基準重取是同款先例。
+    $rec.LegitRemoved = $rec.Deduped + $gov.Removed
     return $rec
 }
 
@@ -964,7 +969,11 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     # 確定性調帳（issue #6／L93）：先調帳再驗完整性——節標題／輪次行由本層
     # 直接重建、silent loss 列由本層直接補回；下方 L90 檢查降格為最後一道
     # assertion（調帳修不了的才會走到回滾／停機）。
-    $null = Invoke-PostSessionReconcile -PreInv $preInv -PreRound $preRound -Tag $phase
+    $recB = Invoke-PostSessionReconcile -PreInv $preInv -PreRound $preRound -Tag $phase
+    if ($recB.LegitRemoved -gt 0) {
+        $preItemTotal -= $recB.LegitRemoved
+        Write-Log "完整性基準調整：外環合法刪列 $($recB.LegitRemoved)（D 項治理／同文去重）→ 基準 $preItemTotal"
+    }
 
     # checklist 完整性（L90 分級）：每 session 必驗，反應看傷勢——
     # 節標題消失、項目數未損＝閃爍性腐蝕，下個 session 整檔重寫會自然修復
@@ -1034,7 +1043,11 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             Write-Log "手術 session 逾時強殺——一致性檢查 PASS，續跑"
         }
         elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 errorStreak）" }
-        $null = Invoke-PostSessionReconcile -PreInv $sPreInv -PreRound $preRound -Tag "surgery-$surgeryRound"
+        $recS = Invoke-PostSessionReconcile -PreInv $sPreInv -PreRound $preRound -Tag "surgery-$surgeryRound"
+        if ($recS.LegitRemoved -gt 0) {
+            $preItemTotal -= $recS.LegitRemoved
+            Write-Log "完整性基準調整（手術後）：外環合法刪列 $($recS.LegitRemoved) → 基準 $preItemTotal"
+        }
         $ci = Test-ChecklistIntegrity -PreTotal $preItemTotal
         if ($ci.Cosmetic.Count -gt 0 -and $ci.Lost.Count -eq 0) {
             foreach ($pb in $ci.Cosmetic) { Write-Log "CHECKLIST WARN（可自癒，手術第 $surgeryRound 批）：$pb" }
