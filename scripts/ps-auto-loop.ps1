@@ -501,6 +501,73 @@ function Invoke-PostSessionReconcile {
     return $rec
 }
 
+# ── 手術佇列生命週期（issue #11／L102）─────────────────────────
+# lint 永遠是「工單存在與否」的唯一真相；台帳只 overlay 生命週期
+# metadata（attempts／blocked），且每次存檔即對 lint 現況剪枝——
+# lint 已不出的工單不得被台帳「復活」。指紋＝去編號的工單文字
+# （編號隨清單縮短漂移，不是身分）。
+$surgeryLedgerPath = Join-Path $logRoot "surgery-ledger.json"
+
+function Get-OrderFingerprint {
+    param([string]$Line)
+    return (($Line -replace '^\s*\d+\.\s*', '')).Trim()
+}
+
+function Get-SurgeryLedger {
+    if (-not (Test-Path -LiteralPath $surgeryLedgerPath)) { return @{} }
+    try {
+        $j = Get-Content -LiteralPath $surgeryLedgerPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $h = @{}
+        foreach ($p in $j.PSObject.Properties) {
+            $h[$p.Name] = @{ attempts = [int]$p.Value.attempts; blocked = [bool]$p.Value.blocked }
+        }
+        return $h
+    }
+    catch { return @{} }
+}
+
+function Save-SurgeryLedger {
+    param($Ledger, [string[]]$CurrentSurgical)
+    # 剪枝：lint 已不出的工單＝已解決，metadata 一併清（lint 是唯一真相）
+    $current = @{}
+    foreach ($ln in @($CurrentSurgical)) { $current[(Get-OrderFingerprint $ln)] = $true }
+    $keep = @{}
+    foreach ($k in @($Ledger.Keys)) {
+        if ($current.ContainsKey($k)) { $keep[$k] = $Ledger[$k] }
+    }
+    $o = [ordered]@{}
+    foreach ($k in ($keep.Keys | Sort-Object)) {
+        $o[$k] = [pscustomobject]@{ attempts = $keep[$k].attempts; blocked = $keep[$k].blocked }
+    }
+    [System.IO.File]::WriteAllText($surgeryLedgerPath,
+        (ConvertTo-Json ([pscustomobject]$o) -Depth 3),
+        (New-Object System.Text.UTF8Encoding($false)))
+    return $keep
+}
+
+# 選批跳過 BLOCKED（毒丸靠邊，後方健康工單照常服務——公平性保證）
+function Select-SurgeryBatch {
+    param([string[]]$Surgical, $Ledger, [int]$Size)
+    $batch = @()
+    foreach ($ln in @($Surgical)) {
+        $fp = Get-OrderFingerprint $ln
+        if ($Ledger.ContainsKey($fp) -and $Ledger[$fp].blocked) { continue }
+        $batch += $ln
+        if ($batch.Count -ge $Size) { break }
+    }
+    return , $batch
+}
+
+function Get-ActionableSurgicalCount {
+    param([string[]]$Surgical, $Ledger)
+    $n = 0
+    foreach ($ln in @($Surgical)) {
+        $fp = Get-OrderFingerprint $ln
+        if (-not ($Ledger.ContainsKey($fp) -and $Ledger[$fp].blocked)) { $n++ }
+    }
+    return $n
+}
+
 # 自動復原（L90）：回滾整個領域目錄到上一圈快照＋清掉本圈新生的未追蹤檔
 # ——本圈作廢（含正當寫入），換一圈重來。快照只在完整性通過後才拍，
 # HEAD 恆為乾淨還原點。回 $true＝已回滾。
@@ -824,6 +891,8 @@ $timeoutStreak = 0
 $errorStreak = 0
 $noProgress = 0
 $auditStall = 0
+$drainNoProgress = 0    # 排水圈熔絲（issue #11）：連 2 圈排水無進度 → 退回正常相位
+$surgeryFailStreak = 0  # 手術 session 獨立熔絲（issue #11 P0-6）：不污染 research 的 streak
 $graduated = $false
 $gradContentHash = $null
 $gradAuditRound = 0
@@ -911,7 +980,27 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             $goResearch = ($before.Unticked -gt 0)
         }
     }
-    if ($goResearch) {
+    # ── 排水圈（issue #11／L102）：可執行手術債優先於 producer ─────────
+    # budget 用盡是 checkpoint 不是完工——債清完之前不先啟動會新增工作面的
+    # research/audit（backpressure）。BLOCKED（台帳停滯）不算可執行債；
+    # 連 2 圈排水無進度 → 退回正常相位（防排水活鎖，殘債見台帳與停機訊息）。
+    $drainCycle = $false
+    $actionableD = 0
+    if ($before.Exists -and $drainNoProgress -lt 2) {
+        $ledgerD = Get-SurgeryLedger
+        $preLint = if ($Tier -eq 1) {
+            if ($null -ne $coverBefore) { $coverBefore } else { Invoke-Lint -Coverage }
+        }
+        else { Invoke-Lint }
+        $actionableD = Get-ActionableSurgicalCount -Surgical $preLint.Surgical -Ledger $ledgerD
+        if ($actionableD -gt 0) { $drainCycle = $true }
+    }
+    if ($drainCycle) {
+        $phase = "drain"
+        Write-Log "排水圈：既存可執行手術債 $actionableD 筆——本圈跳過 producer，直接續清（checkpoint≠完工）"
+        $r = @{ TimedOut = $false; ExitCode = 0; ErrFile = $null; OutFile = $null }
+    }
+    elseif ($goResearch) {
         $phase = "research"
         $r = Invoke-Opencode -ExtraArgs '--command ps-research' -PromptText $Domain `
             -TimeoutMin $ResearchTimeoutMin -Tag "research"
@@ -1018,13 +1107,19 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     $fatalStop = $false
     $cycleRedo = $false
     $surgeryRound = 0
+    $surgeryLedger = Get-SurgeryLedger
     # 有工單就修，不綁 exit（L79）：[回灌] 型是「稽核已查到答案」的機械修復，
     # 本身不是違規——lint 可能 exit 0 卻仍有工單，綁 exit 會讓它永遠不被套用。
-    while ($lint.Surgical.Count -gt 0 -and $surgeryRound -lt $MaxSurgeryPerCycle) {
+    # 選批跳過 BLOCKED（issue #11）：毒丸靠邊，後方健康工單照常服務；
+    # 煞車改「身分尺」：舊工單有被解決才算進度（掉 A 生 D 的總數平手＝有進度）。
+    while ((Get-ActionableSurgicalCount -Surgical $lint.Surgical -Ledger $surgeryLedger) -gt 0 -and
+        $surgeryRound -lt $MaxSurgeryPerCycle) {
         $surgeryRound++
-        $beforeSurgical = $lint.Surgical.Count
-        $batch = @($lint.Surgical | Select-Object -First $SurgeryBatchSize)
-        if ($lint.Surgical.Count -gt $SurgeryBatchSize) { Write-Log "手術清單 $($lint.Surgical.Count) 筆，本批先修 $SurgeryBatchSize 筆（第 $surgeryRound/$MaxSurgeryPerCycle 批；本圈最多處理 $($SurgeryBatchSize * $MaxSurgeryPerCycle) 筆，其餘交下一圈）" }
+        $beforeSet = @{}
+        foreach ($sLn in $lint.Surgical) { $beforeSet[(Get-OrderFingerprint $sLn)] = $true }
+        $batch = Select-SurgeryBatch -Surgical $lint.Surgical -Ledger $surgeryLedger -Size $SurgeryBatchSize
+        if ($batch.Count -eq 0) { break }
+        if ($lint.Surgical.Count -gt $batch.Count) { Write-Log "手術清單 $($lint.Surgical.Count) 筆（含 BLOCKED），本批修 $($batch.Count) 筆（第 $surgeryRound/$MaxSurgeryPerCycle 批）" }
         $flat = ($batch -join "；") -replace '"', "'"
         # 禁令必要：ps-deep-research 在 checklist 全勾時會自行接跑稽核（agent 啟動
         # 規則），改寫 90-audit.md／輪次會污染本圈的畢業判定與下圈的轉移基準
@@ -1049,7 +1144,19 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             }
             Write-Log "手術 session 逾時強殺——一致性檢查 PASS，續跑"
         }
-        elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 errorStreak）" }
+        elseif ($sr.ExitCode -ne 0) { Write-Log "手術 session 非零 exit=$($sr.ExitCode)（記錄；不計入 research 的 errorStreak）" }
+        # 手術 session 獨立熔絲（issue #11 P0-6）：session 級故障（逾時／非零
+        # exit）不冤枉工單（不計 attempts）、不污染 research streak，但也不能
+        # 無聲反覆燒整個 timeout——連 2 次即停本圈手術。
+        $srHealthy = ((-not $sr.TimedOut) -and ($sr.ExitCode -eq 0))
+        if (-not $srHealthy) {
+            $surgeryFailStreak++
+            if ($surgeryFailStreak -ge 2) {
+                Write-Log "手術 session 連續 $surgeryFailStreak 次異常（逾時/非零 exit）——本圈手術停用，工單不計 attempts（session 級故障非工單故障），下一圈再試"
+                break
+            }
+        }
+        else { $surgeryFailStreak = 0 }
         $recS = Invoke-PostSessionReconcile -PreInv $sPreInv -PreRound $preRound -Tag "surgery-$surgeryRound"
         if ($recS.LegitRemoved -gt 0) {
             $preItemTotal -= $recS.LegitRemoved
@@ -1075,10 +1182,35 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         $lint2 = if ($Tier -eq 1) { Invoke-Lint -Coverage } else { Invoke-Lint }
         Write-Log "LINT(術後第 $surgeryRound 批) exit=$($lint2.Exit) 手術清單=$($lint2.Surgical.Count) 筆"
         $lint = $lint2
-        if ($lint.Surgical.Count -ge $beforeSurgical) {
-            Write-Log "本批未讓手術清單變短（$beforeSurgical → $($lint.Surgical.Count)）——停止本圈續修，交下一圈或人工處理"
+        # 身分尺進度＋attempts 記帳（issue #11 P0-3/P0-5）：
+        #   resolved＝session 前存在、session 後消失的工單數（count 平手也可能
+        #   有進度：掉 A 生 D）。只有**健康 session** 才記 attempts——批內工單
+        #   仍在＝該筆得到公平嘗試而未解，attempts≥2 → BLOCKED（跳頭、可見、
+        #   人工清單＝surgery-ledger.json；lint 一旦不出該單即自動剪枝）。
+        $afterSet = @{}
+        foreach ($sLn in $lint.Surgical) { $afterSet[(Get-OrderFingerprint $sLn)] = $true }
+        $resolved = 0
+        foreach ($k in $beforeSet.Keys) { if (-not $afterSet.ContainsKey($k)) { $resolved++ } }
+        if ($srHealthy) {
+            foreach ($bLn in $batch) {
+                $fp = Get-OrderFingerprint $bLn
+                if (-not $afterSet.ContainsKey($fp)) { continue }   # 已解，剪枝交給 Save
+                if (-not $surgeryLedger.ContainsKey($fp)) { $surgeryLedger[$fp] = @{ attempts = 0; blocked = $false } }
+                $surgeryLedger[$fp].attempts++
+                if ($surgeryLedger[$fp].attempts -ge 2 -and -not $surgeryLedger[$fp].blocked) {
+                    $surgeryLedger[$fp].blocked = $true
+                    $fpShow = $fp
+                    if ($fpShow.Length -gt 80) { $fpShow = $fpShow.Substring(0, 80) + "…" }
+                    Write-Log "手術停滯 BLOCKED（attempts=2）：$fpShow ——跳頭續修後方，人工清單見 surgery-ledger.json"
+                }
+            }
+        }
+        $surgeryLedger = Save-SurgeryLedger -Ledger $surgeryLedger -CurrentSurgical $lint.Surgical
+        if ($resolved -eq 0) {
+            Write-Log "本批零解決（身分尺：舊單消失 0 筆；總數 $($lint.Surgical.Count)）——停止本圈續修，交下一圈或台帳隔離"
             break
         }
+        Write-Log "本批解決 $resolved 筆（身分尺）"
     }
     if ($fatalStop) { break }
     if ($cycleRedo) { Write-Log "本圈作廢（腐蝕連續計數 $corruptStreak/2），下一圈重來"; continue }
@@ -1086,7 +1218,21 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     # 進度與畢業判定
     $after = Get-ChecklistState
     $gitNoteLint = "lint exit=$($lint.Exit) 工單 $($lint.Surgical.Count) 筆"
-    if ($phase -eq "audit") {
+    if ($phase -eq "drain") {
+        # 排水圈進度＝可執行債有沒有變少（身分尺）；未勾數／缺料數與本圈
+        # 無關，不得餵給 research／audit 的熔絲（issue #11 P0-7）
+        $ledgerAfterD = Get-SurgeryLedger
+        $actionableAfter = Get-ActionableSurgicalCount -Surgical $lint.Surgical -Ledger $ledgerAfterD
+        if ($actionableAfter -ge $actionableD) {
+            $drainNoProgress++
+            Write-Log "排水圈無進度（$drainNoProgress/2）：可執行債 $actionableD→$actionableAfter——達 2 退回正常相位（殘債見 surgery-ledger.json）"
+        }
+        else {
+            $drainNoProgress = 0
+            Write-Log "排水圈進度：可執行債 $actionableD→$actionableAfter"
+        }
+    }
+    elseif ($phase -eq "audit") {
         # 三層畢業門（issue #2）——外環保證「有沒有做」，內層約束「怎麼做」
         # ★ 改動本門判定＝必須 bump ps-graduation.ps1 的 GraduationGateVersion，
         #   否則舊門發的收據對新門永久有效（門邏輯不在任何 hash 覆蓋內）
@@ -1162,11 +1308,18 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             $auditStall++
             Write-Log "audit 圈零回灌且未畢業（$auditStall/2）——擋下原因見上方 GATE 行"
             if ($auditStall -ge 2) {
-                $stopReason = "audit 相位連續 2 圈零回灌未畢業（門檻擋下、無自動修復管道）——看 GATE 行與 strict-cycle*.txt 後人工處理"
+                # 停機訊息帶殘債實況（issue #11 P0-7）：只剩 BLOCKED 時要講清楚
+                # 人工要做什麼，不是一句「無自動修復管道」帶過
+                $ledgerStop = Get-SurgeryLedger
+                $blockedN = @($ledgerStop.Keys | Where-Object { $ledgerStop[$_].blocked }).Count
+                $blockedHint = ""
+                if ($blockedN -gt 0) { $blockedHint = "；另有 $blockedN 筆 BLOCKED 手術工單需人工（清單與 attempts 見 auto-loop-logs\$Domain\surgery-ledger.json，處理完刪該檔即重新放行）" }
+                $stopReason = "audit 相位連續 2 圈零回灌未畢業（門檻擋下、無自動修復管道）——看 GATE 行與 strict-cycle*.txt 後人工處理$blockedHint"
                 break
             }
         }
         $noProgress = 0
+        $drainNoProgress = 0
     }
     else {
         # 進度量測也要換尺（否則 tier 1 會被自己的成功誤殺）：
@@ -1201,6 +1354,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             if ($noProgress -ge 2) { $stopReason = "連續 2 圈無進度（$howDesc；卡住的項需人工裁決）"; break }
         }
         else { $noProgress = 0 }
+        $drainNoProgress = 0
     }
     # 每圈一個還原點（L83）：session 崩在半路是常態故障，
     # 有 commit 才敢讓它無人看管——只 commit、永不 push。
