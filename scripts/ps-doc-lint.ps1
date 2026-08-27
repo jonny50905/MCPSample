@@ -17,6 +17,10 @@ param(
     [Parameter(Mandatory = $true)][string]$Domain,
     [switch]$StrictAudit,
     [switch]$CoverageOnly,
+    # 標題正規化（L101／issue #10）：變體章節標題（**粗體**／#層級漂移／
+    # 少內部空格／尾冒號）機械改寫成正典「## X」。只修「行內容僅有標題」
+    # 且正典缺席的情況；同節多個變體＝有歧義，跳過並警告。冪等。
+    [switch]$FixHeadings,
     # 唯一會寫檔的開關（循 ps-fs-doctor -FixBom 前例）：修歸檔裡的未打勾列。
     # agent 被硬規則禁止改寫 checklist-archive*.md，理由是**模型的 write 工具
     # 沒有 append、重寫大檔會撐爆**——那是工具層限制，不是語意禁令；
@@ -399,6 +403,30 @@ if ((Test-Path -LiteralPath $overviewPath) -and $null -ne $checklistOnly) {
 # 成本（要 oracleMCP 專查）不是不適用；要補＝開明確回灌戰役，
 # 不靜默翻門檻（翻了＝15 檔瞬間全違規）。
 $requiredSections = @('## 相關物件', '## 功能定位', '## 畫面與欄位', '## 行為邏輯', '## 資料流', '## 執行方式', '## 未解事項', '## Evidence 附錄')
+# 章節錨定（L101／issue #10 P1）：行首（容忍 ≤3 前導空白）＋字面標題——
+# 內文/引文提到「## X」不再誤判為章節存在；「### X」也不再因 substring
+# 巧合通過（### 的第三個 # 對不上字面「## 」後的空格）。
+function Get-SectionAnchor {
+    param([string]$Sec)
+    return '(?m)^[ \t]{0,3}' + [regex]::Escape($Sec)
+}
+# 標題變體樣式（L101）：整行只有標題字樣（粗體/1~6 個 #/少內部空格/
+# 尾冒號/（gaps）尾註都容忍）才算變體——內文句子提到章節名不會誤中。
+$sectionLoose = @{
+    '## 相關物件'      = '相關物件'
+    '## 功能定位'      = '功能定位'
+    '## 畫面與欄位'    = '畫面與欄位'
+    '## 行為邏輯'      = '行為邏輯'
+    '## 資料流'        = '資料流'
+    '## 執行方式'      = '執行方式'
+    '## 未解事項'      = '未解事項'
+    '## Evidence 附錄' = 'Evidence[ \t]*附錄'
+}
+function Get-VariantLinePattern {
+    param([string]$Sec)
+    return '^[ \t]{0,3}(?:#{1,6}[ \t]*)?(?:\*\*)?[ \t]*' + $sectionLoose[$Sec] +
+        '[ \t]*(?:（gaps）|\(gaps\))?[ \t]*(?:\*\*)?[ \t]*[:：]?[ \t]*$'
+}
 $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 $nnNames = @()
 $truncatedIds = @()
@@ -413,6 +441,49 @@ $relinkOrders = @()      # [回灌]：90-audit.md 明細「處置」欄帶的機
 $sectionGapByFile = @{}  # [章節]（L93）：檔名 → 缺的必要章節清單——缺章節曾是
                          # 「有偵測、無執行者」的死角（16~20 實案：lint 每輪報、
                          # 工單不出、無 session 被告知，永遠不癒）
+
+# ── -FixHeadings（L101／issue #10）：變體標題確定性正規化 ─────────────
+# LLM 寫錯結構語法 → 確定性層抓到 → **確定性層修**，不再回頭叫 LLM 修
+# 語法（實案：**Evidence 附錄** 粗體標題 ×6，手術 session 看到「節明明在」
+# 無所適從，61→61 卡死隊頭）。在掃描前執行：修完才掃，輸出即修復後現況。
+if ($FixHeadings) {
+    Write-Host "=== -FixHeadings：變體章節標題正規化 ===" -ForegroundColor Cyan
+    $fhCount = 0
+    Get-ChildItem -LiteralPath $dir -Filter "*.md" |
+        Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
+        ForEach-Object {
+            $fhBytes = [System.IO.File]::ReadAllBytes($_.FullName)
+            if ($fhBytes.Length -eq 0) { return }
+            $fhBom = ($fhBytes.Length -ge 3 -and $fhBytes[0] -eq 0xEF -and $fhBytes[1] -eq 0xBB -and $fhBytes[2] -eq 0xBF)
+            $fhText = [System.Text.Encoding]::UTF8.GetString($fhBytes)
+            if ($fhText.Length -gt 0 -and [int]$fhText[0] -eq 0xFEFF) { $fhText = $fhText.Substring(1) }
+            $fhLines = @($fhText -split "`r?`n")
+            $fhChanged = $false
+            foreach ($sec in $requiredSections) {
+                if ($fhText -match (Get-SectionAnchor $sec)) { continue }   # 正典已在＝不動
+                $vp = Get-VariantLinePattern $sec
+                $hits = @()
+                for ($li = 0; $li -lt $fhLines.Count; $li++) {
+                    if ($fhLines[$li] -match $vp) { $hits += $li }
+                }
+                if ($hits.Count -eq 1) {
+                    Write-Host ("  [標題正規化] " + $_.Name + "：「" + $fhLines[$hits[0]].Trim() + "」 → 「" + $sec + "」") -ForegroundColor Yellow
+                    $fhLines[$hits[0]] = $sec
+                    $fhChanged = $true
+                    $fhCount++
+                }
+                elseif ($hits.Count -gt 1) {
+                    Write-Host ("  [跳過] " + $_.Name + "：「" + $sec + "」有 " + $hits.Count + " 個變體候選——有歧義，留人工") -ForegroundColor DarkYellow
+                }
+            }
+            if ($fhChanged) {
+                [System.IO.File]::WriteAllText($_.FullName, ($fhLines -join "`r`n"),
+                    (New-Object System.Text.UTF8Encoding($fhBom)))
+            }
+        }
+    Write-Host "=== 正規化結束：修正 $fhCount 個標題；以下為修復後現況掃描 ===" -ForegroundColor Cyan
+    Write-Host ""
+}
 
 Get-ChildItem -LiteralPath $dir -Filter "*.md" |
     Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' } |
@@ -435,7 +506,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
 
         $secMissing = @()
         foreach ($sec in $requiredSections) {
-            if ($text -notmatch [regex]::Escape($sec)) {
+            if ($text -notmatch (Get-SectionAnchor $sec)) {
                 $violations += "${name}：缺章節「$sec」"
                 $secMissing += $sec
             }
@@ -450,7 +521,8 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         # 無內容）會安靜通過；行為邏輯還有 confidence 代理間接抓到，
         # 資料流完全漏網。實案：劣化 session 寫出雙空節的空殼檔。
         foreach ($sec in @('## 行為邏輯', '## 資料流')) {
-            $secIdx = $text.IndexOf($sec)
+            $secM = [regex]::Match($text, (Get-SectionAnchor $sec))
+            $secIdx = if ($secM.Success) { $secM.Index } else { -1 }
             if ($secIdx -ge 0) {
                 $after = $text.Substring($secIdx + $sec.Length)
                 $nextIdx = $after.IndexOf("`n## ")
@@ -516,7 +588,8 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
 
         # Evidence 義務：檔案行號型（xxx:12-24 樣式）的表格列必附
         # chunk id（UUID）或標明 SQL——兩者皆無＝MISSING_CHUNK_ID
-        $evIdx = $text.IndexOf('## Evidence 附錄')
+        $evM = [regex]::Match($text, (Get-SectionAnchor '## Evidence 附錄'))
+        $evIdx = if ($evM.Success) { $evM.Index } else { -1 }
         if ($evIdx -ge 0) {
             $evText = $text.Substring($evIdx)
             # 絕對行號（L41）：讓人能直接跳到該列人工確認，不必自己搜
@@ -1254,7 +1327,7 @@ if ($FixArchive) {
             $complete = $true
             if ($nnText.ContainsKey($n)) {
                 foreach ($sec in $requiredSections) {
-                    if ($nnText[$n] -notmatch [regex]::Escape($sec)) { $complete = $false; break }
+                    if ($nnText[$n] -notmatch (Get-SectionAnchor $sec)) { $complete = $false; break }
                 }
             }
             $tick = if ($complete) { "x" } else { " " }

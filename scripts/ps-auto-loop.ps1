@@ -997,6 +997,13 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     }
     $corruptStreak = 0
 
+    # 標題正規化（L101／issue #10）：LLM 寫錯結構語法 → 確定性層修，
+    # 不再回頭叫 LLM 修語法。冪等、無變體時零寫入；在 lint 評估前跑，
+    # 「假缺章節」到不了工單。
+    $fhRaw = & $lintPath -Domain $Domain -FixHeadings *>&1 | Out-String
+    $fhN = @([regex]::Matches($fhRaw, '\[標題正規化\]')).Count
+    if ($fhN -gt 0) { Write-Log "標題正規化：確定性修正 $fhN 個變體標題" }
+
     # 每個 session 後跑 lint；FAIL 且有手術清單→自動餵修復 session。
     # **手術用的尺必須跟 tier 一致**（L70）：tier 1 用 CoverageOnly——它的工單
     # 只出缺料類（[洩漏] 型）。用基礎 lint 會讓 tier 1 燒好幾個 session 去修

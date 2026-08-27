@@ -91,7 +91,10 @@ docs/ps-research/<領域>/
    條件 UI 變異多在此）；回報含 businessRelevant UI 變異 →
    其 suggestedNext（ps-ui-flow 解析）屬深度規則，必須執行
    （oracleMCP 類，計入同時 ≤ 3）。
-2. 依 function-detail 模板寫 `NN-<物件名>.md`：
+2. 依 function-detail 模板寫 `NN-<物件名>.md`：**寫檔前必先 read
+   `.opencode/peoplesoft/report-templates/function-detail-template.md`，
+   八個章節標題逐字照抄（含 `## ` 前綴與內部空格）——標題是機器契約，
+   `**粗體**`／`###`／少空格都會被 lint 判缺章節（L101）**。
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
    有 businessRelevant 條件 UI → 檔內加「條件 UI」小節：每筆一列
