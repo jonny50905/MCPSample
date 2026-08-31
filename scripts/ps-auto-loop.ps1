@@ -510,7 +510,18 @@ $surgeryLedgerPath = Join-Path $logRoot "surgery-ledger.json"
 
 function Get-OrderFingerprint {
     param([string]$Line)
-    return (($Line -replace '^\s*\d+\.\s*', '')).Trim()
+    $t = (($Line -replace '^\s*\d+\.\s*', '')).Trim()
+    # 行號不是身分（L103）：工單文字帶「檔.md:行號」時，同檔任何其他編輯都會
+    # 使行號漂移——舊指紋消失＋新指紋出現＝幻影 resolved（假進度）、attempts
+    # 全數歸零，BLOCKED 永遠到不了（實案：15 筆卡 5 圈不動、台帳空白）。
+    # [欄位] 型的「（行 a、b、c）」清單同理剝除；「N 列」數量是真實狀態
+    # （只在實際修復或新增違規時變動），保留作為身分的一部分。
+    # 只剝**半形冒號**行號——lint 的行號一律 `檔.md:120`；全形「：」是
+    # 型別分隔符，後面可能緊跟計數（「27-TW_A.md：12 列」），吃掉它
+    # 會把不同狀態的工單合流（自己的測試抓到）。
+    $t = $t -replace '(\.md):\d+(?:-\d+)?', '$1'
+    $t = $t -replace '（行 [^）]*）', ''
+    return $t.Trim()
 }
 
 function Get-SurgeryLedger {
@@ -618,6 +629,75 @@ function Test-FsConsistency {
         }
     }
     return , $problems
+}
+
+# ── NN 檔破壞防衛（L103）─────────────────────────────────
+# session 可能整檔重寫 NN 檔並吃掉正典章節（實案：一檔被改到只剩不完整
+# 的 Evidence 附錄，靠人工 git 才救回）。checklist 有完整性檢查與調帳層，
+# NN 檔過去只有 0-byte 檢查——「有內容但被掏空」完全裸奔。
+# 快照＝位元組層（原編碼原樣還原，不經解碼再編碼）；判定只採高置信訊號：
+#   (a) session 前存在的 ## 級標題 session 後消失——規則禁刪固定節，
+#       合法操作只增不減；比對前剝（gaps）尾註與空白，FixHeadings 類
+#       的合法正規化不誤傷
+#   (b) 原檔 ≥ 40 行且行數掉到 30% 以下（節標題還在、內容被掏空）
+# 命中即還原該檔 session 前位元組——該 session 對本檔的改動作廢；工單
+# 自然還在 → attempts 記帳 → 兩次即 BLOCKED 進人工清單，不會無聲循環。
+# 90-audit.md 每輪全量重寫、checklist*.md 有自己的守備——都不在範圍。
+function Get-NnHeadKeys {
+    param([string]$Text)
+    $keys = @{}
+    foreach ($m in [regex]::Matches($Text, '(?m)^##[ \t]+(.+?)[ \t]*$')) {
+        $k = $m.Groups[1].Value -replace '（gaps）|\(gaps\)', '' -replace '\s', ''
+        if ($k -ne '') { $keys[$k] = $true }
+    }
+    return $keys
+}
+
+function Get-NnGuardSnapshot {
+    $snap = @{}
+    if (-not (Test-Path $dir)) { return $snap }
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter "*.md" -File |
+            Where-Object { $_.Name -match '^\d\d-' -and $_.Name -ne '90-audit.md' })) {
+        $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+        $text = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8
+        if ($null -eq $text) { $text = "" }
+        $snap[$f.Name] = @{
+            Bytes = $bytes
+            Heads = (Get-NnHeadKeys $text)
+            Lines = @($text -split "`n").Count
+        }
+    }
+    return $snap
+}
+
+function Invoke-NnDestructionGuard {
+    param($Snap, [string]$Tag)
+    $restored = 0
+    foreach ($name in @($Snap.Keys)) {
+        $p = Join-Path $dir $name
+        $before = $Snap[$name]
+        $reason = $null
+        if (-not (Test-Path -LiteralPath $p)) { $reason = "檔案消失" }
+        else {
+            $now = Get-Content -LiteralPath $p -Raw -Encoding UTF8
+            if ($null -eq $now) { $now = "" }
+            $nowHeads = Get-NnHeadKeys $now
+            $lost = @($before.Heads.Keys | Where-Object { -not $nowHeads.ContainsKey($_) })
+            $nowLines = @($now -split "`n").Count
+            if ($lost.Count -gt 0) {
+                $reason = "正典節消失：$($lost -join '、')（$($before.Lines)→$nowLines 行）"
+            }
+            elseif ($before.Lines -ge 40 -and $nowLines -lt [int]($before.Lines * 0.3)) {
+                $reason = "整檔掏空（$($before.Lines)→$nowLines 行，節標題雖在）"
+            }
+        }
+        if ($reason) {
+            [System.IO.File]::WriteAllBytes($p, $before.Bytes)
+            Write-Log "破壞防衛（$Tag）：$name $reason——已還原 session 前內容，該 session 對本檔改動作廢"
+            $restored++
+        }
+    }
+    return $restored
 }
 
 # ── 開一個新鮮 opencode session（逾時整樹強殺）────────────
@@ -995,6 +1075,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         $actionableD = Get-ActionableSurgicalCount -Surgical $preLint.Surgical -Ledger $ledgerD
         if ($actionableD -gt 0) { $drainCycle = $true }
     }
+    # 破壞防衛快照（L103）：producer session 前拍——drain 圈不跑 producer，
+    # 快照留給下方手術迴圈自己每批重拍
+    $nnSnap = Get-NnGuardSnapshot
     if ($drainCycle) {
         $phase = "drain"
         Write-Log "排水圈：既存可執行手術債 $actionableD 筆——本圈跳過 producer，直接續清（checkpoint≠完工）"
@@ -1014,6 +1097,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
 
     # 保險絲：逾時（強殺後先驗檔案一致性——FAIL 即停機進人工，不進下一圈）
     if ($r.TimedOut) {
+        # 破壞防衛先跑（L103）：強殺半寫的 NN 檔能確定性還原就還原，
+        # 別讓一致性檢查對「已可救回」的傷停機
+        $null = Invoke-NnDestructionGuard -Snap $nnSnap -Tag "$phase-強殺後"
         $fsProblems = Test-FsConsistency -HadChecklist $preHadChecklist -PreItemTotal $preItemTotal
         if ($fsProblems.Count -gt 0) {
             foreach ($pb in $fsProblems) { Write-Log "CONSISTENCY FAIL：$pb" }
@@ -1028,6 +1114,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         continue
     }
     $timeoutStreak = 0
+    # 破壞防衛（L103）：healthy exit 不代表沒掏空 NN 檔——實案正是正常
+    # 結束的 session 把檔改到只剩 Evidence 節；drain 圈無 producer 免驗
+    if ($phase -ne "drain") { $null = Invoke-NnDestructionGuard -Snap $nnSnap -Tag $phase }
     # 轉移快照的 after 點：緊貼 audit session 返回、在 lint／手術之前
     if ($phase -eq "audit") { $auditAfter = Get-AuditTransition }
     $sessionOk = ($r.ExitCode -eq 0)
@@ -1127,11 +1216,15 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         # 禁 peoplecode 代償、有合法終止出口（否則 B 型項目＝無限迴圈）
         # L53／L57：清單混有三種型別——prompt 必須先分流，否則洩漏型／欄位型
         # 會被套上證據型的修法（去找 chunk id）而做無解的事（L43 同族）
-        $sPrompt = "lint 修復清單逐筆處理，先看方括號型別再動手。[回灌] 型＝稽核已經查到答案（來自 90-audit.md 明細的處置欄）：**純字串替換，不要重查、不要呼叫任何檢索工具**——read 該檔，把工單所給的舊 UUID 的**所有出現處**換成新 UUID（同一 chunk 常被多列引用，漏換等於下輪再開一次單）；只用新 id 呼叫一次 get_chunks_details 驗貨，回傳 ChunkText 必須含該列原引文，不含＝抓錯 chunk，禁止硬填、該筆記收據跳過；舊 UUID 在該檔找不到＝該列已被改過或刪除，記收據跳過不要硬塞；更新行號／更新數值同理，依所給新值改該列，內容一個字都不動。[欄位] 型＝證據其實在位置欄、機器參照欄放的是標籤：**純編輯，不要重查也不要呼叫任何工具**，把可重跑的那一份（完整36字元ChunkId 或 SELECT…FROM…）搬到機器參照欄，位置欄改放 filePath:行號 或表名鍵值；證據內容一個字都不要改，改短或憑印象重打就是捏造。[洩漏] 型＝模型內部標記寫進交付物：read 該檔看標記前後整個區塊有無被截斷（表格斷半路、章節缺下半段、混進推理獨白或工具回傳原文），刪標記與所有非交付內容，補回被截斷的內容（證據照原有 chunk id 或 SQL 重取，禁止憑印象重寫）；補不回＝該段已遺失，在該檔未解事項記一行「章節因寫入脫軌遺失待重查」後停止該筆，不得編造。[章節] 型＝檔案缺必要模板章節：**補研究不是機械修**——read 該檔辨識主角物件，既有內容與既有證據全部保留；所缺章節依 function-detail 模板補寫，內容須經委派檢索取證（委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者），Evidence 附錄要完整36字元ChunkId 且逐字取自工具回傳；取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面。[證據] 型＝先判 CHUNK 或 SQL：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id，委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者之一（禁 general、explore、scout——四個MCP全封等於零工具，派過去必然轉圈到逾時；CHUNK型也禁 ps-ui-flow，它沒有ES與Source），首選查無時改派 ps-ae-flow 或 ps-metadata-flow（四工具全譜）再試一次、兩個管道都查無才算查無；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
+        $sPrompt = "lint 修復清單逐筆處理，先看方括號型別再動手。[回灌] 型＝稽核已經查到答案（來自 90-audit.md 明細的處置欄）：**純字串替換，不要重查、不要呼叫任何檢索工具**——read 該檔，把工單所給的舊 UUID 的**所有出現處**換成新 UUID（同一 chunk 常被多列引用，漏換等於下輪再開一次單）；只用新 id 呼叫一次 get_chunks_details 驗貨，回傳 ChunkText 必須含該列原引文，不含＝抓錯 chunk，禁止硬填、該筆記收據跳過；舊 UUID 在該檔找不到＝該列已被改過或刪除，記收據跳過不要硬塞；更新行號／更新數值同理，依所給新值改該列，內容一個字都不動。[欄位] 型＝證據其實在位置欄、機器參照欄放的是標籤：**純編輯，不要重查也不要呼叫任何工具**，把可重跑的那一份（完整36字元ChunkId 或 SELECT…FROM…）搬到機器參照欄，位置欄改放 filePath:行號 或表名鍵值；證據內容一個字都不要改，改短或憑印象重打就是捏造。[洩漏] 型＝模型內部標記寫進交付物：read 該檔看標記前後整個區塊有無被截斷（表格斷半路、章節缺下半段、混進推理獨白或工具回傳原文），刪標記與所有非交付內容，補回被截斷的內容（證據照原有 chunk id 或 SQL 重取，禁止憑印象重寫）；補不回＝該段已遺失，在該檔未解事項記一行「章節因寫入脫軌遺失待重查」後停止該筆，不得編造。[章節] 型＝檔案缺必要模板章節：**補研究不是機械修**——read 該檔辨識主角物件，既有內容與既有證據全部保留；所缺章節依 function-detail 模板補寫，內容須經委派檢索取證（委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者），Evidence 附錄要完整36字元ChunkId 且逐字取自工具回傳；取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面。[附錄] 型＝Evidence 附錄是裸 ChunkId 清單、不是模板表格：read 該檔並 read report-templates 的 function-detail-template.md 的 Evidence 附錄節，把附錄重建為四欄表格（表頭欄名逐字照抄模板：編號、位置、說明、機器參照），節內每個裸 ChunkId 各委派一次解引用（get_chunks_details）取得 filePath 行號與內容摘要後逐筆成列，機器參照欄放完整36字元UUID；解不了的 id 該筆移除並在該檔未解事項記一行查法收據；禁止憑印象編位置或說明，本文其他章節一字不動。[證據] 型＝先判 CHUNK 或 SQL：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id，委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者之一（禁 general、explore、scout——四個MCP全封等於零工具，派過去必然轉圈到逾時；CHUNK型也禁 ps-ui-flow，它沒有ES與Source），首選查無時改派 ps-ae-flow 或 ps-metadata-flow（四工具全譜）再試一次、兩個管道都查無才算查無；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
         # 每批手術前重拍身分快照（前批的合法改動不能算進本批的損失）
         $sPreInv = Get-ChecklistInventory
+        # 破壞防衛快照（L103）：每批重拍——前批的合法改寫是新基準
+        $sNnSnap = Get-NnGuardSnapshot
         $sr = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $sPrompt `
             -TimeoutMin $ResearchTimeoutMin -Tag "surgery"
+        # 破壞防衛（L103）：實案的「只剩 Evidence 節」正是手術路徑寫壞的
+        $null = Invoke-NnDestructionGuard -Snap $sNnSnap -Tag "surgery-第$surgeryRound批"
         # 手術 session 也在保險絲與一致性檢查的守備範圍（原本 $sr 沒人看＝
         # 強殺後半寫狀態恰好發生在唯一沒人看的路徑上）
         if ($sr.TimedOut) {
@@ -1192,8 +1285,13 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         $resolved = 0
         foreach ($k in $beforeSet.Keys) { if (-not $afterSet.ContainsKey($k)) { $resolved++ } }
         if ($srHealthy) {
+            $seenFp = @{}
             foreach ($bLn in $batch) {
                 $fp = Get-OrderFingerprint $bLn
+                # 正規化後同指紋只記一次（L103）：同檔同型多列剝行號後會合流，
+                # 不去重會一批灌兩次 attempts、首批就冤枉 BLOCKED
+                if ($seenFp.ContainsKey($fp)) { continue }
+                $seenFp[$fp] = $true
                 if (-not $afterSet.ContainsKey($fp)) { continue }   # 已解，剪枝交給 Save
                 if (-not $surgeryLedger.ContainsKey($fp)) { $surgeryLedger[$fp] = @{ attempts = 0; blocked = $false } }
                 $surgeryLedger[$fp].attempts++

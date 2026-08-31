@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "fb385e9",
+  "commit": "b3071b6",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -28,8 +28,8 @@
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 423,
-      "sha256": "0d54199858657d82e6d409445eda548ffc3a3526ffd2eb449127f86ee2cd9a58",
+      "lines": 433,
+      "sha256": "a68e3e92610da2c5f38efdb72220fc871e5048bfbd65cda887473e0a85aa3544",
       "bom": false
     },
     {
@@ -112,8 +112,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 2638,
-      "sha256": "88abeef02b2695c78e402266c54e72b1a64fbb93a0c0475251c203d93d80aab4",
+      "lines": 2683,
+      "sha256": "4bc01c5b606488b3d72171154a8ceb0228135c3ef5dbd9d12f4f900a9d0b9e4f",
       "bom": false
     },
     {
@@ -280,14 +280,14 @@
     },
     {
       "path": "scripts/ps-auto-loop.ps1",
-      "lines": 1418,
-      "sha256": "39d2d9c048f176d49ff0d2757cc84e0773792fa8b5ba623ddc81be524fb0d9f2",
+      "lines": 1516,
+      "sha256": "f8f7a5ed42368d8ec950ede4e406edc3486a574920bdf62c2e7c342a515d0422",
       "bom": true
     },
     {
       "path": "scripts/ps-doc-lint.ps1",
-      "lines": 1378,
-      "sha256": "13a987ba9fb25b7698feb820389e612977cb73397c2e4fe3f49ec60c713ef340",
+      "lines": 1422,
+      "sha256": "935a6f1ec982538b66041128f4e75f9c84e669296cca021edf03afd82ffcde78",
       "bom": true
     },
     {

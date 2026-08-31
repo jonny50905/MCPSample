@@ -438,6 +438,9 @@ $bogusIds = @()          # 非 UUID／自編樣式的 id——不可信，須重
 $failedQueryRows = @()   # 以失敗查詢當機器參照的列（SQL 型，改表名重查）
 $jsonLeaks = @()         # subagent 契約 JSON 原樣洩漏（缺料類：內容可能被截斷）
 $relinkOrders = @()      # [回灌]：90-audit.md 明細「處置」欄帶的機械修復指令
+$rawAppendix = @()       # [附錄]（L103）：Evidence 附錄是裸 ChunkId 清單、不是模板
+                         # 表格——節內逐列檢查全掛在「| 開頭的表格列」上，一列表格
+                         # 都沒有＝零檢查零違規（實案：chunks GUID1,GUID2,… 整批放行）
 $sectionGapByFile = @{}  # [章節]（L93）：檔名 → 缺的必要章節清單——缺章節曾是
                          # 「有偵測、無執行者」的死角（16~20 實案：lint 每輪報、
                          # 工單不出、無 session 被告知，永遠不癒）
@@ -605,6 +608,32 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             if ($evText -notmatch $fullUuid -and $evText -notmatch $realSelect -and
                 $evText -notmatch $pendingMark) {
                 $violations += "${name}：Evidence 附錄空白（有章節標題但無任何 chunk id／SQL 證據）"
+            }
+            # 附錄形狀（L103）：裸 ChunkId 傾倒偵測。下方逐列檢查只看「| 開頭」
+            # 的表格列——附錄若是 chunks GUID1,GUID2,… 這種清單，一列表格都沒有
+            # ＝零檢查零違規，而那不是證據是遺物：無位置無說明，稽核解不了引用。
+            # 判定（高置信）：節內有 UUID 卻無任何表格資料列，或存在表格外
+            # 單行 ≥3 個 UUID 的傾倒列。節界＝下一個 ## 標題（附錄非末節時不越界）。
+            $evNextIdx = $evText.IndexOf("`n## ")
+            $evBody = if ($evNextIdx -ge 0) { $evText.Substring(0, $evNextIdx) } else { $evText }
+            $evRealRows = 0
+            $bareUuidN = 0
+            $dumpLine = $false
+            foreach ($evBLine in ($evBody -split "`n")) {
+                if ($evBLine -match '^\s*\|') {
+                    if ($evBLine -notmatch '^\s*\|[\s:|-]+\|?\s*$' -and
+                        $evBLine -notmatch '機器參照' -and
+                        $evBLine -notmatch '^\s*\|\s*(#|編號)\s*\|') { $evRealRows++ }
+                }
+                else {
+                    $bareN = ([regex]::Matches($evBLine, $fullUuid)).Count
+                    $bareUuidN += $bareN
+                    if ($bareN -ge 3) { $dumpLine = $true }
+                }
+            }
+            if (($evRealRows -eq 0 -and $bareUuidN -gt 0) -or $dumpLine) {
+                $violations += "${name}：Evidence 附錄非模板表格（表格外裸 ChunkId $bareUuidN 筆）——無位置／說明，稽核不可解引用；依模板四欄表格重建"
+                $rawAppendix += $name
             }
             # 檔案行號樣式（L37 收緊）：冒號前必須是**含字母的檔名 token**——
             # 舊規則「任何 冒號+數字」會把時間（23:00）、比例（1:3）當行號，
@@ -1088,7 +1117,8 @@ $polishOrderCount = $truncatedIds.Count + $missingIds.Count + $misplacedRefRows.
     $bogusIds.Count + $failedQueryRows.Count
 $emitPolish = (-not $CoverageOnly)
 # [章節] 兩個 tier 都出（L93）：缺章節是缺料不是美工（CoverageOnly 本來就不降它）
-$orderTotal = $leakDelegable.Count + $relinkOrders.Count + $jsonLeaks.Count + $sectionGapByFile.Count
+# [附錄] 同理（L103）：裸 id 傾倒＝證據不可解引用＝缺料，不是排版
+$orderTotal = $leakDelegable.Count + $relinkOrders.Count + $jsonLeaks.Count + $sectionGapByFile.Count + $rawAppendix.Count
 if ($emitPolish) { $orderTotal += $polishOrderCount }
 # [回灌] 兩個 tier 都出（L79）：它不需要任何檢索（答案已在明細），而每不做
 # 一次，下一輪全量重驗就要對同一筆重付一次二次定位——與 [欄位]／[證據]
@@ -1118,6 +1148,12 @@ if ($orderTotal -gt 0) {
         $i++
         $secs = (@($sectionGapByFile[$fn]) -join '、')
         Write-Host "$i. [章節] ${fn}：缺 $secs"
+    }
+    # [附錄]（L103）：一檔一單；工單文字不帶筆數——筆數是狀態不是身分，
+    # 帶進去會讓 auto-loop 台帳指紋失穩（attempts 歸零、BLOCKED 到不了）
+    foreach ($fn in ($rawAppendix | Sort-Object)) {
+        $i++
+        Write-Host "$i. [附錄] ${fn}：Evidence 附錄非模板表格（裸 ChunkId 傾倒）"
     }
     # [欄位] 型按**檔**合併成一個任務：對調欄位是純編輯，一個檔一次改完最省
     # ——逐列開單會把 30 列變成 30 個任務，而 auto-loop 一圈只吃 7 筆（實案：
@@ -1159,6 +1195,14 @@ if ($orderTotal -gt 0) {
         Write-Host "  2) 所缺章節依 function-detail 模板補寫——內容須經委派 ps-* flow"
         Write-Host "     檢索取證（Evidence 附錄要完整 36 字元 ChunkId，逐字取自工具回傳）"
         Write-Host "  3) 取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面"
+    }
+    if ($rawAppendix.Count -gt 0) {
+        Write-Host "【附錄】型（Evidence 附錄是裸 id 清單、不是模板表格）——**重建表格不是排版**："
+        Write-Host "  1) read 該檔＋read report-templates/function-detail-template.md 的 Evidence 附錄節"
+        Write-Host "  2) 節內每個裸 ChunkId 各委派一次解引用（get_chunks_details）取 filePath＋行號"
+        Write-Host "     ＋內容摘要 → 依模板四欄表格逐筆成列（欄名逐字照抄：編號、位置、說明、機器參照）"
+        Write-Host "  3) 解不了的 id → 該筆移除、未解事項記一行查法收據；**禁止憑印象編位置／說明**"
+        Write-Host "  4) 本文其他章節一字不動"
     }
     if ($leakDelegable.Count -gt 0) {
         Write-Host "【洩漏】型（模型內部標記寫進了交付物）——**不是刪掉標記就好**："

@@ -80,7 +80,12 @@ docs/ps-research/<領域>/
 
 對每個未勾選項，**一次只處理一項**；**單次 run 至多處理 6 項**
 （含 A 項）——達 6 即停止，結束總結提示使用者開新 session 重跑
-續作（長對話尾端品質劣化＝紙上修復的溫床；checklist 自會接手進度）：
+續作（長對話尾端品質劣化＝紙上修復的溫床；checklist 自會接手進度）。
+**取項順序＝由上而下，從第一個未勾項起依序前進，禁止挑選跳項
+（L103）**——某項做不動不准繞過去做後面的：照該項型別的出口處置
+（打勾附註／改寫 D 項／FAIL 收據記未解事項）後才算前進。實案：
+一批 16 個 A 項被挑著做，中間兩項被靜默跳過——沒有出口註記的跳過
+＝該列永遠卡住，且沒人知道為什麼：
 
 1. 委派標準深度鏈（同 ps-orchestrator 的委派表與深度規則）：
    ui-flow（欄位/選項）→ peoplecode-flow（帶 Record.Field＋stored values 找邏輯）
@@ -95,6 +100,10 @@ docs/ps-research/<領域>/
    `.opencode/peoplesoft/report-templates/function-detail-template.md`，
    八個章節標題逐字照抄（含 `## ` 前綴與內部空格）——標題是機器契約，
    `**粗體**`／`###`／少空格都會被 lint 判缺章節（L101）**。
+   **Evidence 附錄不只標題義務，還有表格義務（L103）：逐字照抄模板
+   四欄表頭（# ／位置／說明／機器參照），每筆證據一列**——禁止以
+   裸 ChunkId 清單（`chunks id1,id2,…`）充當附錄：沒有位置與說明的
+   id 稽核解不了引用，lint 判 [附錄] 違規、整檔進手術單重建。
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
    有 businessRelevant 條件 UI → 檔內加「條件 UI」小節：每筆一列
@@ -148,7 +157,8 @@ docs/ps-research/<領域>/
   所在的 chunk（`CHUNK` 證據：id＋filePath＋行號）重新引用。
 - FAIL(NO_EVIDENCE_SECTION)：檔案結構殘缺（無 Evidence 附錄／缺必要
   章節）——**這不是證據修補，是定向補研究**：委派標準深度鏈針對該檔
-  主角物件補齊所缺章節（含 Evidence 附錄的完整取證）；既有正確內容
+  主角物件補齊所缺章節（含 Evidence 附錄的完整取證——**表格形式義務
+  同建檔規則，L103：四欄表格，不是裸 id 清單**）；既有正確內容
   全部保留，照 function-detail 模板章節就位後快驗再打勾。
 - **工具身分＝server 前綴＋工具名**：解引用＝
   `PeoplecodeSource_get_chunks_details`、結構＝`PeoplecodeSource_get_file_structure`、
