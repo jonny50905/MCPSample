@@ -166,6 +166,13 @@ docs/ps-research/<領域>/
   工具、不是 Source 的。`unavailable tool`（名字錯／掛錯 server／本 agent 對
   該 server 是 deny）**不是暫時故障**，重試必然再失敗。本 agent 對四個 MCP
   **全部 deny**——任何檢索一律**委派**，自己直接呼叫必得 unavailable tool。
+  **實案高頻滑倒（L103）：自己呼叫 `oracle_sql_run`／任何 oracle 字樣
+  的工具名 → unavailable tool → 反覆重試 → doom_loop 攔截**。
+  規則：unavailable tool 出現的**當下就是終局**，同名或改名**一次都
+  不准再試**；照需求型別立刻改道——SQL／metadata 需求＝委派
+  @ps-metadata-flow（或該筆走 `待人工SQL` 出口），程式碼需求＝委派
+  ps-peoplecode／sql／sqr／ae-flow。可用工具清單裡沒有的名字，
+  換幾種拼法都不會出現。
 - **查不到時的合法出口**：機器參照欄只准放三種東西——完整 36 字元
   ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。取不到證據時
   **照型別走對應出口**：SQL／metadata 型（查 DB 表——排程、權限、
