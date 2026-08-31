@@ -656,15 +656,23 @@ function Get-NnHeadKeys {
 function Get-NnGuardSnapshot {
     $snap = @{}
     if (-not (Test-Path $dir)) { return $snap }
+    # 歸檔檔也在防衛範圍（L103 追記，r60 實案：checklist-archive*.md 於
+    # session 中整檔消失——調帳層只能把列復活回「活頁」這個錯的家，
+    # 種下 88 列跨檔重複）。agent 禁改寫歸檔的硬規則給了乾淨判準：
+    # session 視窗內歸檔檔只准長大（新增歸檔檔合法）——消失或變短＝違規。
+    # FixArchive 的合法刪列跑在圈首快照之前，不誤傷。
     foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter "*.md" -File |
-            Where-Object { $_.Name -match '^\d\d-' -and $_.Name -ne '90-audit.md' })) {
+            Where-Object { ($_.Name -match '^\d\d-' -and $_.Name -ne '90-audit.md') -or
+                           $_.Name -like 'checklist-archive*' })) {
         $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
         $text = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8
         if ($null -eq $text) { $text = "" }
+        $kind = if ($f.Name -like 'checklist-archive*') { 'archive' } else { 'nn' }
         $snap[$f.Name] = @{
             Bytes = $bytes
             Heads = (Get-NnHeadKeys $text)
             Lines = @($text -split "`n").Count
+            Kind  = $kind
         }
     }
     return $snap
@@ -681,14 +689,22 @@ function Invoke-NnDestructionGuard {
         else {
             $now = Get-Content -LiteralPath $p -Raw -Encoding UTF8
             if ($null -eq $now) { $now = "" }
-            $nowHeads = Get-NnHeadKeys $now
-            $lost = @($before.Heads.Keys | Where-Object { -not $nowHeads.ContainsKey($_) })
             $nowLines = @($now -split "`n").Count
-            if ($lost.Count -gt 0) {
-                $reason = "正典節消失：$($lost -join '、')（$($before.Lines)→$nowLines 行）"
+            if ($before.Kind -eq 'archive') {
+                # 歸檔檔：session 視窗內只准長大（r60 實案）——變短即違規
+                if ($nowLines -lt $before.Lines) {
+                    $reason = "歸檔檔縮短（$($before.Lines)→$nowLines 行）——agent 禁改寫歸檔"
+                }
             }
-            elseif ($before.Lines -ge 40 -and $nowLines -lt [int]($before.Lines * 0.3)) {
-                $reason = "整檔掏空（$($before.Lines)→$nowLines 行，節標題雖在）"
+            else {
+                $nowHeads = Get-NnHeadKeys $now
+                $lost = @($before.Heads.Keys | Where-Object { -not $nowHeads.ContainsKey($_) })
+                if ($lost.Count -gt 0) {
+                    $reason = "正典節消失：$($lost -join '、')（$($before.Lines)→$nowLines 行）"
+                }
+                elseif ($before.Lines -ge 40 -and $nowLines -lt [int]($before.Lines * 0.3)) {
+                    $reason = "整檔掏空（$($before.Lines)→$nowLines 行，節標題雖在）"
+                }
             }
         }
         if ($reason) {
