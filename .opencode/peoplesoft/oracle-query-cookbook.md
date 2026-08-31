@@ -16,6 +16,12 @@
    先驗證（查不到表 / 欄位時記入 gaps，不要瞎改表名硬湊）。
 7. oracleMCP 的實際工具名（query / execute_sql…）以 OpenCode /mcp 清單為準，
    一律使用唯讀查詢工具。
+7a. **通道前置檢查（L103）**：可用工具清單裡**一個 `oracleMCP_` 前綴
+   工具都沒有**＝通道未掛（SQLcl MCP 未啟動／VS Code 端已死），
+   **不是工具名記錯、不是暫時故障、重試不會出現**。處置：**立即回報
+   FAIL(ORACLE_MCP_DOWN) 並結束本委派**——禁止猜工具名重試
+   （實案：模型自創 `oracle_sql_run` 反覆撞牆到被 doom_loop 攔截）、
+   禁止改用 ES／Source／metadata MCP 代償 SQL 證據。
 8. **查詢前欄位驗證**：要用「樣板裡沒有的
    欄位名」或不確定欄位存不存在時，先跑
    SELECT column_name FROM all_tab_columns WHERE table_name='<大寫表名>'
