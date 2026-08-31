@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "3ac8d22",
+  "commit": "26ffba1",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -28,8 +28,8 @@
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 445,
-      "sha256": "29cab66efa457df5e7df15ca8595f572dc6b83572b8da70b3026f801dafe7b8d",
+      "lines": 448,
+      "sha256": "6a3f53f5a4acdd745f4665e48236d373bb093c2db850ed969e17a66f5a964b82",
       "bom": false
     },
     {
@@ -112,8 +112,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 2693,
-      "sha256": "4fb34e1b87554dd7b6c0899e1c030cde420ed5b04f879c649da4a5e7786e04eb",
+      "lines": 2703,
+      "sha256": "f8a9f88d99ec09e7e445bb032f3f720bdff247e146ce305fe5152c0496e0100b",
       "bom": false
     },
     {
@@ -130,8 +130,8 @@
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 344,
-      "sha256": "b1b0d70f9ce041ab57e0c99cfa83c1772f754dfa23f3bf12c86e3917a12fdeff",
+      "lines": 349,
+      "sha256": "a9d2250b01254e29b8198740bd84d4ed7d903c4c3513c906c8878c69d3c6e097",
       "bom": false
     },
     {

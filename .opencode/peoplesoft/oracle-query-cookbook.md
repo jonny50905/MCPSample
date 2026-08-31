@@ -20,8 +20,13 @@
    工具都沒有**＝通道未掛（SQLcl MCP 未啟動／VS Code 端已死），
    **不是工具名記錯、不是暫時故障、重試不會出現**。處置：**立即回報
    FAIL(ORACLE_MCP_DOWN) 並結束本委派**——禁止猜工具名重試
-   （實案：模型自創 `oracle_sql_run` 反覆撞牆到被 doom_loop 攔截）、
-   禁止改用 ES／Source／metadata MCP 代償 SQL 證據。
+   （實案：模型自創 `oracle_sql_run` 反覆撞牆到被 doom_loop 攔截）。
+   **換路查可以、冒充不行**：ES／Source／metadata MCP 有等價線索
+   （程式碼、註解、metadata 定位）照常可查——但產物**只能以
+   INFERRED＋CHUNK 證據**入報告，並記「DB 實際狀態待通道恢復驗證」；
+   **不得**寫成 SQL 型證據（DB 狀態事實只有可重跑的 SELECT 驗得動，
+   chunk 只能證明程式碼怎麼寫）、不得憑它宣稱查無、
+   原 SQL 型待辦不因此視為完成。
 8. **查詢前欄位驗證**：要用「樣板裡沒有的
    欄位名」或不確定欄位存不存在時，先跑
    SELECT column_name FROM all_tab_columns WHERE table_name='<大寫表名>'
