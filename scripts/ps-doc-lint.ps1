@@ -246,6 +246,19 @@ if (Test-Path -LiteralPath $overviewPath) {
         $warnings += "00-overview.md：凍結快照已歷 $clRound 輪稽核且無換版標記——閱讀請以 checklist／NN 檔／wiki 為準；要刷新走 SOP-15 換版，換版後在檔頭引言區寫「$canonical」本提醒才會消"
     }
 }
+# 查無全量抽驗落後提示（L103，同 L54 換版落後的邏輯）：平常每輪只對
+# 查無類主張抽樣 5 個，全量重驗只在管理者手加「查無全量抽驗：待執行」
+# 旗標時發生——旗標靠人的記憶，落後程度要機械浮出。通道故障期間產生
+# 的「查無」是偽陰性高風險群：不是查了沒有，是沒查成。警告級不擋門。
+if ($null -ne $checklistOnly -and $clRound -ge 0) {
+    $msw = [regex]::Match($checklistOnly, '查無全量抽驗[：:]\s*已執行[（(]第\s*([0-9]+)\s*輪[）)]')
+    if ($msw.Success) {
+        $sweepBehind = $clRound - [int]$msw.Groups[1].Value
+        if ($sweepBehind -ge 3) {
+            $warnings += "checklist.md：查無全量抽驗上次於第 $($msw.Groups[1].Value) 輪、已落後 $sweepBehind 輪——期間若工具鏈（oracleMCP 等）曾故障，查無類主張是偽陰性高風險群；把該行改為「查無全量抽驗：待執行」讓下輪稽核全量重驗"
+        }
+    }
+}
 if (Test-Path -LiteralPath $checklistPath) {
     # checklist 模板節標題必須存在——標題整個消失＝破壞性覆寫指紋
     # （row 清空可以是合法歸檔後狀態，節標題消失不是）
