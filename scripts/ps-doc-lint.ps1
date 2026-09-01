@@ -536,8 +536,12 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             }
         }
 
-        # ChunkId 必須是 UUID（非 UUID = 捏造）
-        foreach ($m in [regex]::Matches($text, 'ChunkId\s*`?(?<id>[^`\s|]+)`?')) {
+        # ChunkId 必須是 UUID（非 UUID = 捏造）。
+        # L103：行內證據清單「**證據 ChunkIds**: `a`,`b`,`c`」是合法寫法
+        # （完整 UUID、可解引用）——舊 regex 單數導向，把 ChunkId 後面的
+        # 「s**:」捕獲成 id，整批誤判捏造進手術單（fixture 實證）。改為
+        # 消化複數 s／粗體 **／冒號後取第一個 id；逗號入排除類防清單黏連。
+        foreach ($m in [regex]::Matches($text, 'ChunkIds?(?:\*\*)?\s*[:：]?\s*`?(?<id>[^`\s|,]+)`?')) {
             $id = $m.Groups['id'].Value
             if ($id -notmatch '^[0-9A-Za-z]') {
                 # 標點開頭＝「ChunkId」被當普通名詞寫在散文裡，非 id 引用——略過
