@@ -47,6 +47,28 @@ businessDomains:
     allowDeliveredDependencies: true
     deliveredFallback: false
 
+  job_opening:
+    displayName: 職缺（Job Opening）
+    aliases:
+      - 職缺
+      - 開缺
+      - 職缺開立
+      - 徵才
+      - 求才
+      - 招募職缺
+      - Job Opening
+      - 缺額
+
+    # 政策待管理者確認（L104 之後這個欄位直接決定 Domain Gate 的判準）：
+    # 若職缺功能為全客製 → 改 CUSTOM_ONLY_ROOTS＋deliveredFallback: false
+    # （同兵役）；若建立在原生 Recruiting/TAM 模組上的客製 → 維持現值。
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true
+
   employee_name:
     displayName: 員工姓名
     aliases:
