@@ -889,6 +889,16 @@ if (Test-Path -LiteralPath $auditPath) {
                     if (Test-Path -LiteralPath $wp) { $tgtText = Get-Content $wp -Raw -Encoding UTF8 }
                 }
                 if ($tgtText -and $tgtText.IndexOf($newId, [StringComparison]::OrdinalIgnoreCase) -ge 0) { continue }
+                # L103：舊 id 也不在目標檔＝工單陳舊（檔案已重建／該列已刪）
+                # ——換無可換，開單只會讓 session 收據跳過、attempts 空轉到
+                # BLOCKED（實案：重建後的 NN 檔連吃多圈換 id 工單）。壓下並
+                # 點名；90-audit 下輪全量重寫時自然刷新。pair 仍餵 wiki 掃描
+                # （舊 id 可能還活在 wiki sources）。
+                if ($null -eq $tgtText -or $tgtText.IndexOf($mR.Groups['old'].Value, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                    $warnings += "[回灌] 陳舊工單壓下：$target 已無舊 id $($mR.Groups['old'].Value)（檔案疑似已重建或該列已刪）——下輪稽核重寫明細即自然刷新"
+                    $relinkPairs += , @($mR.Groups['old'].Value, $newId)
+                    continue
+                }
                 $ord = "換 id $($mR.Groups['old'].Value) → $newId"
                 $relinkPairs += , @($mR.Groups['old'].Value, $newId)
             }
@@ -1217,6 +1227,9 @@ if ($orderTotal -gt 0) {
         Write-Host "  2) 所缺章節依 function-detail 模板補寫——內容須經委派 ps-* flow"
         Write-Host "     檢索取證（Evidence 附錄要完整 36 字元 ChunkId，逐字取自工具回傳）"
         Write-Host "  3) 取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面"
+        Write-Host "  4) 該節對物件型別**不適用**（如 Function Library 無使用者畫面 → 畫面與欄位）"
+        Write-Host "     → 章節標題仍要就位，內文寫「（無——<一句原因>）」——標題是機器契約，"
+        Write-Host "       誠實申報不適用即合格；**只有標題缺席才是違規**，禁止為湊內容編造"
     }
     if ($rawAppendix.Count -gt 0) {
         Write-Host "【附錄】型（Evidence 附錄是裸 id 清單、不是模板表格）——**重建表格不是排版**："

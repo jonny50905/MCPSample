@@ -481,6 +481,37 @@ function Invoke-DItemGovernance {
     return $result
 }
 
+# 跨檔同文去重（L103 追記二）：「歸檔＝搬移」的刪活頁半步由外環保證。
+# 模型抄不搬已成慣性（88 列清完又生 11 列）——照 L101 哲學：誰能保證
+# 做對誰修。只動**已勾**的活頁列（已完成列的家在歸檔）；活頁未勾×
+# 歸檔已存＝「重開 vs 誤歸檔」歧義，留人工。刪除量進 LegitRemoved
+# 記帳（L100），完整性守衛不誤報。
+function Invoke-ArchiveDedup {
+    $clPath = Join-Path $dir "checklist.md"
+    if (-not (Test-Path -LiteralPath $clPath)) { return 0 }
+    $arc = @{}
+    foreach ($af in @(Get-ChildItem -LiteralPath $dir -Filter "checklist-archive*.md" -File -ErrorAction SilentlyContinue)) {
+        $t = Get-Content -LiteralPath $af.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($t)) { continue }
+        foreach ($m in [regex]::Matches($t, '(?m)^\s*-\s*\[[ xX]\]\s*(.+?)\s*$')) { $arc[$m.Groups[1].Value] = $true }
+    }
+    if ($arc.Count -eq 0) { return 0 }
+    $raw = Get-Content -LiteralPath $clPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($raw)) { return 0 }
+    $removed = 0
+    $keep = @()
+    foreach ($ln in ($raw -split "`r?`n")) {
+        $m = [regex]::Match($ln, '^\s*-\s*\[[xX]\]\s*(.+?)\s*$')
+        if ($m.Success -and $arc.ContainsKey($m.Groups[1].Value)) { $removed++; continue }
+        $keep += $ln
+    }
+    if ($removed -gt 0) {
+        [System.IO.File]::WriteAllText($clPath, ($keep -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+        Write-Log "跨檔同文去重：活頁已勾且歸檔已存 $removed 列——外環補完「搬移」的刪活頁半步"
+    }
+    return $removed
+}
+
 # 統一調帳邊界（P0-4）：任何 session 之後都走這裡——log 有跡可查
 function Invoke-PostSessionReconcile {
     param([hashtable]$PreInv, [int]$PreRound, [string]$Tag)
@@ -497,7 +528,8 @@ function Invoke-PostSessionReconcile {
     # 刪除，完整性守衛的基準必須同步下修——否則守衛把自家清潔工的
     # работу當竊案報（實案：第一圈治理刪重複 D 提案 → 總數下降 →
     # 誤判「列遺失」停機）。FixArchive 的基準重取是同款先例。
-    $rec.LegitRemoved = $rec.Deduped + $gov.Removed
+    $adx = Invoke-ArchiveDedup
+    $rec.LegitRemoved = $rec.Deduped + $gov.Removed + $adx
     return $rec
 }
 
@@ -1232,7 +1264,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         # 禁 peoplecode 代償、有合法終止出口（否則 B 型項目＝無限迴圈）
         # L53／L57：清單混有三種型別——prompt 必須先分流，否則洩漏型／欄位型
         # 會被套上證據型的修法（去找 chunk id）而做無解的事（L43 同族）
-        $sPrompt = "lint 修復清單逐筆處理，先看方括號型別再動手。[回灌] 型＝稽核已經查到答案（來自 90-audit.md 明細的處置欄）：**純字串替換，不要重查、不要呼叫任何檢索工具**——read 該檔，把工單所給的舊 UUID 的**所有出現處**換成新 UUID（同一 chunk 常被多列引用，漏換等於下輪再開一次單）；只用新 id 呼叫一次 get_chunks_details 驗貨，回傳 ChunkText 必須含該列原引文，不含＝抓錯 chunk，禁止硬填、該筆記收據跳過；舊 UUID 在該檔找不到＝該列已被改過或刪除，記收據跳過不要硬塞；更新行號／更新數值同理，依所給新值改該列，內容一個字都不動。[欄位] 型＝證據其實在位置欄、機器參照欄放的是標籤：**純編輯，不要重查也不要呼叫任何工具**，把可重跑的那一份（完整36字元ChunkId 或 SELECT…FROM…）搬到機器參照欄，位置欄改放 filePath:行號 或表名鍵值；證據內容一個字都不要改，改短或憑印象重打就是捏造。[洩漏] 型＝模型內部標記寫進交付物：read 該檔看標記前後整個區塊有無被截斷（表格斷半路、章節缺下半段、混進推理獨白或工具回傳原文），刪標記與所有非交付內容，補回被截斷的內容（證據照原有 chunk id 或 SQL 重取，禁止憑印象重寫）；補不回＝該段已遺失，在該檔未解事項記一行「章節因寫入脫軌遺失待重查」後停止該筆，不得編造。[章節] 型＝檔案缺必要模板章節：**補研究不是機械修**——read 該檔辨識主角物件，既有內容與既有證據全部保留；所缺章節依 function-detail 模板補寫，內容須經委派檢索取證（委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者），Evidence 附錄要完整36字元ChunkId 且逐字取自工具回傳；取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面。[附錄] 型＝Evidence 附錄是裸 ChunkId 清單、不是模板表格：read 該檔並 read report-templates 的 function-detail-template.md 的 Evidence 附錄節，把附錄重建為四欄表格（表頭欄名逐字照抄模板：編號、位置、說明、機器參照），節內每個裸 ChunkId 各委派一次解引用（get_chunks_details）取得 filePath 行號與內容摘要後逐筆成列，機器參照欄放完整36字元UUID；解不了的 id 該筆移除並在該檔未解事項記一行查法收據；禁止憑印象編位置或說明，本文其他章節一字不動。[證據] 型＝先判 CHUNK 或 SQL：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id，委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者之一（禁 general、explore、scout——四個MCP全封等於零工具，派過去必然轉圈到逾時；CHUNK型也禁 ps-ui-flow，它沒有ES與Source），首選查無時改派 ps-ae-flow 或 ps-metadata-flow（四工具全譜）再試一次、兩個管道都查無才算查無；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
+        $sPrompt = "lint 修復清單逐筆處理，先看方括號型別再動手。[回灌] 型＝稽核已經查到答案（來自 90-audit.md 明細的處置欄）：**純字串替換，不要重查、不要呼叫任何檢索工具**——read 該檔，把工單所給的舊 UUID 的**所有出現處**換成新 UUID（同一 chunk 常被多列引用，漏換等於下輪再開一次單）；只用新 id 呼叫一次 get_chunks_details 驗貨，回傳 ChunkText 必須含該列原引文，不含＝抓錯 chunk，禁止硬填、該筆記收據跳過；舊 UUID 在該檔找不到＝該列已被改過或刪除，記收據跳過不要硬塞；更新行號／更新數值同理，依所給新值改該列，內容一個字都不動。[欄位] 型＝證據其實在位置欄、機器參照欄放的是標籤：**純編輯，不要重查也不要呼叫任何工具**，把可重跑的那一份（完整36字元ChunkId 或 SELECT…FROM…）搬到機器參照欄，位置欄改放 filePath:行號 或表名鍵值；證據內容一個字都不要改，改短或憑印象重打就是捏造。[洩漏] 型＝模型內部標記寫進交付物：read 該檔看標記前後整個區塊有無被截斷（表格斷半路、章節缺下半段、混進推理獨白或工具回傳原文），刪標記與所有非交付內容，補回被截斷的內容（證據照原有 chunk id 或 SQL 重取，禁止憑印象重寫）；補不回＝該段已遺失，在該檔未解事項記一行「章節因寫入脫軌遺失待重查」後停止該筆，不得編造。[章節] 型＝檔案缺必要模板章節：**補研究不是機械修**——read 該檔辨識主角物件，既有內容與既有證據全部保留；所缺章節依 function-detail 模板補寫，內容須經委派檢索取證（委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者），Evidence 附錄要完整36字元ChunkId 且逐字取自工具回傳；取證不到的節照實寫「查無＋查法收據」進未解事項，不得編造充版面；該節對物件型別不適用時（如 Function Library 無使用者畫面之於畫面與欄位）＝章節標題仍要就位、內文寫（無——一句原因），誠實申報不適用即合格，只有標題缺席才是違規，禁止為湊內容編造畫面。[附錄] 型＝Evidence 附錄是裸 ChunkId 清單、不是模板表格：read 該檔並 read report-templates 的 function-detail-template.md 的 Evidence 附錄節，把附錄重建為四欄表格（表頭欄名逐字照抄模板：編號、位置、說明、機器參照），節內每個裸 ChunkId 各委派一次解引用（get_chunks_details）取得 filePath 行號與內容摘要後逐筆成列，機器參照欄放完整36字元UUID；解不了的 id 該筆移除並在該檔未解事項記一行查法收據；禁止憑印象編位置或說明，本文其他章節一字不動。[證據] 型＝先判 CHUNK 或 SQL：CHUNK 型（程式碼）＝filePath 重取、驗貨（回傳須含原引文）、只補完整36字元id，委派對象限 ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-ae-flow／ps-metadata-flow 五者之一（禁 general、explore、scout——四個MCP全封等於零工具，派過去必然轉圈到逾時；CHUNK型也禁 ps-ui-flow，它沒有ES與Source），首選查無時改派 ps-ae-flow 或 ps-metadata-flow（四工具全譜）再試一次、兩個管道都查無才算查無；SQL／metadata 型（DB 表如 PSPRCSRQST）＝委派具 oracleMCP 權限的 flow（ps-metadata-flow 等）照 cookbook 重查、機器參照改寫成 SQL：SELECT…、你自己沒有 SQL 工具是圍堵設計、禁止改查 peoplecode 代償；皆不可得＝該筆輸出收據「舊值 → 待人工SQL」或「移除入gaps」後停止該筆。每筆附收據；只准修改清單所列檔案，禁止修改 checklist.md 與 90-audit.md，禁止執行稽核：$flat"
         # 每批手術前重拍身分快照（前批的合法改動不能算進本批的損失）
         $sPreInv = Get-ChecklistInventory
         # 破壞防衛快照（L103）：每批重拍——前批的合法改寫是新基準

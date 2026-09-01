@@ -25,6 +25,10 @@
 
 <動態 label / 動態選項標 DYNAMIC_RUNTIME 並附 evidence。>
 
+<!-- 物件無畫面（Function Library 等）：標題保留，內文寫
+     「（無——Function Library，無使用者畫面）」——不適用要申報，
+     不能省略標題（標題是機器契約，L103）。 -->
+
 ## 行為邏輯
 
 <條件 → 動作，逐項標信心等級：>
