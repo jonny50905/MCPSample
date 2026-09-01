@@ -49,6 +49,11 @@ param(
     # 一批塞幾筆工單（L70）：原本硬編碼 7——44 筆工單＝7 批，一圈只給 3 批，
     # 要 3 圈才清得完，而圈 2／圈 3 的前置 session 對清工單零貢獻。
     [int]$SurgeryBatchSize = 7,
+    # Domain Gate 保險絲（issue #12／L104）：單輪稽核新增 D 項超過此數＝
+    # 疑似 scope creep（共用表反查沿依賴圖外擴）——停機要求人工 scope
+    # review。數量上限只是熔絲，不是 Domain Gate 的替代品（gate 在稽核
+    # 契約：DOMAIN_ROOT 才准成 D）。
+    [int]$MaxNewDPerAudit = 10,
     # 逾時＝熔絲不是效能參數，照實測基線設（L48）：research 曾在 30 分上限被
     # 強殺（＝上限訂太緊，把健康的 session 砍掉），放寬到 60 分後未再撞上限。
     # 注意手術 session 沿用 ResearchTimeoutMin，改這個值等於同步放寬手術上限；
@@ -510,6 +515,53 @@ function Invoke-ArchiveDedup {
         Write-Log "跨檔同文去重：活頁已勾且歸檔已存 $removed 列——外環補完「搬移」的刪活頁半步"
     }
     return $removed
+}
+
+# 歸檔所有權在外環（issue #13／L105）：模型只維護 checklist 列狀態與
+# 輪次行；「已勾列 → checklist-archive-r<N>.md」的搬移由本函式單一負責。
+# 順序＝先寫 archive、寫後逐列驗證、驗證全過才刪活頁——驗證失敗活頁
+# 不動（舊態完整）；兩寫之間的崩潰窗留下跨檔重複，由 Invoke-ArchiveDedup
+# 在下個調帳邊界確定性收斂——不需 journal 即達成「終態收斂」。
+# 同輪重跑＝讀舊檔合併寫（外環沒有模型 write 的大檔限制；-FixArchive 同
+# 先例）。搬移對 Get-ItemTotal 總數中性（兩檔合併計數），不動完整性基準。
+function Invoke-ChecklistArchiveCommit {
+    $clPath = Join-Path $dir "checklist.md"
+    if (-not (Test-Path -LiteralPath $clPath)) { return 0 }
+    $raw = Get-Content -LiteralPath $clPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($raw)) { return 0 }
+    $mRound = [regex]::Match($raw, '稽核輪次[：:]\s*([0-9]+)')
+    if (-not $mRound.Success) { return 0 }
+    $round = [int]$mRound.Groups[1].Value
+    $ticked = @()
+    $keep = @()
+    foreach ($ln in ($raw -split "`r?`n")) {
+        if ($ln -match '^\s*-\s*\[[xX]\]\s*\S') { $ticked += $ln.TrimEnd() } else { $keep += $ln }
+    }
+    if ($ticked.Count -eq 0) { return 0 }
+    $arPath = Join-Path $dir ("checklist-archive-r{0}.md" -f $round)
+    $have = @{}
+    $existing = @()
+    if (Test-Path -LiteralPath $arPath) {
+        foreach ($el in @(Get-Content -LiteralPath $arPath -Encoding UTF8)) {
+            $existing += $el
+            $t = ([string]$el).Trim(); if ($t -ne '') { $have[$t] = $true }
+        }
+    }
+    $add = @($ticked | Where-Object { -not $have.ContainsKey($_.Trim()) })
+    $arOut = @($existing) + $add
+    [System.IO.File]::WriteAllText($arPath, ((($arOut | Where-Object { $null -ne $_ }) -join "`r`n").TrimEnd() + "`r`n"),
+        (New-Object System.Text.UTF8Encoding($true)))
+    $check = Get-Content -LiteralPath $arPath -Raw -Encoding UTF8
+    foreach ($t in $ticked) {
+        if ($check.IndexOf($t.Trim()) -lt 0) {
+            Write-Log "歸檔 commit 驗證失敗：「$($t.Trim().Substring(0, [Math]::Min(40, $t.Trim().Length)))…」未落檔——活頁不動（舊態完整），下邊界重試"
+            return 0
+        }
+    }
+    [System.IO.File]::WriteAllText($clPath, ($keep -join "`r`n"),
+        (New-Object System.Text.UTF8Encoding($true)))
+    Write-Log "歸檔 commit（外環）：$($ticked.Count) 列已勾 → checklist-archive-r$round.md（寫後驗證通過，活頁同步刪除）"
+    return $ticked.Count
 }
 
 # 統一調帳邊界（P0-4）：任何 session 之後都走這裡——log 有跡可查
@@ -1014,6 +1066,9 @@ if (-not $mutexHeld) {
 
 # ── 主迴圈 ──────────────────────────────────────────────────
 Write-Log "=== auto-loop 啟動：領域=$Domain MaxCycles=$MaxCycles Model=$(if($Model){$Model}else{'(全域預設)'}) ==="
+# 啟動即結清歸檔（issue #13）：人工跑過 /ps-audit 的殘留已勾列在此搬進
+# archive——外環是唯一歸檔者，不分列是誰打的勾
+$null = Invoke-ChecklistArchiveCommit
 $corruptStreak = 0
 $timeoutStreak = 0
 $errorStreak = 0
@@ -1222,6 +1277,26 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         break
     }
     $corruptStreak = 0
+
+    if ($phase -eq "audit") {
+        # 歸檔 commit（issue #13／L105）：稽核 session 只遞增輪次與打勾，
+        # 已勾列的搬移在這裡由外環單一執行
+        $null = Invoke-ChecklistArchiveCommit
+        # Domain Gate 保險絲（issue #12／L104）：本輪新增未勾 D 項計數——
+        # 超限＝疑似共用表反查外擴，停機交人工 scope review。
+        # 上限是熔絲不是 gate：gate 在稽核契約（DOMAIN_ROOT 才准成 D）。
+        $postInvD = Get-ChecklistInventory
+        $newD = 0
+        foreach ($k in $postInvD.Keys) {
+            if ($k -notmatch '^wo:D') { continue }
+            if ($null -ne $preInv -and $preInv.ContainsKey($k)) { continue }
+            if ($postInvD[$k].Raw -match '^\s*-\s*\[ \]') { $newD++ }
+        }
+        if ($newD -gt $MaxNewDPerAudit) {
+            $stopReason = "本輪稽核新增 D 項 $newD 筆 > 上限 $MaxNewDPerAudit（-MaxNewDPerAudit）——疑似 scope creep（共用表反查沿依賴圖外擴）。人工 scope review 未勾 D 提案：域根留、依附／域外整列刪，確認後再啟動"
+            break
+        }
+    }
 
     # 標題正規化（L101／issue #10）：LLM 寫錯結構語法 → 確定性層修，
     # 不再回頭叫 LLM 修語法。冪等、無變體時零寫入；在 lint 評估前跑，

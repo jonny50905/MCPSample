@@ -169,6 +169,12 @@ PeoplecodeMetadata **只吃欄位名／Component 關鍵字**——以 Record 反
 時，帶該表的**關鍵欄位名**進 `find_field_usage`，不得帶 Record 名或
 Page 名（帶錯必查空，屬方法錯誤）。任一角度**查無 ≠ 不存在**
 （自製索引不保證完整）；列入疑似遺漏前至少兩個角度交叉。
+**回傳不是裸名單（issue #12／L104）**：每個候選附可判定域界的脈絡
+——物件型別、經由哪張表反查到、讀寫方向、origin 訊號（依
+customization-profile 的分類：名稱符合客製 prefix＝CUSTOM_PREFIX，
+判不出＝UNKNOWN，不用額外查證）。**你不做 Domain Gate**（域界判定
+是委派方的事）——你的職責是讓委派方**判得動**：「兩個來源證明碰到
+核心表」只證明引用存在，不證明屬於本業務領域。
 
 ## 回報格式（最終輸出只有這份 JSON）
 
@@ -185,7 +191,12 @@ Page 名（帶錯必查空，屬方法錯誤）。任一角度**查無 ≠ 不�
   "claims": [
     { "claim": "<原文一句>", "verdict": "DISPUTED", "reason": "chunk 內無此條件" }
   ],
-  "discoveredObjects": ["<任務 C 用：物件名清單>"],
+  "discoveredObjects": [
+    { "name": "<物件名>", "type": "<Component|Page|Record|AE|SQR|...>",
+      "viaTable": "<經由哪張核心表反查到>",
+      "direction": "<READ|WRITE|BOTH|UNKNOWN>",
+      "origin": "<CUSTOM_PREFIX|CUSTOM_REGISTRY|MODIFIED_DELIVERED|DELIVERED|UNKNOWN>" }
+  ],
   "gaps": ["<UNVERIFIABLE 的原因彙整>"]
 }
 ```

@@ -285,7 +285,28 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    `- [ ] D<本輪輪次>-<序號> 新發現 <物件名>：<一句來源>（稽核）`
    ——**遺漏候選不得寫成 A 項**（A 項處理假設檔案已存在、且無模板
    義務，拿它建檔＝天生缺章節）。
-   **生成前逐物件查重（L96）**：該物件已有任何 D 列（勾或未勾）、
+   **生成前先過 Domain Gate（issue #12／L104）——「引用核心表」不是
+   「屬於本領域」**：共用表天然被全系統讀寫，反查候選沿依賴圖外擴
+   ＝scope creep（實案：單領域 NN 檔失控長到 85）。對任務 C 每個
+   候選（含 type／viaTable／direction／origin 脈絡），依
+   business-domain-map.yaml 本領域政策三分：
+   · **DOMAIN_ROOT**（唯一准成 D 項的類）：具本領域業務證據——命中
+     aliases／UI・選單・Component 描述可證屬本業務流程／從既有 root
+     有明確業務 call path，**且** origin 符合 rootObjectPolicy
+     （CUSTOM_ONLY_ROOTS 領域只有 CUSTOM_PREFIX／CUSTOM_REGISTRY
+     可為 root）。
+   · **DEPENDENCY**：被本領域 root 使用的共用／delivered／技術依附
+     ——記進引用它的 NN 檔「相關物件」表與 90-audit 完整性節
+     「依附物件」行，**不建 D、不建 NN**。
+     `allowDeliveredDependencies: true` 只表示「可作依附」，
+     **不得解讀成可升格 root**。
+   · **OUT_OF_SCOPE**：僅因共用表／泛用框架被反查到——90-audit
+     完整性節記一行（物件＋一句排除理由），不建 D。
+   判不準（UNKNOWN origin 又無業務證據）＝**不建 D**，寫進 90-audit
+   完整性節待人工裁決——**寧漏勿擴**（漏的下輪反查還會出現，
+   擴出去的要人工清）。外環另有單輪新 D 熔絲（超限即停機）——
+   熔絲被觸發＝你的 gate 失守，不是配額。
+   **通過 gate 後逐物件查重（L96）**：該物件已有任何 D 列（勾或未勾）、
    或已有對應 NN 檔 → 不生成；本輪序號連續且唯一，**禁止重號**
    （各任務 C 批次的結果先聯集去重再編號，不得逐批各自編）。
    **A 項（修既有檔）**＝**任何非 PASS／
@@ -299,18 +320,17 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    ——**禁止逐筆開項**。寫入時同步做三件事：
    (a) 輪次行更新為「稽核輪次：N+1」——90-audit.md 表頭的稽核輪次
    必須寫同一個 N+1；
-   (b) **歸檔（每輪寫新檔）**：把所有**已打勾**項目（原樣含 ⚠ 註記）
-   寫成**新檔** `checklist-archive-r<N+1>.md`（單次小 write）。
-   checklist.md 可移除的**只有**已搬進本輪 archive 的已勾列；
+   (b) **歸檔所有權在外環（issue #13／L105）**：你**不建立、不讀、
+   不改**任何 `checklist-archive*.md`——auto-loop 會在本 session 結束後
+   把所有已勾列確定性搬進 `checklist-archive-r<N+1>.md`（先寫後驗、
+   驗過才刪活頁、崩潰窗自癒）。你只維護 checklist.md：列的勾選
+   狀態、輪次行、新 A／U／D 列。
    固定結構節點——檔頭標題、「稽核輪次：N」行、旗標行、
    `## 調查進度` 與 `## Gaps 彙整` 節標題及 Gaps 內容——
    **任何情況不得刪除**（節標題不是裝飾，是狀態檔的骨架；L93）。
-   **歸檔是搬移不是複製**：寫進 archive 的每一列都要從 checklist.md 移除。
    **只有調查項、A 項、U 項（條件UI回灌）與 D 項（新發現）可以是
    checklist 列**——任務 A／B／C 的委派切分、批次編號寫 log.md，
-   不得寫成 checklist 列、不得歸檔。
-   **禁止 read 或改寫任何既有 checklist-archive*.md**——每輪只寫
-   一個新檔；archive 永不回讀進 context；
+   不得寫成 checklist 列；
    (c) 旗標行「查無全量抽驗：待執行」（若有）改為
    「查無全量抽驗：已執行（第 N+1 輪）」——翻旗標，下輪不再全量。
 4. **後寫記分卡**：依 `.opencode/peoplesoft/report-templates/audit-template.md`

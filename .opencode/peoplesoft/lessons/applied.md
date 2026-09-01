@@ -2718,3 +2718,60 @@
 - 套用：本 commit（auto-loop 指紋正規化＋記帳去重＋破壞防衛三掛點＋
   手術 prompt [附錄] 型；lint [附錄] 守衛＋工單＋修法說明；
   deep-research 取項順序＋表格義務；測試 20~22）。
+
+### L104 反查是候選產生器，不是域界判定器——Domain Gate（2026-09）
+- 症狀（外部協作者 issue #12，逐條對碼成立）：單領域 NN 檔失控長到
+  85 且持續增加。根因鏈：任務 C 從核心表反查讀寫物件 → 回傳**裸
+  物件名清單**（無型別／經由表／方向／origin）→ 委派方對候選唯一的
+  過濾是**查重** → 「兩個來源證明碰到核心表」被實作成「屬於本領域，
+  建 NN」。共用表（JOB 類）天然被全系統讀寫，反查沿依賴圖外擴：
+  root → 共用表 → 其他流程 → 更多依賴——**收斂論在共用表面前不成立**
+  （此前對「覆蓋 vs 新發現」矛盾的收斂解釋因此修正）。
+- 最誅心的一刀：domain policy **早就存在**——business-domain-map 的
+  rootObjectPolicy（CUSTOM_ONLY_ROOTS＝原生僅能列 DEPENDENCY）在
+  階段一盤點用過，任務 C 路徑完全繞過它。不是缺規則，是**有一條路
+  不經過規則**。
+- 落點：
+  1. auditor 任務 C 回傳結構化候選（name／type／viaTable／direction／
+     origin）——「你不做 gate，你的職責是讓委派方判得動」；
+  2. 稽核契約 D 項生成前三分（Domain Gate）：DOMAIN_ROOT（業務證據
+     ＋origin 符合 rootObjectPolicy）才准成 D；DEPENDENCY 記 NN
+     相關物件表＋90-audit，不建檔；OUT_OF_SCOPE 記 90-audit；
+     判不準＝不建 D 待人工——**寧漏勿擴**（漏的下輪還會出現，
+     擴的要人工清）；`allowDeliveredDependencies` 只授權作依附，
+     不授權升格 root；
+  3. 外環熔絲 -MaxNewDPerAudit（預設 10）：單輪新 D 超限＝gate 失守
+     訊號，停機交人工 scope review——**上限是熔絲，不是 gate 的
+     替代品**（協作者明文列在「不接受的修法」，同意）。
+- 原則：**產生器與判定器是兩個職位**——反查證明「引用存在」，
+  只有政策證明「屬於領域」。任何「候選 → 正式身分」的升格點都要有
+  明確的 gate，沒有 gate 的升格點＝scope creep 的入口。
+- 套用：本 commit（auditor 結構化候選；deep-research／ps-audit
+  Domain Gate；auto-loop -MaxNewDPerAudit 熔絲）。
+
+### L105 durable state 的搬移不能交給機率性 writer——歸檔外環化（2026-09）
+- 症狀（外部協作者 issue #13，逐條對碼成立）：歸檔要求模型做
+  「寫新 archive＋從 checklist 刪除＋輪次遞增」三個獨立 write，
+  之間沒有任何 transaction 邊界。失效矩陣全部發生過：archive 整檔
+  消失（r60）、抄不搬跨檔重複（88→11 列）、輪次錯亂（r61 內容
+  標 61 卻於 62 歸檔）。既有守衛（完整性／調帳／破壞防衛／
+  ArchiveDedup）全是**事後修補**，中間態本身一直合法可見；
+  session 中新建的 archive 更不受 pre-session 快照保護。
+- 落點：**歸檔所有權整個移交外環**——模型只維護 checklist（勾選、
+  輪次行、新列），Invoke-ChecklistArchiveCommit 是唯一歸檔者：
+  先寫 archive → 寫後逐列驗證 → 全過才刪活頁（驗證失敗＝活頁不動
+  ＝舊態完整）；同輪重跑合併寫；audit 相位後＋loop 啟動時各結清
+  一次（啟動結清承接人工 /ps-audit 的殘留）。
+- 與 issue #13 的一處簡化（有意為之）：不做 .tmp／journal 全套
+  transaction——兩個單次 WriteAllText 之間的崩潰窗只留下「跨檔
+  重複」一種中間態，而 ArchiveDedup 在下個調帳邊界確定性收斂它。
+  **不變量靠「終態收斂」達成，不靠原子性**：確定性 writer 的崩潰
+  窗以秒計，收斂保證比 journal 協定便宜一個數量級且測得動。
+  ArchiveDedup／FixArchive 自此降級為 crash recovery（協作者建議的
+  終態定位，同意）——正常路徑若仍頻繁出現跨檔重複＝commit 有 bug。
+- 原則：L96 說「LLM 可以提出狀態變更，不能當 transaction manager」
+  ——當時只管到 checklist 的列，本課補完：**同一原則適用於每一份
+  durable state 與它們之間的搬移**。凡「A 檔刪、B 檔加」的跨檔
+  語義，寫入方必須是能保證順序與驗證的確定性層。
+- 套用：本 commit（Invoke-ChecklistArchiveCommit＋audit 相位／啟動
+  掛點；deep-research／ps-audit 歸檔段改所有權宣告；測試情境 24）。
