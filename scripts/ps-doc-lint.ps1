@@ -556,6 +556,11 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
         # 消化複數 s／粗體 **／冒號後取第一個 id；逗號入排除類防清單黏連。
         foreach ($m in [regex]::Matches($text, 'ChunkIds?(?:\*\*)?\s*[:：]?\s*`?(?<id>[^`\s|,]+)`?')) {
             $id = $m.Groups['id'].Value
+            # L103：id 後緊貼註記——「uuid( auditor 覆核)」「uuid（auditor 補）」
+            # 無空格時括號會被捕進 id 尾巴，完整 UUID 被冤判捏造（fixture
+            # 實證，兩種括號寬度都會）。括號起一律是註記不是 id；尾端標點同理。
+            $id = ($id -replace '[（(].*$', '').TrimEnd('）', ')', '。', '；', ';', '：', ':', '.')
+            if ($id -eq '') { continue }
             if ($id -notmatch '^[0-9A-Za-z]') {
                 # 標點開頭＝「ChunkId」被當普通名詞寫在散文裡，非 id 引用——略過
             }
