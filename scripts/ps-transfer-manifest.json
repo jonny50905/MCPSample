@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "a17c0ed",
+  "commit": "1de0345",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -28,8 +28,8 @@
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 468,
-      "sha256": "e03113067499be7854894e39e04dfce7965ab451e3f9c7307f149c2e42398834",
+      "lines": 470,
+      "sha256": "41318012352ec3ec68adb6b1dd0c72eb19c4486f2f791a304992844bc758a9ff",
       "bom": false
     },
     {
@@ -100,8 +100,8 @@
     },
     {
       "path": ".opencode/peoplesoft/business-domain-map.yaml",
-      "lines": 124,
-      "sha256": "676c9b99c962a6be73780d8b4b66a1c4a441f37aa8cce51c7ed2b4345d5da4c2",
+      "lines": 127,
+      "sha256": "037f5ffa6e0606dffadeb19ac8934ea6e9390a6d986a5c1ec6304fba6ef3bd5f",
       "bom": false
     },
     {

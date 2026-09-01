@@ -293,8 +293,10 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
    · **DOMAIN_ROOT**（唯一准成 D 項的類）：具本領域業務證據——命中
      aliases／UI・選單・Component 描述可證屬本業務流程／從既有 root
      有明確業務 call path，**且** origin 符合 rootObjectPolicy
-     （CUSTOM_ONLY_ROOTS 領域只有 CUSTOM_PREFIX／CUSTOM_REGISTRY
-     可為 root）。
+     （CUSTOM_ONLY_ROOTS 領域只有 CUSTOM_PREFIX／CUSTOM_REGISTRY／
+     MODIFIED_DELIVERED 可為 root——改過的原生＝客製；CUSTOM_FIRST
+     領域的**未改動原生**要成 root 需業務證據特別充分：它是客製的
+     掛接點或流程樞紐，而不只是被流程經過）。
    · **DEPENDENCY**：被本領域 root 使用的共用／delivered／技術依附
      ——記進引用它的 NN 檔「相關物件」表與 90-audit 完整性節
      「依附物件」行，**不建 D、不建 NN**。

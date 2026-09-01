@@ -59,9 +59,12 @@ businessDomains:
       - Job Opening
       - 缺額
 
-    # 政策待管理者確認（L104 之後這個欄位直接決定 Domain Gate 的判準）：
-    # 若職缺功能為全客製 → 改 CUSTOM_ONLY_ROOTS＋deliveredFallback: false
-    # （同兵役）；若建立在原生 Recruiting/TAM 模組上的客製 → 維持現值。
+    # 管理者確認（2026-09）：原生 Recruiting 流程為主（約 8 成）＋少量
+    # 客製（約 2 成）→ CUSTOM_FIRST：客製與 MODIFIED_DELIVERED 優先成為
+    # root／NN 檔（知識庫的價值在客製與掛接點）；未改動的原生骨幹寫進
+    # 總覽功能地圖與 DEPENDENCY，不逐檔建 NN（原生標準行為 PeopleBooks
+    # 有，逐檔深究＝燒 session 抄官方文件＋原生 Recruiting 物件量會撐爆
+    # 領域範圍）。真需要深究某原生節點時人工加 D 項——人的判定優先於政策。
     rootObjectPolicy: CUSTOM_FIRST
     preferredPrefixes:
       - TW_
