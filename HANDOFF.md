@@ -11,16 +11,29 @@
 改掛回實證能寫檔的 `ps-deep-research`（80196ee），**待管理者搬檔重跑驗證**。職缺領域（第二領域）
 政策定案 CUSTOM_FIRST、已入佇列，等大領域告一段落再開。
 
+**接手追記（2026-09-02，第二個 session）**：manifest 在 80196ee 後未重生——c6dae63 新增的
+`scripts/tests/test-auto-loop.ps1` 落在 fs-doctor 的搬運集合（scripts 全樹）內卻不在 manifest、且無 BOM。
+已補 BOM、以 `ps-fs-doctor -WriteManifest` 重生為 55 檔；測試組在 pwsh 7.4.6（Linux）實跑
+**全部情境 PASS**（98 個 Assert）。§1 步驟 1 已改為 5 檔＋核對欄。程式碼零改動。
+
 ## 1. 管理者下一步（按序）
 
-1. 搬 4 檔：`scripts/ps-auto-loop.ps1`（BOM）、`.opencode/command/ps-audit-batch.md`、
-   `.opencode/agent/ps-audit-orchestrator.md`（備用、未掛載，但 manifest 要對）、
-   `scripts/ps-transfer-manifest.json` → `ps-fs-doctor`（54 檔）。
+1. 搬 5 檔（核對欄：行數＝編輯器總行數，允許 ±1 行尾差異）：
+
+   | 檔案 | 新增／修改 | 行數 | 備註 |
+   |---|---|---|---|
+   | `scripts/ps-auto-loop.ps1` | 修改 | 2259 | 存 UTF-8 with BOM |
+   | `.opencode/command/ps-audit-batch.md` | 修改 | 107 | 掛 ps-deep-research（80196ee） |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 137 | 備用、未掛載，但 manifest 要對 |
+   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor`（55 檔，基準 commit c6dae63） |
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log
    新增的 `out>` 三行（模型最後說的話）——剩下兩種可能：模型印表沒 write（新版 stdout 回收會過）、
-   或 `write` 被 opencode.json 的 permission `ask` 規則擋（建議 doom_loop ask→deny，見 L103 追記）。
+   或 `write` 被 opencode.json 的 permission `ask` 規則擋（建議 doom_loop ask→deny，見 L60 二次修正；
+   但依 L60 實測 headless 的 ask 是**阻塞到逾時**，不會 exit 0——b0 實案 12 分鐘 exit 0，此假說先驗不成立，
+   剩「agent 未被認到」（80196ee 已消滅變數）與「印表沒寫」（stdout 回收已接住）兩種）。
 5. 成功後觀察：「稽核第 i 批…收據 x/y」累積、「稽核 BLOCKED」（若有，先試 `-AuditEvidencePageSize 5`）、
    「稽核輪次 N 合併完成」。首輪後 lint 若報「未稽核」列＝有檔 BLOCKED，不得畢業。
 6. 大領域收尾：查無全量抽驗蓋章（旗標由外環翻）、待人工SQL 回填、畢業（GraduationGateVersion 3，
@@ -68,5 +81,9 @@
 - `-AuditEvidencePageSize` 未校準；serving 端 context 真值不可得，靠自校準（溢出對半）。
 - Domain Gate 只擋新增，存量 67 檔內的依附／域外物件不回溯清洗（人工 scope review 可選）。
 - 收據證明「parent 寫的數字通過不變量」，不證明「子代理真跑過」——與現況同，未新增風險。
+- 文件漂移（下一波有其他改動時一併搬，不為此單獨搬大檔）：`ps-deep-research.md:251` 仍寫
+  「ps-audit-batch（agent ps-audit-orchestrator）」，80196ee 後實掛 ps-deep-research（僅註解性文字，
+  該節對批次指令本就不適用）；`SOP.md` 未收 L104～L107 的操作知識（台帳刪除語義、分批稽核參數、
+  log 訊號詞只在本檔 §3，而本檔不搬公司機）——建議下一波以「只加不刪」補一節進 SOP。
 - 舊掛起：已畢業領域貼 U 項工單；PENDING_MANUAL 人工 SQL（SOP-2 第 4 階）；`-GitCommit` 觀察期
   結束後恢復；畢業後端到端測試；opencode.json 的 doom_loop ask→deny。

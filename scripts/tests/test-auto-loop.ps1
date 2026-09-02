@@ -1,4 +1,4 @@
-# scripts/tests/test-auto-loop.ps1 — 外環函式的功能測試（AST 抽真實函式，跑 fixture 情境）
+﻿# scripts/tests/test-auto-loop.ps1 — 外環函式的功能測試（AST 抽真實函式，跑 fixture 情境）
 # 用法：pwsh -NoProfile -File scripts/tests/test-auto-loop.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：調帳／治理／台帳／破壞防衛／歸檔 commit／分批稽核（manifest、part 不變量、合併器）
 #       ＋ lint fixture（[附錄] 守衛、ChunkId 誤判、[回灌] 陳舊、-EvidenceStats、-StrictAudit 未稽核）
