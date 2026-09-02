@@ -1572,7 +1572,7 @@ function Invoke-AuditRound {
         foreach ($f in $batch) { $e = $ledger.files[$f]; $files += @{ Name = $f; Rows = $e.rows; PageSize = [Math]::Max(1, $e.pageSize); Claims = @(Get-ClaimSample -Path (Join-Path $dir $f) -Max 5) } }
         $totalB = [int][Math]::Ceiling($pending.Count / [double]$k)
         $null = New-AuditManifest -TargetRound $target -FullSweep $fullSweep -Files $files -BatchIndex $bi -BatchTotal $totalB -DomainTasks $false -WikiPicks @()
-        Write-Log "稽核批次 $bi/$totalB：$($batch.Count) 檔（K=$k）｜列數 $(($files | ForEach-Object { $_.Rows }) -join ',')"
+        Write-Log "稽核第 $bi 批（待驗 $($pending.Count) 檔、以 K=$k 估餘 $totalB 批）：$($batch -join '、')｜列數 $(($files | ForEach-Object { $_.Rows }) -join ',')"
         $sr = Invoke-AuditBatchSession -Tag "audit-b$bi"
         $batchesRun++
         $exp = @{}
@@ -1604,7 +1604,11 @@ function Invoke-AuditRound {
         }
         if ($got -eq 0) {
             $failStreak++
-            if ($overflow -or $healthy) { $ledger.batchK = [Math]::Max(1, [int][Math]::Floor($k / 2)); Write-Log "稽核批次 $bi 零收據（$(if ($overflow) { 'CONTEXT_OVERFLOW' } else { 'session exit=' + $sr.ExitCode + ' timeout=' + $sr.TimedOut })）→ 批次 K 減半為 $($ledger.batchK)" }
+            # 零收據的逐檔原因必印（觀測缺口實案：管理者只看到「K 減半」，看不到是 part 檔沒寫還是合計不符）
+            $whyAll = (($batch | ForEach-Object { $_ + '（' + $ledger.files[$_].reason + '）' }) -join '、')
+            $partExists = Test-Path -LiteralPath (Join-Path $auditPartsDir ("part-{0}.md" -f $bi))
+            Write-Log "稽核第 $bi 批零收據｜part-$bi.md $(if ($partExists) { '存在' } else { '不存在（session 沒寫或寫錯路徑）' })｜$(if ($overflow) { 'CONTEXT_OVERFLOW' } else { 'session exit=' + $sr.ExitCode + ' timeout=' + $sr.TimedOut })｜逐檔：$whyAll"
+            if ($overflow -or $healthy) { $ledger.batchK = [Math]::Max(1, [int][Math]::Floor($k / 2)); Write-Log "稽核：批次 K 減半為 $($ledger.batchK)（零收據＝整批同因的機率高：格式／路徑／溢出——看上一行逐檔原因，格式問題縮 K 沒用）" }
         }
         else { $failStreak = 0; $progress += $got; Write-Log "稽核批次 $bi：收據 $got/$($batch.Count)$(if ($res.Invalid.Count -gt 0) { '；未達標：' + (($res.Invalid.Keys | ForEach-Object { $_ + '（' + $res.Invalid[$_] + '）' }) -join '、') } else { '' })" }
         Save-AuditLedger -Ledger $ledger
