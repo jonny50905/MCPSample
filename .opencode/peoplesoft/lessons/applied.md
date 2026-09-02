@@ -2875,3 +2875,59 @@
   ps-audit-batch 新檔；auditor 範圍委派規則；lint 未稽核違規；
   ps-graduation gate v3；audit-template 註記；測試情境 26＋lint
   -StrictAudit 未稽核斷言，63 判定全 PASS）。
+
+### L108 交接規格不是文件，是契約——Legacy Contract 產物線落地（issue #17，2026-09）
+- 症狀：#16／#17 要求「新系統開發者可直接實作」的 Behavior＋Persistence
+  規格，而現況產物鏈（subagent JSON → 模型手寫 NN markdown → wiki）只有
+  「畫面與欄位」五欄表、「行為邏輯」散文、「資料流」四欄表；stable ID、
+  storageKind、鍵、生效日規則、read／write 語意、存取策略、五維驗證狀態
+  **全無前身**，Markdown 就是唯一真相、模型改一句話就漂移。
+- 根因：規格若由模型直寫成散文，就沒有可算的分母、沒有可驗的不變量、
+  沒有跨階段（#18～#21）能引用的身分。L107 的教訓在稽核側已證明：
+  bounded 的單位由確定性層切、收據由確定性層驗、合併由確定性層寫——
+  規格產物線也必須是同一形狀，只是「part 檔」換成「fragment」。
+- 落點（切片 1，全部以現有零件形狀拼）：
+  1. **模型只寫固定表格 fragment**（`contract-parts/screen-<COMPONENT>.md`、
+     分頁檔 `screen-<COMPONENT>-p<k>.md`、`entity-<RECNAME>.md`，每檔 ≤150 行；
+     章節標題與表頭逐字、欄位值只准 `legacy-contract-vocabulary.md` 的封閉值域、
+     證據只准 `E<nn>.<n>`（nn＝來源 NN 前兩碼、n＝附錄列）／`SQL:<n>`（本檔查詢表
+     列）／`UNRESOLVED`）。不寫 JSON（write 工具的 JSON 逃逸與截斷是永久條件；
+     audit part 的固定表格已在分批稽核實跑中可寫）、不寫 ID、不寫 spec、不自估
+     容量（沒有「續」列——分頁由外環切）。
+  2. **外環（`ps-contract.ps1`＋`ps-contract-lib.ps1`）**：`-Plan` 從 NN 檔確定性
+     抽事實（Component、欄位列、行為邏輯分類、資料流、權限節、附錄型別）寫
+     manifest（控制項依頁大小分頁，預設 30）；`-Accept` 驗不變量發 fragment 級
+     收據（INVALID 兩次即 BLOCKED；>150 行＝容量事件→該 Component 頁大小對半重切、
+     不記 attempts；NN 內容變即作廢）；`-Merge` 派發 stable ID（`SCR.／CTL.／STA.／
+     INT.／VAL.／NAV.／BOP.／EFF.／ENT.／FLD.／WRT.／RDS.／RQ.`＋自然鍵，列序無關）、
+     解引用證據、算五維、套 approvals、蓋 verify 收據（只在 currentSchema 已知時採信；
+     oracleRead 只認 SQL hash 相符的 RQ 單位收據）→ canonical `legacy-contract.json`；
+     `-Render` 由磁碟 JSON 產 18 節 developer-facing `spec/*.spec.md`；`-Gate`
+     算 G1～G18（分母＝NN 抽取）→ tier 1（結構類 gate 無 FAIL）／tier 2（全
+     PASS 且零 UNRESOLVED debt），獨立 `contract-receipt.json`，不動畢業門。
+  3. **未知與不適用是值，不是空白**：每個值域都有 `UNRESOLVED`／
+     `NOT_APPLICABLE` 出口；`DIRECT_DB_WRITE_APPROVED` 模型永遠不准填，只能
+     由人填 `approvals.md` 升格；Oracle 驗證是「SQL 收據」（cookbook §7，
+     樣板全標待公司機驗證），通道未掛＝NOT_RUN 不是 FAIL。
+  4. 兩個陷阱當場踩到並寫進測試：PowerShell 對字典 `$d.Keys` 會被名為
+     `keys` 的鍵劫持（entity 的鍵欄位整個序列化成垃圾）→ 序列化改走
+     GetEnumerator、欄位改名 recordKeys；render parity 若拿記憶體物件比
+     磁碟 JSON 會假 FAIL → Render／Gate 一律回讀磁碟 JSON（獨立 -Gate 吃到比
+     contract-parts 舊的 JSON 只印 GATE_WARN，重合併走 -All）。
+  5. 對抗審查（3 視角 ×12 驗證者）確認 7 條設計缺口，全部落地並寫進測試：
+     `E<n>` 無法跨來源→`E<nn>.<n>`；模型自估「（續）」→外環分頁＋容量事件；
+     列序派 ID→自然鍵；模型可自填 EXECUTED→參考查詢只准 PENDING、oracleRead
+     只認外環 hash 相符的 RQ 收據；FILL_ME 下收據被採信→currentSchema 守衛
+     （-VerifyPlan exit 2）；一實體一委派塞爆→OBJ／FLD-a-b／RQ-n 單位收據；
+     culture 排序跨機不一致→Ordinal。
+- 原則：**規格的每一格都要有分母、有值域、有證據、有身分**——分母來自
+  確定性抽取（不是模型說有多少）、值域封閉（自由 token＝INVALID）、證據
+  指回已稽核的 NN 附錄（不重抄 ChunkId）、身分由外環派發（自然鍵決定，
+  列序無關）。做不到四者之一的欄位，就不該進 contract，該留在 NN 散文。
+- 有意不做（切片 2）：外環駕駛 loop（先人工 `opencode run --command
+  ps-contract-batch` 實測 fragment 可寫性）、metadata 分母（PSPNLFIELD 全頁
+  盤點）、修改 ps-auto-loop／ps-deep-research／lint。
+- 套用：本 commit（vocabulary／fragments 兩份契約；ps-contract-batch／
+  ps-contract-verify 兩指令；ps-contract.ps1＋lib；cookbook §7；
+  scripts/tests/test-contract.ps1 情境 K1～K10 共 102 判定全 PASS；SOP-18；
+  設計備忘 docs/design/legacy-contract-phase1-decision-memo.md）。

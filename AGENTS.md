@@ -49,7 +49,8 @@
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：最新在 `claude/peoplesoft-framework-handover-0u6b5g`
    （自 `claude/review-implement-requirement-svqhqt` 的 `67e9b36` 接續；
-   main 上沒有框架）。版線以維護 session 為節點串接——新的維護
+   main 上沒有框架）。功能分支 `claude/issue-17-legacy-contract-phase1`
+   （自 handover 的 `3d523dc` 開，issue #17 Phase 1）**必須併回 handover 分支**。版線以維護 session 為節點串接——新的維護
    session 從最新版線頭開自己的分支，交接時**回來更新本行**；
    前後版線的 diff＝該任 session 的全部改動（review 邊界）。
 

@@ -347,3 +347,97 @@ FETCH FIRST 200 ROWS ONLY;
 SELECT RECNAME FROM PSRECFIELDDB WHERE FIELDNAME = :fieldName
 FETCH FIRST 100 ROWS ONLY;
 ```
+
+---
+
+## 7. Schema Verification（協定角色：Legacy Contract G16——issue #17 Phase 1）
+
+用途：把 contract 裡的 logical Record／physical object／欄位／鍵，用**唯讀** SELECT 對照 Oracle 實況，
+結果寫成 `contract-parts/verify-<RECNAME>.md` 收據（格式見 `legacy-contract-fragments.md`）。
+本節樣板中 **PeopleTools 系統表以外的欄位語意（RECTYPE 代碼、USEEDIT 位元）與 Oracle 字典視圖
+皆待公司機驗證**（規則 6／8）：第一次使用前先跑 `all_tab_columns` 驗欄位名，查不到記 gaps，不硬湊。
+
+**7a. 實體物件存在與型別（OBJECT_EXISTS／OBJECT_TYPE）**
+
+```sql
+SELECT OBJECT_NAME, OBJECT_TYPE
+  FROM ALL_OBJECTS
+ WHERE OBJECT_NAME = :physicalObject
+   AND OBJECT_TYPE IN ('TABLE', 'VIEW')
+FETCH FIRST 10 ROWS ONLY
+```
+
+> 查無＝結果 `NOT_FOUND`（先確認 CURRENT_SCHEMA 步驟做了、且 `:physicalObject` 是 PSRECDEFN.SQLTABLENAME
+> 或 `PS_<RECNAME>`，不要自行加減 PS_）。VIEW 對到 contract storageKind 應為 SQL_VIEW／DYNAMIC_VIEW／QUERY_VIEW。
+
+**7b. 欄位存在與型別長度（COLUMN_EXISTS／COLUMN_TYPE）**
+
+```sql
+SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE
+  FROM ALL_TAB_COLUMNS
+ WHERE TABLE_NAME = :physicalObject
+ ORDER BY COLUMN_ID
+FETCH FIRST 200 ROWS ONLY
+```
+
+> 一次取整表欄位清單，逐欄對照 contract「欄位」表：缺欄＝該欄 `NOT_FOUND`；型別對映（待驗）：
+> VARCHAR2→CHAR/VARCHAR、NUMBER→NUMBER/SIGNED_NUMBER、DATE→DATE、TIMESTAMP→DATETIME、CLOB→LONG_CHAR、BLOB→IMAGE。
+
+**7c. Record 型別與實體表名（storageKind 對照，RECTYPE 值域待驗）**
+
+```sql
+SELECT RECNAME, RECTYPE, SQLTABLENAME, PARENTRECNAME
+  FROM PSRECDEFN
+ WHERE RECNAME = :recName
+```
+
+> RECTYPE 代碼 → storageKind 的對照表**不得憑記憶填**：第一次使用時對三個已知物件（一張 SQL Table、
+> 一個 View、一個 Derived/Work）各查一次，把觀察到的代碼回填本節；回填前 storageKind 只能由 NN／程式碼證據推得。
+
+**7d. Record 鍵（KEY_METADATA，PeopleSoft 側；USEEDIT 位元語意待驗）**
+
+```sql
+SELECT RECNAME, FIELDNAME, FIELDNUM, USEEDIT
+  FROM PSRECFIELDDB
+ WHERE RECNAME = :recName
+ ORDER BY FIELDNUM
+FETCH FIRST 200 ROWS ONLY
+```
+
+> USEEDIT 是位元遮罩；哪一位代表 Key／Alternate Search／Duplicate Order **待公司機以已知物件驗證後回填**。
+> 驗證前 KEY_METADATA 收據只准寫 `keyRows` 原始值，結果欄寫 `PASS` 僅限「contract psKeys 與 FIELDNUM 順序前段一致」
+> 這種弱判定；判不出寫 `BLOCKED` 不寫 PASS。
+
+**7e. 實體唯一索引（KEY_METADATA，Oracle 側）**
+
+```sql
+SELECT I.INDEX_NAME, I.UNIQUENESS, C.COLUMN_NAME, C.COLUMN_POSITION
+  FROM ALL_INDEXES I
+  JOIN ALL_IND_COLUMNS C
+    ON C.INDEX_OWNER = I.OWNER AND C.INDEX_NAME = I.INDEX_NAME
+ WHERE I.TABLE_NAME = :physicalObject
+   AND I.UNIQUENESS = 'UNIQUE'
+ ORDER BY I.INDEX_NAME, C.COLUMN_POSITION
+FETCH FIRST 200 ROWS ONLY
+```
+
+> PeopleSoft 通常以唯一索引 `PS_<RECNAME>` 表達鍵，不一定有 PK constraint；有 constraint 時另查
+> `ALL_CONSTRAINTS`（CONSTRAINT_TYPE IN ('P','U')）＋`ALL_CONS_COLUMNS`。
+
+**7f. 生效日查詢形狀（EFFDT_SHAPE）——只驗「查得動」，不撈資料**
+
+```sql
+SELECT COUNT(*) AS CNT
+  FROM <physicalObject> A
+ WHERE A.EFFDT = (SELECT MAX(B.EFFDT) FROM <physicalObject> B
+                   WHERE B.<鍵1> = A.<鍵1> AND B.EFFDT <= SYSDATE)
+   AND ROWNUM <= 1
+```
+
+> 有 EFFSEQ 的表再加 `AND A.EFFSEQ = (SELECT MAX(C.EFFSEQ) FROM <physicalObject> C WHERE C.<鍵1> = A.<鍵1> AND C.EFFDT = A.EFFDT)`；
+> 有 EFF_STATUS 的加 `AND A.EFF_STATUS = 'A'`。只回 COUNT，不回明細（遮罩原則）。
+
+**7g. 參考查詢可執行（REFERENCE_QUERY）**
+
+照 contract「參考查詢」表的 SQL 原樣執行（必含 FETCH FIRST／ROWNUM 上限）；成功＝`PASS`＋關鍵列摘要（不含具名個資），
+ORA- 錯誤＝`FAIL`＋錯誤碼，逾時＝`BLOCKED`。

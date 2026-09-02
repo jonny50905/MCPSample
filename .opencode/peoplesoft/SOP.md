@@ -567,3 +567,55 @@ checklist／NN 檔／wiki。lint 會在領域歷 3 輪稽核後開始提醒落�
 □ 5. 換版使 graduation 收據 contentHash 失效＝下次 batch 重驗——
      屬預期行為（文件變了本該重驗）；想省成本就攢在 CR 後一起做
 ```
+
+## SOP-18 Legacy Contract 批次（issue #17 Phase 1；L108）
+
+領域研究到 tier 1 後，可為它產「新系統可實作」的 Behavior＋Persistence 契約。
+產物全在 `docs\ps-research\<領域>\contract-parts\` 與 `contract\`（子目錄，不入
+lint 八節門檻、不入畢業 contentHash）。切片 1 沒有外環駕駛 loop——每批人工跑。
+前提：SOP-17 第 0 條的 `doom_loop: "deny"` 已設；同一領域**不得**與分批稽核／auto-loop
+同時跑（同 SOP-12 單通道紀律：opencode 與 oracleMCP 都是單通道）；首批用 `-BatchSize 1`
+先看單檔可寫性與行數，再放大。
+
+```text
+□ 1. 規劃：.\scripts\ps-contract.ps1 -Domain <領域> -Plan  （-BatchSize 預設 4）
+      → 印 PLAN_UNIT 行，寫 contract-parts\manifest.txt（模型唯讀）
+□ 2. 產 fragment：opencode run --command ps-contract-batch --title auto-ct "<領域>"
+      → 模型只寫 manifest「## 輸出」列的 screen-*.md（含分頁 -p<k>）／entity-*.md（固定表格）
+□ 3. 驗收＋合併＋渲染＋判定：.\scripts\ps-contract.ps1 -Domain <領域> -All
+      → ACCEPT：每檔 DONE／INVALID（理由逐條印）；INVALID 兩次即 BLOCKED；
+        >150 行＝容量事件（該 Component 頁大小對半、screen 檔全部重排 PENDING → 回到 1 重切）
+      → MERGE：contract\legacy-contract.json（單一真相）
+      → RENDER：contract\spec\<COMPONENT>.spec.md＋index.spec.md（禁手改，G18 會抓）
+      → GATE：G1～G18 逐行＋DEBT 行＋GATE_SUMMARY；exit 0＝tier 1 過
+□ 4. 回到 1 直到「PLAN：無待寫單位」
+□ 5. Oracle schema 驗證（G16，可選）：-VerifyPlan → opencode run --command ps-contract-verify --title auto-cv "<領域>"
+      → currentSchema 仍 FILL_ME 時 -VerifyPlan 直接 exit 2（或以 -CurrentSchema 覆寫）
+      → 模型每單位寫 verify-<RECNAME>-<OBJ|FLD-a-b|RQ-n>.md 收據 → 再跑 -All 蓋章
+□ 6. tier 2：.\scripts\ps-contract.ps1 -Domain <領域> -Gate -Tier 2（零 UNRESOLVED debt 才過）
+```
+
+台帳與刪除語義（都在 `contract\`）：`contract-ledger.json`（fragment 級收據：hash／status／
+attempts／nnHash＋`pageSizes`（每 Component 控制項頁大小，容量事件後對半、最小 10）；NN 檔內容變
+即作廢；BLOCKED 想重來＝刪該項；頁大小想重來＝刪 pageSizes 該項）、`contract-gate.json`（G1～G18
+與 debt 清單，供 #18～#21 繼承）、`contract-receipt.json`（單機收據，gitignore）。
+`contract-parts\` 的 fragment 驗收後**不刪**（可續跑原料）。
+
+人工核准（只有這條路能出現 `DIRECT_DB_WRITE_APPROVED`）：人填 `contract\approvals.md`：
+
+```text
+| Record | 操作鍵 | 策略 | 核准者 | 日期 | 證據 |
+|---|---|---|---|---|---|
+| TW_X | SAVE | DIRECT_DB_WRITE_APPROVED | 王小明 | 2026-09-02 | 架構會議紀錄 2026-09-01 |
+```
+
+六欄缺一不生效；進內部 git PR 審核。模型在 fragment 寫 DIRECT_DB_WRITE_APPROVED＝INVALID。
+
+log 訊號詞：`PLAN_UNIT`、`ACCEPT：… DONE／INVALID／BLOCKED`、`ACCEPT：容量事件——`、`MERGE：… 未解析引用=N`、
+`GATE：G<n>=PASS／FAIL／NOT_APPLICABLE／UNRESOLVED`、`GATE_WARN：`（獨立 -Gate 吃到舊 JSON，改跑 -All）、
+`DEBT：`、`GATE_SUMMARY：tier1= tier2=`、`VERIFY_PLAN：`、`VERIFY：… 收據無效`。零產出的批次先看 out 檔尾（同分批稽核的 `out>` 判讀）。
+
+首次上線前（管理者）：cookbook §7 的表名／欄位名／RECTYPE 值域全數**未在公司機驗證**——
+第一次跑 -VerifyPlan 後，先手動對三個已知物件各跑一次 §7a～§7e，把觀察值回填 cookbook，
+再讓模型跑 `/ps-contract-verify`。`currentSchema` 仍 FILL_ME 時所有 verify 收據只能是 NOT_RUN。
+改 ps-contract*.ps1 後必跑 `pwsh -File scripts\tests\test-contract.ps1`。

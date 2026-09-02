@@ -1,7 +1,8 @@
 # HANDOFF — PeopleSoft 知識庫分析框架（2026-09-02 交接）
 
 > 給下一個 session（或明天的自己）。開發分支 `claude/peoplesoft-framework-handover-0u6b5g`，
-> HEAD 見 `git log -1`。本檔在 manifest 範圍外，不需搬到公司機。
+> HEAD 見 `git log -1`。功能分支 `claude/issue-17-legacy-contract-phase1`（自 `3d523dc` 開）
+> **必須併回本分支**（見 §0 功能分支追記、§1b）。本檔在 manifest 範圍外，不需搬到公司機。
 
 ## 0. 一句話現況
 
@@ -19,6 +20,15 @@
 →K 翻倍至上限、零收據且有寫檔→對半；修「台帳持久＝K 永遠 1、65 檔跑 65 個 session」）——
 本 session 已 pull、逐行讀過、測試組在 ab1ee40 上重跑全 PASS。**同一分支目前有兩個維護 session 在推**，
 push 前先 `git pull`。
+
+**功能分支追記（2026-09-02，同一個接手 session）**：issue #17 Phase 1 切片 1 已在功能分支
+`claude/issue-17-legacy-contract-phase1` 落地——Legacy Contract 產物線（L108、SOP-18、設計備忘
+`docs/design/legacy-contract-phase1-decision-memo.md`）：模型只寫固定表格 fragment，外環
+`ps-contract.ps1` 做 NN 抽取→manifest→不變量收據→stable ID merge→canonical JSON→18 節 spec→G1～G18。
+不動 ps-auto-loop／lint／ps-deep-research／畢業門；`scripts/tests/test-contract.ps1` K1～K10 共 102 判定
+在 pwsh 7.4 全 PASS，`test-auto-loop.ps1` 不受影響。**併回方式**：handover 上若有新 commit，先在功能分支
+`git merge` handover 跑兩套測試，再 `git merge --no-ff claude/issue-17-legacy-contract-phase1` 回 handover，
+併回後重生 manifest。分批稽核照 §1 走；contract 線等稽核告一段落再依 §1b 開。
 
 ## 1. 管理者下一步（按序）
 
@@ -44,6 +54,35 @@ push 前先 `git pull`。
    舊收據作廢屬預期）。
 7. 職缺領域：`ps-auto-loop.ps1 -Domain 職缺 -Tier 1`（一次只跑一個領域；oracleMCP 單通道）。
 
+## 1b. Legacy Contract 線（issue #17 Phase 1；功能分支；稽核告一段落後再開）
+
+1. 搬 11 檔（核對欄：行數＝編輯器總行數，允許 ±1 行尾差異；只加不刪的三檔可只補貼新節）：
+
+   | 檔案 | 新增／修改 | 行數 | 備註 |
+   |---|---|---|---|
+   | `.opencode/peoplesoft/legacy-contract-vocabulary.md` | 新增 | 400 | 封閉值域單一真相（模型照抄、腳本解析；vocabularyVersion 1） |
+   | `.opencode/peoplesoft/legacy-contract-fragments.md` | 新增 | 223 | fragment／分頁檔／verify 收據形狀（模型側契約） |
+   | `.opencode/command/ps-contract-batch.md` | 新增 | 40 | 掛 ps-deep-research |
+   | `.opencode/command/ps-contract-verify.md` | 新增 | 32 | 掛 ps-deep-research |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（只加 §7，L353 起） | 443 | §7 樣板全標「待公司機驗證」 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-18，L571 起） | 621 | 操作程序、台帳語義、log 訊號詞 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108，L2879 起） | 2933 | |
+   | `scripts/ps-contract-lib.ps1` | 新增 | 1440 | 存 UTF-8 with BOM；不直接執行 |
+   | `scripts/ps-contract.ps1` | 新增 | 247 | 存 UTF-8 with BOM |
+   | `scripts/tests/test-contract.ps1` | 新增 | 553 | 存 UTF-8 with BOM；`pwsh -NoProfile -File`；自建 fixture 領域 `zz-contract-fixture` 跑完自刪 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 377 | 最後搬；`ps-fs-doctor` 應報 62 檔一致（commit 欄＝產生時 HEAD `3d523dc`，比含它的 commit 早一步，屬預期） |
+2. 公司機先跑 `pwsh -NoProfile -File scripts\tests\test-contract.ps1`，**再用 `powershell -NoProfile -File` 跑一次**——
+   腳本照 PS 5.1 慣例寫（無三元、[ordered]、自寫 JSON 序列化、Ordinal 排序）但只在 pwsh 7.4 實跑過；5.1 有 FAIL 就回報行號。
+3. 挑一個已 tier 1、NN 檔少的領域：`.\scripts\ps-contract.ps1 -Domain <領域> -Plan -BatchSize 1` → 看
+   `contract-parts\manifest.txt`（PLAN_UNIT 行、`E<nn>.<n>` token、控制項頁範圍）是否與 NN 檔一致。
+4. `opencode run --command ps-contract-batch --title auto-ct "<領域>"` → 看 `contract-parts\` 有沒有出現 fragment
+   （沒有＝同分批稽核「模型不寫檔」的判讀路徑：看 out 檔尾）。
+5. `.\scripts\ps-contract.ps1 -Domain <領域> -All` → ACCEPT 理由逐條看；把 INVALID 的常見形狀（哪一欄、什麼值）
+   回報維護 session，用來調 fragments.md 措辭或不變量。>150 行會自動「容量事件」對半分頁，不用手動處理。
+6. 先**不跑** `-VerifyPlan`（currentSchema 仍 FILL_ME → exit 2；cookbook §7 表名／欄位／RECTYPE 值域未在公司機驗證，
+   依 SOP-18 末段先手動驗三個已知物件回填 cookbook）。
+7. 併回 handover 後（§0 功能分支追記）才算「切片 1 完成」；切片 2（外環駕駛 loop、metadata 分母）另開 issue／分支。
+
 ## 2. 本 session 落地的機制（L103～L107，全在 `.opencode/peoplesoft/lessons/applied.md`）
 
 | 教訓 | 一句話 | 關鍵碼 |
@@ -53,6 +92,7 @@ push 前先 `git pull`。
 | L105 | 歸檔所有權外環化：模型只打勾，`Invoke-ChecklistArchiveCommit` 唯一歸檔者；`Invoke-ArchiveDedup` 降為 crash recovery | auto-loop；ps-audit／deep-research 歸檔段 |
 | L106 | context 溢出先分端再修：auditor 二次定位頁數上限、`FailureKind` 標籤、lint `-EvidenceStats` | ps-auditor；progressive-source-retrieval §5.1 |
 | L107 | 稽核分批化：manifest／檔級收據／part 不變量／外環合併／溢出＝容量事件（K 對半、頁對半、BLOCKED→未稽核→lint 違規） | auto-loop 分批稽核塊（`Invoke-AuditRound` 等）；`ps-audit-batch` 指令 |
+| L108（功能分支） | 交接規格是契約不是文件：模型只寫固定表格 fragment（`E<nn>.<n>`／`SQL:<n>`／UNRESOLVED 三種證據、封閉值域、外環分頁），外環派 stable ID（自然鍵）、算五維、G1～G18、tier 1／2 獨立收據 | `ps-contract.ps1`＋`ps-contract-lib.ps1`；`ps-contract-batch`／`ps-contract-verify` 指令；vocabulary／fragments 兩份契約；cookbook §7 |
 
 外部協作者 issue #12／#13／#22 皆已逐條對碼驗證並回帖（成立處落地、分歧處註明理由）。
 分批稽核的完整設計備忘：`docs/design/audit-batching-decision-memo.md`。
@@ -77,7 +117,12 @@ push 前先 `git pull`。
 - **cmd 傳遞限制**：session prompt 禁半形雙引號與 `> < & | % ^`；findstr 對 UTF-8 中文不可靠，
   一律 `powershell Get-Content -Encoding UTF8`。
 - **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（26 個真實函式 AST 抽取、63+ 判定，
-  含 lint fixture）。改 auto-loop／lint 後必跑。
+  含 lint fixture）。改 auto-loop／lint 後必跑。功能分支另有 `scripts/tests/test-contract.ps1`
+  （K1～K10、102 判定、不需模型；改 ps-contract*.ps1／vocabulary／fragments 後必跑）。
+- **contract 台帳**（功能分支；都在 `docs\ps-research\<領域>\contract\`）：`contract-ledger.json`
+  （fragment 收據＋每 Component 控制項頁大小；BLOCKED 想重來＝刪該項）、`contract-gate.json`、
+  `contract-receipt.json`（gitignore）、`approvals.md`（人填；唯一能出現 DIRECT_DB_WRITE_APPROVED 的地方）。
+  `contract-parts\` 的 fragment 驗收後不刪（可續跑原料）。
 
 ## 4. 未決與風險
 
@@ -91,3 +136,7 @@ push 前先 `git pull`。
   log 訊號詞只在本檔 §3，而本檔不搬公司機）——建議下一波以「只加不刪」補一節進 SOP。
 - 舊掛起：已畢業領域貼 U 項工單；PENDING_MANUAL 人工 SQL（SOP-2 第 4 階）；`-GitCommit` 觀察期
   結束後恢復；畢業後端到端測試；opencode.json 的 doom_loop ask→deny。
+- 功能分支（issue #17）未實測項：Qwen 寫 12 欄控制項表 30 列的可寫性（不行就 `-ControlPageSize 15`）；
+  存量 NN「畫面與欄位」的欄位寫法（`RECNAME.FIELDNAME` 或只 `FIELDNAME`）決定 G2 配對，抽取規則在
+  lib `Get-CtNnFacts`；PS 5.1 未實跑；cookbook §7 未驗。併回時若 handover 又改了 SOP.md／applied.md／README
+  （兩 session 共用），衝突以「只加不刪」手解，併回後重生 manifest。

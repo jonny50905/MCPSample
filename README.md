@@ -75,9 +75,9 @@ skill    決定「怎麼做」   載入當下 context 的作業程序（查法�
 
 ### Command（`.opencode/command/`）
 
-使用者的四個入口。指令本身只是一段 prompt ＋ 指定執行的 agent。
+使用者的入口。指令本身只是一段 prompt ＋ 指定執行的 agent。
 
-四個指令的 frontmatter 都是 `agent: ps-deep-research`——因為只有它有寫檔權限。
+所有指令的 frontmatter 都是 `agent: ps-deep-research`——因為只有它有寫檔權限。
 
 | 指令 | 做什麼 |
 |---|---|
@@ -85,6 +85,8 @@ skill    決定「怎麼做」   載入當下 context 的作業程序（查法�
 | `/ps-audit <領域>` | 稽核：逐檔委派 `ps-auditor` 做證據解引用、claim 反駁抽驗、完整性 diff → 產 `90-audit.md`，問題回灌 checklist |
 | `/ps-lesson <描述>` | 模型答錯時登錄教訓：自動分類落點、套用最小修改、記進 `applied.md` |
 | `/ps-correct <正確知識>` | 業務知識被指正時更新 wiki entity（作廢不刪除、來源標 human、標 verified） |
+| `/ps-contract-batch <領域>` | Legacy Contract 批次（外環專用）：依 `contract-parts/manifest.txt` 只寫本批 fragment（固定表格）；SOP-18 |
+| `/ps-contract-verify <領域>` | Legacy Contract 的 Oracle schema 唯讀驗證批次（外環專用）：每單位（OBJ／FLD／RQ）寫 `verify-<RECNAME>-<單位>.md` 收據 |
 
 後兩者「本機立即生效」，團隊生效走內部 git PR 審核。
 
@@ -237,7 +239,7 @@ tier 1 **不保證每句話能回溯驗證**——證據 id 格式、機器參�
 
 ## 腳本
 
-五個是框架本體，兩個是前一個專案的遺留。全部 PowerShell 5.1、**UTF-8 with
+七個是框架本體，兩個是前一個專案的遺留。全部 PowerShell 5.1、**UTF-8 with
 BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` 反推 repo 根；
 放錯資料夾會印 WARN）。
 
@@ -248,6 +250,8 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-auto-all.ps1` | 多領域批次排程 | log |
 | `ps-graduation.ps1` | 收據的寫入與驗證（函式庫，不直接執行） | 收據 |
 | `ps-fs-doctor.ps1` | 檔案系統健檢 | 唯讀（`-FixBom` 例外） |
+| `ps-contract.ps1` | Legacy Contract 外環（issue #17）：NN 抽取→manifest→fragment 驗收→canonical JSON→spec render→G1～G18 | `contract-parts/`、`contract/` |
+| `ps-contract-lib.ps1` | 上者的函式庫（值域解析／不變量／stable ID／merge／render／gate；不直接執行） | — |
 | `test-mcp-tools-list.ps1`<br>`test-elasticsearch-mcp-tools-list.ps1` | **遺留**，與本框架無關 | — |
 
 ---
@@ -459,6 +463,31 @@ G  全部正常
 
 **資安設計**：實際路徑與檔名只印在你自己螢幕上。回報維護 session 時
 **只需要講代號那一行**，不必貼任何輸出。
+
+---
+
+### `ps-contract.ps1` — Legacy Contract 外環（issue #17 Phase 1）
+
+把已研究的領域翻成「新系統可直接實作」的 Behavior＋Persistence 契約：模型只寫
+固定表格 fragment（`contract-parts/screen-<COMPONENT>.md`、`entity-<RECNAME>.md`，
+每檔 ≤150 行、值只准 `legacy-contract-vocabulary.md` 的封閉值域、證據只引
+NN 附錄的 `E<nn>.<n>` 或本檔查詢表的 `SQL:<n>`；控制項多於頁大小時由外環切成
+分頁檔 `screen-<COMPONENT>-p<k>.md`），其餘全是確定性外環：
+
+```powershell
+.\scripts\ps-contract.ps1 -Domain 兵役 -Plan         # 抽 NN 事實、寫 contract-parts\manifest.txt
+opencode run --command ps-contract-batch --title auto-ct "兵役"   # 模型寫本批 fragment
+.\scripts\ps-contract.ps1 -Domain 兵役 -All          # Accept → Merge → Render → Gate（tier 1）
+.\scripts\ps-contract.ps1 -Domain 兵役 -Gate -Tier 2 # 零 UNRESOLVED 才過
+.\scripts\ps-contract.ps1 -Domain 兵役 -VerifyPlan   # Oracle schema 驗證工單（G16；cookbook §7）
+```
+
+產物：`contract/legacy-contract.json`（canonical，單一真相；stable ID 由外環派發）、
+`contract/spec/<COMPONENT>.spec.md`（18 節 developer-facing spec，deterministic render，
+手改會被 G18 抓）、`contract/contract-gate.json`（G1～G18＋debt 清單，供 Phase 2～5 繼承）、
+`contract/contract-ledger.json`（fragment 級收據＋每 Component 控制項頁大小）。exit 0／1／2 同 lint。
+`DIRECT_DB_WRITE_APPROVED` 只能由人填 `contract/approvals.md` 產生。
+設計備忘：`docs/design/legacy-contract-phase1-decision-memo.md`；操作：SOP-18；教訓：L108。
 
 ---
 
