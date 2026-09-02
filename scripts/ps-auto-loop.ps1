@@ -1577,7 +1577,18 @@ function Invoke-AuditRound {
         $batchesRun++
         $exp = @{}
         foreach ($f in $batch) { $exp[$f] = [int]$ledger.files[$f].rows }
-        $res = Test-AuditPart -PartPath (Join-Path $auditPartsDir ("part-{0}.md" -f $bi)) -Expected $exp
+        $partPath = Join-Path $auditPartsDir ("part-{0}.md" -f $bi)
+        # stdout 回收（實案：session exit 0、沒逾時、part 檔不存在＝模型把兩張表
+        # 印在對話裡當結案，沒 write）。stdout 裡有「## 記分卡」就整份當 part 檔驗
+        # ——不變量照驗，過不了照樣無收據；只是「講了沒寫」不再等於白跑一批。
+        if (-not (Test-Path -LiteralPath $partPath) -and $sr.OutFile -and (Test-Path -LiteralPath $sr.OutFile)) {
+            $ot = Get-Content -LiteralPath $sr.OutFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+            if ($ot -and ($ot -match '(?m)^\s*#+\s*記分卡')) {
+                [System.IO.File]::WriteAllText($partPath, $ot, (New-Object System.Text.UTF8Encoding($true)))
+                Write-Log "稽核第 $bi 批：part-$bi.md 不存在但 session stdout 含記分卡表——已回收 stdout 為 part 檔驗收（模型講了沒寫）"
+            }
+        }
+        $res = Test-AuditPart -PartPath $partPath -Expected $exp
         $got = 0
         foreach ($f in $batch) {
             $e = $ledger.files[$f]
@@ -1608,6 +1619,11 @@ function Invoke-AuditRound {
             $whyAll = (($batch | ForEach-Object { $_ + '（' + $ledger.files[$_].reason + '）' }) -join '、')
             $partExists = Test-Path -LiteralPath (Join-Path $auditPartsDir ("part-{0}.md" -f $bi))
             Write-Log "稽核第 $bi 批零收據｜part-$bi.md $(if ($partExists) { '存在' } else { '不存在（session 沒寫或寫錯路徑）' })｜$(if ($overflow) { 'CONTEXT_OVERFLOW' } else { 'session exit=' + $sr.ExitCode + ' timeout=' + $sr.TimedOut })｜逐檔：$whyAll"
+            # out 檔尾 3 行直接進主 log（同 err 檔尾 5 行的先例）：不用翻檔就看得到模型最後在幹嘛
+            if ($sr.OutFile -and (Test-Path -LiteralPath $sr.OutFile)) {
+                $tailO = @(Get-Content -LiteralPath $sr.OutFile -Tail 12 -Encoding UTF8 -ErrorAction SilentlyContinue | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 3)
+                foreach ($tl in $tailO) { $t1 = $tl; if ($t1.Length -gt 160) { $t1 = $t1.Substring(0, 160) + '…' }; Write-Log "  out> $t1" }
+            }
             if ($overflow -or $healthy) { $ledger.batchK = [Math]::Max(1, [int][Math]::Floor($k / 2)); Write-Log "稽核：批次 K 減半為 $($ledger.batchK)（零收據＝整批同因的機率高：格式／路徑／溢出——看上一行逐檔原因，格式問題縮 K 沒用）" }
         }
         else { $failStreak = 0; $progress += $got; Write-Log "稽核批次 $bi：收據 $got/$($batch.Count)$(if ($res.Invalid.Count -gt 0) { '；未達標：' + (($res.Invalid.Keys | ForEach-Object { $_ + '（' + $res.Invalid[$_] + '）' }) -join '、') } else { '' })" }

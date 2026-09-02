@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "bdf9636",
+  "commit": "daf651d",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -292,8 +292,8 @@
     },
     {
       "path": "scripts/ps-auto-loop.ps1",
-      "lines": 2221,
-      "sha256": "3f3ff7b8a3343c932d59452f2f841dc1d08b55f7993dbfd26b5bd0958beee942",
+      "lines": 2237,
+      "sha256": "eedd0a45a0faf5b7e234a73361b73d13f3c59e01756d99390d3d4b635b9a957b",
       "bom": true
     },
     {
