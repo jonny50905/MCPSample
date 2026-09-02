@@ -1,5 +1,5 @@
 ---
-description: 分批稽核 orchestrator（auto-loop 專用）：依外環 manifest 只稽核指定 NN 檔／範圍，委派 ps-auditor，結果只寫 audit-parts/。不寫 checklist、不寫 90-audit.md。
+description: （備用，目前未掛載）分批稽核 orchestrator：ps-audit-batch 指令現掛 ps-deep-research（實證能寫檔的 agent）；本 agent 保留給日後精簡 context 之用
 mode: primary
 temperature: 0.1
 tools:

@@ -1552,12 +1552,25 @@ function Invoke-AuditRound {
         $null = New-AuditManifest -TargetRound $target -FullSweep $fullSweep -Files @() -BatchIndex 0 -BatchTotal 0 -DomainTasks $true -WikiPicks $wp
         $sr = Invoke-AuditBatchSession -Tag "audit-b0"
         $batchesRun++
+        # stdout 回收（同檔案批次）：domain.md 不存在但 stdout 含「## 完整性」就整份當 domain.md
+        $domPath = Join-Path $auditPartsDir "domain.md"
+        if (-not (Test-Path -LiteralPath $domPath) -and $sr.OutFile -and (Test-Path -LiteralPath $sr.OutFile)) {
+            $ot0 = Get-Content -LiteralPath $sr.OutFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+            if ($ot0 -and ($ot0 -match '(?m)^\s*#+\s*完整性')) {
+                [System.IO.File]::WriteAllText($domPath, $ot0, (New-Object System.Text.UTF8Encoding($true)))
+                Write-Log "稽核批次 0：domain.md 不存在但 session stdout 含完整性節——已回收 stdout 驗收（模型講了沒寫）"
+            }
+        }
         $dp = Read-DomainPart
         if ($dp.Ok) { $ledger.domainDone = $true; $ledger.domainReason = ''; $failStreak = 0; $progress++; Write-Log "稽核批次 0（領域）完成：候選 $($dp.Candidates.Count) 筆、wiki 列 $($dp.WikiRows.Count)" }
         else {
             $ledger.domainAttempts++
             $ledger.domainReason = $dp.Reason
-            Write-Log "稽核批次 0（領域）未達標：$($dp.Reason)（attempts=$($ledger.domainAttempts)）"
+            Write-Log "稽核批次 0（領域）未達標：$($dp.Reason)（attempts=$($ledger.domainAttempts)）｜session exit=$($sr.ExitCode) timeout=$($sr.TimedOut) kind=$($sr.FailureKind)"
+            if ($sr.OutFile -and (Test-Path -LiteralPath $sr.OutFile)) {
+                $tail0 = @(Get-Content -LiteralPath $sr.OutFile -Tail 12 -Encoding UTF8 -ErrorAction SilentlyContinue | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 3)
+                foreach ($tl in $tail0) { $t1 = $tl; if ($t1.Length -gt 160) { $t1 = $t1.Substring(0, 160) + '…' }; Write-Log "  out> $t1" }
+            }
             if ($ledger.domainAttempts -ge 2) { $ledger.domainDone = $true; Write-Log "稽核批次 0 兩次未達標——本輪完整性節以「未查成」記錄，不再重試" }
             if ($sr.TimedOut -or $sr.ExitCode -ne 0 -or $sr.FailureKind -eq 'CONTEXT_OVERFLOW') { $failStreak++ }
         }
