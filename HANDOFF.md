@@ -15,6 +15,10 @@
 `scripts/tests/test-auto-loop.ps1` 落在 fs-doctor 的搬運集合（scripts 全樹）內卻不在 manifest、且無 BOM。
 已補 BOM、以 `ps-fs-doctor -WriteManifest` 重生為 55 檔；測試組在 pwsh 7.4.6（Linux）實跑
 **全部情境 PASS**（98 個 Assert）。§1 步驟 1 已改為 5 檔＋核對欄。程式碼零改動。
+其後前一 session 又推 ab1ee40（分批稽核 K 改 AIMD：每圈從 `-AuditBatchSize` 重新起算，圈內整批全收據
+→K 翻倍至上限、零收據且有寫檔→對半；修「台帳持久＝K 永遠 1、65 檔跑 65 個 session」）——
+本 session 已 pull、逐行讀過、測試組在 ab1ee40 上重跑全 PASS。**同一分支目前有兩個維護 session 在推**，
+push 前先 `git pull`。
 
 ## 1. 管理者下一步（按序）
 
@@ -22,11 +26,11 @@
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `scripts/ps-auto-loop.ps1` | 修改 | 2259 | 存 UTF-8 with BOM |
+   | `scripts/ps-auto-loop.ps1` | 修改 | 2270 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
    | `.opencode/command/ps-audit-batch.md` | 修改 | 107 | 掛 ps-deep-research（80196ee） |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 137 | 備用、未掛載，但 manifest 要對 |
    | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
-   | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor`（55 檔，基準 commit c6dae63） |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log
@@ -64,11 +68,11 @@
   `audit-ledger.json`（分批稽核檔級收據，輪次合併後自動歸檔為 `audit-r<N>.done.json`；系統性故障後刪＝重置）、
   `reconcile-restored.txt`（復活斷路器）。`docs\ps-research\<領域>\audit-parts\` 是分批稽核的暫存，
   合併後自刪。
-- **主要參數**（ps-auto-loop.ps1）：`-Tier 1|2`、`-AuditBatchSize 6`、`-AuditEvidencePageSize 10`
+- **主要參數**（ps-auto-loop.ps1）：`-Tier 1|2`、`-AuditBatchSize 6`（每圈起算值＝AIMD 上限，ab1ee40）、`-AuditEvidencePageSize 10`
   （唯一尚未實測校準的參數；實測 Evidence 列數最大 37／p95 26／中位 12）、`-AuditBatchesPerCycle 0`、
   `-AuditBatchTimeoutMin 60`、`-MaxNewDPerAudit 10`、`-SurgeryBatchSize 7`、`-MaxSurgeryPerCycle 3`。
 - **log 訊號詞彙**：「排水圈」「本批解決 N 筆（身分尺）」「手術停滯 BLOCKED」「破壞防衛」
-  「歸檔 commit（外環）」「跨檔同文去重」「容量事件：CONTEXT_OVERFLOW」「稽核第 i 批…收據 x/y」
+  「歸檔 commit（外環）」「跨檔同文去重」「容量事件：CONTEXT_OVERFLOW」「批次 K 減半為／升為」「稽核第 i 批…收據 x/y」
   「稽核 BLOCKED」「稽核輪次 N 合併完成」「本輪稽核新增 D 項 N 筆 > 上限」。
 - **cmd 傳遞限制**：session prompt 禁半形雙引號與 `> < & | % ^`；findstr 對 UTF-8 中文不可靠，
   一律 `powershell Get-Content -Encoding UTF8`。
