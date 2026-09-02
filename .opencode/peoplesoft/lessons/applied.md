@@ -2775,3 +2775,56 @@
   語義，寫入方必須是能保證順序與驗證的確定性層。
 - 套用：本 commit（Invoke-ChecklistArchiveCommit＋audit 相位／啟動
   掛點；deep-research／ps-audit 歸檔段改所有權宣告；測試情境 24）。
+
+### L106 context 溢出先分端再修——爆點在子代理輸入側，不在檔案總數（2026-09）
+- 症狀：85 檔領域 loop 停機，管理者實測 **ps-auditor 子代理**
+  context length exceeded。外部協作者 issue #22 定性為 parent
+  （稽核 session）累積溢出並提出 manifest／bounded batch／收據／
+  可續跑 finalization 的整套設計。三角度調查＋逐條對抗驗證後判定：
+- 爆點定性：**主爆點＝auditor 單檔任務 A 的輸入側**——單一委派的
+  context 由「Evidence 筆數 × 每筆 get_chunks_details 完整 chunk 內文
+  × 失聯筆三管道二次定位『翻到底』× 旗標下查無宣告全量重跑」決定，
+  而硬規則「回報筆數少於該檔 Evidence 筆數＝無效」禁止部分回報；
+  同一契約的任務 C 有「>5 張表只做前 5、其餘退回」的對稱防守，任務 A
+  沒有。**主導成長項是單檔 Evidence 列數與失聯比例，NN 總數只是間接
+  放大器**（檔越多、最重的那檔越重、每輪 170+ 次委派必中重尾）。
+  次爆點＝parent 線性累積（85×任務 A JSON＋parent 逐檔 read 抽 claim
+  ＋任務 B JSON＋wiki＋任務 C＋整檔重寫 85 列記分卡）——契約上逐條
+  成立，實測未證。**環境前置疑點**：硬錯而非壓縮，指向 opencode.json
+  宣告 `limit.context` 高於 serving 真值 → 既有壓縮永不先觸發
+  （SOP-10 探針為此而設，L6 疑點至今未回填）。外環對 context 字樣
+  零偵測；子代理溢出多半 exit 0，走不到錯誤分支。
+- issue #22 裁決：五條根因成立（根因 3 方向對機制錯——先爆的是輸入
+  側不是 JSON 輸出；根因 5 成立但不足——分類須掃 out＋err 且不以 exit
+  為前提）；七項實作：manifest（檔級＋範圍級）／PowerShell 確定性抽
+  claim（非 seed——parent 與 auditor 皆 bash:false 算不出 hash）／
+  bounded batch 採納；外環對 auditor JSON schema 驗證拒絕（子代理回報
+  只回 parent、不進 stdout）改為 part 檔不變量；從收據重建 90-audit
+  部分採納（表格機械 render、語意節交 bounded finalizer）；overflow
+  拆批不做 binary split（任務 A 已是一檔一委派）改「收據續跑＋頁減半
+  ＋最小單元 BLOCKED」；精簡稽核 agent 採納為配套。「不接受清單」
+  同意，但兩項其實該做：校正宣告 limit 至 serving 真值（不是換模型、
+  不是調壓縮參數，是讓既有壓縮能觸發）、精簡 agent。
+- 本 commit 落地（安全四件）：auditor 二次定位每管道頁數上限
+  （search 2 頁／結構 1 批／semantic 2 頁，到頂→NOT_FOUND＋查法收據，
+  沿用既有值域不加新 reason code）＋§5.1「翻到全量」改以 §5 預算為
+  上限（消除自我矛盾）；Invoke-Opencode 回傳 FailureKind（掃 out＋err
+  不看 exit，標籤不判定）；lint `-EvidenceStats` 唯讀開關（每檔列數＋
+  最大／p95／中位）供容量校準。
+- **延後至 D0 數據回填後一次落地（不盲猜參數）**：外環 audit manifest
+  ＋每 session K 檔部分報告（audit-parts/）＋Test-AuditPart 不變量
+  （合計＝列數、明細 UUID⊆附錄）＋audit-ledger 收據續跑＋外環合併器
+  （表格／A 列／輪次／旗標／歸檔順序）＋bounded finalizer（Domain Gate
+  與語意節）＋GraduationGateVersion 3。頁大小與批次大小要用 serving
+  真實 context 上限與 `-EvidenceStats` 分布反推——這是 L104/L105 之後
+  最大的一次重構，必須同一 commit 上線（拆開會留下批次各自遞增輪次、
+  旗標被批 1 翻掉的中間態）。
+- 原則：**context 溢出先分端再修**——子代理端修「單一委派的輸入上限」，
+  parent 端修「一輪工作的分批與收據」，環境端修「宣告與真值對齊」；
+  三端症狀同名、藥完全不同，先量再開藥。其次：**反 cherry-pick 的
+  選擇權必須在確定性層**——誰選 claim、誰切範圍，不能是被審的那個
+  模型（L103 根因四的同型）。
+- 套用：本 commit（ps-auditor 頁數上限、progressive-source-retrieval
+  §5.1、auto-loop FailureKind、lint -EvidenceStats；測試情境 25＋
+  EvidenceStats 斷言）；D0 診斷清單交管理者（SOP-10 探針、停機圈
+  rc/err/log 指紋、opencode export 委派形狀、-EvidenceStats 分布）。

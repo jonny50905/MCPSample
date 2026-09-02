@@ -25,7 +25,10 @@ param(
     # agent 被硬規則禁止改寫 checklist-archive*.md，理由是**模型的 write 工具
     # 沒有 append、重寫大檔會撐爆**——那是工具層限制，不是語意禁令；
     # PowerShell 沒有這個限制，所以這件事只有這裡做得到。
-    [switch]$FixArchive
+    [switch]$FixArchive,
+    # 唯讀診斷（issue #22／L106）：印每個 NN 檔的 Evidence 資料列數與分布
+    # ——容量校準用（auditor 單檔委派的 context 隨列數成長），不影響判定與 exit
+    [switch]$EvidenceStats
 )
 
 # 參數消毒（L28）：-Domain 尾部空白/點會觸發 Win32 尾字元正規化不對稱——
@@ -451,6 +454,7 @@ $bogusIds = @()          # 非 UUID／自編樣式的 id——不可信，須重
 $failedQueryRows = @()   # 以失敗查詢當機器參照的列（SQL 型，改表名重查）
 $jsonLeaks = @()         # subagent 契約 JSON 原樣洩漏（缺料類：內容可能被截斷）
 $relinkOrders = @()      # [回灌]：90-audit.md 明細「處置」欄帶的機械修復指令
+$evStats = @{}           # -EvidenceStats（L106）：檔名 → Evidence 資料列數（容量校準）
 $rawAppendix = @()       # [附錄]（L103）：Evidence 附錄是裸 ChunkId 清單、不是模板
                          # 表格——節內逐列檢查全掛在「| 開頭的表格列」上，一列表格
                          # 都沒有＝零檢查零違規（實案：chunks GUID1,GUID2,… 整批放行）
@@ -653,6 +657,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
                     if ($bareN -ge 3) { $dumpLine = $true }
                 }
             }
+            $evStats[$name] = $evRealRows
             if (($evRealRows -eq 0 -and $bareUuidN -gt 0) -or $dumpLine) {
                 $violations += "${name}：Evidence 附錄非模板表格（表格外裸 ChunkId $bareUuidN 筆）——無位置／說明，稽核不可解引用；依模板四欄表格重建"
                 $rawAppendix += $name
@@ -1454,4 +1459,20 @@ if ($FixArchive) {
     Write-Host ""
 }
 
+if ($EvidenceStats) {
+    Write-Host ""
+    Write-Host "=== -EvidenceStats：每檔 Evidence 資料列數（L106 容量校準；不影響判定）===" -ForegroundColor Cyan
+    $evVals = @()
+    foreach ($k in ($evStats.Keys | Sort-Object)) {
+        Write-Host "EVIDENCE_ROWS：$k=$($evStats[$k])"
+        $evVals += [int]$evStats[$k]
+    }
+    if ($evVals.Count -gt 0) {
+        $evSorted = @($evVals | Sort-Object)
+        $evP95 = $evSorted[[Math]::Min($evSorted.Count - 1, [int][Math]::Floor($evSorted.Count * 0.95))]
+        $evMed = $evSorted[[int][Math]::Floor($evSorted.Count / 2)]
+        Write-Host "EVIDENCE_ROWS_SUMMARY：檔數=$($evVals.Count) 最大=$($evSorted[$evSorted.Count - 1]) p95=$evP95 中位=$evMed 總計=$(($evVals | Measure-Object -Sum).Sum)"
+    }
+    Write-Host ""
+}
 exit $exitCode

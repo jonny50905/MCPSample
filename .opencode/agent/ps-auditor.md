@@ -94,10 +94,16 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    `searchMode: semantic`＋offset 全量翻頁做第三管道**（物件/AE 名
    不保證出現在內文，exact 查無是假象）——三管道皆無才判 `FAIL(NOT_FOUND)`。
    **禁止拿事件名（PreBuild 等）當全庫搜尋詞。**
-   **二次定位全程遵守分頁紀律**（progressive-source-retrieval §5.1）：
-   search 結果達 10 筆＝可能有下一頁，必須 offset 續翻到完；
-   結構單元多於一批要逐批取完——**單頁／第一批未見 ≠ 查無**
-   （一個 event 可有 10+ chunks，只看第一頁必漏尾巴）。id 非 UUID 格式時分兩種（都不用查 MCP）：
+   **二次定位有頁數上限（L106）**：每管道 search_chunks 最多翻 **2 頁**
+   （＝§5 maxSearchResults 20）、get_file_structure 後只取**含目標行號
+   的單元 1 批**、semantic 第三管道最多 **2 頁**；**單頁／第一批未見
+   ≠ 查無**仍成立（至少翻到第 2 頁），但**翻到上限仍無 → 該筆
+   `FAIL(NOT_FOUND)`，reason 附最後一次查法收據（管道／參數／頁數）**
+   ——那是合格的查無收據，不是偷懶。理由：「翻頁到底」在大檔上會把
+   單一委派的 context 撐爆（實案：85 檔領域 auditor 子代理
+   context length exceeded，每筆 get_chunks_details 回完整 chunk 內文
+   ×失聯筆三管道翻到底＝無上限）；上限內查無交 A 項，由 research
+   用有 §5 預算的 flow 子代理再試，代價可承受。id 非 UUID 格式時分兩種（都不用查 MCP）：
    **恰為 8 碼 hex（UUID 首段樣式）→ `FAIL(TRUNCATED_ID)`**——
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。

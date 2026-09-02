@@ -215,8 +215,11 @@ maxChunksPerExpansion: 4
   （實例：chunk 在第 40 行斷於註解，看似完整，真正的判斷邏輯在
   41–60 行的下一段——不做覆蓋檢查就會漏掉。）
 - 小檔案（結構 ≤ 6 段）可全取；大檔案依結構選段。Budget（§5）照常適用。
-- 宣告「查無」前：翻頁到最後一頁（回傳數 < limit），或已進 file-mode
-  以結構確認不存在——只看第一頁就說「ES 沒有」是錯誤結論。
+- 宣告「查無」前：翻頁到最後一頁（回傳數 < limit）**或翻到 §5
+  maxSearchResults 上限（20 筆＝2 頁）**——到頂仍無＝合格查無收據
+  （附頁數），或已進 file-mode 以結構確認不存在——只看第一頁就說
+  「ES 沒有」是錯誤結論。**「翻到全量」以 §5 預算為上限**（L106：
+  無上限翻頁在大檔上會把單一委派的 context 撐爆）。
 - **物件＋事件定位優先用結構化參數**：找「某物件某事件」的程式，
   第一選擇是 `search_chunks(ObjectName=<物件名>, eventName=<事件名>)`
   直接過濾（實測可直達），其次才是關鍵字搜檔 → get_file_structure。
@@ -231,7 +234,8 @@ maxChunksPerExpansion: 4
   實測 `objectName=<AE名>＋componentType=ApplicationEngineProgram`
   精準命中；**SQR 帶 `componentType=sqr`、SQC 帶 `componentType=sqc`**
   （值表見 §6.0）；SQL definition 類用對應 componentType）→
-  (2) `query=<物件/AE 名>`＋`searchMode: semantic`＋offset 翻到全量。
+  (2) `query=<物件/AE 名>`＋`searchMode: semantic`＋offset 翻頁至 §5
+  上限（定位只需命中檔案，之後進 file-mode；盤點不靠搜尋）。
   實測：AE 名用 semantic 精準命中全部 59 chunk，同名用 exactPhrases
   查零筆（假查無）。
   `exactPhrases`／`exact` 只准用於「已知該字串必出現在內文」的
@@ -239,7 +243,7 @@ maxChunksPerExpansion: 4
   用錯 mode 的查無＝方法錯誤，不是「不存在」。
 - **componentType 過濾回零筆時不得下「查無」**，必先：
   (a) 換大小寫寫法重試一次；(b) 拿掉 componentType，只留
-  `query=<程式/物件名>`＋`searchMode: semantic` 翻頁到全量。
+  `query=<程式/物件名>`＋`searchMode: semantic` 翻頁至 §5 上限。
   兩者皆空才算查無——**只試過一種寫法的查無不構成合格的查無收據**。
   §6.0 表中未列的 componentType 值禁止使用。
 - 不准回報「程式碼截斷、無法確認」而不嘗試 file-mode 接續。

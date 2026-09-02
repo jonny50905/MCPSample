@@ -800,6 +800,23 @@ function Invoke-NnDestructionGuard {
     return $restored
 }
 
+# ── 容量事件標籤（issue #22／L106）──────────────────────────
+# 子代理 context 溢出通常以 exit 0 收場（OpenCode 的 task 錯誤回給 parent
+# 當工具結果，不進父行程 stderr）——只看 exit code 永遠看不到。不論 exit
+# 都掃 out＋err 全文。這是**標籤不是判定**：無此字樣≠無溢出（Ollama 類
+# 靜默截斷不報錯），完整性仍由 lint／StrictAudit 守。
+function Get-SessionFailureKind {
+    param([string]$OutFile, [string]$ErrFile)
+    $pat = '(?i)context.?length|maximum context|context window|context_length_exceeded|truncating input|input (?:is )?too long'
+    foreach ($f in @($OutFile, $ErrFile)) {
+        if ($f -and (Test-Path -LiteralPath $f)) {
+            $t = Get-Content -LiteralPath $f -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+            if ($t -and ($t -match $pat)) { return 'CONTEXT_OVERFLOW' }
+        }
+    }
+    return 'NONE'
+}
+
 # ── 開一個新鮮 opencode session（逾時整樹強殺）────────────
 # $ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'
 # 注意：prompt 走 cmd.exe 命令列——內容禁用半形雙引號與 cmd 特殊字元
@@ -889,7 +906,9 @@ function Invoke-Opencode {
         else {
             Write-Log "SESSION($Tag) 判讀：強殺當下靜止 $killSilent 分（介於兩者之間）——先看 out 檔尾端停在哪個步驟再決定調上限或查通道"
         }
-        return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile }
+        $fkT = Get-SessionFailureKind -OutFile $outFile -ErrFile $errFile
+        if ($fkT -ne 'NONE') { Write-Log "SESSION($Tag) 容量事件：$fkT（out/err 含 context 溢出字樣）——逾時前已撞 context 上限，調時間無用；見 SOP-10 校正宣告 limit 與 L106" }
+        return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fkT }
     }
     # 優先讀落檔的結束碼（可觀測事實），讀不到才退回 Process 物件
     $code = $null
@@ -911,7 +930,9 @@ function Invoke-Opencode {
         $code = 0
     }
     Write-Log "SESSION($Tag) 結束 exit=$code 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
-    return @{ TimedOut = $false; ExitCode = $code; ErrFile = $errFile; OutFile = $outFile }
+    $fk = Get-SessionFailureKind -OutFile $outFile -ErrFile $errFile
+    if ($fk -ne 'NONE') { Write-Log "SESSION($Tag) 容量事件：$fk（out/err 含 context 溢出字樣；exit=$code 不代表沒事——子代理溢出多半 exit 0）——無此字樣≠無溢出；處置見 SOP-10／L106，不要只調 timeout" }
+    return @{ TimedOut = $false; ExitCode = $code; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fk }
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
