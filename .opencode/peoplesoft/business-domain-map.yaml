@@ -58,6 +58,7 @@ businessDomains:
       - 招募職缺
       - Job Opening
       - 缺額
+      - JO
 
     # 管理者確認（2026-09）：原生 Recruiting 流程為主（約 8 成）＋少量
     # 客製（約 2 成）→ CUSTOM_FIRST：客製與 MODIFIED_DELIVERED 優先成為
