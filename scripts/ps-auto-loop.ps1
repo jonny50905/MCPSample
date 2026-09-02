@@ -1106,8 +1106,11 @@ if (-not $mutexHeld) {
 # 點名——不 binary split、不原樣重跑。中途崩潰：輪次未遞增、收據持久，
 # 下圈只補缺檔。
 $auditLedgerPath = Join-Path $logRoot "audit-ledger.json"
-$auditManifestPath = Join-Path $logRoot "audit-manifest.txt"
 $auditPartsDir = Join-Path $dir "audit-parts"
+# manifest 放領域目錄內（模型天天讀寫 docs/ps-research，排除「讀不到 auto-loop-logs」
+# 的路徑層風險）；auto-loop-logs 另留一份副本給人看
+$auditManifestPath = Join-Path $auditPartsDir "manifest.txt"
+$auditManifestCopy = Join-Path $logRoot "audit-manifest.txt"
 $uuidRx = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 
 function Get-AuditLedger {
@@ -1238,7 +1241,9 @@ function New-AuditManifest {
     $ln += "## 輸出（唯一可寫的路徑）"
     if ($DomainTasks) { $ln += "- docs/ps-research/$Domain/audit-parts/domain.md" }
     else { $ln += "- docs/ps-research/$Domain/audit-parts/part-$BatchIndex.md" }
+    if (-not (Test-Path -LiteralPath $auditPartsDir)) { New-Item -ItemType Directory -Path $auditPartsDir -Force | Out-Null }
     [System.IO.File]::WriteAllText($auditManifestPath, (($ln -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+    try { Copy-Item -LiteralPath $auditManifestPath -Destination $auditManifestCopy -Force } catch { }
     return $auditManifestPath
 }
 
@@ -1601,11 +1606,14 @@ function Invoke-AuditRound {
         }
         $healthy = (-not $sr.TimedOut) -and ($sr.ExitCode -eq 0)
         $overflow = ($sr.FailureKind -eq 'CONTEXT_OVERFLOW')
+        $partWritten = Test-Path -LiteralPath $partPath
         foreach ($f in $batch) {
             $e = $ledger.files[$f]
             if ($e.status -eq 'DONE') { continue }
             $why = $res.Invalid[$f]; if (-not $why) { $why = '無收據' }
-            if ($healthy) { $e.attempts++ }
+            # attempts 只在「模型有寫 part 檔、但該檔驗不過」時記（實案：模型整批沒寫
+            # 任何檔＝session 級故障，連兩批就把同 3 檔冤枉成 BLOCKED——那不是檔案的錯）
+            if ($healthy -and $partWritten) { $e.attempts++ }
             $e.reason = $why
             if ($overflow -and $e.rows -gt $e.pageSize) { $e.pageSize = [Math]::Max(3, [int][Math]::Floor($e.pageSize / 2)); Write-Log "稽核：$f 溢出→頁大小減半為 $($e.pageSize)" }
             if ($e.attempts -ge 2 -or ($overflow -and $e.pageSize -le 3 -and $e.rows -gt 3)) {
@@ -1624,7 +1632,8 @@ function Invoke-AuditRound {
                 $tailO = @(Get-Content -LiteralPath $sr.OutFile -Tail 12 -Encoding UTF8 -ErrorAction SilentlyContinue | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 3)
                 foreach ($tl in $tailO) { $t1 = $tl; if ($t1.Length -gt 160) { $t1 = $t1.Substring(0, 160) + '…' }; Write-Log "  out> $t1" }
             }
-            if ($overflow -or $healthy) { $ledger.batchK = [Math]::Max(1, [int][Math]::Floor($k / 2)); Write-Log "稽核：批次 K 減半為 $($ledger.batchK)（零收據＝整批同因的機率高：格式／路徑／溢出——看上一行逐檔原因，格式問題縮 K 沒用）" }
+            if ($overflow -or ($healthy -and $partExists)) { $ledger.batchK = [Math]::Max(1, [int][Math]::Floor($k / 2)); Write-Log "稽核：批次 K 減半為 $($ledger.batchK)（零收據且有寫檔＝疑似容量或格式；格式問題縮 K 沒用，看上一行逐檔原因）" }
+            elseif (-not $partExists) { Write-Log "稽核：part 檔不存在＝session 級故障（模型沒 write）——不減 K、不記檔案 attempts；連 2 批即停本圈，看 out> 行與 SOP" }
         }
         else { $failStreak = 0; $progress += $got; Write-Log "稽核批次 $bi：收據 $got/$($batch.Count)$(if ($res.Invalid.Count -gt 0) { '；未達標：' + (($res.Invalid.Keys | ForEach-Object { $_ + '（' + $res.Invalid[$_] + '）' }) -join '、') } else { '' })" }
         Save-AuditLedger -Ledger $ledger

@@ -25,7 +25,7 @@ tools:
 
 ## 第一動作（禁止先說話）
 
-`read auto-loop-logs/<領域>/audit-manifest.txt`（領域＝指令參數）。
+`read docs/ps-research/<領域>/audit-parts/manifest.txt`（領域＝指令參數）。
 manifest 是外環產生的**唯讀工單**：目標輪次、旗標、本批檔案清單
 （每檔 Evidence 列數、範圍切段、任務 B claims）、領域任務、唯一可寫
 路徑。**不在清單內的檔一律不碰；清單怎麼切你怎麼做**。
@@ -129,7 +129,9 @@ claim 只有 VERIFIED／DISPUTED／UNVERIFIABLE。auditor 自創詞就近映射
 - **只寫 manifest 指定的那一個檔**；禁止改 checklist.md、90-audit.md、
   任何 NN 檔、wiki 檔、log.md——輪次、旗標、A／D 列、歸檔全由外環做。
 - 寫 part 檔用**整檔 write**（小檔，一次寫完）；寫完 read 回來確認兩張表
-  都在、每個檔每個範圍都有列，再結束。
+  都在、每個檔每個範圍都有列，再結束。**交付＝檔案，不是對話**：只在
+  對話裡印表格而沒有 write＝本批白做（外環只驗檔案）。最終回覆只准
+  一行「已寫 <路徑>」。
 - 判定只依據 auditor 本次回報；禁止 read 舊 90-audit.md、禁止沿用數字。
 - 不放大段原始碼；不自製記分卡以外的章節；不輸出計畫或複述指令。
 - 不得反問、不得婉拒。
