@@ -1526,6 +1526,9 @@ function Invoke-AuditRound {
         Write-Log "稽核輪次 $target 開始（分批）：新台帳"
     }
     else { Write-Log "稽核輪次 $target 續跑：台帳已有 $(@($ledger.files.Values | Where-Object { $_.status -eq 'DONE' }).Count) 檔收據" }
+    # K 每圈從參數重新起算（實案：前 run 兩批零收據把 K 壓到 1，台帳持久＝永遠 1、
+    # 65 檔跑 65 個 session）。圈內採 AIMD：整批全收據→翻倍（上限參數）、零收據→對半。
+    $ledger.batchK = [Math]::Max(1, $AuditBatchSize)
     $rows = Get-EvidenceRowCounts
     $nn = @(Get-ChildItem -LiteralPath $dir -Filter "*.md" -File | Where-Object { $_.Name -match '^\d\d-' -and $_.Name -ne '90-audit.md' } | Sort-Object Name)
     foreach ($f in $nn) {
@@ -1648,7 +1651,15 @@ function Invoke-AuditRound {
             if ($overflow -or ($healthy -and $partExists)) { $ledger.batchK = [Math]::Max(1, [int][Math]::Floor($k / 2)); Write-Log "稽核：批次 K 減半為 $($ledger.batchK)（零收據且有寫檔＝疑似容量或格式；格式問題縮 K 沒用，看上一行逐檔原因）" }
             elseif (-not $partExists) { Write-Log "稽核：part 檔不存在＝session 級故障（模型沒 write）——不減 K、不記檔案 attempts；連 2 批即停本圈，看 out> 行與 SOP" }
         }
-        else { $failStreak = 0; $progress += $got; Write-Log "稽核批次 $bi：收據 $got/$($batch.Count)$(if ($res.Invalid.Count -gt 0) { '；未達標：' + (($res.Invalid.Keys | ForEach-Object { $_ + '（' + $res.Invalid[$_] + '）' }) -join '、') } else { '' })" }
+        else {
+            $failStreak = 0; $progress += $got
+            Write-Log "稽核批次 $bi：收據 $got/$($batch.Count)$(if ($res.Invalid.Count -gt 0) { '；未達標：' + (($res.Invalid.Keys | ForEach-Object { $_ + '（' + $res.Invalid[$_] + '）' }) -join '、') } else { '' })"
+            # AIMD 回升：整批全收據且本批已用滿 K → K 翻倍（上限 -AuditBatchSize）
+            if ($got -eq $batch.Count -and $batch.Count -ge $k -and $k -lt $AuditBatchSize) {
+                $ledger.batchK = [Math]::Min($AuditBatchSize, $k * 2)
+                Write-Log "稽核：整批全收據 → 批次 K 升為 $($ledger.batchK)（上限 $AuditBatchSize；再零收據會對半，自行找到 parent 撐得住的批次大小）"
+            }
+        }
         Save-AuditLedger -Ledger $ledger
     }
     $script:auditRoundProgress = $progress
