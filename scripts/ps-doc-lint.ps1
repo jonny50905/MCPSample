@@ -798,6 +798,15 @@ if (Test-Path -LiteralPath $auditPath) {
         # 訊息自己都寫「綠燈不可信」了，就不該只在 tier 2 擋。
         if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
     }
+    # 未稽核列（L107）：分批稽核 BLOCKED 的檔在記分卡以「未稽核」佔位——檔名
+    # 被提及即過覆蓋檢查，這條把它擋回來（tier 1／2 都擋；訊息以 90-audit.md
+    # 開頭歸 AUDIT_ONLY）。出路＝人工拆續篇縮小單檔證據或修正後刪 audit-ledger 重跑
+    $unaudited = @([regex]::Matches($auditText, '(?m)^\|\s*([^|\r\n]+?)\s*\|\s*未稽核'))
+    if ($unaudited.Count -gt 0) {
+        $uaSample = (@($unaudited | Select-Object -First 3 | ForEach-Object { $_.Groups[1].Value }) -join '、')
+        $msg = "90-audit.md 記分卡有 $($unaudited.Count) 檔標「未稽核」（分批稽核 BLOCKED：$uaSample）——未稽核≠已稽核，不得畢業；出路見 auto-loop-logs 的 audit-r*.done.json／停機訊息"
+        if ($StrictAudit -or $CoverageOnly) { $violations += $msg } else { $warnings += $msg }
+    }
     # 全量對帳（L36 結構化）：找「涵蓋最多 NN 檔」的章節當記分卡，驗是否覆蓋
     # 全部——標題叫什麼不重要，覆蓋率才是塌縮判準（自創標題不再擋畢業）
     $cover = Get-ScorecardCoverage -AuditText $auditText -NnNames $nnNames

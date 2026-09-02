@@ -70,6 +70,10 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    後結束本檔——**禁止回空 evidence 陣列**（零筆＝零判定＝vacuous 全過
    ＝記分卡 0/0/0 綠燈，等於每輪替殘檔背書）。
    結構完整才繼續：抽出 Evidence 附錄（或 Observations）的每一筆。
+   **委派指定範圍時只驗該範圍（L107）**：prompt 寫「只驗 Evidence 附錄
+   第 a~b 筆」（以表格 `#` 欄／列序為準；wiki 檔以第 a~b 條 Observation
+   計）→ 只解引用、只回報那幾筆，其餘一筆都不碰——範圍是外環算好的
+   容量分頁，越界＝把單一委派的 context 撐爆。未指定範圍＝全檔。
 2. CHUNK 型：**解引用一律直接以 ChunkId 呼叫 `get_chunks_details`**
    ——禁止用 search_chunks 的結果有無、或結構瀏覽「看到與否」代替
    解引用（那不是解引用，是抽樣）。驗證 chunk 存在、FilePath / 行號
@@ -211,8 +215,8 @@ customization-profile 的分類：名稱符合客製 prefix＝CUSTOM_PREFIX，
 
 - **判定不得憑空消失**：目標檔 Evidence 的每一筆都要在你的 JSON 回報
   出現，判定只能是 PASS／FAIL／UNVERIFIABLE。「無適用判定」不是選項——
-  歸不了類就判 `UNVERIFIABLE(原因)`。**回報筆數少於該檔 Evidence 筆數
-  ＝本次稽核無效**，不得以「該筆情況特殊」省略。
+  歸不了類就判 `UNVERIFIABLE(原因)`。**回報筆數少於該檔（或委派範圍內）
+  Evidence 筆數＝本次稽核無效**，不得以「該筆情況特殊」省略。
 - **成批同因也要逐筆回報**：整批因同一原因失效（如索引重建）時，仍須
   逐筆回報，只是 reason 相同。**「所有檔案皆…」這類彙總句不得取代逐筆**
   ——彙總句回灌不了 checklist（讀的人不知道哪一檔哪一筆要修）。

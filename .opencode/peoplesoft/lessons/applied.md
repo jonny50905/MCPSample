@@ -2828,3 +2828,50 @@
   §5.1、auto-loop FailureKind、lint -EvidenceStats；測試情境 25＋
   EvidenceStats 斷言）；D0 診斷清單交管理者（SOP-10 探針、停機圈
   rc/err/log 指紋、opencode export 委派形狀、-EvidenceStats 分布）。
+
+### L107 稽核也要 bounded——manifest／收據／外環合併（2026-09）
+- D0 數據（管理者實測）：serving 真值拿不到；停機圈 rc=1；
+  `-EvidenceStats` 67 檔、最大 37 列、p95=26、中位 12、總計 845；
+  出事委派＝單一 NN 檔純任務 A。結論：**單檔 37 列的任務 A 就爆**
+  ——分頁是必要不是選配；rc=1 分不清 parent 是否也爆 → 兩端一起上。
+- 設計（用現有零件拼，issue #22 的必要實作取其骨、去其重）：
+  1. **外環凍結本輪工作**：`audit-manifest.txt`（模型唯讀）——目標
+     輪次、旗標、本批檔案、每檔 Evidence 列數（來自 lint 唯一實作）、
+     範圍切段（頁大小自校準：預設 10＜中位，溢出對半、最小 3）、
+     任務 B claims（**確定性 regex 抽**，反 cherry-pick 的選擇權不在
+     被審的模型手上；seed 抽法不可行——parent／auditor 都 bash:false）。
+  2. **每 session K 檔、只寫 audit-parts/part-<i>.md**（新 agent
+     ps-audit-orchestrator：四 MCP 全 deny、只委派、只抄表；新指令
+     ps-audit-batch）；批次 0 做任務 C（含 Domain Gate 三分）與 wiki
+     抽驗寫 domain.md。
+  3. **part 不變量 → 檔級收據**（audit-ledger.json）：合計＝列數、
+     範圍覆蓋、明細「內容」欄 id ⊆ 該檔附錄（捏造判定抓得到）、
+     非 PASS 必有明細列、無洩漏標記。收據的是「parent 寫的數字通過
+     不變量」，不是「子代理真跑過」——與現況風險同，不新增。
+  4. **收據齊備才合併**：外環寫 90-audit.md（六章節就位、記分卡逐檔
+     ＋合計、明細串接、完整性承接 domain.md、語意節誠實佔位）、機械產
+     A 列（一檔一行、PENDING_MANUAL 不開單）、D 列（僅 DOMAIN_ROOT，
+     治理層裁決重複）、遞增輪次、翻旗標——L105 的「durable state 搬移
+     交確定性層」延伸到 A 列／輪次／旗標。中途崩潰：輪次未遞增、
+     收據持久、下圈只補缺檔；檔案內容變 → 該檔收據作廢。
+  5. **溢出＝容量事件**：FailureKind 標籤；零收據批 → K 對半；單檔
+     溢出 → 頁對半；到底或 attempts≥2 → BLOCKED，記分卡標「未稽核」
+     → lint（tier 1／2）判違規不得畢業——未稽核≠已稽核，不能因檔名
+     被提及就過覆蓋門。出路＝拆續篇縮小單檔證據。
+  6. 門：GraduationGateVersion 2→3（舊收據作廢）；auditStall 對「輪次
+     進行中且本圈有收據」不計零回灌；-AuditBatchesPerCycle 時間圍欄。
+- 與 issue #22 的取捨：不做 journal／.tmp 全套 transaction（兩寫之間
+  唯一中間態由既有守衛收斂）；不做 taskId／claimId 級 receipt（檔級
+  ＋範圍級已能證明每筆落位）；不做 finalizer session（Domain Gate 由
+  批次 0 的 session 做、其餘語意節誠實佔位——少一個會壞的 writer）；
+  不 binary split（任務 A 已是一檔一委派）。人工 /ps-audit 全量路徑
+  保留給互動使用。
+- 原則：**「規模再大也照樣執行」是反拒答條款，不是容量保證**——
+  fresh session 只清歷史，不讓本輪工作 bounded。任何「一個 session
+  做完整輪」的契約，在 corpus 成長下必然撞牆；bounded 的單位要由
+  確定性層切、收據要由確定性層驗、合併要由確定性層寫。
+- 套用：本 commit（auto-loop 分批稽核塊：manifest／台帳／Test-AuditPart
+  ／Invoke-AuditMerge／Invoke-AuditRound；ps-audit-orchestrator 與
+  ps-audit-batch 新檔；auditor 範圍委派規則；lint 未稽核違規；
+  ps-graduation gate v3；audit-template 註記；測試情境 26＋lint
+  -StrictAudit 未稽核斷言，63 判定全 PASS）。

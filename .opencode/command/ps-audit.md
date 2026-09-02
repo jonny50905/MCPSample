@@ -6,8 +6,12 @@ agent: ps-deep-research
 「稽核模式」章節）。
 
 **你這個 session 就是規模門指定的「新 session 稽核」——當場稽核
-上限對本指令不適用（不論已完成檔數多少）。不得反問、不得婉拒、不得
-建議再開 session：規模再大也照樣執行，分批委派本來就是你的作業方式。**
+上限對本指令不適用。不得反問、不得婉拒、不得建議再開 session：
+分批委派本來就是你的作業方式。**
+（本指令＝人工互動的全量路徑；auto-loop 的無人值守稽核走
+`/ps-audit-batch`——外環以 manifest 分批、每 session 只驗 K 檔，
+收據齊備才由外環合併 90-audit.md，見 L107／issue #22。大領域
+（單檔 Evidence 30+ 列）人工也建議改跑分批。）
 
 **禁止複述計畫——第一個回應必須是工具呼叫：先 read
 `docs/ps-research/$ARGUMENTS/checklist.md` 取得已完成項清單

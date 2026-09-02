@@ -14,7 +14,12 @@
 
 <!-- 最後一列必為「合計」：各欄加總＋燈號分佈——趨勢追蹤靠它。 -->
 
-燈號：🟢 無 FAIL / DISPUTED；🟡 僅 UNVERIFIABLE；🔴 有 FAIL 或 DISPUTED
+燈號：🟢 無 FAIL / DISPUTED；🟡 僅 UNVERIFIABLE；🔴 有 FAIL 或 DISPUTED；⛔ 未稽核（分批稽核 BLOCKED 的檔——lint 判違規，不得畢業）
+
+<!-- 分批稽核（L107）：auto-loop 由外環合併 audit-parts/ 產生本報告；
+     記分卡的 UNVERIFIABLE 欄含 PENDING_MANUAL（待人工SQL）筆數，
+     但 A 列的 UNVERIFIABLE 計數不含它。「未稽核」列＝該檔兩次嘗試
+     仍無合格收據，出路＝拆續篇縮小單檔證據或修正後刪 audit-ledger.json 重跑。 -->
 
 ## FAIL / DISPUTED / UNVERIFIABLE 明細
 

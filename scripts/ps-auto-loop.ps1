@@ -54,6 +54,15 @@ param(
     # review。數量上限只是熔絲，不是 Domain Gate 的替代品（gate 在稽核
     # 契約：DOMAIN_ROOT 才准成 D）。
     [int]$MaxNewDPerAudit = 10,
+    # 分批稽核（issue #22／L107）：每個稽核 session 處理幾個 NN 檔（parent 分批）
+    [int]$AuditBatchSize = 6,
+    # 單檔任務 A 每次委派驗幾筆 Evidence（子代理分頁）——實測 37 列即爆、p95=26、
+    # 中位 12：從中位以下起跳，溢出自動對半（最小 3），到底 BLOCKED 點名
+    [int]$AuditEvidencePageSize = 10,
+    # 一圈最多跑幾個稽核批次（0＝跑完整輪）——時間圍欄；未跑完的批次下圈續跑
+    [int]$AuditBatchesPerCycle = 0,
+    # 單一稽核批次的逾時（分）：批次小、沿用 L48 沉默基線 30 分的兩倍
+    [int]$AuditBatchTimeoutMin = 60,
     # 逾時＝熔絲不是效能參數，照實測基線設（L48）：research 曾在 30 分上限被
     # 強殺（＝上限訂太緊，把健康的 session 砍掉），放寬到 60 分後未再撞上限。
     # 注意手術 session 沿用 ResearchTimeoutMin，改這個值等於同步放寬手術上限；
@@ -1085,6 +1094,552 @@ if (-not $mutexHeld) {
     exit 3
 }
 
+# ── 分批稽核（issue #22／L107）：manifest／收據／合併器／回合驅動 ──────
+# 爆點（實測）：auditor 單檔任務 A 的**輸入側**——Evidence 列數×每筆完整
+# chunk 內文×失聯筆二次定位；37 列即爆、p95=26、中位 12；rc=1 分不清
+# parent 是否也爆。serving 真值拿不到 → **自校準**：頁大小從中位以下起跳，
+# 失敗才縮；K 檔／session 分批讓 parent 也有上限。
+# 所有權：外環凍結本輪工作（manifest，模型唯讀）→ session 只寫
+# audit-parts/part-<i>.md → 外環驗不變量（合計＝列數、範圍覆蓋、明細 id⊆
+# 附錄）發**檔級收據** → 收據齊備才由外環合併 90-audit.md、機械產 A／D 列、
+# 遞增輪次、翻旗標。溢出＝容量事件：K 對半、單檔頁對半、到底 BLOCKED
+# 點名——不 binary split、不原樣重跑。中途崩潰：輪次未遞增、收據持久，
+# 下圈只補缺檔。
+$auditLedgerPath = Join-Path $logRoot "audit-ledger.json"
+$auditManifestPath = Join-Path $logRoot "audit-manifest.txt"
+$auditPartsDir = Join-Path $dir "audit-parts"
+$uuidRx = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+
+function Get-AuditLedger {
+    if (-not (Test-Path -LiteralPath $auditLedgerPath)) { return $null }
+    try {
+        $j = Get-Content -LiteralPath $auditLedgerPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $files = @{}
+        if ($null -ne $j.files) {
+            foreach ($p in $j.files.PSObject.Properties) {
+                $v = $p.Value
+                $d = @(); if ($null -ne $v.detail) { $d = @($v.detail | Where-Object { $null -ne $_ }) }
+                $files[$p.Name] = @{ hash = [string]$v.hash; rows = [int]$v.rows; status = [string]$v.status
+                    attempts = [int]$v.attempts; pageSize = [int]$v.pageSize; reason = [string]$v.reason
+                    pass = [int]$v.pass; fail = [int]$v.fail; unver = [int]$v.unver; pending = [int]$v.pending
+                    verified = [int]$v.verified; disputed = [int]$v.disputed; detail = $d }
+            }
+        }
+        $wiki = @(); if ($null -ne $j.wiki) { $wiki = @($j.wiki | Where-Object { $null -ne $_ }) }
+        return @{ round = [int]$j.round; batchK = [int]$j.batchK; domainDone = [bool]$j.domainDone
+            domainAttempts = [int]$j.domainAttempts; domainReason = [string]$j.domainReason; files = $files; wiki = $wiki }
+    }
+    catch { return $null }
+}
+
+function Save-AuditLedger {
+    param($Ledger)
+    $o = [ordered]@{ round = $Ledger.round; batchK = $Ledger.batchK; domainDone = $Ledger.domainDone
+        domainAttempts = $Ledger.domainAttempts; domainReason = $Ledger.domainReason; wiki = @($Ledger.wiki); files = [ordered]@{} }
+    foreach ($k in ($Ledger.files.Keys | Sort-Object)) {
+        $f = $Ledger.files[$k]
+        $o.files[$k] = [ordered]@{ hash = $f.hash; rows = $f.rows; status = $f.status; attempts = $f.attempts
+            pageSize = $f.pageSize; reason = $f.reason; pass = $f.pass; fail = $f.fail; unver = $f.unver
+            pending = $f.pending; verified = $f.verified; disputed = $f.disputed; detail = @($f.detail) }
+    }
+    [System.IO.File]::WriteAllText($auditLedgerPath, (ConvertTo-Json $o -Depth 6),
+        (New-Object System.Text.UTF8Encoding($false)))
+}
+
+# 每檔 Evidence 資料列數：只有 lint 的一份實作（-EvidenceStats），外環只解析
+function Get-EvidenceRowCounts {
+    $raw = & $lintPath -Domain $Domain -EvidenceStats *>&1 | Out-String
+    $h = @{}
+    foreach ($m in [regex]::Matches($raw, '(?m)^EVIDENCE_ROWS：(?<f>[^=\r\n]+)=(?<n>\d+)')) {
+        $h[$m.Groups['f'].Value.Trim()] = [int]$m.Groups['n'].Value
+    }
+    return $h
+}
+
+# 任務 B claim 由確定性層抽（反 cherry-pick 的選擇權不在被審的模型手上）：
+# 模板兩種形狀——行為邏輯的「- **CONFIRMED**：…」行、資料流表的「| … | CONFIRMED |」列
+function Get-ClaimSample {
+    param([string]$Path, [int]$Max = 5)
+    $out = @()
+    if (-not (Test-Path -LiteralPath $Path)) { return , $out }
+    $t = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($t)) { return , $out }
+    foreach ($m in [regex]::Matches($t, '(?m)^\s*-\s*\*\*CONFIRMED\*\*\s*[：:]\s*(.+?)\s*$')) {
+        $c = ($m.Groups[1].Value -replace '\|', '／').Trim()
+        if ($c.Length -gt 120) { $c = $c.Substring(0, 120) + '…' }
+        if ($c -ne '') { $out += $c }
+        if ($out.Count -ge $Max) { return , $out }
+    }
+    foreach ($m in [regex]::Matches($t, '(?m)^\s*\|(?<row>[^\r\n]*\|\s*CONFIRMED\s*\|[^\r\n]*)\r?$')) {
+        $cells = @($m.Groups['row'].Value -split '\|' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' -and $_ -ne 'CONFIRMED' })
+        $c = ($cells -join '／')
+        if ($c.Length -gt 120) { $c = $c.Substring(0, 120) + '…' }
+        if ($c -ne '') { $out += $c }
+        if ($out.Count -ge $Max) { return , $out }
+    }
+    return , $out
+}
+
+# wiki 抽驗：本領域 NN 檔 [[連結]] 到的 entity，依 last_verified 最舊優先取 5
+function Get-WikiPicks {
+    param([int]$Max = 5)
+    $wikiDir = Join-Path $root "docs/ps-research/wiki"
+    $picks = @()
+    if (-not (Test-Path -LiteralPath $wikiDir)) { return , $picks }
+    $names = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter "*.md" -File | Where-Object { $_.Name -match '^\d\d-' -and $_.Name -ne '90-audit.md' })) {
+        $t = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($t)) { continue }
+        foreach ($m in [regex]::Matches($t, '\[\[([^\]\|#]+)')) { $names[$m.Groups[1].Value.Trim()] = $true }
+    }
+    $cands = @()
+    foreach ($n in $names.Keys) {
+        $p = Join-Path $wikiDir ($n + ".md")
+        if (-not (Test-Path -LiteralPath $p)) { continue }
+        $lv = "0000-00-00"
+        $head = Get-Content -LiteralPath $p -TotalCount 30 -Encoding UTF8
+        foreach ($l in @($head)) { if ($l -match '^last_verified\s*:\s*(\S+)') { $lv = $Matches[1]; break } }
+        $cands += [pscustomobject]@{ Name = $n; LastVerified = $lv }
+    }
+    foreach ($c in @($cands | Sort-Object LastVerified, Name | Select-Object -First $Max)) {
+        $picks += ("docs/ps-research/wiki/" + $c.Name + ".md")
+    }
+    return , $picks
+}
+
+function New-AuditManifest {
+    param([int]$TargetRound, [bool]$FullSweep, $Files, [int]$BatchIndex, [int]$BatchTotal, [bool]$DomainTasks, $WikiPicks)
+    $ln = @()
+    $ln += "# 稽核批次 manifest（外環產生，模型唯讀——不得修改；不在清單內的檔一律不碰）"
+    $ln += "領域：$Domain"
+    $ln += "目標輪次：$TargetRound"
+    $ln += "查無全量抽驗：$(if ($FullSweep) { '待執行（每個任務 A 委派末尾加註「本檔查無宣告抽驗全量做」）' } else { '照常（每檔抽 1~2 筆）' })"
+    $ln += "批次：$BatchIndex/$BatchTotal"
+    $ln += ""
+    $ln += "## 檔案（每檔每範圍一個任務 A 委派；任務 B 只用下列 claims，不得自選）"
+    if ($Files.Count -eq 0) { $ln += "（本批無檔案任務）" }
+    foreach ($f in $Files) {
+        $rg = @()
+        $n = [int]$f.Rows; $ps = [int]$f.PageSize
+        if ($n -le 0) { $rg += "全" }
+        else { $s = 1; while ($s -le $n) { $e = [Math]::Min($n, $s + $ps - 1); $rg += "$s-$e"; $s = $e + 1 } }
+        $cl = "（無可機械抽取的 CONFIRMED 行——任務 B 回單筆 UNVERIFIABLE）"
+        if ($f.Claims.Count -gt 0) { $cl = ($f.Claims -join "；") }
+        $ln += "- $($f.Name)｜Evidence 列數=$n｜範圍=$($rg -join ',')｜claims=$cl"
+    }
+    $ln += ""
+    $ln += "## 領域任務"
+    if ($DomainTasks) {
+        $ln += "- 任務 C：核心資料表清單取自 00-overview.md，每批 ≤5 張表一個委派；候選逐一過 Domain Gate 三分（DOMAIN_ROOT／DEPENDENCY／OUT_OF_SCOPE）"
+        if ($WikiPicks.Count -gt 0) { $ln += "- wiki 抽驗（任務 A，只傳路徑）：" + ($WikiPicks -join "、") } else { $ln += "- wiki 抽驗：無候選" }
+    }
+    else { $ln += "（無）" }
+    $ln += ""
+    $ln += "## 輸出（唯一可寫的路徑）"
+    if ($DomainTasks) { $ln += "- docs/ps-research/$Domain/audit-parts/domain.md" }
+    else { $ln += "- docs/ps-research/$Domain/audit-parts/part-$BatchIndex.md" }
+    [System.IO.File]::WriteAllText($auditManifestPath, (($ln -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+    return $auditManifestPath
+}
+
+# part 檔不變量（收據的唯一依據）——parent 寫的數字必須自洽且對得上檔案：
+#   (i) 檔的所有範圍列都在且覆蓋 1..列數；(ii) PASS+FAIL+UNVERIFIABLE+
+#   PENDING_MANUAL 合計＝該檔 Evidence 列數；(iii) 明細「內容」欄的 id 都在
+#   該檔附錄裡（捏造判定抓得到）；(iv) 有非 PASS 判定必有明細列。
+function Test-AuditPart {
+    param([string]$PartPath, [hashtable]$Expected)
+    $res = @{ Files = @{}; Invalid = @{} }
+    if (-not (Test-Path -LiteralPath $PartPath)) {
+        foreach ($n in $Expected.Keys) { $res.Invalid[$n] = 'part 檔不存在' }
+        return $res
+    }
+    $t = Get-Content -LiteralPath $PartPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($t)) { foreach ($n in $Expected.Keys) { $res.Invalid[$n] = 'part 檔空白' }; return $res }
+    if ($t -match '</?think(ing)?>|<\|im_(start|end)\|>|</?tool_call>|<function=|invalid\[tool=') {
+        foreach ($n in $Expected.Keys) { $res.Invalid[$n] = 'part 檔含模型內部標記（洩漏）' }
+        return $res
+    }
+    $sec = ''; $sc = @(); $dt = @()
+    foreach ($ln in ($t -split "`r?`n")) {
+        if ($ln -match '^##\s*(.+)$') { $sec = $Matches[1].Trim(); continue }
+        if ($ln -notmatch '^\s*\|') { continue }
+        if ($ln -match '^\s*\|[\s:|-]+\|?\s*$') { continue }
+        if ($sec -match '記分卡') { $sc += $ln } elseif ($sec -match '明細') { $dt += $ln }
+    }
+    $acc = @{}
+    foreach ($row in $sc) {
+        $c = @($row.Trim().Trim('|') -split '\|' | ForEach-Object { $_.Trim() })
+        if ($c.Count -lt 8 -or $c[0] -match '^檔案') { continue }
+        $f = $c[0]
+        if (-not $Expected.ContainsKey($f)) { continue }
+        $nums = @(); $ok = $true
+        for ($i = 2; $i -le 7; $i++) { $v = 0; if ([int]::TryParse($c[$i], [ref]$v)) { $nums += $v } else { $ok = $false } }
+        if (-not $ok) { $res.Invalid[$f] = "記分卡欄位非數字：$($row.Trim())"; continue }
+        if (-not $acc.ContainsKey($f)) { $acc[$f] = @{ pass = 0; fail = 0; unver = 0; pending = 0; verified = 0; disputed = 0; ranges = @(); detail = @() } }
+        $a = $acc[$f]
+        $a.pass += $nums[0]; $a.fail += $nums[1]; $a.unver += $nums[2]; $a.pending += $nums[3]; $a.verified += $nums[4]; $a.disputed += $nums[5]
+        if ($c[1] -match '(\d+)\s*[-–~]\s*(\d+)') { $a.ranges += , @([int]$Matches[1], [int]$Matches[2]) }
+        else { $a.ranges += , @(1, [Math]::Max(1, [int]$Expected[$f])) }
+    }
+    foreach ($row in $dt) {
+        $c = @($row.Trim().Trim('|') -split '\|' | ForEach-Object { $_.Trim() })
+        if ($c.Count -lt 3 -or $c[0] -match '^檔案') { continue }
+        $f = $c[0]
+        if ($acc.ContainsKey($f)) { $acc[$f].detail += , @($row.Trim(), $c[2]) }
+    }
+    foreach ($f in @($acc.Keys)) {
+        if ($res.Invalid.ContainsKey($f)) { continue }
+        $a = $acc[$f]
+        $exp = [Math]::Max(1, [int]$Expected[$f])   # 無 Evidence 節＝單筆 NO_EVIDENCE_SECTION
+        $sum = $a.pass + $a.fail + $a.unver + $a.pending
+        if ($sum -ne $exp) { $res.Invalid[$f] = "證據判定合計 $sum ≠ Evidence 列數 $exp"; continue }
+        $covered = New-Object bool[] ($exp + 1)
+        foreach ($r in $a.ranges) { for ($i = [Math]::Max(1, $r[0]); $i -le [Math]::Min($exp, $r[1]); $i++) { $covered[$i] = $true } }
+        $gap = @(); for ($i = 1; $i -le $exp; $i++) { if (-not $covered[$i]) { $gap += $i } }
+        if ($gap.Count -gt 0) { $res.Invalid[$f] = "範圍未覆蓋第 $($gap -join ',') 筆"; continue }
+        $nnP = Join-Path $dir $f
+        if (Test-Path -LiteralPath $nnP) {
+            $nnT = Get-Content -LiteralPath $nnP -Raw -Encoding UTF8
+            if ($null -eq $nnT) { $nnT = "" }
+            $bad = $null
+            foreach ($d in $a.detail) {
+                foreach ($u in [regex]::Matches($d[1], $uuidRx)) {
+                    if ($nnT.IndexOf($u.Value, [StringComparison]::OrdinalIgnoreCase) -lt 0) { $bad = $u.Value; break }
+                }
+                if ($bad) { break }
+            }
+            if ($bad) { $res.Invalid[$f] = "明細「內容」引用的 id $bad 不在該檔 Evidence 附錄（疑似捏造判定）"; continue }
+        }
+        if (($a.fail + $a.unver + $a.pending + $a.disputed) -gt 0 -and $a.detail.Count -eq 0) {
+            $res.Invalid[$f] = "有非 PASS 判定卻無明細列"; continue
+        }
+        $res.Files[$f] = @{ pass = $a.pass; fail = $a.fail; unver = $a.unver; pending = $a.pending
+            verified = $a.verified; disputed = $a.disputed; detail = @($a.detail | ForEach-Object { $_[0] }) }
+    }
+    foreach ($n in $Expected.Keys) {
+        if (-not $res.Files.ContainsKey($n) -and -not $res.Invalid.ContainsKey($n)) { $res.Invalid[$n] = '記分卡無此檔列' }
+    }
+    return $res
+}
+
+# domain.md（批次 0）：完整性宣告＋任務 C 候選（含 Domain Gate 分類）＋wiki 結果
+function Read-DomainPart {
+    $p = Join-Path $auditPartsDir "domain.md"
+    $r = @{ Ok = $false; Integrity = @(); Candidates = @(); WikiRows = @(); WikiDetail = @(); Reason = '' }
+    if (-not (Test-Path -LiteralPath $p)) { $r.Reason = 'domain.md 不存在'; return $r }
+    $t = Get-Content -LiteralPath $p -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($t)) { $r.Reason = 'domain.md 空白'; return $r }
+    if ($t -notmatch '任務\s*C\s*覆蓋.*\d+.*\d+') { $r.Reason = '缺「任務 C 覆蓋：完成 N／共 M 批」宣告'; return $r }
+    $sec = ''
+    foreach ($ln in ($t -split "`r?`n")) {
+        if ($ln -match '^##\s*(.+)$') { $sec = $Matches[1].Trim(); continue }
+        if ($sec -match '完整性') {
+            if ($ln.Trim() -ne '' -and $ln -notmatch '^\s*\|[\s:|-]+\|?\s*$') {
+                if ($ln -match '^\s*\|') {
+                    $c = @($ln.Trim().Trim('|') -split '\|' | ForEach-Object { $_.Trim() })
+                    if ($c.Count -ge 7 -and $c[0] -notmatch '^候選') { $r.Candidates += , $c }
+                    else { $r.Integrity += $ln }
+                }
+                else { $r.Integrity += $ln }
+            }
+        }
+        elseif ($sec -match 'wiki' -and $sec -match '記分卡') {
+            if ($ln -match '^\s*\|' -and $ln -notmatch '^\s*\|[\s:|-]+\|?\s*$' -and $ln -notmatch '^\s*\|\s*檔案') { $r.WikiRows += $ln.Trim() }
+        }
+        elseif ($sec -match 'wiki' -and $sec -match '明細') {
+            if ($ln -match '^\s*\|' -and $ln -notmatch '^\s*\|[\s:|-]+\|?\s*$' -and $ln -notmatch '^\s*\|\s*檔案') { $r.WikiDetail += $ln.Trim() }
+        }
+    }
+    $r.Ok = $true
+    return $r
+}
+
+# 在「## 調查進度」節尾插列（最小插入，其餘內容一字不動）
+function Add-ChecklistRows {
+    param([string[]]$Rows)
+    if ($Rows.Count -eq 0) { return }
+    $clPath = Join-Path $dir "checklist.md"
+    if (-not (Test-Path -LiteralPath $clPath)) { return }
+    $lines = @((Get-Content -LiteralPath $clPath -Raw -Encoding UTF8) -split "`r?`n")
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^##\s*調查進度') { $start = $i; break } }
+    if ($start -lt 0) { $lines += ''; $lines += '## 調查進度'; $start = $lines.Count - 1 }
+    $end = $lines.Count
+    for ($i = $start + 1; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^##\s') { $end = $i; break } }
+    $ins = $end
+    while ($ins -gt $start + 1 -and $lines[$ins - 1].Trim() -eq '') { $ins-- }
+    $out = @()
+    if ($ins -gt 0) { $out += $lines[0..($ins - 1)] }
+    $out += $Rows
+    if ($ins -lt $lines.Count) { $out += $lines[$ins..($lines.Count - 1)] }
+    [System.IO.File]::WriteAllText($clPath, ($out -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+}
+
+function Set-ChecklistRoundAndFlag {
+    param([int]$NewRound)
+    $clPath = Join-Path $dir "checklist.md"
+    if (-not (Test-Path -LiteralPath $clPath)) { return }
+    $raw = Get-Content -LiteralPath $clPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($raw)) { return }
+    $raw = [regex]::Replace($raw, '(?m)^(\s*稽核輪次[：:]\s*)[0-9]+', ('${1}' + $NewRound))
+    $raw = [regex]::Replace($raw, '(?m)^(\s*查無全量抽驗[：:]\s*)待執行[^\r\n]*', ('${1}已執行（第 ' + $NewRound + ' 輪）'))
+    [System.IO.File]::WriteAllText($clPath, $raw, (New-Object System.Text.UTF8Encoding($true)))
+}
+
+# 合併器：收據齊備（DONE 或 BLOCKED，無 PENDING）後由外環寫 90-audit.md、
+# 機械產 A 列（一檔一行）與 D 列（僅 DOMAIN_ROOT）、遞增輪次、翻旗標。
+# 模板六章節全數就位（lint 認標題）；語意類章節寫誠實佔位，不由模型覆核。
+function Invoke-AuditMerge {
+    param($Ledger, [int]$TargetRound)
+    $dp = Read-DomainPart
+    $sc = @(); $dt = @(); $aRows = @(); $dRows = @()
+    $tp = 0; $tf = 0; $tu = 0; $tv = 0; $td = 0; $g = 0; $y = 0; $rd = 0; $blocked = @()
+    $seq = 0
+    foreach ($f in ($Ledger.files.Keys | Sort-Object)) {
+        $e = $Ledger.files[$f]
+        if ($e.status -eq 'BLOCKED') {
+            $sc += "| $f | 未稽核（BLOCKED：$($e.reason)） | - | - | - | - | ⛔ |"
+            $blocked += $f
+            continue
+        }
+        $u = $e.unver + $e.pending
+        $light = if ($e.fail -gt 0 -or $e.disputed -gt 0) { '🔴' } elseif ($u -gt 0) { '🟡' } else { '🟢' }
+        if ($light -eq '🔴') { $rd++ } elseif ($light -eq '🟡') { $y++ } else { $g++ }
+        $sc += "| $f | $($e.pass) | $($e.fail) | $u | $($e.verified) | $($e.disputed) | $light |"
+        $tp += $e.pass; $tf += $e.fail; $tu += $u; $tv += $e.verified; $td += $e.disputed
+        foreach ($d in @($e.detail)) { $dt += $d }
+        if (($e.fail + $e.disputed + $e.unver) -gt 0) {
+            $seq++
+            $aRows += ("- [ ] A{0}-{1:D2} 補查 {2}：FAIL {3}／DISPUTED {4}／UNVERIFIABLE {5}（稽核）" -f $TargetRound, $seq, $f, $e.fail, $e.disputed, $e.unver)
+        }
+    }
+    foreach ($w in $dp.WikiRows) {
+        $c = @($w.Trim('|') -split '\|' | ForEach-Object { $_.Trim() })
+        if ($c.Count -lt 8) { continue }
+        $nums = @(); $ok = $true
+        for ($i = 2; $i -le 7; $i++) { $v = 0; if ([int]::TryParse($c[$i], [ref]$v)) { $nums += $v } else { $ok = $false } }
+        if (-not $ok) { continue }
+        $u = $nums[2] + $nums[3]
+        $light = if ($nums[1] -gt 0 -or $nums[5] -gt 0) { '🔴' } elseif ($u -gt 0) { '🟡' } else { '🟢' }
+        $sc += "| $($c[0]) | $($nums[0]) | $($nums[1]) | $u | $($nums[4]) | $($nums[5]) | $light |"
+        if (($nums[1] + $nums[5] + $nums[2]) -gt 0) {
+            $seq++
+            $aRows += ("- [ ] A{0}-{1:D2} 補查 {2}：FAIL {3}／DISPUTED {4}／UNVERIFIABLE {5}（稽核）" -f $TargetRound, $seq, $c[0], $nums[1], $nums[5], $nums[2])
+        }
+    }
+    foreach ($w in $dp.WikiDetail) { $dt += $w }
+    # D 列：只有 Domain Gate 判 DOMAIN_ROOT 的候選；重複提案交 Invoke-DItemGovernance 裁決
+    $dseq = 0
+    foreach ($c in $dp.Candidates) {
+        if ($c[5] -notmatch '(?i)DOMAIN_ROOT') { continue }
+        $obj = $c[0] -replace '[`\[\]]', ''
+        if ($obj -eq '') { continue }
+        $dseq++
+        $why = $c[6]; if ($why.Length -gt 80) { $why = $why.Substring(0, 80) + '…' }
+        $dRows += ("- [ ] D{0}-{1:D2} 新發現 {2}：{3}（稽核）" -f $TargetRound, $dseq, $obj, $why)
+    }
+    # 系統性觀察：明細「類型」欄同類 ≥2 機械統計
+    $typeCount = @{}
+    foreach ($d in $dt) {
+        $c = @($d.Trim('|') -split '\|' | ForEach-Object { $_.Trim() })
+        if ($c.Count -ge 2) { $k = $c[1]; if ($typeCount.ContainsKey($k)) { $typeCount[$k]++ } else { $typeCount[$k] = 1 } }
+    }
+    $sys = @(); foreach ($k in ($typeCount.Keys | Sort-Object)) { if ($typeCount[$k] -ge 2) { $sys += "- 「$k」×$($typeCount[$k])——同類 ≥2，建議 /ps-lesson 檢視" } }
+    if ($sys.Count -eq 0) { $sys += "- 無" }
+    $today = Get-Date -Format "yyyy-MM-dd"
+    $totalFiles = $Ledger.files.Count
+    $o = @()
+    $o += "# $Domain 稽核報告（90-audit）"
+    $o += ""
+    $o += "> 稽核輪次：$TargetRound　稽核日期：$today　範圍：已完成的 $totalFiles 個檔案（分批稽核，外環合併；BLOCKED $($blocked.Count) 檔）　執行：auto-loop 分批稽核（issue #22）"
+    $o += ""
+    $o += "## 總覽記分卡"
+    $o += ""
+    $o += "| 檔案 | 證據 PASS | FAIL | UNVERIFIABLE | Claim VERIFIED | DISPUTED | 燈號 |"
+    $o += "|---|---|---|---|---|---|---|"
+    $o += $sc
+    $o += "| **合計** | **$tp** | **$tf** | **$tu** | **$tv** | **$td** | 🟢$g／🟡$y／🔴$rd$(if ($blocked.Count -gt 0) { '／⛔' + $blocked.Count } else { '' }) |"
+    $o += ""
+    $o += "燈號：🟢 無 FAIL / DISPUTED；🟡 僅 UNVERIFIABLE；🔴 有 FAIL 或 DISPUTED；⛔ 未稽核（BLOCKED，見 audit-ledger.json，處理後刪台帳重跑）"
+    $o += ""
+    $o += "## FAIL / DISPUTED / UNVERIFIABLE 明細"
+    $o += ""
+    $o += "| 檔案 | 類型 | 內容 | 原因 | 處置 |"
+    $o += "|---|---|---|---|---|"
+    if ($dt.Count -eq 0) { $o += "| （無） | - | - | - | - |" } else { $o += $dt }
+    $o += ""
+    $o += "## 上輪回灌項覆核（第 2 輪起必填；首輪寫「無上輪」）"
+    $o += ""
+    $o += "- 分批稽核由外環合併，本節不由模型覆核：上輪 A 項的處置結果以本輪記分卡的全量重驗數字為準（同檔仍非 PASS＝未修成／已修成則本輪不再開單）。"
+    $o += ""
+    $o += "## 完整性（換角度 diff）"
+    $o += ""
+    if ($dp.Ok) {
+        $o += $dp.Integrity
+        if ($dp.Candidates.Count -gt 0) {
+            $o += ""
+            $o += "| 候選物件 | 型別 | 經由表 | 方向 | origin | 分類 | 理由 |"
+            $o += "|---|---|---|---|---|---|---|"
+            foreach ($c in $dp.Candidates) { $o += ("| " + ($c -join " | ") + " |") }
+        }
+    }
+    else {
+        $o += "- 任務 C 覆蓋：完成 0／共 1 批（未完成批次：領域批次未產出 domain.md——$($dp.Reason)）"
+        $o += "- 資料角度發現、功能地圖沒有的物件：本輪未查成（非「無」）"
+    }
+    $o += ""
+    $o += "## 已回灌 checklist 的行動項"
+    $o += ""
+    if (($aRows.Count + $dRows.Count) -eq 0) { $o += "- 無（本輪全量 PASS／VERIFIED）" } else { $o += $aRows; $o += $dRows }
+    $o += ""
+    $o += "## 系統性錯誤觀察（同類 FAIL ≥ 2 → 建議 /ps-lesson）"
+    $o += ""
+    $o += $sys
+    $o += ""
+    # 順序：先回灌 checklist，再寫報告（模板約束：行動項必須「先」在 checklist）
+    Add-ChecklistRows -Rows (@($aRows) + @($dRows))
+    Set-ChecklistRoundAndFlag -NewRound $TargetRound
+    [System.IO.File]::WriteAllText((Join-Path $dir "90-audit.md"), ($o -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+    return @{ ARows = $aRows.Count; DRows = $dRows.Count; Blocked = $blocked; Files = $totalFiles }
+}
+
+# 回合驅動：凍結本輪 → 逐批 session → 驗收發收據 → 齊備即合併。
+# 回傳與 Invoke-Opencode 同形的 $r（下游守衛／熔絲照舊）。
+function Invoke-AuditRound {
+    $clPath = Join-Path $dir "checklist.md"
+    $curRound = 0; $fullSweep = $false
+    if (Test-Path -LiteralPath $clPath) {
+        foreach ($l in (Get-Content -LiteralPath $clPath -Encoding UTF8)) {
+            if ($l -match '稽核輪次[：:]\s*([0-9]+)') { $curRound = [int]$Matches[1] }
+            if ($l -match '查無全量抽驗[：:]\s*待執行') { $fullSweep = $true }
+        }
+    }
+    $target = $curRound + 1
+    $ledger = Get-AuditLedger
+    if ($null -eq $ledger -or $ledger.round -ne $target) {
+        $ledger = @{ round = $target; batchK = $AuditBatchSize; domainDone = $false; domainAttempts = 0; domainReason = ''; files = @{}; wiki = @() }
+        Write-Log "稽核輪次 $target 開始（分批）：新台帳"
+    }
+    else { Write-Log "稽核輪次 $target 續跑：台帳已有 $(@($ledger.files.Values | Where-Object { $_.status -eq 'DONE' }).Count) 檔收據" }
+    $rows = Get-EvidenceRowCounts
+    $nn = @(Get-ChildItem -LiteralPath $dir -Filter "*.md" -File | Where-Object { $_.Name -match '^\d\d-' -and $_.Name -ne '90-audit.md' } | Sort-Object Name)
+    foreach ($f in $nn) {
+        $h = Get-NormalizedFileHash -LiteralPath $f.FullName
+        $n = 0; if ($rows.ContainsKey($f.Name)) { $n = [int]$rows[$f.Name] }
+        if ($ledger.files.ContainsKey($f.Name)) {
+            $e = $ledger.files[$f.Name]
+            if ($e.hash -ne $h) { $e.hash = $h; $e.rows = $n; $e.status = 'PENDING'; $e.attempts = 0; $e.reason = '' ; Write-Log "稽核：$($f.Name) 內容已變，收據作廢重驗" }
+        }
+        else {
+            $ledger.files[$f.Name] = @{ hash = $h; rows = $n; status = 'PENDING'; attempts = 0; pageSize = $AuditEvidencePageSize; reason = ''
+                pass = 0; fail = 0; unver = 0; pending = 0; verified = 0; disputed = 0; detail = @() }
+        }
+    }
+    foreach ($k in @($ledger.files.Keys)) { if (-not (Test-Path -LiteralPath (Join-Path $dir $k))) { $ledger.files.Remove($k) } }
+    if (-not (Test-Path -LiteralPath $auditPartsDir)) { New-Item -ItemType Directory -Path $auditPartsDir -Force | Out-Null }
+    Save-AuditLedger -Ledger $ledger
+    $failStreak = 0; $batchesRun = 0; $progress = 0
+    $script:auditRoundProgress = 0
+    # 批次 0：領域任務（任務 C＋wiki 抽驗）
+    if (-not $ledger.domainDone) {
+        $wp = Get-WikiPicks
+        $ledger.wiki = @($wp)
+        $null = New-AuditManifest -TargetRound $target -FullSweep $fullSweep -Files @() -BatchIndex 0 -BatchTotal 0 -DomainTasks $true -WikiPicks $wp
+        $sr = Invoke-AuditBatchSession -Tag "audit-b0"
+        $batchesRun++
+        $dp = Read-DomainPart
+        if ($dp.Ok) { $ledger.domainDone = $true; $ledger.domainReason = ''; $failStreak = 0; $progress++; Write-Log "稽核批次 0（領域）完成：候選 $($dp.Candidates.Count) 筆、wiki 列 $($dp.WikiRows.Count)" }
+        else {
+            $ledger.domainAttempts++
+            $ledger.domainReason = $dp.Reason
+            Write-Log "稽核批次 0（領域）未達標：$($dp.Reason)（attempts=$($ledger.domainAttempts)）"
+            if ($ledger.domainAttempts -ge 2) { $ledger.domainDone = $true; Write-Log "稽核批次 0 兩次未達標——本輪完整性節以「未查成」記錄，不再重試" }
+            if ($sr.TimedOut -or $sr.ExitCode -ne 0 -or $sr.FailureKind -eq 'CONTEXT_OVERFLOW') { $failStreak++ }
+        }
+        Save-AuditLedger -Ledger $ledger
+    }
+    # 檔案批次
+    $bi = 0
+    while ($true) {
+        if ($AuditBatchesPerCycle -gt 0 -and $batchesRun -ge $AuditBatchesPerCycle) { Write-Log "稽核：本圈批次上限 $AuditBatchesPerCycle 已達，餘檔下圈續跑"; break }
+        if ($failStreak -ge 2) { Write-Log "稽核：連續 2 批 session 級故障——本圈停止，餘檔下圈續跑（收據保留）"; break }
+        $pending = @($ledger.files.Keys | Where-Object { $ledger.files[$_].status -eq 'PENDING' } | Sort-Object)
+        if ($pending.Count -eq 0) { break }
+        $k = [Math]::Max(1, [int]$ledger.batchK)
+        $batch = @($pending | Select-Object -First $k)
+        $bi++
+        $files = @()
+        foreach ($f in $batch) { $e = $ledger.files[$f]; $files += @{ Name = $f; Rows = $e.rows; PageSize = [Math]::Max(1, $e.pageSize); Claims = @(Get-ClaimSample -Path (Join-Path $dir $f) -Max 5) } }
+        $totalB = [int][Math]::Ceiling($pending.Count / [double]$k)
+        $null = New-AuditManifest -TargetRound $target -FullSweep $fullSweep -Files $files -BatchIndex $bi -BatchTotal $totalB -DomainTasks $false -WikiPicks @()
+        Write-Log "稽核批次 $bi/$totalB：$($batch.Count) 檔（K=$k）｜列數 $(($files | ForEach-Object { $_.Rows }) -join ',')"
+        $sr = Invoke-AuditBatchSession -Tag "audit-b$bi"
+        $batchesRun++
+        $exp = @{}
+        foreach ($f in $batch) { $exp[$f] = [int]$ledger.files[$f].rows }
+        $res = Test-AuditPart -PartPath (Join-Path $auditPartsDir ("part-{0}.md" -f $bi)) -Expected $exp
+        $got = 0
+        foreach ($f in $batch) {
+            $e = $ledger.files[$f]
+            if ($res.Files.ContainsKey($f)) {
+                $v = $res.Files[$f]
+                $e.status = 'DONE'; $e.reason = ''
+                $e.pass = $v.pass; $e.fail = $v.fail; $e.unver = $v.unver; $e.pending = $v.pending; $e.verified = $v.verified; $e.disputed = $v.disputed; $e.detail = @($v.detail)
+                $got++
+            }
+        }
+        $healthy = (-not $sr.TimedOut) -and ($sr.ExitCode -eq 0)
+        $overflow = ($sr.FailureKind -eq 'CONTEXT_OVERFLOW')
+        foreach ($f in $batch) {
+            $e = $ledger.files[$f]
+            if ($e.status -eq 'DONE') { continue }
+            $why = $res.Invalid[$f]; if (-not $why) { $why = '無收據' }
+            if ($healthy) { $e.attempts++ }
+            $e.reason = $why
+            if ($overflow -and $e.rows -gt $e.pageSize) { $e.pageSize = [Math]::Max(3, [int][Math]::Floor($e.pageSize / 2)); Write-Log "稽核：$f 溢出→頁大小減半為 $($e.pageSize)" }
+            if ($e.attempts -ge 2 -or ($overflow -and $e.pageSize -le 3 -and $e.rows -gt 3)) {
+                $e.status = 'BLOCKED'
+                Write-Log "稽核 BLOCKED：$f（列數 $($e.rows)，attempts=$($e.attempts)）——$why；出路＝人工拆續篇 NN-X-2.md 縮小單檔證據，或修正後刪 audit-ledger.json 重跑"
+            }
+        }
+        if ($got -eq 0) {
+            $failStreak++
+            if ($overflow -or $healthy) { $ledger.batchK = [Math]::Max(1, [int][Math]::Floor($k / 2)); Write-Log "稽核批次 $bi 零收據（$(if ($overflow) { 'CONTEXT_OVERFLOW' } else { 'session exit=' + $sr.ExitCode + ' timeout=' + $sr.TimedOut })）→ 批次 K 減半為 $($ledger.batchK)" }
+        }
+        else { $failStreak = 0; $progress += $got; Write-Log "稽核批次 $bi：收據 $got/$($batch.Count)$(if ($res.Invalid.Count -gt 0) { '；未達標：' + (($res.Invalid.Keys | ForEach-Object { $_ + '（' + $res.Invalid[$_] + '）' }) -join '、') } else { '' })" }
+        Save-AuditLedger -Ledger $ledger
+    }
+    $script:auditRoundProgress = $progress
+    $left = @($ledger.files.Keys | Where-Object { $ledger.files[$_].status -eq 'PENDING' }).Count
+    if ($left -gt 0 -or -not $ledger.domainDone) {
+        Write-Log "稽核輪次 $target 未完成：剩 $left 檔待驗（本圈收據 +$progress）——輪次不遞增、收據保留，下圈續跑"
+        return @{ TimedOut = $false; ExitCode = 0; ErrFile = $null; OutFile = $null; FailureKind = 'NONE'; RoundComplete = $false }
+    }
+    $mg = Invoke-AuditMerge -Ledger $ledger -TargetRound $target
+    $null = Invoke-DItemGovernance
+    Write-Log "稽核輪次 $target 合併完成：$($mg.Files) 檔、A 列 $($mg.ARows)、D 列 $($mg.DRows)、BLOCKED $($mg.Blocked.Count)$(if ($mg.Blocked.Count -gt 0) { '（' + ($mg.Blocked -join '、') + '——記分卡標未稽核，lint 擋畢業）' } else { '' })"
+    $done = Join-Path $logRoot ("audit-r{0}.done.json" -f $target)
+    Copy-Item -LiteralPath $auditLedgerPath -Destination $done -Force
+    Remove-Item -LiteralPath $auditLedgerPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $auditPartsDir -Recurse -Force -ErrorAction SilentlyContinue
+    return @{ TimedOut = $false; ExitCode = 0; ErrFile = $null; OutFile = $null; FailureKind = 'NONE'; RoundComplete = $true }
+}
+
+# 單一稽核批次 session：前後照手術批次的守備（NN 快照／破壞防衛／調帳邊界）
+function Invoke-AuditBatchSession {
+    param([string]$Tag)
+    $snap = Get-NnGuardSnapshot
+    $preInvB = Get-ChecklistInventory
+    $preRoundB = 0
+    $clPath = Join-Path $dir "checklist.md"
+    if (Test-Path -LiteralPath $clPath) { foreach ($l in (Get-Content -LiteralPath $clPath -Encoding UTF8)) { if ($l -match '稽核輪次[：:]\s*([0-9]+)') { $preRoundB = [int]$Matches[1] } } }
+    $sr = Invoke-Opencode -ExtraArgs '--command ps-audit-batch' -PromptText $Domain -TimeoutMin $AuditBatchTimeoutMin -Tag $Tag
+    $null = Invoke-NnDestructionGuard -Snap $snap -Tag $Tag
+    $rec = Invoke-PostSessionReconcile -PreInv $preInvB -PreRound $preRoundB -Tag $Tag
+    if ($rec.LegitRemoved -gt 0) { $script:preItemTotal -= $rec.LegitRemoved; Write-Log "完整性基準調整（$Tag）：外環合法刪列 $($rec.LegitRemoved) → 基準 $($script:preItemTotal)" }
+    return $sr
+}
+
 # ── 主迴圈 ──────────────────────────────────────────────────
 Write-Log "=== auto-loop 啟動：領域=$Domain MaxCycles=$MaxCycles Model=$(if($Model){$Model}else{'(全域預設)'}) ==="
 # 啟動即結清歸檔（issue #13）：人工跑過 /ps-audit 的殘留已勾列在此搬進
@@ -1100,6 +1655,7 @@ $surgeryFailStreak = 0  # 手術 session 獨立熔絲（issue #11 P0-6）：不�
 $graduated = $false
 $gradContentHash = $null
 $gradAuditRound = 0
+$auditRoundProgress = 0   # 分批稽核本圈收據數（輪次未合併時不計零回灌熔絲）
 $stopReason = "圈數上限（$MaxCycles）"
 
 for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
@@ -1215,8 +1771,8 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     else {
         $phase = "audit"
         $auditBefore = Get-AuditTransition
-        $r = Invoke-Opencode -ExtraArgs '--command ps-audit' -PromptText $Domain `
-            -TimeoutMin $AuditTimeoutMin -Tag "audit"
+        # 分批稽核（issue #22／L107）：manifest → K 檔/session → 收據 → 齊備才合併
+        $r = Invoke-AuditRound
     }
 
     # 保險絲：逾時（強殺後先驗檔案一致性——FAIL 即停機進人工，不進下一圈）
@@ -1539,8 +2095,9 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             }
             break
         }
-        if ($after.Unticked -gt 0) {
-            Write-Log "audit 回灌 $($after.Unticked) 項，續跑"
+        if ($after.Unticked -gt 0 -or $auditRoundProgress -gt 0) {
+            if ($after.Unticked -gt 0) { Write-Log "audit 回灌 $($after.Unticked) 項，續跑" }
+            else { Write-Log "audit 輪次分批進行中（本圈收據 +$auditRoundProgress，尚未合併）——不計零回灌，續跑" }
             $auditStall = 0
         }
         else {

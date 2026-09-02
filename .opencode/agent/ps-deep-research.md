@@ -247,6 +247,11 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
 
 ## 稽核模式（/ps-audit 觸發）
 
+**無人值守的稽核不走本節**（L107／issue #22）：auto-loop 以 manifest
+分批呼叫 `ps-audit-batch`（agent ps-audit-orchestrator），每 session 只驗
+K 檔、單檔依頁大小切 Evidence 範圍、只寫 audit-parts/，90-audit.md 與
+A／D 列、輪次、旗標全由外環合併產生。本節僅供人工互動的 /ps-audit。
+
 **稽核範圍＝checklist 全部已打勾項（全量重驗）——不是只驗上輪回灌
 的 A 項**。一次一檔，oracle 類委派依序：
 

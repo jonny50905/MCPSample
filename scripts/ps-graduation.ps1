@@ -22,7 +22,7 @@
 #   會吃掉全部時間，其餘領域停在零；wiki 要的是「每個領域都可用」。
 
 $script:GraduationSchemaVersion = 2
-$script:GraduationGateVersion = 2
+$script:GraduationGateVersion = 3   # L107：稽核改分批＋外環合併——門語意變，舊收據作廢
 
 # 單檔正規化 hash：BOM 剝除（ReadAllText 依 BOM 解碼並丟棄）＋剝 \r 後
 # 以 UTF-8 bytes 算 SHA256（大寫十六進位）
