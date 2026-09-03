@@ -2946,9 +2946,10 @@
      connect（一次、冪等）→ ALTER SESSION 每任務一次（重複無害）→ 查 →
      **不得 disconnect**（headless 結束時連線隨行程關閉；逾時／BLOCKED 前也不斷）。
   2. ps-ui-flow／ps-metadata-flow／ps-ae-flow 三個帶 oracleMCP 的 agent 同步改。
-  3. 會查 oracleMCP 的委派同時 ≤ 3 → **≤ 1**：ps-audit-batch、ps-audit、
-     ps-deep-research（三處）、ps-audit-orchestrator；功能分支另含
-     ps-contract-batch／ps-contract-verify。ES＋Source 類維持 ≤ 6。
+  3. 會查 oracleMCP 的委派同時上限：真因未明時曾壓到 1，硬性 deny 落地後**恢復 ≤ 3**
+     並加「本批第一個 oracleMCP 委派先單獨派、回報後其餘再並行」（避免同時 connect）：
+     ps-audit-batch、ps-audit、ps-deep-research（三處）、ps-audit-orchestrator；功能分支
+     另含 ps-contract-batch／ps-contract-verify。ES＋Source 類維持 ≤ 6。
   4. SOP-12 補實驗結論與新協定；`.gitignore` 補 `docs/ps-research/*/audit-parts/`
      （分批稽核暫存，輪次未合併時會殘留，開 -GitCommit 會被 commit 進去）。
   5. 硬性擋線（管理者要求）：ps-auditor／ps-ui-flow／ps-metadata-flow／ps-ae-flow 的

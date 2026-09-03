@@ -42,10 +42,11 @@ docs/ps-research/<領域>/
   **兩個委派**。禁止把多個檔、多個 A 項區間或多個任務塞進同一個委派。
 - **併發上限看「這個委派會呼叫哪個 server」**（不是任務類型——同樣是
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
-  · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：**同時 ≤ 1**
-    （連線是全域共用單例，L109；並行＝互拆）。
+  · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3，
+    但**第一個先單獨派**、回報後其餘再並行（連線是全域共用單例，L109：
+    讓第一個把連線建好，避免同時 connect；disconnect 已對 subagent 硬性關閉）。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
-  同時派出總數 ≤ 6，其中會查 DB 的 ≤ 1。
+  同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
 
 ## 啟動與續跑（每次被呼叫先做這個）
@@ -96,7 +97,7 @@ docs/ps-research/<領域>/
    Activate／PostBuild 定位（ObjectName＋eventName 結構化搜尋——
    條件 UI 變異多在此）；回報含 businessRelevant UI 變異 →
    其 suggestedNext（ps-ui-flow 解析）屬深度規則，必須執行
-   （oracleMCP 類，計入同時 ≤ 1，L109）。
+   （oracleMCP 類，計入同時 ≤ 3，L109）。
 2. 依 function-detail 模板寫 `NN-<物件名>.md`：**寫檔前必先 read
    `.opencode/peoplesoft/report-templates/function-detail-template.md`，
    八個章節標題逐字照抄（含 `## ` 前綴與內部空格）——標題是機器契約，
@@ -208,7 +209,7 @@ docs/ps-research/<領域>/
   （Activate／PostBuild）結構化定位，偵測 UI 狀態變異（含條件分支）。
 - 查無變異 → NN 檔不動、該列打勾，收據記「查無＋查法」。
 - 有 businessRelevant 變異 → 依 suggestedNext 委派 @ps-ui-flow 解析
-  （oracleMCP 類，同時 ≤ 1，L109），在該 NN 檔**檔尾追加**「條件 UI」小節
+  （oracleMCP 類，同時 ≤ 3，L109），在該 NN 檔**檔尾追加**「條件 UI」小節
   （格式同階段二步驟 2；證據照契約 CHUNK＋SQL；只追加，不改寫既有內容）。
 - 打勾前快驗照階段二步驟 4（auditor 任務 A）。
 - 不動 wiki——新知識由畢業後提煉相位歸戶。

@@ -23,7 +23,7 @@ push 前先 `git pull`。
 
 **追記（2026-09-03，oracleMCP 連線根因）**：管理者三個實驗定案 oracleMCP 連線是 server 全域單例
 （誰 disconnect 全員斷線；L109、SOP-12 補述）。已改模型側契約：cookbook 生命週期「不得 disconnect、
-connect 冪等」、三個 flow agent 同步、會查 oracleMCP 的委派同時 ≤ 3 → ≤ 1（ps-audit-batch／ps-audit／
+connect 冪等」、三個 flow agent 同步、會查 oracleMCP 的委派維持 ≤ 3＋首個先單獨派（曾短暫壓到 1，已恢復）（ps-audit-batch／ps-audit／
 ps-deep-research／ps-audit-orchestrator）、`.gitignore` 補 audit-parts。**ps-auto-loop.ps1 一行未動**
 （外環斷路器草案留解凍後，見 L109「有意不做」；立即緩解可加 `-AuditBatchesPerCycle 4`）。
 搬運清單見 §1 步驟 1a。功能分支 `claude/issue-17-legacy-contract-phase1` 已 merge 本修正並另改
@@ -45,7 +45,7 @@ ps-contract-batch／ps-contract-verify。
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
    | `scripts/ps-auto-loop.ps1` | 修改 | 2270 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
-   | `.opencode/command/ps-audit-batch.md` | 修改 | 108 | 掛 ps-deep-research（80196ee） |
+   | `.opencode/command/ps-audit-batch.md` | 修改 | 109 | 掛 ps-deep-research（80196ee） |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 138 | 備用、未掛載，但 manifest 要對 |
    | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
@@ -53,17 +53,17 @@ ps-contract-batch／ps-contract-verify。
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則） | 360 | handover 版本行數 |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則） | 362 | handover 版本行數 |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期） | 115 | handover 版本行數 |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期） | 102 | handover 版本行數 |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | handover 版本行數 |
    | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則） | 236 | handover 版本行數 |
-   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 1） | 108 | handover 版本行數 |
-   | `.opencode/command/ps-audit.md` | 修改（≤ 1） | 71 | handover 版本行數 |
-   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 1） | 476 | handover 版本行數 |
-   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 1） | 138 | handover 版本行數 |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述） | 597 | handover 版本行數 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109） | 2912 | handover 版本行數 |
+   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派） | 109 | handover 版本行數 |
+   | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 | handover 版本行數 |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 | handover 版本行數 |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 | handover 版本行數 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述） | 598 | handover 版本行數 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109） | 2913 | handover 版本行數 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | handover 版：fs-doctor 應報 55 檔一致 |
 
    從功能分支搬則改用 §1b 的聯集表（含本批全部檔案，行數為功能分支版本）。
@@ -88,19 +88,19 @@ ps-contract-batch／ps-contract-verify。
    |---|---|---|---|
    | `.opencode/peoplesoft/legacy-contract-vocabulary.md` | 新增 | 400 | 封閉值域單一真相（vocabularyVersion 1） |
    | `.opencode/peoplesoft/legacy-contract-fragments.md` | 新增 | 223 | fragment／分頁檔／verify 收據形狀 |
-   | `.opencode/command/ps-contract-batch.md` | 新增 | 40 | 掛 ps-deep-research；oracleMCP 委派 ≤ 1 |
-   | `.opencode/command/ps-contract-verify.md` | 新增 | 32 | 掛 ps-deep-research；oracleMCP 委派 ≤ 1 |
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（連線生命週期改版＋只加 §7） | 454 | 生命週期 L48 起；§7 自 L364 起，樣板全標待公司機驗證 |
+   | `.opencode/command/ps-contract-batch.md` | 新增 | 40 | 掛 ps-deep-research；oracleMCP 委派 ≤ 3、首個先單獨派 |
+   | `.opencode/command/ps-contract-verify.md` | 新增 | 32 | 掛 ps-deep-research；oracleMCP 委派 ≤ 3、首個先單獨派 |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（連線生命週期改版＋只加 §7） | 456 | 生命週期 L48 起；§7 自 L364 起，樣板全標待公司機驗證 |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期） | 115 | L109 |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期） | 102 | L109 |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | L109 |
    | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則） | 236 | L109 |
-   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 1） | 108 |  |
-   | `.opencode/command/ps-audit.md` | 修改（≤ 1） | 71 |  |
-   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 1） | 476 |  |
-   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 1） | 138 |  |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-18） | 649 | SOP-18 自 L591 起 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109） | 2968 | L108 自 L2879、L109 自 L2935 起 |
+   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派） | 109 |  |
+   | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 |  |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 |  |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 |  |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-18） | 650 | SOP-18 自 L591 起 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109） | 2969 | L108 自 L2879、L109 自 L2935 起 |
    | `scripts/ps-contract-lib.ps1` | 新增 | 1440 | 存 UTF-8 with BOM；不直接執行 |
    | `scripts/ps-contract.ps1` | 新增 | 247 | 存 UTF-8 with BOM |
    | `scripts/tests/test-contract.ps1` | 新增 | 553 | 存 UTF-8 with BOM；`pwsh -NoProfile -File`；fixture 自刪 |

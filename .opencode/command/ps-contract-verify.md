@@ -13,7 +13,7 @@ agent: ps-deep-research
 
 ## 委派規則
 
-- **一個單位一個委派**（manifest 的「## 單位 n」＝一個委派＝一個收據檔），禁止把多個單位或多個樣板族塞進同一委派；同時 ≤ 1（oracleMCP 連線全域單例，L109；查完不得 disconnect）。
+- **一個單位一個委派**（manifest 的「## 單位 n」＝一個委派＝一個收據檔），禁止把多個單位或多個樣板族塞進同一委派；同時 ≤ 3、第一個單位先單獨派再並行（oracleMCP 連線全域單例，L109；查完不得 disconnect）。
 - 委派模板（只傳事實，不貼 NN 內容）：
   - OBJ：`[任務] Oracle 物件驗證 Record <RECNAME>／實體表 <PHYSICAL>：照 cookbook §7a OBJECT_EXISTS＋OBJECT_TYPE、§7c RECTYPE／SQLTABLENAME、§7d／§7e 鍵與唯一索引<、§7f 生效日形狀>；每個查詢回報 sql＋keyRows；只准 SELECT。`
   - FLD：`[任務] Oracle 欄位驗證 <PHYSICAL>：照 cookbook §7b 取 ALL_TAB_COLUMNS 整表，回報下列欄位的 COLUMN_NAME／DATA_TYPE／DATA_LENGTH：<欄位清單>；查無回 NOT_FOUND；只准 SELECT。`

@@ -476,9 +476,10 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 □ 新協定（cookbook 連線生命週期已改版）：**誰都不准 disconnect**（headless 結束時
   連線隨行程關閉）；connect 冪等（先直接查，回未連線錯誤才 connect 一次）；
   ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害
-□ **會查 oracleMCP 的委派同時 ≤ 1**（上文的 3 作廢；ES＋Source 類仍 ≤ 6）——
-  ps-audit-batch／ps-audit／ps-deep-research／ps-audit-orchestrator／
-  ps-contract-batch／ps-contract-verify 已同步改
+□ 會查 oracleMCP 的委派同時 ≤ 3 維持（硬性 deny 落地後恢復；曾短暫壓到 1，
+  那是 disconnect 真因未明時的暫時解）；**本批第一個 oracleMCP 委派先單獨派**、
+  回報後其餘再並行，避免同時 connect——ps-audit-batch／ps-audit／ps-deep-research／
+  ps-audit-orchestrator／ps-contract-batch／ps-contract-verify 已同步
 □ 主 agent（ps-deep-research）的 oracleMCP 權限維持關閉：第一個 subagent 開的
   連線，後面的 subagent 直接沿用，不需要 main 先開
 □ 風暴判讀：auto-loop-logs\<領域>\*-audit-b*.out.txt 裡 oracleMCP_disconnect
