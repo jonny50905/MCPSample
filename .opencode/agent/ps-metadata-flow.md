@@ -18,6 +18,8 @@ tools:
   # PeopleTools metadata（排程 / 授權 / origin / Record 結構）用 oracleMCP 查，
   # 查詢一律照 oracle-query-cookbook.md 的樣板，只准 SELECT：
   "oracleMCP_*": true
+  # L109：連線是全域單例，subagent 一律不准斷線（放在 oracleMCP_* 之後：OpenCode 最後匹配者優先，順序不可顛倒）
+  "oracleMCP_disconnect": false
   # PeoplecodeMetadata：欄位用途反查（find_field_usage）／Component 關鍵字
   # 搜尋（search_component_metadata）——回傳只作定位線索，證據仍走 SQL／CHUNK：
   "PeoplecodeMetadata_*": true

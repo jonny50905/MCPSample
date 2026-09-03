@@ -15,6 +15,8 @@ tools:
   # PeopleTools metadata（translate values、label、Page/Component 對映、prompt）
   # 用 oracleMCP 查，一律照 oracle-query-cookbook.md 樣板，只准 SELECT：
   "oracleMCP_*": true
+  # L109：連線是全域單例，subagent 一律不准斷線（放在 oracleMCP_* 之後：OpenCode 最後匹配者優先，順序不可顛倒）
+  "oracleMCP_disconnect": false
   # PeoplecodeMetadata：欄位用途反查／Component 關鍵字搜尋——免連線、最便宜，
   # 但回傳只作「定位線索」，證據仍走 oracleMCP（SQL）：
   "PeoplecodeMetadata_*": true

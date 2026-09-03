@@ -17,6 +17,8 @@ tools:
   "PeoplecodeSource_*": true
   # AE 結構（Section / Step 清單）用 oracleMCP 照 cookbook §5 查，只准 SELECT：
   "oracleMCP_*": true
+  # L109：連線是全域單例，subagent 一律不准斷線（放在 oracleMCP_* 之後：OpenCode 最後匹配者優先，順序不可顛倒）
+  "oracleMCP_disconnect": false
   # PeoplecodeMetadata：get_ae_sql_metadata（aeApplid）取 AE SQL 中繼資料
   # ——免連線的定位／結構線索，證據仍走 SQL／CHUNK：
   "PeoplecodeMetadata_*": true

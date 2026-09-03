@@ -483,6 +483,14 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
   連線，後面的 subagent 直接沿用，不需要 main 先開
 □ 風暴判讀：auto-loop-logs\<領域>\*-audit-b*.out.txt 裡 oracleMCP_disconnect
   一批出現數十次且無查詢結果列＝有人還在 disconnect（舊版 agent 檔沒搬到）
+□ 硬性擋線（管理者要求）：四個帶 oracleMCP 的 subagent（ps-auditor／ps-ui-flow／
+  ps-metadata-flow／ps-ae-flow）tools 表在 "oracleMCP_*": true **之後**加
+  "oracleMCP_disconnect": false（OpenCode 規則：最後匹配者優先，順序不可顛倒）——
+  不聽話的 subagent 也叫不到 disconnect；prompt 層的「不得 disconnect」只是第二道。
+  primary agent（ps-deep-research／ps-orchestrator／ps-audit-orchestrator）oracleMCP_*
+  全關；只有管理者的互動 session（build／general）還能 disconnect。本機 opencode.json
+  若版本支援 per-tool permission 可再加 "oracleMCP_disconnect": "deny"，版本未驗證前
+  不要加（config 驗證失敗會讓 agent 載入失敗，症狀同 L60「agent 未被認到」）
 ```
 
 ## SOP-11 系統 CR 上線後的知識庫對齊
