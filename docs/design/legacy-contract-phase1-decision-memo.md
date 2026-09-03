@@ -271,7 +271,7 @@ docs/ps-research/<領域>/
 ### D7. 指令（掛 ps-deep-research，程序全寫在指令本文；agent 定義不改）
 
 - `/ps-contract-batch <領域>`：第一動作 read `contract-parts/manifest.txt`；對每個單位：read 指定 NN 檔 → 缺料才委派（screen：@ps-ui-flow 以 cookbook §2d／§2e 取 Page 欄位盤點與 modes；entity：@ps-metadata-flow 以 §6 取 RECTYPE／SQLTABLENAME／欄位）→ 照 `legacy-contract-fragments.md` 寫 fragment → read 回確認。不寫 NN／checklist／90-audit／spec。
-- `/ps-contract-verify <領域>`：第一動作 read `contract-parts/verify-manifest.txt`；每單位（OBJ／FLD-a-b／RQ-n）一個委派 @ps-metadata-flow 跑 cookbook §7 樣板（同時 ≤3）→ 寫 `verify-<RECNAME>-<單位>.md`（「## 查詢」表：單位｜樣板｜SQL｜關鍵列｜狀態；FLD 加「## 欄位」表、OBJ 加「## 物件」表）；模型不判 PASS／FAIL。
+- `/ps-contract-verify <領域>`：第一動作 read `contract-parts/verify-manifest.txt`；每單位（OBJ／FLD-a-b／RQ-n）一個委派 @ps-metadata-flow 跑 cookbook §7 樣板（同時 ≤ 1，L109）→ 寫 `verify-<RECNAME>-<單位>.md`（「## 查詢」表：單位｜樣板｜SQL｜關鍵列｜狀態；FLD 加「## 欄位」表、OBJ 加「## 物件」表）；模型不判 PASS／FAIL。
 - 切片 1 不做外環駕駛 loop（實驗先行）：管理者手動 `opencode run --command ps-contract-batch <領域>` 每批一次，之間跑 `ps-contract.ps1 -Domain <領域> -All`。實測 fragment 可寫後再上 loop（切片 2）。
 
 ### D8. Cookbook §7（Schema Verification 樣板，全數標「待公司機驗證」）

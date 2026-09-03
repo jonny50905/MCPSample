@@ -24,7 +24,7 @@ manifest 是外環產生的唯讀工單：每個單位給輸出檔路徑、來�
    - screen 分頁檔（screen-<COMP>-p<k>.md）：只寫「## 畫面」（component／page／sourceNn）＋「## 控制項」（manifest 列的那一頁欄位）。
    - entity：資料流中該 Record 的操作 → 寫入表；欄位表只列鍵欄位、EFFDT 類、NN 提到的欄位；其餘鍵值查不到寫 UNRESOLVED。
 2. **證據欄只准逐字抄 manifest 列出的 `E<nn>.<n>` token**（nn＝來源 NN 前兩碼）、本檔查詢表的 `SQL:<n>`、或 `UNRESOLVED`。不抄 ChunkId、不自創。
-3. 缺料才委派，且一個單位至多 2 個委派、會查 oracleMCP 的同時 ≤ 3：
+3. 缺料才委派，且一個單位至多 2 個委派、會查 oracleMCP 的同時 ≤ 1（連線全域單例，L109；查完不得 disconnect）：
    - screen 缺 Page 清單／modes／Search Record／欄位盤點 → 委派 @ps-ui-flow：`[任務] Component <名> 的 Page 清單、Search Record、各 Page 的 Record.Field 盤點（cookbook §2d／§2e／§4 PSPNLGRPDEFN）`
    - entity 缺 RECTYPE／SQLTABLENAME／欄位／鍵 → 委派 @ps-metadata-flow：`[任務] Record <名> 結構：RECTYPE、SQLTABLENAME、欄位清單與鍵（cookbook §6／§7）`
    - 委派回報的 SQL 證據（sql＋keyRows）抄進本檔查詢表（screen：查詢證據；entity：參考查詢，狀態 PENDING），再以 `SQL:<n>` 引用。

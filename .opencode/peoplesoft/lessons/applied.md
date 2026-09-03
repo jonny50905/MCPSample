@@ -2931,3 +2931,34 @@
   ps-contract-verify 兩指令；ps-contract.ps1＋lib；cookbook §7；
   scripts/tests/test-contract.ps1 情境 K1～K10 共 102 判定全 PASS；SOP-18；
   設計備忘 docs/design/legacy-contract-phase1-decision-memo.md）。
+
+### L109 oracleMCP 連線是全域單例——誰 disconnect 全員斷線（2026-09-03）
+- 症狀：分批稽核第三批起 log 出現成串 `oracleMCP_disconnect`、收據 4/6、
+  外環一圈接一圈重排同一批停不下來。
+- 根因（管理者三個實驗定案）：(1) main 開連線 → subagent 只查：通；
+  (2) main 不開 → subagent 只查：不通；(3) main 不開 → subagent 自開再查：通。
+  ⇒ SQLcl MCP 的「目前連線」是 server 行程級單例，main 與全部 subagent 共用
+  同一個開關；cookbook 舊生命週期第 5 步「查完必 disconnect」在 ≥2 個委派
+  並行時必然互拆——先查完的斷線，其餘失敗重連再互拆，成風暴。L66／SOP-12
+  當初只寫到「可能互拆」，這次坐實。
+- 落點：
+  1. cookbook 連線生命週期改版：先直接查 → 回未連線錯誤才 list-connections＋
+     connect（一次、冪等）→ ALTER SESSION 每任務一次（重複無害）→ 查 →
+     **不得 disconnect**（headless 結束時連線隨行程關閉；逾時／BLOCKED 前也不斷）。
+  2. ps-ui-flow／ps-metadata-flow／ps-ae-flow 三個帶 oracleMCP 的 agent 同步改。
+  3. 會查 oracleMCP 的委派同時 ≤ 3 → **≤ 1**：ps-audit-batch、ps-audit、
+     ps-deep-research（三處）、ps-audit-orchestrator；功能分支另含
+     ps-contract-batch／ps-contract-verify。ES＋Source 類維持 ≤ 6。
+  4. SOP-12 補實驗結論與新協定；`.gitignore` 補 `docs/ps-research/*/audit-parts/`
+     （分批稽核暫存，輪次未合併時會殘留，開 -GitCommit 會被 commit 進去）。
+- 原則：**有狀態的單工資源，所有權要明確——共用就沒人能關，要關只能由行程
+  結束關**。「用完必斷」在每個 agent 各有一條連線時才對；資源是單例時，
+  禮貌的 disconnect 就是對別人的 kill。
+- 有意不做：外環（ps-auto-loop.ps1）對「零收據且 out/err 含 oracleMCP 字樣連 N 批」
+  的斷路器——根因已在模型側消除，外環改動屬解凍後事項（草案：Test-OracleMcpSignal
+  ＋跨圈 $script: 計數、只在零收據分支計數、連 3 批 exit 2；另 Invoke-AuditRound
+  回傳硬寫 TimedOut=$false／ExitCode=0 使檔頭兩條熔絲對稽核相位失效、
+  -AuditBatchesPerCycle 0 圈內無上限，皆留待解凍；立即緩解可用
+  -AuditBatchesPerCycle 4）。
+- 套用：本 commit（cookbook、三個 flow agent、四個併發上限檔、SOP-12、.gitignore、
+  manifest 重生；功能分支再加兩個 contract 指令）。

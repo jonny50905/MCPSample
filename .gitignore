@@ -26,3 +26,6 @@ docs/ps-research/*/graduation.json
 
 # Legacy Contract 收據（issue #17／L108）＝單機事實，同 graduation.json 理由
 docs/ps-research/*/contract/contract-receipt.json
+
+# 分批稽核暫存（L107）：輪次未合併時會殘留 part-*.md／domain.md，不入庫（L109）
+docs/ps-research/*/audit-parts/

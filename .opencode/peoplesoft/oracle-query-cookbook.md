@@ -45,23 +45,31 @@
    要當證據，就得用本 cookbook 的 SELECT 取得並附「SQL＋關鍵列」。
 ```
 
-## 連線生命週期（每次任務照此順序，硬性）
+## 連線生命週期（每次任務照此順序，硬性；2026-09-03 依實驗改版，L109）
 
 SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線」，指令依序執行。
+**實驗定案（2026-09-03）**：這條連線是 MCP server 全域單例——main 與所有 subagent
+共用同一個開關，任何一方 `disconnect` 就把其他人一起斷線。
+因此：**連線是共用資源，誰都不准 disconnect；connect 要冪等。**
 
 ```text
-1. list-connections     → 取得可用的已儲存連線名（不要自己編連線名）
-2. connect（帶連線名）   → 切換本行程的目前連線
+1. 先直接查            → 本次任務的第一個 SELECT 直接發（連線多半已被前一個
+                          委派開好）；成功＝已連線，跳到第 4 步
+2. 只在回「未連線」類錯誤時
+   list-connections     → 取得可用的已儲存連線名（不要自己編連線名）
+   connect（帶連線名）   → 只做一次；回「已連線」也視為成功
 3. 設 schema            → read customization-profile.yaml 取
                           oracle.currentSchema，執行一次
                           ALTER SESSION SET CURRENT_SCHEMA=<該值>
-                          （**唯一准許的非 SELECT 語句**；
-                          值為 FILL_ME → 跳過此步）
+                          （**唯一准許的非 SELECT 語句**；重複執行無害；
+                          值為 FILL_ME → 跳過此步）→ 重發第 1 步那個查詢一次
 4. 查詢                 → 本次任務的查詢全部做完（裸表名即可，
                           schema 已由第 3 步解決——PeopleTools 表
                           不屬於登入帳號的 schema，漏這步會
                           view/table not found）
-5. disconnect           → 用完必斷，不要佔住單工 server
+5. 不得 disconnect      → 連線留給下一個委派；headless 的 opencode run
+                          結束時 MCP server 隨行程結束，連線自然關閉。
+                          逾時、BLOCKED 回報前也一樣不斷線
 ```
 
 逾時與平行規則：
@@ -73,6 +81,9 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
   禍及其他 agent。
 - 不要假設可以同時有第二條連線——「目前連線」是行程級全域狀態，
   交錯使用會把查詢跑在錯的連線上。
+- 會查 oracleMCP 的委派同時 ≤ 1（單工連線跑不了並行 SQL；並行＝互相等
+  一個不會回來的回應，L66）。純 ES＋Source 的委派不受此限。
+- 任何情況都不呼叫 disconnect——斷線會把 main 與其他 subagent 一起拆掉。
 ```
 
 ## Effective Date 標準樣式（有 EFFDT 的表都要套）
