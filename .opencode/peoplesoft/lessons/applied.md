@@ -2951,6 +2951,10 @@
      ps-contract-batch／ps-contract-verify。ES＋Source 類維持 ≤ 6。
   4. SOP-12 補實驗結論與新協定；`.gitignore` 補 `docs/ps-research/*/audit-parts/`
      （分批稽核暫存，輪次未合併時會殘留，開 -GitCommit 會被 commit 進去）。
+  5. 硬性擋線（管理者要求）：ps-auditor／ps-ui-flow／ps-metadata-flow／ps-ae-flow 的
+     tools 表在 `"oracleMCP_*": true` 之後加 `"oracleMCP_disconnect": false`（最後匹配
+     者優先）；併發下 subagent 的行為靠 prompt 管不住，工具層關掉才算數。primary
+     agent oracleMCP 全關，只有管理者互動 session 能 disconnect。
 - 原則：**有狀態的單工資源，所有權要明確——共用就沒人能關，要關只能由行程
   結束關**。「用完必斷」在每個 agent 各有一條連線時才對；資源是單例時，
   禮貌的 disconnect 就是對別人的 kill。

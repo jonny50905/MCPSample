@@ -14,6 +14,8 @@ tools:
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
   "oracleMCP_*": true
+  # L109：連線是全域單例，subagent 一律不准斷線（放在 oracleMCP_* 之後：OpenCode 最後匹配者優先，順序不可顛倒）
+  "oracleMCP_disconnect": false
   # PeoplecodeMetadata 可作任務 C 的反查角度（欄位用途／Component 搜尋）；
   # 證據解引用（任務 A）仍只認 ES／Source／oracleMCP 三個來源：
   "PeoplecodeMetadata_*": true
@@ -226,7 +228,8 @@ customization-profile 的分類：名稱符合客製 prefix＝CUSTOM_PREFIX，
 - 判定只依據重新取得的證據；「文件這樣寫」不構成理由。
 - quote 比對失敗照實 FAIL——不腦補「大概是後來改版了」。
 - 不修文件、不寫任何檔案。
-- oracleMCP 只准 SELECT；逾時 → 該筆 UNVERIFIABLE，**不准重試迴圈**。
+- oracleMCP 只准 SELECT；逾時 → 該筆 UNVERIFIABLE，**不准重試迴圈**；連線生命週期照 cookbook
+  （先直接查、回未連線錯誤才 connect 一次、**不得 disconnect**——工具已對本 agent 關閉，L109）。
 - 回報內不放大段原始碼（單段引用 ≤ 5 行）。
 - **原因欄寫人話**：每筆 FAIL 的 reason 要讓修復者一看就懂——
   固定格式「文件說＜一句＞；實際取到＜一句＞；差異＜一句＞」；

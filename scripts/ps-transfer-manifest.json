@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "bc8072c",
+  "commit": "0d96d84",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -16,8 +16,8 @@
     },
     {
       "path": ".opencode/agent/ps-ae-flow.md",
-      "lines": 88,
-      "sha256": "7167ed322f31d1d4b22dddd9cad98aa3ffe3c9bbd321db1dbf8eebf6dee3168d",
+      "lines": 90,
+      "sha256": "c515b1a210f48c206709679ca39926a35a3a5549d11186a490c7b5eeef9f5bdc",
       "bom": false
     },
     {
@@ -28,8 +28,8 @@
     },
     {
       "path": ".opencode/agent/ps-auditor.md",
-      "lines": 233,
-      "sha256": "bff9da26209159538c4fa96e3c34053066b1487071d54bcd13bca3d98e366de5",
+      "lines": 236,
+      "sha256": "b8c59f6d03daff3fd537c669768bb0076e6d5b77ba1f05b48be40ffdda72b8e4",
       "bom": false
     },
     {
@@ -40,8 +40,8 @@
     },
     {
       "path": ".opencode/agent/ps-metadata-flow.md",
-      "lines": 100,
-      "sha256": "e00dc05cb293e49ec51e9362ba211a03ea8e86e598b6ac50b606a7749af2235d",
+      "lines": 102,
+      "sha256": "4615971ceebf173ff0600171f69fb1045a3865231d63c063dd51030499fcb4c8",
       "bom": false
     },
     {
@@ -70,8 +70,8 @@
     },
     {
       "path": ".opencode/agent/ps-ui-flow.md",
-      "lines": 113,
-      "sha256": "52b83f50a439acb0169707e3fdbcfc6715b39fbc98158a5b8cee8a428e1446b3",
+      "lines": 115,
+      "sha256": "d4300615742881e313838fe647c09b3cdb031ab0e9e7e9c4142cb3167316d807",
       "bom": false
     },
     {
@@ -148,8 +148,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 2964,
-      "sha256": "5719da07f9a305c02350f75b32c3e196ba821505afd167e77a9a0e7dfe3932ce",
+      "lines": 2968,
+      "sha256": "824127e645b028fe42d856a2a693b31bd15a6a9f8f80f9edc7242993487261a6",
       "bom": false
     },
     {
@@ -220,8 +220,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 641,
-      "sha256": "d6f3ec714ebad310d0a01a203e0dfa081ff9e93ee7f164c1a001f26fc166b175",
+      "lines": 649,
+      "sha256": "073af0fea89621cf073f4a1059b548367f813de6c5783a8153c7d36bfd6b6342",
       "bom": false
     },
     {
