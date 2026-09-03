@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "80544f8",
+  "commit": "2294750",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -23,7 +23,7 @@
     {
       "path": ".opencode/agent/ps-audit-orchestrator.md",
       "lines": 138,
-      "sha256": "f77426bf0bb231f8c0655f2ff2537907b942fe4b679ce0f80b7594f1a6a20911",
+      "sha256": "25cb210d48576808347699c42f126e7c687b9c255352cbc572eaf89c4551f47f",
       "bom": false
     },
     {
@@ -34,8 +34,8 @@
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 476,
-      "sha256": "a7e0dc54b3651a9e19bec5f5038eb5b36137639f16fc616188ee27c762663c57",
+      "lines": 477,
+      "sha256": "e62f6ecc9bc90e59dd25b994fa07441772f5f15602ce53108fe8d950544c8391",
       "bom": false
     },
     {
@@ -82,14 +82,14 @@
     },
     {
       "path": ".opencode/command/ps-audit-batch.md",
-      "lines": 108,
-      "sha256": "ea11ca44df6462f398eedc7453d5324b55cb447af72a270691c513d072e7702b",
+      "lines": 109,
+      "sha256": "6716f3a23f371e6fff6ad83ddeb7e26d0a02c227b705f4ff5d22014c046393b0",
       "bom": false
     },
     {
       "path": ".opencode/command/ps-audit.md",
-      "lines": 71,
-      "sha256": "59ac42d96cb4477a6881588d6dce7efc4c41ea3f0e4b9830f470446e98b9f949",
+      "lines": 72,
+      "sha256": "cfdc068ddf3b28df73f48d903683fa1c38bc14aa33d5d918be82a82fe34b0c0c",
       "bom": false
     },
     {
@@ -124,8 +124,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 2912,
-      "sha256": "2dba483157c6e39afc3fd2ec8b44641d5f16df4c01e92ba259aaff5f1ea35a80",
+      "lines": 2913,
+      "sha256": "4809ea5d0250cdcb7d88804175526ad93c0012e8aa5b5ac6d0af70e17578936c",
       "bom": false
     },
     {
@@ -142,8 +142,8 @@
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 360,
-      "sha256": "7ffc2df0613f07aad7b75338744aee8443749af237c061d84ca94aff4886b1e9",
+      "lines": 362,
+      "sha256": "9ac85c5377834f35081a81ab4827bb2547f6072b1345d2a6a24a5045898d475b",
       "bom": false
     },
     {
@@ -196,8 +196,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 597,
-      "sha256": "419ae55454761afe3c9286745835a4f8a877af1a5be7842e30c4e8f103d3b99f",
+      "lines": 598,
+      "sha256": "db79a3172546e02d920dfedf299656e669f98a169415f1eb4b50cd1205f11abd",
       "bom": false
     },
     {

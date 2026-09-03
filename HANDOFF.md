@@ -22,7 +22,7 @@ push 前先 `git pull`。
 
 **追記（2026-09-03，oracleMCP 連線根因）**：管理者三個實驗定案 oracleMCP 連線是 server 全域單例
 （誰 disconnect 全員斷線；L109、SOP-12 補述）。已改模型側契約：cookbook 生命週期「不得 disconnect、
-connect 冪等」、三個 flow agent 同步、四個 subagent tools 表硬性 `"oracleMCP_disconnect": false`（ps-auditor 也在內）、會查 oracleMCP 的委派同時 ≤ 3 → ≤ 1（ps-audit-batch／ps-audit／
+connect 冪等」、三個 flow agent 同步、四個 subagent tools 表硬性 `"oracleMCP_disconnect": false`（ps-auditor 也在內）、會查 oracleMCP 的委派維持 ≤ 3＋首個先單獨派（曾短暫壓到 1，已恢復）（ps-audit-batch／ps-audit／
 ps-deep-research／ps-audit-orchestrator）、`.gitignore` 補 audit-parts。**ps-auto-loop.ps1 一行未動**
 （外環斷路器草案留解凍後，見 L109「有意不做」；立即緩解可加 `-AuditBatchesPerCycle 4`）。
 搬運清單見 §1 步驟 1a。功能分支 `claude/issue-17-legacy-contract-phase1` 已 merge 本修正並另改
@@ -35,7 +35,7 @@ ps-contract-batch／ps-contract-verify。
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
    | `scripts/ps-auto-loop.ps1` | 修改 | 2270 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
-   | `.opencode/command/ps-audit-batch.md` | 修改 | 108 | 掛 ps-deep-research（80196ee） |
+   | `.opencode/command/ps-audit-batch.md` | 修改 | 109 | 掛 ps-deep-research（80196ee） |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 138 | 備用、未掛載，但 manifest 要對 |
    | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
@@ -43,17 +43,17 @@ ps-contract-batch／ps-contract-verify。
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則） | 360 | |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則） | 362 | |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期） | 115 | |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期） | 102 | |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | |
    | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則） | 236 | |
-   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 1） | 108 | |
-   | `.opencode/command/ps-audit.md` | 修改（≤ 1） | 71 | |
-   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 1） | 476 | |
-   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 1） | 138 | |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述） | 597 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109） | 2912 | |
+   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派） | 109 | |
+   | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 | |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 | |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述） | 598 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109） | 2913 | |
    | `scripts/ps-transfer-manifest.json` | 修改 | 335 | 最後搬；fs-doctor 應報 55 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
    `.gitignore`、`HANDOFF.md` 不在搬運集合；ps-auto-loop.ps1 本批未動。
