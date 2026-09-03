@@ -465,6 +465,26 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 
 ---
 
+**2026-09-03 實驗定案（L109）——連線是 MCP server 全域單例，不是每個 agent 一條**：
+(1) main 開連線 → subagent 只查：通；(2) main 不開 → subagent 只查：不通；
+(3) main 不開 → subagent 自開再查：通。結論：所有 agent 共用同一個開關，任何一方
+`disconnect` 就把其他人一起斷線。上文「輕量查詢可並發」只在沒人 disconnect 時成立；
+分批稽核 3 個 auditor 並行、先查完的那個 disconnect，就是「一堆 oracleMCP_disconnect、
+批次 4/6、loop 一圈接一圈停不下來」的根因。
+
+```text
+□ 新協定（cookbook 連線生命週期已改版）：**誰都不准 disconnect**（headless 結束時
+  連線隨行程關閉）；connect 冪等（先直接查，回未連線錯誤才 connect 一次）；
+  ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害
+□ **會查 oracleMCP 的委派同時 ≤ 1**（上文的 3 作廢；ES＋Source 類仍 ≤ 6）——
+  ps-audit-batch／ps-audit／ps-deep-research／ps-audit-orchestrator／
+  ps-contract-batch／ps-contract-verify 已同步改
+□ 主 agent（ps-deep-research）的 oracleMCP 權限維持關閉：第一個 subagent 開的
+  連線，後面的 subagent 直接沿用，不需要 main 先開
+□ 風暴判讀：auto-loop-logs\<領域>\*-audit-b*.out.txt 裡 oracleMCP_disconnect
+  一批出現數十次且無查詢結果列＝有人還在 disconnect（舊版 agent 檔沒搬到）
+```
+
 ## SOP-11 系統 CR 上線後的知識庫對齊
 
 前提觀念：ES 索引是程式碼**快照**——索引沒更新，稽核驗的是舊

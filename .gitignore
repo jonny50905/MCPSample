@@ -23,3 +23,6 @@ auto-loop-logs/
 # 畢業收據＝單機事實（跨機 lint/gate 腳本 hash 必不同→乒乓失效）；
 # 各機各自畢業、batch 只在管理機跑（SOP-14）
 docs/ps-research/*/graduation.json
+
+# 分批稽核暫存（L107）：輪次未合併時會殘留 part-*.md／domain.md，不入庫（L109）
+docs/ps-research/*/audit-parts/

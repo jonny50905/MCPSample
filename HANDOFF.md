@@ -20,6 +20,14 @@
 本 session 已 pull、逐行讀過、測試組在 ab1ee40 上重跑全 PASS。**同一分支目前有兩個維護 session 在推**，
 push 前先 `git pull`。
 
+**追記（2026-09-03，oracleMCP 連線根因）**：管理者三個實驗定案 oracleMCP 連線是 server 全域單例
+（誰 disconnect 全員斷線；L109、SOP-12 補述）。已改模型側契約：cookbook 生命週期「不得 disconnect、
+connect 冪等」、三個 flow agent 同步、會查 oracleMCP 的委派同時 ≤ 3 → ≤ 1（ps-audit-batch／ps-audit／
+ps-deep-research／ps-audit-orchestrator）、`.gitignore` 補 audit-parts。**ps-auto-loop.ps1 一行未動**
+（外環斷路器草案留解凍後，見 L109「有意不做」；立即緩解可加 `-AuditBatchesPerCycle 4`）。
+搬運清單見 §1 步驟 1a。功能分支 `claude/issue-17-legacy-contract-phase1` 已 merge 本修正並另改
+ps-contract-batch／ps-contract-verify。
+
 ## 1. 管理者下一步（按序）
 
 1. 搬 5 檔（核對欄：行數＝編輯器總行數，允許 ±1 行尾差異）：
@@ -31,6 +39,23 @@ push 前先 `git pull`。
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 137 | 備用、未掛載，但 manifest 要對 |
    | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
+1a. oracleMCP 根因修正（2026-09-03；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
+
+   | 檔案 | 新增／修改 | 行數 | 備註 |
+   |---|---|---|---|
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則） | 360 | |
+   | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期） | 113 | |
+   | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期） | 100 | |
+   | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 88 | |
+   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 1） | 108 | |
+   | `.opencode/command/ps-audit.md` | 修改（≤ 1） | 71 | |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 1） | 476 | |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 1） | 138 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述） | 589 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109） | 2908 | |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 335 | 最後搬；fs-doctor 應報 55 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
+
+   `.gitignore`、`HANDOFF.md` 不在搬運集合；ps-auto-loop.ps1 本批未動。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log
