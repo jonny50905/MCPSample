@@ -100,12 +100,12 @@ OpenCode 內建 agent 重新上鎖。
 | `ps-orchestrator` | primary | 業務問答主流程：解析領域與客製政策，把重檢索委派出去，彙整 JSON 報告後產出業務說明 |
 | `ps-deep-research` | primary | 文件生成：總覽 ＋ 調查 checklist ＋ 逐功能深查，可中斷續跑 |
 | `ps-auditor` | subagent | 稽核：證據解引用驗證（chunk／SQL 重查比對）、claim 反駁、換角度完整性盤點 |
-| `ps-ui-flow` | subagent | 畫面顯示文字、選項 label↔儲存值、Component/Page/Record.Field 對映 |
+| `ps-ui-flow` | subagent | 畫面顯示文字、選項 label↔儲存值、Component/Page/Record.Field 對映、**Portal Registry 導覽入口**（複數；Fluid／NavBar／Nav Collection 未實作→gap） |
 | `ps-peoplecode-flow` | subagent | 事件與分支邏輯（FieldChange／SaveEdit／SavePre/PostChange…），漸進式取段 |
 | `ps-sql-flow` | subagent | SQL Definition／View SQL／AE SQL，table 讀寫分類、Meta-SQL、動態 SQL |
 | `ps-sqr-flow` | subagent | SQR/SQC：先 outline 再定向取段，procedure call graph、SQC include |
 | `ps-ae-flow` | subagent | Application Engine：Section/Step/Action 結構、Call Section 鏈、State Record |
-| `ps-metadata-flow` | subagent | 資料血緣、Process Scheduler 執行方式、授權路徑（Menu→Component→PL→Role） |
+| `ps-metadata-flow` | subagent | 資料血緣、Process Scheduler 執行方式、**技術授權路徑**（Menu→Component→PL→Role；**不是使用者導覽路徑**） |
 | `explore`／`general`／`scout` | 覆寫 | OpenCode 內建 agent 的同名覆寫——**唯一目的是補鎖** |
 
 **兩條非讀不可的設計規則：**
@@ -137,7 +137,7 @@ PeopleSoft 問題時，載入對應 skill 就能照同一套流程走。
 | `ps-sqr-flow` | SQR/SQC：outline 優先、procedure call graph、SQC include、報表輸出 |
 | `ps-ae-flow` | Application Engine 結構與 Call Section 鏈 |
 | `ps-process-flow` | 批次執行方式：Process Definition／Job／Recurrence／Run Control |
-| `ps-security-flow` | 授權路徑：Menu → Component → Permission List → Role 與 Row-level Security |
+| `ps-security-flow` | **技術授權路徑**：Menu → Component → Permission List → Role 與 Row-level Security（使用者導覽入口見 `ps-ui-flow` + cookbook §2k） |
 | `ps-data-lineage` | Record.Field 資料血緣：上下游誰讀誰寫（READ／UPDATE／…／DYNAMIC_RUNTIME） |
 | `ps-impact-analysis` | （選配）物件變更影響盤點：UI/PeopleCode/SQL/SQR/AE/Process/Security 引用面與嚴重度分級 |
 

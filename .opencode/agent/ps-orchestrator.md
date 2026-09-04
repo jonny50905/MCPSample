@@ -77,7 +77,8 @@ tools:
 | SQL Definition、View SQL、table 讀寫、Meta-SQL | @ps-sql-flow |
 | SQR / SQC 程式、批次報表邏輯 | @ps-sqr-flow |
 | Application Engine 結構與 Step/Action | @ps-ae-flow |
-| 資料血緣、排程/執行方式、授權路徑 | @ps-metadata-flow |
+| 資料血緣、排程/執行方式、授權路徑（technical） | @ps-metadata-flow |
+| 選單路徑／導覽入口（使用者從哪裡點進這個畫面） | @ps-ui-flow（Portal Registry，cookbook §2k） |
 | 變更影響盤點 | 依上表拆成多個委派（參考 ps-impact-analysis skill 的工作流） |
 
 ### 問題深度規則（選項 / 欄位類必看）
@@ -158,3 +159,10 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
   這類能力性否定——照實說「**DB 通道忙碌或逾時**（單一連線；常見
   原因＝另一個視窗的稽核／研究正在用），稍後重試即可」；
   非 DB 的部分照常作答，並標明哪部分因此缺料。
+- **路徑類問題的作答紀律（issue #24）**：「這功能在選單哪裡」屬 @ps-ui-flow
+  （Portal Registry，cookbook §2k），**不是** @ps-metadata-flow 的授權路徑。
+  回答必須把「Portal Registry 登錄入口」與「Technical Menu」分兩段講、入口為複數；
+  無 user／security context 時只能說「Registry 中登錄的入口」，**禁止**說
+  「使用者可以從…進入」；未盤查的 Navigation Collection／Fluid／NavBar 要照實說。
+  查不到就照 `ps-business-explain` 的規則說「未確認」，**不得**拿
+  MENUNAME/BARNAME/ITEMNAME 串成路徑充數。

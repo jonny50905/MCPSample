@@ -55,6 +55,11 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
    label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數、
    條件 UI 變異目標解析（§2h～§2j，流程照 SKILL「條件 UI」節）。
+3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時；issue #24）**：照 cookbook §2k
+   走 2k-0（先驗表名欄位）→ 2k-1（PSMENUITEM seed，只叫 technicalMenuLocation）→
+   2k-2（menu＋component＋market 找 CREF）→ 2k-3（parent walk，visited／depth 20／不跨 Portal）→
+   2k-4（語系 label，逐段記 source／fallback）→ 2k-5（CREF Link 與其他 surface）。
+   本步屬 **oracleMCP 類委派，計入同時 ≤ 3（L109），上限不變**。
 4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
 5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
@@ -68,6 +73,12 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查
   （只吃欄位名）、`search_component_metadata` Component 關鍵字搜尋
   （只吃 Component 關鍵字）——Page／Record 名帶入必查空。
+- **可用（oracleMCP + cookbook §2k，issue #24）**：Portal Registry 導覽入口——
+  Component → CREF → Folder 階層 → 逐段語系 label；輸出 `navigationEntries[]`（複數）
+  與 `technicalMenuLocations[]`（分開，永不合併）。
+- **尚缺（導覽，本版不實作）**：Navigation Collection、Fluid Tile／Homepage、NavBar 的入口探索；
+  以及 `AUTHORIZED_FOR_CONTEXT`（需 user／security／runtime portal context）。
+  這三類**一律回 gaps**，且**即使 classic path 已 CONFIRMED 也不得宣稱是唯一入口**。
 - **尚缺（UI Semantic Index 未建）**：跨全部 UI 文字的語意（非精確）搜尋、
   Page Field 覆寫 label 的最終文字解析、Grid/Tab/GroupBox 專屬 label。
   查不到時記入 `gaps`，**不得**改用猜測或從物件命名腦補畫面文字。
@@ -97,6 +108,16 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
   `search_component_metadata` 只吃 Component 關鍵字——Page／Record／
   選單名帶入必查空＝**方法錯誤**（不是「不存在」），此類問題改走
   cookbook §2 對映。
+- **導覽硬規則（issue #24）**：
+  1. **PSMENUITEM 的 MENUNAME／BARNAME／ITEMNAME 永遠只是 `technicalMenuLocation`**，
+     不得串成使用者路徑、不得當 `navigationEntries` 的 fallback。查不到 Portal Registry
+     入口就回空陣列＋gaps，**不是**退回技術選單。
+  2. **入口是複數**：discovery 回幾個 location 就回幾筆；壓成單一路徑＝報告不合格。
+  3. **可見性只准 `REGISTRY_DEFINED`**（無 user／security context 時）或 `UNKNOWN_VISIBILITY`
+     （隱藏旗標、過期、走訪未達根、Fluid 等未解析 surface）。
+     `AUTHORIZED_FOR_CONTEXT` 本版**不得產出**。文字一律寫
+     「Portal Registry 登錄入口：A > B > C」，**不得**寫成「使用者操作路徑」。
+  4. parent 斷鏈／達 depth cap → 該筆 `UNRESOLVED`＋gap，**禁止**用物件名或 delivered 慣例補段。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。

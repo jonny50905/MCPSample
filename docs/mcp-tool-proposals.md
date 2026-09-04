@@ -173,3 +173,16 @@ Action 節點附 sourceId 供長文本工具取段。
 輸入:`{ "componentName": "TW_MILITARY_DATA" }`
 輸出:Menu → Component → Permission List → Role(→ User 統計)路徑,
 各節點附 origin。
+
+## 4.6 ps_get_navigation_entries（issue #24）
+
+輸入:`{ "componentName": "USERMAINT", "menuName": "MAINTAIN_SECURITY", "market": "GBL",
+        "portalName": "EMPLOYEE", "languageCode": "ZHT", "includeAlternateEntries": true }`
+輸出:`{ "technicalMenuLocations": [ { "menuName": "...", "barName": "...", "itemName": "..." } ],
+        "navigationEntries": [ { "portalName": "...", "entryType": "PORTAL_REGISTRY",
+          "crefObjectName": "...", "labels": [ { "displayText": "...", "languageCode": "ZHT",
+          "displayTextSource": "LANG|BASE", "fallbackLanguageCode": "ENG" } ],
+          "visibility": "REGISTRY_DEFINED", "confidence": "CONFIRMED" } ],
+        "gaps": [ "alternate navigation surfaces not fully inspected" ] }`
+現況實作＝cookbook §2k（值域見 mcp-tool-contracts.md §3）。
+`technicalMenuLocations` 與 `navigationEntries` 是兩個不同 claim,**不得合併或互相 fallback**。

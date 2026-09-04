@@ -3,6 +3,7 @@
 # 範圍：調帳／治理／台帳／破壞防衛／歸檔 commit／分批稽核（manifest、part 不變量、合併器）
 #       ＋ lint fixture（[附錄] 守衛、ChunkId 誤判、[回灌] 陳舊、-EvidenceStats、-StrictAudit 未稽核）
 #       ＋ research 範圍債（#23：checkpoint ≠ discovery complete、GateVersion 4 舊收據作廢）
+#       ＋ lint 導覽主張守衛（#24：情境 28，在 docs/ps-research/zz-nav24-fixture 建臨時領域跑真 lint，結束自刪）
 # 注意：情境 22 會在 docs/ps-research/zz-l103-fixture 建臨時領域跑真 lint，結束自刪。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
@@ -532,6 +533,36 @@ $auditUa = @('# 稽核報告','','> 稽核輪次：1','','## 總覽記分卡','|
 $lintUa = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom -StrictAudit *>&1 | Out-String)
 Assert ($lintUa -match '90-audit\.md 記分卡有 1 檔標「未稽核」' -and $lintUa -match 'FAIL：') "lint -StrictAudit：記分卡「未稽核」列＝違規（L107）"
 Remove-Item -Recurse -Force $fxDir
+
+Write-Host "情境 28：lint 導覽主張守衛——技術選單冒充路徑／可見性過度宣稱／誠實 gap 不誤報（issue #24）"
+$nvDom = "zz-nav24-fixture"
+$nvDir = (Join-Path $repoRoot "docs/ps-research/$nvDom")
+New-Item -ItemType Directory -Path $nvDir -Force | Out-Null
+$nvHead = @('## 相關物件', 'x')
+$nvTail = @('## 畫面與欄位', 'x', '## 行為邏輯', '- **CONFIRMED**：測試（`a.pcode:1`）', '## 資料流', '| 表 | 操作 |', '|---|---|', '| PS_X | UPDATE |', '## 執行方式', 'x', '## 未解事項（gaps）', '- 無')
+$nvEvMenu = @('## Evidence 附錄', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', "| 1 | PSMENUITEM（PNLGRPNAME='TW_X'） | 技術選單 | SQL：SELECT MENUNAME, BARNAME, ITEMNAME FROM PSMENUITEM WHERE PNLGRPNAME='TW_X' FETCH FIRST 200 ROWS ONLY |")
+$nvEvPortal = @('## Evidence 附錄', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', "| 1 | PSPRSMDEFN（CREF） | Portal 入口 | SQL：SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM PSPRSMDEFN WHERE PORTAL_REFTYPE='C' FETCH FIRST 200 ROWS ONLY |")
+# Case 1：技術選單三欄被串成使用者路徑，證據只有 PSMENUITEM
+$nvBad = @('# 41 壞檔（TW_NAV_BAD）') + $nvHead + @('## 功能定位', 'Recruiting > Use > Manage Applicants。人資使用。') + $nvTail + $nvEvMenu
+# Case 3：Registry 有入口但無 user context，卻寫「使用者可以從…」
+$nvOver = @('# 42 過度宣稱（TW_NAV_OVER）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Recruiting > Applicant Management > Manage Applicants（REGISTRY_DEFINED）。', '使用者可以從此路徑進入。') + $nvTail + $nvEvPortal
+# Case 5：parent 斷鏈／未查證＝誠實 gap，且技術選單用 / 分隔——兩條規則都不得誤報
+$nvGood = @('# 43 好檔（TW_NAV_GOOD）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）。', '### Technical Menu', 'RECRUITING / USE / MANAGE_APPLICANTS') + $nvTail + $nvEvMenu
+[System.IO.File]::WriteAllText((Join-Path $nvDir "41-TW_NAV_BAD.md"), ($nvBad -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText((Join-Path $nvDir "42-TW_NAV_OVER.md"), ($nvOver -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText((Join-Path $nvDir "43-TW_NAV_GOOD.md"), ($nvGood -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText((Join-Path $nvDir "00-overview.md"), "# 總覽`r`n測試 fixture", (New-Object System.Text.UTF8Encoding($true)))
+$nvOut = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom *>&1 | Out-String)
+Assert ($nvOut -match '41-TW_NAV_BAD\.md：功能定位宣稱導覽路徑') "Case 1：技術選單串成路徑＋無 Portal 證據 → 違規"
+Assert ($nvOut -match '\[導覽\] 41-TW_NAV_BAD\.md：TECHNICAL_MENU_AS_NAVIGATION') "Case 1：出 [導覽] 工單"
+Assert ($nvOut -notmatch '42-TW_NAV_OVER\.md：功能定位宣稱導覽路徑') "Case 1 對照組：有 PSPRSMDEFN 證據的路徑主張不誤報"
+Assert ($nvOut -match '42-TW_NAV_OVER\.md：功能定位宣稱使用者可見性') "Case 3：無 AUTHORIZED_FOR_CONTEXT 的使用者宣稱 → 違規"
+Assert ($nvOut -notmatch '43-TW_NAV_GOOD\.md：功能定位') "Case 5：誠實寫未確認＋Technical Menu 用 / 分隔 → 零違規（不誤報）"
+Assert ($nvOut -match '【導覽】型') "修法說明段有印"
+$nvCov = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -CoverageOnly *>&1 | Out-String)
+Assert ($nvCov -match '\[美工／不擋覆蓋畢業\].*功能定位宣稱導覽路徑') "tier 1：導覽類降為警告（不重演 L94 全存量違規）"
+Assert ($nvCov -notmatch '\[導覽\] 41-TW_NAV_BAD') "tier 1：導覽工單受 emitPolish 抑制"
+Remove-Item -Recurse -Force $nvDir
 
 Remove-Item -Recurse -Force $dir
 Write-Host ""

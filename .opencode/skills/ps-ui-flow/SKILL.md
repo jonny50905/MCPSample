@@ -49,6 +49,9 @@ MENU_LABEL / COMPONENT_LABEL / MESSAGE_CATALOG / DYNAMIC_PEOPLECODE / UNKNOWN
 **不可假設執行時一定顯示預設文字**。
 
 語系必須保留：`languageCode` / `displayText` / `fallbackLanguageCode`。
+導覽入口的**每一段**（Portal → Folder → … → CREF）同樣要各自保留這三項
+再加 `displayTextSource`（`LANG`＝PSPRSMDEFNLANG 覆寫／`BASE`＝PSPRSMDEFN 原生）——
+逐段記錄才做得到「ZHT 優先、缺翻譯 fallback ENG」而不是整條路徑一個語系（issue #24）。
 
 ## 業務搜尋權重
 
@@ -114,8 +117,10 @@ scroll 層級變異（HideRow／HideScroll 等，無 Record.Field 可解析）
 | `ps_search_ui_semantics` | 由顯示文字 / 選項文字反查 Component / Page / Record.Field |
 | `ps_get_ui_graph` | 取 UI 圖（含 controls、display text、choices、languages） |
 | `ps_get_field_choices` | 取某欄位的 choice type 與選項清單（label ↔ stored value） |
+| `ps_get_navigation_entries` | 取 Portal Registry 導覽入口（複數；含 entryType／labels／visibility）與 technicalMenuLocations |
 
-圖節點／邊的詞彙表見 `.opencode/peoplesoft/mcp-tool-contracts.md` §2。
+圖節點／邊的詞彙表見 `.opencode/peoplesoft/mcp-tool-contracts.md` §2；
+導覽入口的 `navigationEntryType`／`navigationVisibility` 值域見同檔 §3。
 
 ## Skill Rules
 
@@ -154,6 +159,19 @@ When display text is dynamically assigned by PeopleCode:
 - preserve the default static label
 - include PeopleCode evidence
 - mark the final runtime text as DYNAMIC_RUNTIME
+
+Navigation entries (issue #24):
+- PSMENUITEM MENUNAME/BARNAME/ITEMNAME is technical menu metadata only.
+  Never render it as a user-facing navigation path and never use it as a
+  fallback when Portal Registry lookup finds nothing.
+- Always return navigationEntries as a list; one CREF row is one path, and
+  multiple CREF rows (target plus links) are multiple entries. Never collapse.
+- Without user/security context, visibility is REGISTRY_DEFINED at best.
+  Use UNKNOWN_VISIBILITY for hidden-from-nav ancestors, expired CREFs,
+  walks that never reach the root, and un-inspected surfaces.
+  Never emit AUTHORIZED_FOR_CONTEXT in this version.
+- Report Navigation Collection, Fluid tile and NavBar as gaps even when no
+  such rows are found — absence of rows is not proof of a single entry point.
 ```
 
 ## Context 控制

@@ -137,6 +137,26 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    **查得到 → `FAIL(FALSE_NEGATIVE)`**（附找到的 chunk id；
    負面結論失效，該項需回灌補查）；仍查無 → PASS。
    工具鏈修復後的首輪稽核，此步**全量**做（歷史查無平反）。
+4a. **導覽主張檢查（issue #24；以「## 功能定位」節為單位，判定掛在該節所引的
+   Evidence 列上——`ref` 寫該列的 ChunkId 或 SQL 摘要）**：
+   · `FAIL(TECHNICAL_MENU_AS_NAVIGATION)`：文件宣稱選單路徑／操作路徑／導覽入口
+     （任何以 `>`／`→` 串起 ≥3 段的路徑字串），但該主張所引的證據只有
+     PSMENUITEM／PSAUTHITEM，無任何 PSPRSMDEFN 類 Portal Registry 證據。
+     **怎麼查**：read 該檔的「## 功能定位」與「## Evidence 附錄」，看該路徑主張引的是哪一列；
+     該列的 SQL 重跑一次（只准 SELECT）確認它查的是哪張表。判 FAIL 不需要自己查 Portal。
+   · `FAIL(SINGLE_PATH_COLLAPSE)`：文件只列一條入口且（明示或暗示）宣稱唯一，
+     但重跑 cookbook §2k-2 的識別查詢回**多列** CREF（TARG＋LINK）。
+     **怎麼查**：以該檔的 Component＋menu＋market 重跑 §2k-2（首選 structured 三欄比對；
+     **禁止**用 `LIKE '%component%'` 當判準）；回 ≥2 列而文件只有 1 列＝FAIL，
+     reason 附查到的 `PORTAL_OBJNAME` 清單。查不到 Portal 表／欄位 →
+     `UNVERIFIABLE(PENDING_MANUAL)`，不判 FAIL。
+   · `FAIL(USER_VISIBILITY_OVERCLAIM)`：文件寫「使用者可以從…」「某角色會看到…」
+     這類 user-visible 宣稱，但無 user／security context 證據且未標 `AUTHORIZED_FOR_CONTEXT`。
+     **怎麼查**：純文件判定＋確認該檔無 PSPRSMPERM／角色層級證據；有隱藏旗標
+     （PSPRSMSYSATTRVL.PORTAL_ATTR_NAM='PORTAL_HIDE_FROM_NAV'）或 CREF 已過期
+     （PORTAL_EXPIRE_DT < SYSDATE）時，reason 一併附上。
+   三者都不是新 verdict——仍是 `FAIL(原因)`，落在第 5 條的三值域內。
+   查無 Portal Registry 表／欄位時一律 `UNVERIFIABLE(PENDING_MANUAL)`，不得判 FAIL。
 5. 每筆判 `PASS` / `FAIL(原因)` / `UNVERIFIABLE(原因)`——**值域只有這三個，
    沒有第四種**。任何情境（含索引重建、舊 id 全面失效）都必須落在其中之一。
 

@@ -64,6 +64,20 @@ Do not include claims that have no evidence ID.
 
 If the evidence is insufficient to answer part of the question, say which part
 and which flow skill should be run to fill the gap.
+
+Navigation hard rules (issue #24):
+- Never convert PSMENUITEM MENUNAME/BARNAME/ITEMNAME into a user-visible
+  navigation path. Rendering RECRUITING > USE > X as somewhere a user clicks
+  is a fabricated claim, not a formatting choice.
+- Technical menu location and Portal Registry entries are two different claims.
+  Report them separately, each with its own evidence.
+- An entry with no user/security context is REGISTRY_DEFINED, not
+  user-authorized. Never write 「使用者可以從…」「某角色會看到…」 unless the
+  entry is explicitly marked AUTHORIZED_FOR_CONTEXT.
+- If several entries were found, present all of them; if alternate surfaces
+  were not inspected, say so instead of implying a single entry point.
+- visibility is not confidence: keep CONFIRMED / INFERRED / DYNAMIC_RUNTIME on
+  every statement and state visibility separately.
 ```
 
 ## 輸出建議結構
@@ -71,6 +85,9 @@ and which flow skill should be run to fill the gap.
 ```text
 1. 一句話結論（業務語言）
 2. 在哪裡維護（Component / Page，含畫面文字與語系）
+2a. 從哪裡進得去——**Portal Registry 導覽入口**（複數；每筆標可見性
+    REGISTRY_DEFINED／UNKNOWN_VISIBILITY）與 **Technical Menu**（MENUNAME/BARNAME/ITEMNAME）
+    **分兩段講**；沒查證就寫「未確認（navigation metadata 尚未查證）」
 3. 選項與儲存值對照＋生命狀態（如適用）
 4. 什麼條件會變成哪個值 / 選擇後會發生什麼（PeopleCode / SQL / AE / SQR，逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME）
 5. 資料流向（讀了什麼、更新了什麼）

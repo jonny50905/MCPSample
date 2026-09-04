@@ -32,6 +32,15 @@ sensitive-data masking.
 When the domain policy is custom-only, delivered roles or permission lists
 that merely include the custom component are dependencies — the custom
 component remains the business root.
+
+The access path resolved here is an AUTHORIZATION chain built from
+PSAUTHITEM joined to PSMENUITEM (cookbook §4). Its menu segment is technical
+authorization metadata, not a user-visible navigation path: never render it
+as 選單路徑 / 操作路徑 / 導覽入口, and never merge it with Portal Registry
+entries into one claim. Questions of the form "which entry point does this
+role actually see" need Portal Registry entries (cookbook §2k) crossed with
+CREF/folder security and runtime context — not implemented in this version,
+so answer with a gap rather than an inferred entry point.
 ```
 
 ## 工具
