@@ -186,7 +186,9 @@ FETCH FIRST 200 ROWS ONLY
 SELECT PNLGRPNAME, PNLNAME, ITEMLABEL FROM PSPNLGROUP WHERE PNLGRPNAME = :componentName;
 -- Page 屬於哪些 Component
 SELECT PNLGRPNAME FROM PSPNLGROUP WHERE PNLNAME = :pageName;
--- Component 掛在哪些 Menu
+-- Component 掛在哪些 Menu（**technicalMenuLocation**：App Designer 技術選單 metadata，
+-- 8.4 之後 BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級——**不得串成使用者導覽路徑**；
+-- 使用者看得到的入口走 §2k Portal Registry。本段亦是 §2k-2 的 seed（menu＋component＋market）
 SELECT MENUNAME, BARNAME, ITEMNAME FROM PSMENUITEM WHERE PNLGRPNAME = :componentName;
 ```
 
@@ -286,6 +288,177 @@ FETCH FIRST 50 ROWS ONLY;
 
 Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 §2c。
 
+**2k. Navigation Entry Discovery（Portal Registry；協定角色：ps_get_navigation_entries——issue #24）**
+
+用途：回答「使用者從哪裡點得到這個 Component」。輸出**複數** `navigationEntries[]`，
+每筆帶 `portalName / entryType / crefObjectName / labels[] / visibility`，
+與 §2e 的 `technicalMenuLocations[]`（PSMENUITEM 三欄）**分開回報，永不合併**。
+本節**所有表名、欄位名、代碼值域皆待公司機驗證**（規則 6／8／8a）：
+PSPRSMDEFN 系列對本 cookbook 是全新表名，**第一次使用前必須先跑 2k-0**（先 `all_tables` 驗表名、
+再 `all_tab_columns` 驗欄位名），查不到記 gaps，不硬湊、不自行加減 `PS_` 前綴。
+驗證回填前，本節任何結論最高只能標 **INFERRED**。
+`REGISTRY_DEFINED／AUTHORIZED_FOR_CONTEXT／UNKNOWN_VISIBILITY` 是**可見性**維度，與 confidence 正交，
+不得寫進 confidence 欄（subagent-report-contract 硬規則 3a）。
+
+**2k-0. 前置欄位驗證（必跑，其餘 2k-* 的前提）**
+
+```sql
+-- (1) 表名（規則 8a：樣板沒有的表先確認實際表名，禁止自行加減 PS_）
+SELECT TABLE_NAME FROM ALL_TABLES
+ WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMPERM','PSPRSMSYSATTRVL',
+                      'PSPRSMATTRVAL','PSPRSMNAVINFO','PSPRDMDEFN','PSMENUITEM')
+FETCH FIRST 20 ROWS ONLY;
+-- (2) 欄位名／型別（規則 8：禁止憑記憶寫欄位名）
+SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, COLUMN_ID
+  FROM ALL_TAB_COLUMNS
+ WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN')
+ ORDER BY TABLE_NAME, COLUMN_ID
+FETCH FIRST 200 ROWS ONLY;
+-- (3) 代碼值域（不得憑記憶填，觀察後回填本節）
+SELECT PORTAL_REFTYPE, COUNT(*) FROM PSPRSMDEFN GROUP BY PORTAL_REFTYPE;
+SELECT PORTAL_CREF_USGT, COUNT(*) FROM PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
+ GROUP BY PORTAL_CREF_USGT ORDER BY 2 DESC FETCH FIRST 20 ROWS ONLY;
+SELECT DISTINCT PORTAL_ATTR_NAM FROM PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY;
+SELECT PORTAL_NAME FROM PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY;
+```
+
+> **未驗前的降級規則**：(1)(2) 任一表／欄位查無 → 該筆記 gaps，**該 2k 步驟停止**，
+> 文件寫「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」，
+> **不得**退回用 PSMENUITEM 補位。`portalName` 一律由 `PSPRDMDEFN` 列舉取得，
+> **禁止硬編** `EMPLOYEE／CUSTOMER／SUPPLIER／PARTNER`（後三者非普遍交付）。
+> `PORTAL_CREF_USGT` 代碼→entryType 的對照（待驗）：`TARG`→PORTAL_REGISTRY、`LINK`→CREF_LINK；
+> `GRPT`／`HPGT`／`HPGC`→Fluid／首頁類**本版不解析**，一律回 gap；`FRMT`／`HTMT`／`IFRM`＝模板管線，排除。
+> **本環境是否只有 C／F 兩種 PORTAL_REFTYPE 亦待驗**；出現第三值＝環境意外，記 gaps 不得靜默假設。
+
+**2k-1. Technical Menu seed（只叫 technicalMenuLocation）**
+
+```sql
+SELECT MENUNAME, BARNAME, ITEMNAME, PNLGRPNAME, MARKET
+  FROM PSMENUITEM WHERE PNLGRPNAME = :componentName
+FETCH FIRST 200 ROWS ONLY
+```
+
+> 本段的**唯一合法用途**是餵 2k-2 的識別三元組（menu＋component＋market）。
+> `MARKET` 欄存在與否待 2k-0 驗證；查無該欄就退回 `:market='GBL'` 並記 gaps。
+> 輸出欄位名一律 `technicalMenuLocations[]`，**永遠不得**輸出成 `menuPath`／選單路徑／導覽入口。
+
+**2k-2. Portal CREF 識別（menu＋component＋market；禁止 SEG2 單欄比對）**
+
+```sql
+-- 首選：structured URI 欄位（三欄同時比對，且限定 content reference）
+SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
+       PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
+  FROM PSPRSMDEFN
+ WHERE PORTAL_REFTYPE = 'C'
+   AND UPPER(TRIM(PORTAL_URI_SEG1)) = UPPER(:menuName)
+   AND UPPER(TRIM(PORTAL_URI_SEG2)) = UPPER(:componentName)
+   AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)
+FETCH FIRST 200 ROWS ONLY;
+-- 次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對
+SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME, PORTAL_URLTEXT
+  FROM PSPRSMDEFN
+ WHERE PORTAL_REFTYPE = 'C'
+   AND UPPER(PORTAL_URLTEXT) LIKE '%/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market) || '%'
+FETCH FIRST 200 ROWS ONLY
+```
+
+> **硬性禁止**：`LIKE '%' || :componentName || '%'`、只比 `PORTAL_URI_SEG2`、憑欄位位置猜 SEG 語意。
+> 理由：同一 Component 會登在多個 menu、多個 market、多個 portal；SEG 只在
+> **component 型 CREF**（URL 文法 `/c/<MENU>.<COMPONENT>.<MARKET>`）才是 menu／component／market，
+> `q/`（Query）、`s/`（iScript）、`w/`（Worklist）與外部 URL CREF 的 SEG 語意不同——判不出即 `entryType=UNKNOWN`。
+> 次選路徑的每一筆結論標記 `confidence=INFERRED`（來源＝URLTEXT 文法解析），**不得標 CONFIRMED**。
+> 少於三欄命中的匹配只能回 `PARTIAL_IDENTITY_MATCH` 並記 gaps。
+> `PORTAL_EXPIRE_DT < SYSDATE` 的 CREF：入口仍列出，但 `visibility` 降為 `UNKNOWN_VISIBILITY` 並記 gap
+> （「valid-from」對應欄位名未證實，**不得**憑記憶寫 `PORTAL_EFFDT`）。
+
+**2k-3. 沿 parent 往上組路徑（visited／depth cap／不跨 Portal）**
+
+```sql
+SELECT LEVEL AS LVL, PORTAL_NAME, PORTAL_REFTYPE, PORTAL_OBJNAME,
+       PORTAL_PRNTOBJNAME, PORTAL_LABEL, PORTAL_SEQ_NUM
+  FROM PSPRSMDEFN
+ START WITH PORTAL_NAME = :portalName
+        AND PORTAL_REFTYPE = 'C'
+        AND PORTAL_OBJNAME = :crefObjName
+CONNECT BY NOCYCLE PRIOR PORTAL_PRNTOBJNAME = PORTAL_OBJNAME
+        AND PRIOR PORTAL_NAME = PORTAL_NAME
+        AND LEVEL <= 20
+ ORDER BY LVL DESC
+FETCH FIRST 200 ROWS ONLY
+```
+
+> `NOCYCLE` ＋ `LEVEL <= 20` ＝ visited／深度上限（**cycle 不得 doom-loop**）；
+> `AND PRIOR PORTAL_NAME = PORTAL_NAME` 寫在 `CONNECT BY` 內才擋得住跨 Portal（寫在外層 WHERE 只過濾輸出、擋不住走訪）。
+> **終止判定**：最後一列 `PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT'`（或其 parent 為空）＝走到根，路徑完整；
+> 撞到 LEVEL 20、或某段 parent 指向不存在的列（鏈提早斷）→ 該入口 `visibility=UNKNOWN_VISIBILITY`、
+> 路徑標 `UNRESOLVED` 並記 gap；**絕不得**用物件名、delivered 慣例或印象補上缺掉的段。
+> 每段另查一次隱藏旗標（欄位不存在＝attribute 列，不是 PSPRSMDEFN 的欄位）：
+> `SELECT PORTAL_OBJNAME, PORTAL_ATTR_VAL FROM PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
+> ——**任一祖先** `= 'Y'` ＝整條分支在左側導覽看不到 → `visibility=UNKNOWN_VISIBILITY`＋gap。
+> 平台可攜性：非 Oracle 環境改用遞迴 CTE＋顯式 depth 計數＋visited 反連接，行為必須完全一致（待驗）。
+
+**2k-4. 語系 label（base＋override＋fallback，逐段記來源）**
+
+```sql
+SELECT D.PORTAL_OBJNAME,
+       D.PORTAL_LABEL AS BASE_LABEL,
+       L.PORTAL_LABEL AS LANG_LABEL,
+       COALESCE(NULLIF(TRIM(L.PORTAL_LABEL), ''), D.PORTAL_LABEL) AS DISPLAY_TEXT
+  FROM PSPRSMDEFN D
+  LEFT JOIN PSPRSMDEFNLANG L
+    ON L.PORTAL_NAME = D.PORTAL_NAME
+   AND L.PORTAL_REFTYPE = D.PORTAL_REFTYPE
+   AND L.PORTAL_OBJNAME = D.PORTAL_OBJNAME
+   AND L.LANGUAGE_CD = :languageCd
+ WHERE D.PORTAL_NAME = :portalName
+   AND D.PORTAL_OBJNAME IN (<2k-3 的祖先清單>)
+FETCH FIRST 200 ROWS ONLY
+```
+
+> **必須 LEFT JOIN**：INNER JOIN 會靜默丟掉沒有翻譯的段，產出「比較短的錯路徑」。
+> 每一段都要保留 `displayText / languageCode / displayTextSource（LANG｜BASE）/ fallbackLanguageCode`
+> ——ps-ui-flow SKILL 既有的語系義務（`languageCode` / `displayText` / `fallbackLanguageCode`）套用到導覽段。
+> PeopleSoft 字元欄以空白而非 NULL 儲存，故用 `NULLIF(TRIM(...),'')` 而非裸 `COALESCE`。
+> **PSPRSMDEFNLANG 的鍵清單與是否含 PORTAL_LABEL 待 2k-0 驗證**；查無該表／該欄 → 只回 base label，
+> `displayTextSource=BASE`＋gap，不得宣稱已做語系 fallback。
+
+**2k-5. CREF Link 與其他入口 surface（複數入口；未支援者一律回 gap）**
+
+```sql
+-- (1) LINK 的指向機制**未證實**，先探測：LINK 列是否也帶 URI 三段？
+SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT,
+       PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_PRNTOBJNAME
+  FROM PSPRSMDEFN
+ WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT = 'LINK'
+FETCH FIRST 20 ROWS ONLY;
+-- (2) 其他 surface 是否存在（存在與否都要回 gap，見下）
+SELECT PORTAL_CREF_USGT, COUNT(*) FROM PSPRSMDEFN
+ WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT IN ('GRPT','HPGT','HPGC')
+ GROUP BY PORTAL_CREF_USGT;
+SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM PSPRSMDEFN
+ WHERE PORTAL_REFTYPE = 'F'
+   AND (UPPER(PORTAL_LABEL) LIKE '%FLUID%' OR UPPER(PORTAL_LABEL) LIKE '%NAVIGATION COLLECTION%')
+FETCH FIRST 50 ROWS ONLY
+```
+
+> **每個 CREF 列只有一個 parent**（`PORTAL_PRNTOBJNAME` 單值）⇒ 一列＝一條路徑。
+> 複數入口來自**多個 CREF 列**（1 個 TARG ＋ N 個 LINK），因此模型是「N 個錨點 × 各走一次 2k-3」，
+> **不是**「一個錨點走出多條路徑」。每個 location 分開回傳、各自帶自己的 labels 與 visibility；
+> 壓成單一路徑＝`SINGLE_PATH_COLLAPSE`。
+> 探測 (1) 若 LINK 列帶 URI 三段 ⇒ 2k-2 的識別查詢已同時撈到 TARG 與 LINK，無需第二跳；
+> 若不帶 ⇒ 需要一次「LINK → 目標 CREF」解析跳，該跳同樣要 visited set ＋ depth cap（link→link→link 不得成環），
+> **在探測回填前，多入口宣稱一律附 gap「alternate entries not fully resolved」**。
+> 破損 link（指向不存在的 CREF）＝該筆 `UNRESOLVED`＋gap，不猜目標。
+> **Fluid Tile／NavBar／Navigation Collection 本版一律不解析**：
+> (2) 有命中＝`entryType=FLUID_TILE／UNKNOWN`＋`visibility=UNKNOWN_VISIBILITY`＋gap；
+> **(2) 零命中也必須回 gap**「alternate navigation surfaces not fully inspected」
+> ——沒有 Fluid CREF 列不證明沒有 Fluid 入口，**永遠不得宣稱「唯一入口」**。
+> `PSPRSMNAVINFO`（若 2k-0 驗到存在）只能當**交叉檢查**：它由 App Engine 於索引建置時物化（會過期、可能為空）、
+> 只涵蓋 TARG、且 `PORTAL_NAVPATH` 是預先組好的 CLOB（無法逐段做語系 fallback）——
+> 與 2k-3 走出的路徑不一致時**記 gap，不得選邊**。
+> `AUTHORIZED_FOR_CONTEXT` 本版**不實作**：`PSPRSMPERM`（含 `PORTAL_ISCASCADE`）只給到 permission list 層級，
+> 角色／使用者／runtime portal context 皆未建模，此類問題一律回 gap。
+
 ---
 
 ## 3. Process / 排程（協定角色：ps_get_process_usage）
@@ -311,6 +484,8 @@ SELECT * FROM PS_PRCSRECUR WHERE RECURNAME = :recurName;
 
 ```sql
 -- Component → Permission List（經由 Menu Item）
+-- 本節回傳的 MENUNAME 是 **technical authorization metadata**，不是導覽路徑；
+-- 「某角色實際看得到哪個入口」需另外接 §2k 的 Portal Registry 入口與 CREF 權限，本節不足以回答
 SELECT DISTINCT A.CLASSID, A.MENUNAME, A.AUTHORIZEDACTIONS
   FROM PSAUTHITEM A
   JOIN PSMENUITEM M

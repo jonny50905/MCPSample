@@ -2996,3 +2996,38 @@
   lint 對帳規則（「未勾且檔案不存在」在 lint 語意裡仍是合法狀態，債由外環數）。
 - 套用：本 commit（auto-loop 兩函式＋三處接線、ps-graduation v4、test-auto-loop
   情境 27 九判定、SOP-13 補述、README tier 1 門列）。
+
+### L111 技術選單不是導覽路徑——有必填格、無證據來源、無把關＝框架主動生產誤報（issue #24，2026-09-04）
+- 症狀：deep-research 產出的 NN 檔寫「Recruiting > Use > xxxx」當使用者路徑；
+  但 PIA 裡根本沒有 `Use` 這一層——那是 App Designer 的 Menu Bar 名稱。
+- 根因（三件事同時成立，缺一不會發生）：
+  1. **有必填格**：function-detail-template.md 的「## 功能定位」要求寫「選單路徑」，
+     contract 線另有必填 kv `menuPath`（自由短句、無值域、無 gate）。
+  2. **無合法來源**：全 repo 唯一的 menu 查詢是 cookbook §2e 的
+     `SELECT MENUNAME, BARNAME, ITEMNAME FROM PSMENUITEM`（technical metadata），
+     `PSPRSMDEFN` 等 Portal Registry 表零命中；`ps-ui-flow` 甚至明文寫「選單名不是有效查詢鍵」。
+  3. **無把關**：lint 只驗「## 功能定位」標題存在、不驗內容；auditor 以 Evidence 條目為單位，
+     功能定位的散文沒有條目可驗。
+- 原則：**「要求輸出的欄位」與「取得該欄位的合法管道」必須同批存在**。只有必填格沒有來源，
+  模型不會空著——它會用手上唯一被授權的樣板去填，於是把技術 metadata 渲染成使用者事實。
+  這是 L94「門檻即現實，模板只是願望」的鏡像：**願望不是免費的，它會被最近的可用素材兌現**。
+- 第二原則：**可見性不是 confidence**。「查得到這個入口」與「這個人看得到這個入口」是兩個維度；
+  把後者塞進 CONFIRMED/INFERRED 只會讓 CONFIRMED 同時代表兩件不同的事。
+- 落點：cookbook §2e／§4 就地正名＋新增 §2k（2k-0 欄位驗證先行、parent walk 帶 visited／depth 20／
+  不跨 Portal、語系逐段 fallback、CREF Link 複數入口、未實作 surface 一律 gap）；
+  mcp-tool-contracts.md 新角色 `ps_get_navigation_entries` ＋§3 兩個值域；
+  subagent-report-contract.md 硬規則 3a ＋ `navigationEntries[]`／`technicalMenuLocations[]`；
+  function-detail-template.md 功能定位拆「### 導覽入口」「### Technical Menu」；
+  ps-ui-flow（agent＋SKILL）接導覽職責；ps-security-flow／ps-metadata-flow 正名為 technical；
+  ps-business-explain 五條硬規則；ps-auditor 三個 FAIL 原因；ps-deep-research 回灌處置三條；
+  ps-doc-lint 兩條確定性規則＋[導覽] 工單（auto-loop 手術 prompt 補型別）；contract 線
+  menuPath→technicalMenu、導覽表加入口型／可見性、NAV ID 含 entryType、vocabularyVersion 1→2、
+  schemaVersion 1→2（功能分支）。
+- 有意不做：不做 BARNAME 黑名單（issue 明列為不接受的修法，且會漏 PROCESS／INQUIRE／REPORT
+  與中文 label 版本）；不做 `AUTHORIZED_FOR_CONTEXT`（需 user／security／runtime context，本版一律 gap）；
+  不做 Navigation Collection／Fluid Tile／NavBar 探索（回 gap，且**零命中也要 gap**）；
+  lint 兩規則先列**美工類**（存量全無 Portal 證據，直接列缺料＝重演 L94 的全存量違規），
+  回灌戰役完成後再提升為缺料——提升方式＝把兩個訊息字串移出 `$polishPatterns`（SOP-19）。
+- 待公司機驗證：§2k 全部表名／欄位／代碼（PORTAL_CREF_USGT 值域、PORTAL_HIDE_FROM_NAV、
+  PSPRSMDEFNLANG 鍵清單、LINK 指向機制、valid-from 欄位名、PORTAL_ROOT_OBJECT 是否為實列）。
+- 套用：本 commit（handover 線 13 檔＋測試情境 28 八判定；contract 線另見功能分支）。

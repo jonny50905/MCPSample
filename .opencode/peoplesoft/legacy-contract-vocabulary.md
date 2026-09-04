@@ -1,6 +1,6 @@
 # Legacy Contract 封閉值域（單一真相）
 
-vocabularyVersion: 1
+vocabularyVersion: 2
 
 本檔是 Legacy Contract（issue #17）所有封閉值域的**唯一**定義：
 `scripts/ps-contract-lib.ps1` 機械解析本檔（`## 值域名` 標題＋其下表格的第一欄＝合法值），
@@ -148,6 +148,27 @@ vocabularyVersion: 1
 | MODAL | Modal |
 | RETURN | 返回 |
 | DYNAMIC_RUNTIME | 目標由執行期決定 |
+| UNRESOLVED | 查不到 |
+
+## navigationEntryType
+
+| 值 | 說明 |
+|---|---|
+| PORTAL_REGISTRY | Portal Registry 的 target CREF（PORTAL_CREF_USGT=TARG，待驗） |
+| CREF_LINK | Content Reference Link（同一目標的另一個入口位置，待驗） |
+| NAV_COLLECTION | Navigation Collection（本版不解析，必附 gap） |
+| FLUID_TILE | Fluid Tile／Homepage（本版不解析，必附 gap） |
+| NAVBAR | NavBar（本版不解析，必附 gap） |
+| UNKNOWN | 判不出入口型 |
+| UNRESOLVED | 查不到 |
+
+## navigationVisibility
+
+| 值 | 說明 |
+|---|---|
+| REGISTRY_DEFINED | Registry 中登錄的入口；未經 user／security context 驗證 |
+| AUTHORIZED_FOR_CONTEXT | 已對特定 user／role context 驗證（**本版不得由模型填**） |
+| UNKNOWN_VISIBILITY | 祖先 hidden-from-nav／CREF 過期／走訪未達根／surface 未解析 |
 | UNRESOLVED | 查不到 |
 
 ## componentMode

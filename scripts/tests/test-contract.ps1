@@ -37,7 +37,13 @@ $nnText = @'
 
 ## 功能定位
 
-人事 > 兵役 > 兵役資料維護。
+### 導覽入口
+
+人事 > 兵役 > 兵役資料維護（REGISTRY_DEFINED；PSPRSMDEFN 待人工SQL）。
+
+### Technical Menu
+
+RECRUITING / USE / TW_MIL001
 
 ## 畫面與欄位
 
@@ -136,7 +142,7 @@ $screenText = @'
 | pages | TW_MIL001_PG1 |
 | searchRecord | TW_MIL_SRCH |
 | modes | ADD;UPDATE |
-| menuPath | 人事 > 兵役 > 兵役資料維護 |
+| technicalMenu | RECRUITING/USE/TW_MIL001 |
 | origin | CUSTOM_PREFIX |
 | sourceNn | 03-TW_MIL001.md |
 
@@ -162,9 +168,10 @@ $screenText = @'
 | SAVE_EDIT | EXEMPT_RSN 空白 | ERROR | 20001,5 | E03.2 |
 
 ## 導覽
-| 來源 | 目標 | 型 | 證據 |
-|---|---|---|---|
-| MENU | TW_MIL001 | MENU_ENTRY | UNRESOLVED |
+| 來源 | 目標 | 型 | 入口型 | 可見性 | 證據 |
+|---|---|---|---|---|---|
+| HC_TW_MIL_CREF | TW_MIL001 | MENU_ENTRY | PORTAL_REGISTRY | REGISTRY_DEFINED | UNRESOLVED |
+| HC_TW_MIL_LINK | TW_MIL001 | MENU_ENTRY | CREF_LINK | REGISTRY_DEFINED | UNRESOLVED |
 
 ## 業務操作
 | 操作鍵 | 觸發 | 模式 | 說明 | 寫入 | 證據 |
@@ -279,8 +286,8 @@ $vocab = Get-CtVocabulary -LiteralPath $vocabPath
 Reset-Fixture
 
 Write-Host "情境 K1：值域檔解析——值域、黑名單、UNRESOLVED 出口、無 PARTIAL"
-Assert ($vocab.Version -eq 1) "vocabularyVersion=1"
-Assert ($vocab.Enums.Count -ge 30) "值域數 ≥30（實際 $($vocab.Enums.Count)）"
+Assert ($vocab.Version -eq 2) "vocabularyVersion=2"
+Assert ($vocab.Enums.Count -ge 32) "值域數 ≥32（實際 $($vocab.Enums.Count)）"
 Assert ($vocab.Blacklist -contains 'probablyDirectWritable') "黑名單含 probablyDirectWritable"
 Assert (Test-CtEnum -Vocab $vocab -EnumName 'storageKind' -Value 'DERIVED_WORK') "storageKind 含 DERIVED_WORK"
 Assert (-not (Test-CtEnum -Vocab $vocab -EnumName 'fragmentStatus' -Value 'PARTIAL')) "fragmentStatus 無 PARTIAL（容量由外環分頁決定）"
@@ -351,25 +358,34 @@ Assert ($s1.id -eq 'SCR.TW_MIL001' -and $s1.controls[0].id -eq 'CTL.TW_MIL001.TW
 Assert ($s1.states[0].id -eq 'STA.TW_MIL001.TW_MILITARY.EXEMPT_RSN.VISIBLE') "STA ID 含 RECORD.FIELD.PROPERTY"
 Assert ($s1.interactions[0].id -eq 'INT.TW_MIL001.FIELD_CHANGE.SET_VALUE.TW_MILITARY.EXEMPT_DT') "INT ID＝事件.效果.目標（非列序）"
 Assert ($s1.validations[0].id -eq 'VAL.TW_MIL001.SAVE_EDIT.ERROR.20001_5') "VAL ID＝事件.訊息型.訊息"
-Assert ($s1.navigation[0].id -eq 'NAV.TW_MIL001.MENU.TW_MIL001.MENU_ENTRY') "NAV ID＝來源.目標.型"
+Assert ($s1.navigation[0].id -eq 'NAV.TW_MIL001.HC_TW_MIL_CREF.TW_MIL001.MENU_ENTRY.PORTAL_REGISTRY' -and $s1.navigation[1].id -eq 'NAV.TW_MIL001.HC_TW_MIL_LINK.TW_MIL001.MENU_ENTRY.CREF_LINK') "NAV ID＝來源.目標.型.入口型（TARG／LINK 不撞名，#24 Case 2）"
+Assert ($s1.navigation[0].entryType -eq 'PORTAL_REGISTRY' -and $s1.navigation[0].visibility -eq 'REGISTRY_DEFINED' -and @($s1.technicalMenu).Count -eq 1 -and @($s1.technicalMenu)[0] -eq 'RECRUITING/USE/TW_MIL001' -and $null -eq $s1.menuPath) "JSON：entryType／visibility 入欄、technicalMenu 陣列、menuPath 已移除（#24）"
 Assert ($s1.businessOperations[0].id -eq 'BOP.TW_MIL001.SAVE' -and $s1.persistenceEffects[0].id -eq 'EFF.TW_MIL001.SAVE.TW_MILITARY.UPDATE') "BOP／EFF ID"
 $e1 = $c1.dataEntities[0]
 Assert ($e1.id -eq 'ENT.TW_MILITARY' -and $e1.fields[0].id -eq 'FLD.TW_MILITARY.EMPLID' -and $e1.readSemantics[0].id -eq 'RDS.TW_MILITARY.SOURCE' -and $e1.readSemantics[1].id -eq 'RDS.TW_MILITARY.LOOKUP') "ENT／FLD／RDS ID（RDS 依型別不依列序）"
 Assert ($e1.referenceQueries[0].id -eq 'RQ.TW_MILITARY.1' -and $e1.referenceQueries[0].sqlHash.Length -eq 12) "RQ ID＋12 碼 sqlHash"
 Assert ($s1.controls[0].claimDomain -eq 'BEHAVIOR' -and $e1.fields[0].claimDomain -eq 'PERSISTENCE') "claimDomain 依前綴"
 $inserted = $screenText -replace '(\| FIELD_CHANGE \| MIL_STATUS = ''E'' \| SET_VALUE)', "| ROW_INIT | NOT_APPLICABLE | SET_DEFAULT | TW_MILITARY.MIL_STATUS | 預設 S | E03.1 |`n`$1"
-$inserted = $inserted -replace '(\| MENU \| TW_MIL001 \| MENU_ENTRY \| UNRESOLVED \|)', "| TW_MIL001 | TW_MIL002 | TRANSFER | UNRESOLVED |`n`$1"
+$inserted = $inserted -replace '(\| HC_TW_MIL_CREF \| TW_MIL001 \| MENU_ENTRY \| PORTAL_REGISTRY \| REGISTRY_DEFINED \| UNRESOLVED \|)', "| TW_MIL001 | TW_MIL002 | TRANSFER | NOT_APPLICABLE | NOT_APPLICABLE | UNRESOLVED |`n`$1"
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $inserted
 $c2 = Get-Merged $facts
 $oldInt = @($c1.screens[0].interactions | ForEach-Object { $_.id }); $newInt = @($c2.screens[0].interactions | ForEach-Object { $_.id })
 $oldNav = @($c1.screens[0].navigation | ForEach-Object { $_.id }); $newNav = @($c2.screens[0].navigation | ForEach-Object { $_.id })
-Assert ((@($oldInt | Where-Object { $newInt -notcontains $_ }).Count -eq 0) -and (@($oldNav | Where-Object { $newNav -notcontains $_ }).Count -eq 0) -and $newInt.Count -eq 2 -and $newNav.Count -eq 2) "互動／導覽表首列前插入一列 → 原 ID 一個不變"
+Assert ((@($oldInt | Where-Object { $newInt -notcontains $_ }).Count -eq 0) -and (@($oldNav | Where-Object { $newNav -notcontains $_ }).Count -eq 0) -and $newInt.Count -eq 2 -and $newNav.Count -eq 3) "互動／導覽表首列前插入一列 → 原 ID 一個不變"
 $dupRow = $screenText -replace '\| TW_MIL001_PG1 \| TW_MILITARY\.EXEMPT_RSN \| 免役原因 \| ZHT \| EDIT_BOX \| NONE \| NOT_APPLICABLE \| UNRESOLVED \| DYNAMIC_RUNTIME \| YES \| DYNAMIC_RUNTIME \| E03\.1 \|', "| TW_MIL001_PG1 | TW_MILITARY.EXEMPT_RSN | 免役原因 | ZHT | EDIT_BOX | NONE | NOT_APPLICABLE | UNRESOLVED | DYNAMIC_RUNTIME | YES | DYNAMIC_RUNTIME | E03.1 |`n| TW_MIL001_PG1 | TW_MILITARY.EXEMPT_RSN | 免役原因（第二欄位） | ZHT | EDIT_BOX | NONE | NOT_APPLICABLE | UNRESOLVED | YES | YES | NO | E03.1 |"
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $dupRow
 $c3 = Get-Merged $facts
 Assert (@($c3.screens[0].controls | Where-Object { $_.id -eq 'CTL.TW_MIL001.TW_MIL001_PG1.TW_MILITARY.EXEMPT_RSN.2' }).Count -eq 1) "同自然鍵第二列 → .2"
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $screenText
 
+Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid).Count -eq 0) "導覽表兩列不同入口型 → 通過不變量（#24 Case 2 多入口）"
+$navDup = $screenText -replace '\| HC_TW_MIL_LINK \| TW_MIL001 \| MENU_ENTRY \| CREF_LINK \| REGISTRY_DEFINED \| UNRESOLVED \|', '| HC_TW_MIL_CREF | TW_MIL001 | MENU_ENTRY | PORTAL_REGISTRY | REGISTRY_DEFINED | UNRESOLVED |'
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navDup
+Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*四元組*' }).Count -gt 0) "同（來源,目標,型,入口型）寫兩列 → INVALID（ID 不退回列序相依）"
+$navAuth = $screenText -replace 'REGISTRY_DEFINED', 'AUTHORIZED_FOR_CONTEXT'
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navAuth
+Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*AUTHORIZED_FOR_CONTEXT*' }).Count -gt 0) "模型填 AUTHORIZED_FOR_CONTEXT → INVALID（#24 Case 3）"
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $screenText
 Write-Host "情境 K6：證據解引用與交叉引用——E<nn>.<n> 多來源、screen 查詢證據 SQL:<n>、effect 連結、缺 entity、五維"
 $c = Get-Merged $facts
 $ef = $c.screens[0].persistenceEffects[0]
@@ -395,14 +411,14 @@ Assert (@((Read-Frag 'entity-TW_MILITARY.md' 'entity' $facts2).Invalid | Where-O
 Remove-Item -LiteralPath (Join-Path $fixtureDir '07-TW_MIL003.md') -Force
 $null = Write-Fixture 'contract-parts/entity-TW_MILITARY.md' $entityText
 # screen 查詢證據
-$qe = $screenText -replace '\| NOT_APPLICABLE \| NOT_APPLICABLE \| NOT_APPLICABLE \|', "| Page 欄位盤點 | SELECT PNLNAME, RECNAME, FIELDNAME FROM PSPNLFIELD WHERE PNLNAME='TW_MIL001_PG1' FETCH FIRST 200 ROWS ONLY | 2 列 |"
-$qe = $qe -replace '\| MENU \| TW_MIL001 \| MENU_ENTRY \| UNRESOLVED \|', '| MENU | TW_MIL001 | MENU_ENTRY | SQL:1 |'
+$qe = $screenText -replace '\| NOT_APPLICABLE \| NOT_APPLICABLE \| NOT_APPLICABLE \|', "| 導覽入口（cookbook §2k） | SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM PSPRSMDEFN WHERE PORTAL_URI_SEG2='TW_MIL001' FETCH FIRST 200 ROWS ONLY | 2 列 |"
+$qe = $qe -replace '\| HC_TW_MIL_CREF \| TW_MIL001 \| MENU_ENTRY \| PORTAL_REGISTRY \| REGISTRY_DEFINED \| UNRESOLVED \|', '| HC_TW_MIL_CREF | TW_MIL001 | MENU_ENTRY | PORTAL_REGISTRY | REGISTRY_DEFINED | SQL:1 |'
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $qe
 $frq = Read-Frag 'screen-TW_MIL001.md' 'screen' $facts
 Assert ($frq.Invalid.Count -eq 0) "screen 查詢證據 1 列＋導覽引用 SQL:1 → 通過"
 $cq = Get-Merged $facts
 Assert ($cq.screens[0].navigation[0].verification.staticEvidence -eq 'PASS' -and $cq.screens[0].navigation[0].evidence[0].kind -eq 'SQL' -and $cq.screens[0].queryEvidence.Count -eq 1) "SQL:1 → staticEvidence PASS、evidenceKind SQL（不派 RQ id）"
-$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' ($qe -replace '\| MENU_ENTRY \| SQL:1 \|', '| MENU_ENTRY | SQL:2 |')
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' ($qe -replace '\| REGISTRY_DEFINED \| SQL:1 \|', '| REGISTRY_DEFINED | SQL:2 |')
 Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*SQL:2 超出查詢證據*' }).Count -gt 0) "SQL:2 超出查詢證據列數 → INVALID"
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' ($screenText -replace 'TW_MILITARY:UPDATE', 'TW_MILITARY:UPDATE;TW_MIL_HIST:INSERT')
 $cx = Get-Merged $facts

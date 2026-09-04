@@ -35,7 +35,8 @@
 | ps_get_ae_graph | cookbook §5（內容另走 ES＋Source） |
 | ps_get_data_lineage | ES table 名搜尋＋cookbook §6 反查交叉 |
 | ps_get_process_usage | cookbook §3 |
-| ps_get_security_path | cookbook §4 |
+| ps_get_security_path | cookbook §4（**technical authorization path**，非使用者導覽路徑） |
+| ps_get_navigation_entries | cookbook §2k（Portal Registry；本版只做 PORTAL_REGISTRY／CREF_LINK，Fluid／NavBar／Nav Collection 一律回 gap） |
 
 未來實作這些角色的完整 I/O 規格：`docs/mcp-tool-proposals.md`（agent 不讀）。
 
@@ -82,6 +83,39 @@ USES_CHOICE_SET
 CONTAINS_CHOICE
 TRIGGERS_EVENT
 ```
+
+## 3. 導覽入口詞彙表（ps_get_navigation_entries；issue #24）
+
+`navigationEntryType`（入口型）：
+
+```text
+PORTAL_REGISTRY
+CREF_LINK
+NAV_COLLECTION
+FLUID_TILE
+NAVBAR
+UNKNOWN
+```
+
+`navigationVisibility`（可見性——**與 confidence 正交，不得互相取代**）：
+
+```text
+REGISTRY_DEFINED
+AUTHORIZED_FOR_CONTEXT
+UNKNOWN_VISIBILITY
+```
+
+輸入（欄位表，非可呼叫 JSON）：`componentName`（必填）、`menuName`、`market`（預設 `GBL`）、
+`portalName`（省略＝列舉 `PSPRDMDEFN`）、`languageCode`（如 `ZHT`）、`includeAlternateEntries`（預設 true）。
+
+輸出兩個**互不合併**的陣列：
+- `technicalMenuLocations[]`：`menuName` / `barName` / `itemName`（來源 §2e／§2k-1；**永遠不是導覽路徑**）
+- `navigationEntries[]`：`portalName` / `entryType`（上表）/ `crefObjectName` /
+  `labels[]`（每段 `displayText`、`languageCode`、`displayTextSource`、`fallbackLanguageCode`）/
+  `visibility`（上表）/ `confidence`（仍只有 CONFIRMED／INFERRED／DYNAMIC_RUNTIME）
+
+**本版未實作的 surface（NAV_COLLECTION／FLUID_TILE／NAVBAR）不得靜默省略——一律以 gaps 回報。**
+完整 I/O JSON 見 `docs/mcp-tool-proposals.md` §4.6（agent 不讀）。
 
 `origin` 值域見 `customization-profile.yaml` 的 `objectOrigins`。
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata

@@ -17,7 +17,7 @@ manifest 是外環產生的唯讀工單：每個單位給輸出檔路徑、來�
 
 ## 每個單位的作法
 
-1. read 來源 NN 檔（manifest 給路徑）。把「畫面與欄位」「行為邏輯」「資料流」「權限」「Evidence 附錄」的內容**搬成表格列**：
+1. read 來源 NN 檔（manifest 給路徑）。把「功能定位」「畫面與欄位」「行為邏輯」「資料流」「權限」「Evidence 附錄」的內容**搬成表格列**：
    - screen：manifest 列給本檔的每個欄位 → 控制項表一列（不寫 manifest 沒列的欄位）；行為邏輯的每一條 →
      狀態／互動／驗證表擇一（UI 顯示隱藏唯讀必填→狀態；設值帶入清除轉頁→互動；存檔擋錯訊息→驗證）；
      資料流 → 業務操作表的「寫入」欄；權限節 → 權限表；沒有委派就在「查詢證據」寫一列全 NOT_APPLICABLE。
@@ -26,6 +26,7 @@ manifest 是外環產生的唯讀工單：每個單位給輸出檔路徑、來�
 2. **證據欄只准逐字抄 manifest 列出的 `E<nn>.<n>` token**（nn＝來源 NN 前兩碼）、本檔查詢表的 `SQL:<n>`、或 `UNRESOLVED`。不抄 ChunkId、不自創。
 3. 缺料才委派，且一個單位至多 2 個委派、會查 oracleMCP 的同時 ≤ 3、第一個先單獨派再並行（連線全域單例，L109；查完不得 disconnect）：
    - screen 缺 Page 清單／modes／Search Record／欄位盤點 → 委派 @ps-ui-flow：`[任務] Component <名> 的 Page 清單、Search Record、各 Page 的 Record.Field 盤點（cookbook §2d／§2e／§4 PSPNLGRPDEFN）`
+   - screen 缺導覽入口／technicalMenu → 委派 @ps-ui-flow：`[任務] Component <名> 的 Portal Registry 導覽入口（cookbook §2k：2k-0 先驗欄位；每個入口一列，標入口型與可見性；未實作 surface 回 gap）與 technicalMenuLocation（§2e）`
    - entity 缺 RECTYPE／SQLTABLENAME／欄位／鍵 → 委派 @ps-metadata-flow：`[任務] Record <名> 結構：RECTYPE、SQLTABLENAME、欄位清單與鍵（cookbook §6／§7）`
    - 委派回報的 SQL 證據（sql＋keyRows）抄進本檔查詢表（screen：查詢證據；entity：參考查詢，狀態 PENDING），再以 `SQL:<n>` 引用。
    - 委派失敗一次即改填 UNRESOLVED，不重試第三次。

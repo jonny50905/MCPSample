@@ -652,3 +652,20 @@ log 訊號詞：`PLAN_UNIT`、`ACCEPT：… DONE／INVALID／BLOCKED`、`ACCEPT�
 第一次跑 -VerifyPlan 後，先手動對三個已知物件各跑一次 §7a～§7e，把觀察值回填 cookbook，
 再讓模型跑 `/ps-contract-verify`。`currentSchema` 仍 FILL_ME 時所有 verify 收據只能是 NOT_RUN。
 改 ps-contract*.ps1 後必跑 `pwsh -File scripts\tests\test-contract.ps1`。
+
+## SOP-19 導覽入口首次上線（issue #24；L111）
+
+cookbook §2k 的 Portal Registry 表名／欄位／代碼值域**全數未在公司機驗證**。上線程序：
+
+1. 管理者先手跑 §2k-0 的四段查詢（`ALL_TABLES` → `ALL_TAB_COLUMNS` → `PORTAL_REFTYPE`／
+   `PORTAL_CREF_USGT`／`PORTAL_ATTR_NAM` 分布 → `PSPRDMDEFN` 的 portal 清單），把觀察值**回填 §2k-0 的註解**。
+2. 用一個已知 Component（menu＋component＋market 三者皆知）走一次 2k-2 → 2k-3 → 2k-4，
+   確認 (a) 三欄比對真的命中、(b) 走訪終止在 `PORTAL_ROOT_OBJECT`、(c) ZHT 覆寫確實存在。
+   任一步不成立＝該步驟改回 gap，**不得**降級成 PSMENUITEM 補位。
+3. 跑 §2k-5 的 LINK 探測，把「LINK 列是否帶 URI 三段」的答案回填 §2k-5——
+   回填前所有多入口宣稱一律附 gap。
+4. 回填完成前，NN 檔的「### 導覽入口」一律寫「未確認（navigation metadata 尚未查證）」；
+   lint 的 `[導覽]` 工單在此階段是**預期的**（美工類、不擋 tier 1）。
+5. 回填完成、回灌戰役結束後才考慮把 `technical menu 當導覽路徑`／`可見性過度宣稱`
+   兩個訊息字串移出 `ps-doc-lint.ps1` 的 `$polishPatterns`（升為缺料類、擋 tier 1）。
+6. 改 `ps-doc-lint.ps1` 後必跑 `pwsh -File scripts\tests\test-auto-loop.ps1`（情境 28）。

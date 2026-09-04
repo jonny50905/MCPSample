@@ -68,7 +68,9 @@ docs/ps-research/<領域>/
    **未命中 → 不拒答**：自行展開 3~6 個同義詞（中英文），用
    `searchPolicy.defaultMode`，並在「掃描範圍聲明」記錄用了哪些詞。
 2. 多角度盤點（各角度一個委派，oracleMCP 類**依序**派）：
-   - @ps-ui-flow：以 aliases 反查 UI 文字 / 選單 / Component 描述 → 功能清單
+   - @ps-ui-flow：以 aliases 反查 UI 文字 / Component 描述 → 功能清單。
+     「選單」在本階段只取 **technicalMenuLocation**（cookbook §2e）當定位線索，
+     **不寫進 00-overview 的任何路徑欄**；使用者導覽入口屬階段二（cookbook §2k）。
    - @ps-metadata-flow：Process / SQR / AE 名稱與描述命中 → 批次清單；核心 Record
    - @ps-peoplecode-flow：以 aliases 搜客製程式碼入口 → 補漏（只要物件清單，不要邏輯細節）
 3. 依 overview 模板寫 `00-overview.md`（功能地圖、批次、核心表、
@@ -108,6 +110,17 @@ docs/ps-research/<領域>/
    id 稽核解不了引用，lint 判 [附錄] 違規、整檔進手術單重建。
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
+   **「## 功能定位」的兩個 `###` 子段（issue #24）**：
+   · `### 導覽入口`＝委派 @ps-ui-flow 照 cookbook §2k 取 Portal Registry 入口
+     （oracleMCP 類，**計入同時 ≤ 3，上限不變**），每個入口一列、標可見性
+     `REGISTRY_DEFINED`（無 user／security context 時只准這個）或 `UNKNOWN_VISIBILITY`。
+   · 未查證／查無／§2k-0 欄位驗證未過 → 該段**整段**寫
+     「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」，
+     並在「## 未解事項」記一行查法收據（用什麼查、哪一步斷、結論）。
+   · `### Technical Menu`＝PSMENUITEM 的 MENUNAME / BARNAME / ITEMNAME，以 `/` 分隔。
+     **絕不可**把它當導覽入口的 fallback、也不可用 `>` 串接。
+   · 只要 `### 導覽入口` 有內容，「## 未解事項」就必須有一行
+     「Navigation Collection／Fluid Tile／NavBar 未盤查——不宣稱唯一入口」。
    有 businessRelevant 條件 UI → 檔內加「條件 UI」小節：每筆一列
    「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→
    業務含意」；幾何包含標 INFERRED（此小節不屬必要章節）。
@@ -162,6 +175,17 @@ docs/ps-research/<領域>/
   主角物件補齊所缺章節（含 Evidence 附錄的完整取證——**表格形式義務
   同建檔規則，L103：四欄表格，不是裸 id 清單**）；既有正確內容
   全部保留，照 function-detail 模板章節就位後快驗再打勾。
+- FAIL(TECHNICAL_MENU_AS_NAVIGATION)（issue #24）：**定向補查，不是改字**——
+  委派 @ps-ui-flow 照 cookbook §2k 取 Portal Registry 入口（先跑 2k-0 驗欄位）。
+  查得到 → 填「### 導覽入口」表、原路徑字串移到「### Technical Menu」段並改以 `/` 分隔；
+  查不到 → 「### 導覽入口」寫「未確認（navigation metadata 尚未查證）」＋未解事項記查法收據。
+  **禁止**只換分隔符、禁止刪掉 BARNAME 那段充數、禁止做 BARNAME 黑名單。
+- FAIL(SINGLE_PATH_COLLAPSE)（issue #24）：稽核已附查到的 CREF 清單——
+  依該清單把每個 location 各補一列（各自 labels 與可見性），並移除任何「唯一入口」措辭。
+  清單解析不到就記收據跳過，不得憑印象補列。
+- FAIL(USER_VISIBILITY_OVERCLAIM)（issue #24）：**純改寫，不必重查**——
+  把「使用者可以從…」「某角色會看到…」改成「Portal Registry 登錄入口：…（可見性 REGISTRY_DEFINED）」。
+  本版不得產出 AUTHORIZED_FOR_CONTEXT；有隱藏旗標／過期證據時改標 UNKNOWN_VISIBILITY。
 - **工具身分＝server 前綴＋工具名**：解引用＝
   `PeoplecodeSource_get_chunks_details`、結構＝`PeoplecodeSource_get_file_structure`、
   搜候選＝`PeoplecodeElasticSearch_search_chunks`；`get_chunk_by_id` 是 ES 的

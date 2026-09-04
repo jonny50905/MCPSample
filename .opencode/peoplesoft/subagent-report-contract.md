@@ -14,6 +14,11 @@ orchestrator 主 context 只累積小而結構化的報告。
 2. findings 內每個 claim 必附 ≥ 1 個 evidence ID；
    沒有 evidence 的內容寫入 gaps，不寫入 findings。
 3. confidence 只能是 CONFIRMED / INFERRED / DYNAMIC_RUNTIME。
+3a. **可見性是另一條軸，不是 confidence 值**（issue #24）：導覽入口的
+   REGISTRY_DEFINED / AUTHORIZED_FOR_CONTEXT / UNKNOWN_VISIBILITY 只能寫在
+   `navigationEntries[].visibility`，**不得**寫進 `confidence` 欄；同一筆導覽入口
+   仍要照第 3 條標它自己的 confidence。沒有 user／security context 時
+   **只准** REGISTRY_DEFINED（或 UNKNOWN_VISIBILITY），不得升格為 AUTHORIZED_FOR_CONTEXT。
 4. 查無 / 不確定 / 超出 budget：用 status=PARTIAL 或 BLOCKED + gaps 說明，
    不得編造物件名稱或執行期結果。
 5. 報告目標長度 ≤ 600 tokens（軟性）；findings 依相關性排序，最多 8 筆。
@@ -90,6 +95,23 @@ orchestrator 主 context 只累積小而結構化的報告。
   "dependencies": [
     { "type": "FUNCLIB", "name": "HR_COMMON_UTIL", "origin": "DELIVERED", "role": "DEPENDENCY" }
   ],
+  "technicalMenuLocations": [
+    { "menuName": "RECRUITING", "barName": "USE", "itemName": "MANAGE_APPLICANTS" }
+  ],
+  "navigationEntries": [
+    {
+      "portalName": "EMPLOYEE",
+      "entryType": "PORTAL_REGISTRY",
+      "crefObjectName": "HC_HRS_MANAGE_APPLICANTS",
+      "labels": [
+        { "displayText": "招募", "languageCode": "ZHT", "displayTextSource": "LANG", "fallbackLanguageCode": "" },
+        { "displayText": "Applicant Management", "languageCode": "ENG", "displayTextSource": "BASE", "fallbackLanguageCode": "ENG" }
+      ],
+      "visibility": "REGISTRY_DEFINED",
+      "confidence": "CONFIRMED",
+      "evidence": [ { "kind": "SQL", "sql": "SELECT … FROM PSPRSMDEFN …", "keyRows": ["…"] } ]
+    }
+  ],
   "_sqlEvidenceExample": {
     "kind": "SQL",
     "sql": "SELECT FIELDVALUE, XLATLONGNAME FROM PSXLATITEM WHERE FIELDNAME = 'MIL_STATUS' ...",
@@ -118,6 +140,8 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `coverage[]` | 長文本必填 | 程式單位、結構行號範圍、已分析行號區間；未覆蓋區間必同時列於 gaps |
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
 | `dependencies[]` | ✔（可為空陣列） | 原生 / 相依物件，只能出現在這裡 |
+| `technicalMenuLocations[]` | 選填 | PSMENUITEM 的 MENUNAME／BARNAME／ITEMNAME——**technical metadata，不是導覽路徑**（issue #24） |
+| `navigationEntries[]` | 選填（導覽類委派必填，可為空陣列） | Portal Registry 入口，**複數**；每筆帶 entryType／labels／visibility（值域見 `mcp-tool-contracts.md` §3）。空陣列＋gaps＝查無；未支援的 surface 記 gaps，不得省略 |
 | `dynamicRuntimeWarnings[]` | ✔（可為空陣列） | 所有 DYNAMIC_RUNTIME 事項集中列出 |
 | `gaps[]` | ✔（可為空陣列） | 未涵蓋範圍與原因（budget 到頂 / 與題無關 / 查無） |
 | `suggestedNext[]` | 選填 | 建議 orchestrator 的後續委派 |

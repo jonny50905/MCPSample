@@ -7,7 +7,7 @@
 # 兩個已踩過的陷阱：(1) 字典若有名為 keys 的鍵，PowerShell 的 $dict.Keys 會回該鍵的值——序列化走 GetEnumerator、
 # 欄位改名 recordKeys；(2) 排序一律 Ordinal（culture 排序跨機不定序，同 ps-graduation.ps1）。
 
-$script:ContractSchemaVersion = 1
+$script:ContractSchemaVersion = 2
 
 # ── 基礎 I/O ─────────────────────────────────────────────────────────────────
 function Read-CtText {
@@ -286,12 +286,12 @@ function Get-CtFragmentSpec {
     $controls = @{ Type = $tb; Header = @('頁', 'Record.Field', '顯示文字', '語系', '控制型', '選項型', '選項', '預設', '可見', '可編輯', '必填', '證據'); Enums = @{ 3 = 'languageCode'; 4 = 'controlType'; 5 = 'choiceType'; 8 = 'yesNo'; 9 = 'yesNo'; 10 = 'yesNo' }; EvidenceCol = 11; KeyCol = 1 }
     return @{
         screen = [ordered]@{
-            '畫面'     = @{ Type = $kv; Keys = @('component', 'pages', 'searchRecord', 'modes', 'menuPath', 'origin', 'sourceNn'); Enums = @{ modes = 'componentMode'; origin = 'origin' }; Multi = @('pages', 'modes', 'sourceNn') }
+            '畫面'     = @{ Type = $kv; Keys = @('component', 'pages', 'searchRecord', 'modes', 'technicalMenu', 'origin', 'sourceNn'); Enums = @{ modes = 'componentMode'; origin = 'origin' }; Multi = @('pages', 'modes', 'sourceNn', 'technicalMenu') }
             '控制項'   = $controls
             '狀態'     = @{ Type = $tb; Header = @('目標 Record.Field', '屬性', '條件', '觸發事件', '解析', '證據'); Enums = @{ 1 = 'stateProperty'; 3 = 'eventTrigger'; 4 = 'resolution' }; EvidenceCol = 5; KeyCol = 0 }
             '互動'     = @{ Type = $tb; Header = @('觸發事件', '條件', '效果型', '目標', '說明', '證據'); Enums = @{ 0 = 'eventTrigger'; 2 = 'effectType' }; EvidenceCol = 5 }
             '驗證'     = @{ Type = $tb; Header = @('觸發事件', '條件', '訊息型', '訊息', '證據'); Enums = @{ 0 = 'eventTrigger'; 2 = 'messageKind' }; EvidenceCol = 4 }
-            '導覽'     = @{ Type = $tb; Header = @('來源', '目標', '型', '證據'); Enums = @{ 2 = 'navigationKind' }; EvidenceCol = 3 }
+            '導覽'     = @{ Type = $tb; Header = @('來源', '目標', '型', '入口型', '可見性', '證據'); Enums = @{ 2 = 'navigationKind'; 3 = 'navigationEntryType'; 4 = 'navigationVisibility' }; EvidenceCol = 5 }
             '業務操作' = @{ Type = $tb; Header = @('操作鍵', '觸發', '模式', '說明', '寫入', '證據'); Enums = @{ 1 = 'eventTrigger'; 2 = 'componentMode' }; EvidenceCol = 5; OpKeyCol = 0 }
             '權限'     = @{ Type = $tb; Header = @('Permission List', 'Role', '人數', 'Search Record', '證據'); Enums = @{}; EvidenceCol = 4 }
             '查詢證據' = @{ Type = $tb; Header = @('用途', 'SQL', '關鍵列'); Enums = @{}; SqlCol = 1 }
@@ -461,6 +461,18 @@ function Read-CtFragment {
             foreach ($g in $got) { if ($ExpectedFields -notcontains $g) { $res.Invalid += "「## 控制項」欄位 $g 不在本檔範圍（manifest 未列）" } }
         }
     }
+    # 導覽入口不變量（issue #24）：四元組唯一＝ID 與列序無關（decision-memo「插列不改既有 ID」）；
+    # AUTHORIZED_FOR_CONTEXT 需 user／security context，本版模型不得填（同 DIRECT_DB_WRITE_APPROVED 紀律）
+    if ($Kind -eq 'screen' -and $res.Sections.Contains('導覽')) {
+        $navSeen = @{}
+        foreach ($r in $res.Sections['導覽'].Rows) {
+            if ($r.NotApplicable) { continue }
+            if ($r.Cells[4] -eq 'AUTHORIZED_FOR_CONTEXT') { $res.Invalid += "「## 導覽」第 $($r.Row) 列可見性 AUTHORIZED_FOR_CONTEXT 不得由模型填（無 user／security context，只能 REGISTRY_DEFINED／UNKNOWN_VISIBILITY）" }
+            $navKey = ($r.Cells[0] + '|' + $r.Cells[1] + '|' + $r.Cells[2] + '|' + $r.Cells[3]).ToUpperInvariant()
+            if ($navSeen.ContainsKey($navKey)) { $res.Invalid += "「## 導覽」第 $($r.Row) 列（來源,目標,型,入口型）四元組與第 $($navSeen[$navKey]) 列重複——多入口請以不同來源（CREF 物件名）區分，否則 ID 會退回列序相依" }
+            else { $navSeen[$navKey] = $r.Row }
+        }
+    }
     if ($Kind -eq 'entity' -and $res.Sections.Contains('實體')) {
         $kvm = $res.Sections['實體'].Kv
         $rec = [string]$kvm['record']
@@ -606,6 +618,7 @@ function New-CtManifest {
                 $ln += "  - 行為邏輯：$(@($f.BehaviorLines).Count) 列（UI 狀態類 $($f.UiStateLineCount)、存檔類 $($f.SaveKeywordCount)）"
                 $ln += "  - 資料流：" + $(if (@($f.DataFlowRows).Count -eq 0) { '無' } else { (($f.DataFlowRows | ForEach-Object { $_.Record + ':' + $_.Op }) -join '；') })
                 $ln += "  - 權限節：$(if ($f.PermissionDeclared) { '有內容' } else { '空／缺（權限表寫 UNRESOLVED）' })"
+                $ln += "  - 導覽入口：NN 的「## 功能定位／### 導覽入口」有幾列就寫幾列（多入口不得壓成一列）；查不到寫 UNRESOLVED，缺料才委派 @ps-ui-flow（cookbook §2k）。technicalMenu 是 PSMENUITEM 三欄，不是導覽路徑"
             }
             elseif ($u.Kind -eq 'screenpage') {
                 $ln += "  - 分頁檔：只寫「## 畫面」（component／page=$($u.PageIndex)／sourceNn）＋「## 控制項」；本頁欄位（每個都要有一列、不多不少）：" + (($f.FieldRows | Where-Object { $u.PageFields -contains $_.Field } | ForEach-Object { $_.Field + '（' + $_.Label + '）' }) -join '；')
@@ -1002,9 +1015,10 @@ function Merge-CtContract {
         $navs = @(); $seenN = @{}
         foreach ($r in $fr.Sections['導覽'].Rows) {
             if ($r.NotApplicable) { continue }
-            $nid = Get-CtUniqueId -Base (Get-CtId -Prefix 'NAV' -Parts @($comp, $r.Cells[0], $r.Cells[1], $r.Cells[2])) -Seen $seenN
-            $ev = Resolve-CtEvidence -Ref $r.Cells[3] -NnFactsMap $NnFactsMap -SourceNn $fr.SourceNn -SqlRows $qRows -SqlKind 'QE'
-            $navs += , ([ordered]@{ id = $nid; claimDomain = 'BEHAVIOR'; from = $r.Cells[0]; to = $r.Cells[1]; kind = $r.Cells[2]; evidence = $ev.Evidence; verification = (New-CtVerification -Static $ev.State) })
+            # ID 含 entryType（issue #24）：同一 from/to/kind 的 TARG 與 LINK 才不會靠列序派 .2
+            $nid = Get-CtUniqueId -Base (Get-CtId -Prefix 'NAV' -Parts @($comp, $r.Cells[0], $r.Cells[1], $r.Cells[2], $r.Cells[3])) -Seen $seenN
+            $ev = Resolve-CtEvidence -Ref $r.Cells[5] -NnFactsMap $NnFactsMap -SourceNn $fr.SourceNn -SqlRows $qRows -SqlKind 'QE'
+            $navs += , ([ordered]@{ id = $nid; claimDomain = 'BEHAVIOR'; from = $r.Cells[0]; to = $r.Cells[1]; kind = $r.Cells[2]; entryType = $r.Cells[3]; visibility = $r.Cells[4]; evidence = $ev.Evidence; verification = (New-CtVerification -Static $ev.State) })
         }
         $ops = @(); $effects = @()
         foreach ($r in $fr.Sections['業務操作'].Rows) {
@@ -1037,7 +1051,7 @@ function Merge-CtContract {
         }
         $screens[$comp] = [ordered]@{
             id = (Get-CtId -Prefix 'SCR' -Parts @($comp)); claimDomain = 'BEHAVIOR'; component = $comp
-            pages = @(Split-CtMulti -Value ([string]$kvm['pages'])); searchRecord = [string]$kvm['searchRecord']; modes = @(Split-CtMulti -Value ([string]$kvm['modes'])); menuPath = [string]$kvm['menuPath']; origin = [string]$kvm['origin']; sourceNn = @($fr.SourceNn)
+            pages = @(Split-CtMulti -Value ([string]$kvm['pages'])); searchRecord = [string]$kvm['searchRecord']; modes = @(Split-CtMulti -Value ([string]$kvm['modes'])); technicalMenu = @(Split-CtMulti -Value ([string]$kvm['technicalMenu'])); origin = [string]$kvm['origin']; sourceNn = @($fr.SourceNn)
             controls = $controls; states = $states; interactions = $interactions; validations = $validations; navigation = $navs; businessOperations = $ops; persistenceEffects = $effects; security = $perms
             queryEvidence = $qRows
             fragment = [ordered]@{ file = $fr.File; hash = $fr.Hash; pageFiles = $pageFiles }
@@ -1090,7 +1104,8 @@ function ConvertTo-CtSpec {
     $o.Add("| 鍵 | 值 |")
     $o.Add("|---|---|")
     $o.Add("| Component | $($Screen.component) |")
-    $o.Add("| 選單路徑 | $($Screen.menuPath) |")
+    $o.Add("| Technical Menu（非導覽路徑） | $(if (@($Screen.technicalMenu).Count) { @($Screen.technicalMenu) -join '；' } else { 'UNRESOLVED' }) |")
+    $o.Add("| Portal Registry 入口 | $(@($Screen.navigation | Where-Object { $_.entryType -eq 'PORTAL_REGISTRY' -or $_.entryType -eq 'CREF_LINK' }).Count) 筆（見 ## Navigation） |")
     $o.Add("| Search Record | $($Screen.searchRecord) |")
     $o.Add("| 模式 | $(if ($Screen.modes.Count) { $Screen.modes -join '；' } else { 'UNRESOLVED' }) |")
     $o.Add("| Origin | $($Screen.origin) |")
@@ -1130,10 +1145,10 @@ function ConvertTo-CtSpec {
     if ($Screen.validations.Count -eq 0) { $o.Add("| （無） | | | | | |") }
     $o.Add("")
     $o.Add("## Navigation")
-    $o.Add("| navigationId | 來源 | 目標 | 型 | 證據 |")
-    $o.Add("|---|---|---|---|---|")
-    foreach ($n in $Screen.navigation) { $o.Add("| $($n.id) | $($n.from) | $($n.to) | $($n.kind) | $(ConvertTo-CtEvidenceText $n.evidence) |") }
-    if ($Screen.navigation.Count -eq 0) { $o.Add("| （無） | | | | |") }
+    $o.Add("| navigationId | 來源 | 目標 | 型 | 入口型 | 可見性 | 證據 |")
+    $o.Add("|---|---|---|---|---|---|---|")
+    foreach ($n in $Screen.navigation) { $o.Add("| $($n.id) | $($n.from) | $($n.to) | $($n.kind) | $($n.entryType) | $($n.visibility) | $(ConvertTo-CtEvidenceText $n.evidence) |") }
+    if ($Screen.navigation.Count -eq 0) { $o.Add("| （無） | | | | | | |") }
     $o.Add("")
     $o.Add("## Business Operations")
     $o.Add("| businessOperationId | 操作鍵 | 觸發 | 模式 | 說明 | 持久化效果 | 證據 |")
@@ -1391,6 +1406,8 @@ function Test-CtGates {
     $den = 0; $num = 0; $bad = @()
     $all = @()
     foreach ($s in $Contract.screens) { $all += @($s.controls) + @($s.states) + @($s.interactions) + @($s.validations) + @($s.navigation) + @($s.businessOperations) + @($s.persistenceEffects) }
+    # 導覽可見性（issue #24）：未確認的入口出 debt，不另立 gate（新 gate 會動 tier 判定與 test 斷言）
+    foreach ($s in $Contract.screens) { foreach ($n in @($s.navigation)) { if ($n.visibility -eq 'UNKNOWN_VISIBILITY' -or $n.visibility -eq 'UNRESOLVED') { $debts += "NAV｜$($n.id)｜visibility｜$($n.visibility)" } } }
     foreach ($e in $Contract.dataEntities) { $all += @($e.fields) + @($e.readSemantics) + @($e.writeSemantics) }
     foreach ($c in $all) { $den++; $st = [string]$c.verification.staticEvidence; if ($st -eq 'PASS' -or $st -eq 'NOT_APPLICABLE') { $num++ } elseif ($st -eq 'FAIL') { $bad += $c.id } else { $debts += "G15｜$($c.id)｜staticEvidence｜UNRESOLVED" } }
     foreach ($u in $Contract.unresolvedReferences) { $bad += $u }

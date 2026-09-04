@@ -458,6 +458,8 @@ $evStats = @{}           # -EvidenceStats（L106）：檔名 → Evidence 資料
 $rawAppendix = @()       # [附錄]（L103）：Evidence 附錄是裸 ChunkId 清單、不是模板
                          # 表格——節內逐列檢查全掛在「| 開頭的表格列」上，一列表格
                          # 都沒有＝零檢查零違規（實案：chunks GUID1,GUID2,… 整批放行）
+$navOrders = @()         # [導覽]（issue #24）：功能定位的導覽主張與證據出處不符
+                         # ——technical menu 冒充導覽路徑／無 context 卻宣稱使用者看得到
 $sectionGapByFile = @{}  # [章節]（L93）：檔名 → 缺的必要章節清單——缺章節曾是
                          # 「有偵測、無執行者」的死角（16~20 實案：lint 每輪報、
                          # 工單不出、無 session 被告知，永遠不癒）
@@ -550,6 +552,45 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
                 if (Test-SectionHollow $body) {
                     $violations += "${name}：章節「$sec」空白（有標題無實質內容——空殼／僅註解／「同前」類省略語；git 考古或開重查工單）"
                 }
+            }
+        }
+
+        # ── 導覽主張守衛（issue #24）：TECHNICAL_MENU_AS_NAVIGATION／USER_VISIBILITY_OVERCLAIM ──
+        # 只掃「## 功能定位」節 body（節界＝下一個 `n## `；`### ` 子標題不截斷，
+        # 所以 ### 導覽入口／### Technical Menu 都在範圍內）。判定＝**主張形狀 × 證據出處**
+        # 的合取，不是字串黑名單——issue #24 明列「BARNAME=USE 黑名單」為不接受的修法，
+        # 且黑名單會漏掉 PROCESS／INQUIRE／REPORT 與中文 label 版本。
+        # 剝殼順序固定：HTML 註解 → 行內 <佔位符> → markdown 引言列，否則模板自帶的
+        # 「<…一段話。>」與「-->」會自我觸發（同 Test-SectionHollow 的既有作法，L35）。
+        # 路徑分隔符同時認 > ＞ → »：框架自身用「→」（模板 ## 權限、ps-security-flow），
+        # contract 線草案用「>」——只認一種必然欠涵蓋。
+        $fdM = [regex]::Match($text, (Get-SectionAnchor '## 功能定位'))
+        if ($fdM.Success) {
+            $fdAfter = $text.Substring($fdM.Index + '## 功能定位'.Length)
+            $fdNext = $fdAfter.IndexOf("`n## ")
+            $fdBody = if ($fdNext -ge 0) { $fdAfter.Substring(0, $fdNext) } else { $fdAfter }
+            $fdClean = [regex]::Replace($fdBody, '(?s)<!--.*?-->', '')
+            $fdClean = [regex]::Replace($fdClean, '<[^<>]*>', '')
+            $fdClean = [regex]::Replace($fdClean, '(?m)^[ \t]{0,3}>.*$', '')
+            $navSeg = '[^\s|>＞→»]+'
+            $navSep = '[ \t]*[>＞→»][ \t]*'
+            # ≥3 段非空 token 串起來才算路徑宣稱；標題列（#）不算
+            $navClaim = [regex]::Match($fdClean, '(?m)^(?![ \t]{0,3}#).*?' + $navSeg + $navSep + $navSeg + $navSep + $navSeg)
+            # Portal 證據＝可重跑的 PSPRSMDEFN SELECT，或以合法出口申報的待人工SQL（L43／L53）
+            $navPortalEv = ($text -match '(?is)\bSELECT\b[\s\S]{0,400}?\bFROM\b[\s\S]{0,200}?\bPSPRSMDEFN') -or
+                           ($text -match '(?m)^.*\bPSPRSMDEFN.*待人工SQL.*$')
+            $navKinds = @()
+            if ($navClaim.Success -and -not $navPortalEv) {
+                $violations += "${name}：功能定位宣稱導覽路徑「$($navClaim.Value.Trim())」但全檔無 Portal Registry 證據——technical menu 當導覽路徑（PSMENUITEM 只是 technicalMenuLocation；導覽入口走 cookbook §2k）"
+                $navKinds += 'TECHNICAL_MENU_AS_NAVIGATION'
+            }
+            $ovM = [regex]::Match($fdClean, '(使用者(?:一定)?可(?:以)?(?:從|由)|使用者都(?:能|可以)(?:進|看)|角色[^。\r\n]{0,12}(?:會看到|看得到|才看得到))')
+            if ($ovM.Success -and $fdClean -notmatch 'AUTHORIZED_FOR_CONTEXT') {
+                $violations += "${name}：功能定位宣稱使用者可見性「$($ovM.Value)」但未標 AUTHORIZED_FOR_CONTEXT——無 user／security context 的入口只能是 REGISTRY_DEFINED（可見性過度宣稱）"
+                $navKinds += 'USER_VISIBILITY_OVERCLAIM'
+            }
+            if ($navKinds.Count -gt 0) {
+                $navOrders += [pscustomobject]@{ File = $name; Kinds = ($navKinds -join '＋') }
             }
         }
 
@@ -1094,7 +1135,9 @@ $polishPatterns = @(
     '機器參照無效',
     '行為邏輯無任何 confidence 標註',
     'frontmatter 缺 ',
-    'status 值非法'
+    'status 值非法',
+    'technical menu 當導覽路徑',
+    '可見性過度宣稱'
 )
 function Test-IsPolishViolation {
     param([string]$Msg)
@@ -1160,7 +1203,7 @@ $leakManual = @($leaks | Where-Object { -not $_.Delegable })
 # 燒好幾個 session 修不擋門的東西，與廣度優先（L50：tier 1 不保證回溯驗證，
 # 回溯驗證是 tier 2 的工作）直接牴觸。
 $polishOrderCount = $truncatedIds.Count + $missingIds.Count + $misplacedRefRows.Count +
-    $bogusIds.Count + $failedQueryRows.Count
+    $bogusIds.Count + $failedQueryRows.Count + $navOrders.Count
 $emitPolish = (-not $CoverageOnly)
 # [章節] 兩個 tier 都出（L93）：缺章節是缺料不是美工（CoverageOnly 本來就不降它）
 # [附錄] 同理（L103）：裸 id 傾倒＝證據不可解引用＝缺料，不是排版
@@ -1233,6 +1276,12 @@ if ($orderTotal -gt 0) {
         $i++
         Write-Host "$i. [證據] ${t}：以失敗查詢當機器參照（SQL 型，多半表名寫錯）"
     }
+    # [導覽]（issue #24）：一檔一單；工單文字**不帶行號、不帶筆數**——那是狀態不是身分，
+    # 帶進去會讓 ps-auto-loop 的台帳指紋失穩（Get-OrderFingerprint 會剝行號，但筆數剝不掉）
+    foreach ($t in $navOrders) {
+        $i++
+        Write-Host "$i. [導覽] $($t.File)：$($t.Kinds)"
+    }
     }
     Write-Host ""
     if ($sectionGapByFile.Count -gt 0) {
@@ -1244,6 +1293,22 @@ if ($orderTotal -gt 0) {
         Write-Host "  4) 該節對物件型別**不適用**（如 Function Library 無使用者畫面 → 畫面與欄位）"
         Write-Host "     → 章節標題仍要就位，內文寫「（無——<一句原因>）」——標題是機器契約，"
         Write-Host "       誠實申報不適用即合格；**只有標題缺席才是違規**，禁止為湊內容編造"
+    }
+    if ($emitPolish -and $navOrders.Count -gt 0) {
+        Write-Host "【導覽】型（功能定位的導覽主張與證據出處不符）——**補查證不是改字**："
+        Write-Host "  1) TECHNICAL_MENU_AS_NAVIGATION：文件把 A > B > C 當使用者路徑，但全檔只有"
+        Write-Host "     PSMENUITEM／PSAUTHITEM 證據。修法＝委派 @ps-ui-flow 照 cookbook §2k 取"
+        Write-Host "     Portal Registry 入口（2k-0 先驗欄位）；查得到 → 依模板填「### 導覽入口」表"
+        Write-Host "     並把原 A > B > C 移到「### Technical Menu」段（以 / 分隔，不是 >）；"
+        Write-Host "     查不到 → 「### 導覽入口」整段寫「Portal Registry 導覽入口：未確認"
+        Write-Host "     （navigation metadata 尚未查證）」＋未解事項記一行查法收據。"
+        Write-Host "     **禁止**只把 > 換成別的符號、禁止刪掉 BARNAME 那一段充數。"
+        Write-Host "  2) USER_VISIBILITY_OVERCLAIM：寫了「使用者可以從…」「某角色會看到…」卻無"
+        Write-Host "     user／security context。修法＝改寫成「Portal Registry 登錄入口：…"
+        Write-Host "     （可見性 REGISTRY_DEFINED）」；本版**不得**產出 AUTHORIZED_FOR_CONTEXT。"
+        Write-Host "  3) 兩型都要在該檔未解事項補一行：未實作的 Navigation Collection／Fluid Tile／"
+        Write-Host "     NavBar 未盤查，**不得宣稱唯一入口**（issue #24 Case 6）。"
+        Write-Host "  4) 本文其他章節一字不動。"
     }
     if ($rawAppendix.Count -gt 0) {
         Write-Host "【附錄】型（Evidence 附錄是裸 id 清單、不是模板表格）——**重建表格不是排版**："

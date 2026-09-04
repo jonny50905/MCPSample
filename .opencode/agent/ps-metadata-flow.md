@@ -100,3 +100,8 @@ tools:
   `search_component_metadata` 只吃 Component 關鍵字、
   `get_ae_sql_metadata` 只吃 AE 程式名——Page／Record／選單名帶入
   必查空＝**方法錯誤**（不是「不存在」），改走 cookbook §2／§6。
+- **授權路徑 ≠ 導覽路徑（issue #24）**：本 agent 產出的 Menu→Component→PL→Role 是
+  **technical authorization path**（cookbook §4，來源 PSAUTHITEM ⋈ PSMENUITEM）。
+  其 MENUNAME 不得輸出成選單路徑／操作路徑／導覽入口，也不得與 Portal Registry
+  入口併成同一 claim。使用者導覽入口屬 @ps-ui-flow（cookbook §2k）；
+  「某角色實際看得到哪個入口」本版無能力回答，回 `status: PARTIAL` ＋ gaps。

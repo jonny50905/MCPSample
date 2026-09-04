@@ -20,6 +20,14 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
    `SQL:<n>`（screen＝本檔「查詢證據」表第 n 列；entity＝本檔「參考查詢」表第 n 列）、`UNRESOLVED`。
    多個以 `;` 分隔。**不抄 ChunkId、不自創、不用 manifest 沒列的 E token。**
 5. 自然鍵一律大寫，`Record.Field` 恰含一個點；各段（COMPONENT、PAGE、RECNAME、FIELDNAME、OPKEY）內不得有 `.`、`;`、`|`、空白。
+5a. **導覽入口（issue #24）**：`## 導覽` 一列＝一個入口，**同一 Component 的多個入口就寫多列**
+   （CREF Link 會讓同一畫面出現在多個位置，壓成一列＝誤報）。同一檔內
+   （來源, 目標, 型, 入口型）四元組不得重複——重複＝INVALID（ID 若靠列序派 `.2` 就不再與列序無關）。
+   `MENU_ENTRY` 只在**畫面內轉頁**語意下使用；Portal Registry 入口的「型」寫 `MENU_ENTRY`
+   且「入口型」寫 `PORTAL_REGISTRY`／`CREF_LINK`，來源欄寫 **CREF 物件名或 Portal 名**，不寫死字串 `MENU`。
+   無 user／security context 時「可見性」**只准** `REGISTRY_DEFINED` 或 `UNKNOWN_VISIBILITY`；
+   `AUTHORIZED_FOR_CONTEXT` 模型不得填（同 `DIRECT_DB_WRITE_APPROVED` 的紀律）。
+   `technicalMenu`（畫面 kv）是 PSMENUITEM 三欄，**不是導覽路徑**，不得與本表混用。
    操作鍵符合 `^[A-Z][A-Z0-9_]{1,30}$`。
 6. 一檔 ≤150 行。**容量由 manifest 決定**：控制項表只寫 manifest 列給本檔的那一頁欄位（不多不少）；
    其餘欄位由 `screen-<COMPONENT>-p<k>.md` 分頁檔承載（manifest 另列單位）。寫不下＝外環會縮頁重排，你不用自估。
@@ -33,7 +41,8 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
 ## screen fragment（`contract-parts/screen-<COMPONENT>.md`，一個 Component 一檔）
 
 來源＝manifest 指定的 NN 檔（read 它的「畫面與欄位」「行為邏輯」「資料流」「權限」「Evidence 附錄」）。
-缺料才委派：Page 欄位盤點／modes／Search Record → @ps-ui-flow（cookbook §2d／§2e／§4）；其餘不委派。
+缺料才委派：Page 欄位盤點／modes／Search Record → @ps-ui-flow（cookbook §2d／§2e／§4）；
+導覽入口（`## 導覽` 的 Portal Registry 列）與 `technicalMenu` → @ps-ui-flow（cookbook §2k／§2e，oracleMCP 類同時 ≤ 3）；其餘不委派。
 委派回報的 SQL 證據抄進「## 查詢證據」。
 
 ```markdown
@@ -44,7 +53,7 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
 | pages | <PAGE1>;<PAGE2> |
 | searchRecord | <RECNAME 或 UNRESOLVED> |
 | modes | ADD;UPDATE（componentMode，多值） |
-| menuPath | <選單路徑短句 或 UNRESOLVED> |
+| technicalMenu | <MENUNAME/BARNAME/ITEMNAME；多筆以 ; 分隔 或 UNRESOLVED> |
 | origin | <origin> |
 | sourceNn | <NN 檔名，照 manifest> |
 
@@ -69,9 +78,9 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
 | <eventTrigger> | <條件短句> | <messageKind> | <set,number 或文字> | E03.2 |
 
 ## 導覽
-| 來源 | 目標 | 型 | 證據 |
-|---|---|---|---|
-| <MENU／Component／Page> | <Component／Page> | <navigationKind> | E03.3 |
+| 來源 | 目標 | 型 | 入口型 | 可見性 | 證據 |
+|---|---|---|---|---|---|
+| <Portal／CREF 物件名／Component／Page> | <Component／Page> | <navigationKind> | <navigationEntryType 或 NOT_APPLICABLE> | <navigationVisibility 或 NOT_APPLICABLE> | E03.3 |
 
 ## 業務操作
 | 操作鍵 | 觸發 | 模式 | 說明 | 寫入 | 證據 |

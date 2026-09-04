@@ -81,7 +81,7 @@ docs/ps-research/<領域>/
 | pages | TW_MIL001_PG1;TW_MIL001_PG2 |
 | searchRecord | TW_MIL_SRCH |
 | modes | ADD;UPDATE |
-| menuPath | 人事 > 兵役 > 兵役資料維護 |
+| technicalMenu | RECRUITING/USE/TW_MIL001 |
 | origin | CUSTOM_PREFIX |
 | sourceNn | 03-TW_MIL001.md |
 
@@ -106,9 +106,10 @@ docs/ps-research/<領域>/
 | SAVE_EDIT | EXEMPT_RSN 空白 | ERROR | 20001,5 | E2 |
 
 ## 導覽
-| 來源 | 目標 | 型 | 證據 |
-|---|---|---|---|
-| MENU | TW_MIL001 | MENU_ENTRY | E3 |
+| 來源 | 目標 | 型 | 入口型 | 可見性 | 證據 |
+|---|---|---|---|---|---|
+| HC_TW_MIL_CREF | TW_MIL001 | MENU_ENTRY | PORTAL_REGISTRY | REGISTRY_DEFINED | E3 |
+| HC_TW_MIL_LINK | TW_MIL001 | MENU_ENTRY | CREF_LINK | REGISTRY_DEFINED | E3 |
 
 ## 業務操作
 | 操作鍵 | 觸發 | 模式 | 說明 | 寫入 | 證據 |
@@ -199,7 +200,7 @@ docs/ps-research/<領域>/
 | state | `STA.<COMPONENT>.<RECNAME>.<FIELDNAME>.<PROPERTY>[.<n>]` | BEHAVIOR |
 | interaction | `INT.<COMPONENT>.<EVENT>.<EFFECT>.<TARGET>[.<n>]` | BEHAVIOR |
 | validation | `VAL.<COMPONENT>.<EVENT>.<KIND>.<MSG>[.<n>]` | BEHAVIOR |
-| navigation | `NAV.<COMPONENT>.<FROM>.<TO>.<KIND>[.<n>]` | BEHAVIOR |
+| navigation | `NAV.<COMPONENT>.<FROM>.<TO>.<KIND>.<ENTRYTYPE>[.<n>]` | BEHAVIOR |
 | businessOperation | `BOP.<COMPONENT>.<OPKEY>` | BEHAVIOR |
 | dataEntity | `ENT.<RECNAME>` | PERSISTENCE |
 | fieldMapping | `FLD.<RECNAME>.<FIELDNAME>` | PERSISTENCE |
@@ -328,7 +329,7 @@ PSRECDEFN.RECTYPE（→ storageKind 對照，值域待驗）、PSRECFIELDDB 欄�
 9. 控制項分頁：35 欄位 → 主檔＋p2；覆蓋不變量（少列「範圍未覆蓋」／越界列「不在本檔範圍」）；>150 行 → 容量事件 30→15、重切為 3 單位；單頁與分頁 merge 的 CTL ID 集合相同。
 10. CLI 收據語意：NN 內容變 → 收據作廢；INVALID 兩次 → BLOCKED、-Plan 靠邊；獨立 -Gate 吃舊 JSON → GATE_WARN＋G17 FAIL；-All 重合併後 capacity debt、G2 FAIL 標 BLOCKED。
 
-實作結果：K1～K10 共 102 判定全 PASS（pwsh 7.4；PS 5.1 待公司機回歸）。
+實作結果：K1～K10 共 102 判定全 PASS（pwsh 7.4；PS 5.1 待公司機回歸）；issue #24 後 106 判定（導覽入口型／可見性、四元組唯一、禁填 AUTHORIZED_FOR_CONTEXT）。
 
 ---
 
