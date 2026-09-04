@@ -50,10 +50,10 @@ ps-auto-all 會重新 RUN）；test-auto-loop 情境 27。搬運見 §1 步驟 1
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `scripts/ps-auto-loop.ps1` | 修改 | 2270 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
+   | `scripts/ps-auto-loop.ps1` | 修改 | 2326 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
    | `.opencode/command/ps-audit-batch.md` | 修改 | 109 | 掛 ps-deep-research（80196ee） |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 138 | 備用、未掛載，但 manifest 要對 |
-   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
+   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 539 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
 1a. oracleMCP 根因修正＋#23 research 債修正（2026-09-03～04；**從 handover 分支搬時**用本表；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
 
@@ -68,8 +68,8 @@ ps-auto-all 會重新 RUN）；test-auto-loop 情境 27。搬運見 §1 步驟 1
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 | handover 版本行數 |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 | handover 版本行數 |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 | handover 版本行數 |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門） | 598 | handover 版本行數 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110） | 2913 | handover 版本行數 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門） | 602 | handover 版本行數 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110） | 2942 | handover 版本行數 |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺） | 2326 | 存 UTF-8 with BOM；handover 版本行數 |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期；handover 版本行數 |
    | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27） | 539 | 存 UTF-8 with BOM；handover 版本行數 |
@@ -108,8 +108,8 @@ ps-auto-all 會重新 RUN）；test-auto-loop 情境 27。搬運見 §1 步驟 1
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 |  |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 |  |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 |  |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 門＋SOP-18） | 650 | SOP-18 自 L591 起 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110） | 2969 | L108 自 L2879、L109 自 L2935 起 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 門＋SOP-18） | 654 | SOP-18 自 L591 起 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110） | 2998 | L108 自 L2879、L109 自 L2935 起 |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債） | 2326 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM |
    | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27） | 539 | 存 UTF-8 with BOM |
