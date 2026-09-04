@@ -207,7 +207,7 @@ powershell -File .\scripts\ps-auto-all.ps1 -MaxCyclesPerDomain 8
 
 | | 保證什麼 | 門檻 |
 |---|---|---|
-| **tier 1**<br>覆蓋畢業（可用） | 功能查得到、每份文件有實質內容、沒被截斷或污染 | session 正常收場 ＋ 稽核狀態轉移 ＋ `lint -CoverageOnly` 全過 |
+| **tier 1**<br>覆蓋畢業（可用） | 功能查得到、每份文件有實質內容、沒被截斷或污染 | session 正常收場 ＋ 稽核狀態轉移 ＋ `lint -CoverageOnly` 全過 ＋ 研究範圍完成（原始調查項／D 項全建檔，#23） |
 | **tier 2**<br>精修畢業 | 每句話都能逐條回溯驗證 | 上述 ＋ 待辦清零 ＋ lint 全綠 ＋ `-StrictAudit` 全綠 |
 
 tier 1 **不保證每句話能回溯驗證**——證據 id 格式、機器參照、confidence

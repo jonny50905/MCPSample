@@ -305,9 +305,13 @@ checklist 重查。
 ```text
 tier 1＝覆蓋畢業（可用／80 分）
   門：SESSION_OK ＋ WORK_TRANSITION_OK ＋ lint -CoverageOnly 全過
+      ＋ RESEARCH_SCOPE_OK（#23／L110：原始調查項與 D 新發現項全部建檔完成；
+        checkpoint ≠ discovery complete；GraduationGateVersion 4）
   保證：功能查得到、每份文件有實質內容、沒被截斷或污染
   不保證：每句話能逐條回溯驗證（證據 id／機器參照／confidence 屬美工）
   未勾項：留著不擋——稽核回灌的補強項是建議不是債（SOP-13）
+        但原始調查項／D 項未勾＝research 債：相位回 research、不得畢業
+        （只有 A／U 補強項不擋；-Preflight 會印「research 債」）
 
 tier 2＝精修畢業（100 分）
   門：現行三層門（未勾=0 ＋ lint 全綠 ＋ StrictAudit 全綠），一字未改

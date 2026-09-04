@@ -2911,3 +2911,32 @@
   -AuditBatchesPerCycle 4）。
 - 套用：本 commit（cookbook、三個 flow agent、四個併發上限檔、SOP-12、.gitignore、
   manifest 重生；功能分支再加兩個 contract 指令）。
+
+### L110 checkpoint 不是完工——tier 1 相位把原始調查項當成補強項，新領域只剩一槍（issue #23，2026-09-04）
+- 症狀：新領域跑 tier 1，第一圈盤點＋寫了幾個 NN 檔（單次 run 上限或被中斷）後，
+  重跑再也不建新的 NN 檔：直接進 audit、發 tier 1 收據停機，理由「未勾 N 項屬
+  補強類」；ps-auto-all 之後因收據有效永久 SKIP。
+- 根因：L72 把 tier 1 相位改成「看 lint -CoverageOnly 缺料，不看未勾數」，畢業門
+  同樣不看未勾數；而 lint 對帳只抓「已勾但檔案不存在」，「未勾且目標 NN 未建」是
+  合法的「還沒做」。設計假設「tier 1 時未勾的都是稽核回灌的 A／U／D 補強項」，對
+  一個 research session 做不完的 checklist 不成立——原始調查項被誤當補強項，
+  checkpoint 被當成 discovery complete。
+- 落點（ps-auto-loop.ps1）：
+  1. `Get-ResearchDebt`：機械數活頁未勾列中的原始調查項（含 NN 目標檔名、無 A/U/D
+     編號）與 D 項（新發現建新檔）＝research 債；A／U 項只修既有 NN 不算；流程
+     標籤（任務 C 批次 n/m、task C batch）不算；目標檔存在但未勾照算（以勾選為準）。
+  2. 相位：tier 1 `goResearch = 債>0 或 缺料自動項>0`；「無自動路徑→停機」的分支
+     只在債＝0 時才走。
+  3. 畢業門：`Test-ResearchScopeOk` 獨立呼叫＝RESEARCH_SCOPE_OK，tier 1 的 baseOk；
+     相位若因任何 bug 走到 audit，這一層仍擋收據（縱深）。
+  4. 進度尺：tier 1 無進度熔絲改為「缺料沒減且債沒減」，債驅動的 research 圈才
+     量得到進度。
+  5. `GraduationGateVersion` 3→4：誤發的 tier 1 收據機械失效，ps-auto-all 重新 RUN。
+  6. `-Preflight` 印 research 債；log 訊號詞 `RESEARCH_SCOPE(圈前)`、`GATE … scope=`。
+- 原則：**「做到哪」與「做完了」是兩個狀態，外環必須各有一把機械的尺**。用
+  「產物品質」（缺料）推論「範圍完成」是類別錯誤：品質尺只看得到已存在的東西，
+  看不到該存在而不存在的。
+- 有意不做：不要求 tier 1 未勾＝0（A／U 補強項仍留 tier 2，SOP-13 不變）；不動
+  lint 對帳規則（「未勾且檔案不存在」在 lint 語意裡仍是合法狀態，債由外環數）。
+- 套用：本 commit（auto-loop 兩函式＋三處接線、ps-graduation v4、test-auto-loop
+  情境 27 九判定、SOP-13 補述、README tier 1 門列）。

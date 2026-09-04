@@ -28,6 +28,12 @@ ps-deep-research／ps-audit-orchestrator）、`.gitignore` 補 audit-parts。**p
 搬運清單見 §1 步驟 1a。功能分支 `claude/issue-17-legacy-contract-phase1` 已 merge 本修正並另改
 ps-contract-batch／ps-contract-verify。
 
+**追記（2026-09-04，issue #23）**：新領域 tier 1 只剩「一槍」的根因＝tier 1 相位與畢業門只看 CoverageOnly
+缺料、把未做的原始調查項當補強項（L110）。修法：`ps-auto-loop.ps1` 加 `Get-ResearchDebt`／
+`Test-ResearchScopeOk`（原始調查項＋D 項＝research 債；A／U 不算；流程標籤不算），相位 `債>0 → research`、
+畢業門 RESEARCH_SCOPE_OK、進度尺加債；`ps-graduation.ps1` GateVersion 3→4（誤發的 tier 1 收據作廢，
+ps-auto-all 會重新 RUN）；test-auto-loop 情境 27。搬運見 §1 步驟 1a。**這是解凍後第一次動 auto-loop**。
+
 ## 1. 管理者下一步（按序）
 
 1. 搬 5 檔（核對欄：行數＝編輯器總行數，允許 ±1 行尾差異）：
@@ -39,7 +45,7 @@ ps-contract-batch／ps-contract-verify。
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 138 | 備用、未掛載，但 manifest 要對 |
    | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
-1a. oracleMCP 根因修正（2026-09-03；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
+1a. oracleMCP 根因修正＋#23 research 債修正（2026-09-03～04；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
@@ -52,11 +58,14 @@ ps-contract-batch／ps-contract-verify。
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 | |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 | |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 | |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述） | 598 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109） | 2913 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門） | 598 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110） | 2913 | |
+   | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺） | 2326 | 存 UTF-8 with BOM |
+   | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期 |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27） | 539 | 存 UTF-8 with BOM |
    | `scripts/ps-transfer-manifest.json` | 修改 | 335 | 最後搬；fs-doctor 應報 55 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
-   `.gitignore`、`HANDOFF.md` 不在搬運集合；ps-auto-loop.ps1 本批未動。
+   `.gitignore`、`HANDOFF.md`、`README.md` 不在搬運集合。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log
@@ -66,7 +75,7 @@ ps-contract-batch／ps-contract-verify。
    剩「agent 未被認到」（80196ee 已消滅變數）與「印表沒寫」（stdout 回收已接住）兩種）。
 5. 成功後觀察：「稽核第 i 批…收據 x/y」累積、「稽核 BLOCKED」（若有，先試 `-AuditEvidencePageSize 5`）、
    「稽核輪次 N 合併完成」。首輪後 lint 若報「未稽核」列＝有檔 BLOCKED，不得畢業。
-6. 大領域收尾：查無全量抽驗蓋章（旗標由外環翻）、待人工SQL 回填、畢業（GraduationGateVersion 3，
+6. 大領域收尾：查無全量抽驗蓋章（旗標由外環翻）、待人工SQL 回填、畢業（GraduationGateVersion 4，#23 後舊 tier 1 收據作廢重驗，
    舊收據作廢屬預期）。
 7. 職缺領域：`ps-auto-loop.ps1 -Domain 職缺 -Tier 1`（一次只跑一個領域；oracleMCP 單通道）。
 
@@ -102,7 +111,7 @@ ps-contract-batch／ps-contract-verify。
   「稽核 BLOCKED」「稽核輪次 N 合併完成」「本輪稽核新增 D 項 N 筆 > 上限」。
 - **cmd 傳遞限制**：session prompt 禁半形雙引號與 `> < & | % ^`；findstr 對 UTF-8 中文不可靠，
   一律 `powershell Get-Content -Encoding UTF8`。
-- **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（26 個真實函式 AST 抽取、63+ 判定，
+- **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（28 個真實函式 AST 抽取、情境 27 含 #23、
   含 lint fixture）。改 auto-loop／lint 後必跑。
 
 ## 4. 未決與風險
