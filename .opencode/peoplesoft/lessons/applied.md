@@ -2975,3 +2975,9 @@
 - 待公司機驗證：§2k 全部表名／欄位／代碼（PORTAL_CREF_USGT 值域、PORTAL_HIDE_FROM_NAV、
   PSPRSMDEFNLANG 鍵清單、LINK 指向機制、valid-from 欄位名、PORTAL_ROOT_OBJECT 是否為實列）。
 - 套用：本 commit（handover 線 13 檔＋測試情境 28 八判定；contract 線另見功能分支）。
+- 審查追記（同日，25 個 opus agent 對抗審查後補強，只加不刪）：lint 路徑式加寬鬆重試（段內含空白的英文路徑原本零觸發）、
+  箭頭型流程敘述豁免（假陽性）、`AUTHORIZED_FOR_CONTEXT` 字串本身判違規（原本標了它反而消音）、SINGLE_PATH_COLLAPSE
+  第三型（有入口列無 surface 未盤查 gap／宣稱唯一入口）、反序待人工SQL 認證據、`### Technical Menu` 段不參與路徑判定、
+  主詞變體可見性式；[導覽] 工單指紋剝 Kinds；cookbook §2k 補 PSMENUITEM／PSOPTIONS 欄位驗證、(2b) base language、
+  次選與祖先帶 PORTAL_EXPIRE_DT、PARTIAL_IDENTITY_MATCH 診斷查詢、USGT 分流、列數上限；模板加「CREF 物件名」欄並改佔位符；
+  report-contract 範例補 CREF_LINK 第二筆與 Case 6 gap 行；情境 28 加九判定。contract 線補強另見功能分支同日 commit。

@@ -22,9 +22,9 @@
 <依 cookbook §2k 取得的 Portal Registry 入口；每個入口一列。沒查證就整段寫
  「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」。>
 
-| # | Portal | 入口型 | 導覽入口（Portal Registry 登錄路徑） | 可見性 | 語系／來源 | 證據 |
-|---|---|---|---|---|---|---|
-| 1 | EMPLOYEE | PORTAL_REGISTRY | 招募 > 應徵者管理 > 維護應徵者 | REGISTRY_DEFINED | ZHT／LANG（第 2 段 fallback ENG） | E01.4 |
+| # | Portal | 入口型 | CREF 物件名 | 導覽入口（Portal Registry 登錄路徑） | 可見性 | 語系／來源 | 證據 |
+|---|---|---|---|---|---|---|---|
+| 1 | <PORTAL_NAME> | PORTAL_REGISTRY | <PORTAL_OBJNAME> | <段1> > <段2> > <段3> | REGISTRY_DEFINED | <語系>／<LANG｜BASE> | <E01.n> |
 
 <!-- 入口型：PORTAL_REGISTRY / CREF_LINK / NAV_COLLECTION / FLUID_TILE / NAVBAR / UNKNOWN
      可見性：REGISTRY_DEFINED（Registry 中登錄的入口，未經 user／security context 驗證）
@@ -32,14 +32,16 @@
              UNKNOWN_VISIBILITY（祖先 hidden-from-nav／CREF 過期／走訪未達根／未解析 surface）
      多入口就寫多列——CREF Link 讓同一畫面出現在多個位置，**壓成一列＝誤報**。
      未實作的 surface（Navigation Collection／Fluid Tile／NavBar）**即使查無也要在「未解事項」記一行 gap**，
-     不得宣稱「唯一入口」。值域見 mcp-tool-contracts.md §3。 -->
+     不得宣稱「唯一入口」。值域見 mcp-tool-contracts.md §3。
+     CREF 物件名＝§2k-2 回傳的 PORTAL_OBJNAME（contract 線的「來源」欄靠它區分同 Portal 的多入口；查不到寫 UNRESOLVED）。
+     上表數值為格式示意，一律以 §2k 查證結果覆寫；AUTHORIZED_FOR_CONTEXT 這個字串本身不得出現在正文（lint 判違規）。 -->
 
 ### Technical Menu
 
 <PSMENUITEM 的 MENUNAME / BARNAME / ITEMNAME，以「/」分隔，多筆用分號。
  這是 App Designer 技術選單 metadata，**不是使用者點得到的路徑**。>
 
-RECRUITING / USE / MANAGE_APPLICANTS
+<MENUNAME> / <BARNAME> / <ITEMNAME>
 
 <!-- 絕不可把這一段當成「導覽入口」的 fallback：8.4 之後 BARNAME（USE／PROCESS／
      INQUIRE…）在 PIA 沒有對應層級，串成 A > B > C 就是誤報（issue #24 Case 1）。

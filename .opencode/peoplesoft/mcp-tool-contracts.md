@@ -95,6 +95,7 @@ NAV_COLLECTION
 FLUID_TILE
 NAVBAR
 UNKNOWN
+UNRESOLVED
 ```
 
 `navigationVisibility`（可見性——**與 confidence 正交，不得互相取代**）：
@@ -103,13 +104,16 @@ UNKNOWN
 REGISTRY_DEFINED
 AUTHORIZED_FOR_CONTEXT
 UNKNOWN_VISIBILITY
+UNRESOLVED
 ```
+
+兩個值域的完整定義（含 `UNRESOLVED`＝查不到）以 `legacy-contract-vocabulary.md` 為準；報告端缺值改用 gaps 說明，`AUTHORIZED_FOR_CONTEXT` 本版不得由模型產出。
 
 輸入（欄位表，非可呼叫 JSON）：`componentName`（必填）、`menuName`、`market`（預設 `GBL`）、
 `portalName`（省略＝列舉 `PSPRDMDEFN`）、`languageCode`（如 `ZHT`）、`includeAlternateEntries`（預設 true）。
 
 輸出兩個**互不合併**的陣列：
-- `technicalMenuLocations[]`：`menuName` / `barName` / `itemName`（來源 §2e／§2k-1；**永遠不是導覽路徑**）
+- `technicalMenuLocations[]`：`menuName` / `barName` / `itemName`（來源 §2e／§2k-1；**永遠不是導覽路徑**；contract 線 fragment 的 kv 名為 `technicalMenu`，值＝`MENUNAME/BARNAME/ITEMNAME`）
 - `navigationEntries[]`：`portalName` / `entryType`（上表）/ `crefObjectName` /
   `labels[]`（每段 `displayText`、`languageCode`、`displayTextSource`、`fallbackLanguageCode`）/
   `visibility`（上表）/ `confidence`（仍只有 CONFIRMED／INFERRED／DYNAMIC_RUNTIME）

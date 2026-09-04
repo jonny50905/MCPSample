@@ -551,6 +551,21 @@ $nvGood = @('# 43 好檔（TW_NAV_GOOD）') + $nvHead + @('## 功能定位', '##
 [System.IO.File]::WriteAllText((Join-Path $nvDir "41-TW_NAV_BAD.md"), ($nvBad -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
 [System.IO.File]::WriteAllText((Join-Path $nvDir "42-TW_NAV_OVER.md"), ($nvOver -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
 [System.IO.File]::WriteAllText((Join-Path $nvDir "43-TW_NAV_GOOD.md"), ($nvGood -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+# #24 審查補強：多字段英文路徑（嚴格式漏抓）／箭頭流程敘述（假陽性）／AUTHORIZED_FOR_CONTEXT 自證（消音）／
+# 有入口列無 gap 行（Case 6）／反序待人工SQL（合法出口）／Technical Menu 段用 >（誠實分段不誤報）
+$nvTailGap = @($nvTail | ForEach-Object { if ($_ -eq '- 無') { '- Navigation Collection／Fluid Tile／NavBar 未盤查——不宣稱唯一入口' } else { $_ } })
+$nvSpace = @('# 44 多字段路徑（TW_NAV_SPACE）') + $nvHead + @('## 功能定位', 'Workforce Administration > Job Information > Job Data。人資使用。') + $nvTail + $nvEvMenu
+$nvFlow = @('# 45 流程敘述（TW_NAV_FLOW）') + $nvHead + @('## 功能定位', '本功能供 HR 使用：員工申請 → 主管審核 → HR 覆核 後入帳。') + $nvTail + $nvEvMenu
+$nvAuth = @('# 46 自證消音（TW_NAV_AUTH）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Recruiting > Applicants > Manage（REGISTRY_DEFINED）。', '使用者可以從此路徑進入（可見性：AUTHORIZED_FOR_CONTEXT）。') + $nvTailGap + $nvEvPortal
+$nvNavTbl = @('### 導覽入口', '| # | Portal | 入口型 | CREF 物件名 | 導覽入口（Portal Registry 登錄路徑） | 可見性 | 語系／來源 | 證據 |', '|---|---|---|---|---|---|---|---|', '| 1 | EMPLOYEE | PORTAL_REGISTRY | HC_TW_X_CREF | Recruiting > Applicants > Manage | REGISTRY_DEFINED | ENG／BASE | E01.1 |')
+$nvOnly = @('# 47 有入口列無 gap（TW_NAV_ONLY）') + $nvHead + @('## 功能定位') + $nvNavTbl + $nvTail + $nvEvPortal
+$nvGap = @('# 48 有入口列有 gap（TW_NAV_GAP）') + $nvHead + @('## 功能定位') + $nvNavTbl + $nvTailGap + $nvEvPortal
+$nvEvPend = @('## Evidence 附錄', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', '| 1 | Portal Registry | 導覽入口 | 待人工SQL（PSPRSMDEFN 需 DBA 權限） |')
+$nvPend = @('# 49 反序待人工SQL（TW_NAV_PEND）') + $nvHead + @('## 功能定位', '### 導覽入口', '招募 > 應徵者管理 > 維護應徵者（REGISTRY_DEFINED）。') + $nvTailGap + $nvEvPend
+$nvTm = @('# 50 技術選單段用 >（TW_NAV_TM）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）。', '### Technical Menu', 'Technical Menu（非導覽路徑）：RECRUITING > USE > MANAGE_APPLICANTS') + $nvTail + $nvEvMenu
+foreach ($pair in @(@('44-TW_NAV_SPACE.md', $nvSpace), @('45-TW_NAV_FLOW.md', $nvFlow), @('46-TW_NAV_AUTH.md', $nvAuth), @('47-TW_NAV_ONLY.md', $nvOnly), @('48-TW_NAV_GAP.md', $nvGap), @('49-TW_NAV_PEND.md', $nvPend), @('50-TW_NAV_TM.md', $nvTm))) {
+    [System.IO.File]::WriteAllText((Join-Path $nvDir $pair[0]), ($pair[1] -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+}
 [System.IO.File]::WriteAllText((Join-Path $nvDir "00-overview.md"), "# 總覽`r`n測試 fixture", (New-Object System.Text.UTF8Encoding($true)))
 $nvOut = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom *>&1 | Out-String)
 Assert ($nvOut -match '41-TW_NAV_BAD\.md：功能定位宣稱導覽路徑') "Case 1：技術選單串成路徑＋無 Portal 證據 → 違規"
@@ -559,6 +574,14 @@ Assert ($nvOut -notmatch '42-TW_NAV_OVER\.md：功能定位宣稱導覽路徑') 
 Assert ($nvOut -match '42-TW_NAV_OVER\.md：功能定位宣稱使用者可見性') "Case 3：無 AUTHORIZED_FOR_CONTEXT 的使用者宣稱 → 違規"
 Assert ($nvOut -notmatch '43-TW_NAV_GOOD\.md：功能定位') "Case 5：誠實寫未確認＋Technical Menu 用 / 分隔 → 零違規（不誤報）"
 Assert ($nvOut -match '【導覽】型') "修法說明段有印"
+Assert ($nvOut -match '44-TW_NAV_SPACE\.md：功能定位宣稱導覽路徑') "審查補強：多字段英文路徑（段內含空白）＋無 Portal 證據 → 違規（嚴格式漏抓）"
+Assert ($nvOut -notmatch '45-TW_NAV_FLOW\.md：功能定位') "審查補強：箭頭型流程敘述不是導覽主張 → 不誤報"
+Assert ($nvOut -match '46-TW_NAV_AUTH\.md：功能定位出現 AUTHORIZED_FOR_CONTEXT' -and $nvOut -match '\[導覽\] 46-TW_NAV_AUTH\.md：[^\r\n]*USER_VISIBILITY_OVERCLAIM') "審查補強：加註 AUTHORIZED_FOR_CONTEXT 不能消音（Case 3）"
+Assert ($nvOut -match '47-TW_NAV_ONLY\.md：功能定位 ### 導覽入口 有 1 列但未解事項無' -and $nvOut -match '\[導覽\] 47-TW_NAV_ONLY\.md：SINGLE_PATH_COLLAPSE') "審查補強：有入口列但無 surface 未盤查 gap → SINGLE_PATH_COLLAPSE（Case 6）"
+Assert ($nvOut -notmatch '48-TW_NAV_GAP\.md：功能定位') "審查補強：有入口列＋gap 行＋Portal 證據 → 零違規"
+Assert ($nvOut -notmatch '49-TW_NAV_PEND\.md：功能定位宣稱導覽路徑') "審查補強：反序「待人工SQL（PSPRSMDEFN…）」是合法出口 → 不誤報"
+Assert ($nvOut -notmatch '50-TW_NAV_TM\.md：功能定位') "審查補強：### Technical Menu 段用 > 串（誠實分段）→ 不誤報"
+Assert ((Get-OrderFingerprint '3. [導覽] 41-TW_NAV_BAD.md：TECHNICAL_MENU_AS_NAVIGATION＋USER_VISIBILITY_OVERCLAIM') -eq '[導覽] 41-TW_NAV_BAD.md') "審查補強：[導覽] 工單指紋剝 Kinds（狀態不是身分）"
 $nvCov = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -CoverageOnly *>&1 | Out-String)
 Assert ($nvCov -match '\[美工／不擋覆蓋畢業\].*功能定位宣稱導覽路徑') "tier 1：導覽類降為警告（不重演 L94 全存量違規）"
 Assert ($nvCov -notmatch '\[導覽\] 41-TW_NAV_BAD') "tier 1：導覽工單受 emitPolish 抑制"

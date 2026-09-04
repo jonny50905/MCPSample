@@ -572,22 +572,59 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $fdClean = [regex]::Replace($fdBody, '(?s)<!--.*?-->', '')
             $fdClean = [regex]::Replace($fdClean, '<[^<>]*>', '')
             $fdClean = [regex]::Replace($fdClean, '(?m)^[ \t]{0,3}>.*$', '')
+            # 「### Technical Menu」子段不參與路徑形狀判定——它本來就自標「非導覽路徑」（用 > 串也只是格式問題），
+            # 該段被當導覽用由 auditor 的語意規則管；否則誠實分段的檔反被開單而工單又禁止換符號（#24 審查發現）
+            $fdClean = [regex]::Replace($fdClean, '(?ms)^[ \t]{0,3}#{3,6}[ \t]*Technical[ \t]*Menu[^\r\n]*(?:\r?\n|\z).*?(?=^[ \t]{0,3}#{2,6}[ \t]|\z)', '')
             $navSeg = '[^\s|>＞→»]+'
             $navSep = '[ \t]*[>＞→»][ \t]*'
             # ≥3 段非空 token 串起來才算路徑宣稱；標題列（#）不算
             $navClaim = [regex]::Match($fdClean, '(?m)^(?![ \t]{0,3}#).*?' + $navSeg + $navSep + $navSeg + $navSep + $navSeg)
+            # 段內含空白的路徑（PIA 導覽與交付選單常態：'Workforce Administration > Job Information > Job Data'）
+            # 嚴格式不中時以寬鬆式重試：段＝非分隔符起頭、≤40 字、不跨行（#24 審查發現：嚴格式漏掉多字段英文路徑）
+            if (-not $navClaim.Success) {
+                $navSegW = '[^\s|>＞→»][^|>＞→»\r\n]{0,39}'
+                $navClaim = [regex]::Match($fdClean, '(?m)^(?![ \t]{0,3}#).*?' + $navSegW + $navSep + $navSegW + $navSep + $navSegW)
+            }
+            # 箭頭型流程敘述（員工申請 → 主管審核 → HR 覆核）不是導覽主張：分隔符全是 → 且行內無導覽字樣時豁免（#24 審查發現的假陽性）
+            $navIsFlow = $false
+            if ($navClaim.Success) {
+                $navIsFlow = ($navClaim.Value -notmatch '[>＞»]') -and ($navClaim.Value -notmatch '(導覽|入口|選單|路徑|Menu|Portal|Registry|Navigation)')
+            }
             # Portal 證據＝可重跑的 PSPRSMDEFN SELECT，或以合法出口申報的待人工SQL（L43／L53）
             $navPortalEv = ($text -match '(?is)\bSELECT\b[\s\S]{0,400}?\bFROM\b[\s\S]{0,200}?\bPSPRSMDEFN') -or
-                           ($text -match '(?m)^.*\bPSPRSMDEFN.*待人工SQL.*$')
+                           ($text -match '(?m)^.*\bPSPRSMDEFN.*待人工SQL.*$') -or
+                           ($text -match '(?m)^.*待人工SQL.*\bPSPRSMDEFN.*$')   # 反序寫法「待人工SQL（PSPRSMDEFN…）」同樣是合法出口
             $navKinds = @()
-            if ($navClaim.Success -and -not $navPortalEv) {
+            if ($navClaim.Success -and -not $navPortalEv -and -not $navIsFlow) {
                 $violations += "${name}：功能定位宣稱導覽路徑「$($navClaim.Value.Trim())」但全檔無 Portal Registry 證據——technical menu 當導覽路徑（PSMENUITEM 只是 technicalMenuLocation；導覽入口走 cookbook §2k）"
                 $navKinds += 'TECHNICAL_MENU_AS_NAVIGATION'
             }
             $ovM = [regex]::Match($fdClean, '(使用者(?:一定)?可(?:以)?(?:從|由)|使用者都(?:能|可以)(?:進|看)|角色[^。\r\n]{0,12}(?:會看到|看得到|才看得到))')
+            if (-not $ovM.Success) {
+                # 主詞變體（HR 人員／員工／主管／一般使用者／具…權限者）——原式只認「使用者」「角色」（#24 審查發現）
+                $ovM = [regex]::Match($fdClean, '((?:HR|人資|員工|人員|主管|同仁|承辦人?|用戶|一般使用者|具[^。\r\n]{0,10}權限者)(?:皆|都|均|即|就|一定)?(?:(?:可|能)(?:以)?(?:從|由|進入|進到|看到|看得到)|會(?:看到|看得到)))')
+            }
             if ($ovM.Success -and $fdClean -notmatch 'AUTHORIZED_FOR_CONTEXT') {
                 $violations += "${name}：功能定位宣稱使用者可見性「$($ovM.Value)」但未標 AUTHORIZED_FOR_CONTEXT——無 user／security context 的入口只能是 REGISTRY_DEFINED（可見性過度宣稱）"
                 $navKinds += 'USER_VISIBILITY_OVERCLAIM'
+            }
+            # AUTHORIZED_FOR_CONTEXT 本版不得產出（與 ps-contract-lib 的 fragment 不變量對稱）：寫了它＝用禁用標籤宣稱
+            # user 可見性，且不因標了它而豁免上一條——否則一個 token 就把 lint 與 auditor 兩層同時消音（#24 審查發現）
+            if ($fdClean -match 'AUTHORIZED_FOR_CONTEXT') {
+                $violations += "${name}：功能定位出現 AUTHORIZED_FOR_CONTEXT——本版不得產出（無 user／security context 只能 REGISTRY_DEFINED／UNKNOWN_VISIBILITY；可見性過度宣稱）"
+                if ($navKinds -notcontains 'USER_VISIBILITY_OVERCLAIM') { $navKinds += 'USER_VISIBILITY_OVERCLAIM' }
+            }
+            # SINGLE_PATH_COLLAPSE（#24 Case 6）：宣稱唯一入口、或「### 導覽入口」有資料列（首欄流水號）但「## 未解事項」
+            # 沒有「Navigation Collection／Fluid Tile／NavBar 未盤查」——本版不解析那些 surface，有入口列就必須附這行 gap
+            $navRows = @([regex]::Matches($fdClean, '(?m)^[ \t]*\|[ \t]*\d+[ \t]*\|')).Count
+            $gapBody = ''
+            $gpM = [regex]::Match($text, (Get-SectionAnchor '## 未解事項'))
+            if ($gpM.Success) { $gpAfter = $text.Substring($gpM.Index + '## 未解事項'.Length); $gpNext = $gpAfter.IndexOf("`n## "); $gapBody = if ($gpNext -ge 0) { $gpAfter.Substring(0, $gpNext) } else { $gpAfter } }
+            $upM = [regex]::Match($fdClean, '(唯一(?:的)?(?:入口|路徑)|只能(?:從|由)[^。\r\n]{0,20}(?:進入|點進|進到)|僅此一條(?:路徑|入口))')
+            if ($upM.Success -or ($navRows -ge 1 -and $gapBody -notmatch '(?i)(Navigation Collection|Nav Collection|Fluid|NavBar)')) {
+                $why = if ($upM.Success) { "宣稱唯一入口「$($upM.Value)」" } else { "### 導覽入口 有 $navRows 列但未解事項無「Navigation Collection／Fluid Tile／NavBar 未盤查」" }
+                $violations += "${name}：功能定位 ${why}——其他導覽 surface 本版未盤查，不得宣稱唯一入口（未盤查即宣稱唯一入口）"
+                $navKinds += 'SINGLE_PATH_COLLAPSE'
             }
             if ($navKinds.Count -gt 0) {
                 $navOrders += [pscustomobject]@{ File = $name; Kinds = ($navKinds -join '＋') }
@@ -1137,7 +1174,8 @@ $polishPatterns = @(
     'frontmatter 缺 ',
     'status 值非法',
     'technical menu 當導覽路徑',
-    '可見性過度宣稱'
+    '可見性過度宣稱',
+    '未盤查即宣稱唯一入口'
 )
 function Test-IsPolishViolation {
     param([string]$Msg)
@@ -1306,6 +1344,10 @@ if ($orderTotal -gt 0) {
         Write-Host "  2) USER_VISIBILITY_OVERCLAIM：寫了「使用者可以從…」「某角色會看到…」卻無"
         Write-Host "     user／security context。修法＝改寫成「Portal Registry 登錄入口：…"
         Write-Host "     （可見性 REGISTRY_DEFINED）」；本版**不得**產出 AUTHORIZED_FOR_CONTEXT。"
+        Write-Host "     寫了 AUTHORIZED_FOR_CONTEXT 這個字串本身就是違規——不得用它加註或自證。"
+        Write-Host "  2a) SINGLE_PATH_COLLAPSE：宣稱「唯一入口」、或「### 導覽入口」有列但未解事項沒有"
+        Write-Host "     「Navigation Collection／Fluid Tile／NavBar 未盤查」。修法＝補該 gap 行、刪「唯一」措辭；"
+        Write-Host "     **不得**刪入口列充數（壓成一列＝誤報）。"
         Write-Host "  3) 兩型都要在該檔未解事項補一行：未實作的 Navigation Collection／Fluid Tile／"
         Write-Host "     NavBar 未盤查，**不得宣稱唯一入口**（issue #24 Case 6）。"
         Write-Host "  4) 本文其他章節一字不動。"

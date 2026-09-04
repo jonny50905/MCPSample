@@ -306,23 +306,26 @@ PSPRSMDEFN 系列對本 cookbook 是全新表名，**第一次使用前必須先
 -- (1) 表名（規則 8a：樣板沒有的表先確認實際表名，禁止自行加減 PS_）
 SELECT TABLE_NAME FROM ALL_TABLES
  WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMPERM','PSPRSMSYSATTRVL',
-                      'PSPRSMATTRVAL','PSPRSMNAVINFO','PSPRDMDEFN','PSMENUITEM')
+                      'PSPRSMATTRVAL','PSPRSMNAVINFO','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
 FETCH FIRST 20 ROWS ONLY;
 -- (2) 欄位名／型別（規則 8：禁止憑記憶寫欄位名）
 SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, COLUMN_ID
   FROM ALL_TAB_COLUMNS
- WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN')
+ WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
  ORDER BY TABLE_NAME, COLUMN_ID
 FETCH FIRST 200 ROWS ONLY;
+-- (2b) base language（決定 2k-4 的 fallbackLanguageCode；不得憑 delivered convention 填 ENG）——表名／欄位同樣先看 (1)(2) 有沒有列出
+SELECT LANGUAGE_CD FROM PSOPTIONS FETCH FIRST 1 ROWS ONLY;
 -- (3) 代碼值域（不得憑記憶填，觀察後回填本節）
-SELECT PORTAL_REFTYPE, COUNT(*) FROM PSPRSMDEFN GROUP BY PORTAL_REFTYPE;
+-- (3) 必須在讀完 (1)(2) 回傳之後才發：(1) 未列出的表、(2) 未列出的欄位，其對應的 (3) 查詢直接跳過並記 gap
+SELECT PORTAL_REFTYPE, COUNT(*) FROM PSPRSMDEFN GROUP BY PORTAL_REFTYPE FETCH FIRST 20 ROWS ONLY;
 SELECT PORTAL_CREF_USGT, COUNT(*) FROM PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
  GROUP BY PORTAL_CREF_USGT ORDER BY 2 DESC FETCH FIRST 20 ROWS ONLY;
 SELECT DISTINCT PORTAL_ATTR_NAM FROM PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY;
 SELECT PORTAL_NAME FROM PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY;
 ```
 
-> **未驗前的降級規則**：(1)(2) 任一表／欄位查無 → 該筆記 gaps，**該 2k 步驟停止**，
+> **未驗前的降級規則**：(1)(2) 任一表／欄位查無 → 該筆記 gaps，**該 2k 步驟停止**（含本步驟的 (3)），
 > 文件寫「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」，
 > **不得**退回用 PSMENUITEM 補位。`portalName` 一律由 `PSPRDMDEFN` 列舉取得，
 > **禁止硬編** `EMPLOYEE／CUSTOMER／SUPPLIER／PARTNER`（後三者非普遍交付）。
@@ -340,6 +343,7 @@ FETCH FIRST 200 ROWS ONLY
 
 > 本段的**唯一合法用途**是餵 2k-2 的識別三元組（menu＋component＋market）。
 > `MARKET` 欄存在與否待 2k-0 驗證；查無該欄就退回 `:market='GBL'` 並記 gaps。
+> PSMENUITEM 的欄位一併由 2k-0 (2) 驗證；(2) 未列出 `MARKET` 才可退回 `:market='GBL'`＋gap——**不得**先查再等 ORA-00904（連線生命週期禁止重試迴圈）。
 > 輸出欄位名一律 `technicalMenuLocations[]`，**永遠不得**輸出成 `menuPath`／選單路徑／導覽入口。
 
 **2k-2. Portal CREF 識別（menu＋component＋market；禁止 SEG2 單欄比對）**
@@ -355,10 +359,19 @@ SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTO
    AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)
 FETCH FIRST 200 ROWS ONLY;
 -- 次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對
-SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME, PORTAL_URLTEXT
+SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
   FROM PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(PORTAL_URLTEXT) LIKE '%/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market) || '%'
+   -- 或（避免 `_` 被 LIKE 當單字元萬用字元）：AND INSTR(UPPER(PORTAL_URLTEXT), '/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market)) > 0
+FETCH FIRST 200 ROWS ONLY;
+-- 診斷（前兩條皆 0 列時才跑）：menu＋component 命中但 market 不符／空白 ⇒ PARTIAL_IDENTITY_MATCH（永不 CONFIRMED）
+SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
+       PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
+  FROM PSPRSMDEFN
+ WHERE PORTAL_REFTYPE = 'C'
+   AND UPPER(TRIM(PORTAL_URI_SEG1)) = UPPER(:menuName)
+   AND UPPER(TRIM(PORTAL_URI_SEG2)) = UPPER(:componentName)
 FETCH FIRST 200 ROWS ONLY
 ```
 
@@ -370,12 +383,16 @@ FETCH FIRST 200 ROWS ONLY
 > 少於三欄命中的匹配只能回 `PARTIAL_IDENTITY_MATCH` 並記 gaps。
 > `PORTAL_EXPIRE_DT < SYSDATE` 的 CREF：入口仍列出，但 `visibility` 降為 `UNKNOWN_VISIBILITY` 並記 gap
 > （「valid-from」對應欄位名未證實，**不得**憑記憶寫 `PORTAL_EFFDT`）。
+> 首選／次選／診斷三條都必須帶回 `PORTAL_EXPIRE_DT`；沒取到＝視為未檢查，該筆一律 `visibility=UNKNOWN_VISIBILITY`＋gap。
+> 次選命中後必須把 URLTEXT 依 `/c/<MENU>.<COMPONENT>.<MARKET>` 文法切段、逐段等值比對確認（`_` 在 LIKE 是萬用字元），比對不過即丟棄該筆並記 gap。
+> 回傳列先依 `PORTAL_CREF_USGT` 分流（對照見 2k-0）：`TARG`／`LINK` 才進 2k-3；`FRMT`／`HTMT`／`IFRM` 排除、不列入 navigationEntries；
+> `GRPT`／`HPGT`／`HPGC` 不走 2k-3，記 `entryType=FLUID_TILE／UNKNOWN`＋`visibility=UNKNOWN_VISIBILITY`＋gap；對照表以外的值＝環境意外，記 gaps。
 
 **2k-3. 沿 parent 往上組路徑（visited／depth cap／不跨 Portal）**
 
 ```sql
 SELECT LEVEL AS LVL, PORTAL_NAME, PORTAL_REFTYPE, PORTAL_OBJNAME,
-       PORTAL_PRNTOBJNAME, PORTAL_LABEL, PORTAL_SEQ_NUM
+       PORTAL_PRNTOBJNAME, PORTAL_LABEL, PORTAL_SEQ_NUM, PORTAL_EXPIRE_DT
   FROM PSPRSMDEFN
  START WITH PORTAL_NAME = :portalName
         AND PORTAL_REFTYPE = 'C'
@@ -395,6 +412,7 @@ FETCH FIRST 200 ROWS ONLY
 > 每段另查一次隱藏旗標（欄位不存在＝attribute 列，不是 PSPRSMDEFN 的欄位）：
 > `SELECT PORTAL_OBJNAME, PORTAL_ATTR_VAL FROM PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
 > ——**任一祖先** `= 'Y'` ＝整條分支在左側導覽看不到 → `visibility=UNKNOWN_VISIBILITY`＋gap。
+> 同理，**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → 該入口 `visibility=UNKNOWN_VISIBILITY`＋gap（欄位未取到＝視為未檢查，一樣降級並記 gap）。
 > 平台可攜性：非 Oracle 環境改用遞迴 CTE＋顯式 depth 計數＋visited 反連接，行為必須完全一致（待驗）。
 
 **2k-4. 語系 label（base＋override＋fallback，逐段記來源）**
@@ -421,6 +439,8 @@ FETCH FIRST 200 ROWS ONLY
 > PeopleSoft 字元欄以空白而非 NULL 儲存，故用 `NULLIF(TRIM(...),'')` 而非裸 `COALESCE`。
 > **PSPRSMDEFNLANG 的鍵清單與是否含 PORTAL_LABEL 待 2k-0 驗證**；查無該表／該欄 → 只回 base label，
 > `displayTextSource=BASE`＋gap，不得宣稱已做語系 fallback。
+> `fallbackLanguageCode`＝實際回退到的語系：LANG 命中＝`NOT_APPLICABLE`（未回退）；回退到 base＝2k-0 (2b) 查到的 base language；
+> (2b) 未驗到＝`UNRESOLVED`＋gap，**不得**預設寫 ENG（subagent-report-contract 範例中的 ENG 僅為格式示意）。
 
 **2k-5. CREF Link 與其他入口 surface（複數入口；未支援者一律回 gap）**
 
@@ -434,7 +454,7 @@ FETCH FIRST 20 ROWS ONLY;
 -- (2) 其他 surface 是否存在（存在與否都要回 gap，見下）
 SELECT PORTAL_CREF_USGT, COUNT(*) FROM PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT IN ('GRPT','HPGT','HPGC')
- GROUP BY PORTAL_CREF_USGT;
+ GROUP BY PORTAL_CREF_USGT FETCH FIRST 20 ROWS ONLY;
 SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'F'
    AND (UPPER(PORTAL_LABEL) LIKE '%FLUID%' OR UPPER(PORTAL_LABEL) LIKE '%NAVIGATION COLLECTION%')
