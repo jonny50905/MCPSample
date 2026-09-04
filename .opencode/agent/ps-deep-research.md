@@ -117,6 +117,8 @@ docs/ps-research/<領域>/
    · 未查證／查無／§2k-0 欄位驗證未過 → 該段**整段**寫
      「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」，
      並在「## 未解事項」記一行查法收據（用什麼查、哪一步斷、結論）。
+   · 表的「CREF 物件名」欄＝§2k-2 回傳的 `PORTAL_OBJNAME`（contract 線據此區分同 Portal 的多入口）；
+     查不到寫 UNRESOLVED，不得省略該欄；正文不得出現 `AUTHORIZED_FOR_CONTEXT` 字串（lint 判違規）。
    · `### Technical Menu`＝PSMENUITEM 的 MENUNAME / BARNAME / ITEMNAME，以 `/` 分隔。
      **絕不可**把它當導覽入口的 fallback、也不可用 `>` 串接。
    · 只要 `### 導覽入口` 有內容，「## 未解事項」就必須有一行

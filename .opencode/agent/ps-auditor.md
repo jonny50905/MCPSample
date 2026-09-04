@@ -152,6 +152,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
      `UNVERIFIABLE(PENDING_MANUAL)`，不判 FAIL。
    · `FAIL(USER_VISIBILITY_OVERCLAIM)`：文件寫「使用者可以從…」「某角色會看到…」
      這類 user-visible 宣稱，但無 user／security context 證據且未標 `AUTHORIZED_FOR_CONTEXT`。
+     **本版 `AUTHORIZED_FOR_CONTEXT` 不得由模型產出**——文件自行標了它同樣判 `FAIL(USER_VISIBILITY_OVERCLAIM)`，不因該標記而豁免。
      **怎麼查**：純文件判定＋確認該檔無 PSPRSMPERM／角色層級證據；有隱藏旗標
      （PSPRSMSYSATTRVL.PORTAL_ATTR_NAM='PORTAL_HIDE_FROM_NAV'）或 CREF 已過期
      （PORTAL_EXPIRE_DT < SYSDATE）時，reason 一併附上。

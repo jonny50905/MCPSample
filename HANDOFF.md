@@ -44,17 +44,19 @@ function-detail-template 功能定位拆「### 導覽入口」「### Technical M
 ps-security-flow／ps-metadata-flow／ps-orchestrator／ps-business-explain／ps-auditor（三個 FAIL 原因）／ps-deep-research 規則；
 ps-doc-lint 兩條確定性規則（美工類，tier 1 不擋）＋`[導覽]` 工單＋auto-loop 手術 prompt 補型別；test-auto-loop 情境 28。
 上線程序見 SOP-19。功能分支另改 contract 線（menuPath→technicalMenu、導覽表加入口型／可見性、schema／vocabulary 升版）。
+**審查追記（同日）**：25 個 opus agent 對抗審查後補強（L111 末段列表）——lint 寬鬆路徑式／流程箭頭豁免／`AUTHORIZED_FOR_CONTEXT` 字串判違規／
+SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽] 工單指紋剝 Kinds；cookbook §2k 補驗證與到期欄；模板加「CREF 物件名」欄；情境 28 共 17 判定。
 
 **功能分支追記（2026-09-02，同一個接手 session）**：issue #17 Phase 1 切片 1 已在功能分支
 `claude/issue-17-legacy-contract-phase1` 落地——Legacy Contract 產物線（L108、SOP-18、設計備忘
 `docs/design/legacy-contract-phase1-decision-memo.md`）：模型只寫固定表格 fragment，外環
 `ps-contract.ps1` 做 NN 抽取→manifest→不變量收據→stable ID merge→canonical JSON→18 節 spec→G1～G18。
-不動 ps-auto-loop／lint／ps-deep-research／畢業門；`scripts/tests/test-contract.ps1` K1～K10 共 106 判定
+不動 ps-auto-loop／lint／ps-deep-research／畢業門；`scripts/tests/test-contract.ps1` K1～K10 共 111 判定
 在 pwsh 7.4 全 PASS，`test-auto-loop.ps1` 不受影響。**併回方式**：handover 上若有新 commit，先在功能分支
 `git merge` handover 跑兩套測試，再 `git merge --no-ff claude/issue-17-legacy-contract-phase1` 回 handover，
 併回後重生 manifest。分批稽核照 §1 走；contract 線等稽核告一段落再依 §1b 開。
 
-**功能分支追記（2026-09-04，issue #24 contract 線）**：`menuPath` kv 改 `technicalMenu`（PSMENUITEM 三欄、非導覽路徑）、`## 導覽` 表加「入口型」「可見性」兩欄、NAV ID 含入口型（`NAV.<COMP>.<FROM>.<TO>.<KIND>.<ENTRYTYPE>`）、四元組唯一與禁填 AUTHORIZED_FOR_CONTEXT 兩條不變量、UNKNOWN_VISIBILITY 出 debt 不立 gate；`ContractSchemaVersion` 1→2、`vocabularyVersion` 1→2（既有 contract JSON／spec／gate 收據全部重生屬預期）。test-contract 106 判定、test-auto-loop 全 PASS。
+**功能分支追記（2026-09-04，issue #24 contract 線）**：`menuPath` kv 改 `technicalMenu`（PSMENUITEM 三欄、非導覽路徑）、`## 導覽` 表加「入口型」「可見性」兩欄、NAV ID 含入口型（`NAV.<COMP>.<FROM>.<TO>.<KIND>.<ENTRYTYPE>`）、四元組唯一與禁填 AUTHORIZED_FOR_CONTEXT 兩條不變量、UNKNOWN_VISIBILITY 出 debt 不立 gate；`ContractSchemaVersion` 1→2、`vocabularyVersion` 1→2（既有 contract JSON／spec／gate 收據全部重生屬預期）。test-contract 106 判定、test-auto-loop 全 PASS。**審查補強（同日）**：lib 加 technicalMenu 形狀檢查（含 `>`＝INVALID）、Portal 入口列可見性不得 NOT_APPLICABLE、來源／目標須自然鍵（ID 消毒後不撞名）、spec 固定印「其他導覽 surface 未盤查」列＋`alternateSurfaces｜NOT_INSPECTED` debt（不擋 tier 2）；test-contract 111 判定。
 
 ## 1. 管理者下一步（按序）
 
@@ -62,38 +64,38 @@ ps-doc-lint 兩條確定性規則（美工類，tier 1 不擋）＋`[導覽]` �
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `scripts/ps-auto-loop.ps1` | 修改（#24 手術 prompt [導覽] 型） | 2326 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
+   | `scripts/ps-auto-loop.ps1` | 修改（#24 手術 prompt [導覽] 型＋#24 手術 prompt [導覽] 型） | 2329 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
    | `.opencode/command/ps-audit-batch.md` | 修改 | 109 | 掛 ps-deep-research（80196ee） |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 138 | 備用、未掛載，但 manifest 要對 |
-   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28） | 570 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
+   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28） | 593 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
 1a. oracleMCP 根因修正＋#23 research 債＋#24 導覽路徑（2026-09-03～04；**從 handover 分支搬時**用本表；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則＋#24 §2e／§4 正名、§2k） | 537 | handover 版本行數 |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則＋#24 §2e／§4 正名、§2k） | 557 | handover 版本行數 |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期＋#24 導覽職責） | 136 | handover 版本行數 |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期＋#24 授權≠導覽） | 107 | handover 版本行數 |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | handover 版本行數 |
-   | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則＋#24 三個 FAIL 原因） | 256 | handover 版本行數 |
+   | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則＋#24 三個 FAIL 原因） | 257 | handover 版本行數 |
    | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律） | 168 | handover 版本行數 |
-   | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu） | 109 | handover 版本行數 |
-   | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域） | 122 | handover 版本行數 |
-   | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列） | 154 | handover 版本行數 |
+   | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu） | 111 | handover 版本行數 |
+   | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域） | 126 | handover 版本行數 |
+   | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列） | 166 | handover 版本行數 |
    | `.opencode/skills/ps-ui-flow/SKILL.md` | 修改（#24 導覽語系義務＋Rules） | 200 | handover 版本行數 |
    | `.opencode/skills/ps-security-flow/SKILL.md` | 修改（#24 authorization ≠ navigation） | 62 | handover 版本行數 |
    | `.opencode/skills/ps-business-explain/SKILL.md` | 修改（#24 五條硬規則＋輸出 2a） | 111 | handover 版本行數 |
-   | `scripts/ps-doc-lint.ps1` | 修改（#24 兩條導覽規則＋[導覽] 工單，美工類） | 1552 | 存 UTF-8 with BOM；handover 版本行數 |
+   | `scripts/ps-doc-lint.ps1` | 修改（#24 兩條導覽規則＋[導覽] 工單，美工類） | 1594 | 存 UTF-8 with BOM；handover 版本行數 |
    | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派） | 109 | handover 版本行數 |
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 | handover 版本行數 |
-   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法） | 501 | handover 版本行數 |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法） | 503 | handover 版本行數 |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 | handover 版本行數 |
    | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19） | 619 | handover 版本行數 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111） | 2977 | handover 版本行數 |
-   | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型） | 2326 | 存 UTF-8 with BOM；handover 版本行數 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111） | 2983 | handover 版本行數 |
+   | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型） | 2329 | 存 UTF-8 with BOM；handover 版本行數 |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期；handover 版本行數 |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28） | 570 | 存 UTF-8 with BOM；handover 版本行數 |
-   | `scripts/ps-transfer-manifest.json` | 修改 | 335 | handover 版：fs-doctor 應報 55 檔一致 |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28） | 593 | 存 UTF-8 with BOM；handover 版本行數 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 336 | handover 版：fs-doctor 應報 55 檔一致 |
 
    從功能分支搬則改用 §1b 的聯集表（含本批全部檔案，行數為功能分支版本）。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
@@ -116,34 +118,34 @@ ps-doc-lint 兩條確定性規則（美工類，tier 1 不擋）＋`[導覽]` �
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
    | `.opencode/peoplesoft/legacy-contract-vocabulary.md` | 新增（#24 navigationEntryType／navigationVisibility） | 421 | 封閉值域單一真相（vocabularyVersion 2；#24 升版） |
-   | `.opencode/peoplesoft/legacy-contract-fragments.md` | 新增（#24 technicalMenu＋導覽表六欄＋規則 5a） | 232 | fragment／分頁檔／verify 收據形狀 |
+   | `.opencode/peoplesoft/legacy-contract-fragments.md` | 新增（#24 technicalMenu＋導覽表六欄＋規則 5a＋釐清段） | 242 | fragment／分頁檔／verify 收據形狀 |
    | `.opencode/command/ps-contract-batch.md` | 新增（#24 導覽委派） | 41 | 掛 ps-deep-research；oracleMCP 委派 ≤ 3、首個先單獨派 |
    | `.opencode/command/ps-contract-verify.md` | 新增 | 32 | 掛 ps-deep-research；oracleMCP 委派 ≤ 3、首個先單獨派 |
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（連線生命週期改版＋只加 §7＋#24 §2e／§4 正名、§2k） | 631 | 生命週期 L48 起；§2k 自 L291 起、§7 自 L541 起，樣板全標待公司機驗證 |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（連線生命週期改版＋只加 §7＋#24 §2e／§4 正名、§2k） | 651 | 生命週期 L48 起；§2k 自 L291 起、§7 自 L541 起，樣板全標待公司機驗證 |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期＋#24 導覽職責） | 136 | L109 |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期＋#24 授權≠導覽） | 107 | L109 |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | L109 |
-   | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則＋#24 三個 FAIL 原因） | 256 | L109 |
+   | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則＋#24 三個 FAIL 原因） | 257 | L109 |
    | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律） | 168 |  |
-   | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu） | 109 |  |
-   | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域） | 122 |  |
-   | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列） | 154 |  |
+   | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu＋CREF 物件名欄） | 111 |  |
+   | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域） | 126 |  |
+   | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列） | 166 |  |
    | `.opencode/skills/ps-ui-flow/SKILL.md` | 修改（#24 導覽語系義務＋Rules） | 200 |  |
    | `.opencode/skills/ps-security-flow/SKILL.md` | 修改（#24 authorization ≠ navigation） | 62 |  |
    | `.opencode/skills/ps-business-explain/SKILL.md` | 修改（#24 五條硬規則＋輸出 2a） | 111 |  |
-   | `scripts/ps-doc-lint.ps1` | 修改（#24 兩條導覽規則＋[導覽] 工單，美工類） | 1552 | 存 UTF-8 with BOM |
+   | `scripts/ps-doc-lint.ps1` | 修改（#24 三型導覽規則＋[導覽] 工單，美工類；審查補強） | 1594 | 存 UTF-8 with BOM |
    | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派） | 109 |  |
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 |  |
-   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法） | 501 |  |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法） | 503 |  |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 |  |
    | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 門＋SOP-18＋SOP-19） | 671 | SOP-18 自 L604 起；SOP-19 自 L656 起 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110＋L111） | 3033 | L108 自 L2879、L109 自 L2935 起；L111 自 L3000 起 |
-   | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＋#24 手術 prompt [導覽] 型） | 2326 | 存 UTF-8 with BOM |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110＋L111） | 3039 | L108 自 L2879、L109 自 L2935 起；L111 自 L3000 起 |
+   | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＋#24 手術 prompt [導覽] 型＋工單指紋剝 Kinds） | 2329 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28） | 570 | 存 UTF-8 with BOM |
-   | `scripts/ps-contract-lib.ps1` | 新增（#24 導覽不變量＋NAV ID 含入口型＋ContractSchemaVersion 2） | 1457 | 存 UTF-8 with BOM；不直接執行；舊 legacy-contract.json／spec／gate 收據因 schema 升版全部重生屬預期 |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定） | 593 | 存 UTF-8 with BOM |
+   | `scripts/ps-contract-lib.ps1` | 新增（#24 導覽不變量＋NAV ID 含入口型＋ContractSchemaVersion 2＋審查補強：technicalMenu 形狀／可見性／自然鍵／surface debt） | 1469 | 存 UTF-8 with BOM；不直接執行；舊 legacy-contract.json／spec／gate 收據因 schema 升版全部重生屬預期 |
    | `scripts/ps-contract.ps1` | 新增 | 247 | 存 UTF-8 with BOM |
-   | `scripts/tests/test-contract.ps1` | 新增（#24 四條斷言） | 569 | 存 UTF-8 with BOM；`pwsh -NoProfile -File`；fixture 自刪 |
+   | `scripts/tests/test-contract.ps1` | 新增（#24 九條斷言） | 581 | 存 UTF-8 with BOM；`pwsh -NoProfile -File`；fixture 自刪 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 378 | 最後搬；`ps-fs-doctor` 應報 62 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 2. 公司機先跑 `pwsh -NoProfile -File scripts\tests\test-contract.ps1`，**再用 `powershell -NoProfile -File` 跑一次**——
    腳本照 PS 5.1 慣例寫（無三元、[ordered]、自寫 JSON 序列化、Ordinal 排序）但只在 pwsh 7.4 實跑過；5.1 有 FAIL 就回報行號。
@@ -192,7 +194,7 @@ ps-doc-lint 兩條確定性規則（美工類，tier 1 不擋）＋`[導覽]` �
   一律 `powershell Get-Content -Encoding UTF8`。
 - **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（28 個真實函式 AST 抽取、情境 27 含 #23、
   含 lint fixture）。改 auto-loop／lint 後必跑。功能分支另有 `scripts/tests/test-contract.ps1`
-  （K1～K10、106 判定、不需模型；改 ps-contract*.ps1／vocabulary／fragments 後必跑）。
+  （K1～K10、111 判定、不需模型；改 ps-contract*.ps1／vocabulary／fragments 後必跑）。
 - **contract 台帳**（功能分支；都在 `docs\ps-research\<領域>\contract\`）：`contract-ledger.json`
   （fragment 收據＋每 Component 控制項頁大小；BLOCKED 想重來＝刪該項）、`contract-gate.json`、
   `contract-receipt.json`（gitignore）、`approvals.md`（人填；唯一能出現 DIRECT_DB_WRITE_APPROVED 的地方）。

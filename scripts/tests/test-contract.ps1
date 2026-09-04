@@ -385,6 +385,16 @@ Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Obje
 $navAuth = $screenText -replace 'REGISTRY_DEFINED', 'AUTHORIZED_FOR_CONTEXT'
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navAuth
 Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*AUTHORIZED_FOR_CONTEXT*' }).Count -gt 0) "模型填 AUTHORIZED_FOR_CONTEXT → INVALID（#24 Case 3）"
+# #24 審查補強：Portal 入口列可見性 NOT_APPLICABLE／來源寫中文標籤／technicalMenu 寫成路徑
+$navNa = $screenText -replace '\| HC_TW_MIL_LINK \| TW_MIL001 \| MENU_ENTRY \| CREF_LINK \| REGISTRY_DEFINED \| UNRESOLVED \|', '| HC_TW_MIL_LINK | TW_MIL001 | MENU_ENTRY | CREF_LINK | NOT_APPLICABLE | UNRESOLVED |'
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navNa
+Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*可見性只能*' }).Count -gt 0) "Portal 入口列可見性 NOT_APPLICABLE → INVALID（沒有主張）"
+$navZh = $screenText -replace 'HC_TW_MIL_LINK', '招募入口'
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navZh
+Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*大寫英數底線*' }).Count -gt 0) "來源欄寫中文標籤 → INVALID（ID 消毒後不撞名）"
+$tmPath = $screenText -replace '\| technicalMenu \| RECRUITING/USE/TW_MIL001 \|', '| technicalMenu | 人事 > 兵役 > 兵役資料維護 |'
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $tmPath
+Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*technicalMenu*路徑*' }).Count -gt 0) "technicalMenu 寫成 A > B > C → INVALID（#24 不接受的修法 3）"
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $screenText
 Write-Host "情境 K6：證據解引用與交叉引用——E<nn>.<n> 多來源、screen 查詢證據 SQL:<n>、effect 連結、缺 entity、五維"
 $c = Get-Merged $facts
@@ -411,7 +421,7 @@ Assert (@((Read-Frag 'entity-TW_MILITARY.md' 'entity' $facts2).Invalid | Where-O
 Remove-Item -LiteralPath (Join-Path $fixtureDir '07-TW_MIL003.md') -Force
 $null = Write-Fixture 'contract-parts/entity-TW_MILITARY.md' $entityText
 # screen 查詢證據
-$qe = $screenText -replace '\| NOT_APPLICABLE \| NOT_APPLICABLE \| NOT_APPLICABLE \|', "| 導覽入口（cookbook §2k） | SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM PSPRSMDEFN WHERE PORTAL_URI_SEG2='TW_MIL001' FETCH FIRST 200 ROWS ONLY | 2 列 |"
+$qe = $screenText -replace '\| NOT_APPLICABLE \| NOT_APPLICABLE \| NOT_APPLICABLE \|', "| 導覽入口（cookbook §2k-2 首選三欄） | SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_PRNTOBJNAME FROM PSPRSMDEFN WHERE PORTAL_REFTYPE='C' AND UPPER(TRIM(PORTAL_URI_SEG1))='TW_MENU' AND UPPER(TRIM(PORTAL_URI_SEG2))='TW_MIL001' AND UPPER(TRIM(PORTAL_URI_SEG3))='GBL' FETCH FIRST 200 ROWS ONLY | 2 列 |"
 $qe = $qe -replace '\| HC_TW_MIL_CREF \| TW_MIL001 \| MENU_ENTRY \| PORTAL_REGISTRY \| REGISTRY_DEFINED \| UNRESOLVED \|', '| HC_TW_MIL_CREF | TW_MIL001 | MENU_ENTRY | PORTAL_REGISTRY | REGISTRY_DEFINED | SQL:1 |'
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $qe
 $frq = Read-Frag 'screen-TW_MIL001.md' 'screen' $facts
@@ -478,12 +488,14 @@ Assert ($out -match 'ACCEPT_SUMMARY：DONE=2 INVALID=0 BLOCKED=0') "Accept：2 D
 Assert ($out -match 'GATE：G1=PASS' -and $out -match 'GATE：G2=PASS' -and $out -match 'GATE：G7=PASS' -and $out -match 'GATE：G12=PASS' -and $out -match 'GATE：G17=PASS' -and $out -match 'GATE：G18=PASS') "結構類 gate 全 PASS"
 Assert ($out -match 'GATE：G14=UNRESOLVED' -and $out -match 'GATE：G16=UNRESOLVED' -and $out -match 'DEBT：G16｜RQ\.TW_MILITARY\.1｜oracleRead｜NOT_RUN') "G14／G16 首版 UNRESOLVED＋RQ oracleRead debt"
 Assert ($out -match 'GATE_SUMMARY：tier1=True tier2=False') "tier1 通過、tier2 因 UNRESOLVED 未過"
+Assert ($out -match 'DEBT：NAV｜SCR\.TW_MIL001｜alternateSurfaces｜NOT_INSPECTED') "有 Portal 入口列 → 固定出 alternateSurfaces NOT_INSPECTED debt（#24 Case 6）"
 $out = & $cliPath -Domain $fixtureDomain -Gate -Tier 2 *>&1 | Out-String
 Assert ($LASTEXITCODE -eq 1) "-Gate -Tier 2：exit 1"
 $out = & $cliPath -Domain $fixtureDomain -Gate *>&1 | Out-String
 Assert ($LASTEXITCODE -eq 0 -and $out -match 'GATE：G18=PASS') "獨立重跑 -Gate：render parity PASS（磁碟 JSON 為單一真相）"
 $specPath = Join-Path $fixtureDir 'contract/spec/TW_MIL001.spec.md'
 $spec = Read-CtText -LiteralPath $specPath
+Assert ($spec -match '其他導覽 surface \| NAV_COLLECTION／FLUID_TILE／NAVBAR 本版未盤查') "spec：其他導覽 surface 未盤查列（#24 Case 6）"
 $missing = @()
 foreach ($h in @('## 功能與入口', '## 畫面結構', '## 欄位與控制項', '## 狀態與條件', '## 欄位互動', '## 驗證與訊息', '## Navigation', '## Business Operations', '## Data Source of Truth', '## Logical / Physical Data Mapping', '## Key / Effective-Date Semantics', '## Read Semantics / Reference Query', '## Write Semantics / Persistence Effects', '## Data Access Strategy', '## 權限差異', '## Runtime / DB Verification Status', '## 未解事項', '## Traceability / Evidence')) { if ($spec -notmatch [regex]::Escape($h)) { $missing += $h } }
 Assert ($missing.Count -eq 0 -and $spec -notmatch '\[\[') "spec 18 章節齊且不含 [[ ]]"

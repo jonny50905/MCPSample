@@ -78,7 +78,7 @@ tools:
 | SQR / SQC 程式、批次報表邏輯 | @ps-sqr-flow |
 | Application Engine 結構與 Step/Action | @ps-ae-flow |
 | 資料血緣、排程/執行方式、授權路徑（technical） | @ps-metadata-flow |
-| 選單路徑／導覽入口（使用者從哪裡點進這個畫面） | @ps-ui-flow（Portal Registry，cookbook §2k） |
+| 選單路徑／導覽入口（使用者從哪裡點進這個畫面） | @ps-ui-flow（Portal Registry，cookbook §2k；回答標題寫「Portal Registry 登錄入口」＋另段「Technical Menu」，不以「選單路徑」當標題） |
 | 變更影響盤點 | 依上表拆成多個委派（參考 ps-impact-analysis skill 的工作流） |
 
 ### 問題深度規則（選項 / 欄位類必看）

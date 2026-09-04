@@ -449,6 +449,10 @@ function Read-CtFragment {
             if ($res.File -ne ("screen-" + $comp + "-p" + $pg + ".md")) { $res.Invalid += "檔名須為 screen-$comp-p$pg.md" }
         }
         $res.SourceNn = @([string]$kvm['sourceNn'] -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+        # technicalMenu 是 PSMENUITEM 三欄（MENUNAME/BARNAME/ITEMNAME，/ 分隔），不是 A > B > C 路徑——
+        # 只改名沒有形狀檢查＝#24 不接受的修法第 3 條（審查發現：舊 menuPath 內容原樣通過）
+        $tmv = [string]$kvm['technicalMenu']
+        if ($tmv -match '[>＞→»]') { $res.Invalid += "technicalMenu「$tmv」不得寫成 A > B > C 路徑——它是 PSMENUITEM 的 MENUNAME/BARNAME/ITEMNAME（以 / 分隔，多筆以 ; 分隔）" }
         # 控制項分頁覆蓋（鏡射 Test-AuditPart 範圍覆蓋）：本檔須恰好覆蓋外環指定的欄位清單
         if (@($ExpectedFields).Count -gt 0 -and $res.Sections.Contains('控制項')) {
             $got = @()
@@ -468,6 +472,11 @@ function Read-CtFragment {
         foreach ($r in $res.Sections['導覽'].Rows) {
             if ($r.NotApplicable) { continue }
             if ($r.Cells[4] -eq 'AUTHORIZED_FOR_CONTEXT') { $res.Invalid += "「## 導覽」第 $($r.Row) 列可見性 AUTHORIZED_FOR_CONTEXT 不得由模型填（無 user／security context，只能 REGISTRY_DEFINED／UNKNOWN_VISIBILITY）" }
+            # Portal 入口列必須帶可見性主張：NOT_APPLICABLE＝沒有主張，不變量與 debt 都會放行（審查發現）
+            if (@('PORTAL_REGISTRY', 'CREF_LINK') -contains $r.Cells[3] -and -not (@('REGISTRY_DEFINED', 'UNKNOWN_VISIBILITY', 'UNRESOLVED') -contains $r.Cells[4])) { $res.Invalid += "「## 導覽」第 $($r.Row) 列入口型 $($r.Cells[3]) 的可見性只能 REGISTRY_DEFINED／UNKNOWN_VISIBILITY／UNRESOLVED（NOT_APPLICABLE＝沒有主張）" }
+            # 來源／目標須為自然鍵（Portal 名／CREF 物件名／Component／Page）：Get-CtId 會把非 [A-Z0-9_#$] 消毒成 _，
+            # 中文標籤或含符號字串會讓不同四元組撞成同一 ID 再靠列序派 .2（審查發現：不變量比原文、ID 比消毒後）
+            foreach ($ci in @(0, 1)) { $nv = $r.Cells[$ci]; if ($nv -ne 'NOT_APPLICABLE' -and $nv -ne 'UNRESOLVED' -and -not (Test-CtNaturalKey -Value $nv)) { $res.Invalid += "「## 導覽」第 $($r.Row) 列第 $($ci + 1) 欄「$nv」須為大寫英數底線（Portal 名／CREF 物件名／Component／Page），不是標籤路徑" } }
             $navKey = ($r.Cells[0] + '|' + $r.Cells[1] + '|' + $r.Cells[2] + '|' + $r.Cells[3]).ToUpperInvariant()
             if ($navSeen.ContainsKey($navKey)) { $res.Invalid += "「## 導覽」第 $($r.Row) 列（來源,目標,型,入口型）四元組與第 $($navSeen[$navKey]) 列重複——多入口請以不同來源（CREF 物件名）區分，否則 ID 會退回列序相依" }
             else { $navSeen[$navKey] = $r.Row }
@@ -1106,6 +1115,7 @@ function ConvertTo-CtSpec {
     $o.Add("| Component | $($Screen.component) |")
     $o.Add("| Technical Menu（非導覽路徑） | $(if (@($Screen.technicalMenu).Count) { @($Screen.technicalMenu) -join '；' } else { 'UNRESOLVED' }) |")
     $o.Add("| Portal Registry 入口 | $(@($Screen.navigation | Where-Object { $_.entryType -eq 'PORTAL_REGISTRY' -or $_.entryType -eq 'CREF_LINK' }).Count) 筆（見 ## Navigation） |")
+    $o.Add("| 其他導覽 surface | NAV_COLLECTION／FLUID_TILE／NAVBAR 本版未盤查——不得據本表宣稱唯一入口（issue #24 Case 6） |")
     $o.Add("| Search Record | $($Screen.searchRecord) |")
     $o.Add("| 模式 | $(if ($Screen.modes.Count) { $Screen.modes -join '；' } else { 'UNRESOLVED' }) |")
     $o.Add("| Origin | $($Screen.origin) |")
@@ -1408,6 +1418,8 @@ function Test-CtGates {
     foreach ($s in $Contract.screens) { $all += @($s.controls) + @($s.states) + @($s.interactions) + @($s.validations) + @($s.navigation) + @($s.businessOperations) + @($s.persistenceEffects) }
     # 導覽可見性（issue #24）：未確認的入口出 debt，不另立 gate（新 gate 會動 tier 判定與 test 斷言）
     foreach ($s in $Contract.screens) { foreach ($n in @($s.navigation)) { if ($n.visibility -eq 'UNKNOWN_VISIBILITY' -or $n.visibility -eq 'UNRESOLVED') { $debts += "NAV｜$($n.id)｜visibility｜$($n.visibility)" } } }
+    # 其他 surface（Case 6）：有 Portal 入口列就固定出一條 NOT_INSPECTED debt（不擋 tier 2，只讓「入口清單已窮舉」的錯覺不成立）
+    foreach ($s in $Contract.screens) { if (@($s.navigation | Where-Object { $_.entryType -eq 'PORTAL_REGISTRY' -or $_.entryType -eq 'CREF_LINK' }).Count -gt 0) { $debts += "NAV｜$($s.id)｜alternateSurfaces｜NOT_INSPECTED" } }
     foreach ($e in $Contract.dataEntities) { $all += @($e.fields) + @($e.readSemantics) + @($e.writeSemantics) }
     foreach ($c in $all) { $den++; $st = [string]$c.verification.staticEvidence; if ($st -eq 'PASS' -or $st -eq 'NOT_APPLICABLE') { $num++ } elseif ($st -eq 'FAIL') { $bad += $c.id } else { $debts += "G15｜$($c.id)｜staticEvidence｜UNRESOLVED" } }
     foreach ($u in $Contract.unresolvedReferences) { $bad += $u }

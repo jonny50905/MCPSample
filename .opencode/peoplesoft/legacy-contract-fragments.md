@@ -28,6 +28,16 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
    無 user／security context 時「可見性」**只准** `REGISTRY_DEFINED` 或 `UNKNOWN_VISIBILITY`；
    `AUTHORIZED_FOR_CONTEXT` 模型不得填（同 `DIRECT_DB_WRITE_APPROVED` 的紀律）。
    `technicalMenu`（畫面 kv）是 PSMENUITEM 三欄，**不是導覽路徑**，不得與本表混用。
+   **釐清（勿誤讀）**：`TRANSFER`／`TRANSFER_PAGE`／`SECONDARY_PAGE`／`MODAL`／`RETURN` 才是畫面內轉頁；
+   Portal Registry／CREF Link 入口的「型」一律 `MENU_ENTRY`，靠「入口型」區分 `PORTAL_REGISTRY`／`CREF_LINK`。
+   來源／目標欄須為大寫英數底線（Portal 名／CREF 物件名／Component／Page），**不是**標籤路徑（中文或含符號＝INVALID，
+   否則 ID 消毒後撞名會退回列序相依）；NN 的「### 導覽入口」表有「CREF 物件名」欄（§2k-2 的 `PORTAL_OBJNAME`），
+   NN 未記時**必須**委派 @ps-ui-flow 取得再寫，不得以同一來源寫兩列。
+   入口型 `PORTAL_REGISTRY`／`CREF_LINK` 的可見性只能 `REGISTRY_DEFINED`／`UNKNOWN_VISIBILITY`／`UNRESOLVED`
+   （`NOT_APPLICABLE`＝沒有主張＝INVALID）；`TRANSFER` 類才寫 `NOT_APPLICABLE`。
+   `technicalMenu` ＝ subagent 報告 `technicalMenuLocations[]`／cookbook §2k-1 technicalMenuLocation 的三欄以 `/` 串成一筆，
+   含 `>`＝INVALID。未實作 surface（Navigation Collection／Fluid Tile／NavBar）由外環固定出 debt
+   `alternateSurfaces｜NOT_INSPECTED` 並在 spec 印「其他導覽 surface」列——fragment 不需也不得宣稱唯一入口。
    操作鍵符合 `^[A-Z][A-Z0-9_]{1,30}$`。
 6. 一檔 ≤150 行。**容量由 manifest 決定**：控制項表只寫 manifest 列給本檔的那一頁欄位（不多不少）；
    其餘欄位由 `screen-<COMPONENT>-p<k>.md` 分頁檔承載（manifest 另列單位）。寫不下＝外環會縮頁重排，你不用自估。
@@ -80,7 +90,7 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
 ## 導覽
 | 來源 | 目標 | 型 | 入口型 | 可見性 | 證據 |
 |---|---|---|---|---|---|
-| <Portal／CREF 物件名／Component／Page> | <Component／Page> | <navigationKind> | <navigationEntryType 或 NOT_APPLICABLE> | <navigationVisibility 或 NOT_APPLICABLE> | E03.3 |
+| <Portal／CREF 物件名／Component／Page，大寫英數底線> | <Component／Page> | <navigationKind> | <navigationEntryType 或 NOT_APPLICABLE> | <navigationVisibility；TRANSFER 類才 NOT_APPLICABLE> | E03.3 |
 
 ## 業務操作
 | 操作鍵 | 觸發 | 模式 | 說明 | 寫入 | 證據 |
