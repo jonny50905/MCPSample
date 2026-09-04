@@ -160,6 +160,41 @@ function Get-ChecklistState {
     return @{ Exists = $true; Unticked = $unticked; Ticked = $ticked; Round = $round }
 }
 
+# ── research 範圍債（issue #23）：checkpoint ≠ discovery complete ──────────
+# tier 1 的相位與畢業門原本只看 lint -CoverageOnly 的缺料；而 lint 對帳只抓
+# 「已勾但檔案不存在」，「未勾且目標 NN 尚未建立」是合法的「還沒做」，不算缺料。
+# 於是 research session 做完單次上限（或被強殺）後，餘下的原始調查項全被當成
+# 補強項：下一圈直接進 audit、發 tier 1 收據，後面的 NN 永遠不會建（1 shot）。
+# 機械判定（不經模型），活頁未勾列中：
+#   (a) 原始調查項——列內含目標 NN 檔名（NN-<物件>.md），且不帶 A/U/D 工單編號
+#   (b) D 項（新發現、要建新檔）——`D<輪次>-<序號>`
+# 兩者＝「應建立的新知識單位尚不存在」＝research 債。A／U 項只修既有 NN，屬補強
+# （SOP-13），tier 1 不擋；流程標籤（任務 C 批次 n/m、task C batch）不是調查項。
+# 目標檔已存在但列未勾（session 寫了檔還沒打勾就被殺）照樣算債：/ps-research
+# 從第一個未勾項續做，完成與否以勾選為準，不以檔案存在為準。
+function Get-ResearchDebt {
+    $clPath = Join-Path $dir "checklist.md"
+    $r = @{ Plain = 0; D = 0; Total = 0; Items = @() }
+    if (-not (Test-Path $clPath)) { return $r }
+    foreach ($l in (Get-Content $clPath -Encoding UTF8)) {
+        if ($l -notmatch '^\s*-\s*\[ \]') { continue }
+        $body = ($l -replace '^\s*-\s*\[ \]\s*', '').Trim()
+        if ($body -match '^[Dd]\d+-\d+\b') { $r.D++; $r.Items += $body; continue }
+        if ($body -match '^[AUau]\d+-\d+\b') { continue }
+        if ($body -match '(?i)(?:任務|task)\s*[ABC]\b|批次\s*\d+\s*[/／]\s*\d+') { continue }
+        if ($body -match '\d\d-[^\s（）()：:]+\.md') { $r.Plain++; $r.Items += $body; continue }
+    }
+    $r.Total = $r.Plain + $r.D
+    return $r
+}
+
+# tier 1 畢業門的 RESEARCH_SCOPE_OK（#23）——與相位判斷共用 Get-ResearchDebt，
+# 但由畢業門獨立呼叫：相位若因任何 bug 走到 audit，這一層仍擋收據（縱深）。
+function Test-ResearchScopeOk {
+    $rd = Get-ResearchDebt
+    return @{ Ok = ($rd.Total -eq 0); Debt = $rd }
+}
+
 # ── audit 狀態轉移快照（畢業門第 2 層：WORK_TRANSITION_OK）──────
 # Round 正規化：checklist 缺「稽核輪次」行視為 0（與 ps-audit 契約「沒有該行
 # 視為 N=0」對齊——外環用 -1 哨兵會造成首輪 off-by-one 誤判）；取「最後一個」
@@ -1015,6 +1050,8 @@ if ($Preflight) {
     }
     else {
         Write-Host "checklist ：未勾=$($st.Unticked) 已勾=$($st.Ticked) 稽核輪次=$($st.Round)"
+        $rdp = Get-ResearchDebt
+        Write-Host "research 債：$($rdp.Total) 項（原始調查項 $($rdp.Plain)／D 新發現 $($rdp.D)）——>0 時 tier 1 相位必為 research、不得畢業（#23）"
         $ph = if ($st.Unticked -gt 0) { "research（消化 $($st.Unticked) 個未勾項）" } else { "audit（全勾→直接進稽核）" }
     }
     $lc = Invoke-Lint -Coverage
@@ -1734,6 +1771,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     #     建議不是債（SOP-13），不該擋出貨。
     # 領域不存在一律 research（階段一建檔）。
     $coverBefore = $null
+    $rd = @{ Plain = 0; D = 0; Total = 0; Items = @() }
     $goResearch = (-not $before.Exists)
     if (-not $goResearch) {
         if ($Tier -eq 1) {
@@ -1747,14 +1785,20 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             $cvAuditOnly = $cv.AuditOnly
             $cvManualOnly = $cv.ManualOnly
             $cvAuto = $cv.Auto
-            $goResearch = ($cvAuto -gt 0)
+            # research 債（#23）：原始調查項／D 項未建完＝discovery 未完成，
+            # 不管缺料是否已清都回 research——checkpoint ≠ discovery complete
+            $rd = Get-ResearchDebt
+            $goResearch = ($rd.Total -gt 0) -or ($cvAuto -gt 0)
+            if ($rd.Total -gt 0) {
+                Write-Log "RESEARCH_SCOPE(圈前)：research 債 $($rd.Total) 項（原始調查項 $($rd.Plain)／D 新發現 $($rd.D)）——相位 research（#23）"
+            }
             if ($cvAuditOnly -gt 0 -or $cvManualOnly -gt 0) {
                 Write-Log "COVERAGE(圈前) 缺料 $cvTotal 項＝自動 $cvAuto／僅 audit 可修 $cvAuditOnly／需人工 $cvManualOnly——相位只看自動那 $cvAuto 項"
             }
             # 沒有任何自動路徑可走時，**立刻**停機並指名待辦（L74）——
             # 讓它跑滿兩圈再報「無進度」＝燒兩個 session 講一句本來就知道的話，
             # 而且停機理由完全沒提到人要做什麼。
-            if ($cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
+            if ($rd.Total -le 0 -and $cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
                 # 停機前先試一次自動處置（L82）：歸檔未勾列多半是失敗的委派
                 # 紀錄或純批次標籤，lint -FixArchive 判得出來也改得動——
                 # **agent 做不到**（它的 write 沒有 append，重寫大檔會撐爆），
@@ -1769,14 +1813,15 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
                 $cvAuditOnly = $cv.AuditOnly
                 $cvManualOnly = $cv.ManualOnly
                 $cvAuto = $cv.Auto
-                $goResearch = ($cvAuto -gt 0)
+                $rd = Get-ResearchDebt
+                $goResearch = ($rd.Total -gt 0) -or ($cvAuto -gt 0)
                 Write-Log "FixArchive 後：缺料 $cvTotal 項＝自動 $cvAuto／僅 audit $cvAuditOnly／需人工 $cvManualOnly（處置明細見 fixarchive-cycle$cycle.txt）"
                 # FixArchive 會合法刪列（流程標籤）——完整性基準必須重取，
                 # 否則本圈 session 後的檢查會拿舊基準誤報「列被吃掉」
                 $preItemTotal = Get-ItemTotal
                 $preInv = Get-ChecklistInventory
             }
-            if ($cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
+            if ($rd.Total -le 0 -and $cvAuto -le 0 -and $cvAuditOnly -le 0 -and $cvManualOnly -gt 0) {
                 $stopReason = "剩 $cvManualOnly 項需人工（-FixArchive 也判不出來：可能是『沒做完』與『打勾掉了』分不出的列）——清單見 coverage-cycle$cycle-pre.txt 的 MANUAL_ONLY 段、處置紀錄見 fixarchive-cycle$cycle.txt；處理完再啟動"
                 Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-pre.txt" -f $cycle)) `
                     -Value $coverBefore.Raw -Encoding UTF8
@@ -1787,7 +1832,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             # 卡在 research 相位時完全不會產生，而那正是最需要看缺料清單的時候。
             Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-pre.txt" -f $cycle)) `
                 -Value $coverBefore.Raw -Encoding UTF8
-            Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)（0=缺料已清）→ 相位 $(if ($goResearch) { 'research' } else { 'audit' })｜清單見 coverage-cycle$cycle-pre.txt"
+            Write-Log "COVERAGE(圈前) exit=$($coverBefore.Exit)（0=缺料已清）｜research 債 $($rd.Total) → 相位 $(if ($goResearch) { 'research' } else { 'audit' })｜清單見 coverage-cycle$cycle-pre.txt"
         }
         else {
             $goResearch = ($before.Unticked -gt 0)
@@ -2118,10 +2163,17 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             "輪次 $($auditBefore.Round)→$($auditAfter.Round)、hash$(if ($auditAfter.Hash -ne $auditBefore.Hash -and $auditAfter.Hash -ne '') {'已變'} else {'未變'})"
         }
         else { "無快照" }
-        Write-Log "GATE(tier $Tier)：session=$(if ($sessionOk) {'OK'} else {'exit≠0'}) transition=$(if ($transitionOk) {'OK'} else {'FAIL'})（$tDesc） validation=$strictDesc"
-        # 基礎條件：tier 1 不看未勾數與基礎 lint（那是美工；補強項留給 tier 2）
-        $baseOk = $true
-        if ($Tier -eq 2) { $baseOk = ($after.Unticked -eq 0 -and $lint.Exit -eq 0) }
+        # RESEARCH_SCOPE_OK（issue #23）：原始調查項／D 項還沒建完＝discovery 未完成，
+        # tier 1 不得發收據。與相位判斷共用 Get-ResearchDebt 但獨立呼叫（縱深：相位
+        # 若因任何 bug 走到 audit，這一層仍擋）。A／U 補強項不擋（SOP-13）。
+        $scope = Test-ResearchScopeOk
+        $scopeDesc = if ($scope.Ok) { 'OK' } else { "FAIL（research 債 $($scope.Debt.Total)：原始 $($scope.Debt.Plain)／D $($scope.Debt.D)）" }
+        Write-Log "GATE(tier $Tier)：session=$(if ($sessionOk) {'OK'} else {'exit≠0'}) transition=$(if ($transitionOk) {'OK'} else {'FAIL'})（$tDesc） validation=$strictDesc scope=$scopeDesc"
+        # 基礎條件：tier 1 不看未勾數與基礎 lint（那是美工；補強項留給 tier 2），
+        # 但看 RESEARCH_SCOPE_OK（#23）
+        $baseOk = $scope.Ok
+        if ($Tier -eq 2) { $baseOk = ($after.Unticked -eq 0 -and $lint.Exit -eq 0 -and $scope.Ok) }
+        if (-not $scope.Ok) { Write-Log "GATE(tier $Tier)：RESEARCH_SCOPE FAIL——不發收據；下一圈相位回 research（#23）" }
         if ($sessionOk -and $transitionOk -and $baseOk -and $validationOk) {
             $graduated = $true
             # 過門當下快照 contentHash——寫收據時重算比對（TOCTOU 防護）；
@@ -2188,10 +2240,14 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
                 $ca = @([regex]::Matches($coverAfterR.Raw, '(?m)^FAIL：(\d+) 項違規'))
                 $nb = if ($cb.Count -gt 0) { [int]$cb[0].Groups[1].Value } else { 0 }
                 $na = if ($ca.Count -gt 0) { [int]$ca[0].Groups[1].Value } else { 0 }
-                $stalled = ($na -ge $nb -and $nb -gt 0)
+                # research 債也是尺（#23）：圈前債→圈後債沒減、缺料也沒減＝無進度
+                $rdPost = Get-ResearchDebt
+                $rdPre = [int]$rd.Total
+                $progressed = ($na -lt $nb) -or ($rdPost.Total -lt $rdPre)
+                $stalled = (($nb -gt 0) -or ($rdPre -gt 0)) -and (-not $progressed)
                 Add-Content -Path (Join-Path $logRoot ("coverage-cycle{0}-post.txt" -f $cycle)) `
                     -Value $coverAfterR.Raw -Encoding UTF8
-                $howDesc = "缺料違規 $nb→$na（清單見 coverage-cycle$cycle-post.txt）"
+                $howDesc = "缺料違規 $nb→$na、research 債 $rdPre→$($rdPost.Total)（清單見 coverage-cycle$cycle-post.txt）"
             }
         }
         else {

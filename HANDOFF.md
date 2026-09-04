@@ -29,6 +29,12 @@ ps-deep-research／ps-audit-orchestrator）、`.gitignore` 補 audit-parts。**p
 搬運清單見 §1 步驟 1a。功能分支 `claude/issue-17-legacy-contract-phase1` 已 merge 本修正並另改
 ps-contract-batch／ps-contract-verify。
 
+**追記（2026-09-04，issue #23）**：新領域 tier 1 只剩「一槍」的根因＝tier 1 相位與畢業門只看 CoverageOnly
+缺料、把未做的原始調查項當補強項（L110）。修法：`ps-auto-loop.ps1` 加 `Get-ResearchDebt`／
+`Test-ResearchScopeOk`（原始調查項＋D 項＝research 債；A／U 不算；流程標籤不算），相位 `債>0 → research`、
+畢業門 RESEARCH_SCOPE_OK、進度尺加債；`ps-graduation.ps1` GateVersion 3→4（誤發的 tier 1 收據作廢，
+ps-auto-all 會重新 RUN）；test-auto-loop 情境 27。搬運見 §1 步驟 1a。**這是解凍後第一次動 auto-loop**。
+
 **功能分支追記（2026-09-02，同一個接手 session）**：issue #17 Phase 1 切片 1 已在功能分支
 `claude/issue-17-legacy-contract-phase1` 落地——Legacy Contract 產物線（L108、SOP-18、設計備忘
 `docs/design/legacy-contract-phase1-decision-memo.md`）：模型只寫固定表格 fragment，外環
@@ -49,7 +55,7 @@ ps-contract-batch／ps-contract-verify。
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改 | 138 | 備用、未掛載，但 manifest 要對 |
    | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`） | 502 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | 最後搬；搬完跑 `ps-fs-doctor` 應報 55 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
-1a. oracleMCP 根因修正（2026-09-03；**從 handover 分支搬時**用本表；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
+1a. oracleMCP 根因修正＋#23 research 債修正（2026-09-03～04；**從 handover 分支搬時**用本表；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
@@ -62,8 +68,11 @@ ps-contract-batch／ps-contract-verify。
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 | handover 版本行數 |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 | handover 版本行數 |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 | handover 版本行數 |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述） | 598 | handover 版本行數 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109） | 2913 | handover 版本行數 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門） | 598 | handover 版本行數 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110） | 2913 | handover 版本行數 |
+   | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺） | 2326 | 存 UTF-8 with BOM；handover 版本行數 |
+   | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期；handover 版本行數 |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27） | 539 | 存 UTF-8 with BOM；handover 版本行數 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 336 | handover 版：fs-doctor 應報 55 檔一致 |
 
    從功能分支搬則改用 §1b 的聯集表（含本批全部檔案，行數為功能分支版本）。
@@ -76,13 +85,13 @@ ps-contract-batch／ps-contract-verify。
    剩「agent 未被認到」（80196ee 已消滅變數）與「印表沒寫」（stdout 回收已接住）兩種）。
 5. 成功後觀察：「稽核第 i 批…收據 x/y」累積、「稽核 BLOCKED」（若有，先試 `-AuditEvidencePageSize 5`）、
    「稽核輪次 N 合併完成」。首輪後 lint 若報「未稽核」列＝有檔 BLOCKED，不得畢業。
-6. 大領域收尾：查無全量抽驗蓋章（旗標由外環翻）、待人工SQL 回填、畢業（GraduationGateVersion 3，
+6. 大領域收尾：查無全量抽驗蓋章（旗標由外環翻）、待人工SQL 回填、畢業（GraduationGateVersion 4，#23 後舊 tier 1 收據作廢重驗，
    舊收據作廢屬預期）。
 7. 職缺領域：`ps-auto-loop.ps1 -Domain 職缺 -Tier 1`（一次只跑一個領域；oracleMCP 單通道）。
 
 ## 1b. Legacy Contract 線（issue #17 Phase 1；功能分支；稽核告一段落後再開）
 
-1. 搬 19 檔（功能分支＝contract 線 11 檔 ∪ oracleMCP 根因修正 11 檔，重疊 3 檔；核對欄：行數＝編輯器總行數，允許 ±1 行尾差異）：
+1. 搬 22 檔（功能分支＝contract 線 11 檔 ∪ oracleMCP 根因修正 11 檔 ∪ #23 三檔，重疊 3 檔；核對欄：行數＝編輯器總行數，允許 ±1 行尾差異）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
@@ -99,8 +108,11 @@ ps-contract-batch／ps-contract-verify。
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 |  |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3） | 477 |  |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 |  |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-18） | 650 | SOP-18 自 L591 起 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109） | 2969 | L108 自 L2879、L109 自 L2935 起 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 門＋SOP-18） | 650 | SOP-18 自 L591 起 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110） | 2969 | L108 自 L2879、L109 自 L2935 起 |
+   | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債） | 2326 | 存 UTF-8 with BOM |
+   | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27） | 539 | 存 UTF-8 with BOM |
    | `scripts/ps-contract-lib.ps1` | 新增 | 1440 | 存 UTF-8 with BOM；不直接執行 |
    | `scripts/ps-contract.ps1` | 新增 | 247 | 存 UTF-8 with BOM |
    | `scripts/tests/test-contract.ps1` | 新增 | 553 | 存 UTF-8 with BOM；`pwsh -NoProfile -File`；fixture 自刪 |
@@ -150,7 +162,7 @@ ps-contract-batch／ps-contract-verify。
   「稽核 BLOCKED」「稽核輪次 N 合併完成」「本輪稽核新增 D 項 N 筆 > 上限」。
 - **cmd 傳遞限制**：session prompt 禁半形雙引號與 `> < & | % ^`；findstr 對 UTF-8 中文不可靠，
   一律 `powershell Get-Content -Encoding UTF8`。
-- **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（26 個真實函式 AST 抽取、63+ 判定，
+- **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（28 個真實函式 AST 抽取、情境 27 含 #23、
   含 lint fixture）。改 auto-loop／lint 後必跑。功能分支另有 `scripts/tests/test-contract.ps1`
   （K1～K10、102 判定、不需模型；改 ps-contract*.ps1／vocabulary／fragments 後必跑）。
 - **contract 台帳**（功能分支；都在 `docs\ps-research\<領域>\contract\`）：`contract-ledger.json`

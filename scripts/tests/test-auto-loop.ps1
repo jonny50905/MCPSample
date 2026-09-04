@@ -2,15 +2,16 @@
 # 用法：pwsh -NoProfile -File scripts/tests/test-auto-loop.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：調帳／治理／台帳／破壞防衛／歸檔 commit／分批稽核（manifest、part 不變量、合併器）
 #       ＋ lint fixture（[附錄] 守衛、ChunkId 誤判、[回灌] 陳舊、-EvidenceStats、-StrictAudit 未稽核）
+#       ＋ research 範圍債（#23：checkpoint ≠ discovery complete、GateVersion 4 舊收據作廢）
 # 注意：情境 22 會在 docs/ps-research/zz-l103-fixture 建臨時領域跑真 lint，結束自刪。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
 $src = Get-Content (Join-Path $repoRoot "scripts/ps-auto-loop.ps1") -Raw
 $tokens = $null; $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($src, [ref]$tokens, [ref]$errs)
-$wanted = @('Get-RowIdentity', 'Get-ChecklistInventory', 'Invoke-ChecklistReconcile', 'Test-RowStillRepresented', 'Get-CanonicalObject', 'Invoke-DItemGovernance', 'Get-OrderFingerprint', 'Get-SurgeryLedger', 'Save-SurgeryLedger', 'Select-SurgeryBatch', 'Get-ActionableSurgicalCount', 'Get-NnHeadKeys', 'Get-NnGuardSnapshot', 'Invoke-NnDestructionGuard', 'Invoke-ArchiveDedup', 'Invoke-ChecklistArchiveCommit', 'Get-SessionFailureKind', 'Get-AuditLedger', 'Save-AuditLedger', 'Get-ClaimSample', 'New-AuditManifest', 'Test-AuditPart', 'Read-DomainPart', 'Add-ChecklistRows', 'Set-ChecklistRoundAndFlag', 'Invoke-AuditMerge')
+$wanted = @('Get-ResearchDebt', 'Test-ResearchScopeOk', 'Get-RowIdentity', 'Get-ChecklistInventory', 'Invoke-ChecklistReconcile', 'Test-RowStillRepresented', 'Get-CanonicalObject', 'Invoke-DItemGovernance', 'Get-OrderFingerprint', 'Get-SurgeryLedger', 'Save-SurgeryLedger', 'Select-SurgeryBatch', 'Get-ActionableSurgicalCount', 'Get-NnHeadKeys', 'Get-NnGuardSnapshot', 'Invoke-NnDestructionGuard', 'Invoke-ArchiveDedup', 'Invoke-ChecklistArchiveCommit', 'Get-SessionFailureKind', 'Get-AuditLedger', 'Save-AuditLedger', 'Get-ClaimSample', 'New-AuditManifest', 'Test-AuditPart', 'Read-DomainPart', 'Add-ChecklistRows', 'Set-ChecklistRoundAndFlag', 'Invoke-AuditMerge')
 $funcs = $ast.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $wanted -contains $a.Name }, $true)
-if ($funcs.Count -ne 26) { throw "抽不到二十六個函式（抽到 $($funcs.Count)）" }
+if ($funcs.Count -ne 28) { throw "抽不到二十八個函式（抽到 $($funcs.Count)）" }
 foreach ($f in $funcs) { Invoke-Expression $f.Extent.Text }
 function Write-Log([string]$msg) { }
 
@@ -459,6 +460,42 @@ Assert ($clA -match '- \[ \] A6-01 補查 01-TW_A\.md：FAIL 1／DISPUTED 0／UN
 Assert ($clA -match '稽核輪次：6' -and $clA -match '查無全量抽驗：已執行（第 6 輪）' -and $clA -match '## Gaps 彙整' -and $clA -match '16 功能甲') "checklist：輪次遞增、旗標翻轉、骨架與原列保留"
 Remove-Item -Recurse -Force $auditPartsDir; Remove-Item -LiteralPath $auditLedgerPath, $auditManifestPath -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath (Join-Path $dir '01-TW_A.md'), (Join-Path $dir '90-audit.md') -Force
+
+Write-Host "情境 27：research 範圍債——checkpoint ≠ discovery complete（issue #23）"
+Reset-Fixture
+$rd = Get-ResearchDebt
+Assert ($rd.Plain -eq 1 -and $rd.D -eq 1 -and $rd.Total -eq 2) "fixture：原始調查項 1＋D 項 1＝債 2；A 項與流程標籤不計"
+$sc = Test-ResearchScopeOk
+Assert ((-not $sc.Ok) -and $sc.Debt.Total -eq 2) "縱深：有債 → RESEARCH_SCOPE FAIL（畢業門獨立判定，不依賴相位）"
+$rows = @('# 測試領域 調查進度', '', '稽核輪次：0', '', '## 調查進度', '')
+for ($i = 1; $i -le 15; $i++) { $box = if ($i -le 6) { '[x]' } else { '[ ]' }; $rows += ('- ' + $box + ' ' + ('{0:D2}' -f $i) + ' 功能' + $i + ' `TW_F' + $i + '` → ' + ('{0:D2}' -f $i) + '-TW_F' + $i + '.md') }
+$rows += @('', '## Gaps 彙整', '', '- 無')
+[System.IO.File]::WriteAllText($cl, ($rows -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+$rd = Get-ResearchDebt
+Assert ($rd.Plain -eq 9 -and $rd.D -eq 0 -and $rd.Total -eq 9) "正常 checkpoint：15 項做完 6 項 → 債 9（下一圈必須 research，不得 audit）"
+[System.IO.File]::WriteAllText((Join-Path $dir '07-TW_F7.md'), "# 07`n", (New-Object System.Text.UTF8Encoding($true)))
+Assert ((Get-ResearchDebt).Total -eq 9) "強殺：目標檔已存在但列未勾 → 仍是債（以勾選為準，/ps-research 從該項續做）"
+Remove-Item -LiteralPath (Join-Path $dir '07-TW_F7.md') -Force
+$rows2 = @('# x', '', '稽核輪次：2', '', '## 調查進度', '', '- [x] 01 功能1 `TW_F1` → 01-TW_F1.md', '- [ ] A2-01 補查 01-TW_F1.md：FAIL 1（稽核）', '- [ ] U2-01 條件UI回灌 01-TW_F1.md：主角 TW_F1 UI 狀態變異偵測與解析', '- [ ] 任務 C 批次 1/2 未完成', '- [ ] task C batch 2/2', '', '## Gaps 彙整', '', '- 無')
+[System.IO.File]::WriteAllText($cl, ($rows2 -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+$rd = Get-ResearchDebt
+Assert ($rd.Total -eq 0 -and (Test-ResearchScopeOk).Ok) "只剩 A／U 補強項與流程標籤（中英）→ 債 0，tier 1 可進 audit／畢業（non-blocking）"
+$rows3 = @('# x', '', '## 調查進度', '', '- [x] 01 功能1 `TW_F1` → 01-TW_F1.md', '- [ ] d2-01 新發現 TW_NEW：任務C 反查 PS_X（稽核）', '- [ ] 12 功能12 `TW_F12` -> 12-TW_F12.md')
+[System.IO.File]::WriteAllText($cl, ($rows3 -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+$rd = Get-ResearchDebt
+Assert ($rd.D -eq 1 -and $rd.Plain -eq 1 -and (-not (Test-ResearchScopeOk).Ok)) "D 項（小寫、含「任務C」字樣）仍算債擋門；ASCII 箭頭列也算原始調查項"
+Remove-Item -LiteralPath $cl -Force
+Assert ((Get-ResearchDebt).Total -eq 0) "無 checklist → 債 0（相位由「領域不存在一律 research」處理）"
+. (Join-Path $repoRoot 'scripts/ps-graduation.ps1')
+Assert ($script:GraduationGateVersion -ge 4) "GraduationGateVersion 已 bump（≥4）"
+$gdir = Join-Path $dir 'grad-dom'; New-Item -ItemType Directory -Path $gdir -Force | Out-Null
+[System.IO.File]::WriteAllText((Join-Path $gdir '01-TW_X.md'), "# 01`n", (New-Object System.Text.UTF8Encoding($true)))
+$oldRc = @{ schemaVersion = $script:GraduationSchemaVersion; gateVersion = 3; tier = 1; domain = 'grad-dom'; contentHash = 'x' } | ConvertTo-Json
+[System.IO.File]::WriteAllText((Get-GraduationReceiptPath -DomainDir $gdir), $oldRc, (New-Object System.Text.UTF8Encoding($false)))
+$v = Test-GraduationReceipt -DomainDir $gdir -Domain 'grad-dom' -LintScriptPath (Join-Path $repoRoot 'scripts/ps-doc-lint.ps1') -GateScriptPath (Join-Path $repoRoot 'scripts/ps-graduation.ps1') -RequiredTier 1
+Assert ((-not $v.Valid) -and $v.Reason -match 'gateVersion') "GateVersion 3 的舊 tier 1 收據 → invalid（gateVersion 不符），領域重新 RUN"
+Remove-Item -Recurse -Force $gdir
+Reset-Fixture
 
 Write-Host "情境 22：lint [附錄] 形狀守衛——裸 GUID 傾倒抓到、正典表格放行（L103）"
 $fxDom = "zz-l103-fixture"
