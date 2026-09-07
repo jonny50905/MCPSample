@@ -22,8 +22,8 @@ orchestrator 主 context 只累積小而結構化的報告。
    或 UNKNOWN_VISIBILITY，不得升格為 AUTHORIZED_FOR_CONTEXT。
    `labels[].fallbackLanguageCode`：有覆寫而未回退＝`NOT_APPLICABLE`，回退＝實際採用的 base language
    （cookbook §2k-0 (2b)），查不到＝`UNRESOLVED`——**不得留空字串、不得預設 ENG**。
-4. 查無 / 不確定 / 超出 budget：用 status=PARTIAL 或 BLOCKED + gaps 說明，
-   不得編造物件名稱或執行期結果。
+4. 查無 / 不確定 / 超出 budget：用 status=PARTIAL 或 BLOCKED + gaps 說明，並填 `blockedReason`
+   （封閉值，見欄位表）；未連線一律 NOT_CONNECTED，不得寫成逾時或查無。不得編造物件名稱或執行期結果。
 5. 報告目標長度 ≤ 600 tokens（軟性）；findings 依相關性排序，最多 8 筆。
 6. delivered 物件一律進 dependencies，不進 findings 的主要實作敘述
    （CUSTOM_ONLY_ROOTS 模式下尤其如此）。
@@ -61,6 +61,7 @@ orchestrator 主 context 只累積小而結構化的報告。
   "agent": "ps-sqr-flow",
   "task": "一句話重述被委派的問題",
   "status": "COMPLETE | PARTIAL | BLOCKED",
+  "blockedReason": "NOT_APPLICABLE",
   "searchScope": {
     "mode": "CUSTOM_ONLY_ROOTS",
     "customPrefixes": ["TW_"],
@@ -149,6 +150,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `agent` | ✔ | 回報的 subagent 名稱 |
 | `task` | ✔ | 一句話重述任務（供 orchestrator 對帳） |
 | `status` | ✔ | COMPLETE：已回答；PARTIAL：部分回答（見 gaps）；BLOCKED：無法進行（工具失敗 / 查無） |
+| `blockedReason` | status≠COMPLETE 時必填 | 封閉值：NOT_CONNECTED（DB 連線未建，由主 agent 重建後重派）／ORACLE_MCP_DOWN（工具清單無 oracleMCP_）／QUERY_TIMEOUT（>30 秒無回應）／SCHEMA_UNRESOLVED（view/table not found 且 profile currentSchema=FILL_ME）／TOOL_ERROR／NO_EVIDENCE（查無）／BUDGET_EXCEEDED；COMPLETE 時 NOT_APPLICABLE |
 | `searchScope` | ✔ | 實際使用的搜尋模式；用了 delivered fallback 必須在此如實回報 |
 | `coverage[]` | 長文本必填 | 程式單位、結構行號範圍、已分析行號區間；未覆蓋區間必同時列於 gaps |
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |

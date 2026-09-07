@@ -19,6 +19,8 @@ tools:
   "oracleMCP_*": true
   # L109：連線是全域單例，subagent 一律不准斷線（放在 oracleMCP_* 之後：OpenCode 最後匹配者優先，順序不可顛倒）
   "oracleMCP_disconnect": false
+  # 連線由主 agent 建；subagent 只查，未連線就回 BLOCKED(NOT_CONNECTED)，不自己 connect
+  "oracleMCP_connect": false
   # PeoplecodeMetadata：get_ae_sql_metadata（aeApplid）取 AE SQL 中繼資料
   # ——免連線的定位／結構線索，證據仍走 SQL／CHUNK：
   "PeoplecodeMetadata_*": true
@@ -44,6 +46,7 @@ businessDomain / searchMode / customPrefixes、已知物件與聚焦問題。
    PSAESTEPDEFN 取 Section / Step 清單），再只取回答問題必要的
    Action **內容**（AE_SQL / AE PeopleCode Action——照長文本協定
    搜 PeoplecodeElasticSearch、用 PeoplecodeSource 取段，不從 Oracle 撈全文）。
+   連線已由主 agent 建好：第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
 4. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
 

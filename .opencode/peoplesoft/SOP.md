@@ -414,6 +414,12 @@ N 晚自動除役」得先有實測基線（L48：門檻照實測設，不照直
 目前領域數與夜跑次數都不足以定那個 N。**在此之前，每天早上看 Summary
 那一行就是這條熔絲**。
 
+追記（issue #28，2026-09-07）：連線的「開」收攏到主 agent——ps-orchestrator／ps-deep-research／
+ps-audit-orchestrator 的 tools 只開 `oracleMCP_list-connections` 與 `oracleMCP_connect`，派第一個 DB 委派前
+connect 一次；subagent 的 `oracleMCP_connect` 硬關，未連線只回 `BLOCKED(NOT_CONNECTED)` 由主 agent 重建再重派。
+「第一個先單獨派」規則作廢。快篩加第 (0) 步：主 agent 的 opencode.json 對 `oracleMCP_connect` 的權限必須是
+allow——headless 下 ask 等於擋，症狀是主 agent 卡在 connect、所有 DB 委派回 NOT_CONNECTED。
+
 ---
 
 ## SOP-13 維運節奏（領域畢業後的營運模式）

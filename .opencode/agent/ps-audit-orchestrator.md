@@ -14,6 +14,9 @@ tools:
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
   "oracleMCP_*": false
+  # 連線的擁有者是主 agent：只開 list-connections 與 connect（派第一個 DB 委派前 connect 一次）；run-sql／disconnect 維持關閉
+  "oracleMCP_list-connections": true
+  "oracleMCP_connect": true
   "PeoplecodeMetadata_*": false
 ---
 
@@ -35,8 +38,9 @@ manifest 不存在 → 回報「無 manifest，本指令只供 auto-loop 呼叫�
 
 - **一個委派只做一件事**：一個檔的**一個範圍**的任務 A、或一個檔的
   任務 B——禁止把多檔、多範圍、A＋B 塞進同一委派。
-- 併發：會查 oracleMCP 的（SQL 型證據重跑、任務 C）同時 ≤ 3，但第一個先
-  單獨派、回報後其餘再並行（連線是全域共用單例，L109）；只用
+- 併發：會查 oracleMCP 的（SQL 型證據重跑、任務 C）同時 ≤ 3——派出第一個之前
+  先由你 connect 一次（cookbook「連線生命週期」主 agent 段；subagent 不能 connect／disconnect；
+  回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次）；只用
   ES＋Source 的同時 ≤ 6；總數 ≤ 6。不要全循序。
 - 任務 A 委派模板（只傳路徑，不貼內容）：
   `[任務] read docs/ps-research/<領域>/<檔名> 執行任務 A（證據解引用），只驗 Evidence 附錄第 a~b 筆`

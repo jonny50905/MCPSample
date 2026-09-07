@@ -15,6 +15,9 @@ tools:
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
   "oracleMCP_*": false
+  # 連線的擁有者是主 agent：只開 list-connections 與 connect（派第一個 DB 委派前 connect 一次）；run-sql／disconnect 維持關閉
+  "oracleMCP_list-connections": true
+  "oracleMCP_connect": true
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
 ---
@@ -42,9 +45,10 @@ docs/ps-research/<領域>/
   **兩個委派**。禁止把多個檔、多個 A 項區間或多個任務塞進同一個委派。
 - **併發上限看「這個委派會呼叫哪個 server」**（不是任務類型——同樣是
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
-  · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3，
-    但**第一個先單獨派**、回報後其餘再並行（連線是全域共用單例，L109：
-    讓第一個把連線建好，避免同時 connect；disconnect 已對 subagent 硬性關閉）。
+  · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3。
+    **派出第一個之前先由你 connect 一次**（cookbook「連線生命週期」主 agent 段：list-connections →
+    connect，冪等；subagent 不能 connect 也不能 disconnect）。subagent 回 BLOCKED(NOT_CONNECTED) →
+    再 connect 一次、重派一次；第二次仍失敗 → 該筆收據記「DB 連線建立失敗（原因）」，不寫「通道未掛」。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
@@ -67,7 +71,7 @@ docs/ps-research/<領域>/
    `business-domain-map.yaml`。命中 → 用該 domain 的 aliases / policy；
    **未命中 → 不拒答**：自行展開 3~6 個同義詞（中英文），用
    `searchPolicy.defaultMode`，並在「掃描範圍聲明」記錄用了哪些詞。
-2. 多角度盤點（各角度一個委派，oracleMCP 類**依序**派）：
+2. 多角度盤點（各角度一個委派；oracleMCP 類同時 ≤ 3，派前先 connect）：
    - @ps-ui-flow：以 aliases 反查 UI 文字 / Component 描述 → 功能清單。
      「選單」在本階段只取 **technicalMenuLocation**（cookbook §2e）當定位線索，
      **不寫進 00-overview 的任何路徑欄**；使用者導覽入口屬階段二（cookbook §2k）。
@@ -94,7 +98,7 @@ docs/ps-research/<領域>/
 1. 委派標準深度鏈（同 ps-orchestrator 的委派表與深度規則）：
    ui-flow（欄位/選項）→ peoplecode-flow（帶 Record.Field＋stored values 找邏輯）
    → 發現批次再派 sqr/ae-flow → metadata-flow（血緣/排程/權限）。
-   oracleMCP 類委派同時 ≤ 3、首個先單獨派；
+   oracleMCP 類委派同時 ≤ 3（派前先 connect）；
    報告的 suggestedNext 屬深度規則者必須執行。
    **主角是 Component 的項目**：peoplecode-flow 委派必含一次
    Activate／PostBuild 定位（ObjectName＋eventName 結構化搜尋——
