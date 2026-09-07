@@ -66,15 +66,14 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 ## 硬規則
 
 - 不可展開整支 AE 的所有 Section；只追必要的 Call Section 鏈。
-- **oracleMCP 規則（連線是全域共用單例，L109）**：只准 SELECT（唯一例外＝
-  生命週期的 CURRENT_SCHEMA 設定）；先直接發第一個 SELECT；只有回「未連線」
-  類錯誤才 `list-connections` → `connect`（一次；回「已連線」視為成功）→
-  **設 CURRENT_SCHEMA**（read customization-profile.yaml，
-  ALTER SESSION SET CURRENT_SCHEMA=<oracle.currentSchema>；重複無害；
-  值為 FILL_ME 就跳過）→ 重發該查詢 →
-  查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；
-  connect 或查詢逾時（~30 秒）→ 停手回報
-  `status: BLOCKED`，**不准重試迴圈**、也不 disconnect。
+- **oracleMCP 規則（連線是全域共用單例；開只有主 agent 做、關誰都不做）**：只准 SELECT（唯一例外＝
+  生命週期的 CURRENT_SCHEMA 設定）；連線已由主 agent 建好，先直接發第一個 SELECT；回「未連線」
+  類錯誤 → 立即回報 `status: BLOCKED`、`blockedReason: NOT_CONNECTED` 結束本委派（不 list-connections、
+  不 connect——工具已對本 agent 關閉、不重試）；成功 → **設 CURRENT_SCHEMA**（read customization-profile.yaml，
+  ALTER SESSION SET CURRENT_SCHEMA=<oracle.currentSchema>；重複無害；值為 FILL_ME 就跳過）→ 重發該查詢 →
+  查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；查詢逾時（~30 秒）→ 停手回報
+  `status: BLOCKED`、`blockedReason: QUERY_TIMEOUT`，**不准重試迴圈**、也不 disconnect；
+  值為 FILL_ME 而查不到表 → `blockedReason: SCHEMA_UNRESOLVED`。
 - **定位後切換檔案模式**（協定 §5.1）：命中後 `get_file_structure(fileId)`
   → 依結構取段；**禁止換關鍵字重搜同一檔案的內容**；
   Action 內容截斷＝取結構中下一段；單頁「查無」結論無效。

@@ -22,7 +22,9 @@ tools:
   "PeoplecodeSource_*": false
   "oracleMCP_*": false
   # 連線的擁有者是主 agent：只開 list-connections 與 connect（派第一個 DB 委派前 connect 一次）；run-sql／disconnect 維持關閉
+  # 工具名依 OpenCode 版本可能是 list-connections 或 list_connections（連字號被改成底線），兩種拼法都開
   "oracleMCP_list-connections": true
+  "oracleMCP_list_connections": true
   "oracleMCP_connect": true
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
@@ -54,7 +56,7 @@ tools:
    （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
    可平行派；**會用 oracleMCP 的委派（ps-ui-flow / ps-metadata-flow /
    ps-ae-flow）同時 ≤ 3**。**派出第一個 oracleMCP 類委派之前，先由你 connect 一次**
-   （cookbook「連線生命週期」主 agent 段：list-connections → connect，冪等；連線是 server 全域單例，
+   （cookbook「連線生命週期」主 agent 段：連線名先取 profile oracle.connectionName，FILL_ME 才 list-connections（或 list_connections）→ connect，冪等；連線是 server 全域單例，
    只有你能開、誰都不關；subagent 的 connect／disconnect 都已關閉）。
 4. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。

@@ -657,11 +657,12 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 
 ## 7. oracleMCP 連線擁有權（issue #28；只能在公司機跑，手動）
 
-前置：主 agent 的 opencode.json 對 `oracleMCP_connect` 為 allow；`/mcp` 清單有 oracleMCP。
+前置：主 agent 的 opencode.json 對 `oracleMCP_connect` 為 allow；`/mcp` 清單有 oracleMCP；profile `oracle.connectionName` 已回填（未回填則主 agent 需看得到 list-connections 類工具）。
 
 | # | 情境 | 操作 | 預期訊號 |
 |---|---|---|---|
-| R1 | 冷啟動問答 | 新 session，問一題需 DB 的問題 | 主 agent 先 list-connections → connect，再派 subagent；subagent 第一個 SELECT 直接成功；答案含 SQL 證據 |
+| R0 | 工具可見性 | 問主 agent「列出所有名稱含 oracleMCP 的工具全名」 | 看到 connect 與 list-connections（或 list_connections，視 OpenCode 版本）；看不到 run-sql／disconnect。只看到 connect＝tools 表拼法對不上 |
+| R1 | 冷啟動問答 | 新 session，問一題需 DB 的問題 | 主 agent 先取連線名（profile 或 list-connections）→ connect，再派 subagent；subagent 第一個 SELECT 直接成功；答案含 SQL 證據 |
 | R2 | 冷啟動研究 | `/ps-research <領域>` 新 session | deep-research 派第一個 oracleMCP 類委派前 connect 一次；不出現 NOT_CONNECTED |
 | R3 | 連線中途斷 | 對話中手動 disconnect（管理者 session）再問 DB 題 | subagent 回 BLOCKED(NOT_CONNECTED) → 主 agent connect → 重派 → 成功；使用者看不到「沒有連線」 |
 | R4 | 併發 | 一題觸發 ≥2 個 DB 委派 | 只有主 agent connect 一次；subagent 端零 connect／disconnect 呼叫 |

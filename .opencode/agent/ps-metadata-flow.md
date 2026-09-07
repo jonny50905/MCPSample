@@ -77,15 +77,15 @@ tools:
 
 - **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；每個查詢都要有列數上限
   （FETCH FIRST 200 ROWS ONLY）。
-- **oracleMCP 連線生命週期（連線是全域共用單例，L109）**：先直接發本次
-  第一個 SELECT；只有回「未連線」類錯誤才 `list-connections` 取連線名 →
-  `connect`（一次；回「已連線」視為成功）→ **設 CURRENT_SCHEMA**（read
-  customization-profile.yaml 的 oracle.currentSchema，執行一次 ALTER SESSION
-  SET CURRENT_SCHEMA=<值>——唯一准許的非 SELECT、重複無害；值為 FILL_ME 就
-  跳過）→ 重發該查詢 → 查完**不得 `disconnect`**（會把 main 與其他
-  subagent 一起斷線）；connect 或查詢逾時
-  （~30 秒）→ 停手回報 `status: BLOCKED`，**不准重試迴圈**、也不 disconnect。
-  view/table not found 先想「schema 步驟做了沒」。
+- **oracleMCP 連線生命週期（連線是全域共用單例；開只有主 agent 做、關誰都不做）**：連線已由主 agent
+  建好，先直接發本次第一個 SELECT；回「未連線」類錯誤 → 立即回報 `status: BLOCKED`、
+  `blockedReason: NOT_CONNECTED` 結束本委派（不 list-connections、不 connect——兩者工具已對本 agent
+  關閉、不重試）；成功 → **設 CURRENT_SCHEMA**（read customization-profile.yaml 的 oracle.currentSchema，
+  執行一次 ALTER SESSION SET CURRENT_SCHEMA=<值>——唯一准許的非 SELECT、重複無害；值為 FILL_ME 就
+  跳過）→ 重發該查詢 → 查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；
+  查詢逾時（~30 秒）→ 停手回報 `status: BLOCKED`、`blockedReason: QUERY_TIMEOUT`，**不准重試迴圈**、
+  也不 disconnect。view/table not found 先想「schema 步驟做了沒」；值為 FILL_ME 而查不到表 →
+  `blockedReason: SCHEMA_UNRESOLVED`。
 
 - 排程 / 授權一律以 metadata 工具為準，不從程式註解或物件名稱推測。
 - 血緣每條邊必標操作類型與 evidence IDs；動態寫入標 DYNAMIC_RUNTIME。

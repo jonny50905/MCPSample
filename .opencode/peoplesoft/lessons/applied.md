@@ -3045,3 +3045,12 @@
 - 有意不做：備援版（subagent 保留 connect）——併發下會互相重建連線，回到 L109 風暴的溫和版；
   管理者拍板嚴格版。currentSchema=FILL_ME 另案（管理者本機回填，fs-doctor 報該檔 M 屬預期）。
 - 待公司機驗：主 agent 對 `oracleMCP_connect` 的權限是 allow；已連線時再 connect 的回應（「已連線」或重建，皆可）。
+- 追記（2026-09-07，公司機實測）：主 agent 看得到 connect、看不到 list-connections，因此拿不到 connection_name。
+  根因：OpenCode 0.6.0～1.0.x 註冊 MCP 工具時把名稱的連字號改成底線（`replace(/[-\s]+/g, "_")`），
+  實際工具名是 `oracleMCP_list_connections`／`oracleMCP_run_sql`；1.1.30 起改為保留連字號。tools 表寫
+  `oracleMCP_list-connections` 在舊版對不上，被 `oracleMCP_*: false` 蓋掉；`connect` 沒有連字號所以看得到。
+  落點：三個主 agent 兩種拼法都開；profile 加 `oracle.connectionName`（FILL_ME；管理者本機回填），主 agent
+  有值就直接 connect、不依賴 list-connections；cookbook 主 agent 段第 1 步改「先 profile 後 list」並註明工具名
+  兩種拼法等價；ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor 硬規則段殘留的舊流程（回未連線才
+  list→connect）改為只回 BLOCKED(NOT_CONNECTED)；情境 31 斷言兩種拼法、profile 欄位與 subagent 無殘留；
+  §7 加 R0 工具可見性。教訓：對外部工具名不要只信文件，第一次接線就叫模型把工具清單原樣列出來。

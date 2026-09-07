@@ -16,7 +16,9 @@ tools:
   "PeoplecodeSource_*": false
   "oracleMCP_*": false
   # 連線的擁有者是主 agent：只開 list-connections 與 connect（派第一個 DB 委派前 connect 一次）；run-sql／disconnect 維持關閉
+  # 工具名依 OpenCode 版本可能是 list-connections 或 list_connections（連字號被改成底線），兩種拼法都開
   "oracleMCP_list-connections": true
+  "oracleMCP_list_connections": true
   "oracleMCP_connect": true
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
@@ -46,7 +48,7 @@ docs/ps-research/<領域>/
 - **併發上限看「這個委派會呼叫哪個 server」**（不是任務類型——同樣是
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
   · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3。
-    **派出第一個之前先由你 connect 一次**（cookbook「連線生命週期」主 agent 段：list-connections →
+    **派出第一個之前先由你 connect 一次**（cookbook「連線生命週期」主 agent 段：連線名先取 profile oracle.connectionName，FILL_ME 才 list-connections（或 list_connections）→
     connect，冪等；subagent 不能 connect 也不能 disconnect）。subagent 回 BLOCKED(NOT_CONNECTED) →
     再 connect 一次、重派一次；第二次仍失敗 → 該筆收據記「DB 連線建立失敗（原因）」，不寫「通道未掛」。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
