@@ -55,11 +55,12 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
    label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數、
    條件 UI 變異目標解析（§2h～§2j，流程照 SKILL「條件 UI」節）。
-3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時）**：照 cookbook §2k
-   走 2k-0（先驗表名欄位）→ 2k-1（PSMENUITEM seed，只叫 technicalMenuLocation）→
-   2k-2（menu＋component＋market 找 CREF）→ 2k-3（parent walk，visited／depth 20／不跨 Portal）→
-   2k-4（語系 label，逐段記 source／fallback）→ 2k-5（CREF Link 與其他 surface）。
-   本步屬 **oracleMCP 類委派，計入同時 ≤ 3**。
+3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時）**：先讀 profile `navigation:`。
+   `verified: true` → **直接跑 cookbook §2k-C canonical**（bind：componentName＋profile 的 portal／labelLanguage），
+   回傳列原樣映射：`CLASSIC_VISIBLE = 1` → `navigationEntries[]` 一筆（entryType 依 CREF_USGT、visibility＝
+   `CLASSIC_NAV_VISIBLE`、labels 由逐段列填）；`= 0` → 不列入口，gaps 記一行原因。0 列照 §2k-C 的三步排查。
+   `verified: false` → 先跑 2k-0 驗表名／欄位／值域並回報，不得自行推導。
+   `technicalMenuLocations[]` 由 2k-1 取，永遠分開回報。本步屬 **oracleMCP 類委派，計入同時 ≤ 3**。
 4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
 5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
@@ -76,9 +77,10 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **可用（oracleMCP + cookbook §2k）**：Portal Registry 導覽入口——
   Component → CREF → Folder 階層 → 逐段語系 label；輸出 `navigationEntries[]`（複數）
   與 `technicalMenuLocations[]`（分開，永不合併）。
-- **尚缺（導覽，本版不實作）**：Navigation Collection、Fluid Tile／Homepage、NavBar 的入口探索；
-  以及 `AUTHORIZED_FOR_CONTEXT`（需 user／security／runtime portal context）。
-  這三類**一律回 gaps**，且**即使 classic path 已 CONFIRMED 也不得宣稱是唯一入口**。
+- **尚缺（導覽，本版不實作）**：Navigation Collection、Fluid Tile／Homepage、NavBar 的入口探索——
+  profile `navigation.surfaces: CLASSIC_ONLY` 時三者為 `NOT_APPLICABLE`（不記 gap，入口數以 §2k-C 可見列為準）；
+  `CLASSIC_AND_FLUID` 才一律回 gaps 且不得宣稱唯一入口。`AUTHORIZED_FOR_CONTEXT`（需 user／security／
+  runtime portal context）仍不實作。
 - **尚缺（UI Semantic Index 未建）**：跨全部 UI 文字的語意（非精確）搜尋、
   Page Field 覆寫 label 的最終文字解析、Grid/Tab/GroupBox 專屬 label。
   查不到時記入 `gaps`，**不得**改用猜測或從物件命名腦補畫面文字。
@@ -113,11 +115,12 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
      不得串成使用者路徑、不得當 `navigationEntries` 的 fallback。查不到 Portal Registry
      入口就回空陣列＋gaps，**不是**退回技術選單。
   2. **入口是複數**：discovery 回幾個 location 就回幾筆；壓成單一路徑＝報告不合格。
-  3. **可見性只准 `REGISTRY_DEFINED`**（無 user／security context 時）或 `UNKNOWN_VISIBILITY`
-     （隱藏旗標、過期、走訪未達根、Fluid 等未解析 surface）。
-     `AUTHORIZED_FOR_CONTEXT` 本版**不得產出**。文字一律寫
+  3. **可見性只准三值**：`CLASSIC_NAV_VISIBLE`（§2k-C 回 `CLASSIC_VISIBLE = 1`）、`REGISTRY_DEFINED`
+     （未跑 canonical、只有 registry 證據）、`UNKNOWN_VISIBILITY`（隱藏旗標、過期、走訪未達根、未解析 surface）。
+     `AUTHORIZED_FOR_CONTEXT` 本版**不得產出**。文字寫「Classic 選單入口：A > B > C」或
      「Portal Registry 登錄入口：A > B > C」，**不得**寫成「使用者操作路徑」。
   4. parent 斷鏈／達 depth cap → 該筆 `UNRESOLVED`＋gap，**禁止**用物件名或 delivered 慣例補段。
+  5. canonical 回傳的 `MENU_PATH` **原樣使用**：不改字、不補段、不加 BARNAME／ITEMNAME。
 
 - 最終訊息只有 JSON 報告，前後不加說明文字。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。

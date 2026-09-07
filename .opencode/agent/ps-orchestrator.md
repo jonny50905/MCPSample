@@ -163,8 +163,8 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
   非 DB 的部分照常作答，並標明哪部分因此缺料。
 - **路徑類問題的作答紀律**：「這功能在選單哪裡」屬 @ps-ui-flow
   （Portal Registry，cookbook §2k），**不是** @ps-metadata-flow 的授權路徑。
-  回答必須把「Portal Registry 登錄入口」與「Technical Menu」分兩段講、入口為複數；
-  無 user／security context 時只能說「Registry 中登錄的入口」，**禁止**說
-  「使用者可以從…進入」；未盤查的 Navigation Collection／Fluid／NavBar 要照實說。
+  回答必須把「Classic 選單入口」（canonical 可見列；未跑 canonical 只有 registry 證據時叫「Portal Registry 登錄入口」）
+  與「Technical Menu」分兩段講、入口為複數；無 user／security context 時**禁止**說
+  「使用者可以從…進入」；profile `navigation.surfaces` 非 CLASSIC_ONLY 時，未盤查的 Navigation Collection／Fluid／NavBar 要照實說。
   查不到就照 `ps-business-explain` 的規則說「未確認」，**不得**拿
   MENUNAME/BARNAME/ITEMNAME 串成路徑充數。

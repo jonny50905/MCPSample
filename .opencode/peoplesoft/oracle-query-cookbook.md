@@ -293,10 +293,9 @@ Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 
 用途：回答「使用者從哪裡點得到這個 Component」。輸出**複數** `navigationEntries[]`，
 每筆帶 `portalName / entryType / crefObjectName / labels[] / visibility`，
 與 §2e 的 `technicalMenuLocations[]`（PSMENUITEM 三欄）**分開回報，永不合併**。
-本節**所有表名、欄位名、代碼值域皆待公司機驗證**（規則 6／8／8a）：
-PSPRSMDEFN 系列對本 cookbook 是全新表名，**第一次使用前必須先跑 2k-0**（先 `all_tables` 驗表名、
-再 `all_tab_columns` 驗欄位名），查不到記 gaps，不硬湊、不自行加減 `PS_` 前綴。
-驗證回填前，本節任何結論最高只能標 **INFERRED**。
+本節的表名／欄位／代碼值域以 `customization-profile.yaml` 的 `navigation:` 區塊為準：`verified: true` ＝ 已在本環境
+驗證回填，**直接跑 §2k-C**；`verified: false` ＝ 先跑 2k-0（`all_tables` 驗表名、`all_tab_columns` 驗欄位名、值域分布），
+回填 profile 後再跑 §2k-C；查不到記 gaps，不硬湊、不自行加減 `PS_` 前綴。未驗證前本節結論最高只能標 **INFERRED**。
 `REGISTRY_DEFINED／AUTHORIZED_FOR_CONTEXT／UNKNOWN_VISIBILITY` 是**可見性**維度，與 confidence 正交，
 不得寫進 confidence 欄（subagent-report-contract 硬規則 3a）。
 
@@ -333,6 +332,75 @@ SELECT PORTAL_NAME FROM PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY;
 > `GRPT`／`HPGT`／`HPGC`→Fluid／首頁類**本版不解析**，一律回 gap；`FRMT`／`HTMT`／`IFRM`＝模板管線，排除。
 > **本環境是否只有 C／F 兩種 PORTAL_REFTYPE 亦待驗**；出現第三值＝環境意外，記 gaps 不得靜默假設。
 
+**2k-C. Classic 導覽 canonical query（主流程；`navigation.verified: true` 時直接跑）**
+
+輸入只有 `:componentName`；`:portalName`＝profile `navigation.portal`、`:languageCd`＝`navigation.labelLanguage`。
+**原樣執行、原樣回傳**：不改字、不補段、不加 BARNAME／ITEMNAME；`MENU_PATH` 的每一段只來自 PSPRSMDEFN 的 label。
+
+```sql
+WITH NAV_TREE AS (
+    SELECT CONNECT_BY_ROOT D.PORTAL_NAME      AS TARGET_PORTAL,
+           CONNECT_BY_ROOT D.PORTAL_OBJNAME   AS TARGET_CREF,
+           CONNECT_BY_ROOT D.PORTAL_CREF_USGT AS TARGET_USGT,
+           LEVEL                              AS LVL,
+           D.PORTAL_OBJNAME, D.PORTAL_PRNTOBJNAME,
+           TRIM(D.PORTAL_LABEL)               AS BASE_LABEL,
+           (SELECT TRIM(L.PORTAL_LABEL) FROM PSPRSMDEFNLANG L
+             WHERE L.PORTAL_NAME = D.PORTAL_NAME AND L.PORTAL_REFTYPE = D.PORTAL_REFTYPE
+               AND L.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND L.LANGUAGE_CD = :languageCd) AS LANG_LABEL,
+           CASE WHEN EXISTS (SELECT 1 FROM PSPRSMSYSATTRVL A
+                              WHERE A.PORTAL_NAME = D.PORTAL_NAME AND A.PORTAL_REFTYPE = D.PORTAL_REFTYPE
+                                AND A.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND A.PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV'
+                                AND UPPER(TRIM(DBMS_LOB.SUBSTR(A.PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1'))
+                THEN 1 ELSE 0 END AS IS_HIDDEN,
+           CASE WHEN D.PORTAL_EXPIRE_DT IS NOT NULL AND D.PORTAL_EXPIRE_DT < SYSDATE THEN 1 ELSE 0 END AS IS_EXPIRED,
+           CASE WHEN D.PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT' OR TRIM(D.PORTAL_PRNTOBJNAME) IS NULL THEN 1 ELSE 0 END AS IS_ROOT,
+           CONNECT_BY_ISCYCLE                 AS IS_CYCLE
+      FROM PSPRSMDEFN D
+     START WITH D.PORTAL_REFTYPE = 'C'
+            AND D.PORTAL_CREF_USGT IN ('TARG','LINK')
+            AND D.PORTAL_NAME = :portalName
+            AND UPPER(TRIM(D.PORTAL_URI_SEG2)) = UPPER(:componentName)
+            AND EXISTS (SELECT 1 FROM PSMENUITEM M
+                         WHERE UPPER(TRIM(M.PNLGRPNAME)) = UPPER(:componentName)
+                           AND UPPER(TRIM(M.MENUNAME)) = UPPER(TRIM(D.PORTAL_URI_SEG1)))
+   CONNECT BY NOCYCLE PRIOR D.PORTAL_PRNTOBJNAME = D.PORTAL_OBJNAME
+          AND PRIOR D.PORTAL_NAME = D.PORTAL_NAME
+          AND D.PORTAL_REFTYPE = 'F'
+          AND LEVEL <= 20
+),
+NAV_ROWS AS (
+    SELECT T.*,
+           COALESCE(NULLIF(LANG_LABEL, ''), BASE_LABEL) AS DISPLAY_LABEL,
+           CASE WHEN NULLIF(LANG_LABEL, '') IS NULL THEN 'BASE' ELSE 'LANG' END AS LABEL_SOURCE
+      FROM NAV_TREE T
+)
+SELECT TARGET_PORTAL AS PORTAL_NAME, TARGET_CREF AS CREF_OBJECT, TARGET_USGT AS CREF_USGT,
+       LISTAGG(CASE WHEN IS_ROOT = 0 THEN DISPLAY_LABEL END, ' > ') WITHIN GROUP (ORDER BY LVL DESC) AS MENU_PATH,
+       MAX(IS_HIDDEN) AS PATH_HIDDEN, MAX(IS_EXPIRED) AS PATH_EXPIRED,
+       MAX(IS_ROOT) AS ROOT_REACHED, MAX(IS_CYCLE) AS HAS_CYCLE,
+       SUM(CASE WHEN IS_ROOT = 0 AND DISPLAY_LABEL IS NULL THEN 1 ELSE 0 END) AS BLANK_SEGMENTS,
+       CASE WHEN MAX(IS_HIDDEN) = 0 AND MAX(IS_EXPIRED) = 0 AND MAX(IS_ROOT) = 1 AND MAX(IS_CYCLE) = 0
+             AND SUM(CASE WHEN IS_ROOT = 0 AND DISPLAY_LABEL IS NULL THEN 1 ELSE 0 END) = 0
+            THEN 1 ELSE 0 END AS CLASSIC_VISIBLE
+  FROM NAV_ROWS
+ GROUP BY TARGET_PORTAL, TARGET_CREF, TARGET_USGT
+ ORDER BY CLASSIC_VISIBLE DESC, TARGET_PORTAL, MENU_PATH
+FETCH FIRST 200 ROWS ONLY
+```
+
+> **結果映射（一列＝一個 CREF）**：`CLASSIC_VISIBLE = 1` → `navigationEntries[]` 一筆，`entryType` 依 `CREF_USGT`
+> （TARG→`PORTAL_REGISTRY`、LINK→`CREF_LINK`）、`visibility = CLASSIC_NAV_VISIBLE`、`labels[]` 由逐段列填；
+> `CLASSIC_VISIBLE = 0` → **不列為入口**，gaps 記一行原因（`PATH_HIDDEN`＝hide-from-nav／`PATH_EXPIRED`＝過期／
+> `ROOT_REACHED=0`＝未達根／`HAS_CYCLE`＝循環／`BLANK_SEGMENTS`＝空 label）。
+> **逐段列**（供 `labels[].displayText／displayTextSource`）：同一個 CTE 改成
+> `SELECT TARGET_CREF, LVL, PORTAL_OBJNAME, DISPLAY_LABEL, LABEL_SOURCE FROM NAV_ROWS ORDER BY TARGET_CREF, LVL DESC FETCH FIRST 200 ROWS ONLY`。
+> **0 列時**分三種，不得猜：(a) `:componentName` 打錯或 PSMENUITEM 無此 Component（跑 2k-1 確認）；
+> (b) Registry 真的沒有 CREF（跑 2k-2 診斷查詢，去掉 EXISTS 再跑一次）；(c) 全部 CREF 都在其他 portal（把 `:portalName` 條件拿掉重跑）。
+> 三者都空＝「Portal Registry 導覽入口：查無」＋gaps 記查法收據。
+> `PSMENUITEM` 在本 query 只做 identity seed（PNLGRPNAME→Component、MENUNAME→SEG1）；BARNAME／ITEMNAME 永遠不參與路徑。
+> `navigation.identity: MENU_COMPONENT_MARKET` 的環境才在 START WITH 加 `AND UPPER(TRIM(D.PORTAL_URI_SEG3)) = UPPER(:market)`。
+
 **2k-1. Technical Menu seed（只叫 technicalMenuLocation）**
 
 ```sql
@@ -341,12 +409,11 @@ SELECT MENUNAME, BARNAME, ITEMNAME, PNLGRPNAME, MARKET
 FETCH FIRST 200 ROWS ONLY
 ```
 
-> 本段的**唯一合法用途**是餵 2k-2 的識別三元組（menu＋component＋market）。
-> `MARKET` 欄存在與否待 2k-0 驗證；查無該欄就退回 `:market='GBL'` 並記 gaps。
-> PSMENUITEM 的欄位一併由 2k-0 (2) 驗證；(2) 未列出 `MARKET` 才可退回 `:market='GBL'`＋gap——**不得**先查再等 ORA-00904。
+> 本段的**唯一合法用途**是識別 seed（menu＋component；`navigation.identity: MENU_COMPONENT_MARKET` 的環境才加 market）
+> 與報告的 `technicalMenuLocations[]`。`MARKET` 欄只在 identity 含 MARKET 時才查；欄位由 2k-0 (2) 驗證，未列出就不查——**不得**先查再等 ORA-00904。
 > 輸出欄位名一律 `technicalMenuLocations[]`，**永遠不得**輸出成 `menuPath`／選單路徑／導覽入口。
 
-**2k-2. Portal CREF 識別（menu＋component＋market；禁止 SEG2 單欄比對）**
+**2k-2. Portal CREF 識別（診斷用：§2k-C 回 0 列時排查；identity 含 MARKET 時才比 SEG3）**
 
 ```sql
 -- 首選：structured URI 欄位（三欄同時比對，且限定 content reference）
@@ -356,7 +423,7 @@ SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTO
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(TRIM(PORTAL_URI_SEG1)) = UPPER(:menuName)
    AND UPPER(TRIM(PORTAL_URI_SEG2)) = UPPER(:componentName)
-   AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)
+   AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)   -- identity=MENU_COMPONENT_MARKET 時才保留本行
 FETCH FIRST 200 ROWS ONLY;
 -- 次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
@@ -375,11 +442,11 @@ SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTO
 FETCH FIRST 200 ROWS ONLY
 ```
 
-> **硬性禁止**：`LIKE '%' || :componentName || '%'`、只比 `PORTAL_URI_SEG2`、憑欄位位置猜 SEG 語意。
+> **硬性禁止**：`LIKE '%' || :componentName || '%'`、只比 `PORTAL_URI_SEG2` 而不綁 MENUNAME（§2k-C 的 SEG2＋PSMENUITEM EXISTS 是二鍵識別，合法）、憑欄位位置猜 SEG 語意。
 > SEG 只在 **component 型 CREF**（URL 文法 `/c/<MENU>.<COMPONENT>.<MARKET>`）才是 menu／component／market；
 > `q/`（Query）、`s/`（iScript）、`w/`（Worklist）與外部 URL CREF 的 SEG 語意不同——判不出即 `entryType=UNKNOWN`。
 > 次選路徑的每一筆結論標記 `confidence=INFERRED`（來源＝URLTEXT 文法解析），**不得標 CONFIRMED**。
-> 少於三欄命中的匹配只能回 `PARTIAL_IDENTITY_MATCH` 並記 gaps。
+> 命中的鍵數少於 profile `navigation.identity` 要求的鍵數（MENU_COMPONENT＝2、MENU_COMPONENT_MARKET＝3）只能回 `PARTIAL_IDENTITY_MATCH` 並記 gaps。
 > `PORTAL_EXPIRE_DT < SYSDATE` 的 CREF：入口仍列出，但 `visibility` 降為 `UNKNOWN_VISIBILITY` 並記 gap
 > （「valid-from」對應欄位名未證實，**不得**憑記憶寫 `PORTAL_EFFDT`）。
 > 首選／次選／診斷三條都必須帶回 `PORTAL_EXPIRE_DT`；沒取到＝視為未檢查，該筆一律 `visibility=UNKNOWN_VISIBILITY`＋gap。
@@ -387,7 +454,7 @@ FETCH FIRST 200 ROWS ONLY
 > 回傳列先依 `PORTAL_CREF_USGT` 分流（對照見 2k-0）：`TARG`／`LINK` 才進 2k-3；`FRMT`／`HTMT`／`IFRM` 排除、不列入 navigationEntries；
 > `GRPT`／`HPGT`／`HPGC` 不走 2k-3，記 `entryType=FLUID_TILE／UNKNOWN`＋`visibility=UNKNOWN_VISIBILITY`＋gap；對照表以外的值＝環境意外，記 gaps。
 
-**2k-3. 沿 parent 往上組路徑（visited／depth cap／不跨 Portal）**
+**2k-3. 沿 parent 往上組路徑（診斷用；§2k-C 已內含本步：visited／depth cap／不跨 Portal／只走 Folder）**
 
 ```sql
 SELECT LEVEL AS LVL, PORTAL_NAME, PORTAL_REFTYPE, PORTAL_OBJNAME,
@@ -398,6 +465,7 @@ SELECT LEVEL AS LVL, PORTAL_NAME, PORTAL_REFTYPE, PORTAL_OBJNAME,
         AND PORTAL_OBJNAME = :crefObjName
 CONNECT BY NOCYCLE PRIOR PORTAL_PRNTOBJNAME = PORTAL_OBJNAME
         AND PRIOR PORTAL_NAME = PORTAL_NAME
+        AND PORTAL_REFTYPE = 'F'
         AND LEVEL <= 20
  ORDER BY LVL DESC
 FETCH FIRST 200 ROWS ONLY
@@ -408,13 +476,14 @@ FETCH FIRST 200 ROWS ONLY
 > **終止判定**：最後一列 `PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT'`（或其 parent 為空）＝走到根，路徑完整；
 > 撞到 LEVEL 20、或某段 parent 指向不存在的列（鏈提早斷）→ 該入口 `visibility=UNKNOWN_VISIBILITY`、
 > 路徑標 `UNRESOLVED` 並記 gap；**絕不得**用物件名、delivered 慣例或印象補上缺掉的段。
-> 每段另查一次隱藏旗標（欄位不存在＝attribute 列，不是 PSPRSMDEFN 的欄位）：
-> `SELECT PORTAL_OBJNAME, PORTAL_ATTR_VAL FROM PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
-> ——**任一祖先** `= 'Y'` ＝整條分支在左側導覽看不到 → `visibility=UNKNOWN_VISIBILITY`＋gap。
-> 同理，**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → 該入口 `visibility=UNKNOWN_VISIBILITY`＋gap（欄位未取到＝視為未檢查，一樣降級並記 gap）。
+> 祖先一律是 Folder：`CONNECT BY` 必須加 `PORTAL_REFTYPE = 'F'`，否則同名的 Folder 與 CREF 會讓走訪分叉。
+> 隱藏旗標是 attribute 列（不是 PSPRSMDEFN 的欄位），鍵含 `PORTAL_REFTYPE`，值欄 `PORTAL_ATTR_VAL` 是 **CLOB**（直接比對＝ORA-00932）：
+> `SELECT PORTAL_OBJNAME FROM PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
+> ——target CREF 或**任一祖先**命中 ＝ 整條路徑在 Classic 選單看不到 → **不列為入口**（§2k-C 的 `PATH_HIDDEN`），gaps 記一行。
+> 同理，target 或**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → 不列為入口（§2k-C 的 `PATH_EXPIRED`），gaps 記一行。
 > 平台可攜性：非 Oracle 環境改用遞迴 CTE＋顯式 depth 計數＋visited 反連接，行為必須完全一致（待驗）。
 
-**2k-4. 語系 label（base＋override＋fallback，逐段記來源）**
+**2k-4. 語系 label（§2k-C 已內含：`:languageCd`＝profile `navigation.labelLanguage`；本段為逐段來源說明）**
 
 ```sql
 SELECT D.PORTAL_OBJNAME,
@@ -441,7 +510,7 @@ FETCH FIRST 200 ROWS ONLY
 > `fallbackLanguageCode`＝實際回退到的語系：LANG 命中＝`NOT_APPLICABLE`（未回退）；回退到 base＝2k-0 (2b) 查到的 base language；
 > (2b) 未驗到＝`UNRESOLVED`＋gap，**不得**預設寫 ENG。
 
-**2k-5. CREF Link 與其他入口 surface（複數入口；未支援者一律回 gap）**
+**2k-5. CREF Link 與其他入口 surface（複數入口；`navigation.surfaces: CLASSIC_ONLY` 時其他 surface 為 NOT_APPLICABLE）**
 
 ```sql
 -- (1) LINK 的指向機制**未證實**，先探測：LINK 列是否也帶 URI 三段？
@@ -464,14 +533,14 @@ FETCH FIRST 50 ROWS ONLY
 > 複數入口來自**多個 CREF 列**（1 個 TARG ＋ N 個 LINK），因此模型是「N 個錨點 × 各走一次 2k-3」，
 > **不是**「一個錨點走出多條路徑」。每個 location 分開回傳、各自帶自己的 labels 與 visibility；
 > 壓成單一路徑＝`SINGLE_PATH_COLLAPSE`。
-> 探測 (1) 若 LINK 列帶 URI 三段 ⇒ 2k-2 的識別查詢已同時撈到 TARG 與 LINK，無需第二跳；
+> §2k-C 的 seed 已含 `LINK`：探測 (1) 若 LINK 列帶 URI 段 ⇒ canonical 已同時撈到 TARG 與 LINK，無需第二跳；
 > 若不帶 ⇒ 需要一次「LINK → 目標 CREF」解析跳，該跳同樣要 visited set ＋ depth cap（link→link→link 不得成環），
 > **在探測回填前，多入口宣稱一律附 gap「alternate entries not fully resolved」**。
 > 破損 link（指向不存在的 CREF）＝該筆 `UNRESOLVED`＋gap，不猜目標。
-> **Fluid Tile／NavBar／Navigation Collection 本版一律不解析**：
-> (2) 有命中＝`entryType=FLUID_TILE／UNKNOWN`＋`visibility=UNKNOWN_VISIBILITY`＋gap；
-> **(2) 零命中也必須回 gap**「alternate navigation surfaces not fully inspected」
-> ——沒有 Fluid CREF 列不證明沒有 Fluid 入口，**永遠不得宣稱「唯一入口」**。
+> **Fluid Tile／NavBar／Navigation Collection**：`navigation.surfaces: CLASSIC_ONLY` → 一律 `NOT_APPLICABLE`，不跑 (2)、不記 gap，
+> 入口數以 §2k-C 的可見列為準。`CLASSIC_AND_FLUID` 才適用以下：本版不解析，(2) 有命中＝`entryType=FLUID_TILE／UNKNOWN`
+> ＋`visibility=UNKNOWN_VISIBILITY`＋gap；(2) 零命中也必須回 gap「alternate navigation surfaces not fully inspected」，
+> 不得宣稱「唯一入口」。
 > `PSPRSMNAVINFO`（若 2k-0 驗到存在）只能當**交叉檢查**：它由 App Engine 於索引建置時物化（會過期、可能為空）、
 > 只涵蓋 TARG、且 `PORTAL_NAVPATH` 是預先組好的 CLOB（無法逐段做語系 fallback）——
 > 與 2k-3 走出的路徑不一致時**記 gap，不得選邊**。

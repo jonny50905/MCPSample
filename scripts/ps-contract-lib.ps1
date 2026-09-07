@@ -110,6 +110,18 @@ function Read-CtJsonFile {
     try { return ((Read-CtText -LiteralPath $LiteralPath) | ConvertFrom-Json -ErrorAction Stop) } catch { return $null }
 }
 
+# customization-profile.yaml 的 navigation.surfaces（regex 讀）；空＝CLASSIC_AND_FLUID（保守：其他 surface 視為未盤查）
+$script:CtNavSurfaces = ''
+function Get-CtNavSurfaces {
+    param([string]$ProfilePath)
+    if (-not (Test-Path -LiteralPath $ProfilePath)) { return '' }
+    $t = Read-CtText -LiteralPath $ProfilePath
+    if ($t -match '(?m)^\s*surfaces:\s*([A-Z_]+)') { return $Matches[1] }
+    return ''
+}
+function Set-CtNavSurfaces { param([string]$Value) $script:CtNavSurfaces = $Value }
+function Resolve-CtNavSurfaces { param([string]$Value) if ($Value -ne '') { return $Value }; if ($script:CtNavSurfaces -ne '') { return $script:CtNavSurfaces }; return 'CLASSIC_AND_FLUID' }
+
 # customization-profile.yaml 的 oracle.currentSchema（regex 讀，不需 YAML 解析器）；FILL_ME／空＝未知
 function Get-CtCurrentSchema {
     param([string]$ProfilePath)
@@ -473,7 +485,7 @@ function Read-CtFragment {
             if ($r.NotApplicable) { continue }
             if ($r.Cells[4] -eq 'AUTHORIZED_FOR_CONTEXT') { $res.Invalid += "「## 導覽」第 $($r.Row) 列可見性 AUTHORIZED_FOR_CONTEXT 不得由模型填（無 user／security context，只能 REGISTRY_DEFINED／UNKNOWN_VISIBILITY）" }
             # Portal 入口列必須帶可見性主張：NOT_APPLICABLE＝沒有主張，不變量與 debt 都會放行（審查發現）
-            if (@('PORTAL_REGISTRY', 'CREF_LINK') -contains $r.Cells[3] -and -not (@('REGISTRY_DEFINED', 'UNKNOWN_VISIBILITY', 'UNRESOLVED') -contains $r.Cells[4])) { $res.Invalid += "「## 導覽」第 $($r.Row) 列入口型 $($r.Cells[3]) 的可見性只能 REGISTRY_DEFINED／UNKNOWN_VISIBILITY／UNRESOLVED（NOT_APPLICABLE＝沒有主張）" }
+            if (@('PORTAL_REGISTRY', 'CREF_LINK') -contains $r.Cells[3] -and -not (@('CLASSIC_NAV_VISIBLE', 'REGISTRY_DEFINED', 'UNKNOWN_VISIBILITY', 'UNRESOLVED') -contains $r.Cells[4])) { $res.Invalid += "「## 導覽」第 $($r.Row) 列入口型 $($r.Cells[3]) 的可見性只能 CLASSIC_NAV_VISIBLE／REGISTRY_DEFINED／UNKNOWN_VISIBILITY／UNRESOLVED（NOT_APPLICABLE＝沒有主張）" }
             # 來源／目標須為自然鍵（Portal 名／CREF 物件名／Component／Page）：Get-CtId 會把非 [A-Z0-9_#$] 消毒成 _，
             # 中文標籤或含符號字串會讓不同四元組撞成同一 ID 再靠列序派 .2（審查發現：不變量比原文、ID 比消毒後）
             foreach ($ci in @(0, 1)) { $nv = $r.Cells[$ci]; if ($nv -ne 'NOT_APPLICABLE' -and $nv -ne 'UNRESOLVED' -and -not (Test-CtNaturalKey -Value $nv)) { $res.Invalid += "「## 導覽」第 $($r.Row) 列第 $($ci + 1) 欄「$nv」須為大寫英數底線（Portal 名／CREF 物件名／Component／Page），不是標籤路徑" } }
@@ -1097,7 +1109,8 @@ function ConvertTo-CtEvidenceText {
 }
 
 function ConvertTo-CtSpec {
-    param($Contract, $Screen)
+    param($Contract, $Screen, [string]$NavSurfaces = '')
+    $navSurf = Resolve-CtNavSurfaces -Value $NavSurfaces
     $o = New-Object System.Collections.Generic.List[string]
     $ents = @{}
     foreach ($e in $Contract.dataEntities) { $ents[$e.record] = $e }
@@ -1115,7 +1128,8 @@ function ConvertTo-CtSpec {
     $o.Add("| Component | $($Screen.component) |")
     $o.Add("| Technical Menu（非導覽路徑） | $(if (@($Screen.technicalMenu).Count) { @($Screen.technicalMenu) -join '；' } else { 'UNRESOLVED' }) |")
     $o.Add("| Portal Registry 入口 | $(@($Screen.navigation | Where-Object { $_.entryType -eq 'PORTAL_REGISTRY' -or $_.entryType -eq 'CREF_LINK' }).Count) 筆（見 ## Navigation） |")
-    $o.Add("| 其他導覽 surface | NAV_COLLECTION／FLUID_TILE／NAVBAR 本版未盤查——不得據本表宣稱唯一入口（issue #24 Case 6） |")
+    if ($navSurf -eq 'CLASSIC_ONLY') { $o.Add("| 其他導覽 surface | NOT_APPLICABLE（profile navigation.surfaces=CLASSIC_ONLY：無 Fluid／Tile／NavBar／Navigation Collection） |") }
+    else { $o.Add("| 其他導覽 surface | NAV_COLLECTION／FLUID_TILE／NAVBAR 本版未盤查——不得據本表宣稱唯一入口 |") }
     $o.Add("| Search Record | $($Screen.searchRecord) |")
     $o.Add("| 模式 | $(if ($Screen.modes.Count) { $Screen.modes -join '；' } else { 'UNRESOLVED' }) |")
     $o.Add("| Origin | $($Screen.origin) |")
@@ -1270,7 +1284,8 @@ function New-CtGateResult {
 }
 
 function Test-CtGates {
-    param($Contract, $NnFactsMap, $Ledger, $Fragments, $Vocab, [string]$SpecDir, [string]$ApprovalsPath)
+    param($Contract, $NnFactsMap, $Ledger, $Fragments, $Vocab, [string]$SpecDir, [string]$ApprovalsPath, [string]$NavSurfaces = '')
+    $navSurf = Resolve-CtNavSurfaces -Value $NavSurfaces
     $g = @()
     $debts = @()
     $ents = @{}
@@ -1419,7 +1434,7 @@ function Test-CtGates {
     # 導覽可見性（issue #24）：未確認的入口出 debt，不另立 gate（新 gate 會動 tier 判定與 test 斷言）
     foreach ($s in $Contract.screens) { foreach ($n in @($s.navigation)) { if ($n.visibility -eq 'UNKNOWN_VISIBILITY' -or $n.visibility -eq 'UNRESOLVED') { $debts += "NAV｜$($n.id)｜visibility｜$($n.visibility)" } } }
     # 其他 surface（Case 6）：有 Portal 入口列就固定出一條 NOT_INSPECTED debt（不擋 tier 2，只讓「入口清單已窮舉」的錯覺不成立）
-    foreach ($s in $Contract.screens) { if (@($s.navigation | Where-Object { $_.entryType -eq 'PORTAL_REGISTRY' -or $_.entryType -eq 'CREF_LINK' }).Count -gt 0) { $debts += "NAV｜$($s.id)｜alternateSurfaces｜NOT_INSPECTED" } }
+    if ($navSurf -ne 'CLASSIC_ONLY') { foreach ($s in $Contract.screens) { if (@($s.navigation | Where-Object { $_.entryType -eq 'PORTAL_REGISTRY' -or $_.entryType -eq 'CREF_LINK' }).Count -gt 0) { $debts += "NAV｜$($s.id)｜alternateSurfaces｜NOT_INSPECTED" } } }
     foreach ($e in $Contract.dataEntities) { $all += @($e.fields) + @($e.readSemantics) + @($e.writeSemantics) }
     foreach ($c in $all) { $den++; $st = [string]$c.verification.staticEvidence; if ($st -eq 'PASS' -or $st -eq 'NOT_APPLICABLE') { $num++ } elseif ($st -eq 'FAIL') { $bad += $c.id } else { $debts += "G15｜$($c.id)｜staticEvidence｜UNRESOLVED" } }
     foreach ($u in $Contract.unresolvedReferences) { $bad += $u }

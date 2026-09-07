@@ -68,10 +68,10 @@ and which flow skill should be run to fill the gap.
 Navigation:
 - PSMENUITEM MENUNAME/BARNAME/ITEMNAME is technical menu metadata, never a
   user-visible navigation path; report it separately from Portal Registry entries.
-- Without user/security context write 「Portal Registry 登錄入口：…（可見性 REGISTRY_DEFINED）」,
-  never 「使用者可以從…」「某角色會看到…」.
-- Present every entry found; if alternate surfaces were not inspected, say so
-  instead of implying a single entry point.
+- Without user/security context write 「Classic 選單入口：…（可見性 CLASSIC_NAV_VISIBLE）」 or
+  「Portal Registry 登錄入口：…（可見性 REGISTRY_DEFINED）」, never 「使用者可以從…」「某角色會看到…」.
+- Present every entry found; if the profile is not CLASSIC_ONLY and alternate surfaces
+  were not inspected, say so instead of implying a single entry point.
 ```
 
 ## 輸出建議結構

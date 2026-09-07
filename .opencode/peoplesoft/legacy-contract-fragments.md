@@ -26,7 +26,8 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
    （Portal 名／CREF 物件名／Component／Page），不是標籤路徑；Portal Registry 入口的來源寫 CREF 物件名
    （NN「### 導覽入口」表的「CREF 物件名」欄；NN 未記時委派 @ps-ui-flow 取得）。
    Portal Registry／CREF Link 入口的「型」一律 `MENU_ENTRY`、「入口型」寫 `PORTAL_REGISTRY`／`CREF_LINK`，
-   可見性只准 `REGISTRY_DEFINED`／`UNKNOWN_VISIBILITY`／`UNRESOLVED`；`TRANSFER` 類的入口型與可見性寫 `NOT_APPLICABLE`。
+   可見性只准 `CLASSIC_NAV_VISIBLE`（cookbook §2k-C 回 `CLASSIC_VISIBLE = 1`）／`REGISTRY_DEFINED`／`UNKNOWN_VISIBILITY`／`UNRESOLVED`；
+   `TRANSFER` 類的入口型與可見性寫 `NOT_APPLICABLE`；canonical 回 `CLASSIC_VISIBLE = 0` 的 CREF 不寫進本表。
    `AUTHORIZED_FOR_CONTEXT` 不得填。`technicalMenu`（畫面 kv）是 PSMENUITEM 的 MENUNAME/BARNAME/ITEMNAME
    以 `/` 串成一筆，不是導覽路徑，不得含 `>`、不得與本表混用。
 6. 一檔 ≤150 行。**容量由 manifest 決定**：控制項表只寫 manifest 列給本檔的那一頁欄位（不多不少）；

@@ -69,6 +69,7 @@ foreach ($f in (Get-CtNnFiles -DomainDir $dir)) { $nnFacts[$f.Name] = Get-CtNnFa
 $schema = $CurrentSchema
 if ($schema -eq "") { $schema = Get-CtCurrentSchema -ProfilePath $profilePath }
 $schemaKnown = ($schema -ne "")
+Set-CtNavSurfaces (Get-CtNavSurfaces -ProfilePath $profilePath)
 Write-Host "=== ps-contract：領域=$Domain NN=$($nnFacts.Count) 檔 vocabulary v$($vocab.Version) schema v$script:ContractSchemaVersion currentSchema=$(if ($schemaKnown) { '已設' } else { '未回填（verify 收據不採信）' }) ===" -ForegroundColor Cyan
 $exitCode = 0
 $ledger = Get-CtLedger -LiteralPath $ledgerPath

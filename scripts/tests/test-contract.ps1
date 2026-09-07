@@ -286,7 +286,7 @@ $vocab = Get-CtVocabulary -LiteralPath $vocabPath
 Reset-Fixture
 
 Write-Host "情境 K1：值域檔解析——值域、黑名單、UNRESOLVED 出口、無 PARTIAL"
-Assert ($vocab.Version -eq 2) "vocabularyVersion=2"
+Assert ($vocab.Version -eq 3) "vocabularyVersion=3"
 Assert ($vocab.Enums.Count -ge 32) "值域數 ≥32（實際 $($vocab.Enums.Count)）"
 Assert ($vocab.Blacklist -contains 'probablyDirectWritable') "黑名單含 probablyDirectWritable"
 Assert (Test-CtEnum -Vocab $vocab -EnumName 'storageKind' -Value 'DERIVED_WORK') "storageKind 含 DERIVED_WORK"
@@ -389,6 +389,11 @@ Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Obje
 $navNa = $screenText -replace '\| HC_TW_MIL_LINK \| TW_MIL001 \| MENU_ENTRY \| CREF_LINK \| REGISTRY_DEFINED \| UNRESOLVED \|', '| HC_TW_MIL_LINK | TW_MIL001 | MENU_ENTRY | CREF_LINK | NOT_APPLICABLE | UNRESOLVED |'
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navNa
 Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*可見性只能*' }).Count -gt 0) "Portal 入口列可見性 NOT_APPLICABLE → INVALID（沒有主張）"
+$navCv = $screenText -replace '\| PORTAL_REGISTRY \| REGISTRY_DEFINED \|', '| PORTAL_REGISTRY | CLASSIC_NAV_VISIBLE |'
+$null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navCv
+Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid).Count -eq 0) "Portal 入口列可見性 CLASSIC_NAV_VISIBLE → 通過（vocabulary 3）"
+$specF = ConvertTo-CtSpec -Contract $c1 -Screen $c1.screens[0] -NavSurfaces 'CLASSIC_AND_FLUID'
+Assert ($specF -match '其他導覽 surface \| NAV_COLLECTION／FLUID_TILE／NAVBAR 本版未盤查') "surfaces=CLASSIC_AND_FLUID：spec 印未盤查列"
 $navZh = $screenText -replace 'HC_TW_MIL_LINK', '招募入口'
 $null = Write-Fixture 'contract-parts/screen-TW_MIL001.md' $navZh
 Assert (@((Read-Frag 'screen-TW_MIL001.md' 'screen' $facts).Invalid | Where-Object { $_ -like '*大寫英數底線*' }).Count -gt 0) "來源欄寫中文標籤 → INVALID（ID 消毒後不撞名）"
@@ -488,14 +493,14 @@ Assert ($out -match 'ACCEPT_SUMMARY：DONE=2 INVALID=0 BLOCKED=0') "Accept：2 D
 Assert ($out -match 'GATE：G1=PASS' -and $out -match 'GATE：G2=PASS' -and $out -match 'GATE：G7=PASS' -and $out -match 'GATE：G12=PASS' -and $out -match 'GATE：G17=PASS' -and $out -match 'GATE：G18=PASS') "結構類 gate 全 PASS"
 Assert ($out -match 'GATE：G14=UNRESOLVED' -and $out -match 'GATE：G16=UNRESOLVED' -and $out -match 'DEBT：G16｜RQ\.TW_MILITARY\.1｜oracleRead｜NOT_RUN') "G14／G16 首版 UNRESOLVED＋RQ oracleRead debt"
 Assert ($out -match 'GATE_SUMMARY：tier1=True tier2=False') "tier1 通過、tier2 因 UNRESOLVED 未過"
-Assert ($out -match 'DEBT：NAV｜SCR\.TW_MIL001｜alternateSurfaces｜NOT_INSPECTED') "有 Portal 入口列 → 固定出 alternateSurfaces NOT_INSPECTED debt（#24 Case 6）"
+Assert ($out -notmatch 'alternateSurfaces') "profile surfaces=CLASSIC_ONLY：不出 alternateSurfaces debt"
 $out = & $cliPath -Domain $fixtureDomain -Gate -Tier 2 *>&1 | Out-String
 Assert ($LASTEXITCODE -eq 1) "-Gate -Tier 2：exit 1"
 $out = & $cliPath -Domain $fixtureDomain -Gate *>&1 | Out-String
 Assert ($LASTEXITCODE -eq 0 -and $out -match 'GATE：G18=PASS') "獨立重跑 -Gate：render parity PASS（磁碟 JSON 為單一真相）"
 $specPath = Join-Path $fixtureDir 'contract/spec/TW_MIL001.spec.md'
 $spec = Read-CtText -LiteralPath $specPath
-Assert ($spec -match '其他導覽 surface \| NAV_COLLECTION／FLUID_TILE／NAVBAR 本版未盤查') "spec：其他導覽 surface 未盤查列（#24 Case 6）"
+Assert ($spec -match '其他導覽 surface \| NOT_APPLICABLE（profile navigation.surfaces=CLASSIC_ONLY') "spec：surfaces=CLASSIC_ONLY → 其他導覽 surface NOT_APPLICABLE"
 $missing = @()
 foreach ($h in @('## 功能與入口', '## 畫面結構', '## 欄位與控制項', '## 狀態與條件', '## 欄位互動', '## 驗證與訊息', '## Navigation', '## Business Operations', '## Data Source of Truth', '## Logical / Physical Data Mapping', '## Key / Effective-Date Semantics', '## Read Semantics / Reference Query', '## Write Semantics / Persistence Effects', '## Data Access Strategy', '## 權限差異', '## Runtime / DB Verification Status', '## 未解事項', '## Traceability / Evidence')) { if ($spec -notmatch [regex]::Escape($h)) { $missing += $h } }
 Assert ($missing.Count -eq 0 -and $spec -notmatch '\[\[') "spec 18 章節齊且不含 [[ ]]"

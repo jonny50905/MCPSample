@@ -24,14 +24,17 @@
 
 | # | Portal | 入口型 | CREF 物件名 | 導覽入口（Portal Registry 登錄路徑） | 可見性 | 語系／來源 | 證據 |
 |---|---|---|---|---|---|---|---|
-| 1 | <PORTAL_NAME> | PORTAL_REGISTRY | <PORTAL_OBJNAME> | <段1> > <段2> > <段3> | REGISTRY_DEFINED | <語系>／<LANG｜BASE> | <E01.n> |
+| 1 | <PORTAL_NAME> | PORTAL_REGISTRY | <PORTAL_OBJNAME> | <段1> > <段2> > <段3> | <CLASSIC_NAV_VISIBLE｜REGISTRY_DEFINED｜UNKNOWN_VISIBILITY> | <語系>／<LANG｜BASE> | <E01.n> |
 
 <!-- 入口型：PORTAL_REGISTRY / CREF_LINK / NAV_COLLECTION / FLUID_TILE / NAVBAR / UNKNOWN
-     可見性：REGISTRY_DEFINED（Registry 登錄，未經 user／security context 驗證）
+     可見性：CLASSIC_NAV_VISIBLE（cookbook §2k-C canonical 回 CLASSIC_VISIBLE=1：Classic 選單會顯示，未經 user 授權驗證）
+             REGISTRY_DEFINED（只有 registry 證據，未跑 canonical）
              UNKNOWN_VISIBILITY（祖先 hidden-from-nav／CREF 過期／走訪未達根／未解析 surface）
              AUTHORIZED_FOR_CONTEXT 本版不得產出，正文也不得出現這個字串。
-     CREF 物件名＝§2k-2 的 PORTAL_OBJNAME，查不到寫 UNRESOLVED。多入口就寫多列，不得壓成一列。
-     Navigation Collection／Fluid Tile／NavBar 即使查無也要在「未解事項」記一行 gap，不得宣稱「唯一入口」。
+     CREF 物件名＝canonical 的 CREF_OBJECT，查不到寫 UNRESOLVED。多入口就寫多列，不得壓成一列。
+     canonical 回 CLASSIC_VISIBLE=0 的列不列入本表，改在「未解事項」記一行原因（hidden／過期／未達根）。
+     profile navigation.surfaces 非 CLASSIC_ONLY 時，Navigation Collection／Fluid Tile／NavBar 即使查無也要在
+     「未解事項」記一行 gap、不得宣稱「唯一入口」；CLASSIC_ONLY 不需。
      值域見 mcp-tool-contracts.md §3。 -->
 
 ### Technical Menu

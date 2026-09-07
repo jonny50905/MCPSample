@@ -112,18 +112,18 @@ docs/ps-research/<領域>/
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
    **「## 功能定位」的兩個 `###` 子段**：
-   · `### 導覽入口`＝委派 @ps-ui-flow 照 cookbook §2k 取 Portal Registry 入口
-     （oracleMCP 類，**計入同時 ≤ 3，上限不變**），每個入口一列、標可見性
-     `REGISTRY_DEFINED`（無 user／security context 時只准這個）或 `UNKNOWN_VISIBILITY`。
+   · `### 導覽入口`＝委派 @ps-ui-flow 跑 cookbook §2k-C canonical（oracleMCP 類，**計入同時 ≤ 3**），
+     每個 `CLASSIC_VISIBLE = 1` 的列一列、可見性 `CLASSIC_NAV_VISIBLE`；只有 registry 證據時才 `REGISTRY_DEFINED`；
+     `CLASSIC_VISIBLE = 0` 的列不列入表，在「## 未解事項」記一行原因（hidden／過期／未達根）。
    · 未查證／查無／§2k-0 欄位驗證未過 → 該段**整段**寫
      「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」，
      並在「## 未解事項」記一行查法收據（用什麼查、哪一步斷、結論）。
-   · 表的「CREF 物件名」欄＝§2k-2 回傳的 `PORTAL_OBJNAME`；查不到寫 UNRESOLVED，不得省略該欄。
+   · 表的「CREF 物件名」欄＝canonical 的 `CREF_OBJECT`；查不到寫 UNRESOLVED，不得省略該欄。
      正文不得出現 `AUTHORIZED_FOR_CONTEXT` 字串。
    · `### Technical Menu`＝PSMENUITEM 的 MENUNAME / BARNAME / ITEMNAME，以 `/` 分隔。
      **絕不可**把它當導覽入口的 fallback、也不可用 `>` 串接。
-   · 只要 `### 導覽入口` 有內容，「## 未解事項」就必須有一行
-     「Navigation Collection／Fluid Tile／NavBar 未盤查——不宣稱唯一入口」。
+   · profile `navigation.surfaces` 非 CLASSIC_ONLY 時，只要 `### 導覽入口` 有內容，「## 未解事項」就必須有一行
+     「Navigation Collection／Fluid Tile／NavBar 未盤查——不宣稱唯一入口」；CLASSIC_ONLY 不需。
    有 businessRelevant 條件 UI → 檔內加「條件 UI」小節：每筆一列
    「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→
    業務含意」；幾何包含標 INFERRED（此小節不屬必要章節）。
@@ -183,7 +183,7 @@ docs/ps-research/<領域>/
   查得到 → 填「### 導覽入口」表、原路徑字串移到「### Technical Menu」段並改以 `/` 分隔；
   查不到 → 「### 導覽入口」寫「未確認（navigation metadata 尚未查證）」＋未解事項記查法收據。
   **禁止**只換分隔符、禁止刪掉 BARNAME 那段充數、禁止做 BARNAME 黑名單。
-- FAIL(SINGLE_PATH_COLLAPSE)：稽核已附查到的 CREF 清單——
+- FAIL(SINGLE_PATH_COLLAPSE)：稽核已附 canonical 查到的可見列清單（CREF_OBJECT＋MENU_PATH）——
   依該清單把每個 location 各補一列（各自 labels 與可見性），並移除任何「唯一入口」措辭。
   清單解析不到就記收據跳過，不得憑印象補列。
 - FAIL(USER_VISIBILITY_OVERCLAIM)：**純改寫，不必重查**——

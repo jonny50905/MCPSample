@@ -1,6 +1,6 @@
 # Legacy Contract 封閉值域（單一真相）
 
-vocabularyVersion: 2
+vocabularyVersion: 3
 
 本檔是 Legacy Contract 所有封閉值域的**唯一**定義：
 `scripts/ps-contract-lib.ps1` 機械解析本檔（`## 值域名` 標題＋其下表格的第一欄＝合法值），
@@ -167,6 +167,7 @@ vocabularyVersion: 2
 | 值 | 說明 |
 |---|---|
 | REGISTRY_DEFINED | Registry 中登錄的入口；未經 user／security context 驗證 |
+| CLASSIC_NAV_VISIBLE | Classic 選單會顯示：target CREF 與全部祖先皆無 hide-from-nav、未過期、走到 root（cookbook §2k-C `CLASSIC_VISIBLE = 1`）；未經 user／role 授權驗證 |
 | AUTHORIZED_FOR_CONTEXT | 已對特定 user／role context 驗證（**本版不得由模型填**） |
 | UNKNOWN_VISIBILITY | 祖先 hidden-from-nav／CREF 過期／走訪未達根／surface 未解析 |
 | UNRESOLVED | 查不到 |

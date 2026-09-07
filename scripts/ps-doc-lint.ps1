@@ -26,6 +26,8 @@ param(
     # 沒有 append、重寫大檔會撐爆**——那是工具層限制，不是語意禁令；
     # PowerShell 沒有這個限制，所以這件事只有這裡做得到。
     [switch]$FixArchive,
+    # 導覽 surface profile 覆寫（測試用；空＝讀 customization-profile.yaml 的 navigation.surfaces）
+    [string]$NavigationSurfaces = '',
     # 唯讀診斷（issue #22／L106）：印每個 NN 檔的 Evidence 資料列數與分布
     # ——容量校準用（auditor 單檔委派的 context 隨列數成長），不影響判定與 exit
     [switch]$EvidenceStats
@@ -161,6 +163,16 @@ if ((Split-Path $PSScriptRoot -Leaf) -ne 'scripts') {
     Write-Host "WARN：本腳本不在 <repo>\scripts\ 底下（目前位置：$PSScriptRoot）——repo 根反推為 $root，可能指向錯誤的樹" -ForegroundColor Yellow
 }
 $researchRoot = Join-Path $root (Join-Path "docs" "ps-research")
+# 導覽 surface profile：CLASSIC_ONLY＝Fluid／NavBar／Nav Collection 為 NOT_APPLICABLE，[導覽] 不再要求 surface gap 行
+$navSurfaces = $NavigationSurfaces
+if ($navSurfaces -eq '') {
+    $navProfPath = Join-Path $root (Join-Path '.opencode' (Join-Path 'peoplesoft' 'customization-profile.yaml'))
+    if (Test-Path -LiteralPath $navProfPath) {
+        $navProfText = [System.IO.File]::ReadAllText($navProfPath)
+        if ($navProfText -match '(?m)^\s*surfaces:\s*([A-Z_]+)') { $navSurfaces = $Matches[1] }
+    }
+    if ($navSurfaces -eq '') { $navSurfaces = 'CLASSIC_AND_FLUID' }
+}
 if (-not (Test-Path -LiteralPath $researchRoot)) {
     Write-Error "找不到 $researchRoot——腳本應放在 <repo>\scripts\ 底下（目前位置：$PSScriptRoot）"
     exit 2
@@ -593,7 +605,8 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             # Portal 證據＝可重跑的 PSPRSMDEFN SELECT，或以合法出口申報的待人工SQL（L43／L53）
             $navPortalEv = ($text -match '(?is)\bSELECT\b[\s\S]{0,400}?\bFROM\b[\s\S]{0,200}?\bPSPRSMDEFN') -or
                            ($text -match '(?m)^.*\bPSPRSMDEFN.*待人工SQL.*$') -or
-                           ($text -match '(?m)^.*待人工SQL.*\bPSPRSMDEFN.*$')   # 反序寫法「待人工SQL（PSPRSMDEFN…）」同樣是合法出口
+                           ($text -match '(?m)^.*待人工SQL.*\bPSPRSMDEFN.*$') -or   # 反序寫法「待人工SQL（PSPRSMDEFN…）」同樣是合法出口
+                           ($text -match '(?i)\bFROM\s+PSPRSMDEFN\b')            # canonical query（CTE 內 SELECT 與 FROM 相距 >200 字，距離式抓不到）
             $navKinds = @()
             if ($navClaim.Success -and -not $navPortalEv -and -not $navIsFlow) {
                 $violations += "${name}：功能定位宣稱導覽路徑「$($navClaim.Value.Trim())」但全檔無 Portal Registry 證據——technical menu 當導覽路徑（PSMENUITEM 只是 technicalMenuLocation；導覽入口走 cookbook §2k）"
@@ -621,9 +634,12 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $gpM = [regex]::Match($text, (Get-SectionAnchor '## 未解事項'))
             if ($gpM.Success) { $gpAfter = $text.Substring($gpM.Index + '## 未解事項'.Length); $gpNext = $gpAfter.IndexOf("`n## "); $gapBody = if ($gpNext -ge 0) { $gpAfter.Substring(0, $gpNext) } else { $gpAfter } }
             $upM = [regex]::Match($fdClean, '(唯一(?:的)?(?:入口|路徑)|只能(?:從|由)[^。\r\n]{0,20}(?:進入|點進|進到)|僅此一條(?:路徑|入口))')
-            if ($upM.Success -or ($navRows -ge 1 -and $gapBody -notmatch '(?i)(Navigation Collection|Nav Collection|Fluid|NavBar)')) {
+            # surfaces=CLASSIC_ONLY：其他 surface 是 NOT_APPLICABLE，不要求 gap 行，只抓「唯一入口」措辭（入口數以 canonical 可見列為準）
+            $navGapNeeded = ($navSurfaces -ne 'CLASSIC_ONLY')
+            if ($upM.Success -or ($navGapNeeded -and $navRows -ge 1 -and $gapBody -notmatch '(?i)(Navigation Collection|Nav Collection|Fluid|NavBar)')) {
                 $why = if ($upM.Success) { "宣稱唯一入口「$($upM.Value)」" } else { "### 導覽入口 有 $navRows 列但未解事項無「Navigation Collection／Fluid Tile／NavBar 未盤查」" }
-                $violations += "${name}：功能定位 ${why}——其他導覽 surface 本版未盤查，不得宣稱唯一入口（未盤查即宣稱唯一入口）"
+                if ($navGapNeeded) { $violations += "${name}：功能定位 ${why}——其他導覽 surface 本版未盤查，不得宣稱唯一入口（未盤查即宣稱唯一入口）" }
+                else { $violations += "${name}：功能定位 ${why}——入口數以 cookbook §2k-C canonical 的可見列為準，不得自行宣稱唯一入口" }
                 $navKinds += 'SINGLE_PATH_COLLAPSE'
             }
             if ($navKinds.Count -gt 0) {
@@ -1175,7 +1191,8 @@ $polishPatterns = @(
     'status 值非法',
     'technical menu 當導覽路徑',
     '可見性過度宣稱',
-    '未盤查即宣稱唯一入口'
+    '未盤查即宣稱唯一入口',
+    '宣稱唯一入口'
 )
 function Test-IsPolishViolation {
     param([string]$Msg)
@@ -1345,11 +1362,12 @@ if ($orderTotal -gt 0) {
         Write-Host "     user／security context。修法＝改寫成「Portal Registry 登錄入口：…"
         Write-Host "     （可見性 REGISTRY_DEFINED）」；本版**不得**產出 AUTHORIZED_FOR_CONTEXT。"
         Write-Host "     寫了 AUTHORIZED_FOR_CONTEXT 這個字串本身就是違規——不得用它加註或自證。"
-        Write-Host "  2a) SINGLE_PATH_COLLAPSE：宣稱「唯一入口」、或「### 導覽入口」有列但未解事項沒有"
-        Write-Host "     「Navigation Collection／Fluid Tile／NavBar 未盤查」。修法＝補該 gap 行、刪「唯一」措辭；"
-        Write-Host "     **不得**刪入口列充數（壓成一列＝誤報）。"
-        Write-Host "  3) 兩型都要在該檔未解事項補一行：未實作的 Navigation Collection／Fluid Tile／"
-        Write-Host "     NavBar 未盤查，**不得宣稱唯一入口**（issue #24 Case 6）。"
+        Write-Host "  2a) SINGLE_PATH_COLLAPSE：宣稱「唯一入口」（入口數以 cookbook §2k-C canonical 的可見列為準；"
+        Write-Host "     profile navigation.surfaces 非 CLASSIC_ONLY 時另要求「### 導覽入口」有列就在未解事項補"
+        Write-Host "     「Navigation Collection／Fluid Tile／NavBar 未盤查」）。修法＝照 canonical 可見列補列、刪「唯一」措辭；"
+        Write-Host "     **不得**刪入口列充數（壓成一列＝誤報）。目前 surfaces=$navSurfaces。"
+        Write-Host "  3) surfaces 非 CLASSIC_ONLY 時，兩型都要在該檔未解事項補一行：未實作的 Navigation Collection／"
+        Write-Host "     Fluid Tile／NavBar 未盤查，**不得宣稱唯一入口**。"
         Write-Host "  4) 本文其他章節一字不動。"
     }
     if ($rawAppendix.Count -gt 0) {

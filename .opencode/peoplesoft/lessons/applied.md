@@ -3056,3 +3056,25 @@
   AGENTS.md 鐵律加一條並把「只加不刪」釐清為「規則語意只加不刪，錯句直接改對」。
 - 套用：本 commit 清掉 16 個模型檔裡的出處／變更敘述（含前任留下的 issue #12／#13／#22 標籤、
   cookbook 連線生命週期的實驗日期），fragments 5a 錯句改對（功能分支）；L 編號既有 60 餘處未動，另案決定。
+
+### L113 Classic 導覽是環境事實，不是每題的研究——canonical query＋profile 化（issue #27，2026-09-07）
+
+- 症狀：管理者在公司機實測：(1) 同一 Component 查出兩條 Portal Registry 路徑，其中一條被
+  Hide from portal navigation 勾掉，Classic 選單不顯示——PSPRSMDEFN 存在 ≠ 選單顯示；(2) 隱藏旗標在
+  target CREF 與祖先 Folder 都會出現，只查最底層會漏；(3) PSPRSMSYSATTRVL.PORTAL_ATTR_VAL 是 CLOB，
+  cookbook §2k-3 的直接比對會 ORA-00932，值也不是 'Y' 而是 'True'；(4) 環境只用 Classic、不用 MARKET，
+  §2k 的 menu＋component＋market 與「Fluid 未盤查」永久 gap 是假債。§2k 的五步研究型流程對小模型太多判斷。
+- 根因：#24 把三層概念拆開了，但把「哪些是這個環境的事實」（surface、identity、語系、portal、CLOB、
+  隱藏值）留給模型每題重新研究；沒有一條可照抄的 canonical query，也沒有 profile 可切換。
+- 對抗確認（3 鏡頭 × 2 反駁者）：#27 的 canonical SQL 照抄會錯八處——CONNECT BY 缺 REFTYPE='F'（同名
+  Folder／CREF 分叉）、WHERE 在 HAVING 前剔列（空 label 的 hidden 祖先逃過）、無 root-reached／LEVEL／
+  FETCH FIRST、HAVING 丟 hidden 列（0 列三義）、只用 base label（LANG 表有 JPN／JPP／ZHS／ZHT）、排除
+  LINK、忽略 PORTAL_EXPIRE_DT、hide 值只認 TRUE。修正版改回旗標＋CLASSIC_VISIBLE 欄。
+- 落點：profile `navigation:`（surfaces／identity／portal／labelLanguage／hideFromNavValues／attrValType／
+  verified）＝唯一真相；cookbook §2k-C canonical＋結果映射＋0 列三步排查，2k-2／2k-3 降為診斷、2k-3 隱藏旗標
+  改正；ps-ui-flow 3a「verified 就直接跑 canonical、原樣映射」；可見性新值 CLASSIC_NAV_VISIBLE
+  （vocabulary 3；功能分支）；lint 讀 profile（CLASSIC_ONLY 不要求 surface gap 行）、Portal 證據 regex 加
+  `FROM PSPRSMDEFN`（距離式對 canonical 不命中）；auditor 4a 改重跑 canonical 比對可見列；contract-lib
+  在 CLASSIC_ONLY 不出 alternateSurfaces 債（功能分支）；SOP-20 一次驗證；test-auto-loop 情境 28 調整＋
+  情境 30 文字守衛（沒有 Oracle 也擋得住改壞 canonical）。
+- 待公司機驗：CONNECT_BY_ISCYCLE、PSPRSMDEFNLANG 鍵欄位、LINK 列是否帶 SEG、portal 名。

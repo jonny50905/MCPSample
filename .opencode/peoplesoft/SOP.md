@@ -669,3 +669,20 @@ cookbook §2k 的 Portal Registry 表名／欄位／代碼值域**全數未在�
 5. 回填完成、回灌戰役結束後才考慮把 `technical menu 當導覽路徑`／`可見性過度宣稱`
    兩個訊息字串移出 `ps-doc-lint.ps1` 的 `$polishPatterns`（升為缺料類、擋 tier 1）。
 6. 改 `ps-doc-lint.ps1` 後必跑 `pwsh -File scripts\tests\test-auto-loop.ps1`（情境 28）。
+
+（本程序已由 SOP-20 的 profile 化取代：驗證做一次、回填 `navigation:`，之後直接跑 canonical。）
+
+## SOP-20 Classic 導覽 profile 驗證（一次；issue #27）
+
+導覽入口不再是每題的研究問題：環境事實記在 `customization-profile.yaml` 的 `navigation:` 區塊，
+ps-ui-flow 只跑 cookbook §2k-C canonical query、原樣回傳。管理者做一次即可：
+
+1. 跑 cookbook §2k-0 (1)(2)(2b)(3)：確認 PSPRSMDEFN／PSPRSMDEFNLANG／PSPRSMSYSATTRVL／PSMENUITEM 存在、
+   `PORTAL_ATTR_VAL` 型別（CLOB→`attrValType: CLOB`）、`PORTAL_HIDE_FROM_NAV` 的觀察值（→`hideFromNavValues`）、
+   base 語系（`PSOPTIONS.LANGUAGE_CD`→`labelLanguage`）、使用者登入的 portal（`PSPRDMDEFN`→`portal`）。
+2. 拿一個已知 Component 跑 §2k-C：確認 (a) 可見路徑與 Classic 選單一致、(b) 被 Hide from portal navigation 的
+   CREF 出現在 `CLASSIC_VISIBLE=0`、(c) `ROOT_REACHED=1`、(d) 跑逐段列看 `LABEL_SOURCE` 全是 BASE（英文 UI）。
+   `CONNECT_BY_ISCYCLE`／`PORTAL_EXPIRE_DT`／LINK 列是否帶 SEG 也在這一步一併確認。
+3. 全部成立 → `navigation.verified: true`；任一步不成立 → 留 `false` 並記 gaps，不得降級成 PSMENUITEM 補位。
+4. 之後 Fluid 上線、換 portal、換語系、換 PeopleTools 版本時只改 profile，不改 cookbook 與 agent。
+5. 改 `ps-doc-lint.ps1`／`ps-contract-lib.ps1` 後必跑 `test-auto-loop.ps1`（情境 28／30）與 `test-contract.ps1`。
