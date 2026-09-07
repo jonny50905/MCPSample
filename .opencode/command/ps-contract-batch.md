@@ -2,7 +2,7 @@
 description: Legacy Contract 批次（外環專用）：依 docs/ps-research/<領域>/contract-parts/manifest.txt 只寫本批 fragment 檔（固定表格）；不寫 NN、checklist、90-audit、spec
 agent: ps-deep-research
 ---
-對 `docs/ps-research/$ARGUMENTS/` 執行**一個 Legacy Contract 批次**（issue #17 Phase 1）。
+對 `docs/ps-research/$ARGUMENTS/` 執行**一個 Legacy Contract 批次**。
 **本指令不是研究模式、不是稽核模式**：你 system prompt 的階段一／階段二／稽核／提煉章節在此
 **全部不適用**——不打勾、不寫 NN 檔、不寫 checklist.md、不寫 90-audit.md、不寫 wiki、不寫 log.md、
 不遞增輪次、不歸檔。你只做三件事：read manifest → 逐單位 read 來源 NN 檔（缺料才委派）→
@@ -24,7 +24,7 @@ manifest 是外環產生的唯讀工單：每個單位給輸出檔路徑、來�
    - screen 分頁檔（screen-<COMP>-p<k>.md）：只寫「## 畫面」（component／page／sourceNn）＋「## 控制項」（manifest 列的那一頁欄位）。
    - entity：資料流中該 Record 的操作 → 寫入表；欄位表只列鍵欄位、EFFDT 類、NN 提到的欄位；其餘鍵值查不到寫 UNRESOLVED。
 2. **證據欄只准逐字抄 manifest 列出的 `E<nn>.<n>` token**（nn＝來源 NN 前兩碼）、本檔查詢表的 `SQL:<n>`、或 `UNRESOLVED`。不抄 ChunkId、不自創。
-3. 缺料才委派，且一個單位至多 2 個委派、會查 oracleMCP 的同時 ≤ 3、第一個先單獨派再並行（連線全域單例，L109；查完不得 disconnect）：
+3. 缺料才委派，且一個單位至多 2 個委派、會查 oracleMCP 的同時 ≤ 3、第一個先單獨派再並行（查完不得 disconnect）：
    - screen 缺 Page 清單／modes／Search Record／欄位盤點 → 委派 @ps-ui-flow：`[任務] Component <名> 的 Page 清單、Search Record、各 Page 的 Record.Field 盤點（cookbook §2d／§2e／§4 PSPNLGRPDEFN）`
    - screen 缺導覽入口／technicalMenu → 委派 @ps-ui-flow：`[任務] Component <名> 的 Portal Registry 導覽入口（cookbook §2k：2k-0 先驗欄位；每個入口一列，標入口型與可見性；未實作 surface 回 gap）與 technicalMenuLocation（§2e）`
    - entity 缺 RECTYPE／SQLTABLENAME／欄位／鍵 → 委派 @ps-metadata-flow：`[任務] Record <名> 結構：RECTYPE、SQLTABLENAME、欄位清單與鍵（cookbook §6／§7）`

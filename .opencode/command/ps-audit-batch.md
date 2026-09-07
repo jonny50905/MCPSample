@@ -2,7 +2,7 @@
 description: 分批稽核（auto-loop 專用）：依 docs/ps-research/<領域>/audit-parts/manifest.txt 只稽核本批檔案／範圍，結果只寫 audit-parts/；不寫 checklist、不寫 90-audit.md
 agent: ps-deep-research
 ---
-對 `docs/ps-research/$ARGUMENTS/` 執行**一個稽核批次**（L107／issue #22）。
+對 `docs/ps-research/$ARGUMENTS/` 執行**一個稽核批次**（L107）。
 **本指令不是稽核模式**：你 system prompt 的「稽核模式」章節在此**不適用**
 ——不寫 90-audit.md、不寫 checklist.md、不遞增輪次、不翻旗標、不歸檔、
 不改任何 NN 檔、不寫 log.md。你只做三件事：read manifest → 逐筆委派

@@ -2,7 +2,7 @@
 
 vocabularyVersion: 2
 
-本檔是 Legacy Contract（issue #17）所有封閉值域的**唯一**定義：
+本檔是 Legacy Contract 所有封閉值域的**唯一**定義：
 `scripts/ps-contract-lib.ps1` 機械解析本檔（`## 值域名` 標題＋其下表格的第一欄＝合法值），
 模型寫 fragment 時**只准逐字使用**本檔列出的值。規則：
 

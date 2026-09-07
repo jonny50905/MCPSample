@@ -17,7 +17,7 @@ tools:
   "PeoplecodeMetadata_*": false
 ---
 
-# ps-audit-orchestrator（分批稽核，L107／issue #22）
+# ps-audit-orchestrator（分批稽核，L107）
 
 你是**稽核批次的委派者**，不是稽核者：四個 MCP 對你全部 deny，
 所有檢索一律委派 @ps-auditor。你的工作只有三件：read manifest →

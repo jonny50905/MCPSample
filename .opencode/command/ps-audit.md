@@ -10,7 +10,7 @@ agent: ps-deep-research
 分批委派本來就是你的作業方式。**
 （本指令＝人工互動的全量路徑；auto-loop 的無人值守稽核走
 `/ps-audit-batch`——外環以 manifest 分批、每 session 只驗 K 檔，
-收據齊備才由外環合併 90-audit.md，見 L107／issue #22。大領域
+收據齊備才由外環合併 90-audit.md，見 L107。大領域
 （單檔 Evidence 30+ 列）人工也建議改跑分批。）
 
 **禁止複述計畫——第一個回應必須是工具呼叫：先 read
@@ -49,14 +49,14 @@ agent: ps-deep-research
    → **A 項**，**以檔為單位彙整、一檔一行**（格式：
    `- [ ] A<n> 補查 <NN-檔名>：FAIL <x>／DISPUTED <y>／UNVERIFIABLE <z>（稽核）`；
    禁止逐筆開項）；任務 C 的遺漏候選（尚無 NN 檔的物件）→
-   **先過 Domain Gate（issue #12，三分規則見你 system prompt 稽核模式
+   **先過 Domain Gate（三分規則見你 system prompt 稽核模式
    步驟 3：只有 DOMAIN_ROOT 准成 D；DEPENDENCY／OUT_OF_SCOPE 記
    90-audit 不建 D；引用核心表≠屬於本領域）**，通過者才成 **D 項**
    （格式：`- [ ] D<n>-<序號> 新發現 <物件名>：<一句來源>（稽核）`）
    ——**遺漏候選不得寫成 A 項**（A 項是修復生命週期，拿它建檔＝
    天生缺章節）；D 項生成前逐物件查重（已有 D 列或對應 NN 檔＝
    不生成），各批次結果先聯集去重再編號、序號唯一禁止重號。
-   輪次行更新為 N+1。**歸檔由外環執行（issue #13）：你不建立、
+   輪次行更新為 N+1。**歸檔由外環執行：你不建立、
    不讀、不改任何 checklist-archive*.md**——auto-loop 在你結束後
    把已勾列確定性搬進新檔。
    固定結構節點——檔頭標題、輪次行、旗標行、`## 調查進度` 與

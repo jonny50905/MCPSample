@@ -75,3 +75,9 @@
 - 規則修改走**最小新增**（只加不刪）、當天記 applied.md、
   團隊生效靠內部 git PR——實驗先行、規則後補，規則一律從
   觀察到的行為推導，不從規格書想像。
+- **模型讀的檔（`.opencode/agent`、`skills`、`command`、`peoplesoft/*.md`、
+  `report-templates`）只留規則本身、做法、值域在哪**：出處（issue 編號、日期）、
+  審查／舊版／已廢止之類的變更敘述、外環或 lint 的實作機制，一律寫進
+  `lessons/applied.md`／`SOP.md`／`HANDOFF.md`／commit 訊息，不寫進模型檔。
+  「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
+  `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。

@@ -94,7 +94,7 @@ docs/ps-research/<領域>/
 1. 委派標準深度鏈（同 ps-orchestrator 的委派表與深度規則）：
    ui-flow（欄位/選項）→ peoplecode-flow（帶 Record.Field＋stored values 找邏輯）
    → 發現批次再派 sqr/ae-flow → metadata-flow（血緣/排程/權限）。
-   oracleMCP 類委派同時 ≤ 3、首個先單獨派（L109；舊版「一次一個」已廢止）；
+   oracleMCP 類委派同時 ≤ 3、首個先單獨派；
    報告的 suggestedNext 屬深度規則者必須執行。
    **主角是 Component 的項目**：peoplecode-flow 委派必含一次
    Activate／PostBuild 定位（ObjectName＋eventName 結構化搜尋——
@@ -111,15 +111,15 @@ docs/ps-research/<領域>/
    id 稽核解不了引用，lint 判 [附錄] 違規、整檔進手術單重建。
    業務語言優先、逐項標 CONFIRMED / INFERRED / DYNAMIC_RUNTIME、
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
-   **「## 功能定位」的兩個 `###` 子段（issue #24）**：
+   **「## 功能定位」的兩個 `###` 子段**：
    · `### 導覽入口`＝委派 @ps-ui-flow 照 cookbook §2k 取 Portal Registry 入口
      （oracleMCP 類，**計入同時 ≤ 3，上限不變**），每個入口一列、標可見性
      `REGISTRY_DEFINED`（無 user／security context 時只准這個）或 `UNKNOWN_VISIBILITY`。
    · 未查證／查無／§2k-0 欄位驗證未過 → 該段**整段**寫
      「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」，
      並在「## 未解事項」記一行查法收據（用什麼查、哪一步斷、結論）。
-   · 表的「CREF 物件名」欄＝§2k-2 回傳的 `PORTAL_OBJNAME`（contract 線據此區分同 Portal 的多入口）；
-     查不到寫 UNRESOLVED，不得省略該欄；正文不得出現 `AUTHORIZED_FOR_CONTEXT` 字串（lint 判違規）。
+   · 表的「CREF 物件名」欄＝§2k-2 回傳的 `PORTAL_OBJNAME`；查不到寫 UNRESOLVED，不得省略該欄。
+     正文不得出現 `AUTHORIZED_FOR_CONTEXT` 字串。
    · `### Technical Menu`＝PSMENUITEM 的 MENUNAME / BARNAME / ITEMNAME，以 `/` 分隔。
      **絕不可**把它當導覽入口的 fallback、也不可用 `>` 串接。
    · 只要 `### 導覽入口` 有內容，「## 未解事項」就必須有一行
@@ -178,15 +178,15 @@ docs/ps-research/<領域>/
   主角物件補齊所缺章節（含 Evidence 附錄的完整取證——**表格形式義務
   同建檔規則，L103：四欄表格，不是裸 id 清單**）；既有正確內容
   全部保留，照 function-detail 模板章節就位後快驗再打勾。
-- FAIL(TECHNICAL_MENU_AS_NAVIGATION)（issue #24）：**定向補查，不是改字**——
+- FAIL(TECHNICAL_MENU_AS_NAVIGATION)：**定向補查，不是改字**——
   委派 @ps-ui-flow 照 cookbook §2k 取 Portal Registry 入口（先跑 2k-0 驗欄位）。
   查得到 → 填「### 導覽入口」表、原路徑字串移到「### Technical Menu」段並改以 `/` 分隔；
   查不到 → 「### 導覽入口」寫「未確認（navigation metadata 尚未查證）」＋未解事項記查法收據。
   **禁止**只換分隔符、禁止刪掉 BARNAME 那段充數、禁止做 BARNAME 黑名單。
-- FAIL(SINGLE_PATH_COLLAPSE)（issue #24）：稽核已附查到的 CREF 清單——
+- FAIL(SINGLE_PATH_COLLAPSE)：稽核已附查到的 CREF 清單——
   依該清單把每個 location 各補一列（各自 labels 與可見性），並移除任何「唯一入口」措辭。
   清單解析不到就記收據跳過，不得憑印象補列。
-- FAIL(USER_VISIBILITY_OVERCLAIM)（issue #24）：**純改寫，不必重查**——
+- FAIL(USER_VISIBILITY_OVERCLAIM)：**純改寫，不必重查**——
   把「使用者可以從…」「某角色會看到…」改成「Portal Registry 登錄入口：…（可見性 REGISTRY_DEFINED）」。
   本版不得產出 AUTHORIZED_FOR_CONTEXT；有隱藏旗標／過期證據時改標 UNKNOWN_VISIBILITY。
 - **工具身分＝server 前綴＋工具名**：解引用＝
@@ -276,7 +276,7 @@ session（/ps-audit、或 headless 的 --command ps-audit）＝規模門指定�
 
 ## 稽核模式（/ps-audit 觸發）
 
-**無人值守的稽核不走本節**（L107／issue #22）：auto-loop 以 manifest
+**無人值守的稽核不走本節**（L107）：auto-loop 以 manifest
 分批呼叫 `ps-audit-batch`（agent ps-audit-orchestrator），每 session 只驗
 K 檔、單檔依頁大小切 Evidence 範圍、只寫 audit-parts/，90-audit.md 與
 A／D 列、輪次、旗標全由外環合併產生。本節僅供人工互動的 /ps-audit。
@@ -319,7 +319,7 @@ A／D 列、輪次、旗標全由外環合併產生。本節僅供人工互動�
    `- [ ] D<本輪輪次>-<序號> 新發現 <物件名>：<一句來源>（稽核）`
    ——**遺漏候選不得寫成 A 項**（A 項處理假設檔案已存在、且無模板
    義務，拿它建檔＝天生缺章節）。
-   **生成前先過 Domain Gate（issue #12／L104）——「引用核心表」不是
+   **生成前先過 Domain Gate（L104）——「引用核心表」不是
    「屬於本領域」**：共用表天然被全系統讀寫，反查候選沿依賴圖外擴
    ＝scope creep（實案：單領域 NN 檔失控長到 85）。對任務 C 每個
    候選（含 type／viaTable／direction／origin 脈絡），依
@@ -356,7 +356,7 @@ A／D 列、輪次、旗標全由外環合併產生。本節僅供人工互動�
    ——**禁止逐筆開項**。寫入時同步做三件事：
    (a) 輪次行更新為「稽核輪次：N+1」——90-audit.md 表頭的稽核輪次
    必須寫同一個 N+1；
-   (b) **歸檔所有權在外環（issue #13／L105）**：你**不建立、不讀、
+   (b) **歸檔所有權在外環（L105）**：你**不建立、不讀、
    不改**任何 `checklist-archive*.md`——auto-loop 會在本 session 結束後
    把所有已勾列確定性搬進 `checklist-archive-r<N+1>.md`（先寫後驗、
    驗過才刪活頁、崩潰窗自癒）。你只維護 checklist.md：列的勾選

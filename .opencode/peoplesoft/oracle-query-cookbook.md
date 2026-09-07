@@ -45,10 +45,10 @@
    要當證據，就得用本 cookbook 的 SELECT 取得並附「SQL＋關鍵列」。
 ```
 
-## 連線生命週期（每次任務照此順序，硬性；2026-09-03 依實驗改版，L109）
+## 連線生命週期（每次任務照此順序，硬性）
 
 SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線」，指令依序執行。
-**實驗定案（2026-09-03）**：這條連線是 MCP server 全域單例——main 與所有 subagent
+**定案**：這條連線是 MCP server 全域單例——main 與所有 subagent
 共用同一個開關，任何一方 `disconnect` 就把其他人一起斷線。
 因此：**連線是共用資源，誰都不准 disconnect；connect 要冪等。**
 
@@ -288,7 +288,7 @@ FETCH FIRST 50 ROWS ONLY;
 
 Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 §2c。
 
-**2k. Navigation Entry Discovery（Portal Registry；協定角色：ps_get_navigation_entries——issue #24）**
+**2k. Navigation Entry Discovery（Portal Registry；協定角色：ps_get_navigation_entries）**
 
 用途：回答「使用者從哪裡點得到這個 Component」。輸出**複數** `navigationEntries[]`，
 每筆帶 `portalName / entryType / crefObjectName / labels[] / visibility`，
@@ -343,7 +343,7 @@ FETCH FIRST 200 ROWS ONLY
 
 > 本段的**唯一合法用途**是餵 2k-2 的識別三元組（menu＋component＋market）。
 > `MARKET` 欄存在與否待 2k-0 驗證；查無該欄就退回 `:market='GBL'` 並記 gaps。
-> PSMENUITEM 的欄位一併由 2k-0 (2) 驗證；(2) 未列出 `MARKET` 才可退回 `:market='GBL'`＋gap——**不得**先查再等 ORA-00904（連線生命週期禁止重試迴圈）。
+> PSMENUITEM 的欄位一併由 2k-0 (2) 驗證；(2) 未列出 `MARKET` 才可退回 `:market='GBL'`＋gap——**不得**先查再等 ORA-00904。
 > 輸出欄位名一律 `technicalMenuLocations[]`，**永遠不得**輸出成 `menuPath`／選單路徑／導覽入口。
 
 **2k-2. Portal CREF 識別（menu＋component＋market；禁止 SEG2 單欄比對）**
@@ -376,8 +376,7 @@ FETCH FIRST 200 ROWS ONLY
 ```
 
 > **硬性禁止**：`LIKE '%' || :componentName || '%'`、只比 `PORTAL_URI_SEG2`、憑欄位位置猜 SEG 語意。
-> 理由：同一 Component 會登在多個 menu、多個 market、多個 portal；SEG 只在
-> **component 型 CREF**（URL 文法 `/c/<MENU>.<COMPONENT>.<MARKET>`）才是 menu／component／market，
+> SEG 只在 **component 型 CREF**（URL 文法 `/c/<MENU>.<COMPONENT>.<MARKET>`）才是 menu／component／market；
 > `q/`（Query）、`s/`（iScript）、`w/`（Worklist）與外部 URL CREF 的 SEG 語意不同——判不出即 `entryType=UNKNOWN`。
 > 次選路徑的每一筆結論標記 `confidence=INFERRED`（來源＝URLTEXT 文法解析），**不得標 CONFIRMED**。
 > 少於三欄命中的匹配只能回 `PARTIAL_IDENTITY_MATCH` 並記 gaps。
@@ -440,7 +439,7 @@ FETCH FIRST 200 ROWS ONLY
 > **PSPRSMDEFNLANG 的鍵清單與是否含 PORTAL_LABEL 待 2k-0 驗證**；查無該表／該欄 → 只回 base label，
 > `displayTextSource=BASE`＋gap，不得宣稱已做語系 fallback。
 > `fallbackLanguageCode`＝實際回退到的語系：LANG 命中＝`NOT_APPLICABLE`（未回退）；回退到 base＝2k-0 (2b) 查到的 base language；
-> (2b) 未驗到＝`UNRESOLVED`＋gap，**不得**預設寫 ENG（subagent-report-contract 範例中的 ENG 僅為格式示意）。
+> (2b) 未驗到＝`UNRESOLVED`＋gap，**不得**預設寫 ENG。
 
 **2k-5. CREF Link 與其他入口 surface（複數入口；未支援者一律回 gap）**
 
@@ -558,7 +557,7 @@ FETCH FIRST 100 ROWS ONLY;
 
 ---
 
-## 7. Schema Verification（協定角色：Legacy Contract G16——issue #17 Phase 1）
+## 7. Schema Verification（協定角色：Legacy Contract G16）
 
 用途：把 contract 裡的 logical Record／physical object／欄位／鍵，用**唯讀** SELECT 對照 Oracle 實況，
 結果寫成 `contract-parts/verify-<RECNAME>.md` 收據（格式見 `legacy-contract-fragments.md`）。

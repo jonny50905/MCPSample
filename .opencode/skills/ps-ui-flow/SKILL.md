@@ -51,7 +51,7 @@ MENU_LABEL / COMPONENT_LABEL / MESSAGE_CATALOG / DYNAMIC_PEOPLECODE / UNKNOWN
 語系必須保留：`languageCode` / `displayText` / `fallbackLanguageCode`。
 導覽入口的**每一段**（Portal → Folder → … → CREF）同樣要各自保留這三項
 再加 `displayTextSource`（`LANG`＝PSPRSMDEFNLANG 覆寫／`BASE`＝PSPRSMDEFN 原生）——
-逐段記錄才做得到「ZHT 優先、缺翻譯 fallback ENG」而不是整條路徑一個語系（issue #24）。
+逐段記錄才做得到「ZHT 優先、缺翻譯 fallback ENG」而不是整條路徑一個語系。
 
 ## 業務搜尋權重
 
@@ -160,18 +160,10 @@ When display text is dynamically assigned by PeopleCode:
 - include PeopleCode evidence
 - mark the final runtime text as DYNAMIC_RUNTIME
 
-Navigation entries (issue #24):
-- PSMENUITEM MENUNAME/BARNAME/ITEMNAME is technical menu metadata only.
-  Never render it as a user-facing navigation path and never use it as a
-  fallback when Portal Registry lookup finds nothing.
-- Always return navigationEntries as a list; one CREF row is one path, and
-  multiple CREF rows (target plus links) are multiple entries. Never collapse.
-- Without user/security context, visibility is REGISTRY_DEFINED at best.
-  Use UNKNOWN_VISIBILITY for hidden-from-nav ancestors, expired CREFs,
-  walks that never reach the root, and un-inspected surfaces.
-  Never emit AUTHORIZED_FOR_CONTEXT in this version.
-- Report Navigation Collection, Fluid tile and NavBar as gaps even when no
-  such rows are found — absence of rows is not proof of a single entry point.
+Navigation entries:
+- Follow the 導覽硬規則 in the ps-ui-flow agent definition; entryType and
+  visibility value domains are in mcp-tool-contracts.md §3.
+- Never emit AUTHORIZED_FOR_CONTEXT; never collapse multiple CREF rows into one entry.
 ```
 
 ## Context 控制

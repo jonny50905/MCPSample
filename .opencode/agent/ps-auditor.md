@@ -137,7 +137,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    **查得到 → `FAIL(FALSE_NEGATIVE)`**（附找到的 chunk id；
    負面結論失效，該項需回灌補查）；仍查無 → PASS。
    工具鏈修復後的首輪稽核，此步**全量**做（歷史查無平反）。
-4a. **導覽主張檢查（issue #24；以「## 功能定位」節為單位，判定掛在該節所引的
+4a. **導覽主張檢查（以「## 功能定位」節為單位，判定掛在該節所引的
    Evidence 列上——`ref` 寫該列的 ChunkId 或 SQL 摘要）**：
    · `FAIL(TECHNICAL_MENU_AS_NAVIGATION)`：文件宣稱選單路徑／操作路徑／導覽入口
      （任何以 `>`／`→` 串起 ≥3 段的路徑字串），但該主張所引的證據只有
@@ -202,7 +202,7 @@ PeoplecodeMetadata **只吃欄位名／Component 關鍵字**——以 Record 反
 時，帶該表的**關鍵欄位名**進 `find_field_usage`，不得帶 Record 名或
 Page 名（帶錯必查空，屬方法錯誤）。任一角度**查無 ≠ 不存在**
 （自製索引不保證完整）；列入疑似遺漏前至少兩個角度交叉。
-**回傳不是裸名單（issue #12／L104）**：每個候選附可判定域界的脈絡
+**回傳不是裸名單（L104）**：每個候選附可判定域界的脈絡
 ——物件型別、經由哪張表反查到、讀寫方向、origin 訊號（依
 customization-profile 的分類：名稱符合客製 prefix＝CUSTOM_PREFIX，
 判不出＝UNKNOWN，不用額外查證）。**你不做 Domain Gate**（域界判定

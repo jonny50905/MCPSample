@@ -20,25 +20,15 @@ Canonical contract JSON、stable ID、spec.md、驗證結果（PASS／FAIL）全
    `SQL:<n>`（screen＝本檔「查詢證據」表第 n 列；entity＝本檔「參考查詢」表第 n 列）、`UNRESOLVED`。
    多個以 `;` 分隔。**不抄 ChunkId、不自創、不用 manifest 沒列的 E token。**
 5. 自然鍵一律大寫，`Record.Field` 恰含一個點；各段（COMPONENT、PAGE、RECNAME、FIELDNAME、OPKEY）內不得有 `.`、`;`、`|`、空白。
-5a. **導覽入口（issue #24）**：`## 導覽` 一列＝一個入口，**同一 Component 的多個入口就寫多列**
-   （CREF Link 會讓同一畫面出現在多個位置，壓成一列＝誤報）。同一檔內
-   （來源, 目標, 型, 入口型）四元組不得重複——重複＝INVALID（ID 若靠列序派 `.2` 就不再與列序無關）。
-   `MENU_ENTRY` 只在**畫面內轉頁**語意下使用；Portal Registry 入口的「型」寫 `MENU_ENTRY`
-   且「入口型」寫 `PORTAL_REGISTRY`／`CREF_LINK`，來源欄寫 **CREF 物件名或 Portal 名**，不寫死字串 `MENU`。
-   無 user／security context 時「可見性」**只准** `REGISTRY_DEFINED` 或 `UNKNOWN_VISIBILITY`；
-   `AUTHORIZED_FOR_CONTEXT` 模型不得填（同 `DIRECT_DB_WRITE_APPROVED` 的紀律）。
-   `technicalMenu`（畫面 kv）是 PSMENUITEM 三欄，**不是導覽路徑**，不得與本表混用。
-   **釐清（勿誤讀）**：`TRANSFER`／`TRANSFER_PAGE`／`SECONDARY_PAGE`／`MODAL`／`RETURN` 才是畫面內轉頁；
-   Portal Registry／CREF Link 入口的「型」一律 `MENU_ENTRY`，靠「入口型」區分 `PORTAL_REGISTRY`／`CREF_LINK`。
-   來源／目標欄須為大寫英數底線（Portal 名／CREF 物件名／Component／Page），**不是**標籤路徑（中文或含符號＝INVALID，
-   否則 ID 消毒後撞名會退回列序相依）；NN 的「### 導覽入口」表有「CREF 物件名」欄（§2k-2 的 `PORTAL_OBJNAME`），
-   NN 未記時**必須**委派 @ps-ui-flow 取得再寫，不得以同一來源寫兩列。
-   入口型 `PORTAL_REGISTRY`／`CREF_LINK` 的可見性只能 `REGISTRY_DEFINED`／`UNKNOWN_VISIBILITY`／`UNRESOLVED`
-   （`NOT_APPLICABLE`＝沒有主張＝INVALID）；`TRANSFER` 類才寫 `NOT_APPLICABLE`。
-   `technicalMenu` ＝ subagent 報告 `technicalMenuLocations[]`／cookbook §2k-1 technicalMenuLocation 的三欄以 `/` 串成一筆，
-   含 `>`＝INVALID。未實作 surface（Navigation Collection／Fluid Tile／NavBar）由外環固定出 debt
-   `alternateSurfaces｜NOT_INSPECTED` 並在 spec 印「其他導覽 surface」列——fragment 不需也不得宣稱唯一入口。
    操作鍵符合 `^[A-Z][A-Z0-9_]{1,30}$`。
+5a. **導覽入口**：`## 導覽` 一列＝一個入口，同一 Component 有幾個入口就寫幾列；同一檔內
+   （來源, 目標, 型, 入口型）四元組不得重複。來源／目標須為大寫英數底線的物件名
+   （Portal 名／CREF 物件名／Component／Page），不是標籤路徑；Portal Registry 入口的來源寫 CREF 物件名
+   （NN「### 導覽入口」表的「CREF 物件名」欄；NN 未記時委派 @ps-ui-flow 取得）。
+   Portal Registry／CREF Link 入口的「型」一律 `MENU_ENTRY`、「入口型」寫 `PORTAL_REGISTRY`／`CREF_LINK`，
+   可見性只准 `REGISTRY_DEFINED`／`UNKNOWN_VISIBILITY`／`UNRESOLVED`；`TRANSFER` 類的入口型與可見性寫 `NOT_APPLICABLE`。
+   `AUTHORIZED_FOR_CONTEXT` 不得填。`technicalMenu`（畫面 kv）是 PSMENUITEM 的 MENUNAME/BARNAME/ITEMNAME
+   以 `/` 串成一筆，不是導覽路徑，不得含 `>`、不得與本表混用。
 6. 一檔 ≤150 行。**容量由 manifest 決定**：控制項表只寫 manifest 列給本檔的那一頁欄位（不多不少）；
    其餘欄位由 `screen-<COMPONENT>-p<k>.md` 分頁檔承載（manifest 另列單位）。寫不下＝外環會縮頁重排，你不用自估。
 7. 缺值：查不到＝`UNRESOLVED`；不適用＝`NOT_APPLICABLE`。整個表格不適用時保留標題與表頭，只寫一列全 `NOT_APPLICABLE`。

@@ -2,7 +2,7 @@
 description: Legacy Contract 的 Oracle schema 唯讀驗證批次（外環專用）：依 contract-parts/verify-manifest.txt 一單位一委派跑 SELECT，結果只寫 contract-parts/verify-<RECNAME>-<單位>.md
 agent: ps-deep-research
 ---
-對 `docs/ps-research/$ARGUMENTS/` 執行**一個 Oracle schema 驗證批次**（issue #17 Phase 1，G16）。
+對 `docs/ps-research/$ARGUMENTS/` 執行**一個 Oracle schema 驗證批次**（G16）。
 **本指令不是研究模式、不是稽核模式**——不寫 NN、checklist、90-audit、wiki、spec、log.md。
 你只做三件事：read verify-manifest → 逐單位委派 @ps-metadata-flow 跑唯讀 SELECT → 把回報**照抄成表**寫進該單位的收據檔。
 **你不判 PASS／FAIL**：結果由外環對照 entity fragment 算；你只抄 SQL、關鍵列與執行狀態。

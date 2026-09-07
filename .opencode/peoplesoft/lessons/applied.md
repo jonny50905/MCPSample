@@ -3042,3 +3042,17 @@
   主詞變體可見性式；[導覽] 工單指紋剝 Kinds；cookbook §2k 補 PSMENUITEM／PSOPTIONS 欄位驗證、(2b) base language、
   次選與祖先帶 PORTAL_EXPIRE_DT、PARTIAL_IDENTITY_MATCH 診斷查詢、USGT 分流、列數上限；模板加「CREF 物件名」欄並改佔位符；
   report-contract 範例補 CREF_LINK 第二筆與 Case 6 gap 行；情境 28 加九判定。contract 線補強另見功能分支同日 commit。
+
+### L112 模型讀的檔不是交接文件——出處與變更敘述反覆混進 agent 檔（2026-09-07）
+
+- 症狀：連續數任維護 session 把「（issue #24）」「（L109；舊版已廢止）」「審查發現」「同日」「外環會出 debt」
+  這類給人看的資訊寫進 agent／skill／command／contract／template；模型讀了只佔 context，
+  範例裡的「（issue #24 Case 6）」還會被照抄進報告。管理者指出「已經發生過很多次」。
+- 根因：(1) 交接壓力讓 session 把「為什麼改」寫在改的地方，而不是 applied.md；(2)「只加不刪」被解讀成
+  「不能改錯句、只能加釐清段」，於是錯句留著、旁邊再長一段；(3) 沒有任何確定性檢查——AGENTS.md 的
+  文字規則對這件事已失效多次（L94 同型：願望不是免費的）。
+- 落點：`scripts/ps-agent-doc-lint.ps1`（範圍＝模型讀的檔；阻擋 issue 編號／日期／變更敘述詞；L 編號先只計數）
+  掛進 `ps-fs-doctor -WriteManifest` 前置（不過＝不重生基準＝推不出去）；test-auto-loop 情境 29；
+  AGENTS.md 鐵律加一條並把「只加不刪」釐清為「規則語意只加不刪，錯句直接改對」。
+- 套用：本 commit 清掉 16 個模型檔裡的出處／變更敘述（含前任留下的 issue #12／#13／#22 標籤、
+  cookbook 連線生命週期的實驗日期），fragments 5a 錯句改對（功能分支）；L 編號既有 60 餘處未動，另案決定。
