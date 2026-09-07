@@ -684,5 +684,6 @@ ps-ui-flow 只跑 cookbook §2k-C canonical query、原樣回傳。管理者做�
    CREF 出現在 `CLASSIC_VISIBLE=0`、(c) `ROOT_REACHED=1`、(d) 跑逐段列看 `LABEL_SOURCE` 全是 BASE（英文 UI）。
    `CONNECT_BY_ISCYCLE`／`PORTAL_EXPIRE_DT`／LINK 列是否帶 SEG 也在這一步一併確認。
 3. 全部成立 → `navigation.verified: true`；任一步不成立 → 留 `false` 並記 gaps，不得降級成 PSMENUITEM 補位。
+   驗證結果（觀察值、日期）記進 applied.md 該課的追記，profile 註解只留結論。
 4. 之後 Fluid 上線、換 portal、換語系、換 PeopleTools 版本時只改 profile，不改 cookbook 與 agent。
 5. 改 `ps-doc-lint.ps1`／`ps-contract-lib.ps1` 後必跑 `test-auto-loop.ps1`（情境 28／30）與 `test-contract.ps1`。

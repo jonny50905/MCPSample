@@ -374,28 +374,35 @@ NAV_ROWS AS (
            COALESCE(NULLIF(LANG_LABEL, ''), BASE_LABEL) AS DISPLAY_LABEL,
            CASE WHEN NULLIF(LANG_LABEL, '') IS NULL THEN 'BASE' ELSE 'LANG' END AS LABEL_SOURCE
       FROM NAV_TREE T
+),
+NAV_PATHS AS (
+    SELECT TARGET_PORTAL AS PORTAL_NAME, TARGET_CREF AS CREF_OBJECT, TARGET_USGT AS CREF_USGT,
+           LISTAGG(CASE WHEN IS_ROOT = 0 THEN DISPLAY_LABEL END, ' > ') WITHIN GROUP (ORDER BY LVL DESC) AS MENU_PATH,
+           MAX(IS_HIDDEN) AS PATH_HIDDEN, MAX(IS_EXPIRED) AS PATH_EXPIRED,
+           MAX(IS_ROOT) AS ROOT_REACHED, MAX(IS_CYCLE) AS HAS_CYCLE,
+           SUM(CASE WHEN IS_ROOT = 0 AND DISPLAY_LABEL IS NULL THEN 1 ELSE 0 END) AS BLANK_SEGMENTS,
+           CASE WHEN MAX(IS_HIDDEN) = 0 AND MAX(IS_EXPIRED) = 0 AND MAX(IS_ROOT) = 1 AND MAX(IS_CYCLE) = 0
+                 AND SUM(CASE WHEN IS_ROOT = 0 AND DISPLAY_LABEL IS NULL THEN 1 ELSE 0 END) = 0
+                THEN 1 ELSE 0 END AS CLASSIC_VISIBLE
+      FROM NAV_ROWS
+     GROUP BY TARGET_PORTAL, TARGET_CREF, TARGET_USGT
 )
-SELECT TARGET_PORTAL AS PORTAL_NAME, TARGET_CREF AS CREF_OBJECT, TARGET_USGT AS CREF_USGT,
-       LISTAGG(CASE WHEN IS_ROOT = 0 THEN DISPLAY_LABEL END, ' > ') WITHIN GROUP (ORDER BY LVL DESC) AS MENU_PATH,
-       MAX(IS_HIDDEN) AS PATH_HIDDEN, MAX(IS_EXPIRED) AS PATH_EXPIRED,
-       MAX(IS_ROOT) AS ROOT_REACHED, MAX(IS_CYCLE) AS HAS_CYCLE,
-       SUM(CASE WHEN IS_ROOT = 0 AND DISPLAY_LABEL IS NULL THEN 1 ELSE 0 END) AS BLANK_SEGMENTS,
-       CASE WHEN MAX(IS_HIDDEN) = 0 AND MAX(IS_EXPIRED) = 0 AND MAX(IS_ROOT) = 1 AND MAX(IS_CYCLE) = 0
-             AND SUM(CASE WHEN IS_ROOT = 0 AND DISPLAY_LABEL IS NULL THEN 1 ELSE 0 END) = 0
-            THEN 1 ELSE 0 END AS CLASSIC_VISIBLE
-  FROM NAV_ROWS
- GROUP BY TARGET_PORTAL, TARGET_CREF, TARGET_USGT
- ORDER BY CLASSIC_VISIBLE DESC, TARGET_PORTAL, MENU_PATH
+SELECT PORTAL_NAME, CREF_OBJECT, CREF_USGT, MENU_PATH
+  FROM NAV_PATHS
+ WHERE CLASSIC_VISIBLE = 1
+ ORDER BY PORTAL_NAME, MENU_PATH
 FETCH FIRST 200 ROWS ONLY
 ```
 
-> **結果映射（一列＝一個 CREF）**：`CLASSIC_VISIBLE = 1` → `navigationEntries[]` 一筆，`entryType` 依 `CREF_USGT`
-> （TARG→`PORTAL_REGISTRY`、LINK→`CREF_LINK`）、`visibility = CLASSIC_NAV_VISIBLE`、`labels[]` 由逐段列填；
-> `CLASSIC_VISIBLE = 0` → **不列為入口**，gaps 記一行原因（`PATH_HIDDEN`＝hide-from-nav／`PATH_EXPIRED`＝過期／
-> `ROOT_REACHED=0`＝未達根／`HAS_CYCLE`＝循環／`BLANK_SEGMENTS`＝空 label）。
-> **逐段列**（供 `labels[].displayText／displayTextSource`）：同一個 CTE 改成
+> **結果映射（canonical 一列＝一個 Classic 選單看得到的入口）**：每列 → `navigationEntries[]` 一筆，`entryType` 依
+> `CREF_USGT`（TARG→`PORTAL_REGISTRY`、LINK→`CREF_LINK`）、`visibility = CLASSIC_NAV_VISIBLE`、`labels[]` 由逐段列填。
+> **逐段列**（供 `labels[].displayText／displayTextSource`）：同一組 CTE，最後的 SELECT 換成
 > `SELECT TARGET_CREF, LVL, PORTAL_OBJNAME, DISPLAY_LABEL, LABEL_SOURCE FROM NAV_ROWS ORDER BY TARGET_CREF, LVL DESC FETCH FIRST 200 ROWS ONLY`。
-> **0 列時**分三種，不得猜：(a) `:componentName` 打錯或 PSMENUITEM 無此 Component（跑 2k-1 確認）；
+> **診斷形（只在 canonical 回 0 列時跑）**：最後的 SELECT 換成
+> `SELECT * FROM NAV_PATHS ORDER BY CLASSIC_VISIBLE DESC, PORTAL_NAME, MENU_PATH FETCH FIRST 200 ROWS ONLY`——
+> 有列但 `CLASSIC_VISIBLE = 0` → 文件寫「Classic 選單無可見入口（Registry 有 N 筆）」，gaps 每筆記一行原因
+> （`PATH_HIDDEN`＝hide-from-nav／`PATH_EXPIRED`＝過期／`ROOT_REACHED=0`＝未達根／`HAS_CYCLE`＝循環／`BLANK_SEGMENTS`＝空 label）；
+> 診斷形也 0 列 → 分三種，不得猜：(a) `:componentName` 打錯或 PSMENUITEM 無此 Component（跑 2k-1 確認）；
 > (b) Registry 真的沒有 CREF（跑 2k-2 診斷查詢，去掉 EXISTS 再跑一次）；(c) 全部 CREF 都在其他 portal（把 `:portalName` 條件拿掉重跑）。
 > 三者都空＝「Portal Registry 導覽入口：查無」＋gaps 記查法收據。
 > `PSMENUITEM` 在本 query 只做 identity seed（PNLGRPNAME→Component、MENUNAME→SEG1）；BARNAME／ITEMNAME 永遠不參與路徑。
@@ -479,8 +486,8 @@ FETCH FIRST 200 ROWS ONLY
 > 祖先一律是 Folder：`CONNECT BY` 必須加 `PORTAL_REFTYPE = 'F'`，否則同名的 Folder 與 CREF 會讓走訪分叉。
 > 隱藏旗標是 attribute 列（不是 PSPRSMDEFN 的欄位），鍵含 `PORTAL_REFTYPE`，值欄 `PORTAL_ATTR_VAL` 是 **CLOB**（直接比對＝ORA-00932）：
 > `SELECT PORTAL_OBJNAME FROM PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
-> ——target CREF 或**任一祖先**命中 ＝ 整條路徑在 Classic 選單看不到 → **不列為入口**（§2k-C 的 `PATH_HIDDEN`），gaps 記一行。
-> 同理，target 或**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → 不列為入口（§2k-C 的 `PATH_EXPIRED`），gaps 記一行。
+> ——target CREF 或**任一祖先**命中 ＝ 整條路徑在 Classic 選單看不到 → canonical 不回該列（診斷形 `PATH_HIDDEN=1`），gaps 記一行。
+> 同理，target 或**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → canonical 不回該列（診斷形 `PATH_EXPIRED=1`），gaps 記一行。
 > 平台可攜性：非 Oracle 環境改用遞迴 CTE＋顯式 depth 計數＋visited 反連接，行為必須完全一致（待驗）。
 
 **2k-4. 語系 label（§2k-C 已內含：`:languageCd`＝profile `navigation.labelLanguage`；本段為逐段來源說明）**

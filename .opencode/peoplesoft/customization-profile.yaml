@@ -94,4 +94,5 @@ navigation:
   hideFromNavValues: [TRUE, Y, 1] # PSPRSMSYSATTRVL.PORTAL_HIDE_FROM_NAV 觀察值 TRUE（Y／1 保留）
   attrValType: CLOB               # PORTAL_ATTR_VAL 型別——CLOB 必須經 DBMS_LOB.SUBSTR 才能比對
   rootObject: PORTAL_ROOT_OBJECT
-  verified: true                  # false＝先跑 cookbook §2k-0 驗表／欄／值再回填本區塊
+  linkRowsCarrySeg2: true         # LINK 列絕大多數帶 PORTAL_URI_SEG2（1039/1045）→ canonical 的 seed 直接含 LINK，不需第二跳
+  verified: true                  # 已驗：PSPRSMDEFN.PORTAL_EXPIRE_DT 存在、CONNECT_BY_ISCYCLE 可用、EMPLOYEE 在 PSPRDMDEFN、canonical 對已知 Component 回 1 可見／4 不可見；false＝先跑 cookbook §2k-0 再回填本區塊

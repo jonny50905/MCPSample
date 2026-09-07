@@ -49,6 +49,8 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
 **追記（2026-09-07）**：清除 ps-orchestrator／ps-deep-research 殘留的「一次只准一個」（L109 追記）；orchestrator 歸戶建議改分流（已有研究→`/ps-correct`，沒研究過才 `/ps-research`）。
 **追記（2026-09-07，L112）**：模型檔清理——16 個 agent／skill／command／contract／template 檔移除 issue 編號、日期、審查／舊版／已廢止敘述與外環機制說明；新增 `scripts/ps-agent-doc-lint.ps1`（`-WriteManifest` 前置，擋這類內容進模型檔）；AGENTS.md 鐵律加一條；test-auto-loop 情境 29。
 **追記（2026-09-07，issue #27／L113）**：Classic 導覽改為 profile 化＋canonical query——`customization-profile.yaml` 加 `navigation:`（surfaces CLASSIC_ONLY、identity MENU_COMPONENT、portal、labelLanguage ENG、hideFromNavValues、attrValType CLOB、verified）；cookbook 新 §2k-C（canonical＋結果映射＋0 列排查），2k-2／2k-3 降診斷、2k-3 隱藏旗標改正（CLOB／REFTYPE／值）；ps-ui-flow 3a 改「verified 就直接跑 canonical、原樣映射」；可見性新值 CLASSIC_NAV_VISIBLE（功能分支 vocabulary 3）；lint 讀 profile（CLASSIC_ONLY 不要求 surface gap 行）＋Portal 證據 regex 加 `FROM PSPRSMDEFN`；auditor 4a 改重跑 canonical；SOP-20；情境 28 調整、情境 30 canonical 文字守衛。**待公司機驗**：CONNECT_BY_ISCYCLE、PSPRSMDEFNLANG 鍵欄位、LINK 列是否帶 SEG、portal 名。
+**追記（2026-09-07，issue #27／L113）**：Classic 導覽改為 profile 化＋canonical query——`customization-profile.yaml` 加 `navigation:`（surfaces CLASSIC_ONLY、identity MENU_COMPONENT、portal、labelLanguage ENG、hideFromNavValues、attrValType CLOB、verified）；cookbook 新 §2k-C（canonical＋結果映射＋0 列排查），2k-2／2k-3 降診斷、2k-3 隱藏旗標改正（CLOB／REFTYPE／值）；ps-ui-flow 3a 改「verified 就直接跑 canonical、原樣映射」；可見性新值 CLASSIC_NAV_VISIBLE（功能分支 vocabulary 3）；lint 讀 profile（CLASSIC_ONLY 不要求 surface gap 行）＋Portal 證據 regex 加 `FROM PSPRSMDEFN`；auditor 4a 改重跑 canonical；SOP-20；情境 28 調整、情境 30 canonical 文字守衛。**公司機已驗（同日）**：PORTAL_EXPIRE_DT 存在、LINK 列帶 SEG2（1039/1045）、EMPLOYEE 在、CONNECT_BY_ISCYCLE 可用；canonical 對已知 Component 回 1 可見／4 不可見。管理者定案 canonical 只回看得到的列（NAV_PATHS CTE＋`WHERE CLASSIC_VISIBLE = 1`），帶旗標版降為診斷形。
+**追記（2026-09-07，issue #27／L113）**：Classic 導覽改為 profile 化＋canonical query——`customization-profile.yaml` 加 `navigation:`（surfaces CLASSIC_ONLY、identity MENU_COMPONENT、portal、labelLanguage ENG、hideFromNavValues、attrValType CLOB、verified）；cookbook 新 §2k-C（canonical＋結果映射＋0 列排查），2k-2／2k-3 降診斷、2k-3 隱藏旗標改正（CLOB／REFTYPE／值）；ps-ui-flow 3a 改「verified 就直接跑 canonical、原樣映射」；可見性新值 CLASSIC_NAV_VISIBLE（功能分支 vocabulary 3）；lint 讀 profile（CLASSIC_ONLY 不要求 surface gap 行）＋Portal 證據 regex 加 `FROM PSPRSMDEFN`；auditor 4a 改重跑 canonical；SOP-20；情境 28 調整、情境 30 canonical 文字守衛。**公司機已驗（同日）**：PORTAL_EXPIRE_DT 存在、LINK 列帶 SEG2（1039/1045）、EMPLOYEE 在、CONNECT_BY_ISCYCLE 可用；canonical 對已知 Component 回 1 可見／4 不可見。管理者定案 canonical 只回看得到的列（NAV_PATHS CTE＋`WHERE CLASSIC_VISIBLE = 1`），帶旗標版降為診斷形。
 
 **功能分支追記（2026-09-02，同一個接手 session）**：issue #17 Phase 1 切片 1 已在功能分支
 `claude/issue-17-legacy-contract-phase1` 落地——Legacy Contract 產物線（L108、SOP-18、設計備忘
@@ -76,7 +78,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則＋#24 §2e／§4 正名、§2k＋L112 清理＋#27 Classic canonical） | 625 | handover 版本行數 |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則＋#24 §2e／§4 正名、§2k＋L112 清理＋#27 Classic canonical） | 632 | handover 版本行數 |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期＋#24 導覽職責＋L112 清理＋#27 Classic canonical） | 139 | handover 版本行數 |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期＋#24 授權≠導覽＋L112 清理） | 107 | handover 版本行數 |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | handover 版本行數 |
@@ -84,7 +86,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律＋清除一次只准一個殘留、歸戶分流＋L112 清理＋#27 Classic canonical） | 170 | handover 版本行數 |
    | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu＋L112 清理＋#27 Classic canonical） | 111 | handover 版本行數 |
    | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域＋L112 清理＋#27 Classic canonical） | 128 | handover 版本行數 |
-   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（navigation 區塊：Classic 導覽環境事實） | 97 | 管理者依 SOP-20 核對 portal／labelLanguage 後把 verified 設 true；handover 版本行數 |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（navigation 區塊：Classic 導覽環境事實） | 98 | 管理者依 SOP-20 核對 portal／labelLanguage 後把 verified 設 true；handover 版本行數 |
    | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列＋L112 清理＋#27 Classic canonical） | 167 | handover 版本行數 |
    | `.opencode/skills/ps-ui-flow/SKILL.md` | 修改（#24 導覽語系義務＋Rules＋L112 清理） | 192 | handover 版本行數 |
    | `.opencode/skills/ps-security-flow/SKILL.md` | 修改（#24 authorization ≠ navigation） | 62 | handover 版本行數 |
@@ -97,8 +99,8 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派＋L112 清理） | 72 | handover 版本行數 |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical） | 504 | handover 版本行數 |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派＋L112 清理） | 138 | handover 版本行數 |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20） | 636 | handover 版本行數 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113） | 3024 | handover 版本行數 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20） | 637 | handover 版本行數 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113） | 3028 | handover 版本行數 |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM；handover 版本行數 |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期；handover 版本行數 |
    | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28＋情境 29＋情境 30） | 627 | 存 UTF-8 with BOM；handover 版本行數 |
@@ -128,7 +130,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/peoplesoft/legacy-contract-fragments.md` | 新增（#24 technicalMenu＋導覽表六欄＋規則 5a＋釐清段＋L112 清理＋#27 Classic canonical） | 233 | fragment／分頁檔／verify 收據形狀 |
    | `.opencode/command/ps-contract-batch.md` | 新增（#24 導覽委派＋L112 清理） | 41 | 掛 ps-deep-research；oracleMCP 委派 ≤ 3、首個先單獨派 |
    | `.opencode/command/ps-contract-verify.md` | 新增（L112 清理） | 32 | 掛 ps-deep-research；oracleMCP 委派 ≤ 3、首個先單獨派 |
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（連線生命週期改版＋只加 §7＋#24 §2e／§4 正名、§2k＋L112 清理＋#27 Classic canonical） | 719 | 生命週期 L48 起；§2k 自 L291 起、§7 自 L541 起，樣板全標待公司機驗證 |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（連線生命週期改版＋只加 §7＋#24 §2e／§4 正名、§2k＋L112 清理＋#27 Classic canonical） | 726 | 生命週期 L48 起；§2k 自 L291 起、§7 自 L541 起，樣板全標待公司機驗證 |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期＋#24 導覽職責＋L112 清理＋#27 Classic canonical） | 139 | L109 |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期＋#24 授權≠導覽＋L112 清理） | 107 | L109 |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | L109 |
@@ -136,7 +138,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律＋清除一次只准一個殘留、歸戶分流＋L112 清理＋#27 Classic canonical） | 170 |  |
    | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu＋CREF 物件名欄＋L112 清理＋#27 Classic canonical） | 111 |  |
    | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域＋L112 清理＋#27 Classic canonical） | 128 |  |
-   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（navigation 區塊：Classic 導覽環境事實） | 97 | 管理者依 SOP-20 核對 portal／labelLanguage 後把 verified 設 true |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（navigation 區塊：Classic 導覽環境事實） | 98 | 管理者依 SOP-20 核對 portal／labelLanguage 後把 verified 設 true |
    | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列＋L112 清理＋#27 Classic canonical） | 167 |  |
    | `.opencode/skills/ps-ui-flow/SKILL.md` | 修改（#24 導覽語系義務＋Rules＋L112 清理） | 192 |  |
    | `.opencode/skills/ps-security-flow/SKILL.md` | 修改（#24 authorization ≠ navigation） | 62 |  |
@@ -149,13 +151,13 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派＋L112 清理） | 72 |  |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical） | 504 |  |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派＋L112 清理） | 138 |  |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 門＋SOP-18＋SOP-19＋SOP-20） | 688 | SOP-18 自 L604 起；SOP-19 自 L656 起 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110＋L111＋L109 追記＋L112＋L113） | 3080 | L108 自 L2879、L109 自 L2935 起；L111 自 L3000 起 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 門＋SOP-18＋SOP-19＋SOP-20） | 689 | SOP-18 自 L604 起；SOP-19 自 L656 起 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110＋L111＋L109 追記＋L112＋L113） | 3084 | L108 自 L2879、L109 自 L2935 起；L111 自 L3000 起 |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＋#24 手術 prompt [導覽] 型＋工單指紋剝 Kinds＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM |
    | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30） | 627 | 存 UTF-8 with BOM |
    | `scripts/ps-contract-lib.ps1` | 新增（#24 導覽不變量＋NAV ID 含入口型＋ContractSchemaVersion 2＋審查補強：technicalMenu 形狀／可見性／自然鍵／surface debt＋#27 Classic canonical） | 1484 | 存 UTF-8 with BOM；不直接執行；舊 legacy-contract.json／spec／gate 收據因 schema 升版全部重生屬預期 |
-   | `scripts/ps-contract.ps1` | 新增（#27 Classic canonical） | 248 | 存 UTF-8 with BOM |
+   | `scripts/ps-contract.ps1` | 新增（#27 Classic canonical＋#27 Classic canonical） | 248 | 存 UTF-8 with BOM |
    | `scripts/tests/test-contract.ps1` | 新增（#24 九條斷言＋#27 Classic canonical） | 586 | 存 UTF-8 with BOM；`pwsh -NoProfile -File`；fixture 自刪 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 384 | 最後搬；`ps-fs-doctor` 應報 63 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 2. 公司機先跑 `pwsh -NoProfile -File scripts\tests\test-contract.ps1`，**再用 `powershell -NoProfile -File` 跑一次**——
