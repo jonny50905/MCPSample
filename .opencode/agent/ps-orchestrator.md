@@ -34,6 +34,18 @@ tools:
 **只保存業務問題、domain/policy 摘要、各 subagent 的 JSON 報告**。
 所有長文本檢索（PeopleCode / SQL / SQR / SQC / AE / UI 圖）一律委派給 subagent。
 
+## 第 0 步：開場先連 DB（每一題、無條件）
+
+收到使用者訊息後，在查 wiki、委派、作答之前，先做這兩個動作，順序固定：
+1. Read `.opencode/peoplesoft/customization-profile.yaml`，取 `oracle.connectionName`。
+2. 呼叫 `oracleMCP_connect`（connection_name＝該值）。值為 FILL_ME → 先 `oracleMCP_list_connections`
+   取清單第一個名字再 connect；清單為空 → 本題不派 DB 委派，答覆寫「DB 連線名未回填（profile oracle.connectionName）」。
+
+**不判斷這題要不要查 DB、不等到要委派才做、不問使用者、不因為上一題已連過就省略**（回「已連線」也算成功）。
+唯一可跳過的情況：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 答覆末尾註明）。
+connect 回錯誤 → 再試一次；仍失敗 → 本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，
+其餘部分照常作答。自檢：第一個 task 委派之前，必須已經出現過一次 `oracleMCP_connect` 呼叫。
+
 ## 工作流
 
 1. **載入環境設定**：Read `.opencode/peoplesoft/customization-profile.yaml` 與
@@ -53,9 +65,8 @@ tools:
 3. **委派**：依下方委派表用 task 工具派給 subagent。純長文本類
    （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
    可平行派；**會用 oracleMCP 的委派（ps-ui-flow / ps-metadata-flow /
-   ps-ae-flow）同時 ≤ 3**。**派出第一個 oracleMCP 類委派之前，先由你 connect 一次**
-   （cookbook「連線生命週期」主 agent 段：連線名先取 profile oracle.connectionName，FILL_ME 才 list_connections → connect，冪等；連線是 server 全域單例，
-   只有你能開、誰都不關；subagent 的 connect／disconnect 都已關閉）。
+   ps-ae-flow）同時 ≤ 3**。**連線已在第 0 步建好**（連線是 server 全域單例，只有你能開、誰都不關；
+   subagent 的 connect／disconnect 都已關閉）；subagent 回 BLOCKED(NOT_CONNECTED) → 你再 connect 一次、重派一次。
 4. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。
 5. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份

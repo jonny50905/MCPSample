@@ -3056,3 +3056,8 @@
   §7 加 R0 工具可見性。教訓：對外部工具名不要只信文件，第一次接線就叫模型把工具清單原樣列出來。
 - 定案（同日，管理者）：公司機 OpenCode 的工具名就是底線版，全樹一律寫 `list_connections`／`run_sql`，連字號拼法
   （tools 表、cookbook、SOP、test-scenarios、HANDOFF）全部移除，不再兩種都開；情境 31 加守衛擋連字號拼法回流。
+- 追記（同日，公司機回饋）：主 agent 仍高機率不 connect。條件式規則（「派第一個 DB 委派之前」）要模型先判斷題目要不要 DB
+  再記得做，兩個判斷點都會漏。改成無條件開場動作：三個主 agent 第 0 步固定 read profile → `oracleMCP_connect`，
+  不判斷、不省略、回「已連線」也算成功；cookbook 主 agent 段、/ps-audit、/ps-audit-batch 同步；情境 31 斷言三個主 agent
+  含「第 0 步」與「無條件」、agent／command 不再有「派出第一個之前先由你 connect」；§7 加 R8。教訓：有狀態資源的
+  初始化不要做成條件式，做成每次開場的固定動作——connect 是冪等的，多連一次沒有成本，漏連一次整題失效。

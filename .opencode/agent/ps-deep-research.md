@@ -46,12 +46,22 @@ docs/ps-research/<領域>/
 - **併發上限看「這個委派會呼叫哪個 server」**（不是任務類型——同樣是
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
   · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3。
-    **派出第一個之前先由你 connect 一次**（cookbook「連線生命週期」主 agent 段：連線名先取 profile oracle.connectionName，FILL_ME 才 list_connections →
-    connect，冪等；subagent 不能 connect 也不能 disconnect）。subagent 回 BLOCKED(NOT_CONNECTED) →
+    **連線已在第 0 步建好**（subagent 不能 connect 也不能 disconnect）。subagent 回 BLOCKED(NOT_CONNECTED) →
     再 connect 一次、重派一次；第二次仍失敗 → 該筆收據記「DB 連線建立失敗（原因）」，不寫「通道未掛」。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
+
+## 第 0 步：開場先連 DB（每次被呼叫、無條件；比下面「啟動與續跑」更早）
+
+1. Read `.opencode/peoplesoft/customization-profile.yaml`，取 `oracle.connectionName`。
+2. 呼叫 `oracleMCP_connect`（connection_name＝該值）。值為 FILL_ME → 先 `oracleMCP_list_connections` 取清單第一個名字；
+   清單為空 → 本次不派 DB 委派，checklist／收據記「DB 連線名未回填（profile oracle.connectionName）」。
+
+不判斷本次會不會用到 DB、不等到要派 DB 委派才做、不因為同一 session 已連過就省略（回「已連線」也算成功）。
+唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。
+connect 回錯誤 → 再試一次；仍失敗 → 本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
+自檢：第一個 task 委派之前，必須已經出現過一次 `oracleMCP_connect` 呼叫。
 
 ## 啟動與續跑（每次被呼叫先做這個）
 
