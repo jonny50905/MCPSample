@@ -80,7 +80,7 @@ oracle:
   # 值為 FILL_ME 則跳過該步。
   currentSchema: FILL_ME
   # SQLcl 已儲存連線的名稱（connect 的 connection_name）——主 agent 建連線時直接用，
-  # 不必先 list-connections。值為 FILL_ME 時主 agent 才呼叫 list-connections 取名。
+  # 不必先 list_connections。值為 FILL_ME 時主 agent 才呼叫 list_connections 取名。
   connectionName: FILL_ME
 
 # 業務領域定義（Domain alias、rootObjectPolicy、fallback 政策）

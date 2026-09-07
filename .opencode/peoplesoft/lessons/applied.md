@@ -2942,7 +2942,7 @@
   並行時必然互拆——先查完的斷線，其餘失敗重連再互拆，成風暴。L66／SOP-12
   當初只寫到「可能互拆」，這次坐實。
 - 落點：
-  1. cookbook 連線生命週期改版：先直接查 → 回未連線錯誤才 list-connections＋
+  1. cookbook 連線生命週期改版：先直接查 → 回未連線錯誤才 list_connections＋
      connect（一次、冪等）→ ALTER SESSION 每任務一次（重複無害）→ 查 →
      **不得 disconnect**（headless 結束時連線隨行程關閉；逾時／BLOCKED 前也不斷）。
   2. ps-ui-flow／ps-metadata-flow／ps-ae-flow 三個帶 oracleMCP 的 agent 同步改。
@@ -3090,7 +3090,7 @@
   查→未連線→list→connect→ALTER→重查五步復原；擁有者由題目決定、每次不同，小模型跳一步就變 BLOCKED，
   報告契約又沒有原因欄，orchestrator 只能統一翻成「DB 通道忙碌」。
 - 根因：有狀態的單例資源，開與關都要有明確擁有者；只收攏一半，另一半就變成機率性行為。
-- 落點（嚴格版）：主 agent tools 開 `oracleMCP_list-connections`／`oracleMCP_connect`（不開 run-sql／disconnect），
+- 落點（嚴格版）：主 agent tools 開 `oracleMCP_list_connections`／`oracleMCP_connect`（不開 run_sql／disconnect），
   派出第一個 DB 委派前 connect 一次；subagent `oracleMCP_connect` 硬關，未連線只回 BLOCKED＋
   `blockedReason=NOT_CONNECTED`；主 agent 再 connect、重派一次，第二次才對外說「連線建立失敗（原因）」。
   report-contract 加封閉值 `blockedReason`（NOT_CONNECTED／ORACLE_MCP_DOWN／QUERY_TIMEOUT／SCHEMA_UNRESOLVED／
@@ -3101,12 +3101,14 @@
 - 有意不做：備援版（subagent 保留 connect）——併發下會互相重建連線，回到 L109 風暴的溫和版；
   管理者拍板嚴格版。currentSchema=FILL_ME 另案（管理者本機回填，fs-doctor 報該檔 M 屬預期）。
 - 待公司機驗：主 agent 對 `oracleMCP_connect` 的權限是 allow；已連線時再 connect 的回應（「已連線」或重建，皆可）。
-- 追記（2026-09-07，公司機實測）：主 agent 看得到 connect、看不到 list-connections，因此拿不到 connection_name。
+- 追記（2026-09-07，公司機實測）：主 agent 看得到 connect、看不到 list_connections，因此拿不到 connection_name。
   根因：OpenCode 0.6.0～1.0.x 註冊 MCP 工具時把名稱的連字號改成底線（`replace(/[-\s]+/g, "_")`），
   實際工具名是 `oracleMCP_list_connections`／`oracleMCP_run_sql`；1.1.30 起改為保留連字號。tools 表寫
-  `oracleMCP_list-connections` 在舊版對不上，被 `oracleMCP_*: false` 蓋掉；`connect` 沒有連字號所以看得到。
+  連字號拼法在舊版對不上，被 `oracleMCP_*: false` 蓋掉；`connect` 沒有連字號所以看得到。
   落點：三個主 agent 兩種拼法都開；profile 加 `oracle.connectionName`（FILL_ME；管理者本機回填），主 agent
-  有值就直接 connect、不依賴 list-connections；cookbook 主 agent 段第 1 步改「先 profile 後 list」並註明工具名
+  有值就直接 connect、不依賴 list_connections；cookbook 主 agent 段第 1 步改「先 profile 後 list」並註明工具名
   兩種拼法等價；ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor 硬規則段殘留的舊流程（回未連線才
   list→connect）改為只回 BLOCKED(NOT_CONNECTED)；情境 31 斷言兩種拼法、profile 欄位與 subagent 無殘留；
   §7 加 R0 工具可見性。教訓：對外部工具名不要只信文件，第一次接線就叫模型把工具清單原樣列出來。
+- 定案（同日，管理者）：公司機 OpenCode 的工具名就是底線版，全樹一律寫 `list_connections`／`run_sql`，連字號拼法
+  （tools 表、cookbook、SOP、test-scenarios、HANDOFF）全部移除，不再兩種都開；情境 31 加守衛擋連字號拼法回流。

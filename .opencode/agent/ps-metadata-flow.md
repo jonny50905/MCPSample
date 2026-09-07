@@ -79,7 +79,7 @@ tools:
   （FETCH FIRST 200 ROWS ONLY）。
 - **oracleMCP 連線生命週期（連線是全域共用單例；開只有主 agent 做、關誰都不做）**：連線已由主 agent
   建好，先直接發本次第一個 SELECT；回「未連線」類錯誤 → 立即回報 `status: BLOCKED`、
-  `blockedReason: NOT_CONNECTED` 結束本委派（不 list-connections、不 connect——兩者工具已對本 agent
+  `blockedReason: NOT_CONNECTED` 結束本委派（不 list_connections、不 connect——兩者工具已對本 agent
   關閉、不重試）；成功 → **設 CURRENT_SCHEMA**（read customization-profile.yaml 的 oracle.currentSchema，
   執行一次 ALTER SESSION SET CURRENT_SCHEMA=<值>——唯一准許的非 SELECT、重複無害；值為 FILL_ME 就
   跳過）→ 重發該查詢 → 查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；

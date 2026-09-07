@@ -55,16 +55,16 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
 
 ```text
 0. 工具清單裡沒有任何 oracleMCP_ 工具 → ORACLE_MCP_DOWN（規則 7a），不試 connect，如實回報。
-   工具名以清單為準：list-connections／run-sql 可能顯示成 list_connections／run_sql（連字號被改成底線），兩者等價
+   工具名（底線）：list_connections／connect／run_sql／disconnect
 1. 取連線名           → read customization-profile.yaml 的 oracle.connectionName；有值就用它（不 list）；
-                          FILL_ME → list-connections（或 list_connections）取已儲存連線名（不要自己編）；
+                          FILL_ME → list_connections 取已儲存連線名（不要自己編）；
                           清單為空或沒有 list 類工具又未回填 → CONNECT_FAILED（NO_CONNECTION_NAME），
                           如實回報「profile oracle.connectionName 未回填」
 2. connect（帶連線名）   → 只做一次；回「已連線」也視為成功；>30 秒無回應 → CONNECT_TIMEOUT
 3. 之後本題／本批的委派都不必再 connect。subagent 回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、
    重派一次；第二次仍 NOT_CONNECTED → 對使用者／收據如實寫「DB 連線建立失敗（<connect 的錯誤>）」，
    不得說成「DB 通道忙碌」
-4. 主 agent 永遠不自己 run-sql、不 disconnect
+4. 主 agent 永遠不自己 run_sql、不 disconnect
 ```
 
 **subagent（ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）——每次委派**：
@@ -72,7 +72,7 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
 ```text
 1. 直接發本次任務的第一個 SELECT（連線已由主 agent 建好）
 2. 回「未連線／not connected／no connection」類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED，
-   結束本委派。不 list-connections、不 connect（工具已關）、不重試
+   結束本委派。不 list_connections、不 connect（工具已關）、不重試
 3. 設 schema            → read customization-profile.yaml 取 oracle.currentSchema，執行一次
                           ALTER SESSION SET CURRENT_SCHEMA=<該值>（唯一准許的非 SELECT 語句；
                           重複執行無害；值為 FILL_ME → 跳過）→ 重發第 1 步那個查詢一次。
