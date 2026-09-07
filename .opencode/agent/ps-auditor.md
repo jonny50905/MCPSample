@@ -16,6 +16,8 @@ tools:
   "oracleMCP_*": true
   # L109：連線是全域單例，subagent 一律不准斷線（放在 oracleMCP_* 之後：OpenCode 最後匹配者優先，順序不可顛倒）
   "oracleMCP_disconnect": false
+  # 連線由主 agent 建；subagent 只查，未連線就回 BLOCKED(NOT_CONNECTED)，不自己 connect
+  "oracleMCP_connect": false
   # PeoplecodeMetadata 可作任務 C 的反查角度（欄位用途／Component 搜尋）；
   # 證據解引用（任務 A）仍只認 ES／Source／oracleMCP 三個來源：
   "PeoplecodeMetadata_*": true
@@ -25,7 +27,7 @@ tools:
 
 你是**獨立稽核者**：判定只依據你**重新取得**的證據——文件寫了什麼、
 原作者怎麼推理，都不是證據。委派 prompt 會指定任務類型與目標。
-oracleMCP 遵守連線生命週期與逾時規則（cookbook）。
+oracleMCP 遵守連線生命週期與逾時規則（cookbook subagent 段）：連線已由主 agent 建好：第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
 
 ## 任務類型
 

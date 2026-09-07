@@ -45,46 +45,47 @@
    要當證據，就得用本 cookbook 的 SELECT 取得並附「SQL＋關鍵列」。
 ```
 
-## 連線生命週期（每次任務照此順序，硬性）
+## 連線生命週期（硬性；連線的擁有者是主 agent）
 
 SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線」，指令依序執行。
-**定案**：這條連線是 MCP server 全域單例——main 與所有 subagent
-共用同一個開關，任何一方 `disconnect` 就把其他人一起斷線。
-因此：**連線是共用資源，誰都不准 disconnect；connect 要冪等。**
+**定案**：這條連線是 MCP server 全域單例——main 與所有 subagent 共用同一個開關，
+任何一方 `disconnect` 就把其他人一起斷線。所以：**開，只有主 agent 做；關，誰都不做；查，subagent 做。**
+
+**主 agent（ps-orchestrator／ps-deep-research／ps-audit-orchestrator）——派出第一個 oracleMCP 類委派之前**：
 
 ```text
-1. 先直接查            → 本次任務的第一個 SELECT 直接發（連線多半已被前一個
-                          委派開好）；成功＝已連線，跳到第 4 步
-2. 只在回「未連線」類錯誤時
-   list-connections     → 取得可用的已儲存連線名（不要自己編連線名）
-   connect（帶連線名）   → 只做一次；回「已連線」也視為成功
-3. 設 schema            → read customization-profile.yaml 取
-                          oracle.currentSchema，執行一次
-                          ALTER SESSION SET CURRENT_SCHEMA=<該值>
-                          （**唯一准許的非 SELECT 語句**；重複執行無害；
-                          值為 FILL_ME → 跳過此步）→ 重發第 1 步那個查詢一次
-4. 查詢                 → 本次任務的查詢全部做完（裸表名即可，
-                          schema 已由第 3 步解決——PeopleTools 表
-                          不屬於登入帳號的 schema，漏這步會
-                          view/table not found）
-5. 不得 disconnect      → 連線留給下一個委派；headless 的 opencode run
-                          結束時 MCP server 隨行程結束，連線自然關閉。
-                          逾時、BLOCKED 回報前也一樣不斷線
+0. 工具清單裡沒有任何 oracleMCP_ 工具 → ORACLE_MCP_DOWN（規則 7a），不試 connect，如實回報
+1. list-connections     → 取得已儲存連線名（不要自己編）；清單為空 → CONNECT_FAILED（NO_SAVED_CONNECTION）
+2. connect（帶連線名）   → 只做一次；回「已連線」也視為成功；>30 秒無回應 → CONNECT_TIMEOUT
+3. 之後本題／本批的委派都不必再 connect。subagent 回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、
+   重派一次；第二次仍 NOT_CONNECTED → 對使用者／收據如實寫「DB 連線建立失敗（<connect 的錯誤>）」，
+   不得說成「DB 通道忙碌」
+4. 主 agent 永遠不自己 run-sql、不 disconnect
+```
+
+**subagent（ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）——每次委派**：
+
+```text
+1. 直接發本次任務的第一個 SELECT（連線已由主 agent 建好）
+2. 回「未連線／not connected／no connection」類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED，
+   結束本委派。不 list-connections、不 connect（工具已關）、不重試
+3. 設 schema            → read customization-profile.yaml 取 oracle.currentSchema，執行一次
+                          ALTER SESSION SET CURRENT_SCHEMA=<該值>（唯一准許的非 SELECT 語句；
+                          重複執行無害；值為 FILL_ME → 跳過）→ 重發第 1 步那個查詢一次。
+                          view/table not found 且值為 FILL_ME → blockedReason=SCHEMA_UNRESOLVED，不是 NOT_CONNECTED
+4. 查詢                 → 本次任務的查詢全部做完（裸表名即可，schema 已由第 3 步解決）
+5. 不得 disconnect      → 工具已關；逾時、BLOCKED 回報前也一樣不斷線
 ```
 
 逾時與平行規則：
 
 ```text
-- connect 或任何查詢超過約 30 秒沒返回 → 停手，回報 status: BLOCKED，
-  gaps 註明「oracleMCP 無回應」。
-- 不准重試迴圈：卡住的呼叫重發只會排在後面繼續卡，還會佔住 server
-  禍及其他 agent。
-- 不要假設可以同時有第二條連線——「目前連線」是行程級全域狀態，
-  交錯使用會把查詢跑在錯的連線上。
-- 會查 oracleMCP 的委派同時 ≤ 3（disconnect 已對 subagent 硬性關閉後恢復；
-  單一連線內 SQL 仍是排隊執行，再多只會撞 30 秒逾時）；**本批第一個 oracleMCP
-  委派先單獨派**，等它回報（連線已建立）再讓其餘並行，避免同時 connect。
-  純 ES＋Source 的委派不受此限。
+- connect 或任何查詢超過約 30 秒沒返回 → 停手：主 agent 記 CONNECT_TIMEOUT；subagent 回
+  status: BLOCKED、blockedReason=QUERY_TIMEOUT，gaps 註明「oracleMCP 無回應」。
+- 不准重試迴圈：卡住的呼叫重發只會排在後面繼續卡，還會佔住 server 禍及其他 agent。
+- 不要假設可以同時有第二條連線——「目前連線」是行程級全域狀態，交錯使用會把查詢跑在錯的連線上。
+- 會查 oracleMCP 的委派同時 ≤ 3（單一連線內 SQL 仍是排隊執行，再多只會撞 30 秒逾時）；
+  連線由主 agent 先建好，第一個 DB 委派不必等前一個回報，可與其餘同時派出。純 ES＋Source 的委派不受此限。
 - 任何情況都不呼叫 disconnect——斷線會把 main 與其他 subagent 一起拆掉。
 ```
 

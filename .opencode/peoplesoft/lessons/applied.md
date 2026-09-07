@@ -3082,3 +3082,22 @@
   1039 筆帶 SEG2 → seed 含 LINK 成立；EMPLOYEE 在 PSPRDMDEFN；CONNECT_BY_ISCYCLE 可用；canonical 對已知 Component
   回 5 列、只有 1 列 CLASSIC_VISIBLE=1 且與畫面一致。管理者要求 canonical 只回看得到的列 → 最後加 NAV_PATHS CTE
   ＋`WHERE CLASSIC_VISIBLE = 1`，帶旗標版降為診斷形（0 列時才跑）。
+
+### L114 連線的「開」也要有擁有者——主 agent connect、subagent 只查（issue #28，2026-09-07）
+
+- 症狀：查詢模式常見 subagent 回報「沒有連線」。L109 把「關」收攏了（誰都不准 disconnect），
+  「開」還是散的：三個主 agent 對 oracleMCP 全關，冷啟動靠第一個 DB subagent 自己走
+  查→未連線→list→connect→ALTER→重查五步復原；擁有者由題目決定、每次不同，小模型跳一步就變 BLOCKED，
+  報告契約又沒有原因欄，orchestrator 只能統一翻成「DB 通道忙碌」。
+- 根因：有狀態的單例資源，開與關都要有明確擁有者；只收攏一半，另一半就變成機率性行為。
+- 落點（嚴格版）：主 agent tools 開 `oracleMCP_list-connections`／`oracleMCP_connect`（不開 run-sql／disconnect），
+  派出第一個 DB 委派前 connect 一次；subagent `oracleMCP_connect` 硬關，未連線只回 BLOCKED＋
+  `blockedReason=NOT_CONNECTED`；主 agent 再 connect、重派一次，第二次才對外說「連線建立失敗（原因）」。
+  report-contract 加封閉值 `blockedReason`（NOT_CONNECTED／ORACLE_MCP_DOWN／QUERY_TIMEOUT／SCHEMA_UNRESOLVED／
+  TOOL_ERROR／NO_EVIDENCE／BUDGET_EXCEEDED），orchestrator 依它轉譯。cookbook 生命週期改寫成主 agent／subagent
+  兩段；「第一個先單獨派」規則作廢（連線已先建好）。守衛：test-auto-loop 情境 31 解析 7 個 agent 的 tools 表
+  （最後匹配者優先）斷言權限形狀，並斷言 agent／command 不再含「先單獨派」；R1～R7 只能在公司機手動跑，
+  記在 test-scenarios.md §7。
+- 有意不做：備援版（subagent 保留 connect）——併發下會互相重建連線，回到 L109 風暴的溫和版；
+  管理者拍板嚴格版。currentSchema=FILL_ME 另案（管理者本機回填，fs-doctor 報該檔 M 屬預期）。
+- 待公司機驗：主 agent 對 `oracleMCP_connect` 的權限是 allow；已連線時再 connect 的回應（「已連線」或重建，皆可）。

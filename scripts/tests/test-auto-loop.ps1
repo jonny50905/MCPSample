@@ -606,6 +606,38 @@ Assert ($ckSql -notmatch '(?m)^\s*HAVING') "canonical 不用 HAVING 丟列（hid
 $pfText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
 Assert ($pfText -match '(?m)^navigation:' -and $pfText -match '(?m)^\s*surfaces:\s*CLASSIC_ONLY' -and $pfText -match '(?m)^\s*identity:\s*MENU_COMPONENT\b' -and $pfText -match '(?m)^\s*labelLanguage:\s*ENG' -and $pfText -match '(?m)^\s*attrValType:\s*CLOB') "profile navigation 區塊：surfaces／identity／labelLanguage／attrValType"
 
+Write-Host "情境 31：oracleMCP 連線擁有權——主 agent 開 list-connections／connect、不開 run-sql／disconnect；subagent 只查、不能 connect／disconnect（tools 表最後匹配者優先）"
+function Get-AgentToolPerm([string]$File, [string]$Tool) {
+    $txt = [System.IO.File]::ReadAllText($File)
+    $m = [regex]::Match($txt, '(?ms)^tools:\r?\n(.*?)(?=^[A-Za-z_]+:|^---|\z)')
+    if (-not $m.Success) { return 'NO_TOOLS_BLOCK' }
+    $eff = 'UNLISTED'
+    foreach ($ln in ($m.Groups[1].Value -split "`r?`n")) {
+        if ($ln -match '^\s*"?([A-Za-z0-9_\-\*\.]+)"?:\s*(true|false)') {
+            $pat = $Matches[1]; $val = $Matches[2]
+            $rx = '^' + [regex]::Escape($pat).Replace('\*', '.*') + '$'
+            if ($Tool -match $rx) { $eff = $val }
+        }
+    }
+    return $eff
+}
+foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
+    $pf = Join-Path $repoRoot ".opencode/agent/$pa.md"
+    Assert ((Get-AgentToolPerm $pf 'oracleMCP_connect') -eq 'true' -and (Get-AgentToolPerm $pf 'oracleMCP_list-connections') -eq 'true') "主 agent $pa：connect／list-connections 開"
+    Assert ((Get-AgentToolPerm $pf 'oracleMCP_run-sql') -eq 'false' -and (Get-AgentToolPerm $pf 'oracleMCP_disconnect') -eq 'false') "主 agent $pa：run-sql／disconnect 關"
+}
+foreach ($sa in @('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor')) {
+    $sf = Join-Path $repoRoot ".opencode/agent/$sa.md"
+    Assert ((Get-AgentToolPerm $sf 'oracleMCP_run-sql') -eq 'true') "subagent $sa：run-sql 開"
+    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false') "subagent $sa：connect／disconnect 關（在 oracleMCP_* 之後）"
+}
+$ckLc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/oracle-query-cookbook.md'))
+Assert ($ckLc -match '連線的擁有者是主 agent' -and $ckLc -match 'blockedReason=NOT_CONNECTED' -and $ckLc -notmatch '第一個先單獨派\*\*，') "cookbook 生命週期：主 agent／subagent 兩段，先單獨派規則已移除"
+$rcTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/subagent-report-contract.md'))
+Assert ($rcTxt -match 'blockedReason' -and $rcTxt -match 'NOT_CONNECTED' -and $rcTxt -match 'SCHEMA_UNRESOLVED' -and $rcTxt -match 'QUERY_TIMEOUT') "report-contract：blockedReason 封閉值域"
+$noSolo = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '先單獨派' } | ForEach-Object { $_.Name })
+Assert ($noSolo.Count -eq 0) "agent／command 不再有「先單獨派」：$($noSolo -join ',')"
+
 Write-Host "情境 29：agent 檔規則衛生——出處／日期／變更敘述不得進模型讀的檔（ps-agent-doc-lint）"
 $adRoot = Join-Path $dir 'agentdoc'
 New-Item -ItemType Directory -Path (Join-Path $adRoot '.opencode/agent') -Force | Out-Null

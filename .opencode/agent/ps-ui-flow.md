@@ -17,6 +17,8 @@ tools:
   "oracleMCP_*": true
   # L109：連線是全域單例，subagent 一律不准斷線（放在 oracleMCP_* 之後：OpenCode 最後匹配者優先，順序不可顛倒）
   "oracleMCP_disconnect": false
+  # 連線由主 agent 建；subagent 只查，未連線就回 BLOCKED(NOT_CONNECTED)，不自己 connect
+  "oracleMCP_connect": false
   # PeoplecodeMetadata：欄位用途反查／Component 關鍵字搜尋——免連線、最便宜，
   # 但回傳只作「定位線索」，證據仍走 oracleMCP（SQL）：
   "PeoplecodeMetadata_*": true
@@ -55,6 +57,7 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
    label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數、
    條件 UI 變異目標解析（§2h～§2j，流程照 SKILL「條件 UI」節）。
+   連線已由主 agent 建好：第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
 3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時）**：先讀 profile `navigation:`。
    `verified: true` → **直接跑 cookbook §2k-C canonical**（bind：componentName＋profile 的 portal／labelLanguage），
    回傳列原樣映射：每列＝一個看得到的入口（entryType 依 CREF_USGT、visibility＝`CLASSIC_NAV_VISIBLE`、

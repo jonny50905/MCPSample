@@ -21,6 +21,9 @@ tools:
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
   "oracleMCP_*": false
+  # 連線的擁有者是主 agent：只開 list-connections 與 connect（派第一個 DB 委派前 connect 一次）；run-sql／disconnect 維持關閉
+  "oracleMCP_list-connections": true
+  "oracleMCP_connect": true
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
 ---
@@ -50,8 +53,9 @@ tools:
 3. **委派**：依下方委派表用 task 工具派給 subagent。純長文本類
    （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
    可平行派；**會用 oracleMCP 的委派（ps-ui-flow / ps-metadata-flow /
-   ps-ae-flow）同時 ≤ 3**，且**第一個先單獨派**、等它回報再派其餘
-   （連線是 server 全域單例：subagent 不得 disconnect，只有主 session 在任務結束時關）。
+   ps-ae-flow）同時 ≤ 3**。**派出第一個 oracleMCP 類委派之前，先由你 connect 一次**
+   （cookbook「連線生命週期」主 agent 段：list-connections → connect，冪等；連線是 server 全域單例，
+   只有你能開、誰都不關；subagent 的 connect／disconnect 都已關閉）。
 4. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。
 5. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份
@@ -157,10 +161,11 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
 - **委派必須指名 ps-\* agent**（依委派表）：general／explore／scout
   是 OpenCode 內建的「本機檔案探索」agent，**查不到 PeopleSoft**——
   派它們去查業務問題＝路由錯誤，回來的「查無」無效。
-- **oracle 類委派回 BLOCKED／逾時的轉譯**：不得說成「無法執行 SQL」
-  這類能力性否定——照實說「**DB 通道忙碌或逾時**（單一連線；常見
-  原因＝另一個視窗的稽核／研究正在用），稍後重試即可」；
-  非 DB 的部分照常作答，並標明哪部分因此缺料。
+- **oracle 類委派回 BLOCKED 的轉譯（看報告的 `blockedReason`）**：`NOT_CONNECTED` → 你再 connect 一次、
+  重派一次，第二次仍 NOT_CONNECTED 才說「DB 連線建立失敗（<connect 回的錯誤>）」；`QUERY_TIMEOUT` →
+  「**DB 通道忙碌或逾時**（單一連線；常見原因＝另一個視窗的稽核／研究正在用），稍後重試即可」；
+  `SCHEMA_UNRESOLVED` → 「profile oracle.currentSchema 未回填」；`ORACLE_MCP_DOWN` → 「oracleMCP 未掛
+  （SQLcl MCP 未啟動）」。不得說成「無法執行 SQL」這類能力性否定；非 DB 的部分照常作答，並標明哪部分因此缺料。
 - **路徑類問題的作答紀律**：「這功能在選單哪裡」屬 @ps-ui-flow
   （Portal Registry，cookbook §2k），**不是** @ps-metadata-flow 的授權路徑。
   回答必須把「Classic 選單入口」（canonical 可見列；未跑 canonical 只有 registry 證據時叫「Portal Registry 登錄入口」）
