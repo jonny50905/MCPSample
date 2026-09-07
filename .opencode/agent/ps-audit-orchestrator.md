@@ -15,7 +15,9 @@ tools:
   "PeoplecodeSource_*": false
   "oracleMCP_*": false
   # 連線的擁有者是主 agent：只開 list-connections 與 connect（派第一個 DB 委派前 connect 一次）；run-sql／disconnect 維持關閉
+  # 工具名依 OpenCode 版本可能是 list-connections 或 list_connections（連字號被改成底線），兩種拼法都開
   "oracleMCP_list-connections": true
+  "oracleMCP_list_connections": true
   "oracleMCP_connect": true
   "PeoplecodeMetadata_*": false
 ---

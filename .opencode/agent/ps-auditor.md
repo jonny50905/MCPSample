@@ -116,7 +116,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。
 3. SQL 型：重跑該 SELECT（只准 SELECT、加列數上限；**重跑前照
-   cookbook 連線生命週期——connect 後先設 CURRENT_SCHEMA**，
+   cookbook 連線生命週期 subagent 段——先設 CURRENT_SCHEMA**，
    view/table not found 常因漏此步）→ keyRows 仍成立。
    `sql` 欄**非 SELECT**（如 AE 的 UPDATE、程式內語句）→
    `FAIL(WRONG_KIND)`（程式碼語句應改用 CHUNK 證據）——**不執行**、
@@ -252,7 +252,8 @@ customization-profile 的分類：名稱符合客製 prefix＝CUSTOM_PREFIX，
 - quote 比對失敗照實 FAIL——不腦補「大概是後來改版了」。
 - 不修文件、不寫任何檔案。
 - oracleMCP 只准 SELECT；逾時 → 該筆 UNVERIFIABLE，**不准重試迴圈**；連線生命週期照 cookbook
-  （先直接查、回未連線錯誤才 connect 一次、**不得 disconnect**——工具已對本 agent 關閉，L109）。
+  subagent 段（連線已由主 agent 建好；先直接查，回未連線錯誤只回 BLOCKED＋blockedReason=NOT_CONNECTED，
+  不 connect、**不得 disconnect**——兩者工具已對本 agent 關閉）。
 - 回報內不放大段原始碼（單段引用 ≤ 5 行）。
 - **原因欄寫人話**：每筆 FAIL 的 reason 要讓修復者一看就懂——
   固定格式「文件說＜一句＞；實際取到＜一句＞；差異＜一句＞」；
