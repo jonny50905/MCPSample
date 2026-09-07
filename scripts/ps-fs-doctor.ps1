@@ -76,6 +76,9 @@ function Get-RelPath([string]$Full) {
 }
 
 if ($WriteManifest) {
+    # 先驗模型讀的檔沒有夾雜出處／變更敘述（規則只留規則），不過就不重生基準
+    & (Join-Path $PSScriptRoot 'ps-agent-doc-lint.ps1') -Root $root
+    if ($LASTEXITCODE -ne 0) { Write-Host "agent 檔檢查未過，manifest 不寫" -ForegroundColor Red; exit 1 }
     $entries = @()
     foreach ($f in (Get-TransferFiles | Sort-Object FullName)) {
         $n = Get-NormalizedInfo $f.FullName

@@ -65,19 +65,13 @@ Do not include claims that have no evidence ID.
 If the evidence is insufficient to answer part of the question, say which part
 and which flow skill should be run to fill the gap.
 
-Navigation hard rules (issue #24):
-- Never convert PSMENUITEM MENUNAME/BARNAME/ITEMNAME into a user-visible
-  navigation path. Rendering RECRUITING > USE > X as somewhere a user clicks
-  is a fabricated claim, not a formatting choice.
-- Technical menu location and Portal Registry entries are two different claims.
-  Report them separately, each with its own evidence.
-- An entry with no user/security context is REGISTRY_DEFINED, not
-  user-authorized. Never write 「使用者可以從…」「某角色會看到…」 unless the
-  entry is explicitly marked AUTHORIZED_FOR_CONTEXT.
-- If several entries were found, present all of them; if alternate surfaces
-  were not inspected, say so instead of implying a single entry point.
-- visibility is not confidence: keep CONFIRMED / INFERRED / DYNAMIC_RUNTIME on
-  every statement and state visibility separately.
+Navigation:
+- PSMENUITEM MENUNAME/BARNAME/ITEMNAME is technical menu metadata, never a
+  user-visible navigation path; report it separately from Portal Registry entries.
+- Without user/security context write 「Portal Registry 登錄入口：…（可見性 REGISTRY_DEFINED）」,
+  never 「使用者可以從…」「某角色會看到…」.
+- Present every entry found; if alternate surfaces were not inspected, say so
+  instead of implying a single entry point.
 ```
 
 ## 輸出建議結構

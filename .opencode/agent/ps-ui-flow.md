@@ -55,11 +55,11 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
    label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數、
    條件 UI 變異目標解析（§2h～§2j，流程照 SKILL「條件 UI」節）。
-3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時；issue #24）**：照 cookbook §2k
+3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時）**：照 cookbook §2k
    走 2k-0（先驗表名欄位）→ 2k-1（PSMENUITEM seed，只叫 technicalMenuLocation）→
    2k-2（menu＋component＋market 找 CREF）→ 2k-3（parent walk，visited／depth 20／不跨 Portal）→
    2k-4（語系 label，逐段記 source／fallback）→ 2k-5（CREF Link 與其他 surface）。
-   本步屬 **oracleMCP 類委派，計入同時 ≤ 3（L109），上限不變**。
+   本步屬 **oracleMCP 類委派，計入同時 ≤ 3**。
 4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
 5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
@@ -73,7 +73,7 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查
   （只吃欄位名）、`search_component_metadata` Component 關鍵字搜尋
   （只吃 Component 關鍵字）——Page／Record 名帶入必查空。
-- **可用（oracleMCP + cookbook §2k，issue #24）**：Portal Registry 導覽入口——
+- **可用（oracleMCP + cookbook §2k）**：Portal Registry 導覽入口——
   Component → CREF → Folder 階層 → 逐段語系 label；輸出 `navigationEntries[]`（複數）
   與 `technicalMenuLocations[]`（分開，永不合併）。
 - **尚缺（導覽，本版不實作）**：Navigation Collection、Fluid Tile／Homepage、NavBar 的入口探索；
@@ -108,7 +108,7 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
   `search_component_metadata` 只吃 Component 關鍵字——Page／Record／
   選單名帶入必查空＝**方法錯誤**（不是「不存在」），此類問題改走
   cookbook §2 對映。
-- **導覽硬規則（issue #24）**：
+- **導覽硬規則**：
   1. **PSMENUITEM 的 MENUNAME／BARNAME／ITEMNAME 永遠只是 `technicalMenuLocation`**，
      不得串成使用者路徑、不得當 `navigationEntries` 的 fallback。查不到 Portal Registry
      入口就回空陣列＋gaps，**不是**退回技術選單。

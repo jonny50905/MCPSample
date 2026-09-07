@@ -587,6 +587,21 @@ Assert ($nvCov -match '\[美工／不擋覆蓋畢業\].*功能定位宣稱導覽
 Assert ($nvCov -notmatch '\[導覽\] 41-TW_NAV_BAD') "tier 1：導覽工單受 emitPolish 抑制"
 Remove-Item -Recurse -Force $nvDir
 
+Write-Host "情境 29：agent 檔規則衛生——出處／日期／變更敘述不得進模型讀的檔（ps-agent-doc-lint）"
+$adRoot = Join-Path $dir 'agentdoc'
+New-Item -ItemType Directory -Path (Join-Path $adRoot '.opencode/agent') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $adRoot '.opencode/peoplesoft') -Force | Out-Null
+$adLint = Join-Path $repoRoot 'scripts/ps-agent-doc-lint.ps1'
+[System.IO.File]::WriteAllText((Join-Path $adRoot '.opencode/agent/bad.md'), "規則一（issue #24）`r`n舊版寫法已廢止（2026-09-04）`r`n見 L109", (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText((Join-Path $adRoot '.opencode/peoplesoft/SOP.md'), "SOP 可以寫 issue #24 與 2026-09-04", (New-Object System.Text.UTF8Encoding($true)))
+$adOut = (& $adLint -Root $adRoot *>&1 | Out-String); $adExit = $LASTEXITCODE
+Assert ($adExit -eq 1 -and $adOut -match 'bad\.md:1 \[issue 編號\]' -and $adOut -match '\[變更敘述\]' -and $adOut -match '\[日期\]') "壞檔：issue 編號／變更敘述／日期 → 阻擋、exit 1"
+Assert ($adOut -notmatch 'SOP\.md:\d') "SOP.md 不在範圍（給人看的檔可以有歷史）"
+Assert ($adOut -match '教訓編號 L<nn>：1 處') "L 編號只計數不擋"
+[System.IO.File]::WriteAllText((Join-Path $adRoot '.opencode/agent/bad.md'), "規則一`r`n規則二", (New-Object System.Text.UTF8Encoding($true)))
+$null = (& $adLint -Root $adRoot *>&1 | Out-String); Assert ($LASTEXITCODE -eq 0) "乾淨檔 → exit 0"
+$adReal = (& $adLint -Root $repoRoot *>&1 | Out-String); Assert ($LASTEXITCODE -eq 0) "本 repo 的模型檔目前乾淨（exit 0）：$(($adReal -split "`n" | Where-Object { $_ -match '\[' } | Select-Object -First 3) -join ' / ')"
+
 Remove-Item -Recurse -Force $dir
 Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }

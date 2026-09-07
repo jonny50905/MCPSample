@@ -84,7 +84,7 @@ CONTAINS_CHOICE
 TRIGGERS_EVENT
 ```
 
-## 3. 導覽入口詞彙表（ps_get_navigation_entries；issue #24）
+## 3. 導覽入口詞彙表（ps_get_navigation_entries）
 
 `navigationEntryType`（入口型）：
 
@@ -107,13 +107,13 @@ UNKNOWN_VISIBILITY
 UNRESOLVED
 ```
 
-兩個值域的完整定義（含 `UNRESOLVED`＝查不到）以 `legacy-contract-vocabulary.md` 為準；報告端缺值改用 gaps 說明，`AUTHORIZED_FOR_CONTEXT` 本版不得由模型產出。
+完整定義以 `legacy-contract-vocabulary.md` 為準；`AUTHORIZED_FOR_CONTEXT` 本版不得由模型產出。
 
 輸入（欄位表，非可呼叫 JSON）：`componentName`（必填）、`menuName`、`market`（預設 `GBL`）、
 `portalName`（省略＝列舉 `PSPRDMDEFN`）、`languageCode`（如 `ZHT`）、`includeAlternateEntries`（預設 true）。
 
 輸出兩個**互不合併**的陣列：
-- `technicalMenuLocations[]`：`menuName` / `barName` / `itemName`（來源 §2e／§2k-1；**永遠不是導覽路徑**；contract 線 fragment 的 kv 名為 `technicalMenu`，值＝`MENUNAME/BARNAME/ITEMNAME`）
+- `technicalMenuLocations[]`：`menuName` / `barName` / `itemName`（來源 §2e／§2k-1；**永遠不是導覽路徑**）
 - `navigationEntries[]`：`portalName` / `entryType`（上表）/ `crefObjectName` /
   `labels[]`（每段 `displayText`、`languageCode`、`displayTextSource`、`fallbackLanguageCode`）/
   `visibility`（上表）/ `confidence`（仍只有 CONFIRMED／INFERRED／DYNAMIC_RUNTIME）
