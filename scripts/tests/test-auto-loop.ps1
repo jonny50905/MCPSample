@@ -648,8 +648,10 @@ Assert ($hy.Count -eq 0) "全樹 oracleMCP 工具名一律底線拼法（list_co
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
     Assert ($pt -match '第 0 步' -and $pt -match '無條件' -and $pt -match 'oracleMCP_connect') "主 agent $pa：開場無條件 connect（第 0 步）"
+    $s0 = $pt.Substring($pt.IndexOf('## 第 0 步')); $iL = $s0.IndexOf('oracleMCP_list_connections'); $iC = $s0.IndexOf('oracleMCP_connect')
+    Assert ($iL -ge 0 -and $iC -gt $iL -and $s0 -notmatch 'read profile → connect') "主 agent $pa：第 0 步先 list_connections 再 connect"
 }
-$cond = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '派出第一個.{0,12}之前.{0,6}先由你 connect|派出前先由你 connect' } | ForEach-Object { $_.Name })
+$cond = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '派出第一個.{0,12}之前.{0,6}先由你 connect|派出前先由你 connect|read profile → connect' } | ForEach-Object { $_.Name })
 Assert ($cond.Count -eq 0) "agent／command 不再有條件式 connect（派出第一個之前才 connect）：$($cond -join ',')"
 
 Write-Host "情境 29：agent 檔規則衛生——出處／日期／變更敘述不得進模型讀的檔（ps-agent-doc-lint）"

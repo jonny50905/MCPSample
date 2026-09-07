@@ -3117,3 +3117,7 @@
   不判斷、不省略、回「已連線」也算成功；cookbook 主 agent 段、/ps-audit、/ps-audit-batch 同步；情境 31 斷言三個主 agent
   含「第 0 步」與「無條件」、agent／command 不再有「派出第一個之前先由你 connect」；§7 加 R8。教訓：有狀態資源的
   初始化不要做成條件式，做成每次開場的固定動作——connect 是冪等的，多連一次沒有成本，漏連一次整題失效。
+- 追記（同日，管理者）：開場順序固定 `list_connections` → `connect`，不准跳過 list 直接 connect；profile connectionName
+  降為「在清單裡挑名字」（有填且在清單裡用它，否則清單第一個）。三個主 agent 第 0 步、cookbook 主 agent 段、
+  /ps-audit／/ps-audit-batch／/ps-contract-batch／/ps-contract-verify、test-scenarios R1／R8、情境 31（斷言第 0 步裡
+  list_connections 出現在 connect 之前）同步。

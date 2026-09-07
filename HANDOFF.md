@@ -76,7 +76,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `scripts/ps-auto-loop.ps1` | 修改（#24 手術 prompt [導覽] 型＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
    | `.opencode/command/ps-audit-batch.md` | 修改（L112 清理＋#28 連線歸主 agent＋開場無條件 connect＋list→connect 順序） | 109 | 掛 ps-deep-research（80196ee） |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 | 備用、未掛載，但 manifest 要對 |
-   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 673 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
+   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 675 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 384 | 最後搬；搬完跑 `ps-fs-doctor` 應報 56 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
 1a. oracleMCP 根因修正＋#23 research 債＋#24 導覽路徑（2026-09-03～04；**從 handover 分支搬時**用本表；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
 
@@ -105,10 +105,10 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 518 | handover 版本行數 |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 | handover 版本行數 |
    | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20＋SOP-12 追記＋SOP-12 再追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 655 | handover 版本行數 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3063 | handover 版本行數 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3067 | handover 版本行數 |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM；handover 版本行數 |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期；handover 版本行數 |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 673 | 存 UTF-8 with BOM；handover 版本行數 |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 675 | 存 UTF-8 with BOM；handover 版本行數 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | handover 版：fs-doctor 應報 56 檔一致 |
 
    從功能分支搬則改用 §1b 的聯集表（含本批全部檔案，行數為功能分支版本）。
@@ -158,10 +158,10 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 518 |  |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 |  |
    | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 門＋SOP-18＋SOP-19＋SOP-20＋SOP-12 追記＋SOP-12 再追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 707 | SOP-18 自 L604 起；SOP-19 自 L656 起 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3119 | L108 自 L2879、L109 自 L2935 起；L111 自 L3000 起 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L108＋L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3123 | L108 自 L2879、L109 自 L2935 起；L111 自 L3000 起 |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＋#24 手術 prompt [導覽] 型＋工單指紋剝 Kinds＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 673 | 存 UTF-8 with BOM |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 675 | 存 UTF-8 with BOM |
    | `scripts/ps-contract-lib.ps1` | 新增（#24 導覽不變量＋NAV ID 含入口型＋ContractSchemaVersion 2＋審查補強：technicalMenu 形狀／可見性／自然鍵／surface debt＋#27 Classic canonical） | 1484 | 存 UTF-8 with BOM；不直接執行；舊 legacy-contract.json／spec／gate 收據因 schema 升版全部重生屬預期 |
    | `scripts/ps-contract.ps1` | 新增（#27 Classic canonical＋#27 Classic canonical） | 248 | 存 UTF-8 with BOM |
    | `scripts/tests/test-contract.ps1` | 新增（#24 九條斷言＋#27 Classic canonical） | 586 | 存 UTF-8 with BOM；`pwsh -NoProfile -File`；fixture 自刪 |

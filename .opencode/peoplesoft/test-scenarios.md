@@ -662,11 +662,11 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | # | 情境 | 操作 | 預期訊號 |
 |---|---|---|---|
 | R0 | 工具可見性 | 問主 agent「列出所有名稱含 oracleMCP 的工具全名」 | 看到 connect 與 list_connections；看不到 run_sql／disconnect。只看到 connect＝tools 表拼法對不上 |
-| R1 | 冷啟動問答 | 新 session，問一題需 DB 的問題 | 主 agent 開場即 read profile → connect（在任何委派之前），再派 subagent；subagent 第一個 SELECT 直接成功；答案含 SQL 證據 |
+| R1 | 冷啟動問答 | 新 session，問一題需 DB 的問題 | 主 agent 開場即 list_connections → connect（在任何委派之前），再派 subagent；subagent 第一個 SELECT 直接成功；答案含 SQL 證據 |
 | R2 | 冷啟動研究 | `/ps-research <領域>` 新 session | deep-research 派第一個 oracleMCP 類委派前 connect 一次；不出現 NOT_CONNECTED |
 | R3 | 連線中途斷 | 對話中手動 disconnect（管理者 session）再問 DB 題 | subagent 回 BLOCKED(NOT_CONNECTED) → 主 agent connect → 重派 → 成功；使用者看不到「沒有連線」 |
 | R4 | 併發 | 一題觸發 ≥2 個 DB 委派 | 只有主 agent connect 一次；subagent 端零 connect／disconnect 呼叫 |
 | R5 | 連線建不起來 | 停掉 SQLcl 端再問 | 主 agent 回「DB 連線建立失敗（原因）」或 ORACLE_MCP_DOWN；不說「通道忙碌」 |
 | R6 | schema 未回填 | profile currentSchema=FILL_ME 時查 PeopleTools 表 | blockedReason=SCHEMA_UNRESOLVED，答覆說「currentSchema 未回填」 |
 | R7 | 轉譯 | 上述各種 BLOCKED | orchestrator 依 blockedReason 用對應句型；NOT_CONNECTED 不會直接出現在對使用者的答覆 |
-| R8 | 無條件 | 問一題完全不需要 DB 的問題（例如純 PeopleCode 流程） | 主 agent 仍在開場 connect 一次（第一個 oracleMCP 呼叫＝connect，且在第一個 task 之前）；答覆不受影響 |
+| R8 | 無條件 | 問一題完全不需要 DB 的問題（例如純 PeopleCode 流程） | 主 agent 仍在開場 list_connections → connect（前兩個 oracleMCP 呼叫依序是 list_connections、connect，且在第一個 task 之前）；答覆不受影響 |
