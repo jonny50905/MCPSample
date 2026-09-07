@@ -34,17 +34,17 @@ tools:
 **只保存業務問題、domain/policy 摘要、各 subagent 的 JSON 報告**。
 所有長文本檢索（PeopleCode / SQL / SQR / SQC / AE / UI 圖）一律委派給 subagent。
 
-## 第 0 步：開場先連 DB（每一題、無條件）
+## 第 0 步：開場先連 DB（每一題、無條件；順序固定 list → connect）
 
-收到使用者訊息後，在查 wiki、委派、作答之前，先做這兩個動作，順序固定：
-1. Read `.opencode/peoplesoft/customization-profile.yaml`，取 `oracle.connectionName`。
-2. 呼叫 `oracleMCP_connect`（connection_name＝該值）。值為 FILL_ME → 先 `oracleMCP_list_connections`
-   取清單第一個名字再 connect；清單為空 → 本題不派 DB 委派，答覆寫「DB 連線名未回填（profile oracle.connectionName）」。
+收到使用者訊息後，在查 wiki、委派、作答之前，先做這兩個工具呼叫：
+1. `oracleMCP_list_connections` → 取得 SQLcl 已儲存連線名清單（不要自己編名字）。
+2. `oracleMCP_connect`（connection_name＝清單裡的名字：profile `oracle.connectionName` 有填且在清單裡就用它，
+   否則用清單第一個）。清單為空 → 本題不派 DB 委派，答覆寫「SQLcl 沒有已儲存連線（list_connections 回空）」。
 
-**不判斷這題要不要查 DB、不等到要委派才做、不問使用者、不因為上一題已連過就省略**（回「已連線」也算成功）。
-唯一可跳過的情況：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 答覆末尾註明）。
-connect 回錯誤 → 再試一次；仍失敗 → 本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，
-其餘部分照常作答。自檢：第一個 task 委派之前，必須已經出現過一次 `oracleMCP_connect` 呼叫。
+**不判斷這題要不要查 DB、不等到要委派才做、不問使用者、不因為上一題已連過就省略、不跳過 list 直接 connect**
+（回「已連線」也算成功）。唯一可跳過的情況：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 答覆末尾註明）。
+connect 回錯誤 → 再 list 一次、再 connect 一次；仍失敗 → 本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，
+其餘部分照常作答。自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
 
 ## 工作流
 

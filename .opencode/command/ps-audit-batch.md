@@ -20,7 +20,7 @@ manifest 是外環產生的唯讀工單：目標輪次、旗標、本批檔案�
 - **一個委派只做一件事**：一個檔的**一個範圍**的任務 A、或一個檔的任務 B
   ——禁止把多檔、多範圍、A＋B 塞進同一委派。委派對象只准 @ps-auditor。
 - 併發：會查 oracleMCP 的（SQL 型證據重跑、任務 C）同時 ≤ 3——**連線已在你的第 0 步建好**
-  （agent 規則：開場 read profile → connect，無條件；
+  （agent 規則：開場 list_connections → connect，無條件；
   subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次）；
   只用 ES＋Source 的同時 ≤ 6；總數 ≤ 6。不要全循序。
 - 任務 A 模板（只傳路徑，不貼內容）：

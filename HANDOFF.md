@@ -53,6 +53,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
 **再追記（2026-09-07，issue #28 公司機回饋）**：主 agent 看得到 connect、看不到 list_connections——根因是 OpenCode 0.6.0～1.0.x 把 MCP 工具名的連字號改成底線（實際工具名 `oracleMCP_list_connections`），tools 表寫連字號對不上；1.1.30 起保留連字號。落點：三個主 agent tools 表改為底線拼法；`customization-profile.yaml` 加 `oracle.connectionName`（FILL_ME，**管理者本機回填 SQLcl 已儲存連線名**，之後 fs-doctor 報該檔 M 屬預期）；cookbook 主 agent 段第 1 步改「先 profile 後 list」；ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor 硬規則段殘留的舊流程改為只回 BLOCKED(NOT_CONNECTED)；情境 31 加兩種拼法／profile 欄位／殘留守衛；test-scenarios §7 加 R0 工具可見性。
 **再追記（2026-09-07，管理者定案）**：公司機 OpenCode 的工具名就是底線版——全樹一律寫 `list_connections`／`run_sql`，連字號拼法全部移除、不再兩種都開（三個主 agent tools 表只留 `oracleMCP_list_connections`；cookbook 第 0 步列工具名；SOP-12 再追記；test-scenarios §7；情境 31 加守衛擋連字號拼法回流）。
 **再追記（2026-09-07，公司機回饋 2）**：主 agent 仍高機率不 connect——條件式規則（派第一個 DB 委派之前才 connect）模型常跳過。改為無條件開場動作：三個主 agent 加「第 0 步」（read profile → `oracleMCP_connect`，做完才准查 wiki／委派／作答；回「已連線」也算成功）；cookbook 主 agent 段、/ps-audit、/ps-audit-batch 措辭同步；情境 31 斷言三個主 agent 含「第 0 步」「無條件」、agent／command 無條件式 connect 殘留；test-scenarios §7 加 R8。
+**再追記（2026-09-07，管理者定案 2）**：開場順序固定 `list_connections` → `connect`，不准跳過 list；profile `oracle.connectionName` 只用來在清單裡挑名字（有填且在清單裡用它，否則清單第一個）。三個主 agent 第 0 步、cookbook 主 agent 段、/ps-audit／/ps-audit-batch／/ps-contract-batch／/ps-contract-verify、profile 註解、test-scenarios R1／R8、情境 31（斷言第 0 步裡 list 在 connect 之前）同步。
 
 ## 1. 管理者下一步（按序）
 
@@ -61,25 +62,25 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
    | `scripts/ps-auto-loop.ps1` | 修改（#24 手術 prompt [導覽] 型＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
-   | `.opencode/command/ps-audit-batch.md` | 修改（L112 清理＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect） | 109 | 掛 ps-deep-research（80196ee） |
-   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（L112 清理＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect） | 151 | 備用、未掛載，但 manifest 要對 |
-   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect） | 673 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
+   | `.opencode/command/ps-audit-batch.md` | 修改（L112 清理＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect＋list→connect 順序） | 109 | 掛 ps-deep-research（80196ee） |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（L112 清理＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 | 備用、未掛載，但 manifest 要對 |
+   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 673 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；搬完跑 `ps-fs-doctor` 應報 56 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
 1a. oracleMCP 根因修正＋#23 research 債＋#24 導覽路徑（2026-09-03～04；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則＋#24 §2e／§4 正名、§2k＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect） | 638 | |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（生命週期＋平行規則＋#24 §2e／§4 正名、§2k＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 636 | |
    | `.opencode/agent/ps-ui-flow.md` | 修改（生命週期＋#24 導覽職責＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 硬規則段去舊流程＋底線拼法） | 142 | |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期＋#24 授權≠導覽＋L112 清理＋#28 連線歸主 agent＋#28 硬規則段去舊流程＋底線拼法） | 110 | |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期＋#28 連線歸主 agent＋#28 硬規則段去舊流程＋底線拼法） | 92 | |
    | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則＋#24 三個 FAIL 原因＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 硬規則段去舊流程） | 260 | |
-   | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律＋清除一次只准一個殘留、歸戶分流＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect） | 186 |  |
+   | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律＋清除一次只准一個殘留、歸戶分流＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 186 |  |
    | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu＋L112 清理＋#27 Classic canonical） | 111 |  |
    | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域＋L112 清理＋#27 Classic canonical） | 128 |  |
-   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（navigation 區塊：Classic 導覽環境事實＋oracle.connectionName＋底線拼法） | 101 | 管理者依 SOP-20 核對 portal／labelLanguage 後把 verified 設 true；oracle.connectionName 本機回填（之後 fs-doctor 報此檔 M 屬預期） |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（navigation 區塊：Classic 導覽環境事實＋oracle.connectionName＋底線拼法＋list→connect 順序） | 101 | 管理者依 SOP-20 核對 portal／labelLanguage 後把 verified 設 true；oracle.connectionName 本機回填（之後 fs-doctor 報此檔 M 屬預期） |
    | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent） | 169 |  |
-   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7 oracleMCP 連線擁有權手動回歸 R1～R7＋R0＋底線拼法＋開場無條件 connect） | 672 | 公司機手動跑；結果記 applied.md L114 |
+   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7 oracleMCP 連線擁有權手動回歸 R1～R7＋R0＋底線拼法＋開場無條件 connect＋list→connect 順序） | 672 | 公司機手動跑；結果記 applied.md L114 |
    | `.opencode/skills/ps-ui-flow/SKILL.md` | 修改（#24 導覽語系義務＋Rules＋L112 清理） | 192 |  |
    | `.opencode/skills/ps-security-flow/SKILL.md` | 修改（#24 authorization ≠ navigation） | 62 |  |
    | `.opencode/skills/ps-business-explain/SKILL.md` | 修改（#24 五條硬規則＋輸出 2a＋L112 清理＋#27 Classic canonical） | 105 |  |
@@ -87,15 +88,15 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `scripts/ps-agent-doc-lint.ps1` | 新增（L112 模型檔衛生檢查） | 47 | 存 UTF-8 with BOM；`ps-fs-doctor -WriteManifest` 前置 |
    | `scripts/ps-fs-doctor.ps1` | 修改（-WriteManifest 前置 agent 檔檢查） | 308 | 存 UTF-8 with BOM |
    | `AGENTS.md` | 修改（鐵律加模型檔衛生一條） | 82 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
-   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect） | 109 | |
-   | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect） | 72 | |
-   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect） | 518 | |
-   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect） | 151 | |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20＋SOP-12 追記＋SOP-12 再追記＋底線拼法＋開場無條件 connect） | 653 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect） | 3063 | |
+   | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect＋list→connect 順序） | 109 | |
+   | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect＋list→connect 順序） | 72 | |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 518 | |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20＋SOP-12 追記＋SOP-12 再追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 655 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3063 | |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期 |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect） | 673 | 存 UTF-8 with BOM |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 673 | 存 UTF-8 with BOM |
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；fs-doctor 應報 56 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
    `.gitignore`、`HANDOFF.md`、`README.md` 不在搬運集合。
