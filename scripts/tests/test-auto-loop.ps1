@@ -563,7 +563,10 @@ $nvGap = @('# 48 有入口列有 gap（TW_NAV_GAP）') + $nvHead + @('## 功能�
 $nvEvPend = @('## Evidence 附錄', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', '| 1 | Portal Registry | 導覽入口 | 待人工SQL（PSPRSMDEFN 需 DBA 權限） |')
 $nvPend = @('# 49 反序待人工SQL（TW_NAV_PEND）') + $nvHead + @('## 功能定位', '### 導覽入口', '招募 > 應徵者管理 > 維護應徵者（REGISTRY_DEFINED）。') + $nvTailGap + $nvEvPend
 $nvTm = @('# 50 技術選單段用 >（TW_NAV_TM）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）。', '### Technical Menu', 'Technical Menu（非導覽路徑）：RECRUITING > USE > MANAGE_APPLICANTS') + $nvTail + $nvEvMenu
-foreach ($pair in @(@('44-TW_NAV_SPACE.md', $nvSpace), @('45-TW_NAV_FLOW.md', $nvFlow), @('46-TW_NAV_AUTH.md', $nvAuth), @('47-TW_NAV_ONLY.md', $nvOnly), @('48-TW_NAV_GAP.md', $nvGap), @('49-TW_NAV_PEND.md', $nvPend), @('50-TW_NAV_TM.md', $nvTm))) {
+$nvEvCanon = @('## Evidence 附錄', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', "| 1 | Portal Registry（canonical） | Classic 選單入口 | SQL：WITH NAV_TREE AS (SELECT CONNECT_BY_ROOT D.PORTAL_OBJNAME AS TARGET_CREF, LEVEL AS LVL, TRIM(D.PORTAL_LABEL) AS BASE_LABEL, CASE WHEN EXISTS (SELECT 1 FROM PSPRSMSYSATTRVL A WHERE A.PORTAL_NAME = D.PORTAL_NAME AND A.PORTAL_REFTYPE = D.PORTAL_REFTYPE AND A.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND A.PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(A.PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1')) THEN 1 ELSE 0 END AS IS_HIDDEN, CASE WHEN D.PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT' THEN 1 ELSE 0 END AS IS_ROOT FROM PSPRSMDEFN D START WITH D.PORTAL_REFTYPE = 'C' AND UPPER(TRIM(D.PORTAL_URI_SEG2)) = 'TW_X' CONNECT BY NOCYCLE PRIOR D.PORTAL_PRNTOBJNAME = D.PORTAL_OBJNAME AND D.PORTAL_REFTYPE = 'F' AND LEVEL <= 20) SELECT TARGET_CREF, LISTAGG(BASE_LABEL, ' > ') WITHIN GROUP (ORDER BY LVL DESC) AS MENU_PATH, MAX(IS_HIDDEN) AS PATH_HIDDEN FROM NAV_TREE GROUP BY TARGET_CREF FETCH FIRST 200 ROWS ONLY |")
+$nvCanon = @('# 51 canonical 證據（TW_NAV_CANON）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Classic 選單入口：Recruiting > Applicant Management > Manage Applicants（CLASSIC_NAV_VISIBLE）。') + $nvTail + $nvEvCanon
+$nvUniq = @('# 52 唯一入口措辭（TW_NAV_UNIQ）') + $nvHead + @('## 功能定位', '### 導覽入口', '本畫面唯一入口：Recruiting > Applicants > Manage。') + $nvTail + $nvEvPortal
+foreach ($pair in @(@('44-TW_NAV_SPACE.md', $nvSpace), @('45-TW_NAV_FLOW.md', $nvFlow), @('46-TW_NAV_AUTH.md', $nvAuth), @('47-TW_NAV_ONLY.md', $nvOnly), @('48-TW_NAV_GAP.md', $nvGap), @('49-TW_NAV_PEND.md', $nvPend), @('50-TW_NAV_TM.md', $nvTm), @('51-TW_NAV_CANON.md', $nvCanon), @('52-TW_NAV_UNIQ.md', $nvUniq))) {
     [System.IO.File]::WriteAllText((Join-Path $nvDir $pair[0]), ($pair[1] -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
 }
 [System.IO.File]::WriteAllText((Join-Path $nvDir "00-overview.md"), "# 總覽`r`n測試 fixture", (New-Object System.Text.UTF8Encoding($true)))
@@ -577,7 +580,12 @@ Assert ($nvOut -match '【導覽】型') "修法說明段有印"
 Assert ($nvOut -match '44-TW_NAV_SPACE\.md：功能定位宣稱導覽路徑') "審查補強：多字段英文路徑（段內含空白）＋無 Portal 證據 → 違規（嚴格式漏抓）"
 Assert ($nvOut -notmatch '45-TW_NAV_FLOW\.md：功能定位') "審查補強：箭頭型流程敘述不是導覽主張 → 不誤報"
 Assert ($nvOut -match '46-TW_NAV_AUTH\.md：功能定位出現 AUTHORIZED_FOR_CONTEXT' -and $nvOut -match '\[導覽\] 46-TW_NAV_AUTH\.md：[^\r\n]*USER_VISIBILITY_OVERCLAIM') "審查補強：加註 AUTHORIZED_FOR_CONTEXT 不能消音（Case 3）"
-Assert ($nvOut -match '47-TW_NAV_ONLY\.md：功能定位 ### 導覽入口 有 1 列但未解事項無' -and $nvOut -match '\[導覽\] 47-TW_NAV_ONLY\.md：SINGLE_PATH_COLLAPSE') "審查補強：有入口列但無 surface 未盤查 gap → SINGLE_PATH_COLLAPSE（Case 6）"
+Assert ($nvOut -notmatch '47-TW_NAV_ONLY\.md：功能定位') "profile surfaces=CLASSIC_ONLY：有入口列但無 surface gap 行 → 不再要求（Fluid 為 NOT_APPLICABLE）"
+$nvOutF = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -NavigationSurfaces CLASSIC_AND_FLUID *>&1 | Out-String)
+Assert ($nvOutF -match '47-TW_NAV_ONLY\.md：功能定位 ### 導覽入口 有 1 列但未解事項無' -and $nvOutF -match '\[導覽\] 47-TW_NAV_ONLY\.md：SINGLE_PATH_COLLAPSE') "surfaces=CLASSIC_AND_FLUID：有入口列但無 surface gap 行 → SINGLE_PATH_COLLAPSE"
+Assert ($nvOutF -notmatch '48-TW_NAV_GAP\.md：功能定位') "surfaces=CLASSIC_AND_FLUID：有 gap 行 → 零違規"
+Assert ($nvOut -notmatch '51-TW_NAV_CANON\.md：功能定位宣稱導覽路徑') "canonical query 逐字貼在 Evidence（CTE 內 SELECT→FROM 相距 >200 字）→ 認得是 Portal 證據"
+Assert ($nvOut -match '52-TW_NAV_UNIQ\.md：功能定位 宣稱唯一入口' -and $nvOut -match '\[導覽\] 52-TW_NAV_UNIQ\.md：SINGLE_PATH_COLLAPSE') "CLASSIC_ONLY 仍抓「唯一入口」措辭"
 Assert ($nvOut -notmatch '48-TW_NAV_GAP\.md：功能定位') "審查補強：有入口列＋gap 行＋Portal 證據 → 零違規"
 Assert ($nvOut -notmatch '49-TW_NAV_PEND\.md：功能定位宣稱導覽路徑') "審查補強：反序「待人工SQL（PSPRSMDEFN…）」是合法出口 → 不誤報"
 Assert ($nvOut -notmatch '50-TW_NAV_TM\.md：功能定位') "審查補強：### Technical Menu 段用 > 串（誠實分段）→ 不誤報"
@@ -586,6 +594,17 @@ $nvCov = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -Cove
 Assert ($nvCov -match '\[美工／不擋覆蓋畢業\].*功能定位宣稱導覽路徑') "tier 1：導覽類降為警告（不重演 L94 全存量違規）"
 Assert ($nvCov -notmatch '\[導覽\] 41-TW_NAV_BAD') "tier 1：導覽工單受 emitPolish 抑制"
 Remove-Item -Recurse -Force $nvDir
+
+Write-Host "情境 30：Classic 導覽 canonical 文字守衛——cookbook §2k-C 區塊形狀＋profile navigation 鍵（沒有 Oracle 也能擋改壞）"
+$ckText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/oracle-query-cookbook.md'))
+$ckM = [regex]::Match($ckText, '(?s)\*\*2k-C\..*?```sql\r?\n(.*?)```')
+$ckSql = if ($ckM.Success) { $ckM.Groups[1].Value } else { '' }
+Assert ($ckM.Success) "cookbook 有 §2k-C canonical 區塊"
+foreach ($must in @('DBMS_LOB.SUBSTR', 'NOCYCLE', "PORTAL_REFTYPE = 'F'", 'LEVEL <= 20', 'FETCH FIRST', 'CLASSIC_VISIBLE', "IN ('TARG','LINK')", 'PORTAL_EXPIRE_DT', 'CONNECT_BY_ISCYCLE', 'PSPRSMDEFNLANG', ':portalName', ':languageCd')) { Assert ($ckSql.Contains($must)) "canonical 含 $must" }
+Assert ($ckSql -notmatch 'BARNAME|ITEMNAME|LIKE ''%') "canonical 不含 BARNAME／ITEMNAME／LIKE 子字串比對"
+Assert ($ckSql -notmatch '(?m)^\s*HAVING') "canonical 不用 HAVING 丟列（hidden／過期以旗標回傳）"
+$pfText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
+Assert ($pfText -match '(?m)^navigation:' -and $pfText -match '(?m)^\s*surfaces:\s*CLASSIC_ONLY' -and $pfText -match '(?m)^\s*identity:\s*MENU_COMPONENT\b' -and $pfText -match '(?m)^\s*labelLanguage:\s*ENG' -and $pfText -match '(?m)^\s*attrValType:\s*CLOB') "profile navigation 區塊：surfaces／identity／labelLanguage／attrValType"
 
 Write-Host "情境 29：agent 檔規則衛生——出處／日期／變更敘述不得進模型讀的檔（ps-agent-doc-lint）"
 $adRoot = Join-Path $dir 'agentdoc'

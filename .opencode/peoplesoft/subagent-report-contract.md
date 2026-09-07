@@ -18,7 +18,8 @@ orchestrator 主 context 只累積小而結構化的報告。
    REGISTRY_DEFINED / AUTHORIZED_FOR_CONTEXT / UNKNOWN_VISIBILITY 只能寫在
    `navigationEntries[].visibility`，**不得**寫進 `confidence` 欄；同一筆導覽入口
    仍要照第 3 條標它自己的 confidence。沒有 user／security context 時
-   **只准** REGISTRY_DEFINED（或 UNKNOWN_VISIBILITY），不得升格為 AUTHORIZED_FOR_CONTEXT。
+   **只准** CLASSIC_NAV_VISIBLE（cookbook §2k-C 的 `CLASSIC_VISIBLE = 1`）、REGISTRY_DEFINED（只有 registry 證據）
+   或 UNKNOWN_VISIBILITY，不得升格為 AUTHORIZED_FOR_CONTEXT。
    `labels[].fallbackLanguageCode`：有覆寫而未回退＝`NOT_APPLICABLE`，回退＝實際採用的 base language
    （cookbook §2k-0 (2b)），查不到＝`UNRESOLVED`——**不得留空字串、不得預設 ENG**。
 4. 查無 / 不確定 / 超出 budget：用 status=PARTIAL 或 BLOCKED + gaps 說明，
@@ -109,7 +110,7 @@ orchestrator 主 context 只累積小而結構化的報告。
         { "displayText": "招募", "languageCode": "ZHT", "displayTextSource": "LANG", "fallbackLanguageCode": "NOT_APPLICABLE" },
         { "displayText": "Applicant Management", "languageCode": "ENG", "displayTextSource": "BASE", "fallbackLanguageCode": "ENG" }
       ],
-      "visibility": "REGISTRY_DEFINED",
+      "visibility": "CLASSIC_NAV_VISIBLE",
       "confidence": "CONFIRMED",
       "evidence": [ { "kind": "SQL", "sql": "SELECT … FROM PSPRSMDEFN …", "keyRows": ["…"] } ]
     },
@@ -118,7 +119,7 @@ orchestrator 主 context 只累積小而結構化的報告。
       "entryType": "CREF_LINK",
       "crefObjectName": "HC_HRS_MANAGE_APPLICANTS_LNK",
       "labels": [ { "displayText": "Manager Self Service", "languageCode": "ENG", "displayTextSource": "BASE", "fallbackLanguageCode": "UNRESOLVED" } ],
-      "visibility": "REGISTRY_DEFINED",
+      "visibility": "CLASSIC_NAV_VISIBLE",
       "confidence": "INFERRED",
       "evidence": [ { "kind": "SQL", "sql": "SELECT … FROM PSPRSMDEFN … PORTAL_CREF_USGT = 'LINK' …", "keyRows": ["…"] } ]
     }
@@ -133,7 +134,7 @@ orchestrator 主 context 只累積小而結構化的報告。
   ],
   "gaps": [
     "PRINT-REPORT 未展開（與本題無關）",
-    "Navigation Collection／Fluid Tile／NavBar 未盤查——不宣稱唯一入口"
+    "Registry 另有 1 筆入口因 hide-from-nav 不顯示（HC_HRS_MANAGE_APPLICANTS_OLD），未列為入口"
   ],
   "suggestedNext": [
     { "agent": "ps-metadata-flow", "task": "TW_MIL001 的排程與 Run Control" }

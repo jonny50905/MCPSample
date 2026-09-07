@@ -36,7 +36,7 @@
 | ps_get_data_lineage | ES table 名搜尋＋cookbook §6 反查交叉 |
 | ps_get_process_usage | cookbook §3 |
 | ps_get_security_path | cookbook §4（**technical authorization path**，非使用者導覽路徑） |
-| ps_get_navigation_entries | cookbook §2k（Portal Registry；本版只做 PORTAL_REGISTRY／CREF_LINK，Fluid／NavBar／Nav Collection 一律回 gap） |
+| ps_get_navigation_entries | cookbook §2k-C canonical（Classic 選單；PORTAL_REGISTRY／CREF_LINK）；Fluid／NavBar／Nav Collection 依 profile `navigation.surfaces`（CLASSIC_ONLY＝NOT_APPLICABLE） |
 
 未來實作這些角色的完整 I/O 規格：`docs/mcp-tool-proposals.md`（agent 不讀）。
 
@@ -102,6 +102,7 @@ UNRESOLVED
 
 ```text
 REGISTRY_DEFINED
+CLASSIC_NAV_VISIBLE
 AUTHORIZED_FOR_CONTEXT
 UNKNOWN_VISIBILITY
 UNRESOLVED
@@ -109,8 +110,9 @@ UNRESOLVED
 
 完整定義以 `legacy-contract-vocabulary.md` 為準；`AUTHORIZED_FOR_CONTEXT` 本版不得由模型產出。
 
-輸入（欄位表，非可呼叫 JSON）：`componentName`（必填）、`menuName`、`market`（預設 `GBL`）、
-`portalName`（省略＝列舉 `PSPRDMDEFN`）、`languageCode`（如 `ZHT`）、`includeAlternateEntries`（預設 true）。
+輸入（欄位表，非可呼叫 JSON）：`componentName`（必填）、`portalName`（預設 profile `navigation.portal`）、
+`languageCode`（預設 profile `navigation.labelLanguage`）、`market`（只在 `navigation.identity: MENU_COMPONENT_MARKET` 時）、
+`includeAlternateEntries`（`navigation.surfaces: CLASSIC_ONLY` 時無效）。
 
 輸出兩個**互不合併**的陣列：
 - `technicalMenuLocations[]`：`menuName` / `barName` / `itemName`（來源 §2e／§2k-1；**永遠不是導覽路徑**）

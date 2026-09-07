@@ -83,3 +83,15 @@ oracle:
 # 業務領域定義（Domain alias、rootObjectPolicy、fallback 政策）
 # 見同目錄 business-domain-map.yaml
 businessDomainMap: business-domain-map.yaml
+
+# 導覽（Classic PIA）環境事實——cookbook §2k-C canonical query 的 bind 與判定全部從這裡取；
+# 一次驗證回填（SOP-20），之後 ps-ui-flow 直接跑 canonical，不再每題重新研究 schema。
+navigation:
+  surfaces: CLASSIC_ONLY          # CLASSIC_ONLY | CLASSIC_AND_FLUID；CLASSIC_ONLY 下 Fluid Tile／NavBar／Navigation Collection 一律 NOT_APPLICABLE
+  identity: MENU_COMPONENT        # MENU_COMPONENT | MENU_COMPONENT_MARKET；本環境不以 MARKET 區分導覽（PORTAL_URI_SEG3 不參與識別）
+  portal: EMPLOYEE                # 使用者登入的 portal（Classic HR 預設；以 PSPRDMDEFN 列舉確認）——canonical 的 :portalName
+  labelLanguage: ENG              # 使用者看到的選單語系＝base；PSPRSMDEFNLANG 另有 JPN／JPP／ZHS／ZHT 翻譯但 UI 不用——canonical 的 :languageCd
+  hideFromNavValues: [TRUE, Y, 1] # PSPRSMSYSATTRVL.PORTAL_HIDE_FROM_NAV 觀察值 TRUE（Y／1 保留）
+  attrValType: CLOB               # PORTAL_ATTR_VAL 型別——CLOB 必須經 DBMS_LOB.SUBSTR 才能比對
+  rootObject: PORTAL_ROOT_OBJECT
+  verified: true                  # false＝先跑 cookbook §2k-0 驗表／欄／值再回填本區塊
