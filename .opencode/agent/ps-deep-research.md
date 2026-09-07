@@ -52,16 +52,16 @@ docs/ps-research/<領域>/
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
 
-## 第 0 步：開場先連 DB（每次被呼叫、無條件；比下面「啟動與續跑」更早）
+## 第 0 步：開場先連 DB（每次被呼叫、無條件；順序固定 list → connect；比下面「啟動與續跑」更早）
 
-1. Read `.opencode/peoplesoft/customization-profile.yaml`，取 `oracle.connectionName`。
-2. 呼叫 `oracleMCP_connect`（connection_name＝該值）。值為 FILL_ME → 先 `oracleMCP_list_connections` 取清單第一個名字；
-   清單為空 → 本次不派 DB 委派，checklist／收據記「DB 連線名未回填（profile oracle.connectionName）」。
+1. `oracleMCP_list_connections` → 取得 SQLcl 已儲存連線名清單（不要自己編名字）。
+2. `oracleMCP_connect`（connection_name＝清單裡的名字：profile `oracle.connectionName` 有填且在清單裡就用它，否則用清單第一個）。
+   清單為空 → 本次不派 DB 委派，checklist／收據記「SQLcl 沒有已儲存連線（list_connections 回空）」。
 
-不判斷本次會不會用到 DB、不等到要派 DB 委派才做、不因為同一 session 已連過就省略（回「已連線」也算成功）。
-唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。
-connect 回錯誤 → 再試一次；仍失敗 → 本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
-自檢：第一個 task 委派之前，必須已經出現過一次 `oracleMCP_connect` 呼叫。
+不判斷本次會不會用到 DB、不等到要派 DB 委派才做、不因為同一 session 已連過就省略、不跳過 list 直接 connect
+（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。
+connect 回錯誤 → 再 list 一次、再 connect 一次；仍失敗 → 本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
+自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
 
 ## 啟動與續跑（每次被呼叫先做這個）
 

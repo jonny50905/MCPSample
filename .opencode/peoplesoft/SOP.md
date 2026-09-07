@@ -429,6 +429,8 @@ connect 與 list_connections 才算通。管理者定案：公司機就是底線
 再追記（同日）：搬完後主 agent 仍常不 connect——「要派 DB 委派之前才 connect」是條件式規則，模型常跳過。改為無條件：
 三個主 agent 開場固定 read profile → `oracleMCP_connect`，做完才准查 wiki、委派、作答（agent 檔「第 0 步」；cookbook 主 agent 段、
 /ps-audit、/ps-audit-batch 同步）。快篩：看主 agent 的第一個 oracleMCP 呼叫是不是 connect、是否在第一個 task 之前。
+再追記（同日）：管理者定案開場順序固定 `list_connections` → `connect`，不跳過 list；profile `oracle.connectionName`
+只用來在清單裡挑名字（有填且在清單裡用它，否則清單第一個）。快篩改看：前兩個 oracleMCP 呼叫依序是 list_connections、connect。
 
 ---
 
