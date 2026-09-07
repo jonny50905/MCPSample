@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "8f6ee9d",
+  "commit": "ae72d49",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -143,7 +143,7 @@
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
       "lines": 633,
-      "sha256": "4d1a337653aa41d45f0157b3ae6b9bd583dffba243a0a3f5afc5fb5f5164fecf",
+      "sha256": "6fd813940ce66a6056c38b8e3af4c3739ad691a7bebd30b037a1da70790f583f",
       "bom": false
     },
     {
@@ -197,7 +197,7 @@
     {
       "path": ".opencode/peoplesoft/SOP.md",
       "lines": 643,
-      "sha256": "fd8913da3020762a13c32dd59f8f1e5af399a5d1ea8b6cb053b7e9bb240b8663",
+      "sha256": "8dc7543d6ed607c9f5bf1f4f843dd6e7da66e0c73a2568b50bc9ea4524e43271",
       "bom": false
     },
     {
