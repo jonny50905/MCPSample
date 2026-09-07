@@ -2911,6 +2911,11 @@
   -AuditBatchesPerCycle 4）。
 - 套用：本 commit（cookbook、三個 flow agent、四個併發上限檔、SOP-12、.gitignore、
   manifest 重生；功能分支再加兩個 contract 指令）。
+- 追記（2026-09-07）：清除 ps-orchestrator（委派步驟）與 ps-deep-research（委派標準深度鏈）
+  殘留的「一次只准一個／一次一個」措辭——根因是連線共用，該限制本身已無必要，統一為
+  同時 ≤ 3、首個先單獨派。同次把 orchestrator 的歸戶建議改為分流（已有研究→`/ps-correct`
+  單點歸戶或 00-overview 補強項；沒研究過才 `/ps-research`），與其第 4 節「大範圍過時才跑
+  /ps-research」一致——原本一律建議 `/ps-research` 會把單一發現變成整個領域重跑。
 
 ### L110 checkpoint 不是完工——tier 1 相位把原始調查項當成補強項，新領域只剩一槍（issue #23，2026-09-04）
 - 症狀：新領域跑 tier 1，第一圈盤點＋寫了幾個 NN 檔（單次 run 上限或被中斷）後，

@@ -94,7 +94,8 @@ docs/ps-research/<領域>/
 1. 委派標準深度鏈（同 ps-orchestrator 的委派表與深度規則）：
    ui-flow（欄位/選項）→ peoplecode-flow（帶 Record.Field＋stored values 找邏輯）
    → 發現批次再派 sqr/ae-flow → metadata-flow（血緣/排程/權限）。
-   oracleMCP 類委派一次一個；報告的 suggestedNext 屬深度規則者必須執行。
+   oracleMCP 類委派同時 ≤ 3、首個先單獨派（L109；舊版「一次一個」已廢止）；
+   報告的 suggestedNext 屬深度規則者必須執行。
    **主角是 Component 的項目**：peoplecode-flow 委派必含一次
    Activate／PostBuild 定位（ObjectName＋eventName 結構化搜尋——
    條件 UI 變異多在此）；回報含 businessRelevant UI 變異 →

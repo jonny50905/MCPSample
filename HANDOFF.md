@@ -45,6 +45,7 @@ ps-doc-lint 兩條確定性規則（美工類，tier 1 不擋）＋`[導覽]` �
 上線程序見 SOP-19。功能分支另改 contract 線（menuPath→technicalMenu、導覽表加入口型／可見性、schema／vocabulary 升版）。
 **審查追記（同日）**：25 個 opus agent 對抗審查後補強（L111 末段列表）——lint 寬鬆路徑式／流程箭頭豁免／`AUTHORIZED_FOR_CONTEXT` 字串判違規／
 SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽] 工單指紋剝 Kinds；cookbook §2k 補驗證與到期欄；模板加「CREF 物件名」欄；情境 28 共 17 判定。
+**追記（2026-09-07）**：清除 ps-orchestrator／ps-deep-research 殘留的「一次只准一個」（L109 追記）；orchestrator 歸戶建議改分流（已有研究→`/ps-correct`，沒研究過才 `/ps-research`）。
 
 ## 1. 管理者下一步（按序）
 
@@ -66,7 +67,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/agent/ps-metadata-flow.md` | 修改（生命週期＋#24 授權≠導覽） | 107 | |
    | `.opencode/agent/ps-ae-flow.md` | 修改（生命週期） | 90 | |
    | `.opencode/agent/ps-auditor.md` | 修改（tools 硬性 deny＋規則＋#24 三個 FAIL 原因） | 257 | |
-   | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律） | 168 |  |
+   | `.opencode/agent/ps-orchestrator.md` | 修改（#24 路徑類問題委派＋作答紀律＋清除一次只准一個殘留、歸戶分流） | 174 |  |
    | `.opencode/peoplesoft/report-templates/function-detail-template.md` | 修改（#24 功能定位拆 ### 導覽入口／### Technical Menu） | 111 |  |
    | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（#24 ps_get_navigation_entries＋§3 值域） | 126 |  |
    | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（#24 硬規則 3a＋兩個選填陣列） | 166 |  |
@@ -76,10 +77,10 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `scripts/ps-doc-lint.ps1` | 修改（#24 兩條導覽規則＋[導覽] 工單，美工類） | 1594 | 存 UTF-8 with BOM |
    | `.opencode/command/ps-audit-batch.md` | 修改（oracleMCP 委派 ≤ 3、首個先單獨派） | 109 | |
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派） | 72 | |
-   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法） | 503 | |
+   | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留） | 504 | |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派） | 138 | |
    | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19） | 619 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111） | 2983 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記） | 2988 | |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型） | 2329 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期 |
    | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定） | 593 | 存 UTF-8 with BOM |
