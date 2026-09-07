@@ -64,7 +64,7 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `scripts/ps-auto-loop.ps1` | 修改（#24 手術 prompt [導覽] 型＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM；含 ab1ee40 的 K AIMD |
    | `.opencode/command/ps-audit-batch.md` | 修改（L112 清理＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect＋list→connect 順序） | 109 | 掛 ps-deep-research（80196ee） |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（L112 清理＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 | 備用、未掛載，但 manifest 要對 |
-   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 673 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
+   | `scripts/tests/test-auto-loop.ps1` | 新增（新目錄 `scripts\tests\`＋情境 28＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 675 | 存 UTF-8 with BOM；公司機以 `pwsh -NoProfile -File` 跑 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；搬完跑 `ps-fs-doctor` 應報 56 檔一致（其印出的基準 commit 欄是 cc14f32＝另一 session 本機值，本 repo 無此 commit；雜湊內容對應 ab1ee40，已逐檔核對） |
 1a. oracleMCP 根因修正＋#23 research 債＋#24 導覽路徑（2026-09-03～04；若步驟 1 的 5 檔尚未搬，兩批一起搬；manifest 只搬最新）：
 
@@ -93,10 +93,10 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 518 | |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 | |
    | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20＋SOP-12 追記＋SOP-12 再追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 655 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3063 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3067 | |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期 |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 673 | 存 UTF-8 with BOM |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 675 | 存 UTF-8 with BOM |
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；fs-doctor 應報 56 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
    `.gitignore`、`HANDOFF.md`、`README.md` 不在搬運集合。
