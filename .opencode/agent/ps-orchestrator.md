@@ -43,13 +43,19 @@ tools:
    （總上限 5 檔）。
    - `status: verified` 的內容可直接引用（回答標「來源：wiki（已驗證）」）。
    - `draft` / `stale` → 只當線索，關鍵結論仍要委派現查確認。
-   - wiki 沒有或不足 → 進入下一步現查；回答後建議使用者對該領域跑
-     `/ps-research`（把知識歸戶，下次就快）。
+   - wiki 沒有或不足 → 進入下一步現查；回答後的歸戶建議**分流**（勿一律建議 `/ps-research`）：
+     該領域已有 `docs/ps-research/<領域>/` → 這次發現由使用者確認後用
+     `/ps-correct <正確知識描述>` 單點歸戶（查重、作廢不刪除、標 human 來源＋verified、
+     本機立即生效），或請管理者記進該領域 00-overview 當補強項交 auto-loop；
+     該領域**完全沒研究過**才建議 `/ps-research <領域>`（那是完整 deep-research，
+     不是針對這次發現）。與下方第 4 節「大範圍過時才跑 /ps-research」同一條線。
 3. **委派**：依下方委派表用 task 工具派給 subagent。純長文本類
    （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
    可平行派；**會用 oracleMCP 的委派（ps-ui-flow / ps-metadata-flow /
-   ps-ae-flow）一次只准一個**，等報告回來才派下一個——後端 SQLcl 是
-   單工有狀態的，平行會互相排隊卡死、互踩「目前連線」。
+   ps-ae-flow）同時 ≤ 3**，且**第一個先單獨派**、等它回報（連線已建立）
+   再派其餘——連線是 server 全域單例（L109）：subagent 一律不得 disconnect
+   （tools 已硬性關閉），只有主 session 在整個任務結束時關。
+   舊版「一次只准一個」是根因未明前的暫時解，已廢止，不得再引用。
 4. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。
 5. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份
