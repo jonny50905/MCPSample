@@ -415,16 +415,17 @@ N 晚自動除役」得先有實測基線（L48：門檻照實測設，不照直
 那一行就是這條熔絲**。
 
 追記（issue #28，2026-09-07）：連線的「開」收攏到主 agent——ps-orchestrator／ps-deep-research／
-ps-audit-orchestrator 的 tools 只開 `oracleMCP_list-connections` 與 `oracleMCP_connect`，派第一個 DB 委派前
+ps-audit-orchestrator 的 tools 只開 `oracleMCP_list_connections` 與 `oracleMCP_connect`，派第一個 DB 委派前
 connect 一次；subagent 的 `oracleMCP_connect` 硬關，未連線只回 `BLOCKED(NOT_CONNECTED)` 由主 agent 重建再重派。
 「第一個先單獨派」規則作廢。快篩加第 (0) 步：主 agent 的 opencode.json 對 `oracleMCP_connect` 的權限必須是
 allow——headless 下 ask 等於擋，症狀是主 agent 卡在 connect、所有 DB 委派回 NOT_CONNECTED。
-再追記（同日）：公司機實測主 agent 看得到 connect、看不到 list-connections——OpenCode 0.6.0～1.0.x 會把 MCP 工具名的
+再追記（同日）：公司機實測主 agent 看得到 connect、看不到 list_connections——OpenCode 0.6.0～1.0.x 會把 MCP 工具名的
 連字號改成底線（`oracleMCP_list_connections`），tools 表寫連字號就對不上；1.1.30 起保留連字號。落點：三個主 agent 的
 tools 表兩種拼法都開；profile 加 `oracle.connectionName`（SQLcl 已儲存連線名，管理者本機回填），主 agent 直接
-connect、不再依賴 list-connections；四個 subagent 硬規則段殘留的「回未連線才 list→connect」舊流程改為只回
+connect、不再依賴 list_connections；四個 subagent 硬規則段殘留的「回未連線才 list→connect」舊流程改為只回
 BLOCKED(NOT_CONNECTED)。快篩第 (0) 步再加一項：問主 agent「列出所有名稱含 oracleMCP 的工具全名」，看到
-connect 與 list-connections（或 list_connections）才算通。
+connect 與 list_connections 才算通。管理者定案：公司機就是底線版，全樹一律寫 `list_connections`／`run_sql`，
+連字號拼法全部移除、不再兩種都開。
 
 ---
 
@@ -494,7 +495,7 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
   ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害
 □ 會查 oracleMCP 的委派同時 ≤ 3 維持（硬性 deny 落地後恢復；曾短暫壓到 1，
   那是 disconnect 真因未明時的暫時解）；**派本批第一個 oracleMCP 委派之前，主 agent 先
-  list-connections → connect 一次**（issue #28 後 subagent 不再 connect，也不再要求第一個先單獨派）——
+  list_connections → connect 一次**（issue #28 後 subagent 不再 connect，也不再要求第一個先單獨派）——
   ps-audit-batch／ps-audit／ps-deep-research／ps-audit-orchestrator／ps-contract-batch／ps-contract-verify 已同步
 □ 主 agent（ps-deep-research）的 oracleMCP 權限維持關閉：第一個 subagent 開的
   連線，後面的 subagent 直接沿用，不需要 main 先開

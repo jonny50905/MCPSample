@@ -68,7 +68,7 @@ ES 回傳（含 snippet）一律只是 SEARCH_CANDIDATE；
 - 不可展開整支 AE 的所有 Section；只追必要的 Call Section 鏈。
 - **oracleMCP 規則（連線是全域共用單例；開只有主 agent 做、關誰都不做）**：只准 SELECT（唯一例外＝
   生命週期的 CURRENT_SCHEMA 設定）；連線已由主 agent 建好，先直接發第一個 SELECT；回「未連線」
-  類錯誤 → 立即回報 `status: BLOCKED`、`blockedReason: NOT_CONNECTED` 結束本委派（不 list-connections、
+  類錯誤 → 立即回報 `status: BLOCKED`、`blockedReason: NOT_CONNECTED` 結束本委派（不 list_connections、
   不 connect——工具已對本 agent 關閉、不重試）；成功 → **設 CURRENT_SCHEMA**（read customization-profile.yaml，
   ALTER SESSION SET CURRENT_SCHEMA=<oracle.currentSchema>；重複無害；值為 FILL_ME 就跳過）→ 重發該查詢 →
   查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；查詢逾時（~30 秒）→ 停手回報
