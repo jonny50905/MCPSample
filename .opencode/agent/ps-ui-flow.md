@@ -57,8 +57,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    條件 UI 變異目標解析（§2h～§2j，流程照 SKILL「條件 UI」節）。
 3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時）**：先讀 profile `navigation:`。
    `verified: true` → **直接跑 cookbook §2k-C canonical**（bind：componentName＋profile 的 portal／labelLanguage），
-   回傳列原樣映射：`CLASSIC_VISIBLE = 1` → `navigationEntries[]` 一筆（entryType 依 CREF_USGT、visibility＝
-   `CLASSIC_NAV_VISIBLE`、labels 由逐段列填）；`= 0` → 不列入口，gaps 記一行原因。0 列照 §2k-C 的三步排查。
+   回傳列原樣映射：每列＝一個看得到的入口（entryType 依 CREF_USGT、visibility＝`CLASSIC_NAV_VISIBLE`、
+   labels 由逐段列填）。0 列先跑 §2k-C 診斷形：`CLASSIC_VISIBLE = 0` 的列不列入口、gaps 記一行原因；仍 0 列照三步排查。
    `verified: false` → 先跑 2k-0 驗表名／欄位／值域並回報，不得自行推導。
    `technicalMenuLocations[]` 由 2k-1 取，永遠分開回報。本步屬 **oracleMCP 類委派，計入同時 ≤ 3**。
 4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。

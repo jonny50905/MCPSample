@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "2d38f2e",
+  "commit": "8f3d5f9",
   "files": [
     {
       "path": ".opencode/agent/explore.md",
@@ -29,13 +29,13 @@
     {
       "path": ".opencode/agent/ps-auditor.md",
       "lines": 257,
-      "sha256": "be81dabb33154b3bd8559f54d257f4a2b1243556e72354c20a5c8c2b2275d98c",
+      "sha256": "6bf3b94e3b559ec1391c3abfd02baaa94475b84933e993a2356a5e501f2a9b74",
       "bom": false
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
       "lines": 504,
-      "sha256": "d18542f0f47db7e1213e81ee329fdb2375711c67c75f6708e3cf93fbb7c2575c",
+      "sha256": "d7258e743a15eae49bd9f92d8829c8a9bb12793106f230fe32559eb3556877d8",
       "bom": false
     },
     {
@@ -71,7 +71,7 @@
     {
       "path": ".opencode/agent/ps-ui-flow.md",
       "lines": 139,
-      "sha256": "5f87229a754e5edb8e2f40fb363b70f60171ccd1ed79be208a206e568b7ebb49",
+      "sha256": "c9ba27ff51aa83f0eacd573ee25dc4bbe62ea9480f5f7cea4ea5b4117966d02a",
       "bom": false
     },
     {
@@ -118,14 +118,14 @@
     },
     {
       "path": ".opencode/peoplesoft/customization-profile.yaml",
-      "lines": 97,
-      "sha256": "88f1ba4c969fcd178e001795db270790519d0cc44b122af71e4aa15898baa8f2",
+      "lines": 98,
+      "sha256": "67ed358c24752f478cc74e5cc359a249324be2c936df3e1c80fb9ea6ae0142ec",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3024,
-      "sha256": "354436114a507e3bea8d885b5cf5c0e20b3c10d10f83d02369ca169c51cff89f",
+      "lines": 3028,
+      "sha256": "85bce439cb13f2d84ebea1dc81a530249fe4b49aa74fae75110ded72ade77cca",
       "bom": false
     },
     {
@@ -142,8 +142,8 @@
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 625,
-      "sha256": "961334670f8ebd2106820f9a11cb4b33a2baca83ece299eba6786ba212bcbc80",
+      "lines": 632,
+      "sha256": "5034de1387d768d6f1ca2e0044e15e2f4dcfafc6e59b2109a822d690578ca1a3",
       "bom": false
     },
     {
@@ -179,7 +179,7 @@
     {
       "path": ".opencode/peoplesoft/report-templates/function-detail-template.md",
       "lines": 111,
-      "sha256": "3bcc2fff5fc56e6c1aeb2d0a3924b22156652ba74c011abae24e1caf504f8e99",
+      "sha256": "3c2580a37c2ef35451e9b49fb335986610fb33fb9f2a21cbc3f434dfa79103e2",
       "bom": false
     },
     {
@@ -196,8 +196,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 636,
-      "sha256": "0dacb6a8621ff9cfe011ea205f64baeb565b62f12bb49ca1f247af3abd9a4970",
+      "lines": 637,
+      "sha256": "d061e04f4eeb870f8f3bc8e94ba031520886de09c24ba80307e9fd6d8022a950",
       "bom": false
     },
     {
@@ -335,7 +335,7 @@
     {
       "path": "scripts/tests/test-auto-loop.ps1",
       "lines": 627,
-      "sha256": "3785df2a003f7af33ef19d7780878e447ceb57f66e17c029a65fa72d000a77b0",
+      "sha256": "3b84b1798bc8c180272f11a68f5047000104050da7c983255d6aef7f3f2887ab",
       "bom": true
     }
   ]

@@ -144,11 +144,11 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
      PSMENUITEM／PSAUTHITEM，無任何 PSPRSMDEFN 類 Portal Registry 證據。
      **怎麼查**：read 該檔的「## 功能定位」與「## Evidence 附錄」，看該路徑主張引的是哪一列；
      該列的 SQL 重跑一次（只准 SELECT）確認它查的是哪張表。判 FAIL 不需要自己查 Portal。
-   · `FAIL(SINGLE_PATH_COLLAPSE)`：文件列出的入口數少於 cookbook §2k-C canonical 回傳的
-     `CLASSIC_VISIBLE = 1` 列數，或宣稱唯一而可見列 ≥ 2。
+   · `FAIL(SINGLE_PATH_COLLAPSE)`：文件列出的入口數少於 cookbook §2k-C canonical 回傳的列數，
+     或宣稱唯一而 canonical 回 ≥ 2 列。
      **怎麼查**：以該檔的 Component 重跑 §2k-C（bind 由 profile `navigation` 帶入；
      **禁止**用 `LIKE '%component%'` 或 §2k-2 無 hide 過濾的查詢當判準）；比對 `CREF_OBJECT` 集合，
-     `CLASSIC_VISIBLE = 0` 的列**不是** collapse 證據；reason 附可見列的 `CREF_OBJECT`＋`MENU_PATH`。
+     診斷形 `CLASSIC_VISIBLE = 0` 的列**不是** collapse 證據；reason 附 canonical 列的 `CREF_OBJECT`＋`MENU_PATH`。
      profile `navigation.verified: false` 或查不到 Portal 表／欄位 → `UNVERIFIABLE(PENDING_MANUAL)`，不判 FAIL。
    · `FAIL(USER_VISIBILITY_OVERCLAIM)`：文件寫「使用者可以從…」「某角色會看到…」
      這類 user-visible 宣稱，但無 user／security context 證據且未標 `AUTHORIZED_FOR_CONTEXT`。

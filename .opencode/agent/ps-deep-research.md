@@ -113,8 +113,8 @@ docs/ps-research/<領域>/
    confidence 不升級、Evidence 用 `filePath:行號`（＋ChunkId）、gaps 誠實列。
    **「## 功能定位」的兩個 `###` 子段**：
    · `### 導覽入口`＝委派 @ps-ui-flow 跑 cookbook §2k-C canonical（oracleMCP 類，**計入同時 ≤ 3**），
-     每個 `CLASSIC_VISIBLE = 1` 的列一列、可見性 `CLASSIC_NAV_VISIBLE`；只有 registry 證據時才 `REGISTRY_DEFINED`；
-     `CLASSIC_VISIBLE = 0` 的列不列入表，在「## 未解事項」記一行原因（hidden／過期／未達根）。
+     canonical 每列一列、可見性 `CLASSIC_NAV_VISIBLE`；只有 registry 證據時才 `REGISTRY_DEFINED`；
+     診斷形 `CLASSIC_VISIBLE = 0` 的列不列入表，在「## 未解事項」記一行原因（hidden／過期／未達根）。
    · 未查證／查無／§2k-0 欄位驗證未過 → 該段**整段**寫
      「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」，
      並在「## 未解事項」記一行查法收據（用什麼查、哪一步斷、結論）。

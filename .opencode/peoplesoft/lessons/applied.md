@@ -3022,3 +3022,7 @@
   在 CLASSIC_ONLY 不出 alternateSurfaces 債（功能分支）；SOP-20 一次驗證；test-auto-loop 情境 28 調整＋
   情境 30 文字守衛（沒有 Oracle 也擋得住改壞 canonical）。
 - 待公司機驗：CONNECT_BY_ISCYCLE、PSPRSMDEFNLANG 鍵欄位、LINK 列是否帶 SEG、portal 名。
+- 公司機驗證（2026-09-07，SOP-20 步驟 1～2）：PSPRSMDEFN 有 PORTAL_EXPIRE_DT（LANG 表無，不需）；LINK 列 1045 筆中
+  1039 筆帶 SEG2 → seed 含 LINK 成立；EMPLOYEE 在 PSPRDMDEFN；CONNECT_BY_ISCYCLE 可用；canonical 對已知 Component
+  回 5 列、只有 1 列 CLASSIC_VISIBLE=1 且與畫面一致。管理者要求 canonical 只回看得到的列 → 最後加 NAV_PATHS CTE
+  ＋`WHERE CLASSIC_VISIBLE = 1`，帶旗標版降為診斷形（0 列時才跑）。

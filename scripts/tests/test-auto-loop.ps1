@@ -600,7 +600,7 @@ $ckText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peopleso
 $ckM = [regex]::Match($ckText, '(?s)\*\*2k-C\..*?```sql\r?\n(.*?)```')
 $ckSql = if ($ckM.Success) { $ckM.Groups[1].Value } else { '' }
 Assert ($ckM.Success) "cookbook 有 §2k-C canonical 區塊"
-foreach ($must in @('DBMS_LOB.SUBSTR', 'NOCYCLE', "PORTAL_REFTYPE = 'F'", 'LEVEL <= 20', 'FETCH FIRST', 'CLASSIC_VISIBLE', "IN ('TARG','LINK')", 'PORTAL_EXPIRE_DT', 'CONNECT_BY_ISCYCLE', 'PSPRSMDEFNLANG', ':portalName', ':languageCd')) { Assert ($ckSql.Contains($must)) "canonical 含 $must" }
+foreach ($must in @('DBMS_LOB.SUBSTR', 'NOCYCLE', "PORTAL_REFTYPE = 'F'", 'LEVEL <= 20', 'FETCH FIRST', 'CLASSIC_VISIBLE', "IN ('TARG','LINK')", 'PORTAL_EXPIRE_DT', 'CONNECT_BY_ISCYCLE', 'PSPRSMDEFNLANG', ':portalName', ':languageCd', 'WHERE CLASSIC_VISIBLE = 1', 'NAV_PATHS')) { Assert ($ckSql.Contains($must)) "canonical 含 $must" }
 Assert ($ckSql -notmatch 'BARNAME|ITEMNAME|LIKE ''%') "canonical 不含 BARNAME／ITEMNAME／LIKE 子字串比對"
 Assert ($ckSql -notmatch '(?m)^\s*HAVING') "canonical 不用 HAVING 丟列（hidden／過期以旗標回傳）"
 $pfText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
