@@ -645,6 +645,12 @@ $hyPat = 'list' + '-connections|run' + '-sql'
 $hy = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 $hy += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1,*.json | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 Assert ($hy.Count -eq 0) "全樹 oracleMCP 工具名一律底線拼法（list_connections／run_sql）：$($hy -join ',')"
+foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
+    $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
+    Assert ($pt -match '第 0 步' -and $pt -match '無條件' -and $pt -match 'oracleMCP_connect') "主 agent $pa：開場無條件 connect（第 0 步）"
+}
+$cond = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '派出第一個.{0,12}之前.{0,6}先由你 connect|派出前先由你 connect' } | ForEach-Object { $_.Name })
+Assert ($cond.Count -eq 0) "agent／command 不再有條件式 connect（派出第一個之前才 connect）：$($cond -join ',')"
 
 Write-Host "情境 29：agent 檔規則衛生——出處／日期／變更敘述不得進模型讀的檔（ps-agent-doc-lint）"
 $adRoot = Join-Path $dir 'agentdoc'

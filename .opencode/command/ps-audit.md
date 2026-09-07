@@ -26,7 +26,7 @@ agent: ps-deep-research
 - **併發上限看「這個委派會呼叫哪個 server」**（不是任務類型——同樣是
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
   · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3——
-    派出第一個之前先由你 connect 一次（cookbook「連線生命週期」主 agent 段；
+    連線已在你的第 0 步建好（agent 規則：開場 read profile → connect，無條件；
     subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次）。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。

@@ -426,6 +426,9 @@ connect、不再依賴 list_connections；四個 subagent 硬規則段殘留的�
 BLOCKED(NOT_CONNECTED)。快篩第 (0) 步再加一項：問主 agent「列出所有名稱含 oracleMCP 的工具全名」，看到
 connect 與 list_connections 才算通。管理者定案：公司機就是底線版，全樹一律寫 `list_connections`／`run_sql`，
 連字號拼法全部移除、不再兩種都開。
+再追記（同日）：搬完後主 agent 仍常不 connect——「要派 DB 委派之前才 connect」是條件式規則，模型常跳過。改為無條件：
+三個主 agent 開場固定 read profile → `oracleMCP_connect`，做完才准查 wiki、委派、作答（agent 檔「第 0 步」；cookbook 主 agent 段、
+/ps-audit、/ps-audit-batch 同步）。快篩：看主 agent 的第一個 oracleMCP 呼叫是不是 connect、是否在第一個 task 之前。
 
 ---
 
