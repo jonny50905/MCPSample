@@ -31,7 +31,7 @@ function fakeClient({ mcp = "connected", statusSeq, onStatus } = {}) {
   }
 }
 
-function tempProject({ profileGate, connectionName = "FILL_ME" } = {}) {
+function tempProject({ profileGate, connectionName = "HR" } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gate-unit-"))
   fs.mkdirSync(path.join(dir, ".opencode", "agent"), { recursive: true })
   fs.mkdirSync(path.join(dir, ".opencode", "peoplesoft"), { recursive: true })
@@ -49,6 +49,7 @@ const userMsg = (id, text = "q") => ({ message: { id }, parts: [{ type: "text", 
 const S = "ses_primary"
 const NOT_CONNECTED = '<task_result>{"status":"BLOCKED","blockedReason":"NOT_CONNECTED"}</task_result>'
 const COMPLETE = '<task_result>{"status":"COMPLETE"}</task_result>'
+const NOT_CONNECTED_JSON = '{"task":"mock","status":"BLOCKED","blockedReason":"NOT_CONNECTED","findings":[],"gaps":[]}'
 
 const before = (hooks, sid, tool, callID, args = {}) => hooks["tool.execute.before"]({ tool, sessionID: sid, callID }, { args })
 const after = (hooks, sid, tool, callID, out, args = {}) => hooks["tool.execute.after"]({ tool, sessionID: sid, callID, args }, out)
@@ -60,7 +61,10 @@ const list = (hooks, sid, id = "l", text = "Saved connections:\n- HR") => call(h
 const connect = (hooks, sid, id = "c", text = "Successfully connected to HR", name = "HR") => call(hooks, sid, "oracleMCP_connect", id, mcpOk(text), { connection_name: name })
 const disconnect = (hooks, sid, id = "d") => call(hooks, sid, "oracleMCP_disconnect", id, mcpOk("Disconnected"))
 const task = (hooks, sid, id, target = "ps-ui-flow") => hooks["tool.execute.before"]({ tool: "task", sessionID: sid, callID: id }, taskArgs(target))
-const taskDone = (hooks, sid, id, text, target = "ps-ui-flow") => hooks["tool.execute.after"]({ tool: "task", sessionID: sid, callID: id, args: taskArgs(target).args }, { title: "t", metadata: {}, output: text })
+const taskDone = (hooks, sid, id, text, target = "ps-ui-flow", child = "ses_child_" + id) =>
+  hooks["tool.execute.after"]({ tool: "task", sessionID: sid, callID: id, args: taskArgs(target).args }, { title: "t", metadata: { parentSessionId: sid, sessionId: child }, output: text })
+// OpenCode task 工具的輸出包裝：<task id="<子 session>" state="…"><task_result>…</task_result></task>
+const wrap = (child, body, state = "completed") => `<task id="${child}" state="${state}">\n<${state === "error" ? "task_error" : "task_result"}>\n${body}\n</${state === "error" ? "task_error" : "task_result"}>\n</task>`
 const chat = (hooks, sid, id, agent = "ps-orchestrator") => hooks["chat.message"]({ sessionID: sid, agent }, userMsg(id))
 
 async function expectBlock(fn, state) {
@@ -124,8 +128,11 @@ test("狀態機：list → connect → READY 才放行；connect 先於 list 不
   assert.equal(rows("c2").ok, "unknown"); assert.match(rows("c2").note, /empty tool output/); assert.equal(rows("c2").next, "NEED_CONNECT")
   assert.equal(rows("c3").ok, false); assert.equal(rows("c3").failureMatch, "isError")
   assert.equal(rows("c4").ok, true); assert.equal(rows("c4").next, "READY"); assert.equal(rows("c4").connection, "HR")
+  const c5b = log.find((l) => l.hook === "before" && l.callID === "c5")
+  assert.ok(c5b.state === "READY" && c5b.next === "NEED_CONNECT" && /invalidates READY/.test(c5b.note) && c5b.decision === "allow" && c5b.profileConnection === "HR", "READY 後再 connect：嘗試開始就作廢 READY")
+  assert.equal(rows("c5").next, "READY")
   assert.ok(log.filter((l) => l.hook === "after" && /^oracleMCP_/.test(l.tool)).every((l) => l.attribution === "current" && l.turnId === "m1"))
-  assert.deepEqual(log.filter((l) => l.decision === "allow").map((l) => l.state), ["READY", "READY"])
+  assert.deepEqual(log.filter((l) => l.decision === "allow" && l.tool === "task").map((l) => l.state), ["READY", "READY"])
 })
 
 test("沒有入場紀錄的 after（只送 after）：attribution=unknown、不前進；成對的呼叫才算", async () => {
@@ -390,9 +397,137 @@ test("擋下訊息裡的連線規則：profile oracle.connectionName 有填就�
   const h1 = await PsOraclePreflightGate({ directory: dir1, client: fakeClient() })
   await chat(h1, S, "m1")
   await assert.rejects(() => task(h1, S, "t1"), (e) => /「HR_PROD」/.test(e.message) && /不要自己挑清單第一個/.test(e.message) && !/否則清單第一個/.test(e.message))
-  const dir2 = tempProject()
+  const dir2 = tempProject({ connectionName: "FILL_ME" })
   const h2 = await PsOraclePreflightGate({ directory: dir2, client: fakeClient() })
   await chat(h2, S, "m1")
   await list(h2, S)
   await assert.rejects(() => task(h2, S, "t1"), (e) => /FILL_ME／未填/.test(e.message) && /只差 oracleMCP_connect/.test(e.message))
+})
+
+test("connect 目標在執行前強制比對 profile：FILL_ME／未填 → ORACLE_CONNECTION_NOT_CONFIGURED；不一致 → ORACLE_CONNECTION_MISMATCH；一致才執行；observe 只記", async () => {
+  const dir = tempProject({ connectionName: "HR_PROD" })
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  await chat(hooks, S, "m1")
+  await list(hooks, S)
+  await assert.rejects(() => before(hooks, S, "oracleMCP_connect", "c1", { connection_name: "HR_UAT" }), (e) => /ORACLE_CONNECTION_MISMATCH/.test(e.message) && /「HR_UAT」≠ profile/.test(e.message) && /「HR_PROD」/.test(e.message))
+  let row = last(dir, S)
+  assert.equal(row.decision, "block"); assert.equal(row.note, "ORACLE_CONNECTION_MISMATCH"); assert.equal(row.connection, "HR_UAT"); assert.equal(row.profileConnection, "HR_PROD"); assert.equal(row.next, "NEED_CONNECT")
+  await assert.rejects(() => before(hooks, S, "oracleMCP_connect", "c2", {}), /ORACLE_CONNECTION_MISMATCH.*沒有帶 connection_name/)
+  // 被擋的 connect 不會有 after（工具沒執行）；就算模型端偽造一個 after 也沒有快照 → 不前進
+  await after(hooks, S, "oracleMCP_connect", "c1", mcpOk("Successfully connected to HR_UAT"), { connection_name: "HR_UAT" })
+  assert.equal(last(dir, S).attribution, "unknown"); assert.equal(last(dir, S).next, "NEED_CONNECT")
+  await expectBlock(() => task(hooks, S, "t1"), "NEED_CONNECT")
+  await connect(hooks, S, "c3", "Successfully connected to HR_PROD", "HR_PROD")
+  await task(hooks, S, "t2")
+  assert.equal(last(dir, S).decision, "allow")
+  // profile 未填
+  const dir2 = tempProject({ connectionName: "FILL_ME" })
+  const h2 = await PsOraclePreflightGate({ directory: dir2, client: fakeClient() })
+  await chat(h2, S, "m1")
+  await list(h2, S)
+  await assert.rejects(() => before(h2, S, "oracleMCP_connect", "c1", { connection_name: "HR" }), (e) => /ORACLE_CONNECTION_NOT_CONFIGURED/.test(e.message) && /回填/.test(e.message))
+  assert.equal(last(dir2, S).note, "ORACLE_CONNECTION_NOT_CONFIGURED")
+  await expectBlock(() => task(h2, S, "t1"), "NEED_CONNECT")
+  // observe：只記 would-block，connect 照跑、READY 照給（純探測）
+  const dir3 = tempProject({ connectionName: "FILL_ME", profileGate: "observe" })
+  const h3 = await PsOraclePreflightGate({ directory: dir3, client: fakeClient() })
+  await chat(h3, S, "m1")
+  await list(h3, S)
+  await connect(h3, S, "c1", "Successfully connected to HR", "HR")
+  const rows3 = readLog(dir3, S)
+  const b3 = rows3.find((l) => l.hook === "before" && l.callID === "c1")
+  assert.ok(b3.decision === "observe-would-block" && b3.note === "ORACLE_CONNECTION_NOT_CONFIGURED" && b3.gen === 1)
+  assert.equal(rows3.at(-1).next, "READY")
+})
+
+test("connect 嘗試作廢 READY：READY 後再 connect 失敗（isError，無 after）→ NEED_CONNECT、task 被擋；較晚的嘗試取代較早的", async () => {
+  const dir = tempProject()
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  await chat(hooks, S, "m1")
+  await list(hooks, S)
+  await connect(hooks, S, "c1")
+  await task(hooks, S, "t1")
+  assert.equal(last(dir, S).decision, "allow")
+  await before(hooks, S, "oracleMCP_connect", "c2", { connection_name: "HR" }) // isError → after 不觸發
+  let row = last(dir, S)
+  assert.ok(row.state === "READY" && row.next === "NEED_CONNECT" && row.gen === 2)
+  await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
+  await connect(hooks, S, "c3")
+  await task(hooks, S, "t3")
+  assert.equal(last(dir, S).decision, "allow")
+  // 兩個嘗試並行：較早的成功不算（gen 已被取代），較晚的成功才恢復
+  await before(hooks, S, "oracleMCP_connect", "c4", { connection_name: "HR" })
+  await before(hooks, S, "oracleMCP_connect", "c5", { connection_name: "HR" })
+  await after(hooks, S, "oracleMCP_connect", "c4", mcpOk("Successfully connected to HR"), { connection_name: "HR" })
+  row = last(dir, S)
+  assert.ok(row.ok === true && row.gen === 4 && row.next === "NEED_CONNECT" && /superseded/.test(row.note), JSON.stringify(row))
+  await expectBlock(() => task(hooks, S, "t4"), "NEED_CONNECT")
+  await after(hooks, S, "oracleMCP_connect", "c5", mcpOk("Successfully connected to HR"), { connection_name: "HR" })
+  assert.equal(last(dir, S).next, "READY")
+  await task(hooks, S, "t5")
+  assert.equal(last(dir, S).decision, "allow")
+})
+
+test("同題連線世代：同題兩個 task 在舊連線上，A 回 NOT_CONNECTED → 重連 → B 晚回的 NOT_CONNECTED 不作廢新世代的 READY", async () => {
+  const dir = tempProject()
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  await chat(hooks, S, "m1")
+  await list(hooks, S)
+  await connect(hooks, S, "c1") // gen 1
+  await task(hooks, S, "tA")
+  await task(hooks, S, "tB")
+  await taskDone(hooks, S, "tA", wrap("ses_a", NOT_CONNECTED_JSON))
+  let row = last(dir, S)
+  assert.ok(row.next === "NEED_CONNECT" && row.gen === 1 && row.notConnected === true, JSON.stringify(row))
+  await connect(hooks, S, "c2") // gen 2 → READY
+  await taskDone(hooks, S, "tB", wrap("ses_b", NOT_CONNECTED_JSON))
+  row = last(dir, S)
+  assert.ok(row.next === "READY" && row.gen === 1 && /older connection attempt \(admitted gen 1, now 2\)/.test(row.note), JSON.stringify(row))
+  await task(hooks, S, "tC")
+  assert.equal(last(dir, S).decision, "allow")
+  // 同世代的 NOT_CONNECTED 才退回
+  await taskDone(hooks, S, "tC", wrap("ses_c", NOT_CONNECTED_JSON))
+  assert.equal(last(dir, S).next, "NEED_CONNECT")
+  await expectBlock(() => task(hooks, S, "tD"), "NEED_CONNECT")
+})
+
+test("task 回報解析：COMPLETE／PARTIAL／BLOCKED(QUERY_TIMEOUT)／非 JSON／task_error 都記到列上，只有 NOT_CONNECTED 退狀態；run_sql 的 after 記三態 ok", async () => {
+  const dir = tempProject()
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  await chat(hooks, S, "m1")
+  await list(hooks, S)
+  await connect(hooks, S)
+  const cases = [
+    ["t1", wrap("ses_1", '{"task":"x","status":"COMPLETE","blockedReason":"NOT_APPLICABLE","findings":[]}'), { reportValid: true, reportStatus: "COMPLETE", blockedReason: "NOT_APPLICABLE", childSessionID: "ses_1", taskState: "completed", next: "READY" }],
+    ["t2", wrap("ses_2", "```json\n{\"status\":\"PARTIAL\",\"blockedReason\":\"NO_EVIDENCE\"}\n```"), { reportValid: true, reportStatus: "PARTIAL", blockedReason: "NO_EVIDENCE", childSessionID: "ses_2", next: "READY" }],
+    ["t3", wrap("ses_3", '{"status":"BLOCKED","blockedReason":"QUERY_TIMEOUT"}'), { reportValid: true, reportStatus: "BLOCKED", blockedReason: "QUERY_TIMEOUT", notConnected: false, next: "READY" }],
+    ["t4", wrap("ses_4", '{"status":"BLOCKED","blockedReason":"SCHEMA_UNRESOLVED"}'), { reportStatus: "BLOCKED", blockedReason: "SCHEMA_UNRESOLVED", notConnected: false, next: "READY" }],
+    ["t5", wrap("ses_5", "I could not do it, sorry."), { reportValid: false, reportStatus: "INVALID", notConnected: false, next: "READY" }],
+    ["t6", wrap("ses_6", "boom", "error"), { reportValid: false, reportStatus: "INVALID", taskState: "error", next: "READY" }],
+    ["t7", wrap("ses_7", '{"status":"weird"}'), { reportValid: false, reportStatus: "INVALID", next: "READY" }],
+  ]
+  for (const [id, text, expected] of cases) {
+    await task(hooks, S, id)
+    await taskDone(hooks, S, id, text, "ps-ui-flow", "ses_meta_" + id)
+    const row = last(dir, S)
+    for (const [k, v] of Object.entries(expected)) {
+      const want = k === "childSessionID" ? "ses_meta_" + id : v
+      assert.equal(row[k], want, `${id}.${k}: got ${JSON.stringify(row[k])}`)
+    }
+  }
+  // 沒有 metadata 時用包裝標籤的 task id 當子 session
+  await task(hooks, S, "t8")
+  await hooks["tool.execute.after"]({ tool: "task", sessionID: S, callID: "t8", args: taskArgs("ps-ui-flow").args }, { title: "t", output: wrap("ses_from_tag", '{"status":"COMPLETE"}') })
+  assert.equal(last(dir, S).childSessionID, "ses_from_tag")
+  // NOT_CONNECTED（契約 JSON）才退狀態
+  await task(hooks, S, "t9")
+  await taskDone(hooks, S, "t9", wrap("ses_9", NOT_CONNECTED_JSON))
+  assert.ok(last(dir, S).notConnected === true && last(dir, S).next === "NEED_CONNECT" && last(dir, S).reportStatus === "BLOCKED")
+  // 子 session 的 run_sql：成功／未連線／空輸出
+  const C = "ses_child"
+  await call(hooks, C, "oracleMCP_run_sql", "q1", mcpOk("ROW_COUNT\n1"), { sql: "SELECT 1 FROM DUAL" })
+  await call(hooks, C, "oracleMCP_run_sql", "q2", mcpOk("Error: Not connected to a database."), { sql: "SELECT 1 FROM DUAL" })
+  await call(hooks, C, "oracleMCP_run_sql", "q3", { content: [] }, { sql: "SELECT 1 FROM DUAL" })
+  const q = readLog(dir, C).filter((l) => l.hook === "after")
+  assert.deepEqual(q.map((l) => [l.callID, l.ok, l.attribution]), [["q1", true, "current"], ["q2", false, "current"], ["q3", "unknown", "current"]])
 })

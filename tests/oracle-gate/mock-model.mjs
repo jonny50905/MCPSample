@@ -13,6 +13,9 @@
 //                    回報「DB 連線建立失敗」（驗證閘門沒有「失敗幾次就放行」、空輸出不算成功）
 //     stale-probe    第一題：list → connect（慢）→ …；第二題（在第一題的 connect 完成前送進來）：list → task → 被擋 → connect → task
 //                    （驗證上一題晚到的 connect 回覆不會替新題完成前置）
+//     reconnect-probe list → connect（成功、READY）→ 再 connect 一次（失敗）→ task → 被擋 → connect（失敗）→ task → 被擋 → 放棄
+//                    （驗證「已 READY 後再 connect」的嘗試會先作廢 READY，失敗就不放行）
+//   connect-fail／reconnect-probe：connect 若被閘門在執行前擋下（ORACLE_CONNECTION_NOT_CONFIGURED／MISMATCH），照第 0 步規則回報「Oracle 連線未設定」
 //   劇本以「最後一則 user 訊息之後」的工具呼叫為準（同 session 多 turn 時每 turn 重新走劇本）
 //   MOCK_MODEL_LOG        每次請求追加一行 JSON（含該次請求可見的 task／oracleMCP_ 工具名——驗 subagent 的 Oracle 允許清單）
 import http from "node:http"
@@ -107,6 +110,8 @@ function primaryNext(calls, users) {
     case "connect-fail": {
       if (n === 0) return TASK("ps-ui-flow")
       const blockedTasks = calls.filter((c) => c.name === "task" && /PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
+      const gateConnect = calls.some((c) => c.name === "oracleMCP_connect" && /ORACLE_CONNECTION_(NOT_CONFIGURED|MISMATCH)/.test(c.result))
+      if (blockedTasks >= 3 && gateConnect) return { text: "Oracle 連線未設定（profile oracle.connectionName 與清單不一致或未填）：本題不派 DB 委派，其餘部分照常作答。" + JSON.stringify(calls.map((c) => c.name)) }
       if (blockedTasks >= 3) return { text: "DB 連線建立失敗（connect 沒有成功）：本題不派 DB 委派，其餘部分照常作答。" + JSON.stringify(calls.map((c) => c.name)) }
       const listed = calls.some((c) => c.name === "oracleMCP_list_connections")
       if (last.name === "task") return listed ? CONNECT(pickConnection(lastListResult(calls))) : LIST
@@ -122,6 +127,15 @@ function primaryNext(calls, users) {
       if (n === 0) return LIST
       if (n === 1) return TASK("ps-ui-flow")
       if (last.name === "task") return CONNECT(pickConnection(lastListResult(calls)))
+      return TASK("ps-ui-flow")
+    }
+    case "reconnect-probe": {
+      if (n === 0) return LIST
+      if (n === 1) return CONNECT(pickConnection(calls[0].result))
+      if (n === 2) return CONNECT(pickConnection(calls[0].result))
+      const blockedTasks = calls.filter((c) => c.name === "task" && /PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
+      if (blockedTasks >= 3) return { text: "DB 連線建立失敗（再 connect 沒有成功）：本題不派 DB 委派，其餘部分照常作答。" + JSON.stringify(calls.map((c) => c.name)) }
+      if (last.name === "task") return CONNECT(pickConnection(calls[0].result))
       return TASK("ps-ui-flow")
     }
     case "task-first":

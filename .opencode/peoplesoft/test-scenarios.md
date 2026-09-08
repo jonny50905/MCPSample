@@ -674,7 +674,7 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 ### 7a. 執行期閘門（issue #29；plugin `.opencode/plugin/ps-oracle-preflight-gate.js`）
 
 R1／R8 的順序自此由閘門保證：模型錯序時 task 被擋（不執行），模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED`，做完 list→connect 再重派。
-判定看交易紀錄 `auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl`（不看 prompt）；沙箱已用真 OpenCode 1.18.29＋假 oracleMCP＋假模型跑過 14 情境（`tests/oracle-gate/run-e2e.mjs`，含同行程多輪、compaction、第一題 connect 未回就送第二題、空輸出）。閘門的不變量、呼叫配對與三態見 SOP-21。
+判定看交易紀錄 `auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl`（不看 prompt）；沙箱已用真 OpenCode 1.18.29＋假 oracleMCP＋假模型跑過 17 情境（`tests/oracle-gate/run-e2e.mjs`，含同行程多輪、compaction、第一題 connect 未回就送第二題、空輸出、connect 目標不一致／未設定、再 connect 失敗）。閘門的不變量、呼叫配對與三態見 SOP-21。
 
 | # | 情境 | 操作 | 預期訊號 |
 |---|---|---|---|
@@ -687,4 +687,7 @@ R1／R8 的順序自此由閘門保證：模型錯序時 task 被擋（不執行
 | R15 | Topology 實驗 | SOP-21 步驟 9：T1 兩個 opencode 行程（A 已 connect，B 用 build agent 不 connect 直接 run_sql `SELECT SYS_CONTEXT('USERENV','DB_NAME') FROM DUAL`）；T2 同一行程 /new 第二個 session；T3 記 oracleMCP type、同名再 connect 的回覆、B 換連線名後 A 查到的 DB_NAME | 三組結果回報維護 session、寫回 SOP-12——共用連線防護（跨 session／跨行程）依結果另案設計，閘門目前不做 |
 | R16 | 已連線再 connect | 同一視窗連問兩題 | 第二題的 `oracleMCP_connect` 在 jsonl 有 after 列且 `ok:true`；若沒有 after 列（SQLcl 回 isError）、`ok:false`＋`failureMatch`、或 `ok:"unknown"`（回空文字），該題閘門不會開——回報維護 session（回覆原文），再決定要不要接 event hook |
 | R17 | 工具可見性（允許清單） | 問主 agent「列出所有名稱含 oracleMCP 的工具全名」；再讓它派 ps-ui-flow 問同一句 | 主 agent：只有 `oracleMCP_list_connections`、`oracleMCP_connect`；ps-ui-flow：只有 `oracleMCP_run_sql`（list_connections／connect／disconnect／run_sqlcl 都看不到） |
-| R18 | 連線名設定錯誤 | 把 profile `oracle.connectionName` 暫改成清單裡沒有的名字再問一題 DB 題 | 主 agent 回「Oracle 連線未設定（profile 值＋清單）」、不 connect、不挑清單第一個；jsonl 沒有 connect 列、DB 委派被擋（state=NEED_CONNECT）；改回後恢復 |
+| R18 | 連線名設定錯誤 | 把 profile `oracle.connectionName` 暫改成清單裡沒有的名字再問一題 DB 題 | 主 agent 回「Oracle 連線未設定（profile 值＋清單）」、不挑清單第一個；模型若仍 connect → jsonl 的 before connect 列 `decision=block`、note=`ORACLE_CONNECTION_MISMATCH`（未填則 `ORACLE_CONNECTION_NOT_CONFIGURED`）、沒有 after 列、SQLcl 沒收到 connect；DB 委派被擋（state=NEED_CONNECT）；改回後恢復 |
+| R19 | 正向驗收反例 | 故意讓 subagent 回 BLOCKED（例如暫時把 profile currentSchema 改壞 → SCHEMA_UNRESOLVED）或非契約 JSON，再 `-AnalyzeSession <id>` | dbTasksCompleted=0、dbTasksBlocked／dbTasksInvalid ≥ 1（完成＝報告 COMPLETE 且子 session run_sql 成功，宣稱不算） |
+| R20 | 已 READY 後再 connect | 同一題內讓主 agent再 connect 一次 | jsonl 第二個 connect 的 before 列 `state=READY`→`next=NEED_CONNECT`、gen+1；成功 → READY；SQLcl 回錯（沒有 after）→ 之後的 DB 委派全擋直到 connect 成功——回報回覆原文（R16 契約） |
+| R21 | 一開多用 | 主 agent 開線後連派三個 DB 委派（固定探測 SELECT 1 FROM DUAL） | 三個子 session 的 jsonl 各有 `run_sql` after 列 `ok:true`；任一結束不影響其餘；`-AnalyzeSession` 的 dbTasksCompleted=3 |

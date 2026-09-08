@@ -82,3 +82,17 @@ review 對 a31c946 的判定：核心 invariant 乾淨（DB-capable task 只在 
 先於業務查詢、同一輪只一次復原、SQL 與連線操作在真實資源邊界排程、真 SQLcl repeated-connect 契約（R16／topology T1～T3）。
 驗收結論的措辭（採 review 建議）：已修正 subagent 自行管理共用連線的權限路徑、派工前置閘門與跨題晚到回覆的歸屬；共用連線的有效性、
 目標一致性、集中復原與真 SQLcl repeated-connect 契約尚未驗證——目前是「部分修正」，不是「共用連線問題已完整解決」。
+
+## 六、外部 review 第三輪（2026-09-08，對 e0b1c75）逐條
+
+| # | review 主張 | 核對 | 處置 |
+|---|---|---|---|
+| F1 | analyzer 的「完成」＝沒回 NOT_CONNECTED，BLOCKED(QUERY_TIMEOUT／SCHEMA_UNRESOLVED)／非 JSON 都算成功（G4） | 成立 | plugin 的 task after 解析報告（status／blockedReason／taskState／childSessionID），子 session 的 run_sql after 記 ok；analyzer 完成＝COMPLETE 且子 session run_sql ok；PARTIAL／BLOCKED／INVALID／COMPLETE-無-SQL 分開計；情境 33 加假成功反例；e2e 正向情境驗子 session run_sql ok |
+| F2 | connectionName 只是模型規則，plugin 未比對 connect 參數（G1） | 成立 | connect 的 before 在執行前比對 profile：未填 → NOT_CONFIGURED、不一致 → MISMATCH，工具不執行；快照存 validated target 供 after 核對；e2e wrong-target／not-configured |
+| F3 | 同題不同連線世代未隔離（G2） | 成立（hook 層可重現；真 host 排程未證實） | 採 review 選項 2 的 session 內版本：connect 嘗試世代、task 入場記世代、舊世代的 NOT_CONNECTED 不作廢新世代；跨 session 協調另案 |
+| F4 | 已 READY 後再 connect 失敗 READY 不作廢（G3） | 成立 | 嘗試開始即作廢 READY，只由該次嘗試成功恢復；較晚嘗試取代較早；e2e reconnect-fail。「同名已連線再 connect」的真 SQLcl 契約仍待 R16／R20 |
+| — | 保留七個回歸案例 | 已在 unit 中（對照：R1→狀態機、R2→晚到 connect、R3→晚到 NOT_CONNECTED、R4→三態、R5→無快照、R6→未掛載擋、R7→await 期間換題） | tests README 加對照表 |
+| — | 重生 manifest、保留內網設定 | 是 | HANDOFF 註明已填 connectionName／currentSchema 不得被 FILL_ME 覆蓋，且 connectionName 必須與 SQLcl 已儲存連線名完全一致（閘門現在強制） |
+
+review 的驗收結論採納：對「受控 subagent 自己開／關共用連線」的原始路徑，在受控配置下已切斷；「subagent 任何時候都能用正確 Oracle
+連線」仍不能宣告——共用連線持續有效性、跨 session 集中復原、真 SQLcl repeated-connect 契約、DB／schema 一致性是另一階段。

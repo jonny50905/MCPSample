@@ -11,6 +11,10 @@
 //   compaction-serve：同上，但兩題之間做一次 session.summarize（compaction）——插入的 user 訊息只有 compaction part、不觸發 chat.message
 //   stale-connect-serve：第一題的 connect 還沒回（假 MCP 延遲 5 秒）就送第二題——第一題的 connect 回覆晚到：閘門標 stale、歸第一題、
 //                        不替第二題完成前置；第二題自己 list→connect 才放行；export 裡該 connect 也屬第一題（parentID）
+//   wrong-target：profile oracle.connectionName=HR_UAT、模型 connect(HR_DEV) → connect 在執行前被擋（ORACLE_CONNECTION_MISMATCH），假 MCP 沒收到 connect、零 SQL
+//   not-configured：profile 是 FILL_ME → connect 在執行前被擋（ORACLE_CONNECTION_NOT_CONFIGURED）
+//   reconnect-fail：list→connect（READY）後再 connect 一次但假 MCP 從第 2 次起 isError → 嘗試開始就作廢 READY，之後的 task 全擋、零 SQL
+//   每個情境另驗：已執行的 DB task 列帶 reportStatus／childSessionID，且子 session 的交易紀錄裡有成功的 run_sql（可用的定義）
 // 每個情境：建臨時專案（複製 .opencode＋AGENTS.md）、寫 opencode.json、跑 opencode run --agent ps-orchestrator、
 //   讀閘門 jsonl、opencode export 取正式 transcript 交叉比對（task 件數、真實題目 id、每個 task 所屬題目）、斷言。
 //   另驗 subagent 的 Oracle 允許清單：假模型記下每次請求可見的工具名，subagent 只能看到 oracleMCP_run_sql。
@@ -45,6 +49,9 @@ const SCENARIOS = {
   "multi-turn-serve": { model: "task-first", mode: "enforce", mcp: true, serve: 2 },
   "compaction-serve": { model: "task-first", mode: "enforce", mcp: true, serve: 2, summarize: true },
   "stale-connect-serve": { model: "stale-probe", mode: "enforce", mcp: true, serve: 2, overlap: true, connectDelayFirst: 5000 },
+  "wrong-target": { model: "connect-fail", mode: "enforce", mcp: true, profileConnection: "HR_UAT" },
+  "not-configured": { model: "connect-fail", mode: "enforce", mcp: true, profileConnection: "FILL_ME" },
+  "reconnect-fail": { model: "reconnect-probe", mode: "enforce", mcp: true, connectFailFrom: 2 },
 }
 
 function copyDir(src, dst) {
@@ -60,11 +67,17 @@ function makeProject(base, sc, name) {
   copyDir(path.join(repoRoot, ".opencode"), path.join(project, ".opencode"))
   fs.copyFileSync(path.join(repoRoot, "AGENTS.md"), path.join(project, "AGENTS.md"))
   fs.mkdirSync(path.join(project, "docs", "ps-research", "wiki"), { recursive: true })
+  // profile 的 oracle.connectionName：閘門在 connect 執行前比對它；假 MCP 的清單是 HR_DEV／HR_UAT，模型劇本挑清單第一個（HR_DEV）
+  const profilePath = path.join(project, ".opencode", "peoplesoft", "customization-profile.yaml")
+  const profile = fs.readFileSync(profilePath, "utf8")
+  if (!/^\s*connectionName:/m.test(profile)) throw new Error("profile has no oracle.connectionName")
+  fs.writeFileSync(profilePath, profile.replace(/^(\s*connectionName:)\s*\S+/m, `$1 ${sc.profileConnection ?? "HR_DEV"}`))
   const mcpLog = path.join(base, name, "mcp.jsonl")
   const mcpEnv = { MOCK_ORACLE_LOG: mcpLog }
   if (sc.connectFail) mcpEnv.MOCK_ORACLE_CONNECT_FAIL = "1"
   if (sc.emptyConnect) mcpEnv.MOCK_ORACLE_EMPTY_CONNECT = "1"
   if (sc.connectDelayFirst) mcpEnv.MOCK_ORACLE_CONNECT_DELAY_FIRST_MS = String(sc.connectDelayFirst)
+  if (sc.connectFailFrom) mcpEnv.MOCK_ORACLE_CONNECT_FAIL_FROM = String(sc.connectFailFrom)
   const config = {
     $schema: "https://opencode.ai/config.json",
     model: "mock/scripted",
@@ -214,6 +227,17 @@ function assistantText(exported, sessionID) {
     .flatMap((m) => (m.parts ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "")).join("\n")
 }
 
+// 可用的定義：已執行的 DB task 列 reportStatus=COMPLETE、reportValid、childSessionID 指向子 session，且子 session 的 jsonl 有成功的 run_sql
+function childSqlOk(project, child) {
+  if (!child) return 0
+  return jsonl(path.join(project, "auto-loop-logs", "ps-oracle-gate", child + ".jsonl")).filter((g) => g.hook === "after" && g.tool === "oracleMCP_run_sql" && g.ok === true).length
+}
+function assertCompleted(project, executed, failures) {
+  assertOk(executed.length >= 1 && executed.every((e) => e.reportValid === true && e.reportStatus === "COMPLETE" && e.blockedReason === "NOT_APPLICABLE" && typeof e.childSessionID === "string" && e.childSessionID.startsWith("ses_") && e.taskState === "completed"),
+    "executed DB task rows carry a parsed COMPLETE report and child session id; got " + JSON.stringify(executed.map((e) => [e.reportStatus, e.blockedReason, e.childSessionID, e.taskState])), failures)
+  assertOk(executed.every((e) => childSqlOk(project, e.childSessionID) >= 1), "every completed DB task has a successful run_sql in its child session log", failures)
+}
+
 function assertEq(actual, expected, label, failures) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) failures.push(`${label}: expected ${JSON.stringify(expected)} got ${JSON.stringify(actual)}`)
 }
@@ -321,6 +345,9 @@ async function runScenario(name, sc, base, iteration) {
       assertOk(executed[0]?.admitted === "allow" && executed[0]?.turnId === chats[0]?.turnId && executed[0]?.callID && executed[0]?.attribution === "current", "executed row carries admission snapshot (turnId＝chat.message id, callID, attribution=current)", failures)
       assertOk(gate.filter((g) => g.hook === "after" && /^oracleMCP_/.test(g.tool)).every((g) => g.attribution === "current" && g.ok === true), "list/connect after rows paired to their before (attribution=current, ok=true)", failures)
       assertToolLists(modelLog, failures)
+      assertCompleted(project, executed, failures)
+      const cb = gate.find((g) => g.hook === "before" && g.tool === "oracleMCP_connect")
+      assertOk(cb && cb.decision === "allow" && cb.gen === 1 && cb.profileConnection === "HR_DEV" && cb.connection === "HR_DEV", "connect before row: validated against profile (decision=allow, gen=1); got " + JSON.stringify(cb), failures)
       break
     }
     case "connect-first": {
@@ -336,6 +363,7 @@ async function runScenario(name, sc, base, iteration) {
       assertEq(executed.length, 1, "executed task", failures)
       assertEq(mcpSeq, ["list_connections", "connect", "run_sql"], "mcp call order", failures)
       assertToolLists(modelLog, failures)
+      assertCompleted(project, executed, failures)
       break
     }
     case "stubborn": {
@@ -353,7 +381,8 @@ async function runScenario(name, sc, base, iteration) {
     case "observe": {
       const would = before.filter((g) => g.decision === "observe-would-block")
       assertEq(would.length, 1, "observe-would-block", failures); assertEq(blocks.length, 0, "blocks", failures)
-      assertOk(executed.length >= 1 && executed[0].notConnected === true && executed[0].admitted === "observe-would-block", "task executed before preflight and subagent reported NOT_CONNECTED (probe evidence)", failures)
+      assertOk(executed.length >= 1 && executed[0].notConnected === true && executed[0].admitted === "observe-would-block" && executed[0].reportStatus === "BLOCKED" && executed[0].blockedReason === "NOT_CONNECTED", "task executed before preflight and subagent reported NOT_CONNECTED (probe evidence; parsed report)", failures)
+      assertOk(childSqlOk(project, executed[0]?.childSessionID) === 0, "no successful run_sql in the child session (it ran before connect)", failures)
       assertOk(runSqlBeforeConnect, "run_sql happened before connect (observe lets the wrong order through)", failures)
       break
     }
@@ -408,6 +437,7 @@ async function runScenario(name, sc, base, iteration) {
       assertEq(mcpSeq, ["list_connections", "connect", "run_sql", "list_connections", "connect", "run_sql"], "mcp call order", failures)
       assertEq(taskParts.map((p) => p.state?.status), ["error", "completed", "error", "completed"], "task parts across turns", failures)
       assertEq(stale.length, 0, "no stale replies in sequential turns", failures)
+      assertCompleted(project, executed, failures)
       break
     }
     case "stale-connect-serve": {
@@ -423,6 +453,32 @@ async function runScenario(name, sc, base, iteration) {
       assertEq(executed.map((e) => `${ids.indexOf(e.turnId) + 1}:${e.state}`), ["2:READY"], "one executed DB task, in turn 2, READY", failures)
       assertEq(mcpSeq, ["list_connections", "connect", "list_connections", "connect", "run_sql"], "mcp call order", failures)
       assertEq(taskParts.map((p) => p.state?.status), ["error", "completed"], "task parts", failures)
+      assertCompleted(project, executed, failures)
+      break
+    }
+    case "wrong-target":
+    case "not-configured": {
+      const code = name === "wrong-target" ? "ORACLE_CONNECTION_MISMATCH" : "ORACLE_CONNECTION_NOT_CONFIGURED"
+      const cbs = gate.filter((g) => g.hook === "before" && g.tool === "oracleMCP_connect")
+      assertOk(cbs.length >= 2 && cbs.every((g) => g.decision === "block" && g.note === code), `connect blocked before execution (${code}); got ` + JSON.stringify(cbs.map((g) => [g.decision, g.note, g.connection, g.profileConnection])), failures)
+      if (name === "wrong-target") assertOk(cbs.every((g) => g.connection === "HR_DEV" && g.profileConnection === "HR_UAT"), "mismatch rows name both sides", failures)
+      assertEq(mcpSeq, ["list_connections"], "mock MCP never received connect", failures)
+      assertEq(blocks.map((b) => b.state), ["NEED_LIST", "NEED_CONNECT", "NEED_CONNECT"], "task blocks", failures)
+      assertEq(allows.length, 0, "no allowed task", failures); assertEq(executed.length, 0, "no executed task", failures)
+      assertEq(gate.filter((g) => g.hook === "after" && g.tool === "oracleMCP_connect").length, 0, "no connect after rows (tool never ran)", failures)
+      const connParts = parts.filter((p) => p.tool === "oracleMCP_connect")
+      assertOk(connParts.length >= 2 && connParts.every((p) => p.state?.status === "error" && new RegExp(code).test(p.state?.error ?? "")), "connect tool parts are errors carrying the code; got " + JSON.stringify(connParts.map((p) => [p.state?.status, (p.state?.error ?? "").slice(0, 60)])), failures)
+      assertOk(exported && /Oracle 連線未設定/.test(assistantText(exported, sessionID)), "model reported the configuration error instead of guessing a connection", failures)
+      break
+    }
+    case "reconnect-fail": {
+      assertEq(stateSeq, ["list_connections:NEED_LIST->NEED_CONNECT", "connect:NEED_CONNECT->READY"], "only the first connect ever produced an after row", failures)
+      const cbs = gate.filter((g) => g.hook === "before" && g.tool === "oracleMCP_connect")
+      assertOk(cbs.length === 4 && cbs[0].state === "NEED_CONNECT" && cbs[1].state === "READY" && cbs[1].next === "NEED_CONNECT" && /invalidates READY/.test(cbs[1].note ?? "") && cbs.map((g) => g.gen).join(",") === "1,2,3,4", "second connect attempt invalidated READY at attempt start; got " + JSON.stringify(cbs.map((g) => [g.state, g.next, g.gen, g.note])), failures)
+      assertEq(blocks.map((b) => b.state), ["NEED_CONNECT", "NEED_CONNECT", "NEED_CONNECT"], "all tasks blocked after the failed reconnect", failures)
+      assertEq(allows.length, 0, "no allowed task", failures); assertEq(executed.length, 0, "no executed task", failures)
+      assertEq(mcpSeq, ["list_connections", "connect", "connect", "connect", "connect"], "mcp call order (no run_sql)", failures)
+      assertOk(exported && /DB 連線建立失敗/.test(assistantText(exported, sessionID)), "model gave up DB dispatch", failures)
       break
     }
   }

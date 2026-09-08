@@ -3,6 +3,7 @@
 // 環境變數：
 //   MOCK_ORACLE_LOG                    每次 tools/call 追加一行 JSON（供交叉比對；在呼叫「開始」時寫）
 //   MOCK_ORACLE_CONNECT_FAIL           =1 → connect 回 isError（模擬連不上）
+//   MOCK_ORACLE_CONNECT_FAIL_FROM      =N → 第 N 次（含）以後的 connect 回 isError（模擬「已連上，再連卻失敗」）
 //   MOCK_ORACLE_EMPTY_CONNECT          =1 → connect 成功但回空 content（模擬「成功卻沒有文字」——閘門應判未知、不前進）
 //   MOCK_ORACLE_CONNECT_DELAY_FIRST_MS 第一次 connect 延遲 N 毫秒才回（模擬慢連線，讓下一題在它完成前送進來）
 //   MOCK_ORACLE_CONNECTIONS            逗號分隔的已儲存連線名（預設 HR_DEV,HR_UAT）
@@ -10,6 +11,7 @@ import fs from "node:fs"
 
 const names = String(process.env.MOCK_ORACLE_CONNECTIONS ?? "HR_DEV,HR_UAT").split(",").map((s) => s.trim()).filter(Boolean)
 const delayFirst = Number(process.env.MOCK_ORACLE_CONNECT_DELAY_FIRST_MS ?? 0)
+const failFrom = Number(process.env.MOCK_ORACLE_CONNECT_FAIL_FROM ?? 0)
 let connected = null
 let connectCalls = 0
 let buffer = ""
@@ -47,6 +49,7 @@ async function call(name, args) {
       if (connectCalls === 1 && delayFirst > 0) await wait(delayFirst)
       const n = String(args?.connection_name ?? "")
       if (process.env.MOCK_ORACLE_CONNECT_FAIL === "1") return text("ORA-12541: TNS:no listener", true)
+      if (failFrom > 0 && connectCalls >= failFrom) return text("ORA-12541: TNS:no listener", true)
       if (!names.includes(n)) return text("Error: connection " + n + " not found", true)
       const already = connected === n
       connected = n

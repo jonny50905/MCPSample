@@ -3168,3 +3168,23 @@
   真 SQLcl repeated-connect 契約（R16／topology T1～T3）、ps-auditor 混合能力。
   教訓：after 沒有配對 before 就是在相信「現在」而不是「當時」；能力判定要寫成機械欄位，不能讓 analyzer 去解讀說明字串；
   「零違規」要配一條「有做到」的可用判定才算驗收；權限寫成允許清單，不要靠排除清單追新工具。
+- 追記（2026-09-08，外部 review 第三輪，對 e0b1c75）：review 以 11 個 hook-level 探測複審——7 個既有問題回歸通過（未前置阻擋、晚到
+  connect、晚到 NOT_CONNECTED、空輸出、無快照、未掛載擋、await 期間換題），4 個殘留重現：G1 profile=HR_DEV 或 FILL_ME 時 connect(HR_UAT)
+  仍能滿足閘門（連線名只是模型規則、不是硬性限制）；G2 同題復原後舊 task 晚回的 NOT_CONNECTED 仍把新 READY 退回；G3 已 READY 後再
+  connect 失敗（isError、無 after）READY 不作廢；G4 analyzer 的「完成」＝沒回 NOT_CONNECTED，BLOCKED(QUERY_TIMEOUT／SCHEMA_UNRESOLVED)
+  與非 JSON 都被算成功。判定：保留 e0b1c75、小幅修正後接受第一階段，不再退版。落點：(1) connect 的 before 在執行前比對 profile
+  oracle.connectionName——未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED、connection_name 不完全一致 → ORACLE_CONNECTION_MISMATCH，
+  工具不執行（observe 只記）；清單成員資格不在閘門驗（SQLcl 清單格式待驗）。(2) 每次准許執行的 connect 嘗試世代 +1 並把 READY 退回
+  NEED_CONNECT，只由該次嘗試的成功恢復；較晚的嘗試取代較早的（早的成功不算）。(3) task 入場記世代，之後又 connect 過的 task 回
+  NOT_CONNECTED 不作廢新世代（同世代才退回）。(4) task 的 after 解析報告 JSON（<task id state> 包裝、fenced json、純文字都試）：
+  reportValid／reportStatus（COMPLETE／PARTIAL／BLOCKED／INVALID）／blockedReason／taskState／childSessionID（task 工具 metadata.sessionId）；
+  子 session 的 run_sql after 記三態 ok。(5) analyzer 的完成定義改為「報告 COMPLETE 且子 session 至少一個 run_sql ok」；BLOCKED／INVALID／
+  舊紀錄無欄位都不算，PARTIAL 與「COMPLETE 但無 SQL」另計；新增 tasksNotReturned、connectBlocks。驗證：單元 18 組（新增 G1～G4 對應：
+  目標比對三態與 observe、嘗試作廢與取代、同題世代、報告解析七種輸出＋run_sql 三態）；e2e 17 情境真 OpenCode 1.18.29 全 PASS（新增
+  wrong-target／not-configured——connect 在執行前被擋、假 MCP 沒收到 connect、tool part 帶錯誤碼；reconnect-fail——第二次 connect 的
+  before 列 READY→NEED_CONNECT、之後全擋零 SQL；既有正向情境另驗 reportStatus=COMPLETE＋子 session run_sql ok）；analyzer 對真 export
+  判定一致；test-auto-loop 273 判定全 PASS（情境 33 加假成功反例：BLOCKED、非 JSON、COMPLETE 無 SQL、舊紀錄、PARTIAL 都 dbOk=0）。
+  仍未宣告完成（另案）：共用連線的持續有效性（別的 session 改連線本 session 看不到）、跨 session 的集中復原、真 SQLcl repeated-connect
+  契約（R16／R20）、DB／schema 身分一致性。
+  教訓：模型規則要落成執行前的機械檢查才是保證；「READY」是歷史證明，任何會改變資源的嘗試開始時就該作廢它；「完成」要綁到工具層
+  的成功證據，不能綁到報告文字。

@@ -13,6 +13,15 @@
 // 沒有其他退讓：connect／list 一直失敗仍擋（第 0 步規則：本題不派 DB 委派、其餘照常作答）；不跨 session、不跨行程協調
 //   （共用連線的防護待 topology 實驗定案後另案設計，見 SOP-21）。
 //
+// connect 的目標在執行前強制比對：profile oracle.connectionName 未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；connect 的
+//   connection_name 與 profile 不完全一致 → ORACLE_CONNECTION_MISMATCH。兩者都在工具執行前擋（observe 模式只記錄）。清單成員資格
+//   不在這裡驗（SQLcl 清單格式待驗），由主 agent 第 0 步規則負責。
+// 連線嘗試與世代：每次准許執行的 connect 嘗試都 connectGen+1，並把 READY 退回 NEED_CONNECT——READY 只由「該次嘗試」的成功恢復；
+//   例外、timeout、無 after、被較晚的嘗試取代，都不會保留先前的成功證明。task 入場記下當時的 gen：之後又 connect 過（gen 已變）
+//   的 task 回 NOT_CONNECTED，不作廢新世代的 READY（同題內舊連線上的工作晚回，不算新連線斷了）。
+// task 回報解析：after 把子 agent 報告的 status（COMPLETE／PARTIAL／BLOCKED，其餘＝INVALID）、blockedReason、task 包裝的 state
+//   與子 session id 記到列上（analyzer 的「可用」判定用它，不用「沒回 NOT_CONNECTED」）；run_sql 的 after 也記三態 ok。
+//
 // 呼叫配對（會影響狀態的呼叫都在 before 留入場快照，after 依 session:callID 配對）：
 //   - list／connect／disconnect／task 的 before 記 (turn, turnId, state[, target, dbCapable, decision])；after 列用快照標題目，
 //     不用「現在」的題目。沒有入場快照的 after → attribution=unknown，不前進。
@@ -207,6 +216,39 @@ function classifyResult(output) {
   return { ok: !fail, failureMatch: fail, textLength: text.length }
 }
 
+// task 工具的輸出：<task id="<子 session>" state="completed|error"><task_result>…</task_result></task>；子 agent 的最終文字應是契約 JSON
+function parseReport(text) {
+  const t = String(text ?? "")
+  const wrapper = t.match(/<task id="([^"]*)" state="([^"]*)">/)
+  const taskState = wrapper ? wrapper[2] : undefined
+  const taskId = wrapper ? wrapper[1] : undefined
+  const bodies = []
+  const inner = t.match(/<task_(?:result|error)>([\s\S]*?)<\/task_(?:result|error)>/)
+  if (inner) bodies.push(inner[1])
+  bodies.push(t)
+  for (const b of [...bodies]) {
+    const f = b.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (f) bodies.push(f[1])
+  }
+  for (const b of bodies) {
+    const start = b.indexOf("{")
+    const end = b.lastIndexOf("}")
+    if (start < 0 || end <= start) continue
+    let obj
+    try {
+      obj = JSON.parse(b.slice(start, end + 1))
+    } catch {
+      continue
+    }
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) continue
+    const status = String(obj.status ?? "").toUpperCase()
+    const valid = status === "COMPLETE" || status === "PARTIAL" || status === "BLOCKED"
+    const reason = typeof obj.blockedReason === "string" && obj.blockedReason ? obj.blockedReason.toUpperCase() : undefined
+    return { valid, status: valid ? status : "INVALID", blockedReason: reason, taskState, taskId }
+  }
+  return { valid: false, status: "INVALID", blockedReason: undefined, taskState, taskId }
+}
+
 function connectionNameOf(args) {
   if (!args || typeof args !== "object") return undefined
   for (const k of ["connection_name", "connectionName", "name", "connection"]) {
@@ -215,12 +257,48 @@ function connectionNameOf(args) {
   return undefined
 }
 
+function profileUnset(profileName) {
+  return !profileName || profileName.toUpperCase() === "FILL_ME"
+}
+
 function connectRule(profileName) {
-  const shown = profileName && profileName !== "FILL_ME" ? `「${profileName}」` : "（目前是 FILL_ME／未填）"
+  const shown = profileUnset(profileName) ? "（目前是 FILL_ME／未填）" : `「${profileName}」`
   return (
     "connection_name＝profile oracle.connectionName 的值" + shown + "，它必須出現在 list_connections 回的清單裡；" +
-    "profile 未填、FILL_ME 或不在清單 → 不要 connect、本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，不要自己挑清單第一個"
+    "profile 未填、FILL_ME 或不在清單 → 不要 connect、本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，不要自己挑清單第一個" +
+    "（閘門會在執行前擋掉 connection_name ≠ profile 值的 connect）"
   )
+}
+
+// connect 的目標檢查：回 undefined＝可以執行；否則回 { code, message }
+function connectProblem(profileName, target) {
+  if (profileUnset(profileName)) {
+    return {
+      code: "ORACLE_CONNECTION_NOT_CONFIGURED",
+      message:
+        `ORACLE_CONNECTION_NOT_CONFIGURED：本次 oracleMCP_connect 未執行（被 Oracle 連線前置閘門擋下）。profile oracle.connectionName 未填` +
+        `（目前＝${profileName || "空"}）——請管理者在 .opencode/peoplesoft/customization-profile.yaml 回填 SQLcl 已儲存連線名（要和 list_connections 列出的名字完全一致）。` +
+        "模型：不要猜、不要改用清單裡的名字；本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，其餘部分照常作答。",
+    }
+  }
+  if (!target) {
+    return {
+      code: "ORACLE_CONNECTION_MISMATCH",
+      message:
+        `ORACLE_CONNECTION_MISMATCH：本次 oracleMCP_connect 未執行（被 Oracle 連線前置閘門擋下）。呼叫沒有帶 connection_name；` +
+        `只准連 profile oracle.connectionName 指定的「${profileName}」——用 connection_name＝「${profileName}」重新呼叫。`,
+    }
+  }
+  if (target !== profileName) {
+    return {
+      code: "ORACLE_CONNECTION_MISMATCH",
+      message:
+        `ORACLE_CONNECTION_MISMATCH：本次 oracleMCP_connect 未執行（被 Oracle 連線前置閘門擋下）。connect 目標「${target}」≠ profile oracle.connectionName「${profileName}」。` +
+        `只准連 profile 指定的連線：清單裡有「${profileName}」就用它重新呼叫 connect；清單裡沒有 → 不 connect、本題不派 DB 委派，` +
+        "向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，其餘部分照常作答。",
+    }
+  }
+  return undefined
 }
 
 function buildBlockMessage(target, state, blockedCount, profileName) {
@@ -301,7 +379,7 @@ export const PsOraclePreflightGate = async (input) => {
   function getSession(sessionID) {
     let s = sessions.get(sessionID)
     if (!s) {
-      s = { state: "NEED_LIST", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0 }
+      s = { state: "NEED_LIST", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0, connectGen: 0 }
       sessions.set(sessionID, s)
     }
     return s
@@ -411,14 +489,33 @@ export const PsOraclePreflightGate = async (input) => {
       const callID = String(info?.callID ?? "")
       const args = out && typeof out === "object" && out.args && typeof out.args === "object" ? out.args : {}
       if (tool !== TOOL_TASK) {
-        if (tool.startsWith(MCP_PREFIX)) {
-          const s = getSession(sessionID)
-          if (tool === TOOL_LIST || tool === TOOL_CONNECT || tool === TOOL_DISCONNECT) {
-            putEntry(sessionID, callID, { tool, turn: s.turn, turnId: s.turnId, state: s.state })
+        if (!tool.startsWith(MCP_PREFIX)) return
+        const s = getSession(sessionID)
+        if (tool === TOOL_CONNECT) {
+          const mode = readMode(directory)
+          const profileName = String(readProfileOracle(directory).connectionName ?? "").trim()
+          const target = connectionNameOf(args)
+          const problem = connectProblem(profileName, target)
+          const head = { hook: "before", tool, callID, ...stamp(s), connection: target, profileConnection: profileName }
+          if (problem && mode !== "observe") {
+            record(sessionID, { ...head, state: s.state, next: s.state, decision: "block", note: problem.code })
+            throw new Error(problem.message)
           }
-          const conn = tool === TOOL_CONNECT ? connectionNameOf(args) : undefined
-          record(sessionID, { hook: "before", tool, callID, ...stamp(s), state: s.state, decision: "observe", connection: conn })
+          // 嘗試開始：READY 作廢，直到「這一次」嘗試成功才恢復；世代 +1
+          s.connectGen += 1
+          const prev = s.state
+          if (s.state === "READY") s.state = "NEED_CONNECT"
+          putEntry(sessionID, callID, { tool, turn: s.turn, turnId: s.turnId, state: prev, gen: s.connectGen, target })
+          record(sessionID, {
+            ...head, state: prev, next: s.state, gen: s.connectGen, decision: problem ? "observe-would-block" : "allow",
+            note: problem ? problem.code : prev === "READY" ? "connect attempt invalidates READY until it succeeds" : undefined,
+          })
+          return
         }
+        if (tool === TOOL_LIST || tool === TOOL_DISCONNECT || tool === TOOL_RUN_SQL) {
+          putEntry(sessionID, callID, { tool, turn: s.turn, turnId: s.turnId, state: s.state })
+        }
+        record(sessionID, { hook: "before", tool, callID, ...stamp(s), state: s.state, decision: "observe" })
         return
       }
       const target = String(args.subagent_type ?? "")
@@ -426,9 +523,9 @@ export const PsOraclePreflightGate = async (input) => {
       const mode = readMode(directory)
       const cls = classifyTarget(target)
       const entryTurn = { turn: s.turn, turnId: s.turnId }
-      const base = { hook: "before", tool, callID, agent: s.agent, ...entryTurn, target, state: s.state, mode, basis: cls.basis, dbCapable: cls.gated }
+      const base = { hook: "before", tool, callID, agent: s.agent, ...entryTurn, target, state: s.state, mode, basis: cls.basis, dbCapable: cls.gated, gen: s.connectGen }
       const admit = (decision) =>
-        putEntry(sessionID, callID, { tool, ...entryTurn, state: s.state, target, dbCapable: cls.gated, basis: cls.basis, decision })
+        putEntry(sessionID, callID, { tool, ...entryTurn, state: s.state, target, dbCapable: cls.gated, basis: cls.basis, decision, gen: s.connectGen })
       if (!cls.gated) {
         admit("allow")
         record(sessionID, { ...base, decision: "allow", note: "target does not query DB" })
@@ -493,17 +590,25 @@ export const PsOraclePreflightGate = async (input) => {
       }
       if (tool === TOOL_CONNECT) {
         const r = classifyResult(out)
+        const target = connectionNameOf(info?.args)
         let note
         if (r.ok === true && attribution === "current") {
-          if (s.state === "NEED_CONNECT") s.state = "READY"
+          if (entry.gen !== s.connectGen) note = "superseded by a later connect attempt: not counted"
+          else if (entry.target && target && entry.target !== target) note = "connect args differ from admission: not counted"
+          else if (s.state === "NEED_CONNECT") s.state = "READY"
           else if (s.state === "NEED_LIST") note = "connect before list_connections: list still required"
         } else if (r.ok === true && attribution === "stale") note = "stale reply from previous turn: not counted for this turn"
         else if (r.ok === true) note = "no entry snapshot for this callID: not counted"
         else if (r.ok === "unknown") note = "empty tool output: not counted as success"
         record(sessionID, {
-          ...base, state: prev, entryState: entry ? entry.state : undefined, next: s.state, ok: r.ok,
-          failureMatch: r.failureMatch || undefined, outputLength: r.textLength, connection: connectionNameOf(info?.args), note,
+          ...base, state: prev, entryState: entry ? entry.state : undefined, gen: entry ? entry.gen : undefined, next: s.state, ok: r.ok,
+          failureMatch: r.failureMatch || undefined, outputLength: r.textLength, connection: target, note,
         })
+        return
+      }
+      if (tool === TOOL_RUN_SQL) {
+        const r = classifyResult(out)
+        record(sessionID, { ...base, state: prev, next: s.state, ok: r.ok, failureMatch: r.failureMatch || undefined, outputLength: r.textLength })
         return
       }
       if (tool === TOOL_DISCONNECT) {
@@ -518,20 +623,27 @@ export const PsOraclePreflightGate = async (input) => {
         const args = info && typeof info.args === "object" && info.args ? info.args : {}
         const target = String(args.subagent_type ?? "")
         const text = outputText(out)
-        const notConnected = /"blockedReason"\s*:\s*"NOT_CONNECTED"/.test(text)
+        const rep = parseReport(text)
+        const notConnected = rep.blockedReason === "NOT_CONNECTED" || /"blockedReason"\s*:\s*"NOT_CONNECTED"/.test(text)
+        const meta = out && typeof out === "object" && out.metadata && typeof out.metadata === "object" ? out.metadata : {}
+        const child = typeof meta.sessionId === "string" && meta.sessionId ? meta.sessionId : rep.taskId
         // 能力用入場快照（不在 after 重讀 catalog）；沒有快照才現算並註明
         const cls = entry && typeof entry.dbCapable === "boolean" ? { gated: entry.dbCapable, basis: entry.basis } : { ...classifyTarget(target), late: true }
         let note
         if (cls.gated && notConnected) {
           if (attribution === "stale") note = "stale NOT_CONNECTED from previous turn: current turn state kept"
-          else if (s.state === "READY") {
+          else if (entry && typeof entry.gen === "number" && entry.gen !== s.connectGen) {
+            note = `NOT_CONNECTED from an older connection attempt (admitted gen ${entry.gen}, now ${s.connectGen}): state kept`
+          } else if (s.state === "READY") {
             s.state = "NEED_CONNECT"
             note = "subagent reported NOT_CONNECTED: connect again before re-dispatch"
           }
         }
         record(sessionID, {
           ...base, state: entry ? entry.state : prev, admitted: entry ? entry.decision : "unknown", target, executed: true,
-          dbCapable: cls.gated, basis: cls.late ? cls.basis + "(classified after)" : cls.basis, next: s.state, notConnected, note,
+          dbCapable: cls.gated, basis: cls.late ? cls.basis + "(classified after)" : cls.basis, gen: entry ? entry.gen : undefined, next: s.state,
+          notConnected, reportValid: rep.valid, reportStatus: rep.status, blockedReason: rep.blockedReason, taskState: rep.taskState,
+          childSessionID: child, note,
         })
         return
       }
