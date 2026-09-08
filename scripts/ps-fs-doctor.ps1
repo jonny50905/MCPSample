@@ -65,11 +65,7 @@ function Get-TransferFiles {
     }
     $ocDir = Join-Path $root ".opencode"
     if (Test-Path -LiteralPath $ocDir) {
-        # -Force：.npmrc 這類點檔在 Linux 維護端被 PowerShell 當隱藏檔，不加會漏出 manifest（issue #29）；
-        # OpenCode 自己在 .opencode 產生的安裝痕跡（node_modules／package.json／package-lock.json／bun.lock／.gitignore）不列管
-        $list += @(Get-ChildItem -LiteralPath $ocDir -File -Recurse -Force |
-                Where-Object { $_.FullName -notmatch '[\\/]node_modules[\\/]' -and
-                    (@('.gitignore', 'package.json', 'package-lock.json', 'bun.lock') -notcontains $_.Name) })
+        $list += @(Get-ChildItem -LiteralPath $ocDir -File -Recurse)
     }
     return $list
 }

@@ -1,16 +1,7 @@
 // run-e2e.mjs — 用真 OpenCode（預設 PATH 上的 opencode；或 OPENCODE_BIN）＋假 oracleMCP＋假模型，
 // 端到端驗證 ps-oracle-preflight-gate 在 opencode run（headless）路徑的行為。只給維護沙箱用。
 // 用法：node tests/oracle-gate/run-e2e.mjs [--repeat N] [--only <scenario>] [--keep]
-//   scenario：task-first | connect-first | compliant | stubborn | nodb | observe | mcp-down | multi-turn | multi-turn-serve |
-//             compaction-serve | shared-switch | connect-fail | mcp-failed | subtask-command
-//   shared-switch：前置完成後由假模型改寫 connection-state.json（模擬另一行程 connect 到別的名字），驗證 READY 作廢、只需再 connect
-//   connect-fail：假 oracleMCP 的 connect 一律失敗（isError），驗證 list 成功後 connect 失敗兩次閘門退讓（只擋順序不擋可用性）
-//   mcp-failed：oracleMCP 指令不存在（/mcp 狀態 failed），驗證退讓
-//   subtask-command：command 的 agent 是 subagent（OpenCode 走 handleSubtask，callID 是 prt_），驗證閘門退讓而不是殺掉整個 prompt
-//   multi-turn：同一 session 兩個 turn（第二 turn 用 opencode run --session <id>＝新行程），驗證每 turn 都有 chat.message、turnId 不同、各自重做前置
-//   multi-turn-serve：opencode serve 同一行程內對同一 session 連送兩題（HTTP API），驗證 READY 的 session 真的被第二則訊息重置
-//   compaction-serve：同上，但兩題之間做一次 session.summarize（compaction）——插入的 user 訊息只有 compaction part、不觸發 chat.message，
-//                     驗證「真實題目 id ↔ chat.message turnId」的比對不受影響
+//   scenario：task-first | connect-first | compliant | stubborn | nodb | observe | mcp-down
 // 每個情境：建臨時專案（複製 .opencode＋AGENTS.md）、寫 opencode.json、跑 opencode run --agent ps-orchestrator、
 //   讀閘門 jsonl、opencode export 取正式 transcript 交叉比對、斷言。
 import fs from "node:fs"
@@ -37,13 +28,6 @@ const SCENARIOS = {
   nodb: { model: "nodb", mode: "enforce", mcp: true },
   observe: { model: "task-first", mode: "observe", mcp: true },
   "mcp-down": { model: "task-first", mode: "enforce", mcp: false },
-  "multi-turn": { model: "task-first", mode: "enforce", mcp: true, turns: 2 },
-  "multi-turn-serve": { model: "task-first", mode: "enforce", mcp: true, serve: 2 },
-  "compaction-serve": { model: "task-first", mode: "enforce", mcp: true, serve: 2, summarize: true },
-  "shared-switch": { model: "shared-switch", mode: "enforce", mcp: true },
-  "connect-fail": { model: "connect-fail", mode: "enforce", mcp: true, connectFail: true },
-  "mcp-failed": { model: "task-first", mode: "enforce", mcp: true, mcpBroken: true },
-  "subtask-command": { model: "task-first", mode: "enforce", mcp: true, command: "gate-subtask" },
 }
 
 function copyDir(src, dst) {
@@ -76,18 +60,14 @@ function makeProject(base, sc, name) {
     mcp: {
       oracleMCP: {
         type: "local",
-        command: sc.mcpBroken ? ["node", path.join(here, "does-not-exist.mjs")] : ["node", path.join(here, "mock-oracle-mcp.mjs")],
+        command: ["node", path.join(here, "mock-oracle-mcp.mjs")],
         enabled: sc.mcp,
-        environment: { MOCK_ORACLE_LOG: mcpLog, ...(sc.connectFail ? { MOCK_ORACLE_CONNECT_FAIL: "1" } : {}) },
+        environment: { MOCK_ORACLE_LOG: mcpLog },
       },
     },
     permission: { doom_loop: "allow", external_directory: "allow" },
   }
   fs.writeFileSync(path.join(project, "opencode.json"), JSON.stringify(config, null, 2))
-  if (sc.command) {
-    // command 的 agent 是 subagent → OpenCode 走 handleSubtask（prompt 迴圈直接派，不經模型）
-    fs.writeFileSync(path.join(project, ".opencode", "command", sc.command + ".md"), "---\ndescription: e2e subtask command\nagent: ps-ui-flow\n---\n請依契約回 JSON：查 MIL_STATUS 的選項（$ARGUMENTS）\n")
-  }
   return { project, mcpLog }
 }
 
@@ -101,59 +81,6 @@ function startModel(scenario, logFile) {
     p.on("exit", (c) => reject(new Error("mock-model exited " + c)))
     setTimeout(() => reject(new Error("mock-model start timeout")), 5000)
   })
-}
-
-// opencode serve：同一行程內對同一 session 送多題（真正的互動式多 turn）
-async function runServe(project, env, turns, tag, base, summarize) {
-  const port = MODEL_PORT + 100
-  const started = Date.now()
-  const server = spawn(OPENCODE, ["serve", "--port", String(port), "--hostname", "127.0.0.1", "--print-logs", "--log-level", "INFO"], { cwd: project, env, stdio: ["ignore", "pipe", "pipe"] })
-  let out = "", err = ""
-  server.stdout.on("data", (d) => (out += d))
-  server.stderr.on("data", (d) => (err += d))
-  const url = (p) => `http://127.0.0.1:${port}${p}?directory=${encodeURIComponent(project)}`
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-  let sessionID = ""
-  let status = 0
-  try {
-    let ready = false
-    let lastErr = ""
-    for (let i = 0; i < 100 && !ready; i++) {
-      await wait(300)
-      const t0 = Date.now()
-      try { const r = await fetch(url("/session"), { signal: AbortSignal.timeout(20000) }); ready = r.ok; lastErr = "HTTP " + r.status } catch (e) { lastErr = String(e?.cause?.code ?? e?.message ?? e) }
-      out += `[harness] ready-probe ${i} ${lastErr} ${Date.now() - t0}ms t+${Date.now() - started}ms\n`
-    }
-    if (!ready) throw new Error("serve not ready; last: " + lastErr + "; stderr tail: " + err.slice(-800))
-    out += `[harness] ready after ${Date.now() - started}ms\n`
-    const created = await fetch(url("/session"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "gate-e2e-" + tag }) })
-    const cj = await created.json()
-    sessionID = cj.id
-    for (let t = 1; t <= turns; t++) {
-      const text = t === 1 ? "兵役狀態欄位有哪些選項？" : `第 ${t} 題：免役的條件是什麼？`
-      const r = await fetch(url(`/session/${sessionID}/message`), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ agent: "ps-orchestrator", model: { providerID: "mock", modelID: "scripted" }, parts: [{ type: "text", text }] }) })
-      const body = await r.text()
-      out += `[harness] turn ${t} HTTP ${r.status} t+${Date.now() - started}ms\n`
-      fs.writeFileSync(path.join(base, tag, `serve-turn${t}.response.json`), body)
-      if (!r.ok) { status = 1; err += `\n--- turn ${t} HTTP ${r.status} ---\n${body.slice(0, 2000)}` }
-      if (summarize && t < turns) {
-        // 兩題之間做一次 compaction（session.summarize）：會插入一則只有 compaction part 的 user 訊息，不觸發 chat.message
-        const sr = await fetch(url(`/session/${sessionID}/summarize`), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerID: "mock", modelID: "scripted" }) })
-        const sb = await sr.text()
-        out += `[harness] summarize HTTP ${sr.status} t+${Date.now() - started}ms ${sb.slice(0, 120)}\n`
-        if (!sr.ok) { status = 1; err += `\n--- summarize HTTP ${sr.status} ---\n${sb.slice(0, 2000)}` }
-      }
-    }
-  } catch (e) {
-    status = 1
-    err += "\n--- harness error ---\n" + String(e)
-  } finally {
-    server.kill()
-    await wait(500)
-  }
-  fs.writeFileSync(path.join(base, tag, "serve.stdout.txt"), out)
-  fs.writeFileSync(path.join(base, tag, "serve.stderr.txt"), err)
-  return { sessionID, result: { stdout: out, stderr: err, status, signal: null, ms: Date.now() - started } }
 }
 
 function runOpencode(project, env, args) {
@@ -198,33 +125,17 @@ async function runScenario(name, sc, base, iteration) {
     PWD: project,
   }
   const modelLog = path.join(base, tag, "model.jsonl")
-  process.env.MOCK_STATE_FILE = path.join(project, "auto-loop-logs", "ps-oracle-gate", "connection-state.json")
   const model = await startModel(sc.model, modelLog)
   let result, exported = null, sessionID = ""
   try {
-    if (sc.serve) {
-      const sv = await runServe(project, env, sc.serve, tag, base, sc.summarize === true)
-      result = sv.result
-      sessionID = sv.sessionID
-    } else {
-    result = runOpencode(project, env, sc.command
-      ? ["run", "--print-logs", "--log-level", "INFO", "--command", sc.command, "--model", "mock/scripted", "--format", "json", "--title", "gate-e2e-" + tag, "兵役狀態"]
-      : ["run", "--print-logs", "--log-level", "INFO", "--agent", "ps-orchestrator", "--model", "mock/scripted", "--format", "json", "--title", "gate-e2e-" + tag, "兵役狀態欄位有哪些選項？"])
+    result = runOpencode(project, env, ["run", "--print-logs", "--log-level", "INFO", "--agent", "ps-orchestrator", "--model", "mock/scripted", "--format", "json", "--title", "gate-e2e-" + tag, "兵役狀態欄位有哪些選項？"])
     fs.writeFileSync(path.join(base, tag, "run.stdout.txt"), result.stdout)
     fs.writeFileSync(path.join(base, tag, "run.stderr.txt"), result.stderr)
     const events = result.stdout.split("\n").filter((l) => l.trim().startsWith("{")).map((l) => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
     sessionID = events.find((e) => e.sessionID)?.sessionID ?? ""
-    }
-    for (let t = 2; sessionID && !sc.serve && t <= (sc.turns ?? 1); t++) {
-      const r2 = runOpencode(project, env, ["run", "--print-logs", "--log-level", "INFO", "--session", sessionID, "--agent", "ps-orchestrator", "--model", "mock/scripted", "--format", "json", `第 ${t} 題：免役的條件是什麼？`])
-      fs.writeFileSync(path.join(base, tag, `run-turn${t}.stdout.txt`), r2.stdout)
-      fs.writeFileSync(path.join(base, tag, `run-turn${t}.stderr.txt`), r2.stderr)
-      if (r2.status !== 0) result = { ...result, status: r2.status, stderr: result.stderr + "\n--- turn " + t + " ---\n" + r2.stderr }
-    }
     if (sessionID) {
       const ex = runOpencode(project, env, ["export", sessionID])
       try { exported = JSON.parse(ex.stdout) } catch { exported = null }
-      if (exported) fs.writeFileSync(path.join(base, tag, "export.json"), JSON.stringify(exported, null, 1))
     }
   } finally {
     model.kill()
@@ -242,8 +153,6 @@ async function runScenario(name, sc, base, iteration) {
   const blocks = before.filter((g) => g.decision === "block")
   const allows = before.filter((g) => g.decision === "allow")
   const executed = gate.filter((g) => g.hook === "after" && g.tool === "task" && g.executed)
-  const chats = gate.filter((g) => g.hook === "chat.message")
-  const userMsgs = exported ? (exported.messages ?? []).filter((m) => (m.info ?? m).role === "user" && ((m.info ?? m).sessionID ?? sessionID) === sessionID && (m.parts ?? []).some((p) => ["text", "file", "agent", "subtask"].includes(p.type) && p.synthetic !== true)).length : -1
   const stateSeq = gate.filter((g) => g.hook === "after" && /^oracleMCP_/.test(g.tool)).map((g) => `${g.tool.replace("oracleMCP_", "")}:${g.state}->${g.next}`)
   const mcpSeq = mcp.map((m) => m.tool)
   const runSqlBeforeConnect = mcp.some((m) => m.tool === "run_sql" && !m.connectedBefore)
@@ -294,69 +203,8 @@ async function runScenario(name, sc, base, iteration) {
       assertEq(blocks.length, 0, "blocks", failures)
       assertOk(allows.length >= 1 && /gate stands down: mcp-status:(disabled|absent)/.test(allows[0].note ?? ""), "stands down note; got " + JSON.stringify(allows.map((a) => a.note)), failures)
       break
-    case "multi-turn":
-    case "multi-turn-serve":
-    case "compaction-serve": {
-      // 每個 turn：chat.message 重置 → 先 task 被擋（NEED_LIST）→ list → connect → task 放行；turnId＝user 訊息 id，跨行程唯一
-      const ids = chats.map((c) => c.turnId)
-      assertOk(ids.length === 2 && ids[0] && ids[1] && ids[0] !== ids[1], "two chat.message rows with distinct turnId; got " + JSON.stringify(ids), failures)
-      assertEq(userMsgs, 2, "exported user messages", failures)
-      assertEq(blocks.map((b) => `${ids.indexOf(b.turnId) + 1}:${b.state}`), ["1:NEED_LIST", "2:NEED_LIST"], "one block per turn, both from NEED_LIST", failures)
-      assertEq(executed.map((e) => `${ids.indexOf(e.turnId) + 1}:${e.state}`), ["1:READY", "2:READY"], "one executed DB task per turn, both READY", failures)
-      if (name === "multi-turn-serve" || name === "compaction-serve") {
-        // 同一行程：第二則訊息到來時 session 仍是 READY，chat.message 必須把它重置為 NEED_LIST
-        assertOk(chats[1]?.state === "READY" && chats[1]?.next === "NEED_LIST" && chats[1]?.turn === 2, "second chat.message resets a READY session in the same process; got " + JSON.stringify(chats[1]), failures)
-      }
-      if (name === "compaction-serve") {
-        // compaction 插入的 user 訊息：只有 compaction part、沒有 chat.message；analyzer 的真實題目判定必須把它排除（export 3 則 user，真實 2 則）
-        const users = exported ? (exported.messages ?? []).filter((m) => (m.info ?? m).role === "user" && ((m.info ?? m).sessionID ?? sessionID) === sessionID) : []
-        const compactionMsgs = users.filter((m) => (m.parts ?? []).some((p) => p.type === "compaction"))
-        const realPrompts = users.filter((m) => (m.parts ?? []).some((p) => ["text", "file", "agent", "subtask"].includes(p.type) && p.synthetic !== true))
-        assertOk(compactionMsgs.length === 1 && compactionMsgs.every((m) => !(m.parts ?? []).some((p) => ["text", "file", "agent", "subtask"].includes(p.type) && p.synthetic !== true)), "one compaction user message without real prompt parts; users=" + users.length, failures)
-        assertEq(realPrompts.length, 2, "real prompts in export", failures)
-        const ids2 = realPrompts.map((m) => (m.info ?? m).id).sort()
-        assertEq([...ids].sort(), ids2, "chat.message turnIds equal the real prompt ids (compaction message has no chat.message)", failures)
-      }
-      assertEq(stateSeq, ["list_connections:NEED_LIST->NEED_CONNECT", "connect:NEED_CONNECT->READY", "list_connections:NEED_LIST->NEED_CONNECT", "connect:NEED_CONNECT->READY"], "state sequence per turn", failures)
-      assertEq(mcpSeq, ["list_connections", "connect", "run_sql", "list_connections", "connect", "run_sql"], "mcp call order", failures)
-      assertEq(taskParts.map((p) => p.state?.status), ["error", "completed", "error", "completed"], "task parts across turns", failures)
-      break
-    }
-    case "shared-switch": {
-      // 前置完成（READY）後另一個行程把共用連線切到別的名字 → task 被擋（stale，退回 NEED_CONNECT、不計 blocked）→ 只再 connect → 放行
-      assertEq(blocks.length, 1, "blocks", failures)
-      assertOk(blocks[0]?.state === "NEED_CONNECT" && blocks[0]?.blocked === 0 && blocks[0]?.staleBlocks === 1 && /shared connection changed since preflight \(now "OTHER_DB", expected "HR_DEV"; oracleMCP_connect by session ses_other pid 0\)/.test(blocks[0]?.note ?? ""), "block is the stale kind with source; got " + JSON.stringify(blocks.map((b) => [b.state, b.blocked, b.staleBlocks, b.note])), failures)
-      assertOk(errParts.length === 1 && /共用的 Oracle 連線已被改動過/.test(errParts[0].state.error) && /目前是「OTHER_DB」/.test(errParts[0].state.error) && /不必重做 list/.test(errParts[0].state.error), "model saw the stale explanation with source and next step", failures)
-      assertEq(stateSeq, ["list_connections:NEED_LIST->NEED_CONNECT", "connect:NEED_CONNECT->READY", "connect:NEED_CONNECT->READY"], "state sequence", failures)
-      assertEq(executed.length, 1, "executed task", failures)
-      assertEq(mcpSeq, ["list_connections", "connect", "connect", "run_sql"], "mcp call order", failures)
-      break
-    }
-    case "connect-fail": {
-      // list 成功、connect 失敗兩次（isError，after 不觸發）→ 第三次 task 退讓放行 → subagent 回 NOT_CONNECTED
-      assertEq(blocks.map((b) => b.state), ["NEED_LIST", "NEED_CONNECT"], "blocks", failures)
-      assertOk(allows.length === 1 && /gate stands down: connect failed x2 after list_connections/.test(allows[0].note ?? ""), "stand-down note; got " + JSON.stringify(allows.map((a) => a.note)), failures)
-      assertOk(executed.length === 1 && executed[0].notConnected === true, "executed once and subagent reported NOT_CONNECTED", failures)
-      assertEq(mcpSeq, ["list_connections", "connect", "connect", "run_sql"], "mcp call order", failures)
-      assertEq(taskParts.map((p) => p.state?.status), ["error", "error", "completed"], "task parts", failures)
-      assertOk(gate.filter((g) => g.hook === "after" && g.tool === "oracleMCP_connect" && g.viaEvent === true && g.failureMatch === "isError").length === 2, "event hook recorded both isError connects", failures)
-      break
-    }
-    case "mcp-failed":
-      assertEq(blocks.length, 0, "blocks", failures)
-      assertOk(allows.length >= 1 && /gate stands down: mcp-status:failed/.test(allows[0].note ?? ""), "stands down on failed status; got " + JSON.stringify(allows.map((a) => a.note)), failures)
-      break
-    case "subtask-command": {
-      // handleSubtask 路徑：before hook 的 callID 是 prt_…；閘門退讓、prompt 不被殺掉（exit 0）、subtask 執行
-      assertOk(result.status === 0, "exit 0 (a throw here would kill the prompt)", failures)
-      // 第一件 task 是 OpenCode 直接派的 subtask（prt_）；之後主迴圈的假模型還會照劇本再派（那些走一般路徑，被擋→前置→放行）
-      assertOk(before.length >= 1 && /^prt_/.test(before[0].callID ?? "") && before[0].decision === "allow" && /command-driven subtask/.test(before[0].note ?? ""), "first task is the prt_ subtask and stands down; got " + JSON.stringify(before.map((b) => [b.callID, b.decision, b.note])), failures)
-      assertEq(before.filter((b) => /^prt_/.test(b.callID ?? "")).length, 1, "exactly one prt_ task", failures)
-      assertOk(executed.length >= 1 && executed[0].admitted === "allow" && /^prt_/.test(executed[0].callID ?? ""), "subtask executed with admission snapshot", failures)
-      break
-    }
   }
-  const summary = { scenario: name, iteration, ms: result.ms, exit: result.status, sessionID, turns: chats.length, userMsgs, blocks: blocks.length, allows: allows.length, executed: executed.length, stateSeq, mcpSeq, taskParts: taskParts.map((p) => p.state?.status), failures }
+  const summary = { scenario: name, iteration, ms: result.ms, exit: result.status, sessionID, blocks: blocks.length, allows: allows.length, executed: executed.length, stateSeq, mcpSeq, taskParts: taskParts.map((p) => p.state?.status), failures }
   console.log(JSON.stringify(summary))
   if (failures.length && !keep) {
     console.log("--- stderr tail ---\n" + result.stderr.slice(-2000))
