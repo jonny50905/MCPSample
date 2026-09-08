@@ -17,7 +17,11 @@
    `/ps-research <領域>`（ps-deep-research，輸出 docs/ps-research/）。
    在一般 agent 下則載入 `ps-business-discovery` skill 依其流程處理，
    重的檢索用 @ 委派給 ps-* subagent。
-   問答一律**先查 `docs/ps-research/wiki/`**（已歸戶的已驗證知識），
+   主 agent 收到訊息的**第 0 步**（查 wiki、委派、作答之前）固定
+   `oracleMCP_list_connections` → `oracleMCP_connect`（無條件，見 agent 定義）；
+   執行期由 `.opencode/plugin/ps-oracle-preflight-gate.js` 強制：前置未完成就
+   委派會查 DB 的 subagent，該 task 會被擋下並回 `PS_ORACLE_PREFLIGHT_REQUIRED`。
+   第 0 步之後，問答一律**先查 `docs/ps-research/wiki/`**（已歸戶的已驗證知識），
    wiki 沒有或未驗證才現場檢索。
 2. 搜尋任何 PeopleSoft 物件前，先讀
    `.opencode/peoplesoft/customization-profile.yaml` 與 `business-domain-map.yaml`；
@@ -71,6 +75,11 @@
   嚴禁外部 remote 或公開貼出。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。
+- `.opencode/plugin/*.js` 是 OpenCode 執行期閘門（模型迴圈內唯一的確定性層）：
+  **零外部 import**（只准 `node:` 內建；公司網路封鎖 npm）、只擋不改參數；
+  `.opencode/.npmrc` 的 `offline=true` 不可拿掉（否則有 plugin 時啟動會等
+  相依安裝逾時）。改 plugin 必跑 `node --test tests/oracle-gate/unit.test.mjs`
+  與 `tests/oracle-gate/run-e2e.mjs`（真 OpenCode＋假 oracleMCP＋假模型）。
 - 規則修改走**最小新增**（只加不刪）、當天記 applied.md、
   團隊生效靠內部 git PR——實驗先行、規則後補，規則一律從
   觀察到的行為推導，不從規格書想像。

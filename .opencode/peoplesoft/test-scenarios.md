@@ -670,3 +670,17 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | R6 | schema 未回填 | profile currentSchema=FILL_ME 時查 PeopleTools 表 | blockedReason=SCHEMA_UNRESOLVED，答覆說「currentSchema 未回填」 |
 | R7 | 轉譯 | 上述各種 BLOCKED | orchestrator 依 blockedReason 用對應句型；NOT_CONNECTED 不會直接出現在對使用者的答覆 |
 | R8 | 無條件 | 問一題完全不需要 DB 的問題（例如純 PeopleCode 流程） | 主 agent 仍在開場 list_connections → connect（前兩個 oracleMCP 呼叫依序是 list_connections、connect，且在第一個 task 之前）；答覆不受影響 |
+
+### 7a. 執行期閘門（issue #29；plugin `.opencode/plugin/ps-oracle-preflight-gate.js`）
+
+R1／R8 的順序自此由閘門保證：模型錯序時 task 被擋（不執行），模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED`，做完 list→connect 再重派。
+判定看交易紀錄 `auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl`（不看 prompt）；沙箱已用真 OpenCode 1.18.29＋假 oracleMCP＋假模型跑過 7 情境（`tests/oracle-gate/run-e2e.mjs`）。
+
+| # | 情境 | 操作 | 預期訊號 |
+|---|---|---|---|
+| R9 | 錯序被擋 | 新 session 問需 DB 的題；若模型先派 task | jsonl：before task `decision=block`、`state=NEED_LIST`；transcript 該 task 件為 error（含 PS_ORACLE_PREFLIGHT_REQUIRED）；之後 list→connect→task allow；subagent 第一個 SELECT 直接成功；**不出現 NOT_CONNECTED** |
+| R10 | 覆蓋率 | 互動 ≥20 題後 `test-oracle-gate-runtime.ps1 -AnalyzeAll` | hookMismatch=0（閘門看到的 task 次數＝export 的 task 件數）、executedTaskBeforePreflight=0 |
+| R11 | 30 次回歸 | `test-oracle-gate-runtime.ps1 -Scenario B1/B2/B3 -Runs 30` | 三個情境都 PASS（early=0、mismatch=0）；B3 的 DB 委派應為 0 件、preflightRuns 觀察值 |
+| R12 | 退讓 | 停掉 SQLcl MCP（/mcp 非 connected）再問 DB 題 | jsonl：before task `decision=allow` 且 note=`gate stands down: mcp-status:…`；subagent 回 ORACLE_MCP_DOWN，主 agent 如實轉譯 |
+| R13 | 中途斷線 | 主 agent 已 READY，管理者另開 session disconnect，再讓 subagent 查 | subagent 回 NOT_CONNECTED → jsonl after task `notConnected=true`、`next=NEED_CONNECT` → 主 agent 再 connect（READY）→ 重派 allow；未 connect 就重派 → block（state=NEED_CONNECT） |
+| R14 | observe | `$env:PS_ORACLE_GATE_MODE='observe'` 再跑 R9 | jsonl `decision=observe-would-block`、task 照常執行（可能 NOT_CONNECTED）——只作探測，用完改回 enforce |

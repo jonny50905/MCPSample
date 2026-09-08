@@ -54,6 +54,15 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
 **再追記（2026-09-07，管理者定案）**：公司機 OpenCode 的工具名就是底線版——全樹一律寫 `list_connections`／`run_sql`，連字號拼法全部移除、不再兩種都開（三個主 agent tools 表只留 `oracleMCP_list_connections`；cookbook 第 0 步列工具名；SOP-12 再追記；test-scenarios §7；情境 31 加守衛擋連字號拼法回流）。
 **再追記（2026-09-07，公司機回饋 2）**：主 agent 仍高機率不 connect——條件式規則（派第一個 DB 委派之前才 connect）模型常跳過。改為無條件開場動作：三個主 agent 加「第 0 步」（read profile → `oracleMCP_connect`，做完才准查 wiki／委派／作答；回「已連線」也算成功）；cookbook 主 agent 段、/ps-audit、/ps-audit-batch 措辭同步；情境 31 斷言三個主 agent 含「第 0 步」「無條件」、agent／command 無條件式 connect 殘留；test-scenarios §7 加 R8。
 **再追記（2026-09-07，管理者定案 2）**：開場順序固定 `list_connections` → `connect`，不准跳過 list；profile `oracle.connectionName` 只用來在清單裡挑名字（有填且在清單裡用它，否則清單第一個）。三個主 agent 第 0 步、cookbook 主 agent 段、/ps-audit／/ps-audit-batch／/ps-contract-batch／/ps-contract-verify、profile 註解、test-scenarios R1／R8、情境 31（斷言第 0 步裡 list 在 connect 之前）同步。
+**追記（2026-09-08，issue #29／L115）**：公司機（OpenCode 1.18.29）實測第 0 步仍是機率行為（更常 task 先派→NOT_CONNECTED）。
+順序改由**執行期閘門**強制：新增 `.opencode/plugin/ps-oracle-preflight-gate.js`（OpenCode plugin，零外部相依，自動載入）——
+per-session 狀態機 NEED_LIST→NEED_CONNECT→READY、每則訊息重置；`task` 目標為會查 DB 的 subagent（agent 檔 tools 表 run_sql 為開）
+且未 READY → 擋下並回 `PS_ORACLE_PREFLIGHT_REQUIRED`（不執行、不改參數）；NOT_CONNECTED 回報→退回 NEED_CONNECT；oracleMCP 未掛載→退讓；
+enforce／observe 兩模式；交易紀錄 `auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl`。另發現 OpenCode 有 plugin 時啟動會等
+`.opencode` 的 `@opencode-ai/plugin` 安裝結束（斷網實測 72 秒）→ 新增 `.opencode/.npmrc`（`offline=true`，2 秒）。
+AGENTS.md「先查 wiki」改到第 0 步之後。原始碼（anomalyco/opencode v1.18.29）逐條對碼、issue 主張五處修正（`docs/design/oracle-preflight-gate-decision-memo.md`）。
+驗證：情境 32（靜態）、`tests/oracle-gate/unit.test.mjs`（狀態機 5 組）、`tests/oracle-gate/run-e2e.mjs`（真 OpenCode 1.18.29 binary＋假 oracleMCP＋假模型，
+headless 路徑 7 情境全 PASS、重複跑一致）；公司機回歸 `scripts/tests/test-oracle-gate-runtime.ps1`（SOP-21）。搬運見 §1 步驟 1b。
 
 ## 1. 管理者下一步（按序）
 
@@ -100,6 +109,24 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；fs-doctor 應報 56 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
    `.gitignore`、`HANDOFF.md`、`README.md` 不在搬運集合。
+1b. issue #29 執行期閘門（2026-09-08；1／1a 尚未搬的一起搬，manifest 只搬最新）：
+
+   | 檔案 | 新增／修改 | 行數 | 備註 |
+   |---|---|---|---|
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`） | 423 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
+   | `.opencode/.npmrc` | 新增 | 4 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時） |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce） | 106 | 本機已回填 FILL_ME 者只加 `preflightGate` 那 5 行（fs-doctor 報此檔 M 屬預期） |
+   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 追記＋SOP-21 部署與驗證） | 694 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115） | 3113 | |
+   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R14） | 686 | |
+   | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 32） | 707 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
+   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析） | 222 | 存 UTF-8 with BOM；用法見 SOP-21 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 353 | 最後搬；fs-doctor 應報 58 檔一致（commit 欄＝產生時 HEAD 6f26629，早一步屬預期） |
+   | `AGENTS.md` | 修改（第 0 步先於「先查 wiki」；plugin 零相依鐵律） | 91 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
+
+   `tests/oracle-gate/*`（沙箱單元／e2e 測試組）與 `docs/design/oracle-preflight-gate-decision-memo.md` 不搬。
+   搬完照 SOP-21 步驟 2～5 驗：`_plugin.log` 有 loaded → 一題快篩看 jsonl → 互動 20 題後 `-AnalyzeAll` → B1／B2／B3 各 30 次。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log
@@ -147,6 +174,9 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
   「稽核 BLOCKED」「稽核輪次 N 合併完成」「本輪稽核新增 D 項 N 筆 > 上限」。
 - **cmd 傳遞限制**：session prompt 禁半形雙引號與 `> < & | % ^`；findstr 對 UTF-8 中文不可靠，
   一律 `powershell Get-Content -Encoding UTF8`。
+- **閘門測試（#29）**：`node --test tests/oracle-gate/unit.test.mjs`（狀態機）；`OPENCODE_BIN=<binary> node tests/oracle-gate/run-e2e.mjs`
+  （真 OpenCode＋假 oracleMCP＋假模型，binary 由 `npm pack opencode-linux-x64@1.18.29` 取得；`tests/oracle-gate/README.md`）。
+  改 plugin 必跑兩者；改 agent 檔 tools 表也要跑（DB subagent 判定從 tools 表推導）。
 - **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（28 個真實函式 AST 抽取、情境 27 含 #23、
   含 lint fixture）。改 auto-loop／lint 後必跑。
 
@@ -160,5 +190,8 @@ SINGLE_PATH_COLLAPSE 第三型／`### Technical Menu` 不參與判定；[導覽]
   「ps-audit-batch（agent ps-audit-orchestrator）」，80196ee 後實掛 ps-deep-research（僅註解性文字，
   該節對批次指令本就不適用）；`SOP.md` 未收 L104～L107 的操作知識（台帳刪除語義、分批稽核參數、
   log 訊號詞只在本檔 §3，而本檔不搬公司機）——建議下一波以「只加不刪」補一節進 SOP。
+- 閘門（#29）待公司機驗：真 SQLcl `connect`／`list_connections` 的成功回覆是否命中 FAILURE_PATTERNS（誤判會讓閘門永遠不開——
+  jsonl 看 `ok:false`＋`failureMatch`）；互動 TUI 的 hook 覆蓋率（`-AnalyzeAll` hookMismatch=0）；`.npmrc offline` 是否真的讓啟動不再多等。
+  已知限制：同回合中途斷線閘門看不到（靠 NOT_CONNECTED 退回）；DB 連不上時 ps-auditor 的純 chunk 任務也會被擋（第 0 步規則本就如此）。
 - 舊掛起：已畢業領域貼 U 項工單；PENDING_MANUAL 人工 SQL（SOP-2 第 4 階）；`-GitCommit` 觀察期
   結束後恢復；畢業後端到端測試；opencode.json 的 doom_loop ask→deny。

@@ -3065,3 +3065,49 @@
   降為「在清單裡挑名字」（有填且在清單裡用它，否則清單第一個）。三個主 agent 第 0 步、cookbook 主 agent 段、
   /ps-audit／/ps-audit-batch／/ps-contract-batch／/ps-contract-verify、test-scenarios R1／R8、情境 31（斷言第 0 步裡
   list_connections 出現在 connect 之前）同步。
+
+### L115 順序是「必須」不是「應該」——DB 前置改由執行期閘門強制，prompt 只剩第二道（issue #29，2026-09-08）
+
+- 症狀：L114 把第 0 步寫成無條件、順序固定，公司機（OpenCode 1.18.29）實測仍是機率行為：有時
+  list_connections→connect→task，更常 task 先派、subagent 回 NOT_CONNECTED／BLOCKED。情境 31 全 PASS
+  卻與線上行為無關——靜態守衛只證明 prompt 改對了，不證明模型照做。
+- 根因：`task` 工具從回合一開始就對模型可用，順序只活在 prompt 裡（L0：純 prose 規則對小模型效力最弱）。
+  OpenCode 的 plugin hook `tool.execute.before` 是模型迴圈內唯一能「在執行前擋工具」的確定性層；
+  原始碼核對（v1.18.29）：built-in 工具（含 task）與 MCP 工具都先 `Plugin.trigger("tool.execute.before")`
+  再執行（session/tools.ts）；hook throw → AI SDK tool-error → 模型看到 `error.message`（processor
+  `failToolCall`）；MCP 回 isError 會 throw、`after` 不觸發＝after 觸發即成功；`chat.message` 帶 agent；
+  `opencode run` 與 TUI 走同一個 in-process server；plugin 自動載入 `.opencode/{plugin,plugins}/*.{ts,js}`；
+  `run` 用 `process.env.PWD` 決定專案目錄。
+- 落點（機械化）：`.opencode/plugin/ps-oracle-preflight-gate.js`（零外部相依、OpenCode 自動載入）——
+  per-session 狀態機 NEED_LIST→NEED_CONNECT→READY，每則使用者訊息重置（第 0 步「不因上一題已連過就省略」）；
+  `task` 目標為「會查 DB 的 subagent」（agent 檔 tools 表 run_sql 最後匹配者為開：ps-ui-flow／ps-metadata-flow／
+  ps-ae-flow／ps-auditor；不在 agent 目錄的名字保守視為會查）且狀態≠READY → throw `PS_ORACLE_PREFLIGHT_REQUIRED`
+  （task 未執行，模型收到工具錯誤＋下一步指示，用相同參數重試）；connect 先於 list 不算（list 仍要做）；
+  subagent 回 `blockedReason=NOT_CONNECTED` → 退回 NEED_CONNECT（重派前必須再 connect）；本 session disconnect
+  → 退回 NEED_LIST；oracleMCP 未掛載（`/mcp` 狀態非 connected）→ 閘門退讓、交 ORACLE_MCP_DOWN 協定；
+  enforce／observe 兩模式（env `PS_ORACLE_GATE_MODE` ＞ profile `oracle.preflightGate`）；交易紀錄
+  `auto-loop-logs/ps-oracle-gate/<sessionID>.jsonl`（只記 oracleMCP_*／task／訊息事件，不記工具輸出原文），
+  `_plugin.log` 記載入。`.opencode/.npmrc` 加 `offline=true`：OpenCode 每次啟動都在 `.opencode/` 嘗試安裝
+  `@opencode-ai/plugin`，有 plugin 時 `Plugin.init` 會等它結束——沙箱模擬斷網實測 72 秒 → 2 秒。
+  AGENTS.md「先查 wiki」改寫到第 0 步之後（issue 指出的指令衝突）。
+- 守衛三層：情境 32（檔案形狀／零 import／單一匯出／只擋不改參數／npmrc／AGENTS 順序／profile 開關／
+  DB 判定與情境 31 的 tools 表解析一致）；`tests/oracle-gate/unit.test.mjs`（狀態機 5 組，node --test）；
+  `tests/oracle-gate/run-e2e.mjs`（真 OpenCode 1.18.29 binary＋假 oracleMCP stdio server＋假 OpenAI 相容模型，
+  7 情境：錯序被擋→list→connect→放行、connect 先於 list、照做不擋、固執模型 4 次全擋零 SQL、不查 DB 的委派不受影響、
+  observe 留下「早於前置執行」證據、MCP 未掛載退讓；headless `opencode run` 路徑，全 PASS）。公司機回歸：
+  `scripts/tests/test-oracle-gate-runtime.ps1`（N 次 `opencode run` 讀交易紀錄＋`opencode export` 交叉比對，
+  判定 executed task before preflight＝0、hook 覆蓋率 100%；`-AnalyzeAll` 分析互動 session＝P1 探測）。
+- 與 issue #29 主張的分歧（對碼後，管理者提醒「他不一定是對的」）：
+  (1) 不擋「所有 task」，只擋會查 DB 的 subagent——擋全部會讓 DB 掛掉時純 ES／Source 的 PeopleCode 題也無法委派，
+  與第 0 步「非 DB 部分照常作答」矛盾；B3 的判定改為「DB 委派早於前置＝0」，而非「所有 task 都在前置後」。
+  (2) oracleMCP 未掛載時退讓而非硬擋——否則 ps-auditor 的純 chunk 解引用任務整批停擺。
+  (3) hook 覆蓋率不靠目測 20 次 log，改為「交易紀錄的 task 次數＝transcript 的 task 件數」逐 session 機械判定。
+  (4) 不做「行程外 wrapper 先連線」：SQLcl MCP 是 OpenCode 以 stdio 起的子行程，連線狀態活在該行程內，
+  行程外無從連；plugin 已是最外層。
+  (5) issue 假設 `tool.execute.before` 可能在互動與 headless 行為不同——原始碼是同一條路（e2e 已在 headless 驗），
+  互動路徑仍列公司機驗證項（`-AnalyzeAll`）。
+- 有意不做：不改工具參數；不放回 subagent connect；不再加粗 prompt；不做行程級全域狀態（TUI /new 之後也要
+  重做第 0 步）；observe 不是常態模式。已知限制：連線在同一回合中途斷掉，閘門看不到（靠 NOT_CONNECTED 退回規則）。
+- 待公司機驗：(a) `auto-loop-logs\ps-oracle-gate\_plugin.log` 有 loaded 行；(b) 啟動不再多等（.npmrc 生效）；
+  (c) 真 SQLcl `list_connections`／`connect` 成功回覆不命中 FAILURE_PATTERNS（jsonl 的 `ok:true`、`next:READY`）；
+  (d) `test-oracle-gate-runtime.ps1 -Scenario B1 -Runs 30` 判定 PASS；(e) 互動 20 題後 `-AnalyzeAll` hookMismatch＝0。

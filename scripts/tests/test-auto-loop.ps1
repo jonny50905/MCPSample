@@ -4,6 +4,7 @@
 #       ＋ lint fixture（[附錄] 守衛、ChunkId 誤判、[回灌] 陳舊、-EvidenceStats、-StrictAudit 未稽核）
 #       ＋ research 範圍債（#23：checkpoint ≠ discovery complete、GateVersion 4 舊收據作廢）
 #       ＋ lint 導覽主張守衛（#24：情境 28，在 docs/ps-research/zz-nav24-fixture 建臨時領域跑真 lint，結束自刪）
+#       ＋ Oracle 前置閘門 plugin（#29：情境 32，檔案形狀／零相依／單一匯出／npmrc offline／AGENTS 順序／DB 判定；有 node 時跑單元測試）
 # 注意：情境 22 會在 docs/ps-research/zz-l103-fixture 建臨時領域跑真 lint，結束自刪。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
@@ -668,6 +669,37 @@ Assert ($adOut -match '教訓編號 L<nn>：1 處') "L 編號只計數不擋"
 [System.IO.File]::WriteAllText((Join-Path $adRoot '.opencode/agent/bad.md'), "規則一`r`n規則二", (New-Object System.Text.UTF8Encoding($true)))
 $null = (& $adLint -Root $adRoot *>&1 | Out-String); Assert ($LASTEXITCODE -eq 0) "乾淨檔 → exit 0"
 $adReal = (& $adLint -Root $repoRoot *>&1 | Out-String); Assert ($LASTEXITCODE -eq 0) "本 repo 的模型檔目前乾淨（exit 0）：$(($adReal -split "`n" | Where-Object { $_ -match '\[' } | Select-Object -First 3) -join ' / ')"
+
+Write-Host "情境 32：Oracle 前置閘門（plugin）——檔案形狀／零相依／單一匯出／npmrc offline／AGENTS.md 順序／DB subagent 判定與情境 31 一致（issue #29）"
+$gp = Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js'
+Assert (Test-Path -LiteralPath $gp) "plugin 檔存在：.opencode/plugin/ps-oracle-preflight-gate.js"
+$gt = [System.IO.File]::ReadAllText($gp)
+foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_LIST', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+$gImports = @([regex]::Matches($gt, '(?m)^import\s.*?from\s+"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+Assert ($gImports.Count -gt 0 -and @($gImports | Where-Object { $_ -notmatch '^node:' }).Count -eq 0) "plugin 只 import node: 內建模組（公司網路封鎖 npm）：$($gImports -join ',')"
+Assert (@([regex]::Matches($gt, '(?m)^export\s')).Count -eq 1 -and $gt -match '(?m)^export const PsOraclePreflightGate = async') "plugin 只有一個具名匯出函式（OpenCode 舊式載入器要求每個匯出都是函式）"
+Assert ($gt -notmatch '(?i)bypass' -and $gt -notmatch '繞過') "plugin 無「繞過」類字串（SOP-3 安控）"
+Assert ($gt -match 'throw new Error\(message\)' -and $gt -notmatch 'out\.args\s*=(?!=)' -and $gt -notmatch 'args\.subagent_type\s*=(?!=)') "plugin 只擋不改參數（不對 out.args／subagent_type 賦值）"
+$npmrc = Join-Path $repoRoot '.opencode/.npmrc'
+Assert ((Test-Path -LiteralPath $npmrc) -and ([System.IO.File]::ReadAllText($npmrc) -match '(?m)^offline=true\s*$')) ".opencode/.npmrc 含 offline=true（斷網時相依安裝秒失敗，plugin 照常載入）"
+$ag = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))
+$i0 = $ag.IndexOf('第 0 步'); $iw = $ag.IndexOf('docs/ps-research/wiki/')
+Assert ($i0 -ge 0 -and $iw -gt $i0 -and $ag -match 'ps-oracle-preflight-gate') "AGENTS.md：第 0 步（list→connect）寫在「先查 wiki」之前且提到閘門（無指令衝突）"
+$prof32 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
+Assert ($prof32 -match '(?m)^\s*preflightGate:\s*enforce\b') "profile：oracle.preflightGate 預設 enforce"
+foreach ($f in (Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md'))) {
+    $eff = Get-AgentToolPerm $f.FullName 'oracleMCP_run_sql'
+    $isDb = ($eff -ne 'false')
+    $expected = (@('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor') -contains $f.BaseName)
+    Assert ($isDb -eq $expected) "DB subagent 判定（run_sql 最後匹配者，沒列＝開）：$($f.BaseName) run_sql=$eff → 過閘門=$isDb"
+}
+$unit = Join-Path $repoRoot 'tests/oracle-gate/unit.test.mjs'
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if ($nodeCmd -and (Test-Path -LiteralPath $unit)) {
+    $uo = (& node --test $unit 2>&1 | Out-String)
+    Assert ($LASTEXITCODE -eq 0 -and $uo -match '# fail 0') "plugin 狀態機單元測試（node --test tests/oracle-gate/unit.test.mjs）全過"
+}
+else { Write-Host "  （跳過單元測試：沒有 node 或 tests/oracle-gate 未搬——它只在維護沙箱跑，公司機用 scripts/tests/test-oracle-gate-runtime.ps1）" }
 
 Remove-Item -Recurse -Force $dir
 Write-Host ""

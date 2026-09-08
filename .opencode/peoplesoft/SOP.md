@@ -516,6 +516,45 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
   不要加（config 驗證失敗會讓 agent 載入失敗，症狀同 L60「agent 未被認到」）
 ```
 
+**2026-09-08 追記（issue #29／L115）**：第 0 步的順序改由執行期閘門強制（`.opencode/plugin/
+ps-oracle-preflight-gate.js`）——prompt 只剩第二道。部署與驗證程序見 **SOP-21**。
+
+## SOP-21 Oracle 前置閘門（plugin）部署與驗證（issue #29；L115）
+
+閘門做什麼：主 agent 在同一則訊息內未依序完成 `oracleMCP_list_connections`（成功）→ `oracleMCP_connect`
+（成功）之前，任何會查 DB 的 subagent 委派（task 到 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）
+在執行前被擋下，模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED` 與下一步指示；純 ES＋Source 的委派不受影響；
+oracleMCP 未掛載時閘門退讓（交 ORACLE_MCP_DOWN 協定）。
+
+```text
+□ 1. 搬檔：.opencode\plugin\ps-oracle-preflight-gate.js、.opencode\.npmrc（兩檔都在 manifest 內）、
+     scripts\tests\test-oracle-gate-runtime.ps1（BOM）；跑 ps-fs-doctor 應報一致。
+     .npmrc 的 offline=true 不可拿掉：OpenCode 每次啟動會在 .opencode 試裝 @opencode-ai/plugin，
+     有 plugin 時會等它結束，斷網沒這行會多等到重試逾時（沙箱實測 72 秒）。
+□ 2. 有載入嗎：開任一 opencode session 後看 auto-loop-logs\ps-oracle-gate\_plugin.log 出現
+     「loaded … mode=enforce agents=[…ps-ui-flow:DB…]」。沒有＝plugin 沒被載到（檔名／目錄／JS 語法），
+     用 opencode --print-logs --log-level DEBUG 看 plugin 錯誤。
+□ 3. 快篩（一題）：新 session、ps-orchestrator、問一題需 DB 的問題。看
+     auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl：
+     - 模型照做：after list_connections（next=NEED_CONNECT）→ after connect（next=READY）→ before task decision=allow
+     - 模型錯序：before task decision=block（state=NEED_LIST）→ 之後 list→connect → before task allow
+     - 真 SQLcl 的成功回覆若被誤判（ok=false、failureMatch 有值）→ 回報維護 session 調整 FAILURE_PATTERNS
+□ 4. P1 探測（互動 TUI）：正常使用 ≥ 20 題後跑
+     powershell -File scripts\tests\test-oracle-gate-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
+     判定 hookMismatch=0（閘門看到的 task 次數＝opencode export 的 task 件數＝hook 覆蓋率 100%）、
+     executedTaskBeforePreflight=0。blockedRuns＝模型錯序的次數（觀察值，不判定）。
+□ 5. 30 次回歸（headless，opencode run；題目用 -Question／-QuestionFile 從本機帶，真實物件名不進 repo）：
+     -Scenario B1 -Runs 30（需 DB 的題）／-Scenario B2（wiki 已驗證的題）／-Scenario B3（純 PeopleCode 題）
+     每個都要 PASS；B3 附帶看 preflightRuns（R8：不需要 DB 也應做第 0 步，觀察值）。
+□ 6. 暫時關閉／探測模式：$env:PS_ORACLE_GATE_MODE='observe'（該次啟動）或 profile oracle.preflightGate: observe；
+     observe 只記錄不擋（jsonl 的 decision=observe-would-block）。不要長期停在 observe。
+□ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn、target、state→next、decision
+     （allow／block／observe／observe-would-block）、basis（run_sql:enabled／disabled／unknown-agent）、
+     note（gate stands down／ancestor READY／NOT_CONNECTED 退回）、ok／failureMatch（list／connect 是否被判成功）。
+□ 8. 已知限制：連線在同一回合中途斷掉閘門看不到（靠 subagent 回 NOT_CONNECTED → 狀態退回 NEED_CONNECT）；
+     不認識的 subagent 名字一律當會查 DB（保守）；閘門只擋、不改參數、不代模型 connect。
+```
+
 ## SOP-11 系統 CR 上線後的知識庫對齊
 
 前提觀念：ES 索引是程式碼**快照**——索引沒更新，稽核驗的是舊

@@ -44,6 +44,10 @@
 │  ├─ ps-ae-flow.md                    Subagent：Application Engine
 │  ├─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
 │  └─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
+├─ plugin/
+│  └─ ps-oracle-preflight-gate.js      OpenCode 執行期閘門：主 agent 未依序完成 oracleMCP list_connections → connect
+│                                      之前，會查 DB 的 subagent 委派（task）在執行前被擋下（PS_ORACLE_PREFLIGHT_REQUIRED）
+├─ .npmrc                              offline=true——OpenCode 有 plugin 時啟動會等 @opencode-ai/plugin 安裝，斷網要它秒失敗
 ├─ command/
 │  ├─ ps-research.md                   /ps-research <領域> — 文件生成（可續跑）
 │  ├─ ps-audit.md                      /ps-audit <領域> — 稽核 + 回灌 checklist

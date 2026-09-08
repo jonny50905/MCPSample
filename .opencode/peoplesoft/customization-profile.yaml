@@ -82,6 +82,11 @@ oracle:
   # 主 agent 開場 list_connections → connect 時要挑的連線名：有填且在清單裡就用它，
   # FILL_ME 或不在清單裡則用清單第一個。
   connectionName: FILL_ME
+  # 執行期閘門（.opencode/plugin/ps-oracle-preflight-gate.js）的模式：
+  # enforce＝前置（list_connections → connect 成功）未完成就不准派會查 DB 的 subagent；
+  # observe＝只記錄不擋（做 hook 覆蓋率探測或緊急停用時才用）。
+  # 環境變數 PS_ORACLE_GATE_MODE 可臨時覆寫本值。
+  preflightGate: enforce
 
 # 業務領域定義（Domain alias、rootObjectPolicy、fallback 政策）
 # 見同目錄 business-domain-map.yaml
