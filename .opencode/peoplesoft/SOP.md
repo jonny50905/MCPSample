@@ -531,10 +531,11 @@ subagent（ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow）不受影響；ps-au
 「會呼叫哪個 server」是併發上限的軸，不是閘門的軸）。閘門只擋**順序**、不擋**可用性**：oracleMCP 未掛載（交 ORACLE_MCP_DOWN
 協定）、或第 0 步已誠實做過但連不上（同一題內 list 成功、connect 嘗試 ≥ 2 次零成功＝「再 connect 一次」也做了）→ 退讓放行，
 交 subagent 的 NOT_CONNECTED 協定——DB 掛掉時稽核批次不會卡死，純 chunk 任務照跑、SQL 型證據回 UNVERIFIABLE。
-**連線 epoch**：連線是 SQLcl MCP 的全域單例（所有 session、所有 OpenCode 視窗共用），任何 session 的 connect／
-disconnect 嘗試都會推進 `auto-loop-logs\ps-oracle-gate\connection-epoch.json` 的 epoch；某 session 完成前置後若
-epoch 被別人推進過，它的 READY 作廢——下一次派 DB task 會被擋（訊息說明「共用連線已被其他 session／視窗改動」），
-重做 list→connect 即可。代價是多兩個冪等呼叫；換到的是「別的視窗把連線切走後，本視窗不會在錯的庫上查」。
+**共用連線身分**：連線是 SQLcl MCP 的全域單例（所有 session、所有 OpenCode 視窗共用）。閘門把「目前連線名」記在
+`auto-loop-logs\ps-oracle-gate\connection-state.json`（name／changed／by＝誰改的）：某 session 完成前置後，若別人把連線
+**切到不同名字**或 **disconnect**，它的 READY 作廢——下一次派 DB task 會被擋，訊息寫明目前連線是哪條、由哪個 session／pid 的
+哪個工具改的，並說只需再 connect 一次（不必重做 list、不計入放棄提示）。**同名重連不作廢任何人**（每題第 0 步的常態、
+auto-loop 每個 session 開場都會做）。換到的是「別的視窗把連線切走後，本視窗不會在錯的庫上查」；代價是一次冪等 connect。
 
 ```text
 □ 1. 搬檔：.opencode\plugin\ps-oracle-preflight-gate.js、.opencode\.npmrc（兩檔都在 manifest 內）、
@@ -548,7 +549,8 @@ epoch 被別人推進過，它的 READY 作廢——下一次派 DB task 會被�
 □ 2. 有載入嗎：開任一 opencode session 後看 auto-loop-logs\ps-oracle-gate\_plugin.log 出現
      「loaded … mode=enforce agents=[…ps-ui-flow:DB…]」。沒有＝plugin 沒被載到（檔名／目錄／JS 語法），
      用 opencode --print-logs --log-level DEBUG 看 plugin 錯誤。
-□ 3. 快篩（一題）：新 session、ps-orchestrator、問一題需 DB 的問題。看
+□ 3. 快篩（一題）：新 session、ps-orchestrator、問一題需 DB 的問題；**接著同一視窗再問一題**（第二題的 connect 是「已連線再 connect」，
+     看真 SQLcl 怎麼回：正常成功、或回錯但含 already connected 都算成功；回別的錯誤文字就是 FAILURE_PATTERNS 要調）。看
      auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl：
      - 模型照做：after list_connections（next=NEED_CONNECT）→ after connect（next=READY）→ before task decision=allow
      - 模型錯序：before task decision=block（state=NEED_LIST）→ 之後 list→connect → before task allow
@@ -570,15 +572,22 @@ epoch 被別人推進過，它的 READY 作廢——下一次派 DB task 會被�
      observe 只記錄不擋（jsonl 的 decision=observe-would-block）。不要長期停在 observe。
 □ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（該則 user 訊息 id）、target、
      state→next、decision（allow／block／observe／observe-would-block）、basis（run_sql:enabled／disabled／unknown-agent）、
-     note（gate stands down／ancestor READY／NOT_CONNECTED 退回／shared connection changed <來源>／interleaved）、ok／failureMatch
-     （list／connect 是否被判成功）、epoch（connect／disconnect／task 當下的連線 epoch）、callID（同一次工具呼叫的 before／after 配對）、
-     admitted（task 的 after 列：入場時的判定；turn／state 也是入場時的快照）、epochWriteError（epoch 檔寫不進去，看 _plugin.log）。
+     note（gate stands down: <原因>／ancestor READY／NOT_CONNECTED 退回／shared connection changed (now …, expected …; 來源)／interleaved／
+     command-driven subtask／isError but already connected）、ok／failureMatch（list／connect 是否被判成功；`isError` 表示 MCP 回錯、
+     由 event hook 記到）、connection（connect 的連線名、task 當下的共用連線名）、stateChanged／stateWriteError（共用狀態檔的版本／寫失敗）、
+     callID（同一次工具呼叫的 before／after 配對）、admitted（task 的 after 列：入場時的判定；turn／state 也是入場時的快照）、
+     staleBlocks（因共用連線被改而擋的次數，不計入 blocked）、viaEvent（由 event hook 記的列）。
 □ 8. 已知限制：(a) 連線在同一題中途斷掉閘門看不到（靠 subagent 回 NOT_CONNECTED → 狀態退回 NEED_CONNECT）；
      (b) 閘門按 **agent 能力**（tools 表 run_sql）判定、不按任務意圖——ps-auditor 的純 chunk 解引用任務在主 agent
      「list 成功、第一次 connect 失敗、還沒再 connect 一次」的短暫窗口內會被擋一次（第二次 connect 也失敗就退讓）；
      要拆 ps-auditor-source／ps-auditor-db 屬稽核協定變更，另案決定；(c) 不認識的 subagent 名字一律當會查 DB（保守）；
      (d) 閘門只擋、不改參數、不代模型 connect；(e) epoch 檔是同一台機器、同一 repo 目錄內的行程共用；不同 repo 目錄各有一份；
-     (f) 會多擋一次的情況：共用連線被別的視窗動過（epoch 過期 → 重做一次冪等的 list→connect）、`/mcp` 狀態查不到（保守擋）；
+     (f) 會多擋一次的情況：共用連線被別的視窗切到不同名字或 disconnect（只需再 connect 一次）、`/mcp` 狀態查不到（保守擋）；
+     OpenCode 之外的改動（SQL Developer extension 的 UI、另一個 repo 目錄的 OpenCode）閘門看不到——真要防「查錯庫」，
+     要在 subagent 第一句查 `SYS_CONTEXT('USERENV','DB_NAME')` 對照 profile（cookbook／契約變更，另案）；
+     (h) 退讓的完整清單（都只擋順序不擋可用性，jsonl 的 note 以 `gate stands down:` 開頭，analyzer 另計 standDowns）：oracleMCP 未掛載；
+     同一題內 list 成功後 connect 失敗 ≥ 2 次；list 失敗 ≥ 2 次；command 驅動的 subtask（command 的 agent 是 subagent，OpenCode 直接派，
+     模型沒機會做前置）。SQLcl 對「已連線再 connect」若回錯誤但文字含 already connected，閘門視為成功。
      (g) 「oracleMCP 未掛載」看的是 OpenCode 存的 `/mcp` 狀態（OpenCode 1.18.29 只在 transport 斷線或 `/mcp` 手動切換時翻，沒有
      自動重連）：SQLcl／VS Code 端重啟後，要在 `/mcp` 把 oracleMCP 關再開（或開新的 opencode 行程），狀態回 connected 閘門才會再管。
      DB 連不上時的批次判讀：稽核 SQL 型證據成批 UNVERIFIABLE、收據照發（不是零收據）——先停批修 DB，再刪 audit-ledger.json 重跑；

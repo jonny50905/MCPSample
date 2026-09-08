@@ -156,7 +156,13 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
     try {
         if ($ExportPath -ne '') { $obj = ConvertFrom-Json ([System.IO.File]::ReadAllText($ExportPath, [System.Text.Encoding]::UTF8)) }
         elseif ($OcPath -ne '') {
-            $json = (& cmd.exe /d /s /c ('"' + $OcPath + '" export ' + $SessionId + ' 2>nul') | Out-String)
+            # export 先落檔再以 UTF-8 讀：PS 5.1 的主控台解碼（zh-TW 是 CP950）會把 JSON 裡的中文與跳脫弄壞
+            $exportFile = Join-Path $runDir ($SessionId + '.export.json')
+            $inner = '"' + $OcPath + '" export ' + $SessionId + ' 1> "' + $exportFile + '" 2>nul'
+            $null = & cmd.exe /d /s /c $inner
+            if (-not (Test-Path -LiteralPath $exportFile)) { throw 'export 沒有產生檔案' }
+            $json = [System.IO.File]::ReadAllText($exportFile, [System.Text.Encoding]::UTF8)
+            if ($json.Trim() -eq '') { throw 'export 檔為空（session 找不到或 opencode 失敗）' }
             $obj = ConvertFrom-Json $json
         }
     }
@@ -181,6 +187,7 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
         preflight = $preflight; exportedTasks = $exportedTasks; hookMismatch = $mismatch; exportError = $exportErr
         turns = $chatRows.Count; exportedTurns = $exportedTurns; turnMismatch = $missingTurns; orphanTurns = $orphanTurns
         turnInvariantViolations = $turnViol; staleEpochBlocks = $staleBlocks; standDowns = $standDowns
+        exportFailures = $(if ($exportErr -ne '') { 1 } else { 0 }); exitCode = -1; timedOut = $false
         mode = $modeVal
     }
 }
@@ -199,12 +206,15 @@ function Write-Summary($verdicts, [string]$Label) {
     $tmism = ($verdicts | Measure-Object -Property turnMismatch -Sum).Sum
     $tviol = ($verdicts | Measure-Object -Property turnInvariantViolations -Sum).Sum
     $stale = ($verdicts | Measure-Object -Property staleEpochBlocks -Sum).Sum
+    $xfail = ($verdicts | Measure-Object -Property exportFailures -Sum).Sum
+    $exitBad = @($verdicts | Where-Object { $_.exitCode -gt 0 -or $_.timedOut }).Count
     $blockedRuns = @($verdicts | Where-Object { $_.blocked -gt 0 -or $_.wouldBlock -gt 0 }).Count
     $preflightRuns = @($verdicts | Where-Object { $_.preflight }).Count
     $noTask = @($verdicts | Where-Object { $_.taskAttempts -eq 0 }).Count
     $summary = [pscustomobject]@{
         label = $Label; sessions = $verdicts.Count; executedTaskBeforePreflight = [int]$early; hookMismatch = [int]$mism
         turnMismatch = [int]$tmism; turnInvariantViolations = [int]$tviol; staleEpochBlocks = [int]$stale
+        exportFailures = [int]$xfail; runsWithBadExit = $exitBad
         blockedRuns = $blockedRuns; preflightRuns = $preflightRuns; sessionsWithoutTask = $noTask
         stamp = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     }
@@ -218,8 +228,10 @@ function Write-Summary($verdicts, [string]$Label) {
     Write-Host ('orphanTurns=' + [int]$orphan + '（chat.message 有、transcript 沒有的題：/undo 或 fork，觀察值）  standDowns=' + [int]$sd + '（閘門刻意放行：oracleMCP 未掛載或連不上；多＝那段時間 DB 有問題，觀察值）')
     Write-Host ('blockedRuns=' + $blockedRuns + '（模型先派 task 被擋）  preflightRuns=' + $preflightRuns + '  sessionsWithoutTask=' + $noTask)
     Write-Host ('摘要已寫：' + $out)
-    if ([int]$early -gt 0 -or [int]$mism -gt 0 -or [int]$tmism -gt 0 -or [int]$tviol -gt 0) {
-        Write-Host '判定：FAIL（DB 委派先於前置執行／task hook 覆蓋率不足／有 turn 沒收到重置／同 turn 內找不到 list→connect）' -ForegroundColor Red
+    if ([int]$xfail -gt 0) { Write-Host ('注意：' + [int]$xfail + ' 個 session 的 opencode export 失敗（看各列 exportError）——覆蓋率判定對這些 session 是空的') -ForegroundColor Yellow }
+    if ($exitBad -gt 0) { Write-Host ('注意：' + $exitBad + ' 次 run 結束碼非 0 或逾時強殺（看 runs\*.err.txt）') -ForegroundColor Yellow }
+    if ([int]$early -gt 0 -or [int]$mism -gt 0 -or [int]$tmism -gt 0 -or [int]$tviol -gt 0 -or [int]$xfail -gt 0 -or $exitBad -gt 0) {
+        Write-Host '判定：FAIL（DB 委派先於前置執行／task hook 覆蓋率不足／有 turn 沒收到重置／同 turn 內找不到 list→connect／export 失敗／run 異常結束）' -ForegroundColor Red
         return 1
     }
     Write-Host '判定：PASS（executed task before preflight = 0；task／turn hook 覆蓋率 100%；每個已執行的 DB task 同 turn 內都有 list→connect）' -ForegroundColor Green
@@ -279,9 +291,17 @@ for ($i = 1; $i -le $Runs; $i++) {
     Write-Host ('[' + $i + '/' + $Runs + '] ' + $q)
     $p = Start-Process -FilePath 'cmd.exe' -ArgumentList ('/d /s /c "' + $inner + '"') -WorkingDirectory $root -NoNewWindow -PassThru
     try { $null = $p.Handle } catch { }
+    $timedOut = $false
     if (-not $p.WaitForExit($TimeoutMin * 60 * 1000)) {
-        & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
+        # 走 cmd 殺整樹：PS 5.1 在 $ErrorActionPreference=Stop 下，原生指令的 stderr 重導會變成終止錯誤
+        $null = & cmd.exe /d /c ('taskkill /PID ' + $p.Id + ' /T /F >nul 2>&1')
+        $timedOut = $true
         Write-Host ('  逾時（' + $TimeoutMin + ' 分）強殺') -ForegroundColor Yellow
+    }
+    $exitCode = -1
+    if (Test-Path -LiteralPath $rcFile) {
+        $rcText = ([System.IO.File]::ReadAllText($rcFile)).Trim()
+        if ($rcText -match '^-?\d+$') { $exitCode = [int]$rcText }
     }
     $sessionId = ''
     if (Test-Path -LiteralPath $outFile) {
@@ -293,13 +313,15 @@ for ($i = 1; $i -le $Runs; $i++) {
     }
     if ($sessionId -eq '') {
         Write-Host '  找不到 sessionID（看 err 檔）' -ForegroundColor Yellow
-        $verdicts += [pscustomobject]@{ sessionID = ('(run ' + $i + ' no-session)'); rows = 0; taskAttempts = 0; blocked = 0; wouldBlock = 0; executed = 0; executedBeforePreflight = 0; preflight = $false; exportedTasks = -1; hookMismatch = 0; exportError = 'no sessionID'; turns = 0; exportedTurns = -1; turnMismatch = 0; orphanTurns = 0; turnInvariantViolations = 0; staleEpochBlocks = 0; standDowns = 0; mode = '' }
+        $verdicts += [pscustomobject]@{ sessionID = ('(run ' + $i + ' no-session exit=' + $exitCode + ')'); rows = 0; taskAttempts = 0; blocked = 0; wouldBlock = 0; executed = 0; executedBeforePreflight = 0; preflight = $false; exportedTasks = -1; hookMismatch = 0; exportError = 'no sessionID'; turns = 0; exportedTurns = -1; turnMismatch = 0; orphanTurns = 0; turnInvariantViolations = 0; staleEpochBlocks = 0; standDowns = 0; exportFailures = 0; exitCode = -1; timedOut = $false; mode = '' }
         if (-not $KeepGoing) { break }
         continue
     }
     $v = Get-SessionVerdict $sessionId $ocPath
+    $v.exitCode = $exitCode
+    $v.timedOut = $timedOut
     $verdicts += $v
-    Write-Host ('  ' + $sessionId + '  task嘗試=' + $v.taskAttempts + ' 被擋=' + $v.blocked + ' 執行=' + $v.executed + ' 早於前置=' + $v.executedBeforePreflight + ' 前置完成=' + $v.preflight + ' transcript task=' + $v.exportedTasks + ' turns=' + $v.turns + '/' + $v.exportedTurns + ' turnViol=' + $v.turnInvariantViolations)
+    Write-Host ('  ' + $sessionId + '  exit=' + $exitCode + '  task嘗試=' + $v.taskAttempts + ' 被擋=' + $v.blocked + ' 執行=' + $v.executed + ' 早於前置=' + $v.executedBeforePreflight + ' 前置完成=' + $v.preflight + ' transcript task=' + $v.exportedTasks + ' turns=' + $v.turns + '/' + $v.exportedTurns + ' turnViol=' + $v.turnInvariantViolations)
     if (($v.executedBeforePreflight -gt 0 -or $v.turnInvariantViolations -gt 0) -and -not $KeepGoing) { Write-Host '  違反：DB 委派先於前置執行——停止（加 -KeepGoing 可續跑）' -ForegroundColor Red; break }
 }
 Show-Table $verdicts

@@ -8,9 +8,9 @@
 
 | 檔 | 用途 | 跑法 |
 |---|---|---|
-| `unit.test.mjs` | 狀態機單元測試（假 client；11 組：DB 判定／list→connect 順序／NOT_CONNECTED 退回與 disconnect／observe 模式／MCP 未掛載退讓與祖先 READY／連線 epoch（同行程別 session、跨行程改檔、disconnect）／mcp 狀態不快取／synthetic 訊息不重置／connect 交錯只有最後一個 READY／task 執行中送下一題的 after 列用入場快照／list 成功後 connect 失敗兩次退讓） | `node --test tests/oracle-gate/unit.test.mjs` |
+| `unit.test.mjs` | 狀態機單元測試（假 client；15 組：DB 判定／list→connect 順序／NOT_CONNECTED 退回與 disconnect／observe 模式／MCP 未掛載退讓與祖先 READY／連線 epoch（同行程別 session、跨行程改檔、disconnect）／mcp 狀態不快取／synthetic 訊息不重置／connect 交錯只有最後一個 READY／task 執行中送下一題的 after 列用入場快照／list 成功後 connect 失敗兩次退讓／list 失敗兩次退讓與 NOT_CONNECTED 歸零／prt_ subtask 退讓與 session:callID 鍵／event hook 的 already connected／純 subagent 不建檔） | `node --test tests/oracle-gate/unit.test.mjs` |
 | `mock-oracle-mcp.mjs` | 假 SQLcl MCP（stdio JSON-RPC；tools：list_connections／connect／run_sql／disconnect；未 connect 就 run_sql 回 not connected） | 由 e2e 的 opencode.json 啟動 |
-| `mock-model.mjs` | 假 OpenAI 相容模型（SSE 串流），依「最後一則 user 訊息之後」的工具呼叫序列決定下一步；`MOCK_MODEL_SCENARIO`：task-first／connect-first／compliant／stubborn／nodb／epoch | 由 e2e 啟動 |
+| `mock-model.mjs` | 假 OpenAI 相容模型（SSE 串流），依「最後一則 user 訊息之後」的工具呼叫序列決定下一步；`MOCK_MODEL_SCENARIO`：task-first／connect-first／compliant／stubborn／nodb／shared-switch／connect-fail | 由 e2e 啟動 |
 | `run-e2e.mjs` | 真 OpenCode（`OPENCODE_BIN` 或 PATH）＋假 MCP＋假模型跑 `opencode run --agent ps-orchestrator`，讀閘門 jsonl、`opencode export` 交叉比對，7 情境斷言 | `OPENCODE_BIN=<binary> node tests/oracle-gate/run-e2e.mjs [--repeat N] [--only <情境>] [--keep]` |
 
 e2e 七情境與證明的事：
@@ -26,7 +26,10 @@ e2e 七情境與證明的事：
 | mcp-down | oracleMCP `enabled:false` | 閘門退讓（note=gate stands down: mcp-status:disabled） |
 | multi-turn | 同 session 兩題，第二題 `opencode run --session <id>`（新行程） | 兩個 chat.message、turnId 不同；每題各自被擋→前置→放行；export 的 user 訊息＝2 |
 | multi-turn-serve | `opencode serve` 同一行程對同一 session 連送兩題（HTTP API） | 第二則 chat.message 到來時 session 仍 READY，被重置為 NEED_LIST；兩題各自被擋→前置→放行（約 40 秒；serve 啟動後第一個請求可能掛住，執行器每個探測 20 秒逾時後重試，`serve.stdout.txt` 有 `[harness]` 計時行） |
-| epoch | list → connect → 假模型改寫 connection-epoch.json（模擬另一行程 connect）→ task | 被擋且 note=shared connection changed、模型收到「共用的 Oracle 連線已被改動過（來源）」；重做 list→connect 後放行 |
+| shared-switch | list → connect → 假模型改寫 connection-state.json（模擬另一行程把共用連線切到 OTHER_DB）→ task | 被擋（state=NEED_CONNECT、blocked 不加、staleBlocks=1、note 標來源），模型收到「目前是 OTHER_DB…只需再 connect」；再 connect 後放行 |
+| connect-fail | 假 oracleMCP 的 connect 一律 isError | task 被擋 → list → connect 失敗 → task 被擋（NEED_CONNECT）→ connect 失敗 → task 退讓（note=gate stands down: connect failed x2）→ subagent 回 NOT_CONNECTED |
+| mcp-failed | oracleMCP 指令不存在（/mcp 狀態 failed） | 閘門退讓（note=gate stands down: mcp-status:failed） |
+| subtask-command | command 的 agent 是 subagent（`opencode run --command`，OpenCode 走 handleSubtask） | before task 的 callID 是 `prt_…`、閘門退讓不 throw、exit 0、subtask 執行 |
 | compaction-serve | 同 multi-turn-serve，但兩題之間 `POST /session/:id/summarize`（compaction） | export 有 3 則 user 訊息（其中 1 則只有 compaction part）、chat.message 只有 2 則且 id＝兩則真實題目；閘門與 analyzer 的題目比對不受 compaction 影響 |
 
 取得 binary（沙箱）：`npm pack opencode-linux-x64@1.18.29` 解開後 `package/bin/opencode`。

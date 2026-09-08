@@ -73,10 +73,15 @@ user 訊息 id（`turnId`）、analyzer 加 turnMismatch／turnInvariantViolatio
 （SOP-21 步驟 1）；全部 part 都 synthetic 的 user 訊息（背景 subagent 回灌／compaction 續行）不重置；`ps-fs-doctor` 的 `Get-TransferFiles`
 加 `-Force`（Linux 維護端把 `.npmrc` 當隱藏檔漏出 manifest）並排除 OpenCode 產生的安裝痕跡，manifest 59 檔。單元 8 組、e2e 9 情境（含 serve）全 PASS；
 test-auto-loop 情境 33 用固定 jsonl 樣本驗回歸腳本的判定函式（含「第二題沒重做前置」→ turnViol）。
-**第二輪對抗式驗證後再修**：connect 交錯的 TOCTOU（before 記 token、after 核對）、epoch 來源標註與寫檔重試、task 入場快照（使用者在
+**第二輪對抗式驗證後再修**：connect 交錯的 TOCTOU（before 記版本、after 核對）、來源標註與寫檔重試、task 入場快照（使用者在
 task 執行中送下一題不誤標）、`turnMismatch` 改真實題目 id 比對（compaction／`/undo` 不誤判；e2e `compaction-serve`）、verdict 改
 pscustomobject（PS 5.1 的 Measure-Object）、閘門只擋順序不擋可用性（list 成功後 connect 失敗 ≥2 次退讓，交 NOT_CONNECTED 協定；
-analyzer 把刻意放行另計 standDowns）。單元 11 組、e2e 11 情境、PowerShell 238 判定全 PASS。
+analyzer 把刻意放行另計 standDowns）。
+**第三輪（17 個 agent 綜合＋批評者 15 項）**：epoch 改**連線名身分**（`connection-state.json`；同名重連不作廢任何人，換名／disconnect 才作廢，
+作廢退回 NEED_CONNECT、訊息標來源）；command 驅動的 subtask（callID `prt_`）退讓不 throw；list 失敗兩次也退讓；NOT_CONNECTED 後計數歸零；
+map 鍵改 `session:callID`；await 後重判；祖先檢查純讀；`event` hook 接 connect 的 isError（already connected 視為成功）；不記 run_sql、純 subagent
+不建檔；analyzer 的 export 落檔讀 UTF-8（PS 5.1 CP950）、taskkill 走 cmd、exitCode／exportFailures 判 FAIL。單元 15 組、e2e 14 情境、PowerShell 238 判定全 PASS。
+公司機**還要驗一件**：opencode.json 的 oracleMCP `type` 是 local 還是 remote（決定共用狀態檔跨行程的意義），寫回 SOP-12。
 
 ## 1. 管理者下一步（按序）
 
@@ -127,17 +132,17 @@ analyzer 把刻意放行另計 standDowns）。單元 11 組、e2e 11 情境、P
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；含 review 後的連線 epoch／turnId／不快取） | 555 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；含三輪 review 後的連線名身分／turnId／退讓規則／event hook） | 701 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
    | `.opencode/.npmrc` | 新增 | 6 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時） |
    | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce） | 106 | 本機已回填 FILL_ME 者只加 `preflightGate` 那 5 行（fs-doctor 報此檔 M 屬預期） |
-   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 追記＋舊敘述改現況＋SOP-21 部署與驗證） | 724 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115） | 3159 | |
-   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R15） | 687 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 追記＋舊敘述改現況＋SOP-21 部署與驗證） | 733 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115） | 3179 | |
+   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R16） | 688 | |
    | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | |
    | `scripts/tests/test-auto-loop.ps1` | 修改（情境 32＋情境 33） | 790 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
    | `scripts/ps-fs-doctor.ps1` | 修改（Get-TransferFiles 加 -Force、排除 OpenCode 安裝痕跡） | 312 | 存 UTF-8 with BOM；先搬它再重生對照才看得到 .npmrc |
-   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析） | 306 | 存 UTF-8 with BOM；用法見 SOP-21 |
-   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD dd54ab3，早一步屬預期） |
+   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析） | 328 | 存 UTF-8 with BOM；用法見 SOP-21 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD 6d56a5f，早一步屬預期） |
    | `AGENTS.md` | 修改（第 0 步先於「先查 wiki」；plugin 零相依鐵律） | 91 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
 
    `tests/oracle-gate/*`（沙箱單元／e2e 測試組）與 `docs/design/oracle-preflight-gate-decision-memo.md` 不搬。
@@ -209,9 +214,10 @@ analyzer 把刻意放行另計 standDowns）。單元 11 組、e2e 11 情境、P
   該節對批次指令本就不適用）；`SOP.md` 未收 L104～L107 的操作知識（台帳刪除語義、分批稽核參數、
   log 訊號詞只在本檔 §3，而本檔不搬公司機）——建議下一波以「只加不刪」補一節進 SOP。
 - 閘門（#29）待公司機驗：真 SQLcl `connect`／`list_connections` 的成功回覆是否命中 FAILURE_PATTERNS（誤判會讓閘門永遠不開——
-  jsonl 看 `ok:false`＋`failureMatch`）；互動 TUI 的 task／turn hook 覆蓋率（`-AnalyzeAll` hookMismatch=turnMismatch=0）；
-  兩份 `.npmrc offline`（專案＋全域）是否真的讓啟動不再多等；連線 epoch 在互動＋auto-loop 並行時的 staleEpochBlocks 頻率
-  （高＝兩邊在搶連線，SOP-12「重載期間不並行」）。
+  jsonl 看 `ok:false`＋`failureMatch`）；「已連線再 connect」是正常回覆、isError 含 already connected（event hook 接住）、還是別的錯誤
+  文字（R16）；互動 TUI 的 task／turn hook 覆蓋率（`-AnalyzeAll` hookMismatch=turnMismatch=0）；兩份 `.npmrc offline`（專案＋全域）是否
+  真的讓啟動不再多等；oracleMCP 的 `type`（local／remote）；互動＋auto-loop 並行時 staleEpochBlocks 應接近 0（同名重連不作廢），
+  多＝有人切到不同連線名或 disconnect。
   已知限制：同回合中途斷線閘門看不到（靠 NOT_CONNECTED 退回）；ps-auditor 按 agent 能力被 gate，「oracleMCP 有掛載但 connect 失敗」
   時純 chunk 任務也被擋——拆 ps-auditor-source／ps-auditor-db 屬稽核協定變更，另案（review 第 3 點）。
 - 舊掛起：已畢業領域貼 U 項工單；PENDING_MANUAL 人工 SQL（SOP-2 第 4 階）；`-GitCommit` 觀察期

@@ -3156,4 +3156,24 @@
   (5) PS 5.1 的 `Measure-Object -Property` 不吃 hashtable 的鍵，verdict 改 `[pscustomobject]`；`Get-SessionVerdict` 加 `-ExportPath`
   讓情境 33 能餵 export 樣本測 id 比對。(6) e2e 第二 turn 補 `--agent ps-orchestrator`（原本落到 build）。(7) review 第 3 點的便宜修法：
   閘門只擋順序、不擋可用性——同一題內 list 成功、connect 嘗試 ≥ 2 次零成功（第 0 步的「再 connect 一次」也做了）→ 退讓放行，交
-  subagent 的 NOT_CONNECTED 協定；DB 掛掉時 ps-auditor 的純 chunk 任務不再整批卡死，SQL 型證據回 UNVERIFIABLE。單元 11 組。
+  subagent 的 NOT_CONNECTED 協定；DB 掛掉時 ps-auditor 的純 chunk 任務不再整批卡死，SQL 型證據回 UNVERIFIABLE。
+- 追記（同日，對抗式驗證第三輪：17 個 agent 對第二輪修法的綜合＋批評者 15 項，逐條處置）：
+  (1) **epoch 改「連線名身分」**（綜合對 F1 的修正，成立）：對每次 connect 嘗試推進 epoch，會把每題第 0 步的**同名重連**也當成改動——
+  互動視窗與 auto-loop 並行時互相作廢、ping-pong、還會把過期誤計入「被擋 ≥ 3 次就放棄」。改為共用狀態記**連線名**
+  （`connection-state.json`：name／changed／by）：換名 connect 或 disconnect 才作廢別人的 READY，同名重連不作廢；
+  作廢只退回 NEED_CONNECT（list 仍有效）、不計入 blocked、訊息標明「目前是誰、由哪個 session／pid 的哪個工具改的、只需再 connect」；
+  connect 完成時核對共用狀態版本與名字（交錯 connect 不同名時只有最後起跑的算 READY；同名交錯兩邊都算）；
+  成功的 connect 若發現共用狀態沒反映就補寫；寫檔失敗（Windows 防毒鎖檔）改信本行程記憶並記 `_plugin.log`。
+  (2) command 驅動的 subtask（`handleSubtask`：OpenCode 在 prompt 迴圈直接派、callID 是 `prt_`）沒有 tool-error 通道，throw 會殺掉整個
+  prompt → 退讓並記 note（模型沒機會做前置）。(3) list 連失敗 ≥ 2 次也退讓（不只 connect）；subagent 回 NOT_CONNECTED 後連線計數歸零，
+  讓「連失敗兩次退讓」還能再觸發。(4) `admitted`／`pending` 改以 `session:callID` 為鍵（OpenAI 相容端點常用 call_0 這種每回合重複的 id）。
+  (5) task before hook 的兩個 await 之間狀態可能已變（同一步並行的 connect 完成）→ await 後再判一次；祖先檢查改純讀不改父狀態；
+  parent 查詢失敗不快取。(6) SQLcl 對「已連線再 connect」若回 isError（after 不觸發，公司機待驗）：用 `event` hook 接
+  `message.part.updated` 的 connect 錯誤件，文字含 already connected 視為成功，其他錯誤記 `failureMatch=isError`（jsonl 才看得到失敗）。
+  (7) `mcp.status` 回 error 物件（非 2xx）視同查不到 → 保守擋。(8) 紀錄量：不記 run_sql 列、純 subagent 的 session 不建檔；
+  `session.deleted` 事件清記憶。(9) analyzer：`opencode export` 改落檔再以 UTF-8 讀（PS 5.1 主控台 CP950 會弄壞 JSON）、export 失敗計
+  exportFailures 並判 FAIL（否則覆蓋率判定是空的）；`taskkill` 改走 cmd（PS 5.1 在 EAP=Stop 下原生 stderr 重導會終止腳本）；
+  讀 rc 檔記 exitCode／timedOut，非 0 判 FAIL。(10) e2e 補 `connect-fail`（connect 一律 isError → 兩次後退讓）、`mcp-failed`（指令不存在）、
+  `subtask-command`（command 的 agent 是 subagent → prt_ 退讓、exit 0）；`epoch` 情境改 `shared-switch`。單元 15 組。
+  綜合另建議、本輪不做：DB subagent 第一句查 `SYS_CONTEXT('USERENV','DB_NAME')` 對照 profile → BLOCKED(WRONG_CONNECTION)——
+  唯一能擋「OpenCode 之外（SQL Developer UI）切換連線」的手段，屬 cookbook／契約變更，另案由管理者決定。

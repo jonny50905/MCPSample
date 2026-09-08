@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "dd54ab3",
+  "commit": "6d56a5f",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -130,8 +130,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3159,
-      "sha256": "13e3f21a79049d29f39fd454d22f299e0987986e02e03e96f55a58f2a55219a5",
+      "lines": 3179,
+      "sha256": "5cf8b8ccc8a1a925ec6c9970c93e3f49497f906560f4c135e9a74982da702666",
       "bom": false
     },
     {
@@ -202,8 +202,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 724,
-      "sha256": "377c15996fd6b8f76058f5040525574084af27c35dc0b4b115738be78b4c9d00",
+      "lines": 733,
+      "sha256": "02a678a73d5b8c22423493e776c921a877e8804c9edf2e359888650bb681e084",
       "bom": false
     },
     {
@@ -220,14 +220,14 @@
     },
     {
       "path": ".opencode/peoplesoft/test-scenarios.md",
-      "lines": 687,
-      "sha256": "53d9dbf0c6014f357ae433e6105207b82fe0b82dda3d555a3875afce437fbed7",
+      "lines": 688,
+      "sha256": "854158f79f680b3249c3da77b2968e35bb2269fa5e843e238d27145ed6cef27b",
       "bom": false
     },
     {
       "path": ".opencode/plugin/ps-oracle-preflight-gate.js",
-      "lines": 555,
-      "sha256": "5a54a4e1c367772363e55f38b61884ee66eff98cbad51037011b9ccfdc5e261d",
+      "lines": 701,
+      "sha256": "dcb6df8dff14908ca83c69dce7bc5c97e3482563ed3cc973f83f15cb1d619c05",
       "bom": false
     },
     {
@@ -347,13 +347,13 @@
     {
       "path": "scripts/tests/test-auto-loop.ps1",
       "lines": 790,
-      "sha256": "15e67070bf4c4c92c6435d6dcc5bc00bf871845f9fa49292f7535394d6da1004",
+      "sha256": "b57481d9063525e078a1687ccd2f747c3d1df8cc55ce6a9c454bafa93400c665",
       "bom": true
     },
     {
       "path": "scripts/tests/test-oracle-gate-runtime.ps1",
-      "lines": 306,
-      "sha256": "8a96fa4ff382a2e166f071ec019cfc5ba435361d1320caf58df43011a9c5d8ab",
+      "lines": 328,
+      "sha256": "7bd9c3672d30f4bec0e4e7eabb2b48dac3a9d06836c352b313182542c5e47ac4",
       "bom": true
     }
   ]

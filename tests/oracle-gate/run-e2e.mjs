@@ -1,12 +1,16 @@
 // run-e2e.mjs — 用真 OpenCode（預設 PATH 上的 opencode；或 OPENCODE_BIN）＋假 oracleMCP＋假模型，
 // 端到端驗證 ps-oracle-preflight-gate 在 opencode run（headless）路徑的行為。只給維護沙箱用。
 // 用法：node tests/oracle-gate/run-e2e.mjs [--repeat N] [--only <scenario>] [--keep]
-//   scenario：task-first | connect-first | compliant | stubborn | nodb | observe | mcp-down | multi-turn | epoch
+//   scenario：task-first | connect-first | compliant | stubborn | nodb | observe | mcp-down | multi-turn | multi-turn-serve |
+//             compaction-serve | shared-switch | connect-fail | mcp-failed | subtask-command
+//   shared-switch：前置完成後由假模型改寫 connection-state.json（模擬另一行程 connect 到別的名字），驗證 READY 作廢、只需再 connect
+//   connect-fail：假 oracleMCP 的 connect 一律失敗（isError），驗證 list 成功後 connect 失敗兩次閘門退讓（只擋順序不擋可用性）
+//   mcp-failed：oracleMCP 指令不存在（/mcp 狀態 failed），驗證退讓
+//   subtask-command：command 的 agent 是 subagent（OpenCode 走 handleSubtask，callID 是 prt_），驗證閘門退讓而不是殺掉整個 prompt
 //   multi-turn：同一 session 兩個 turn（第二 turn 用 opencode run --session <id>＝新行程），驗證每 turn 都有 chat.message、turnId 不同、各自重做前置
 //   multi-turn-serve：opencode serve 同一行程內對同一 session 連送兩題（HTTP API），驗證 READY 的 session 真的被第二則訊息重置
 //   compaction-serve：同上，但兩題之間做一次 session.summarize（compaction）——插入的 user 訊息只有 compaction part、不觸發 chat.message，
 //                     驗證「真實題目 id ↔ chat.message turnId」的比對不受影響
-//   epoch：前置完成後由假模型改寫 connection-epoch.json（模擬另一個行程 connect），驗證 READY 過期被擋、重做前置後放行
 // 每個情境：建臨時專案（複製 .opencode＋AGENTS.md）、寫 opencode.json、跑 opencode run --agent ps-orchestrator、
 //   讀閘門 jsonl、opencode export 取正式 transcript 交叉比對、斷言。
 import fs from "node:fs"
@@ -36,7 +40,10 @@ const SCENARIOS = {
   "multi-turn": { model: "task-first", mode: "enforce", mcp: true, turns: 2 },
   "multi-turn-serve": { model: "task-first", mode: "enforce", mcp: true, serve: 2 },
   "compaction-serve": { model: "task-first", mode: "enforce", mcp: true, serve: 2, summarize: true },
-  epoch: { model: "epoch", mode: "enforce", mcp: true },
+  "shared-switch": { model: "shared-switch", mode: "enforce", mcp: true },
+  "connect-fail": { model: "connect-fail", mode: "enforce", mcp: true, connectFail: true },
+  "mcp-failed": { model: "task-first", mode: "enforce", mcp: true, mcpBroken: true },
+  "subtask-command": { model: "task-first", mode: "enforce", mcp: true, command: "gate-subtask" },
 }
 
 function copyDir(src, dst) {
@@ -69,14 +76,18 @@ function makeProject(base, sc, name) {
     mcp: {
       oracleMCP: {
         type: "local",
-        command: ["node", path.join(here, "mock-oracle-mcp.mjs")],
+        command: sc.mcpBroken ? ["node", path.join(here, "does-not-exist.mjs")] : ["node", path.join(here, "mock-oracle-mcp.mjs")],
         enabled: sc.mcp,
-        environment: { MOCK_ORACLE_LOG: mcpLog },
+        environment: { MOCK_ORACLE_LOG: mcpLog, ...(sc.connectFail ? { MOCK_ORACLE_CONNECT_FAIL: "1" } : {}) },
       },
     },
     permission: { doom_loop: "allow", external_directory: "allow" },
   }
   fs.writeFileSync(path.join(project, "opencode.json"), JSON.stringify(config, null, 2))
+  if (sc.command) {
+    // command 的 agent 是 subagent → OpenCode 走 handleSubtask（prompt 迴圈直接派，不經模型）
+    fs.writeFileSync(path.join(project, ".opencode", "command", sc.command + ".md"), "---\ndescription: e2e subtask command\nagent: ps-ui-flow\n---\n請依契約回 JSON：查 MIL_STATUS 的選項（$ARGUMENTS）\n")
+  }
   return { project, mcpLog }
 }
 
@@ -187,7 +198,7 @@ async function runScenario(name, sc, base, iteration) {
     PWD: project,
   }
   const modelLog = path.join(base, tag, "model.jsonl")
-  process.env.MOCK_EPOCH_FILE = path.join(project, "auto-loop-logs", "ps-oracle-gate", "connection-epoch.json")
+  process.env.MOCK_STATE_FILE = path.join(project, "auto-loop-logs", "ps-oracle-gate", "connection-state.json")
   const model = await startModel(sc.model, modelLog)
   let result, exported = null, sessionID = ""
   try {
@@ -196,7 +207,9 @@ async function runScenario(name, sc, base, iteration) {
       result = sv.result
       sessionID = sv.sessionID
     } else {
-    result = runOpencode(project, env, ["run", "--print-logs", "--log-level", "INFO", "--agent", "ps-orchestrator", "--model", "mock/scripted", "--format", "json", "--title", "gate-e2e-" + tag, "兵役狀態欄位有哪些選項？"])
+    result = runOpencode(project, env, sc.command
+      ? ["run", "--print-logs", "--log-level", "INFO", "--command", sc.command, "--model", "mock/scripted", "--format", "json", "--title", "gate-e2e-" + tag, "兵役狀態"]
+      : ["run", "--print-logs", "--log-level", "INFO", "--agent", "ps-orchestrator", "--model", "mock/scripted", "--format", "json", "--title", "gate-e2e-" + tag, "兵役狀態欄位有哪些選項？"])
     fs.writeFileSync(path.join(base, tag, "run.stdout.txt"), result.stdout)
     fs.writeFileSync(path.join(base, tag, "run.stderr.txt"), result.stderr)
     const events = result.stdout.split("\n").filter((l) => l.trim().startsWith("{")).map((l) => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
@@ -309,14 +322,37 @@ async function runScenario(name, sc, base, iteration) {
       assertEq(taskParts.map((p) => p.state?.status), ["error", "completed", "error", "completed"], "task parts across turns", failures)
       break
     }
-    case "epoch": {
-      // 前置完成（READY）後另一個行程改動共用連線 → task 被擋（stale）→ 重做 list→connect → 放行
+    case "shared-switch": {
+      // 前置完成（READY）後另一個行程把共用連線切到別的名字 → task 被擋（stale，退回 NEED_CONNECT、不計 blocked）→ 只再 connect → 放行
       assertEq(blocks.length, 1, "blocks", failures)
-      assertOk(blocks[0]?.state === "NEED_LIST" && /shared connection changed since preflight/.test(blocks[0]?.note ?? ""), "block is the stale-epoch kind; got " + JSON.stringify(blocks.map((b) => b.note)), failures)
-      assertOk(errParts.length === 1 && /共用的 Oracle 連線已被改動過/.test(errParts[0].state.error), "model saw the stale-epoch explanation", failures)
-      assertEq(stateSeq, ["list_connections:NEED_LIST->NEED_CONNECT", "connect:NEED_CONNECT->READY", "list_connections:NEED_LIST->NEED_CONNECT", "connect:NEED_CONNECT->READY"], "state sequence", failures)
+      assertOk(blocks[0]?.state === "NEED_CONNECT" && blocks[0]?.blocked === 0 && blocks[0]?.staleBlocks === 1 && /shared connection changed since preflight \(now "OTHER_DB", expected "HR_DEV"; oracleMCP_connect by session ses_other pid 0\)/.test(blocks[0]?.note ?? ""), "block is the stale kind with source; got " + JSON.stringify(blocks.map((b) => [b.state, b.blocked, b.staleBlocks, b.note])), failures)
+      assertOk(errParts.length === 1 && /共用的 Oracle 連線已被改動過/.test(errParts[0].state.error) && /目前是「OTHER_DB」/.test(errParts[0].state.error) && /不必重做 list/.test(errParts[0].state.error), "model saw the stale explanation with source and next step", failures)
+      assertEq(stateSeq, ["list_connections:NEED_LIST->NEED_CONNECT", "connect:NEED_CONNECT->READY", "connect:NEED_CONNECT->READY"], "state sequence", failures)
       assertEq(executed.length, 1, "executed task", failures)
-      assertEq(mcpSeq, ["list_connections", "connect", "list_connections", "connect", "run_sql"], "mcp call order", failures)
+      assertEq(mcpSeq, ["list_connections", "connect", "connect", "run_sql"], "mcp call order", failures)
+      break
+    }
+    case "connect-fail": {
+      // list 成功、connect 失敗兩次（isError，after 不觸發）→ 第三次 task 退讓放行 → subagent 回 NOT_CONNECTED
+      assertEq(blocks.map((b) => b.state), ["NEED_LIST", "NEED_CONNECT"], "blocks", failures)
+      assertOk(allows.length === 1 && /gate stands down: connect failed x2 after list_connections/.test(allows[0].note ?? ""), "stand-down note; got " + JSON.stringify(allows.map((a) => a.note)), failures)
+      assertOk(executed.length === 1 && executed[0].notConnected === true, "executed once and subagent reported NOT_CONNECTED", failures)
+      assertEq(mcpSeq, ["list_connections", "connect", "connect", "run_sql"], "mcp call order", failures)
+      assertEq(taskParts.map((p) => p.state?.status), ["error", "error", "completed"], "task parts", failures)
+      assertOk(gate.filter((g) => g.hook === "after" && g.tool === "oracleMCP_connect" && g.viaEvent === true && g.failureMatch === "isError").length === 2, "event hook recorded both isError connects", failures)
+      break
+    }
+    case "mcp-failed":
+      assertEq(blocks.length, 0, "blocks", failures)
+      assertOk(allows.length >= 1 && /gate stands down: mcp-status:failed/.test(allows[0].note ?? ""), "stands down on failed status; got " + JSON.stringify(allows.map((a) => a.note)), failures)
+      break
+    case "subtask-command": {
+      // handleSubtask 路徑：before hook 的 callID 是 prt_…；閘門退讓、prompt 不被殺掉（exit 0）、subtask 執行
+      assertOk(result.status === 0, "exit 0 (a throw here would kill the prompt)", failures)
+      // 第一件 task 是 OpenCode 直接派的 subtask（prt_）；之後主迴圈的假模型還會照劇本再派（那些走一般路徑，被擋→前置→放行）
+      assertOk(before.length >= 1 && /^prt_/.test(before[0].callID ?? "") && before[0].decision === "allow" && /command-driven subtask/.test(before[0].note ?? ""), "first task is the prt_ subtask and stands down; got " + JSON.stringify(before.map((b) => [b.callID, b.decision, b.note])), failures)
+      assertEq(before.filter((b) => /^prt_/.test(b.callID ?? "")).length, 1, "exactly one prt_ task", failures)
+      assertOk(executed.length >= 1 && executed[0].admitted === "allow" && /^prt_/.test(executed[0].callID ?? ""), "subtask executed with admission snapshot", failures)
       break
     }
   }
