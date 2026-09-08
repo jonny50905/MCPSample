@@ -3,15 +3,18 @@
 // 環境變數：
 //   MOCK_MODEL_PORT       監聽埠（預設 18081）
 //   MOCK_MODEL_SCENARIO   主 agent 劇本：
-//     task-first     （預設）先 task → 被擋 → list → connect → task → 收尾（模擬「常見錯序」）
+//     task-first     （預設）先 task → 被擋 → list → connect → task → 收尾（模擬「常見錯序」）；
+//                    被擋的原因是 oracleMCP 未掛載（ORACLE_MCP_DOWN）→ 不重試、直接回報 ORACLE_MCP_DOWN
 //     connect-first  先 connect（跳過 list）→ task → 被擋 → list → connect → task → 收尾
 //     compliant      list → connect → task → 收尾（第 0 步照做）
 //     stubborn       只會一直 task（不做前置），連續 4 次後放棄作答（驗證閘門不放行）
 //     nodb           直接派 ps-peoplecode-flow（不查 DB 的 subagent）→ 收尾（驗證不受閘門影響）
-//     connect-fail   task → 被擋 → list → connect（失敗）→ task → 被擋 → connect（失敗）→ task → 被擋 → 依第 0 步規則放棄 DB 委派、
-//                    回報「DB 連線建立失敗」（驗證閘門沒有「失敗幾次就放行」）
+//     connect-fail   task → 被擋 → list → connect（失敗／空輸出）→ task → 被擋 → connect → task → 被擋 → 依第 0 步規則放棄 DB 委派、
+//                    回報「DB 連線建立失敗」（驗證閘門沒有「失敗幾次就放行」、空輸出不算成功）
+//     stale-probe    第一題：list → connect（慢）→ …；第二題（在第一題的 connect 完成前送進來）：list → task → 被擋 → connect → task
+//                    （驗證上一題晚到的 connect 回覆不會替新題完成前置）
 //   劇本以「最後一則 user 訊息之後」的工具呼叫為準（同 session 多 turn 時每 turn 重新走劇本）
-//   MOCK_MODEL_LOG        每次請求追加一行 JSON
+//   MOCK_MODEL_LOG        每次請求追加一行 JSON（含該次請求可見的 task／oracleMCP_ 工具名——驗 subagent 的 Oracle 允許清單）
 import http from "node:http"
 import fs from "node:fs"
 
@@ -34,12 +37,13 @@ function toolNames(body) {
   return new Set((body.tools ?? []).map((t) => t?.function?.name).filter(Boolean))
 }
 
-// 把對話壓成「最後一則 user 訊息之後已發生的工具呼叫序列」：[{name, args, result}]
+// 把對話壓成「最後一則 user 訊息之後已發生的工具呼叫序列」：[{name, args, result}]；並數 user 訊息（＝第幾題）
 function history(body) {
   let calls = []
+  let users = 0
   const byId = new Map()
   for (const m of body.messages ?? []) {
-    if (m.role === "user") { calls = []; continue }
+    if (m.role === "user") { calls = []; users += 1; continue }
     if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
       for (const tc of m.tool_calls) {
         let args = {}
@@ -54,7 +58,7 @@ function history(body) {
       if (e) e.result = contentText(m.content)
     }
   }
-  return calls
+  return { calls, users }
 }
 
 function pickConnection(listResult) {
@@ -72,11 +76,12 @@ function lastListResult(calls) {
 }
 
 // 主 agent 劇本：回傳下一個工具呼叫，或 {text} 收尾
-function primaryNext(calls) {
+function primaryNext(calls, users) {
   const n = calls.length
   const last = calls[n - 1]
   const taskDone = calls.filter((c) => c.name === "task" && /task_result/.test(c.result) && !/PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
   if (taskDone >= 1) return { text: "DONE: " + JSON.stringify({ scenario, calls: calls.map((c) => c.name) }) }
+  const blockedByDown = last && last.name === "task" && /ORACLE_MCP_DOWN/.test(last.result) && /PS_ORACLE_PREFLIGHT_REQUIRED/.test(last.result)
   switch (scenario) {
     case "compliant": {
       if (n === 0) return LIST
@@ -102,15 +107,27 @@ function primaryNext(calls) {
     case "connect-fail": {
       if (n === 0) return TASK("ps-ui-flow")
       const blockedTasks = calls.filter((c) => c.name === "task" && /PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
-      if (blockedTasks >= 3) return { text: "DB 連線建立失敗（ORA-12541: TNS:no listener）：本題不派 DB 委派，其餘部分照常作答。" + JSON.stringify(calls.map((c) => c.name)) }
+      if (blockedTasks >= 3) return { text: "DB 連線建立失敗（connect 沒有成功）：本題不派 DB 委派，其餘部分照常作答。" + JSON.stringify(calls.map((c) => c.name)) }
       const listed = calls.some((c) => c.name === "oracleMCP_list_connections")
       if (last.name === "task") return listed ? CONNECT(pickConnection(lastListResult(calls))) : LIST
       if (last.name === "oracleMCP_list_connections") return CONNECT(pickConnection(last.result))
       return TASK("ps-ui-flow")
     }
+    case "stale-probe": {
+      if (users <= 1) {
+        if (n === 0) return LIST
+        if (n === 1) return CONNECT(pickConnection(calls[0].result))
+        return TASK("ps-ui-flow")
+      }
+      if (n === 0) return LIST
+      if (n === 1) return TASK("ps-ui-flow")
+      if (last.name === "task") return CONNECT(pickConnection(lastListResult(calls)))
+      return TASK("ps-ui-flow")
+    }
     case "task-first":
     default: {
       if (n === 0) return TASK("ps-ui-flow")
+      if (blockedByDown) return { text: "ORACLE_MCP_DOWN：oracleMCP 未掛載，本題需要 DB 的部分無法回答；不重試。" + JSON.stringify(calls.map((c) => c.name)) }
       if (last.name === "task") return LIST
       if (last.name === "oracleMCP_list_connections") return CONNECT(pickConnection(last.result))
       if (last.name === "oracleMCP_connect") return TASK("ps-ui-flow")
@@ -158,13 +175,13 @@ const server = http.createServer((req, res) => {
     let body = {}
     try { body = JSON.parse(raw || "{}") } catch {}
     const tools = toolNames(body)
-    const calls = history(body)
+    const { calls, users } = history(body)
     const system = contentText((body.messages ?? []).find((m) => m.role === "system")?.content ?? "")
     let next
-    if (tools.has("task")) next = primaryNext(calls)
+    if (tools.has("task")) next = primaryNext(calls, users)
     else if (tools.size > 0) next = subagentNext(calls, tools)
     else next = { text: /title/i.test(system) ? "mock title" : "ok" }
-    log({ url: req.url, stream: body.stream, tools: [...tools].filter((t) => /^(task|oracleMCP_)/.test(t)), calls: calls.map((c) => c.name), next: next.name ?? "text" })
+    log({ url: req.url, stream: body.stream, users, tools: [...tools].filter((t) => /^(task|oracleMCP_)/.test(t)), calls: calls.map((c) => c.name), next: next.name ?? "text" })
     if (body.stream === false) {
       res.writeHead(200, { "Content-Type": "application/json" })
       const message = next.text !== undefined

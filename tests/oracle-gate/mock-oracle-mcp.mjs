@@ -1,13 +1,17 @@
 // mock-oracle-mcp.mjs — 假 SQLcl MCP server（stdio、JSON-RPC 2.0；只給沙箱端到端測試用）
 // 工具名與真 oracleMCP 相同：list_connections／connect／run_sql／disconnect。
 // 環境變數：
-//   MOCK_ORACLE_LOG            每次 tools/call 追加一行 JSON（供交叉比對）
-//   MOCK_ORACLE_CONNECT_FAIL   =1 → connect 回 isError（模擬連不上）
-//   MOCK_ORACLE_CONNECTIONS    逗號分隔的已儲存連線名（預設 HR_DEV,HR_UAT）
+//   MOCK_ORACLE_LOG                    每次 tools/call 追加一行 JSON（供交叉比對；在呼叫「開始」時寫）
+//   MOCK_ORACLE_CONNECT_FAIL           =1 → connect 回 isError（模擬連不上）
+//   MOCK_ORACLE_EMPTY_CONNECT          =1 → connect 成功但回空 content（模擬「成功卻沒有文字」——閘門應判未知、不前進）
+//   MOCK_ORACLE_CONNECT_DELAY_FIRST_MS 第一次 connect 延遲 N 毫秒才回（模擬慢連線，讓下一題在它完成前送進來）
+//   MOCK_ORACLE_CONNECTIONS            逗號分隔的已儲存連線名（預設 HR_DEV,HR_UAT）
 import fs from "node:fs"
 
 const names = String(process.env.MOCK_ORACLE_CONNECTIONS ?? "HR_DEV,HR_UAT").split(",").map((s) => s.trim()).filter(Boolean)
+const delayFirst = Number(process.env.MOCK_ORACLE_CONNECT_DELAY_FIRST_MS ?? 0)
 let connected = null
+let connectCalls = 0
 let buffer = ""
 
 function log(entry) {
@@ -31,17 +35,22 @@ function text(t, isError) {
   return isError ? { content: [{ type: "text", text: t }], isError: true } : { content: [{ type: "text", text: t }] }
 }
 
-function call(name, args) {
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function call(name, args) {
   log({ tool: name, args, connectedBefore: connected })
   switch (name) {
     case "list_connections":
       return text(names.length ? "Saved connections:\n" + names.map((n) => "- " + n).join("\n") : "No saved connections")
     case "connect": {
+      connectCalls += 1
+      if (connectCalls === 1 && delayFirst > 0) await wait(delayFirst)
       const n = String(args?.connection_name ?? "")
       if (process.env.MOCK_ORACLE_CONNECT_FAIL === "1") return text("ORA-12541: TNS:no listener", true)
       if (!names.includes(n)) return text("Error: connection " + n + " not found", true)
       const already = connected === n
       connected = n
+      if (process.env.MOCK_ORACLE_EMPTY_CONNECT === "1") return { content: [] }
       return text(already ? "Already connected to " + n : "Successfully connected to " + n)
     }
     case "run_sql":
@@ -58,14 +67,14 @@ function call(name, args) {
 function handle(msg) {
   const { id, method, params } = msg
   if (method === "initialize") {
-    return send({ jsonrpc: "2.0", id, result: { protocolVersion: params?.protocolVersion ?? "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "mock-oracle-mcp", version: "0.0.1" } } })
+    return send({ jsonrpc: "2.0", id, result: { protocolVersion: params?.protocolVersion ?? "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "mock-oracle-mcp", version: "0.0.2" } } })
   }
   if (method === "notifications/initialized" || method === "notifications/cancelled") return
   if (method === "ping") return send({ jsonrpc: "2.0", id, result: {} })
   if (method === "tools/list") return send({ jsonrpc: "2.0", id, result: { tools } })
   if (method === "tools/call") {
-    const result = call(params?.name, params?.arguments ?? {})
-    return send({ jsonrpc: "2.0", id, result })
+    call(params?.name, params?.arguments ?? {}).then((result) => send({ jsonrpc: "2.0", id, result }))
+    return
   }
   if (id !== undefined) send({ jsonrpc: "2.0", id, error: { code: -32601, message: "Method not found: " + method } })
 }

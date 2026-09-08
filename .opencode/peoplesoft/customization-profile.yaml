@@ -79,8 +79,8 @@ oracle:
   # ALTER SESSION SET CURRENT_SCHEMA=<此值>（唯一准許的非 SELECT）。
   # 值為 FILL_ME 則跳過該步。
   currentSchema: FILL_ME
-  # 主 agent 開場 list_connections → connect 時要挑的連線名：有填且在清單裡就用它，
-  # FILL_ME 或不在清單裡則用清單第一個。
+  # 主 agent 開場 list_connections → connect 時要連的連線名（必須是 SQLcl 已儲存連線名之一）。
+  # FILL_ME／未填／不在清單裡 → 主 agent 不 connect、不挑清單第一個，回報「Oracle 連線未設定」——請回填。
   connectionName: FILL_ME
   # 執行期閘門（.opencode/plugin/ps-oracle-preflight-gate.js）的模式：
   # enforce＝前置（list_connections → connect 成功）未完成就不准派會查 DB 的 subagent；

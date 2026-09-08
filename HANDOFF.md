@@ -73,6 +73,15 @@ subagent；唯一例外＝目標沒有 Oracle 能力；oracleMCP 未掛載（即
 （未掛載期間放行的 DB task 照算違反，另標 standDowns）；SOP-12 舊敘述改現況；fs-doctor `-Force`。不移植：connection-state／epoch
 （先做 SOP-21 步驟 9 的 topology 實驗 T1～T3 再設計）、event hook「already connected」（R16 驗完再定）、ps-auditor 拆能力（另案）。
 驗證：單元 10 組、e2e 12 情境（真 OpenCode 1.18.29）、test-auto-loop 情境 32／33 全 PASS。細節 L115 追記、`docs/design/oracle-preflight-gate-decision-memo.md` §四。
+**再追記（2026-09-08，外部 review 第二輪，對 d544ec3）**：review 以 hook-level 測試重現兩個時序缺口——上一題晚到的 connect 成功會替下一題
+完成前置、上一題晚到的 NOT_CONNECTED 會作廢下一題已完成的前置；另指出 subagent 的 Oracle 權限是排除清單、analyzer 用 basis 字串篩能力會漏
+unknown-agent 且零違規≠可用、MCP 未掛載退讓與不變量敘述矛盾、空輸出被當成功、「否則清單第一個」是靜默連錯 DB 的來源。第一批修法（不改核心
+不變量）全部落地：plugin 入場快照＋callID 配對（after 用入場題目；stale／unknown 不前進；await 期間換題→擋；成功判定三態）、每列 dbCapable、
+**oracleMCP 未掛載改為擋**（訊息走 ORACLE_MCP_DOWN 協定，不再有環境層退讓）、四個 DB subagent 的 Oracle 工具改允許清單（只開 run_sql）、
+profile `oracle.connectionName` 必填且必須在清單裡（否則回「Oracle 連線未設定」，不挑清單第一個）、analyzer 加 callMismatch（before／after／export
+parentID 歸屬）與安全／可用兩條驗收（-ExpectDbTask）。驗證：單元 14 組、e2e 14 情境（真 OpenCode 1.18.29；新增 empty-connect、stale-connect-serve）、
+analyzer 對 14 份真 export 判定一致、test-auto-loop 262 判定全 PASS。第二批（連線生命週期改版：題目狀態／資源狀態分離、連線世代、owner、
+DUAL 探測、集中復原、真 SQLcl repeated-connect 契約）另案。細節 L115 追記、memo §五。搬運見 §1 步驟 1b（**886d6e2 那批已搬的檔要整批重搬**）。
 
 ## 1. 管理者下一步（按序）
 
@@ -119,26 +128,36 @@ subagent；唯一例外＝目標沒有 Oracle 能力；oracleMCP 未掛載（即
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；fs-doctor 應報 56 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
    `.gitignore`、`HANDOFF.md`、`README.md` 不在搬運集合。
-1b. issue #29 執行期閘門（2026-09-08；1／1a 尚未搬的一起搬，manifest 只搬最新）：
+1b. issue #29 執行期閘門（2026-09-08；1／1a 尚未搬的一起搬，manifest 只搬最新。**已依 886d6e2 或 d544ec3 搬過的檔要整批重搬**——閘門、
+    analyzer、agent 檔都改了）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；最小不變量版：turnId／入場快照／mcp 狀態即時查） | 438 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；review 第二輪後：入場快照／callID 配對／stale／三態／未掛載也擋） | 541 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
    | `.opencode/.npmrc` | 新增 | 4 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時）；啟動仍多等 70 秒才在全域設定目錄再放一份（SOP-21 步驟 1） |
-   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce） | 106 | 本機已回填 FILL_ME 者只加 `preflightGate` 那 5 行（fs-doctor 報此檔 M 屬預期） |
-   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 追記＋舊敘述改現況＋SOP-21 部署／驗證／topology 實驗） | 737 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115＋退版重寫追記） | 3141 | |
-   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R16） | 688 | |
-   | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 32＋情境 33） | 785 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
-   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析；四項判定無豁免） | 331 | 存 UTF-8 with BOM；用法見 SOP-21 |
-   | `scripts/ps-fs-doctor.ps1` | 修改（Get-TransferFiles 加 -Force、排除 OpenCode 安裝痕跡） | 312 | 存 UTF-8 with BOM；先搬它再重生對照才看得到 .npmrc |
-   | `scripts/ps-transfer-manifest.json` | 修改 | 359 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD aa9e42c，早一步屬預期） |
-   | `AGENTS.md` | 修改（第 0 步先於「先查 wiki」；plugin 零相依鐵律） | 91 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce；connectionName 註解改「必填且在清單裡」） | 106 | 本機已回填 FILL_ME 者只合併 oracle 區塊的註解與 `preflightGate`（fs-doctor 報此檔 M 屬預期）；**connectionName 必須是 SQLcl 已儲存連線名之一**，否則主 agent 會回「Oracle 連線未設定」 |
+   | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 允許清單：`"oracleMCP_*": false` → `"oracleMCP_run_sql": true`） | 141 | |
+   | `.opencode/agent/ps-metadata-flow.md` | 修改（同上） | 109 | |
+   | `.opencode/agent/ps-ae-flow.md` | 修改（同上） | 91 | |
+   | `.opencode/agent/ps-auditor.md` | 修改（同上） | 259 | |
+   | `.opencode/agent/ps-orchestrator.md` | 修改（第 0 步：connectionName 缺值／不在清單 → 回「Oracle 連線未設定」，不挑清單第一個） | 188 | |
+   | `.opencode/agent/ps-deep-research.md` | 修改（同上） | 519 | |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（同上） | 153 | |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（主 agent 段第 2 步：CONNECTION_NOT_CONFIGURED，不挑清單第一個） | 638 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 再追記＋SOP-21 整段：配對／三態／未掛載也擋／R17 R18／已知限制改寫／topology 實驗） | 770 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115＋退版重寫追記＋review 第二輪追記） | 3170 | |
+   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R18：R10／R11／R12／R16 改寫，新增 R17 工具可見性、R18 連線名設定錯誤） | 690 | |
+   | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | 上一批已搬者不必重搬 |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 31 允許清單／不挑清單第一個＋情境 32 新欄位與無退讓＋情境 33 unknown-agent／callMismatch／export parentID／可用） | 821 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
+   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析；安全五項＋可用判定；-ExpectDbTask） | 400 | 存 UTF-8 with BOM；用法見 SOP-21 |
+   | `scripts/ps-fs-doctor.ps1` | 修改（Get-TransferFiles 加 -Force、排除 OpenCode 安裝痕跡） | 312 | 存 UTF-8 with BOM；上一批已搬者不必重搬 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD d544ec3，早一步屬預期） |
+   | `AGENTS.md` | 修改（第 0 步先於「先查 wiki」；plugin 零相依鐵律；未掛載也擋） | 92 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
 
    `tests/oracle-gate/*`（沙箱單元／e2e 測試組）與 `docs/design/oracle-preflight-gate-decision-memo.md` 不搬。
-   搬完照 SOP-21 步驟 2～5 驗：`_plugin.log` 有 loaded → 快篩（一題＋同視窗第二題，看 R16）→ 同一視窗互動 20 題後 `-AnalyzeAll`
-   （四項判定無豁免，oracleMCP 掛載中）→ B1／B2／B3 各 30 次；再做步驟 9 的 topology 實驗 T1～T3（R15），結果回報維護 session。
+   搬完照 SOP-21 步驟 2～5 驗：`_plugin.log` 有 loaded → 快篩（一題＋同視窗第二題；看 R16 已連線再 connect、R17 工具可見性、
+   R18 連線名設定錯誤）→ 同一視窗互動 20 題後 `-AnalyzeAll`（安全五項無豁免，oracleMCP 掛載中）→ B1／B2／B3 各 30 次
+   （B1 另判每 session ≥1 個 DB task 完成）；再做步驟 9 的 topology 實驗 T1～T3（R15），結果回報維護 session。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log

@@ -20,7 +20,8 @@
    主 agent 收到訊息的**第 0 步**（查 wiki、委派、作答之前）固定
    `oracleMCP_list_connections` → `oracleMCP_connect`（無條件，見 agent 定義）；
    執行期由 `.opencode/plugin/ps-oracle-preflight-gate.js` 強制：前置未完成就
-   委派會查 DB 的 subagent，該 task 會被擋下並回 `PS_ORACLE_PREFLIGHT_REQUIRED`。
+   委派會查 DB 的 subagent，該 task 會被擋下並回 `PS_ORACLE_PREFLIGHT_REQUIRED`
+   （oracleMCP 未掛載也擋，訊息改走 ORACLE_MCP_DOWN 協定）。
    第 0 步之後，問答一律**先查 `docs/ps-research/wiki/`**（已歸戶的已驗證知識），
    wiki 沒有或未驗證才現場檢索。
 2. 搜尋任何 PeopleSoft 物件前，先讀

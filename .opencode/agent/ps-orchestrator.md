@@ -38,8 +38,10 @@ tools:
 
 收到使用者訊息後，在查 wiki、委派、作答之前，先做這兩個工具呼叫：
 1. `oracleMCP_list_connections` → 取得 SQLcl 已儲存連線名清單（不要自己編名字）。
-2. `oracleMCP_connect`（connection_name＝清單裡的名字：profile `oracle.connectionName` 有填且在清單裡就用它，
-   否則用清單第一個）。清單為空 → 本題不派 DB 委派，答覆寫「SQLcl 沒有已儲存連線（list_connections 回空）」。
+2. `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。profile 未填／FILL_ME／
+   不在清單裡 → **不 connect、不猜、不挑清單第一個**，本題不派 DB 委派，答覆寫「Oracle 連線未設定（profile
+   oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」。清單為空 → 本題不派 DB 委派，答覆寫「SQLcl 沒有已儲存連線
+   （list_connections 回空）」。
 
 **不判斷這題要不要查 DB、不等到要委派才做、不問使用者、不因為上一題已連過就省略、不跳過 list 直接 connect**
 （回「已連線」也算成功）。唯一可跳過的情況：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 答覆末尾註明）。

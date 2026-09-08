@@ -1,24 +1,33 @@
 // ps-oracle-preflight-gate.js — Oracle 連線前置（第 0 步）的確定性閘門（OpenCode plugin）
 //
-// 不變量（與主 agent 第 0 步一致；每一則真實使用者訊息各自成立）：
+// 不變量（與主 agent 第 0 步一致；每一則真實使用者訊息各自成立；沒有環境層退讓）：
 //   NEED_LIST ─ list_connections 成功 ─▶ NEED_CONNECT ─ connect 成功 ─▶ READY ─▶ 才准執行「會查 DB 的 subagent」委派（task）
 // 未 READY 就派會查 DB 的 subagent → 該 task 在執行前被擋（throw），模型收到 PS_ORACLE_PREFLIGHT_REQUIRED 與下一步指示，
 // 做完前置再用相同參數重派。模型選錯順序不會變成錯誤的執行。閘門只擋、不改參數、不代模型 connect。
 //
 // 唯一的例外：目標 subagent 確定沒有 Oracle 能力（.opencode/agent/*.md 的 tools 表對 oracleMCP_run_sql 最後匹配為 false；
 //   OpenCode 規則：最後匹配者優先、沒列＝預設開）→ 不需要 READY。判定依據是「能力」不是任務意圖：ps-auditor 即使做純 chunk
-//   任務也要過閘門；不在 agent 目錄的名字一律視為會查 DB（保守）。
-// 環境層的退讓：oracleMCP 未掛載（/mcp 狀態非 connected；每次即時查、不快取）＝整個環境沒有 Oracle 能力（主 agent 沒有
-//   list／connect 可呼叫、subagent 沒有 run_sql），閘門退讓並記錄，交 subagent 的 ORACLE_MCP_DOWN 協定；狀態查不到 → 保守仍擋。
+//   任務也要過閘門；不在 agent 目錄的名字一律視為會查 DB（保守）。每一列都寫 dbCapable（true／false），analyzer 用它、不用說明字串。
+// oracleMCP 未掛載（/mcp 狀態非 connected；每次即時查、不快取）：一樣擋，只是錯誤訊息改為 ORACLE_MCP_DOWN 協定——不得委派
+//   會查 DB 的 subagent，DB 部分如實回報、非 DB 部分改派沒有 Oracle 能力的 subagent。狀態查不到 → 一樣擋。
 // 沒有其他退讓：connect／list 一直失敗仍擋（第 0 步規則：本題不派 DB 委派、其餘照常作答）；不跨 session、不跨行程協調
 //   （共用連線的防護待 topology 實驗定案後另案設計，見 SOP-21）。
+//
+// 呼叫配對（會影響狀態的呼叫都在 before 留入場快照，after 依 session:callID 配對）：
+//   - list／connect／disconnect／task 的 before 記 (turn, turnId, state[, target, dbCapable, decision])；after 列用快照標題目，
+//     不用「現在」的題目。沒有入場快照的 after → attribution=unknown，不前進。
+//   - after 的回覆若屬於上一題（快照 turnId ≠ 目前 turnId）→ attribution=stale：不拿它滿足新題的前置（上一題晚到的
+//     connect 成功不算數），也不拿它作廢新題的狀態（上一題晚到的 NOT_CONNECTED 不把新題退回）。disconnect 例外：連線真的
+//     斷了，一律退回 NEED_LIST。
+//   - task 在 await（查 /mcp 狀態）期間題目換了 → 以「題目已換」擋下（保守），列上同時記入場題與決定時的題。
+// 成功判定三態：after 有文字且不命中失敗樣式＝成功（true）；命中或 isError＝失敗（false）；沒有文字（空輸出）＝未知
+//   （"unknown"）——失敗與未知都不前進。MCP isError 在 OpenCode 內會 throw、after 不觸發（＝失敗）。
 //
 // 狀態以 session 為單位：
 //   - 每則「真實」使用者訊息重置為 NEED_LIST（第 0 步「不因上一題已連過就省略」）；turnId＝該則 user 訊息 id（跨行程唯一）。
 //     全部 part 都是 synthetic 的訊息（背景 subagent 結果回灌、compaction 續行）與同一 id 重複到達不重置。
-//   - subagent 報告 blockedReason=NOT_CONNECTED → 退回 NEED_CONNECT（重派前必須再 connect 一次）。
+//   - subagent 報告 blockedReason=NOT_CONNECTED（同一題）→ 退回 NEED_CONNECT（重派前必須再 connect 一次）。
 //   - 本 session 呼叫 oracleMCP_disconnect → 退回 NEED_LIST。
-//   - task 入場（before）時快照 turn／turnId／state，after 列用快照（使用者在 task 執行中送下一題時該 task 不會被錯標到新題）。
 //
 // 模式：enforce（預設）＝擋；observe＝只記錄不擋（做 hook 覆蓋率探測時用）。
 //   環境變數 PS_ORACLE_GATE_MODE 優先，其次 customization-profile.yaml 的 oracle.preflightGate。
@@ -41,7 +50,7 @@ const ERROR_CODE = "PS_ORACLE_PREFLIGHT_REQUIRED"
 const LOG_SUBDIR = path.join("auto-loop-logs", "ps-oracle-gate")
 const PROFILE_REL = path.join(".opencode", "peoplesoft", "customization-profile.yaml")
 const AGENT_DIR_REL = path.join(".opencode", "agent")
-const ADMITTED_MAX = 500
+const CALLS_MAX = 2000
 
 // connect／list_connections 回傳文字若命中以下樣式，視為「未成功」（狀態不前進）。
 // 只列不可能出現在成功訊息裡的樣式；保守寬鬆——誤判成功的後果是既有的 NOT_CONNECTED 復原路徑，
@@ -138,14 +147,13 @@ function loadAgentCatalog(directory) {
   return catalog
 }
 
-function readMode(directory) {
-  const env = String(process.env.PS_ORACLE_GATE_MODE ?? "").trim().toLowerCase()
-  if (env === "enforce" || env === "observe") return env
+// profile 的 oracle: 區塊 → { key: value }（只需支援 `  key: value` 與 # 註解）
+function readProfileOracle(directory) {
+  const out = {}
   try {
     const text = fs.readFileSync(path.join(directory, PROFILE_REL), "utf8").replace(/^\uFEFF/, "")
-    const lines = text.split(/\r?\n/)
     let inOracle = false
-    for (const raw of lines) {
+    for (const raw of text.split(/\r?\n/)) {
       if (/^oracle:\s*(#.*)?$/.test(raw)) {
         inOracle = true
         continue
@@ -153,12 +161,20 @@ function readMode(directory) {
       if (!inOracle) continue
       if (raw.trim() === "" || raw.trim().startsWith("#")) continue
       if (!/^\s/.test(raw)) break
-      const m = raw.match(/^\s+preflightGate:\s*(enforce|observe)\b/i)
-      if (m) return m[1].toLowerCase()
+      const m = raw.match(/^\s+([A-Za-z_][A-Za-z0-9_]*):\s*([^#]*?)\s*(#.*)?$/)
+      if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, "")
     }
   } catch {
-    // 沒有 profile 或讀不到 → 預設 enforce
+    // 沒有 profile 或讀不到 → 空
   }
+  return out
+}
+
+function readMode(directory) {
+  const env = String(process.env.PS_ORACLE_GATE_MODE ?? "").trim().toLowerCase()
+  if (env === "enforce" || env === "observe") return env
+  const v = String(readProfileOracle(directory).preflightGate ?? "").toLowerCase()
+  if (v === "enforce" || v === "observe") return v
   return "enforce"
 }
 
@@ -182,21 +198,44 @@ function failureMatch(text) {
   return ""
 }
 
-function buildBlockMessage(target, state, blockedCount) {
+// 三態：true＝有文字且不命中失敗樣式；false＝isError 或命中失敗樣式；"unknown"＝沒有任何文字（不當成功）
+function classifyResult(output) {
+  const text = outputText(output)
+  if (output && typeof output === "object" && output.isError === true) return { ok: false, failureMatch: "isError", textLength: text.length }
+  if (!text.trim()) return { ok: "unknown", failureMatch: "", textLength: text.length }
+  const fail = failureMatch(text)
+  return { ok: !fail, failureMatch: fail, textLength: text.length }
+}
+
+function connectionNameOf(args) {
+  if (!args || typeof args !== "object") return undefined
+  for (const k of ["connection_name", "connectionName", "name", "connection"]) {
+    if (typeof args[k] === "string" && args[k].trim()) return args[k].trim()
+  }
+  return undefined
+}
+
+function connectRule(profileName) {
+  const shown = profileName && profileName !== "FILL_ME" ? `「${profileName}」` : "（目前是 FILL_ME／未填）"
+  return (
+    "connection_name＝profile oracle.connectionName 的值" + shown + "，它必須出現在 list_connections 回的清單裡；" +
+    "profile 未填、FILL_ME 或不在清單 → 不要 connect、本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，不要自己挑清單第一個"
+  )
+}
+
+function buildBlockMessage(target, state, blockedCount, profileName) {
   const lines = [
     `${ERROR_CODE}：本次 task 未執行（被 Oracle 連線前置閘門擋下，不是權限問題）。` +
       `原因：第 0 步尚未完成，不得委派會查 DB 的 subagent「${target}」。目前狀態＝${state}。`,
   ]
   if (state === "NEED_CONNECT") {
     lines.push(
-      "下一步：list_connections 已完成，只差 oracleMCP_connect 成功——呼叫 oracleMCP_connect" +
-        "（connection_name 取自清單：profile oracle.connectionName 有填且在清單裡就用它，否則清單第一個），" +
+      "下一步：list_connections 已完成，只差 oracleMCP_connect 成功——呼叫 oracleMCP_connect（" + connectRule(profileName) + "），" +
         "成功後再用相同參數重新呼叫本次 task。connect 與 task 要依序分開呼叫，不要同一步並行。",
     )
   } else {
     lines.push(
-      "下一步（依序）：1) oracleMCP_list_connections  2) oracleMCP_connect" +
-        "（connection_name 取自清單：profile oracle.connectionName 有填且在清單裡就用它，否則清單第一個）。" +
+      "下一步（依序）：1) oracleMCP_list_connections  2) oracleMCP_connect（" + connectRule(profileName) + "）。" +
         "兩者都成功後，再用相同參數重新呼叫本次 task。三個呼叫要依序分開，不要同一步並行。",
     )
   }
@@ -209,13 +248,23 @@ function buildBlockMessage(target, state, blockedCount) {
   return lines.join("\n")
 }
 
+function buildDownMessage(target, basis, alternatives) {
+  const alt = alternatives.length ? alternatives.join("／") : "（本專案沒有這種 subagent）"
+  return [
+    `${ERROR_CODE}：本次 task 未執行（被 Oracle 連線前置閘門擋下，不是權限問題）。` +
+      `原因：oracleMCP 未掛載（${basis}），本環境目前沒有 Oracle 能力，不得委派會查 DB 的 subagent「${target}」。`,
+    "下一步：不要重試本次 task、不要呼叫 list_connections／connect。依 ORACLE_MCP_DOWN 協定：本題需要 DB 的部分如實回報 " +
+      "ORACLE_MCP_DOWN（oracleMCP 未掛載），不要用猜的補；非 DB 的部分改派沒有 Oracle 能力的 subagent（" + alt + "）或照常作答。",
+  ].join("\n")
+}
+
 export const PsOraclePreflightGate = async (input) => {
   const directory = String(input?.directory ?? process.cwd())
   const client = input?.client
   const logDir = path.join(directory, LOG_SUBDIR)
   const sessions = new Map()
-  // task 入場時（before）的快照，after 列用它標 turn／state（鍵＝session:callID；OpenAI 相容端點的 call_0 這種 id 會跨 session 重複）
-  const admitted = new Map()
+  // 入場快照：鍵＝session:callID（OpenAI 相容端點的 call_0 這種 id 會跨 session 重複），值＝before 當下的題目／狀態／判定
+  const calls = new Map()
   let catalog = loadAgentCatalog(directory)
   let catalogLoaded = Date.now()
 
@@ -262,6 +311,22 @@ export const PsOraclePreflightGate = async (input) => {
     return `${sessionID}:${callID}`
   }
 
+  function putEntry(sessionID, callID, entry) {
+    if (!callID) return
+    const k = keyOf(sessionID, callID)
+    calls.delete(k)
+    calls.set(k, entry)
+    if (calls.size > CALLS_MAX) calls.delete(calls.keys().next().value)
+  }
+
+  function takeEntry(sessionID, callID) {
+    if (!callID) return undefined
+    const k = keyOf(sessionID, callID)
+    const e = calls.get(k)
+    if (e) calls.delete(k)
+    return e
+  }
+
   function stamp(s) {
     return { agent: s.agent, turn: s.turn, turnId: s.turnId }
   }
@@ -274,14 +339,22 @@ export const PsOraclePreflightGate = async (input) => {
     return catalog
   }
 
-  // 目標 subagent 是否會查 DB（要不要過閘門）
+  // 目標 subagent 是否會查 DB（要不要過閘門）；dbCapable 是機械欄位，basis 只是說明
   function classifyTarget(target) {
     const entry = catalogFresh().get(target)
     if (!entry) return { gated: true, basis: "unknown-agent(default:DB)" }
     return { gated: entry.db, basis: entry.db ? "run_sql:enabled" : "run_sql:disabled" }
   }
 
-  // 每次即時查、不快取：退讓是正確性判斷，不能用舊資料。查不到（例外或非 2xx）→ mounted=undefined＝保守擋
+  // 沒有 Oracle 能力的 subagent 名單（oracleMCP 未掛載時錯誤訊息用）
+  function nonDbSubagents() {
+    return [...catalogFresh().entries()]
+      .filter(([, v]) => v.mode === "subagent" && !v.db)
+      .map(([name]) => name)
+      .sort()
+  }
+
+  // 每次即時查、不快取：查不到（例外或非 2xx）→ mounted=undefined＝保守擋
   async function oracleMounted() {
     try {
       const res = await client.mcp.status()
@@ -340,7 +413,11 @@ export const PsOraclePreflightGate = async (input) => {
       if (tool !== TOOL_TASK) {
         if (tool.startsWith(MCP_PREFIX)) {
           const s = getSession(sessionID)
-          record(sessionID, { hook: "before", tool, callID, ...stamp(s), state: s.state, decision: "observe" })
+          if (tool === TOOL_LIST || tool === TOOL_CONNECT || tool === TOOL_DISCONNECT) {
+            putEntry(sessionID, callID, { tool, turn: s.turn, turnId: s.turnId, state: s.state })
+          }
+          const conn = tool === TOOL_CONNECT ? connectionNameOf(args) : undefined
+          record(sessionID, { hook: "before", tool, callID, ...stamp(s), state: s.state, decision: "observe", connection: conn })
         }
         return
       }
@@ -348,11 +425,10 @@ export const PsOraclePreflightGate = async (input) => {
       const s = getSession(sessionID)
       const mode = readMode(directory)
       const cls = classifyTarget(target)
-      const base = { hook: "before", tool, callID, ...stamp(s), target, state: s.state, mode, basis: cls.basis }
-      const admit = (decision) => {
-        if (callID) admitted.set(keyOf(sessionID, callID), { turn: s.turn, turnId: s.turnId, state: s.state, decision })
-        if (admitted.size > ADMITTED_MAX) admitted.delete(admitted.keys().next().value)
-      }
+      const entryTurn = { turn: s.turn, turnId: s.turnId }
+      const base = { hook: "before", tool, callID, agent: s.agent, ...entryTurn, target, state: s.state, mode, basis: cls.basis, dbCapable: cls.gated }
+      const admit = (decision) =>
+        putEntry(sessionID, callID, { tool, ...entryTurn, state: s.state, target, dbCapable: cls.gated, basis: cls.basis, decision })
       if (!cls.gated) {
         admit("allow")
         record(sessionID, { ...base, decision: "allow", note: "target does not query DB" })
@@ -364,25 +440,29 @@ export const PsOraclePreflightGate = async (input) => {
         return
       }
       const mcp = await oracleMounted()
-      // await 期間狀態可能已變（同一步並行的 connect 已完成）：再判一次
-      if (s.state === "READY") {
+      // await 期間題目可能換了（使用者送下一題）或狀態可能已變（同一步並行的 connect 已完成）：兩者都再判一次
+      const turnChanged = s.turnId !== entryTurn.turnId
+      if (!turnChanged && s.state === "READY") {
         admit("allow")
         record(sessionID, { ...base, state: s.state, decision: "allow", note: "became READY during status check" })
         return
       }
-      if (mcp.mounted === false) {
-        admit("allow")
-        record(sessionID, { ...base, decision: "allow", note: "gate stands down: " + mcp.basis })
-        return
-      }
       s.blocked += 1
-      const message = buildBlockMessage(target, s.state, s.blocked)
+      const down = mcp.mounted === false
+      const profileName = String(readProfileOracle(directory).connectionName ?? "")
+      const message = down
+        ? buildDownMessage(target, mcp.basis, nonDbSubagents())
+        : buildBlockMessage(target, s.state, s.blocked, profileName)
+      const note =
+        (down ? `oracleMCP not mounted (${mcp.basis}): DB-capable dispatch refused` : mcp.basis) +
+        (turnChanged ? `; turn changed during status check (now ${s.turnId})` : "")
+      const row = { ...base, state: s.state, blocked: s.blocked, note, ...(turnChanged ? { turnAtDecision: s.turnId } : {}) }
       if (mode === "observe") {
         admit("observe-would-block")
-        record(sessionID, { ...base, decision: "observe-would-block", blocked: s.blocked, note: mcp.basis })
+        record(sessionID, { ...row, decision: "observe-would-block" })
         return
       }
-      record(sessionID, { ...base, decision: "block", blocked: s.blocked, note: mcp.basis })
+      record(sessionID, { ...row, decision: "block" })
       throw new Error(message)
     },
 
@@ -392,47 +472,70 @@ export const PsOraclePreflightGate = async (input) => {
       if (tool !== TOOL_TASK && !tool.startsWith(MCP_PREFIX)) return
       const callID = String(info?.callID ?? "")
       const s = getSession(sessionID)
-      const text = outputText(out)
       const prev = s.state
-      const base = { hook: "after", tool, callID, ...stamp(s), state: prev, outputLength: text.length }
+      const entry = takeEntry(sessionID, callID)
+      // 配對：有快照且題目相同＝current；有快照但題目已換＝stale；沒有快照＝unknown（不前進）
+      const attribution = entry ? (entry.turnId === s.turnId ? "current" : "stale") : "unknown"
+      const stamped = entry ? { agent: s.agent, turn: entry.turn, turnId: entry.turnId } : stamp(s)
+      const base = {
+        hook: "after", tool, callID, ...stamped, attribution,
+        ...(attribution === "stale" ? { stale: true, replyTurnId: s.turnId } : {}),
+      }
       if (tool === TOOL_LIST) {
-        const fail = failureMatch(text)
-        if (!fail && s.state === "NEED_LIST") s.state = "NEED_CONNECT"
-        record(sessionID, { ...base, next: s.state, ok: !fail, failureMatch: fail || undefined })
+        const r = classifyResult(out)
+        let note
+        if (r.ok === true && attribution === "current" && s.state === "NEED_LIST") s.state = "NEED_CONNECT"
+        else if (r.ok === true && attribution === "stale") note = "stale reply from previous turn: not counted for this turn"
+        else if (r.ok === true && attribution === "unknown") note = "no entry snapshot for this callID: not counted"
+        else if (r.ok === "unknown") note = "empty tool output: not counted as success"
+        record(sessionID, { ...base, state: prev, entryState: entry ? entry.state : undefined, next: s.state, ok: r.ok, failureMatch: r.failureMatch || undefined, outputLength: r.textLength, note })
         return
       }
       if (tool === TOOL_CONNECT) {
-        const fail = failureMatch(text)
+        const r = classifyResult(out)
         let note
-        if (!fail && s.state === "NEED_CONNECT") s.state = "READY"
-        else if (!fail && s.state === "NEED_LIST") note = "connect before list_connections: list still required"
-        record(sessionID, { ...base, next: s.state, ok: !fail, failureMatch: fail || undefined, note })
+        if (r.ok === true && attribution === "current") {
+          if (s.state === "NEED_CONNECT") s.state = "READY"
+          else if (s.state === "NEED_LIST") note = "connect before list_connections: list still required"
+        } else if (r.ok === true && attribution === "stale") note = "stale reply from previous turn: not counted for this turn"
+        else if (r.ok === true) note = "no entry snapshot for this callID: not counted"
+        else if (r.ok === "unknown") note = "empty tool output: not counted as success"
+        record(sessionID, {
+          ...base, state: prev, entryState: entry ? entry.state : undefined, next: s.state, ok: r.ok,
+          failureMatch: r.failureMatch || undefined, outputLength: r.textLength, connection: connectionNameOf(info?.args), note,
+        })
         return
       }
       if (tool === TOOL_DISCONNECT) {
         s.state = "NEED_LIST"
-        record(sessionID, { ...base, next: s.state, note: "disconnect in this session" })
+        record(sessionID, {
+          ...base, state: prev, next: s.state,
+          note: "disconnect in this session" + (attribution === "stale" ? " (issued in a previous turn; the connection is gone regardless)" : ""),
+        })
         return
       }
       if (tool === TOOL_TASK) {
         const args = info && typeof info.args === "object" && info.args ? info.args : {}
         const target = String(args.subagent_type ?? "")
-        const cls = classifyTarget(target)
+        const text = outputText(out)
         const notConnected = /"blockedReason"\s*:\s*"NOT_CONNECTED"/.test(text)
-        const k = keyOf(sessionID, callID)
-        const adm = callID ? admitted.get(k) : undefined
-        if (callID) admitted.delete(k)
+        // 能力用入場快照（不在 after 重讀 catalog）；沒有快照才現算並註明
+        const cls = entry && typeof entry.dbCapable === "boolean" ? { gated: entry.dbCapable, basis: entry.basis } : { ...classifyTarget(target), late: true }
         let note
-        if (cls.gated && notConnected && s.state === "READY") {
-          s.state = "NEED_CONNECT"
-          note = "subagent reported NOT_CONNECTED: connect again before re-dispatch"
+        if (cls.gated && notConnected) {
+          if (attribution === "stale") note = "stale NOT_CONNECTED from previous turn: current turn state kept"
+          else if (s.state === "READY") {
+            s.state = "NEED_CONNECT"
+            note = "subagent reported NOT_CONNECTED: connect again before re-dispatch"
+          }
         }
-        // turn／state 用入場時的快照（使用者在 task 執行中送下一題，狀態已被重置，但這個 task 屬於前一題）
-        const stamped = adm ? { turn: adm.turn, turnId: adm.turnId, state: adm.state, admitted: adm.decision } : { admitted: "unknown" }
-        record(sessionID, { ...base, ...stamped, target, executed: true, basis: cls.basis, next: s.state, notConnected, note })
+        record(sessionID, {
+          ...base, state: entry ? entry.state : prev, admitted: entry ? entry.decision : "unknown", target, executed: true,
+          dbCapable: cls.gated, basis: cls.late ? cls.basis + "(classified after)" : cls.basis, next: s.state, notConnected, note,
+        })
         return
       }
-      record(sessionID, { ...base, next: s.state })
+      record(sessionID, { ...base, state: prev, next: s.state })
     },
   }
 }

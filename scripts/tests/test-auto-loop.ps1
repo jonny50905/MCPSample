@@ -631,14 +631,22 @@ foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator'
 foreach ($sa in @('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor')) {
     $sf = Join-Path $repoRoot ".opencode/agent/$sa.md"
     Assert ((Get-AgentToolPerm $sf 'oracleMCP_run_sql') -eq 'true') "subagent $sa：run_sql 開"
-    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false') "subagent $sa：connect／disconnect 關（在 oracleMCP_* 之後）"
+    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_list_connections') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_run_sqlcl') -eq 'false') "subagent $sa：Oracle 允許清單——connect／disconnect／list_connections／run_sqlcl 全關，只開 run_sql"
     $saTxt = [System.IO.File]::ReadAllText($sf)
+    Assert ($saTxt -match '(?m)^\s*"oracleMCP_\*":\s*false\s*$' -and $saTxt -notmatch '(?m)^\s*"oracleMCP_\*":\s*true' -and ($saTxt.IndexOf('"oracleMCP_*": false') -lt $saTxt.IndexOf('"oracleMCP_run_sql": true'))) "subagent $sa：先 oracleMCP_* false 再 run_sql true（允許清單；最後匹配者優先，順序不可顛倒）"
     Assert ($saTxt -notmatch '才 `list_connections`' -and $saTxt -notmatch '回未連線錯誤才 connect' -and $saTxt -match 'NOT_CONNECTED') "subagent $sa：硬規則段無「回未連線才 list→connect」殘留、含 NOT_CONNECTED"
 }
 $prof31 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
 Assert ($prof31 -match '(?m)^\s*connectionName:\s*\S+') "profile：oracle.connectionName 欄位存在"
 $ckLc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/oracle-query-cookbook.md'))
 Assert ($ckLc -match '連線的擁有者是主 agent' -and $ckLc -match 'blockedReason=NOT_CONNECTED' -and $ckLc -match 'list_connections' -and $ckLc -match 'oracle\.connectionName' -and $ckLc -notmatch '第一個先單獨派\*\*，') "cookbook 生命週期：主 agent／subagent 兩段，先單獨派規則已移除"
+Assert ($ckLc -match 'CONNECTION_NOT_CONFIGURED' -and $ckLc -notmatch '或清單第一個') "cookbook：連線名缺值／不在清單 → 報設定錯誤，不挑清單第一個"
+$firstPick = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) + @(Get-Item (Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js')) + @(Get-Item (Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '否則(用)?清單第一個|則用清單第一個' } | ForEach-Object { $_.Name })
+Assert ($firstPick.Count -eq 0) "agent／command／plugin／profile 不再有「否則用清單第一個」（靜默連錯 DB 的來源）：$($firstPick -join ',')"
+foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
+    $pt0 = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
+    Assert ($pt0 -match '不挑清單第一個' -and $pt0 -match 'Oracle 連線未設定') "主 agent $pa：第 0 步 profile 連線名缺值／不在清單 → 回報「Oracle 連線未設定」"
+}
 $rcTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/subagent-report-contract.md'))
 Assert ($rcTxt -match 'blockedReason' -and $rcTxt -match 'NOT_CONNECTED' -and $rcTxt -match 'SCHEMA_UNRESOLVED' -and $rcTxt -match 'QUERY_TIMEOUT') "report-contract：blockedReason 封閉值域"
 $noSolo = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '先單獨派' } | ForEach-Object { $_.Name })
@@ -675,15 +683,18 @@ Write-Host "情境 32：Oracle 前置閘門（plugin）——檔案形狀／零�
 $gp = Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js'
 Assert (Test-Path -LiteralPath $gp) "plugin 檔存在：.opencode/plugin/ps-oracle-preflight-gate.js"
 $gt = [System.IO.File]::ReadAllText($gp)
-foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_LIST', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_LIST', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
 $gImports = @([regex]::Matches($gt, '(?m)^import\s.*?from\s+"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 Assert ($gImports.Count -gt 0 -and @($gImports | Where-Object { $_ -notmatch '^node:' }).Count -eq 0) "plugin 只 import node: 內建模組（公司網路封鎖 npm）：$($gImports -join ',')"
 Assert (@([regex]::Matches($gt, '(?m)^export\s')).Count -eq 1 -and $gt -match '(?m)^export const PsOraclePreflightGate = async') "plugin 只有一個具名匯出函式（OpenCode 舊式載入器要求每個匯出都是函式）"
 Assert ($gt -notmatch '(?i)bypass' -and $gt -notmatch '繞過') "plugin 無「繞過」類字串（SOP-3 安控）"
 Assert ($gt -match 'throw new Error\(message\)' -and $gt -notmatch 'out\.args\s*=(?!=)' -and $gt -notmatch 'args\.subagent_type\s*=(?!=)') "plugin 只擋不改參數（不對 out.args／subagent_type 賦值）"
-Assert ($gt.Contains('turnId') -and $gt.Contains('admitted') -and $gt -notmatch 'MCP_STATUS_TTL_MS' -and $gt -notmatch 'connection-state' -and $gt -notmatch 'connection-epoch' -and $gt -notmatch 'prt_' -and $gt -notmatch 'stands down: connect failed' -and $gt -notmatch 'readyAncestor' -and $gt -notmatch 'session\.get') "plugin 是最小不變量版：turnId／入場快照有、mcp 狀態不快取；沒有跨行程影子狀態、失敗次數放行、prt_ 退讓、祖先放行"
+Assert ($gt.Contains('turnId') -and $gt.Contains('admitted') -and $gt -notmatch 'MCP_STATUS_TTL_MS' -and $gt -notmatch 'connection-state' -and $gt -notmatch 'connection-epoch' -and $gt -notmatch 'prt_' -and $gt -notmatch 'gate stands down' -and $gt -notmatch 'readyAncestor' -and $gt -notmatch 'session\.get') "plugin 是最小不變量版：turnId／入場快照有、mcp 狀態不快取；沒有跨行程影子狀態、失敗次數放行、prt_ 退讓、祖先放行、環境層退讓（未掛載也擋）"
+Assert ($gt -match 'mounted === false' -and $gt -match 'buildDownMessage' -and $gt -notmatch 'decision: "allow", note: "gate stands down') "plugin：oracleMCP 未掛載 → 擋（訊息走 ORACLE_MCP_DOWN 協定），不放行"
+Assert ($gt -match 'entry\.turnId === s\.turnId' -and $gt -match 'attribution === "current"' -and $gt -match 'ok === "unknown"') "plugin：after 依 session:callID 配對入場快照；stale／unknown 不前進；空輸出＝未知"
 $rt = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1'))
 Assert ($rt -match 'turnInvariantViolations' -and $rt -match 'turnMismatch' -and $rt -match 'hookMismatch' -and $rt -match 'executedBeforePreflight' -and $rt -match 'exportFailures' -and $rt -match '\.export\.json' -and $rt -notmatch 'Test-Exempt' -and $rt -notmatch 'taskkill\.exe /PID \$p\.Id /T /F 2>\$null') "runtime 回歸腳本判定 per-turn 不變量／turn 覆蓋率／task 覆蓋率／早於前置／export 失敗，且無豁免；export 落檔讀 UTF-8；taskkill 不直接重導 stderr（PS 5.1 EAP=Stop）"
+Assert ($rt -match 'callMismatch' -and $rt -match 'Test-DbCapable' -and $rt -match 'taskParents' -and $rt -match 'dbTasksCompleted' -and $rt -match 'ExpectDbTask' -and $rt -notmatch 'earlyStandDown' -and $rt -notmatch "basis -eq 'run_sql:enabled'") "runtime 回歸腳本：dbCapable 欄位判定（不用 basis 字串）、callID 歸屬（before／after／export parentID）、安全與可用分開判"
 $npmrc = Join-Path $repoRoot '.opencode/.npmrc'
 Assert ((Test-Path -LiteralPath $npmrc) -and ([System.IO.File]::ReadAllText($npmrc) -match '(?m)^offline=true\s*$')) ".opencode/.npmrc 含 offline=true（斷網時相依安裝秒失敗，plugin 照常載入）"
 $ag = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))
@@ -716,15 +727,19 @@ $global:gateDir = Join-Path $dir 'gate'
 New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
 function New-GateLog([string]$Id, [string[]]$Rows) { [System.IO.File]::WriteAllLines((Join-Path $gateDir ($Id + '.jsonl')), $Rows, (New-Object System.Text.UTF8Encoding($false))) }
 $chat = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","next":"NEED_LIST","mode":"enforce"}'
-$blk = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_LIST","mode":"enforce","basis":"run_sql:enabled","decision":"block","blocked":1,"note":"mcp-status:connected"}'
+$blk = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_LIST","mode":"enforce","basis":"run_sql:enabled","dbCapable":true,"decision":"block","blocked":1,"note":"mcp-status:connected"}'
 $listOk = '{"hook":"after","tool":"oracleMCP_list_connections","callID":"l1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","next":"NEED_CONNECT","ok":true}'
 $connOk = '{"hook":"after","tool":"oracleMCP_connect","callID":"c1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","next":"READY","ok":true}'
-$allow = '{"hook":"before","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"READY","mode":"enforce","basis":"run_sql:enabled","decision":"allow"}'
-$exec = '{"hook":"after","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","admitted":"allow","target":"ps-ui-flow","executed":true,"basis":"run_sql:enabled","next":"READY","notConnected":false}'
+$allow = '{"hook":"before","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"READY","mode":"enforce","basis":"run_sql:enabled","dbCapable":true,"decision":"allow"}'
+$exec = '{"hook":"after","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","attribution":"current","admitted":"allow","target":"ps-ui-flow","executed":true,"basis":"run_sql:enabled","dbCapable":true,"next":"READY","notConnected":false}'
 New-GateLog 'ses_ok' @($chat, $blk, $listOk, $connOk, $allow, $exec)
 $v = Get-SessionVerdict 'ses_ok' ''
-Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.preflight -and $v.turnInvariantViolations -eq 0 -and $v.standDowns -eq 0 -and $v.hookMismatch -eq 0) "錯序被擋→list→connect→執行：try=2 blk=1 exec=1 early=0 turnViol=0"
-New-GateLog 'ses_observe' @($chat, ($blk -replace '"decision":"block"', '"decision":"observe-would-block"'), ($exec -replace '"state":"READY","admitted":"allow"', '"state":"NEED_LIST","admitted":"observe-would-block"' -replace '"next":"READY"', '"next":"NEED_LIST"'))
+Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.preflight -and $v.turnInvariantViolations -eq 0 -and $v.callMismatch -eq 0 -and $v.dbTasksCompleted -eq 1 -and $v.hookMismatch -eq 0) "錯序被擋→list→connect→執行：try=2 blk=1 exec=1 early=0 turnViol=0 callMis=0 dbOk=1"
+$ncExec = $exec -replace '"notConnected":false', '"notConnected":true' -replace '"next":"READY"', '"next":"NEED_CONNECT"'
+New-GateLog 'ses_nc' @($chat, $listOk, $connOk, $allow, $ncExec)
+$v = Get-SessionVerdict 'ses_nc' ''
+Assert ($v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.dbTasksCompleted -eq 0) "DB task 執行了但 subagent 回 NOT_CONNECTED → 安全 0 違反、可用 dbOk=0（零違規不等於可用）"
+New-GateLog 'ses_observe' @($chat, ($blk -replace '"decision":"block"', '"decision":"observe-would-block"'), ($exec -replace '"state":"READY"', '"state":"NEED_LIST"' -replace '"admitted":"allow"', '"admitted":"observe-would-block"' -replace '"next":"READY"', '"next":"NEED_LIST"'))
 $v = Get-SessionVerdict 'ses_observe' ''
 Assert ($v.wouldBlock -eq 1 -and $v.executedBeforePreflight -eq 1 -and $v.turnInvariantViolations -eq 1 -and -not $v.preflight) "observe 模式：DB task 早於前置執行 → early=1、turnViol=1（判定 FAIL 的來源）"
 $chat2 = $chat -replace '"turnId":"m1","state":"NEED_LIST"', '"turnId":"m2","state":"READY"' -replace '"turn":1', '"turn":2'
@@ -741,33 +756,54 @@ $sameId = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m
 New-GateLog 'ses_synth' @($chat, $listOk, $connOk, $synth, $sameId, $allow, $exec)
 $v = Get-SessionVerdict 'ses_synth' ''
 Assert ($v.turns -eq 1 -and $v.turnInvariantViolations -eq 0 -and $v.executedBeforePreflight -eq 0) "synthetic 訊息與同 id 重複到達不算一題：turns=1、不違反"
-$noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"run_sql:enabled"', '"basis":"run_sql:disabled"' -replace '"state":"READY"', '"state":"NEED_LIST"'
+$noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"run_sql:enabled"', '"basis":"run_sql:disabled"' -replace '"dbCapable":true', '"dbCapable":false' -replace '"state":"READY"', '"state":"NEED_LIST"'
 New-GateLog 'ses_nodb' @($chat, $noDb)
 $v = Get-SessionVerdict 'ses_nodb' ''
-Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0) "不查 DB 的委派（basis=run_sql:disabled）不受判定"
-$sdAllow = '{"hook":"before","tool":"task","callID":"k1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_LIST","mode":"enforce","basis":"run_sql:enabled","decision":"allow","note":"gate stands down: mcp-status:disabled"}'
-$sdExec = '{"hook":"after","tool":"task","callID":"k1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","admitted":"allow","target":"ps-ui-flow","executed":true,"basis":"run_sql:enabled","next":"NEED_LIST","notConnected":false}'
-New-GateLog 'ses_standdown' @($chat, $sdAllow, $sdExec)
-$v = Get-SessionVerdict 'ses_standdown' ''
-Assert ($v.executedBeforePreflight -eq 1 -and $v.earlyStandDown -eq 1 -and $v.turnInvariantViolations -eq 1 -and $v.standDowns -eq 1) "oracleMCP 未掛載的放行不是豁免：early=1、turnViol=1，另記 standDowns=1／earlyStandDown=1 說明來源"
+Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0 -and $v.executedDb -eq 0) "不查 DB 的委派（dbCapable=false）不受判定"
+$unk = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-new-agent"' -replace '"basis":"run_sql:enabled"', '"basis":"unknown-agent(default:DB)"' -replace '"state":"READY"', '"state":"NEED_LIST"'
+New-GateLog 'ses_unknown' @($chat, $unk)
+$v = Get-SessionVerdict 'ses_unknown' ''
+Assert ($v.executedBeforePreflight -eq 1 -and $v.turnInvariantViolations -eq 1) "不認識的 agent（dbCapable=true）早於前置執行 → early=1（不是靠 basis 字串篩掉）"
+$unkOld = $unk -replace ',"dbCapable":true', ''
+New-GateLog 'ses_unknown_old' @($chat, $unkOld)
+$v = Get-SessionVerdict 'ses_unknown_old' ''
+Assert ($v.executedBeforePreflight -eq 1) "舊紀錄沒有 dbCapable 欄位：basis=unknown-agent 由推導視為會查 DB → early=1"
+$downBlk = $blk -replace '"note":"mcp-status:connected"', '"note":"oracleMCP not mounted (mcp-status:disabled): DB-capable dispatch refused"'
+New-GateLog 'ses_mcpdown' @($chat, $downBlk)
+$v = Get-SessionVerdict 'ses_mcpdown' ''
+Assert ($v.blocked -eq 1 -and $v.mcpDownBlocks -eq 1 -and $v.executed -eq 0 -and $v.executedBeforePreflight -eq 0) "oracleMCP 未掛載 → 被擋（不放行）：blocked=1、mcpDownBlocks=1、early=0"
+$staleConn = '{"hook":"after","tool":"oracleMCP_connect","callID":"c9","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"stale","stale":true,"replyTurnId":"m2","state":"NEED_LIST","next":"NEED_LIST","ok":true}'
+$unkConn = '{"hook":"after","tool":"oracleMCP_connect","callID":"c8","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":"unknown","note":"empty tool output: not counted as success"}'
+New-GateLog 'ses_stale' @($chat, $listOk, $unkConn, $staleConn)
+$v = Get-SessionVerdict 'ses_stale' ''
+Assert ($v.staleReplies -eq 1 -and $v.unknownResults -eq 1 -and -not $v.preflight) "晚到回覆（stale）與空輸出（ok=unknown）只計觀察值，不算前置完成"
+$misExec = $exec -replace '"turnId":"m1"', '"turnId":"m2"'
+New-GateLog 'ses_callmis' @($chat, $listOk, $connOk, $allow, $misExec)
+$v = Get-SessionVerdict 'ses_callmis' ''
+Assert ($v.callMismatch -eq 1) "同一 callID 的 before（m1）／after（m2）turnId 不一致 → callMismatch=1"
 # export 交叉比對：真實題目 id ↔ chat.message turnId；compaction／synthetic 訊息不算題；/undo 的孤兒只觀察
 # export 樣本不帶 sessionID（比對函式對 null sessionID 一律接受），同一份樣本可餵不同 session 的 jsonl
 $exportFx = @'
 {"messages":[
  {"info":{"id":"m1","role":"user"},"parts":[{"type":"text","text":"Q1"}]},
- {"info":{"id":"a1","role":"assistant"},"parts":[{"type":"tool","tool":"task","state":{"status":"completed"}}]},
+ {"info":{"id":"a1","role":"assistant","parentID":"m1"},"parts":[{"type":"tool","tool":"task","callID":"t2","state":{"status":"completed"}}]},
  {"info":{"id":"mc","role":"user"},"parts":[{"type":"compaction","auto":true}]},
  {"info":{"id":"ms","role":"user"},"parts":[{"type":"text","text":"continue","synthetic":true}]},
  {"info":{"id":"m2","role":"user"},"parts":[{"type":"text","text":"Q2"}]},
- {"info":{"id":"a2","role":"assistant"},"parts":[{"type":"tool","tool":"task","state":{"status":"completed"}}]}
+ {"info":{"id":"a2","role":"assistant","parentID":"m2"},"parts":[{"type":"tool","tool":"task","callID":"t3","state":{"status":"completed"}}]}
 ]}
 '@
 $exportPath = Join-Path $dir 'export-fx.json'
 [System.IO.File]::WriteAllText($exportPath, $exportFx, (New-Object System.Text.UTF8Encoding($false)))
 $ec = Get-ExportCounts (ConvertFrom-Json $exportFx) 'ses_twoturn'
-Assert ($ec.tasks -eq 2 -and @($ec.promptIds).Count -eq 2 -and (@($ec.promptIds) -join ',') -eq 'm1,m2') "export：task 2 件；真實題目只有 m1、m2（compaction／synthetic 不算）"
+Assert ($ec.tasks -eq 2 -and @($ec.promptIds).Count -eq 2 -and (@($ec.promptIds) -join ',') -eq 'm1,m2' -and $ec.taskParents['t2'] -eq 'm1' -and $ec.taskParents['t3'] -eq 'm2') "export：task 2 件；真實題目只有 m1、m2（compaction／synthetic 不算）；task 所屬題目 t2→m1、t3→m2（assistant parentID）"
 $v = Get-SessionVerdict 'ses_twoturn' '' $exportPath
-Assert ($v.exportedTasks -eq 2 -and $v.exportedTurns -eq 2 -and $v.turnMismatch -eq 0 -and $v.orphanTurns -eq 0 -and $v.hookMismatch -eq 0) "兩題都有 chat.message → turnMismatch=0；task 件數 2＝閘門看到的 2 → hookMismatch=0"
+Assert ($v.exportedTasks -eq 2 -and $v.exportedTurns -eq 2 -and $v.turnMismatch -eq 0 -and $v.orphanTurns -eq 0 -and $v.hookMismatch -eq 0 -and $v.callMismatch -eq 0 -and $v.unmatchedCalls -eq 0) "兩題都有 chat.message → turnMismatch=0；task 件數 2＝閘門看到的 2 → hookMismatch=0；每個 task 的題目歸屬與 export 一致 → callMismatch=0"
+$swapAllow = $allow -replace '"turnId":"m1"', '"turnId":"m2"'
+$swapExec = $exec -replace '"turnId":"m1"', '"turnId":"m2"'
+New-GateLog 'ses_swapped' @($chat, $listOk, $connOk, $chat2, $swapAllow, $swapExec)
+$v = Get-SessionVerdict 'ses_swapped' '' $exportPath
+Assert ($v.callMismatch -eq 1) "閘門把 t2 標成 m2、export 說 t2 屬於 m1 → callMismatch=1（歸屬被改標，不只比件數）"
 New-GateLog 'ses_onlym1' @($chat, $listOk, $connOk, $allow, $exec)
 $v = Get-SessionVerdict 'ses_onlym1' '' $exportPath
 Assert ($v.turnMismatch -eq 1 -and $v.orphanTurns -eq 0 -and $v.hookMismatch -eq 1) "m2 沒有 chat.message → turnMismatch=1；閘門只看到 1 個 task、export 有 2 → hookMismatch=1"

@@ -27,13 +27,13 @@
 - **`opencode run` 用 `process.env.PWD`** 決定專案目錄（run.ts:333）——自動化從別的 cwd 啟動時要設 PWD（e2e 執行器已處理；
   Windows cmd 不設 PWD，走 `process.cwd()`，`ps-auto-loop.ps1` 不受影響）。
 - **`chat.message` 帶 agent、每則訊息觸發**：閘門用它做「每則訊息重置」，正好對應第 0 步「不因上一題已連過就省略」。
-- **子 session 不會呼叫 task**（`subagent_depth` 預設 1；ps-* subagent 全 `task: false`），但閘門仍會沿 `parentID`
-  找 READY 的祖先（防未來開深度時死鎖）。
+- **子 session 不會呼叫 task**（`subagent_depth` 預設 1；ps-* subagent 全 `task: false`）；早期版本沿 `parentID` 找 READY 的祖先，
+  退版重寫時移除（死碼且是豁免，見 §四）。
 
 ## 三、閘門的邊界（有意）
 
 - 只擋、不改參數、不代模型 connect（模型仍要自己做第 0 步；閘門把「應該」變「必須」）。
-- oracleMCP 未掛載（`/mcp` 非 connected）退讓；狀態查不到（SDK 例外）保守仍擋。
+- oracleMCP 未掛載（`/mcp` 非 connected）一樣擋，錯誤訊息改走 ORACLE_MCP_DOWN 協定（review 第二輪後；之前是退讓）；狀態查不到（SDK 例外）保守仍擋。
 - 每則訊息重置；同回合中途斷線閘門看不到，靠 subagent 回 NOT_CONNECTED 把狀態退回 NEED_CONNECT。
 - observe 模式只給探測與緊急停用。
 
@@ -64,3 +64,21 @@ review 對 a31c946 的判定：核心 invariant 乾淨（DB-capable task 只在 
 | 失敗 ≥ 2 次退讓；`prt_` 退讓 | 否 | DB 掛掉時的正確行為：DB-specific task 被擋／略過、non-DB task 照常；e2e `connect-fail` 鎖住「三次全擋、零 SQL、模型回報 DB 連線建立失敗」 |
 | event hook 接「already connected」isError | 否（待驗） | 真 SQLcl 的回覆未驗（R16）；驗完再決定 |
 | ps-auditor 混合能力 | 否（另案） | 走 deterministic routing／capability 邊界（拆 agent 或 task 帶確定性 metadata），不在閘門打洞 |
+
+## 五、外部 review 第二輪（2026-09-08，對 d544ec3）逐條
+
+| # | review 主張 | 核對 | 處置 |
+|---|---|---|---|
+| P1-1 | list／connect 沒保存呼叫所屬題目，晚到回覆跨題污染（重現：A 題 connect 晚到替 B 題完成前置） | 成立。d544ec3 的 after 用「現在」的 session 狀態與 turnId。原始碼：`chat.message` 在訊息送進來當下觸發（prompt.ts createUserMessage），忙碌 session 的新訊息併入正在跑的迴圈（ensureRunning），晚到確實可能；單一 session 內 tool 循序，review 的精確交錯（B 的 list 先於 A 的 connect 完成）排不出來，但 hook 層仍要正確 | 落地：入場快照＋callID 配對＋stale／unknown 不前進＋await 後重判 turnId；e2e stale-connect-serve 在真 host 重現「第二題在第一題 connect 期間送進來」 |
+| P1-2 | task 快照只修 log，NOT_CONNECTED 晚到會作廢新題的 READY | 成立 | 落地：NOT_CONNECTED 只在入場 turnId＝目前 turnId 時退狀態；「連線世代」屬第二批 |
+| P1-3 | per-session READY 不是共用連線有效性的保證 | 成立；記載限制不等於修復 | 另案（第二批）：SOP-21 已知限制 (b) 改寫為「不證明共用連線仍是預期連線、不證明查詢跑在正確 DB」；先做 topology 實驗 |
+| P1-4 | 每題無條件 connect ≠ 安全的 ensure-connected；「否則清單第一個」＝靜默連錯 DB | 連線選擇成立、先修；其餘是規格變更 | 落地：profile 必填且在清單裡，否則回「Oracle 連線未設定」、不 connect；不在閘門加「跳過 connect」的例外；ensure-connected／owner／DUAL 探測屬第二批 |
+| P2-1 | subagent Oracle 權限是排除清單，run_sqlcl 等仍開 | 成立（OpenCode permission `findLast` 最後匹配者優先；`disabled()` 把 deny 的工具從模型工具清單拿掉） | 落地：`"oracleMCP_*": false` → `"oracleMCP_run_sql": true`；e2e 驗 subagent 可見 Oracle 工具只剩 run_sql、主 agent 只剩 list_connections＋connect |
+| P2-2 | analyzer 用 basis 字串篩能力漏 unknown-agent；缺 callID 級配對；零違規≠可用 | 成立 | 落地：dbCapable 欄位、callMismatch（before／after／export parentID）、安全／可用兩條驗收、-ExpectDbTask |
+| P2-3 | MCP down 退讓與「絕不在 READY 前執行」矛盾；空輸出當成功 | 成立 | 落地：未掛載改為擋（ORACLE_MCP_DOWN 協定訊息，不重試）；三態 ok；文件不再宣稱環境層退讓；MCP isError 仍靠 OpenCode throw（after 不觸發＝失敗） |
+
+第二批（連線生命週期改版，另案，需同步改 agent／cookbook／plugin／驗收，不能只改 prompt）：題目狀態與資源狀態分離
+（UNKNOWN→PREPARING→READY→DEGRADED、連線世代）、owner 與目標驗證、DUAL 探測（SYS_CONTEXT DB_NAME／SESSION_USER／CURRENT_SCHEMA）
+先於業務查詢、同一輪只一次復原、SQL 與連線操作在真實資源邊界排程、真 SQLcl repeated-connect 契約（R16／topology T1～T3）。
+驗收結論的措辭（採 review 建議）：已修正 subagent 自行管理共用連線的權限路徑、派工前置閘門與跨題晚到回覆的歸屬；共用連線的有效性、
+目標一致性、集中復原與真 SQLcl repeated-connect 契約尚未驗證——目前是「部分修正」，不是「共用連線問題已完整解決」。

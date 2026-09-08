@@ -3139,3 +3139,32 @@
   未掛載放行照算違反／export id 比對／undo 孤兒／pscustomobject 加總）全 PASS。
   教訓：不變量要小到一句話能證明；例外只准來自「能力不存在」這種確定性事實，不准來自重試次數；共用狀態在拿到 topology
   證據之前不要先發明第二個真相來源；驗證指標不能被實作用「豁免」反向改寫。
+- 追記（2026-09-08，外部 review 第二輪，對 d544ec3）：review 以不連 DB 的 hook-level 測試重現兩個時序缺口——上一題晚到的 connect
+  成功會替下一題完成前置、上一題晚到的 NOT_CONNECTED 會作廢下一題已完成的前置（P1-1／P1-2）；另指出 per-session READY 不是共用連線
+  有效性的保證（P1-3，另案）、每題無條件 connect 不等於安全的 ensure-connected 且「否則清單第一個」會把設定錯誤變成靜默連錯 DB（P1-4，
+  連線選擇先修、其餘另案）、subagent 的 Oracle 權限是排除清單不是允許清單（P2-1）、analyzer 用 basis 字串篩能力會漏掉 unknown-agent
+  且「零違規」不等於可用（P2-2）、MCP 未掛載退讓與「任何 DB-capable task 絕不在 READY 前執行」的敘述矛盾、空輸出被當成功（P2-3）。
+  落點（第一批，不改核心不變量）：(1) plugin 每個會影響狀態的呼叫在 before 留入場快照（session:callID → turnId／state／dbCapable／decision），
+  after 依 callID 配對、列上一律用入場題目；晚到回覆標 attribution=stale——connect／list 成功不替新題完成前置、NOT_CONNECTED 不把新題退回
+  （disconnect 例外：連線真的斷了）；沒有快照的 after 標 unknown、不前進；task 在查 /mcp 狀態的 await 期間題目換了 → 擋；成功判定三態
+  （true／false／"unknown"：空輸出＝unknown 不前進，isError 物件＝false）；每列寫 dbCapable。(2) oracleMCP 未掛載改為擋（訊息走 ORACLE_MCP_DOWN
+  協定：不重試、DB 部分如實回報、非 DB 部分改派沒有 Oracle 能力的 subagent）——不變量自此沒有環境層退讓，analyzer 不需要任何豁免類別。
+  (3) 四個 DB subagent 的 Oracle 工具改允許清單（`"oracleMCP_*": false` → `"oracleMCP_run_sql": true`）：list_connections／connect／disconnect／
+  run_sqlcl 對 subagent 不可見（OpenCode permission 最後匹配者優先、deny 的工具不進模型的工具清單），cookbook「工具已關」成真；主 agent 只開
+  list_connections＋connect。(4) 連線選擇：profile oracle.connectionName 必填且必須在清單裡，缺值／不在清單 → 主 agent 回「Oracle 連線未設定」、
+  不 connect、不挑清單第一個（三個主 agent 第 0 步、cookbook、profile 註解、閘門擋下訊息同步）。(5) analyzer：能力看 dbCapable 欄位（舊紀錄由
+  basis 推導，unknown-agent＝會查）；新增 callMismatch（同一 callID 的 before／after turnId 一致、且 export 裡該 task 所屬 assistant 訊息的
+  parentID＝before 的 turnId）；驗收分安全（五項全 0）與可用（B1 每 session ≥1 個 DB task 完成、B3 0 個；-ExpectDbTask 覆寫）；觀察值
+  mcpDownBlocks／staleReplies／unknownResults／unmatchedCalls。
+  原始碼再核對（v1.18.29 prompt.ts）：`chat.message` 在訊息送進來的當下觸發（createUserMessage），之後 `loop()` 對忙碌中的 session 是
+  ensureRunning（併入正在跑的迴圈），所以「上一題的 tool 還沒回、下一題已重置狀態」在真 host 會發生；但同一 session 的 tool 呼叫循序，
+  下一題的 list 不會在上一題的 connect 回來之前先跑——review 描述的「B 題 list 完成後 A 題 connect 才到」在單一 session 內排不出來，
+  stale 保護仍作為 hook 層不變量落地。驗證：單元 14 組（含兩個時序交錯、三態、無快照、await 期間換題、擋下訊息的連線規則）；e2e 14 情境
+  在真 OpenCode 1.18.29 全 PASS（新增 empty-connect、stale-connect-serve——第一題 connect 延遲 5 秒期間送第二題，晚到的 connect 標 stale
+  歸第一題、第二題自己 list→connect 才放行；mcp-down／mcp-failed 改驗擋下＋模型回報 ORACLE_MCP_DOWN；每情境另驗 export parentID 歸屬與
+  subagent 工具清單只剩 run_sql）；analyzer 對 14 份真 export 的判定與 e2e 斷言一致；test-auto-loop 262 判定全 PASS（情境 31 允許清單／
+  不挑清單第一個、情境 32 新欄位與無退讓、情境 33 unknown-agent／callMismatch／export parentID／可用）。另案（第二批，連線生命週期改版）：
+  共用連線有效性與目標一致性（題目狀態與資源狀態分離、連線世代、owner、DUAL 探測、schema 初始化、同時只一次復原、底層排程）、
+  真 SQLcl repeated-connect 契約（R16／topology T1～T3）、ps-auditor 混合能力。
+  教訓：after 沒有配對 before 就是在相信「現在」而不是「當時」；能力判定要寫成機械欄位，不能讓 analyzer 去解讀說明字串；
+  「零違規」要配一條「有做到」的可用判定才算驗收；權限寫成允許清單，不要靠排除清單追新工具。

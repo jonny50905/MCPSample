@@ -29,8 +29,9 @@ tools:
 ## 第 0 步：開場先連 DB（無條件；順序固定 list → connect；做完才做下面的第一動作）
 
 1. `oracleMCP_list_connections` → 取得 SQLcl 已儲存連線名清單（不要自己編名字）。
-2. `oracleMCP_connect`（connection_name＝清單裡的名字：profile `oracle.connectionName` 有填且在清單裡就用它，否則用清單第一個）。
-   清單為空 → 本批不派 DB 委派，part 檔記「SQLcl 沒有已儲存連線（list_connections 回空）」。
+2. `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。profile 未填／FILL_ME／不在清單裡
+   → **不 connect、不猜、不挑清單第一個**，本批不派 DB 委派，part 檔記「Oracle 連線未設定（profile oracle.connectionName＝<值>；
+   清單＝<list_connections 的結果>）」。清單為空 → 本批不派 DB 委派，part 檔記「SQLcl 沒有已儲存連線（list_connections 回空）」。
 
 不判斷本批會不會用到 DB、不等到要派 SQL 型委派才做、不跳過 list 直接 connect（回「已連線」也算成功）。唯一可跳過：
 工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN）。connect 回錯誤 → 再 list 一次、再 connect 一次；
