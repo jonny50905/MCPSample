@@ -10,7 +10,7 @@
 | 1 | 順序只是 prompt 指令，執行是機率性的 | 成立。`task` 從回合一開始就在工具清單裡；情境 31 只驗文字 | 採納（根因） |
 | 2 | 用 `tool.execute.before` 擋 `task`，throw 即阻擋 | 成立。`session/tools.ts`：registry 工具（含 task）與 MCP 工具都先 `Plugin.trigger("tool.execute.before")` 再執行；hook 的 promise reject → AI SDK `tool-error` → `processor.failToolCall` 把 `error.message` 寫進 tool part，模型下一步看得到 | 採納 |
 | 3 | 狀態機 NEED_LIST→NEED_CONNECT→READY；擋而不改參數 | 成立。成功判定：MCP `isError` 會在 `McpCatalog.convertTool` throw，`tool.execute.after` 不觸發，所以 after 觸發＝成功；另加保守的失敗文字樣式（ORA-／TNS-／not connected…）防「成功回傳但內容是錯誤」 | 採納 |
-| 4 | 擋「所有 task」直到 READY | **不採**。ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow 的 tools 表 `oracleMCP_*: false`，不碰 DB；擋全部會讓 DB 掛掉時純 ES／Source 的題也無法委派，與第 0 步「非 DB 部分照常作答」矛盾。改為只擋 tools 表 `oracleMCP_run_sql` 為開的 subagent（最後匹配者優先、沒列＝開、不認識的名字＝開） | 修正 |
+| 4 | 擋「所有 task」直到 READY | **不採**。ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow 的 tools 表 `oracleMCP_*: false`，不碰 DB；擋全部會讓 DB 掛掉時純 ES／Source 的題也無法委派，與第 0 步「非 DB 部分照常作答」矛盾。改為只擋 tools 表 `oracleMCP_run_sql` 為開的 subagent（最後匹配者優先、沒列＝開、不認識的名字＝開）。注意這是能力判定：ps-auditor 的純 chunk 任務也過閘門（見 §四 R3 的退讓） | 修正 |
 | 5 | 互動與 headless 的 hook 行為可能不同，要分開驗 | 原始碼是同一條路（`opencode run` 用 in-process server，`Server.Default().app.fetch`）；沙箱 e2e 已在 headless 驗過 7 情境。互動路徑仍列公司機驗證（`-AnalyzeAll`） | 部分採納 |
 | 6 | 先做「印每次 before 的探針」跑 20 次目測 | 改成機械判定：閘門交易紀錄的 task 次數 ＝ `opencode export` transcript 的 task 件數（逐 session）；observe 模式就是探針 | 修正 |
 | 7 | hook 覆蓋率不到 100% 就把前置移到模型迴圈外的 wrapper | 不可行：SQLcl MCP 是 OpenCode 以 stdio 起的子行程，「目前連線」活在該行程內；行程外的 wrapper 連不到同一條連線。plugin 已是最外層 | 不採（記錄理由） |
@@ -44,9 +44,22 @@
 |---|---|---|---|
 | R1 | 連線是全域單例，per-session READY 會失真（別的 session connect／disconnect 後仍 READY；最壞查錯庫） | **成立**。L109 已定案單例；公司機 oracleMCP 若是遠端（VS Code 端 SQLcl），單例還跨 OpenCode 行程 | 連線 epoch：任何 connect／disconnect 嘗試推進 `connection-epoch.json`（跨行程）；READY 需 readyEpoch＝目前 epoch，否則退回 NEED_LIST 並擋。e2e `epoch`＋單元測試 |
 | R2 | analyzer 只證 task hook 覆蓋率，沒證 chat.message 每題都 fire；需要 per-turn 不變量與真正的多 turn 測試 | **成立** | turnId＝user 訊息 id；analyzer 加 turnMismatch／turnInvariantViolations（都判定）；e2e `multi-turn`（run --session）＋`multi-turn-serve`（serve 同行程兩題，斷言 READY→NEED_LIST 的重置） |
-| R3 | ps-auditor 混合能力，按 agent 能力判定會過度 gate；應拆 agent 或給 task 帶 metadata | **成立但暫不改**：task 工具無 metadata 通道；任務 A 檔級 evidence 混 CHUNK／SQL，拆不開；只在「MCP 有掛載但 connect 失敗」時受影響 | 記為已知限制（SOP-21 第 8 條 b）；拆 agent 另開 issue |
+| R3 | ps-auditor 混合能力，按 agent 能力判定會過度 gate；應拆 agent 或給 task 帶 metadata | **成立**：task 工具無 metadata 通道；任務 A 檔級 evidence 混 CHUNK／SQL，拆不開；閘門的軸是能力，SOP-12 併發上限的軸是實際呼叫 | 不拆 agent（另案）；改閘門只擋順序不擋可用性：list 成功後 connect 失敗 ≥ 2 次 → 退讓，交 NOT_CONNECTED 協定，稽核批次不卡死（SOP-21） |
 | R4 | mcp.status 15 秒快取不能當正確性放行依據 | **成立** | 拿掉快取，每次即時查；單元測試 |
 | R5 | SOP-12 殘留舊協定敘述 | **成立** | 就地改為現況＋標【已作廢】 |
 
 review 沒提、本輪順手修的：`opencode run --session` 續接是**新行程**——plugin 的 in-memory 狀態與數字 turn 計數器都歸零，
 所以 turn 識別必須用 user 訊息 id；同時這也表示 headless 的每一次 run 都從 NEED_LIST 起步（與 per-turn 重置同義）。
+
+對本輪修法再做一次對抗式驗證（15 個獨立視角＋1 個批評者）後補的：
+
+| # | 抓到的洞 | 修法 |
+|---|---|---|
+| S1 | epoch 的 before／after TOCTOU：兩 session 的 connect 交錯，兩邊都 READY | connect 的 before 記住自己推進的 token，after 核對仍是目前 epoch 才 READY，否則 NEED_CONNECT；同一 epoch 最多一個 READY |
+| S2 | 過期訊息一律怪「別的 session」，看不出是誰動的 | epoch 檔記 tool／session／pid，訊息與 note 標來源 |
+| S3 | epoch 檔寫失敗無聲（Windows 防毒鎖檔） | rename 重試 3 次，仍失敗記 `_plugin.log`＋列上 `epochWriteError` |
+| S4 | task 執行中送下一題 → after 列被錯標到新 turn，假 early／turnViol | task 入場時快照 turnId／turn／state（`admitted`），after 列用快照 |
+| S5 | `turnMismatch` 計數比對被 compaction／`/undo`／`--fork` 誤判 | 真實題目 id 逐一比對 chat.message turnId；孤兒只記 orphanTurns；e2e `compaction-serve` |
+| S6 | PS 5.1 的 `Measure-Object -Property` 不吃 hashtable | verdict 改 `[pscustomobject]`；情境 33 加總測試 |
+| S7 | e2e 第二 turn 落到 build agent | `--agent ps-orchestrator` |
+| S8 | `-AnalyzeAll` 對子 session 也跑 export（慢） | 先看 jsonl 判定子 session 再決定要不要 export |

@@ -526,8 +526,11 @@ ps-oracle-preflight-gate.js`）——prompt 只剩第二道。部署與驗證程
 
 閘門做什麼：主 agent 在同一則訊息內未依序完成 `oracleMCP_list_connections`（成功）→ `oracleMCP_connect`
 （成功）之前，任何會查 DB 的 subagent 委派（task 到 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）
-在執行前被擋下，模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED` 與下一步指示；純 ES＋Source 的委派不受影響；
-oracleMCP 未掛載時閘門退讓（交 ORACLE_MCP_DOWN 協定）。
+在執行前被擋下，模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED` 與下一步指示。判定是**能力**不是任務：`oracleMCP_*` 全關的
+subagent（ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow）不受影響；ps-auditor 即使做純 chunk 任務也過閘門（SOP-12 的
+「會呼叫哪個 server」是併發上限的軸，不是閘門的軸）。閘門只擋**順序**、不擋**可用性**：oracleMCP 未掛載（交 ORACLE_MCP_DOWN
+協定）、或第 0 步已誠實做過但連不上（同一題內 list 成功、connect 嘗試 ≥ 2 次零成功＝「再 connect 一次」也做了）→ 退讓放行，
+交 subagent 的 NOT_CONNECTED 協定——DB 掛掉時稽核批次不會卡死，純 chunk 任務照跑、SQL 型證據回 UNVERIFIABLE。
 **連線 epoch**：連線是 SQLcl MCP 的全域單例（所有 session、所有 OpenCode 視窗共用），任何 session 的 connect／
 disconnect 嘗試都會推進 `auto-loop-logs\ps-oracle-gate\connection-epoch.json` 的 epoch；某 session 完成前置後若
 epoch 被別人推進過，它的 READY 作廢——下一次派 DB task 會被擋（訊息說明「共用連線已被其他 session／視窗改動」），
@@ -553,9 +556,12 @@ epoch 被別人推進過，它的 READY 作廢——下一次派 DB task 會被�
 □ 4. P1 探測（互動 TUI）：正常使用 ≥ 20 題後跑
      powershell -File scripts\tests\test-oracle-gate-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
      判定四項都要 0：hookMismatch（閘門看到的 task 次數＝opencode export 的 task 件數＝task hook 覆蓋率 100%）、
-     turnMismatch（閘門看到的 chat.message 次數＝export 的 user 訊息數＝每題都有重置）、
+     turnMismatch（export 裡每一則真實題目——有非 synthetic 的 text／file／agent／subtask part 的 user 訊息——都找得到同 id 的
+     chat.message；compaction／續行／背景回灌插入的 user 訊息不算題）、
      turnInvariantViolations（每個已執行的 DB task 在同一題內、在它之前有 list 成功＋connect→READY）、
-     executedTaskBeforePreflight。blockedRuns（模型錯序被擋）、staleEpochBlocks（共用連線被別人動過而重做前置）＝觀察值。
+     executedTaskBeforePreflight。blockedRuns（模型錯序被擋）、staleEpochBlocks（共用連線被別人動過而重做前置）、
+     orphanTurns（chat.message 有、transcript 沒有：/undo 或 fork）、standDowns（閘門刻意放行：oracleMCP 未掛載或連不上；
+     不算違反，多＝那段時間 DB 有問題）＝觀察值。
      多題互動一定要在**同一個視窗連問**（同一行程、同一 session），才驗得到「READY 的 session 被下一題重置」。
 □ 5. 30 次回歸（headless，opencode run；題目用 -Question／-QuestionFile 從本機帶，真實物件名不進 repo）：
      -Scenario B1 -Runs 30（需 DB 的題）／-Scenario B2（wiki 已驗證的題）／-Scenario B3（純 PeopleCode 題）
@@ -564,13 +570,19 @@ epoch 被別人推進過，它的 READY 作廢——下一次派 DB task 會被�
      observe 只記錄不擋（jsonl 的 decision=observe-would-block）。不要長期停在 observe。
 □ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（該則 user 訊息 id）、target、
      state→next、decision（allow／block／observe／observe-would-block）、basis（run_sql:enabled／disabled／unknown-agent）、
-     note（gate stands down／ancestor READY／NOT_CONNECTED 退回／shared connection changed）、ok／failureMatch
-     （list／connect 是否被判成功）、epoch（connect／disconnect／task 當下的連線 epoch）。
+     note（gate stands down／ancestor READY／NOT_CONNECTED 退回／shared connection changed <來源>／interleaved）、ok／failureMatch
+     （list／connect 是否被判成功）、epoch（connect／disconnect／task 當下的連線 epoch）、callID（同一次工具呼叫的 before／after 配對）、
+     admitted（task 的 after 列：入場時的判定；turn／state 也是入場時的快照）、epochWriteError（epoch 檔寫不進去，看 _plugin.log）。
 □ 8. 已知限制：(a) 連線在同一題中途斷掉閘門看不到（靠 subagent 回 NOT_CONNECTED → 狀態退回 NEED_CONNECT）；
-     (b) 閘門按 **agent 能力**（tools 表 run_sql）判定、不按任務意圖——ps-auditor 的純 chunk 解引用任務在
-     「oracleMCP 有掛載但 connect 失敗」時也會被擋（未掛載時退讓不受影響）；要拆 ps-auditor-source／ps-auditor-db
-     屬稽核協定變更，另案決定；(c) 不認識的 subagent 名字一律當會查 DB（保守）；(d) 閘門只擋、不改參數、不代模型 connect；
-     (e) epoch 檔是同一台機器、同一 repo 目錄內的行程共用；不同 repo 目錄各有一份。
+     (b) 閘門按 **agent 能力**（tools 表 run_sql）判定、不按任務意圖——ps-auditor 的純 chunk 解引用任務在主 agent
+     「list 成功、第一次 connect 失敗、還沒再 connect 一次」的短暫窗口內會被擋一次（第二次 connect 也失敗就退讓）；
+     要拆 ps-auditor-source／ps-auditor-db 屬稽核協定變更，另案決定；(c) 不認識的 subagent 名字一律當會查 DB（保守）；
+     (d) 閘門只擋、不改參數、不代模型 connect；(e) epoch 檔是同一台機器、同一 repo 目錄內的行程共用；不同 repo 目錄各有一份；
+     (f) 會多擋一次的情況：共用連線被別的視窗動過（epoch 過期 → 重做一次冪等的 list→connect）、`/mcp` 狀態查不到（保守擋）；
+     (g) 「oracleMCP 未掛載」看的是 OpenCode 存的 `/mcp` 狀態（OpenCode 1.18.29 只在 transport 斷線或 `/mcp` 手動切換時翻，沒有
+     自動重連）：SQLcl／VS Code 端重啟後，要在 `/mcp` 把 oracleMCP 關再開（或開新的 opencode 行程），狀態回 connected 閘門才會再管。
+     DB 連不上時的批次判讀：稽核 SQL 型證據成批 UNVERIFIABLE、收據照發（不是零收據）——先停批修 DB，再刪 audit-ledger.json 重跑；
+     不要長期用 PS_ORACLE_GATE_MODE=observe 繞。
 ```
 
 ## SOP-11 系統 CR 上線後的知識庫對齊

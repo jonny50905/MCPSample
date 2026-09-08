@@ -3144,3 +3144,16 @@
   PowerShell 當隱藏檔，`ps-fs-doctor` 的 `Get-TransferFiles` 漏了它——加 `-Force` 並排除 OpenCode 產生的安裝痕跡（node_modules／
   package*.json／bun.lock／.gitignore），manifest 59 檔。守衛補情境 33：AST 抽出回歸腳本的 `Get-SessionVerdict` 餵固定 jsonl 樣本
   （錯序被擋／observe 早於前置／epoch 過期／第二題沒重做前置→turnViol／synthetic 不算一題／祖先放行／不查 DB 不受判定）。
+- 追記（同日，對抗式驗證第二輪——對本輪修法再挑）：(1) epoch 有 before／after 的 TOCTOU：A 的 connect 起跑後 B 也 connect，A 完成時
+  讀到的是 B 推進後的 epoch、兩邊都 READY，伺服器上的連線卻是最後那個的。修：connect 的 before 記住「我這次推進的 token」，after 核對
+  目前 epoch 仍是它才 READY，否則退回 NEED_CONNECT（note：another connect/disconnect interleaved）——同一 epoch 最多一個 session READY。
+  (2) epoch 檔記推進者（tool／session／pid），過期訊息與 note 標明來源；寫檔 rename 失敗重試 3 次、仍失敗記 `_plugin.log` 與列上
+  `epochWriteError`；讀檔壞掉重讀一次。(3) 使用者在 task 執行中送下一題：狀態被重置後，該 task 的 after 列會被錯標到新 turn／NEED_LIST
+  → 假的 early／turnViol。修：task 入場（before）時快照 turnId／turn／state，after 列用快照（`admitted` 欄）；同一則訊息 id 重複到達不重置。
+  (4) `turnMismatch` 用計數比對會被 compaction（只有 compaction part 的 user 訊息，不觸發 chat.message）、`/undo`、`--fork` 誤判：
+  改為「真實題目 id（有非 synthetic 的 text／file／agent／subtask part）逐一找同 id 的 chat.message」，漏的才算；chat.message 有、
+  transcript 沒有的（/undo）只記 orphanTurns 觀察值。e2e 加 `compaction-serve`（兩題之間 session.summarize）。
+  (5) PS 5.1 的 `Measure-Object -Property` 不吃 hashtable 的鍵，verdict 改 `[pscustomobject]`；`Get-SessionVerdict` 加 `-ExportPath`
+  讓情境 33 能餵 export 樣本測 id 比對。(6) e2e 第二 turn 補 `--agent ps-orchestrator`（原本落到 build）。(7) review 第 3 點的便宜修法：
+  閘門只擋順序、不擋可用性——同一題內 list 成功、connect 嘗試 ≥ 2 次零成功（第 0 步的「再 connect 一次」也做了）→ 退讓放行，交
+  subagent 的 NOT_CONNECTED 協定；DB 掛掉時 ps-auditor 的純 chunk 任務不再整批卡死，SQL 型證據回 UNVERIFIABLE。單元 11 組。

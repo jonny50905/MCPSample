@@ -709,8 +709,8 @@ Write-Host "情境 33：閘門 runtime 回歸腳本的判定邏輯——AST 抽�
 $rtSrc = Get-Content (Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1') -Raw
 $rtTok = $null; $rtErr = $null
 $rtAst = [System.Management.Automation.Language.Parser]::ParseInput($rtSrc, [ref]$rtTok, [ref]$rtErr)
-$rtFuncs = $rtAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and @('Read-Jsonl', 'Get-SessionVerdict') -contains $a.Name -and $a.Parent -isnot [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)
-Assert ($rtFuncs.Count -eq 2) "runtime 腳本抽到 Read-Jsonl／Get-SessionVerdict 兩個函式（抽到 $($rtFuncs.Count)）"
+$rtFuncs = $rtAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and @('Read-Jsonl', 'Get-ExportCounts', 'Get-SessionVerdict') -contains $a.Name -and $a.Parent -isnot [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)
+Assert ($rtFuncs.Count -eq 3) "runtime 腳本抽到 Read-Jsonl／Get-ExportCounts／Get-SessionVerdict 三個函式（抽到 $($rtFuncs.Count)）"
 foreach ($f in $rtFuncs) { Invoke-Expression $f.Extent.Text }
 $global:gateDir = Join-Path $dir 'gate'
 New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
@@ -750,6 +750,39 @@ $noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' 
 New-GateLog 'ses_nodb' @($chat, $noDb)
 $v = Get-SessionVerdict 'ses_nodb' ''
 Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0) "不查 DB 的委派（basis=run_sql:disabled）不受判定"
+$sdAllow = '{"hook":"before","tool":"task","callID":"k1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_LIST","basis":"run_sql:enabled","decision":"allow","note":"gate stands down: mcp-status:disabled"}'
+$sdExec = '{"hook":"after","tool":"task","callID":"k1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","target":"ps-ui-flow","executed":true,"basis":"run_sql:enabled","next":"NEED_LIST","notConnected":false,"admitted":"allow"}'
+New-GateLog 'ses_standdown' @($chat, $sdAllow, $sdExec)
+$v = Get-SessionVerdict 'ses_standdown' ''
+Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0 -and $v.standDowns -eq 1) "oracleMCP 未掛載的刻意放行：不算違反、記 standDowns=1（callID 配對）"
+# export 交叉比對：真實題目 id ↔ chat.message turnId；compaction／synthetic 訊息不算題；/undo 的孤兒只觀察
+# export 樣本不帶 sessionID（比對函式對 null sessionID 一律接受），同一份樣本可餵不同 session 的 jsonl
+$exportFx = @'
+{"messages":[
+ {"info":{"id":"m1","role":"user"},"parts":[{"type":"text","text":"Q1"}]},
+ {"info":{"id":"a1","role":"assistant"},"parts":[{"type":"tool","tool":"task","state":{"status":"completed"}}]},
+ {"info":{"id":"mc","role":"user"},"parts":[{"type":"compaction","auto":true}]},
+ {"info":{"id":"ms","role":"user"},"parts":[{"type":"text","text":"continue","synthetic":true}]},
+ {"info":{"id":"m2","role":"user"},"parts":[{"type":"text","text":"Q2"}]},
+ {"info":{"id":"a2","role":"assistant"},"parts":[{"type":"tool","tool":"task","state":{"status":"completed"}}]}
+]}
+'@
+$exportPath = Join-Path $dir 'export-fx.json'
+[System.IO.File]::WriteAllText($exportPath, $exportFx, (New-Object System.Text.UTF8Encoding($false)))
+$ec = Get-ExportCounts (ConvertFrom-Json $exportFx) 'ses_twoturn'
+Assert ($ec.tasks -eq 2 -and @($ec.promptIds).Count -eq 2 -and (@($ec.promptIds) -join ',') -eq 'm1,m2') "export：task 2 件；真實題目只有 m1、m2（compaction／synthetic 不算）"
+$v = Get-SessionVerdict 'ses_twoturn' '' $exportPath
+Assert ($v.exportedTasks -eq 2 -and $v.exportedTurns -eq 2 -and $v.turnMismatch -eq 0 -and $v.orphanTurns -eq 0 -and $v.hookMismatch -eq 0) "兩題都有 chat.message → turnMismatch=0；task 件數 2＝閘門看到的 2 → hookMismatch=0"
+New-GateLog 'ses_onlym1' @($chat, $listOk, $connOk, $allow, $exec)
+$v = Get-SessionVerdict 'ses_onlym1' '' $exportPath
+Assert ($v.turnMismatch -eq 1 -and $v.orphanTurns -eq 0) "m2 沒有 chat.message → turnMismatch=1（review 第 2 點的判定）"
+$undoFx = '{"messages":[{"info":{"id":"m1","role":"user"},"parts":[{"type":"text","text":"Q1"}]}]}'
+$undoPath = Join-Path $dir 'export-undo.json'
+[System.IO.File]::WriteAllText($undoPath, $undoFx, (New-Object System.Text.UTF8Encoding($false)))
+$v = Get-SessionVerdict 'ses_twoturn' '' $undoPath
+Assert ($v.turnMismatch -eq 0 -and $v.orphanTurns -eq 1) "/undo 刪掉 m2 → 不算漏（turnMismatch=0）、只記 orphanTurns=1"
+$sum = @($v, (Get-SessionVerdict 'ses_ok' '')) | Measure-Object -Property executedBeforePreflight -Sum
+Assert ($sum.Sum -eq 0) "verdict 是 pscustomobject：Measure-Object -Property 可加總（PS 5.1 對 hashtable 不行）"
 
 Remove-Item -Recurse -Force $dir
 Write-Host ""

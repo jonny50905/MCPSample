@@ -14,8 +14,10 @@
 # 判定（exit 1 ＝ 有違反）：
 #   executedTaskBeforePreflight（會查 DB 的 task 在狀態 READY 之前執行）總和 ＝ 0
 #   hookMismatch（閘門看到的 task 次數 ≠ transcript 的 task 件數）總和 ＝ 0（task hook 覆蓋率 100%）
-#   turnMismatch（閘門看到的 chat.message 次數 ≠ transcript 的 user 訊息數）總和 ＝ 0（每題都有重置）
+#   turnMismatch（transcript 裡的真實 user 訊息（有非 synthetic 的 text／file／agent／subtask part）找不到同 id 的 chat.message）＝ 0
+#     ——compaction／續行／背景回灌那種系統插入的 user 訊息不算題，/undo 刪掉的訊息不算漏（另計 orphanTurns 觀察值）
 #   turnInvariantViolations（已執行的 DB task 在「同一 turn 內」找不到先於它的 list_connections 成功＋connect 成功）＝ 0
+#   （閘門「刻意放行」的不算：oracleMCP 未掛載／連不上退讓、祖先 READY——另計 standDowns 觀察值）
 # 附帶統計（不判定，供觀察模型行為）：blockedRuns＝模型先派 task 被擋的 session 數（＝錯序機率）、
 #   preflightRuns＝有依序完成 list→connect 的 session 數（R8：不需要 DB 的題也應為 100%）。
 # 注意：prompt 走 cmd.exe 命令列——題目禁用半形雙引號與 > < & | % ^（中文引號「」不受限）。
@@ -63,16 +65,59 @@ function Read-Jsonl([string]$Path) {
     return $rows
 }
 
-# 一個 session 的判讀：回傳 hashtable
-function Get-SessionVerdict([string]$SessionId, [string]$OcPath) {
+# 從 opencode export 的物件取：task 工具件數、真實題目（user 訊息）id 清單
+# 真實題目＝role=user 且至少有一個非 synthetic 的 text／file／agent／subtask part；
+# compaction（只有 compaction part）、續行／背景回灌（全部 synthetic）都是系統插的，plugin 不重置、這裡也不算題
+function Get-ExportCounts($Obj, [string]$SessionId) {
+    $n = 0
+    $ids = @()
+    $msgs = @()
+    if ($null -ne $Obj.messages) { $msgs = @($Obj.messages) }
+    foreach ($m in $msgs) {
+        $info = $m.info
+        if ($null -eq $info) { $info = $m }
+        $msid = $info.sessionID
+        $parts = @()
+        if ($null -ne $m.parts) { $parts = @($m.parts) }
+        if ($info.role -eq 'user' -and ($null -eq $msid -or $msid -eq $SessionId)) {
+            $real = $false
+            foreach ($pp in $parts) {
+                if (($pp.synthetic -ne $true) -and (@('text', 'file', 'agent', 'subtask') -contains [string]$pp.type)) { $real = $true }
+            }
+            if ($real) { $ids += [string]$info.id }
+        }
+        foreach ($p in $parts) {
+            if ($p.type -eq 'tool' -and $p.tool -eq 'task') {
+                $sid = $p.sessionID
+                if ($null -eq $sid -or $sid -eq $SessionId) { $n++ }
+            }
+        }
+    }
+    return @{ tasks = $n; promptIds = $ids }
+}
+
+# 一個 session 的判讀：回傳 pscustomobject（PS 5.1 的 Measure-Object／Select-Object 對 hashtable 不吃鍵）
+# -ExportPath：測試用，直接讀 export JSON 檔而不呼叫 opencode
+function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$ExportPath = '') {
     $rows = @(Read-Jsonl (Join-Path $gateDir ($SessionId + '.jsonl')))
     $before = @($rows | Where-Object { $_.hook -eq 'before' -and $_.tool -eq 'task' })
     $blocked = @($before | Where-Object { $_.decision -eq 'block' })
     $wouldBlock = @($before | Where-Object { $_.decision -eq 'observe-would-block' })
     $executed = @($rows | Where-Object { $_.hook -eq 'after' -and $_.tool -eq 'task' -and $_.executed -eq $true })
-    # 會查 DB 的 task 在 READY 之前執行＝違反（observe 模式或閘門退讓時才可能發生）；祖先 READY 放行的子 session 不算
+    # 閘門「刻意放行」的 task（oracleMCP 未掛載／連不上退讓、祖先 READY）：用 callID 把 after 列配回 before 列，不算違反、另計觀察值
+    $exemptIds = @{}
+    foreach ($q in $before) {
+        if ($q.decision -eq 'allow' -and ($q.note -match '^gate stands down' -or $q.note -match 'ancestor READY') -and $q.callID) { $exemptIds[[string]$q.callID] = $true }
+    }
     $ancestorAllowed = (@($before | Where-Object { $_.note -match 'ancestor READY' }).Count -gt 0)
-    $early = @($executed | Where-Object { $_.basis -eq 'run_sql:enabled' -and $_.state -ne 'READY' -and -not $ancestorAllowed })
+    function Test-Exempt($row) {
+        if ($row.callID -and $exemptIds.ContainsKey([string]$row.callID)) { return $true }
+        if (-not $row.callID -and $ancestorAllowed) { return $true }   # 舊版列沒有 callID：整檔以祖先放行處理
+        return $false
+    }
+    $standDowns = @($before | Where-Object { $_.decision -eq 'allow' -and $_.note -match '^gate stands down' }).Count
+    # 會查 DB 的 task 在 READY 之前執行＝違反（observe 模式才會發生；刻意放行的不算）
+    $early = @($executed | Where-Object { $_.basis -eq 'run_sql:enabled' -and $_.state -ne 'READY' -and -not (Test-Exempt $_) })
     $afters = @($rows | Where-Object { $_.hook -eq 'after' })
     $listOk = @($afters | Where-Object { $_.tool -eq 'oracleMCP_list_connections' -and $_.ok -eq $true })
     $connOk = @($afters | Where-Object { $_.tool -eq 'oracleMCP_connect' -and $_.next -eq 'READY' })
@@ -86,6 +131,7 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath) {
     for ($k = 0; $k -lt $rows.Count; $k++) {
         $r = $rows[$k]
         if (-not ($r.hook -eq 'after' -and $r.tool -eq 'task' -and $r.executed -eq $true -and $r.basis -eq 'run_sql:enabled')) { continue }
+        if (Test-Exempt $r) { continue }
         $t = Get-TurnKey $r
         $sawList = $false; $sawConn = $false; $viaAncestor = $false
         for ($j = 0; $j -lt $k; $j++) {
@@ -100,52 +146,42 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath) {
         if (-not ($sawList -and $sawConn) -and -not $viaAncestor) { $turnViol++ }
     }
     $staleBlocks = @($rows | Where-Object { $_.hook -eq 'before' -and $_.tool -eq 'task' -and $_.note -match 'shared connection changed' }).Count
-    # transcript 交叉比對：task 工具件數；user 訊息數（每題一次 chat.message）
+    # transcript 交叉比對：task 工具件數；真實題目 id ↔ chat.message turnId 逐一配對
     $exportedTasks = -1
     $exportedTurns = -1
+    $missingTurns = 0
+    $orphanTurns = 0
     $exportErr = ''
-    if ($OcPath -ne '') {
-        try {
+    $obj = $null
+    try {
+        if ($ExportPath -ne '') { $obj = ConvertFrom-Json ([System.IO.File]::ReadAllText($ExportPath, [System.Text.Encoding]::UTF8)) }
+        elseif ($OcPath -ne '') {
             $json = (& cmd.exe /d /s /c ('"' + $OcPath + '" export ' + $SessionId + ' 2>nul') | Out-String)
             $obj = ConvertFrom-Json $json
-            $n = 0
-            $u = 0
-            $msgs = @()
-            if ($null -ne $obj.messages) { $msgs = @($obj.messages) }
-            foreach ($m in $msgs) {
-                $info = $m.info
-                if ($null -eq $info) { $info = $m }
-                $msid = $info.sessionID
-                $parts = @()
-                if ($null -ne $m.parts) { $parts = @($m.parts) }
-                if ($info.role -eq 'user' -and ($null -eq $msid -or $msid -eq $SessionId)) {
-                    $allSynthetic = ($parts.Count -gt 0)
-                    foreach ($pp in $parts) { if ($pp.synthetic -ne $true) { $allSynthetic = $false } }
-                    if (-not $allSynthetic) { $u++ }
-                }
-                foreach ($p in $parts) {
-                    if ($p.type -eq 'tool' -and $p.tool -eq 'task') {
-                        $sid = $p.sessionID
-                        if ($null -eq $sid -or $sid -eq $SessionId) { $n++ }
-                    }
-                }
-            }
-            $exportedTasks = $n
-            $exportedTurns = $u
         }
-        catch { $exportErr = $_.Exception.Message }
+    }
+    catch { $exportErr = $_.Exception.Message }
+    if ($null -ne $obj) {
+        $ec = Get-ExportCounts $obj $SessionId
+        $exportedTasks = [int]$ec.tasks
+        $promptIds = @($ec.promptIds)
+        $exportedTurns = $promptIds.Count
+        $chatIds = @($chatRows | ForEach-Object { [string]$_.turnId })
+        foreach ($pid0 in $promptIds) { if ($chatIds -notcontains $pid0) { $missingTurns++ } }
+        foreach ($cid in $chatIds) { if ($promptIds -notcontains $cid) { $orphanTurns++ } }
     }
     $mismatch = 0
     if ($exportedTasks -ge 0 -and $exportedTasks -ne $before.Count) { $mismatch = 1 }
-    $turnMismatch = 0
-    if ($exportedTurns -ge 0 -and $exportedTurns -ne $chatRows.Count) { $turnMismatch = 1 }
-    return @{
+    $modeVal = ''
+    $modeRow = @($rows | Where-Object { $_.mode } | Select-Object -First 1)
+    if ($modeRow.Count -gt 0) { $modeVal = [string]$modeRow[0].mode }
+    return [pscustomobject]@{
         sessionID = $SessionId; rows = $rows.Count; taskAttempts = $before.Count; blocked = $blocked.Count
         wouldBlock = $wouldBlock.Count; executed = $executed.Count; executedBeforePreflight = $early.Count
         preflight = $preflight; exportedTasks = $exportedTasks; hookMismatch = $mismatch; exportError = $exportErr
-        turns = $chatRows.Count; exportedTurns = $exportedTurns; turnMismatch = $turnMismatch
-        turnInvariantViolations = $turnViol; staleEpochBlocks = $staleBlocks
-        mode = @($rows | Where-Object { $_.mode } | Select-Object -First 1 | ForEach-Object { $_.mode })
+        turns = $chatRows.Count; exportedTurns = $exportedTurns; turnMismatch = $missingTurns; orphanTurns = $orphanTurns
+        turnInvariantViolations = $turnViol; staleEpochBlocks = $staleBlocks; standDowns = $standDowns
+        mode = $modeVal
     }
 }
 
@@ -177,6 +213,9 @@ function Write-Summary($verdicts, [string]$Label) {
     Write-Host ''
     Write-Host ('sessions=' + $verdicts.Count + '  executedTaskBeforePreflight=' + [int]$early + '  hookMismatch=' + [int]$mism +
         '  turnMismatch=' + [int]$tmism + '  turnInvariantViolations=' + [int]$tviol + '  staleEpochBlocks=' + [int]$stale + '（共用連線被別人改動而重做前置，觀察值）')
+    $orphan = ($verdicts | Measure-Object -Property orphanTurns -Sum).Sum
+    $sd = ($verdicts | Measure-Object -Property standDowns -Sum).Sum
+    Write-Host ('orphanTurns=' + [int]$orphan + '（chat.message 有、transcript 沒有的題：/undo 或 fork，觀察值）  standDowns=' + [int]$sd + '（閘門刻意放行：oracleMCP 未掛載或連不上；多＝那段時間 DB 有問題，觀察值）')
     Write-Host ('blockedRuns=' + $blockedRuns + '（模型先派 task 被擋）  preflightRuns=' + $preflightRuns + '  sessionsWithoutTask=' + $noTask)
     Write-Host ('摘要已寫：' + $out)
     if ([int]$early -gt 0 -or [int]$mism -gt 0 -or [int]$tmism -gt 0 -or [int]$tviol -gt 0) {
@@ -254,7 +293,7 @@ for ($i = 1; $i -le $Runs; $i++) {
     }
     if ($sessionId -eq '') {
         Write-Host '  找不到 sessionID（看 err 檔）' -ForegroundColor Yellow
-        $verdicts += @{ sessionID = ('(run ' + $i + ' no-session)'); rows = 0; taskAttempts = 0; blocked = 0; wouldBlock = 0; executed = 0; executedBeforePreflight = 0; preflight = $false; exportedTasks = -1; hookMismatch = 0; exportError = 'no sessionID'; turns = 0; exportedTurns = -1; turnMismatch = 0; turnInvariantViolations = 0; staleEpochBlocks = 0; mode = '' }
+        $verdicts += [pscustomobject]@{ sessionID = ('(run ' + $i + ' no-session)'); rows = 0; taskAttempts = 0; blocked = 0; wouldBlock = 0; executed = 0; executedBeforePreflight = 0; preflight = $false; exportedTasks = -1; hookMismatch = 0; exportError = 'no sessionID'; turns = 0; exportedTurns = -1; turnMismatch = 0; orphanTurns = 0; turnInvariantViolations = 0; staleEpochBlocks = 0; standDowns = 0; mode = '' }
         if (-not $KeepGoing) { break }
         continue
     }

@@ -11,13 +11,16 @@
 //     （OpenCode 規則：最後匹配者優先；沒列＝預設開）。不在 agent 目錄的名字一律視為會查 DB（保守）。
 //   - 純 ES＋Source 的 subagent（oracleMCP_* 全關）不受閘門影響。
 //   - oracleMCP 未掛載（/mcp 狀態非 connected）→ 閘門退讓，交由 subagent 的 ORACLE_MCP_DOWN 協定。
+//   - 第 0 步已誠實做過但連不上（同一題內 list 成功後 connect 嘗試 ≥ 2 次、零成功＝第 0 步的「再 connect 一次」也做了）
+//     → 閘門退讓（只擋順序，不擋可用性），交由 subagent 的 NOT_CONNECTED 協定；純 chunk 的 ps-auditor 任務因此不會在 DB 掛掉時整批卡死。
 //   - 狀態以 session 為單位，每則使用者訊息重置為 NEED_LIST（第 0 步「不因上一題已連過就省略」）。
 //   - subagent 報告 blockedReason=NOT_CONNECTED → 狀態退回 NEED_CONNECT（重派前必須再 connect 一次）。
 //   - 本 session 呼叫 oracleMCP_disconnect → 狀態退回 NEED_LIST。
 //   - 連線是 SQLcl MCP server 的全域單例（所有 session、所有 OpenCode 行程共用）：任何 session 的
 //     connect／disconnect 嘗試都會推進「連線 epoch」（寫在 auto-loop-logs/ps-oracle-gate/connection-epoch.json，
 //     跨行程可見）；session 的 READY 只在「完成前置時的 epoch ＝ 目前 epoch」才算數，否則視為共用連線已被
-//     別的 session／視窗改動，退回 NEED_LIST、擋下並要求重做第 0 步。
+//     別的 session／視窗改動，退回 NEED_LIST、擋下並要求重做第 0 步。connect 完成時還要核對「我這次
+//     connect 推進的 epoch」是否仍是目前 epoch——兩個 session 的 connect 交錯時，只有最後起跑的那個算 READY。
 //   - oracleMCP 掛載狀態每次即時查（不快取）——退讓與否是正確性判斷，不能用舊資料。
 //   - 「每則訊息重置」只算真實 user 訊息：全部 part 都是 synthetic 的（背景 subagent 結果回灌、compaction
 //     自動續行）不重置；turn 識別用該則 user 訊息 id（跨行程唯一）。
@@ -219,6 +222,8 @@ export const PsOraclePreflightGate = async (input) => {
   const logDir = path.join(directory, LOG_SUBDIR)
   const sessions = new Map()
   const parents = new Map()
+  // task 入場時（before）的快照，after 列用它標 turn／state——使用者在 task 執行中送下一題時，after 列才不會被錯標到新 turn
+  const admitted = new Map()
   let catalog = loadAgentCatalog(directory)
   let catalogLoaded = Date.now()
   const epochFile = path.join(logDir, EPOCH_FILE_NAME)
@@ -255,49 +260,65 @@ export const PsOraclePreflightGate = async (input) => {
     }
   }
 
-  // 全域連線 epoch：檔案為準（跨行程），讀不到才用本行程記憶
-  function readEpoch() {
-    try {
-      const obj = JSON.parse(fs.readFileSync(epochFile, "utf8"))
-      if (obj && typeof obj.epoch === "string" && obj.epoch) {
-        memEpoch = obj.epoch
-        return obj.epoch
+  // 全域連線 epoch：檔案為準（跨行程），讀不到才用本行程記憶。回傳 { epoch, by }，by＝推進者（誰、哪個工具）
+  let memBy = ""
+  function readEpochInfo() {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const obj = JSON.parse(fs.readFileSync(epochFile, "utf8"))
+        if (obj && typeof obj.epoch === "string" && obj.epoch) {
+          memEpoch = obj.epoch
+          memBy = `${obj.tool ?? "?"} by session ${obj.sessionID ?? "?"} pid ${obj.pid ?? "?"}`
+          return { epoch: obj.epoch, by: memBy }
+        }
+        break
+      } catch (e) {
+        if (e && e.code === "ENOENT") break
+        // 壞掉／讀到一半 → 再讀一次
       }
-    } catch {
-      // 沒有檔或壞掉 → 用記憶值（第一次為空字串）
     }
-    return memEpoch
+    return { epoch: memEpoch, by: memBy }
+  }
+  function readEpoch() {
+    return readEpochInfo().epoch
   }
 
   function bumpEpoch(sessionID, tool) {
     epochCounter += 1
     const token = `${Date.now()}-${process.pid}-${epochCounter}`
     memEpoch = token
-    try {
-      ensureLogDir()
-      const tmp = epochFile + "." + process.pid + ".tmp"
-      fs.writeFileSync(tmp, JSON.stringify({ epoch: token, ts: nowIso(), pid: process.pid, sessionID, tool }))
-      fs.renameSync(tmp, epochFile)
-    } catch {
-      // 寫不進去：本行程仍以記憶值運作
+    memBy = `${tool} by session ${sessionID} pid ${process.pid}`
+    let written = false
+    let lastErr = ""
+    for (let attempt = 0; attempt < 3 && !written; attempt++) {
+      try {
+        ensureLogDir()
+        const tmp = epochFile + "." + process.pid + ".tmp"
+        fs.writeFileSync(tmp, JSON.stringify({ epoch: token, ts: nowIso(), pid: process.pid, sessionID, tool }))
+        fs.renameSync(tmp, epochFile)
+        written = true
+      } catch (e) {
+        lastErr = String(e && e.code ? e.code : e)
+      }
     }
-    return token
+    if (!written) pluginLog(`epoch write failed (${lastErr}) session=${sessionID} tool=${tool}: this process falls back to in-memory epoch`)
+    return { token, written, error: written ? undefined : lastErr }
   }
 
   function getSession(sessionID) {
     let s = sessions.get(sessionID)
     if (!s) {
-      s = { state: "NEED_LIST", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0, readyEpoch: undefined }
+      s = { state: "NEED_LIST", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0, readyEpoch: undefined, pending: undefined, connectAttempts: 0, connectSuccesses: 0 }
       sessions.set(sessionID, s)
     }
     return s
   }
 
   // READY 只在 epoch 沒被別人推進時算數；過期就退回 NEED_LIST（回傳過期說明）
-  function readiness(s, epoch) {
+  function readiness(s, info) {
     if (s.state !== "READY") return { ready: false }
-    if (s.readyEpoch === epoch) return { ready: true }
-    const stale = `shared connection changed since preflight (epoch ${s.readyEpoch} -> ${epoch})`
+    if (s.readyEpoch === info.epoch) return { ready: true }
+    const stale = `shared connection changed since preflight (epoch ${s.readyEpoch} -> ${info.epoch}; ${info.by || "unknown source"})`
     s.state = "NEED_LIST"
     s.readyEpoch = undefined
     return { ready: false, stale }
@@ -331,7 +352,7 @@ export const PsOraclePreflightGate = async (input) => {
     }
   }
 
-  async function readyAncestor(sessionID, epoch) {
+  async function readyAncestor(sessionID, info) {
     let id = sessionID
     for (let depth = 0; depth < ANCESTOR_MAX_DEPTH; depth++) {
       let parent = parents.get(id)
@@ -347,7 +368,7 @@ export const PsOraclePreflightGate = async (input) => {
       }
       if (!parent) return undefined
       const ps = sessions.get(parent)
-      if (ps && readiness(ps, epoch).ready) return parent
+      if (ps && readiness(ps, info).ready) return parent
       id = parent
     }
     return undefined
@@ -373,14 +394,20 @@ export const PsOraclePreflightGate = async (input) => {
         record(sessionID, { hook: "chat.message", agent: s.agent, turn: s.turn, turnId: s.turnId, state: s.state, next: s.state, synthetic: true, note: "all parts synthetic: no reset" })
         return
       }
+      // turn 識別用該則 user 訊息的 id（跨行程唯一；opencode run --session 續接是新行程，計數器會歸零）
+      const mid = out && typeof out === "object" && out.message && typeof out.message.id === "string" ? out.message.id : msg.messageID
+      if (typeof mid === "string" && mid && mid === s.turnId) {
+        record(sessionID, { hook: "chat.message", agent: s.agent, turn: s.turn, turnId: s.turnId, state: s.state, next: s.state, note: "same message id: no reset" })
+        return
+      }
       const prev = s.state
       s.state = "NEED_LIST"
       s.readyEpoch = undefined
       s.turn += 1
-      // turn 識別用該則 user 訊息的 id（跨行程唯一；opencode run --session 續接是新行程，計數器會歸零）
-      const mid = out && typeof out === "object" && out.message && typeof out.message.id === "string" ? out.message.id : msg.messageID
       s.turnId = typeof mid === "string" && mid ? mid : `${process.pid}-${s.turn}`
       s.blocked = 0
+      s.connectAttempts = 0
+      s.connectSuccesses = 0
       record(sessionID, { hook: "chat.message", agent: s.agent, turn: s.turn, turnId: s.turnId, state: prev, next: s.state, mode: readMode(directory) })
     },
 
@@ -388,12 +415,23 @@ export const PsOraclePreflightGate = async (input) => {
       const tool = String(info?.tool ?? "")
       const sessionID = info?.sessionID
       const args = out && typeof out === "object" && out.args && typeof out.args === "object" ? out.args : {}
+      const callID = String(info?.callID ?? "")
       if (tool !== TOOL_TASK) {
         if (tool.startsWith(MCP_PREFIX)) {
           const s = getSession(sessionID)
-          // connect／disconnect 的「嘗試」就可能改動全域連線（含失敗的 connect）→ 先推進 epoch
-          const epoch = tool === TOOL_CONNECT || tool === TOOL_DISCONNECT ? bumpEpoch(sessionID, tool) : undefined
-          record(sessionID, { hook: "before", tool, agent: s.agent, turn: s.turn, turnId: s.turnId, state: s.state, decision: "observe", epoch })
+          // connect／disconnect 的「嘗試」就可能改動全域連線（含失敗的 connect）→ 先推進 epoch，並記住這次的 token
+          let epoch
+          let epochWriteError
+          if (tool === TOOL_CONNECT || tool === TOOL_DISCONNECT) {
+            const b = bumpEpoch(sessionID, tool)
+            epoch = b.token
+            epochWriteError = b.error
+            if (tool === TOOL_CONNECT) {
+              s.pending = { callID, token: b.token }
+              s.connectAttempts += 1
+            }
+          }
+          record(sessionID, { hook: "before", tool, callID, agent: s.agent, turn: s.turn, turnId: s.turnId, state: s.state, decision: "observe", epoch, epochWriteError })
         }
         return
       }
@@ -401,34 +439,49 @@ export const PsOraclePreflightGate = async (input) => {
       const s = getSession(sessionID)
       const mode = readMode(directory)
       const cls = classifyTarget(target)
-      const epoch = readEpoch()
-      const base = { hook: "before", tool, agent: s.agent, turn: s.turn, turnId: s.turnId, target, state: s.state, mode, basis: cls.basis, epoch }
+      const info2 = readEpochInfo()
+      const base = { hook: "before", tool, callID, agent: s.agent, turn: s.turn, turnId: s.turnId, target, state: s.state, mode, basis: cls.basis, epoch: info2.epoch }
+      const admit = (decision) => {
+        if (callID) admitted.set(callID, { turnId: s.turnId, turn: s.turn, state: s.state, decision })
+        if (admitted.size > 500) admitted.delete(admitted.keys().next().value)
+      }
       if (!cls.gated) {
+        admit("allow")
         record(sessionID, { ...base, decision: "allow", note: "target does not query DB" })
         return
       }
-      const rd = readiness(s, epoch)
+      const rd = readiness(s, info2)
       if (rd.ready) {
+        admit("allow")
         record(sessionID, { ...base, decision: "allow" })
         return
       }
-      const ancestor = await readyAncestor(sessionID, epoch)
+      const ancestor = await readyAncestor(sessionID, info2)
       if (ancestor) {
+        admit("allow")
         record(sessionID, { ...base, decision: "allow", note: "ancestor READY " + ancestor })
         return
       }
       const mcp = await oracleMounted()
       if (mcp.mounted === false) {
+        admit("allow")
         record(sessionID, { ...base, state: s.state, decision: "allow", note: "gate stands down: " + mcp.basis + (rd.stale ? "; " + rd.stale : "") })
+        return
+      }
+      // 第 0 步已誠實做過（list 成功）且 connect 連失敗 ≥ 2 次（含「再 connect 一次」）：只擋順序、不擋可用性 → 退讓
+      if (s.state === "NEED_CONNECT" && s.connectAttempts >= 2 && s.connectSuccesses === 0) {
+        admit("allow")
+        record(sessionID, { ...base, state: s.state, decision: "allow", note: `gate stands down: connect failed x${s.connectAttempts} after list_connections (subagent NOT_CONNECTED protocol applies)` })
         return
       }
       s.blocked += 1
       const reason = rd.stale
-        ? "你完成第 0 步之後，共用的 Oracle 連線已被其他 session／視窗的 connect 或 disconnect 改動過（連線是全域單例），必須重做第 0 步"
+        ? `你完成第 0 步之後，共用的 Oracle 連線已被改動過（${info2.by || "其他 session／視窗的 connect 或 disconnect"}；連線是全域單例），必須重做第 0 步`
         : undefined
       const message = buildBlockMessage(target, s.state, s.blocked, reason)
       const note = [mcp.basis, rd.stale].filter(Boolean).join("; ")
       if (mode === "observe") {
+        admit("observe-would-block")
         record(sessionID, { ...base, state: s.state, decision: "observe-would-block", blocked: s.blocked, note })
         return
       }
@@ -440,10 +493,11 @@ export const PsOraclePreflightGate = async (input) => {
       const tool = String(info?.tool ?? "")
       const sessionID = info?.sessionID
       if (tool !== TOOL_TASK && !tool.startsWith(MCP_PREFIX)) return
+      const callID = String(info?.callID ?? "")
       const s = getSession(sessionID)
       const text = outputText(out)
       const prev = s.state
-      const base = { hook: "after", tool, agent: s.agent, turn: s.turn, turnId: s.turnId, state: prev, outputLength: text.length }
+      const base = { hook: "after", tool, callID, agent: s.agent, turn: s.turn, turnId: s.turnId, state: prev, outputLength: text.length }
       if (tool === TOOL_LIST) {
         const fail = failureMatch(text)
         if (!fail && s.state === "NEED_LIST") s.state = "NEED_CONNECT"
@@ -452,15 +506,23 @@ export const PsOraclePreflightGate = async (input) => {
       }
       if (tool === TOOL_CONNECT) {
         const fail = failureMatch(text)
-        const epoch = readEpoch()
+        const cur = readEpochInfo()
+        const mine = s.pending && s.pending.callID === callID ? s.pending.token : undefined
+        s.pending = undefined
         let note
-        if (!fail && (s.state === "NEED_CONNECT" || s.state === "READY")) {
-          s.state = "READY"
-          s.readyEpoch = epoch
-        } else if (!fail && s.state === "NEED_LIST") {
+        if (!fail && s.state === "NEED_LIST") {
           note = "connect before list_connections: list still required"
+        } else if (!fail && mine !== undefined && cur.epoch !== mine) {
+          // 我的 connect 起跑後又有別的 connect／disconnect 起跑：伺服器上的目前連線是最後那個的，不算 READY
+          s.state = "NEED_CONNECT"
+          s.readyEpoch = undefined
+          note = `another connect/disconnect interleaved with yours (epoch ${mine} -> ${cur.epoch}; ${cur.by}): connect again`
+        } else if (!fail && (s.state === "NEED_CONNECT" || s.state === "READY")) {
+          s.state = "READY"
+          s.readyEpoch = cur.epoch
+          s.connectSuccesses += 1
         }
-        record(sessionID, { ...base, next: s.state, ok: !fail, failureMatch: fail || undefined, epoch, note })
+        record(sessionID, { ...base, next: s.state, ok: !fail, failureMatch: fail || undefined, epoch: cur.epoch, note })
         return
       }
       if (tool === TOOL_DISCONNECT) {
@@ -474,13 +536,17 @@ export const PsOraclePreflightGate = async (input) => {
         const target = String(args.subagent_type ?? "")
         const cls = classifyTarget(target)
         const notConnected = /"blockedReason"\s*:\s*"NOT_CONNECTED"/.test(text)
+        const adm = callID ? admitted.get(callID) : undefined
+        if (callID) admitted.delete(callID)
         let note
         if (cls.gated && notConnected && s.state === "READY") {
           s.state = "NEED_CONNECT"
           s.readyEpoch = undefined
           note = "subagent reported NOT_CONNECTED: connect again before re-dispatch"
         }
-        record(sessionID, { ...base, target, executed: true, basis: cls.basis, next: s.state, notConnected, note })
+        // turn／state 用入場時的快照（使用者在 task 執行中送下一題，狀態已被重置，但這個 task 屬於前一題）
+        const stamped = adm ? { turn: adm.turn, turnId: adm.turnId, state: adm.state, admitted: adm.decision } : { admitted: "unknown" }
+        record(sessionID, { ...base, ...stamped, target, executed: true, basis: cls.basis, next: s.state, notConnected, note })
         return
       }
       record(sessionID, { ...base, next: s.state })

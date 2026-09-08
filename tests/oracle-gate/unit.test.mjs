@@ -158,7 +158,7 @@ test("連線 epoch：別的 session connect／disconnect 後 READY 過期，必�
   await hooks["tool.execute.before"]({ tool: "task", sessionID: A, callID: "c" }, taskArgs("ps-ui-flow"))
   // B 只是「嘗試」connect（before 就推進 epoch，失敗的 connect 也可能改動全域連線）
   await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: B, callID: "c" }, { args: { connection_name: "OTHER" } })
-  await assert.rejects(() => hooks["tool.execute.before"]({ tool: "task", sessionID: A, callID: "c" }, taskArgs("ps-ui-flow")), (e) => /共用的 Oracle 連線已被其他 session/.test(e.message) && /目前狀態＝NEED_LIST/.test(e.message))
+  await assert.rejects(() => hooks["tool.execute.before"]({ tool: "task", sessionID: A, callID: "c" }, taskArgs("ps-ui-flow")), (e) => /共用的 Oracle 連線已被改動過/.test(e.message) && /目前狀態＝NEED_LIST/.test(e.message))
   let log = readLog(dir, A)
   assert.match(log.at(-1).note, /shared connection changed since preflight/)
   // A 重做 list→connect → 放行
@@ -212,4 +212,81 @@ test("全部 part 都 synthetic 的 user 訊息（背景結果回灌／compactio
   log = readLog(dir, S)
   assert.equal(log.at(-1).turnId, "msg_2")
   assert.equal(log.filter((l) => l.hook === "chat.message" && l.synthetic !== true).length, 2)
+})
+
+test("connect 交錯：A 起跑後 B 也 connect，A 完成時不算 READY，B 算", async () => {
+  const dir = tempProject()
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  const A = "ses_A2", B = "ses_B2"
+  for (const sid of [A, B]) {
+    await hooks["chat.message"]({ sessionID: sid, agent: "ps-orchestrator" })
+    await hooks["tool.execute.after"]({ tool: "oracleMCP_list_connections", sessionID: sid, callID: "l" + sid, args: {} }, mcpOk("- HR"))
+  }
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: A, callID: "cA" }, { args: { connection_name: "HR" } })
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: B, callID: "cB" }, { args: { connection_name: "OTHER" } })
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_connect", sessionID: A, callID: "cA", args: {} }, mcpOk("Connected to HR"))
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_connect", sessionID: B, callID: "cB", args: {} }, mcpOk("Connected to OTHER"))
+  await expectBlock(() => hooks["tool.execute.before"]({ tool: "task", sessionID: A, callID: "t" }, taskArgs("ps-ui-flow")), "NEED_CONNECT")
+  await hooks["tool.execute.before"]({ tool: "task", sessionID: B, callID: "t" }, taskArgs("ps-ui-flow"))
+  const logA = readLog(dir, A)
+  assert.ok(logA.some((l) => l.tool === "oracleMCP_connect" && l.hook === "after" && /interleaved/.test(l.note ?? "") && l.next === "NEED_CONNECT"))
+  assert.equal(readLog(dir, B).at(-1).decision, "allow")
+  // A 再 connect 一次（沒人插隊）→ READY
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: A, callID: "cA2" }, { args: {} })
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_connect", sessionID: A, callID: "cA2", args: {} }, mcpOk("Connected to HR"))
+  await hooks["tool.execute.before"]({ tool: "task", sessionID: A, callID: "t2" }, taskArgs("ps-ui-flow"))
+  assert.equal(readLog(dir, A).at(-1).decision, "allow")
+  // 過期訊息要標明來源
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_disconnect", sessionID: B, callID: "d" }, { args: {} })
+  await assert.rejects(() => hooks["tool.execute.before"]({ tool: "task", sessionID: A, callID: "t3" }, taskArgs("ps-ui-flow")), (e) => /oracleMCP_disconnect by session ses_B2/.test(e.message))
+})
+
+test("task 執行中使用者送下一題：after 列用入場時的 turn／state，不被錯標", async () => {
+  const dir = tempProject()
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, { message: { id: "m1" }, parts: [{ type: "text", text: "Q1" }] })
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_list_connections", sessionID: S, callID: "l", args: {} }, mcpOk("- HR"))
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: S, callID: "c" }, { args: {} })
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_connect", sessionID: S, callID: "c", args: {} }, mcpOk("Connected"))
+  await hooks["tool.execute.before"]({ tool: "task", sessionID: S, callID: "t1" }, taskArgs("ps-ui-flow"))
+  // 下一題到了（狀態重置），然後 t1 才完成
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, { message: { id: "m2" }, parts: [{ type: "text", text: "Q2" }] })
+  await hooks["tool.execute.after"]({ tool: "task", sessionID: S, callID: "t1", args: taskArgs("ps-ui-flow").args }, { title: "t", metadata: {}, output: '<task_result>{"status":"COMPLETE"}</task_result>' })
+  const row = readLog(dir, S).at(-1)
+  assert.equal(row.executed, true)
+  assert.equal(row.turnId, "m1")
+  assert.equal(row.state, "READY")
+  assert.equal(row.admitted, "allow")
+  assert.equal(row.next, "NEED_LIST")
+  // 同一則訊息 id 再來一次不重置
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, { message: { id: "m2" }, parts: [{ type: "text", text: "Q2" }] })
+  assert.match(readLog(dir, S).at(-1).note, /same message id/)
+})
+
+test("第 0 步誠實做過但連不上：list 成功、connect 失敗 2 次後閘門退讓（交 NOT_CONNECTED 協定）", async () => {
+  const dir = tempProject()
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-deep-research" }, { message: { id: "m1" }, parts: [{ type: "text", text: "audit" }] })
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_list_connections", sessionID: S, callID: "l", args: {} }, mcpOk("- HR"))
+  // 第一次 connect：MCP isError → 只有 before（after 不會觸發）
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: S, callID: "c1" }, { args: { connection_name: "HR" } })
+  await expectBlock(() => hooks["tool.execute.before"]({ tool: "task", sessionID: S, callID: "t1" }, taskArgs("ps-auditor")), "NEED_CONNECT")
+  // 第二次 connect：回錯誤文字
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: S, callID: "c2" }, { args: { connection_name: "HR" } })
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_connect", sessionID: S, callID: "c2", args: {} }, mcpOk("ORA-12541: TNS:no listener"))
+  await hooks["tool.execute.before"]({ tool: "task", sessionID: S, callID: "t2" }, taskArgs("ps-auditor"))
+  const row = readLog(dir, S).at(-1)
+  assert.equal(row.decision, "allow")
+  assert.match(row.note, /connect failed x2 after list_connections/)
+  // 沒做 list 就 connect 失敗兩次 → 不退讓（順序沒誠實做）
+  const S2 = "ses_nolist"
+  await hooks["chat.message"]({ sessionID: S2, agent: "ps-deep-research" }, { message: { id: "m9" }, parts: [{ type: "text", text: "x" }] })
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: S2, callID: "a" }, { args: {} })
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: S2, callID: "b" }, { args: {} })
+  await expectBlock(() => hooks["tool.execute.before"]({ tool: "task", sessionID: S2, callID: "t" }, taskArgs("ps-auditor")), "NEED_LIST")
+  // 新的一題重新計數
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-deep-research" }, { message: { id: "m2" }, parts: [{ type: "text", text: "next" }] })
+  await hooks["tool.execute.after"]({ tool: "oracleMCP_list_connections", sessionID: S, callID: "l2", args: {} }, mcpOk("- HR"))
+  await hooks["tool.execute.before"]({ tool: "oracleMCP_connect", sessionID: S, callID: "c3" }, { args: {} })
+  await expectBlock(() => hooks["tool.execute.before"]({ tool: "task", sessionID: S, callID: "t3" }, taskArgs("ps-auditor")), "NEED_CONNECT")
 })

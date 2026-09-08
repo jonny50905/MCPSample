@@ -73,6 +73,10 @@ user 訊息 id（`turnId`）、analyzer 加 turnMismatch／turnInvariantViolatio
 （SOP-21 步驟 1）；全部 part 都 synthetic 的 user 訊息（背景 subagent 回灌／compaction 續行）不重置；`ps-fs-doctor` 的 `Get-TransferFiles`
 加 `-Force`（Linux 維護端把 `.npmrc` 當隱藏檔漏出 manifest）並排除 OpenCode 產生的安裝痕跡，manifest 59 檔。單元 8 組、e2e 9 情境（含 serve）全 PASS；
 test-auto-loop 情境 33 用固定 jsonl 樣本驗回歸腳本的判定函式（含「第二題沒重做前置」→ turnViol）。
+**第二輪對抗式驗證後再修**：connect 交錯的 TOCTOU（before 記 token、after 核對）、epoch 來源標註與寫檔重試、task 入場快照（使用者在
+task 執行中送下一題不誤標）、`turnMismatch` 改真實題目 id 比對（compaction／`/undo` 不誤判；e2e `compaction-serve`）、verdict 改
+pscustomobject（PS 5.1 的 Measure-Object）、閘門只擋順序不擋可用性（list 成功後 connect 失敗 ≥2 次退讓，交 NOT_CONNECTED 協定；
+analyzer 把刻意放行另計 standDowns）。單元 11 組、e2e 11 情境、PowerShell 238 判定全 PASS。
 
 ## 1. 管理者下一步（按序）
 
@@ -123,17 +127,17 @@ test-auto-loop 情境 33 用固定 jsonl 樣本驗回歸腳本的判定函式（
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；含 review 後的連線 epoch／turnId／不快取） | 489 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；含 review 後的連線 epoch／turnId／不快取） | 555 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
    | `.opencode/.npmrc` | 新增 | 6 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時） |
    | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce） | 106 | 本機已回填 FILL_ME 者只加 `preflightGate` 那 5 行（fs-doctor 報此檔 M 屬預期） |
-   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 追記＋舊敘述改現況＋SOP-21 部署與驗證） | 712 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115） | 3146 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 追記＋舊敘述改現況＋SOP-21 部署與驗證） | 724 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115） | 3159 | |
    | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R15） | 687 | |
    | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 32＋情境 33） | 757 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 32＋情境 33） | 790 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
    | `scripts/ps-fs-doctor.ps1` | 修改（Get-TransferFiles 加 -Force、排除 OpenCode 安裝痕跡） | 312 | 存 UTF-8 with BOM；先搬它再重生對照才看得到 .npmrc |
-   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析） | 267 | 存 UTF-8 with BOM；用法見 SOP-21 |
-   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD a31c946，早一步屬預期） |
+   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析） | 306 | 存 UTF-8 with BOM；用法見 SOP-21 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD dd54ab3，早一步屬預期） |
    | `AGENTS.md` | 修改（第 0 步先於「先查 wiki」；plugin 零相依鐵律） | 91 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
 
    `tests/oracle-gate/*`（沙箱單元／e2e 測試組）與 `docs/design/oracle-preflight-gate-decision-memo.md` 不搬。
