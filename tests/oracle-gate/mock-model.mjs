@@ -8,7 +8,11 @@
 //     compliant      list → connect → task → 收尾（第 0 步照做）
 //     stubborn       只會一直 task（不做前置），連續 4 次後放棄作答（驗證閘門不放行）
 //     nodb           直接派 ps-peoplecode-flow（不查 DB 的 subagent）→ 收尾（驗證不受閘門影響）
+//     epoch          list → connect → （模擬另一個行程 connect：改寫 MOCK_EPOCH_FILE）→ task → 被擋（共用連線已變）
+//                    → list → connect → task → 收尾
+//   劇本以「最後一則 user 訊息之後」的工具呼叫為準（同 session 多 turn 時每 turn 重新走劇本）
 //   MOCK_MODEL_LOG        每次請求追加一行 JSON
+//   MOCK_EPOCH_FILE       epoch 情境要改寫的檔（plugin 的 connection-epoch.json）
 import http from "node:http"
 import fs from "node:fs"
 
@@ -31,11 +35,12 @@ function toolNames(body) {
   return new Set((body.tools ?? []).map((t) => t?.function?.name).filter(Boolean))
 }
 
-// 把對話壓成「已發生的工具呼叫序列」：[{name, args, result}]
+// 把對話壓成「最後一則 user 訊息之後已發生的工具呼叫序列」：[{name, args, result}]
 function history(body) {
-  const calls = []
+  let calls = []
   const byId = new Map()
   for (const m of body.messages ?? []) {
+    if (m.role === "user") { calls = []; continue }
     if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
       for (const tc of m.tool_calls) {
         let args = {}
@@ -94,6 +99,19 @@ function primaryNext(calls) {
     case "nodb": {
       if (n === 0) return TASK("ps-peoplecode-flow")
       return { text: "DONE: " + JSON.stringify({ scenario, calls: calls.map((c) => c.name) }) }
+    }
+    case "epoch": {
+      if (n === 0) return LIST
+      if (n === 1) return CONNECT(pickConnection(calls[0].result))
+      if (n === 2) {
+        // 模擬另一個 OpenCode 行程剛 connect：直接改寫 epoch 檔
+        const f = process.env.MOCK_EPOCH_FILE
+        if (f) { try { fs.writeFileSync(f, JSON.stringify({ epoch: "foreign-" + Date.now(), ts: new Date().toISOString(), pid: 0, sessionID: "other", tool: "oracleMCP_connect" })) } catch {} }
+        return TASK("ps-ui-flow")
+      }
+      if (last.name === "task") return LIST
+      if (last.name === "oracleMCP_list_connections") return CONNECT(pickConnection(last.result))
+      return TASK("ps-ui-flow")
     }
     case "task-first":
     default: {

@@ -3111,3 +3111,35 @@
 - 待公司機驗：(a) `auto-loop-logs\ps-oracle-gate\_plugin.log` 有 loaded 行；(b) 啟動不再多等（.npmrc 生效）；
   (c) 真 SQLcl `list_connections`／`connect` 成功回覆不命中 FAILURE_PATTERNS（jsonl 的 `ok:true`、`next:READY`）；
   (d) `test-oracle-gate-runtime.ps1 -Scenario B1 -Runs 30` 判定 PASS；(e) 互動 20 題後 `-AnalyzeAll` hookMismatch＝0。
+- 追記（2026-09-08，外部 review 五點；handover 第二筆 commit）：
+  (1) **共用連線 vs per-session READY**（Must，成立）：連線是 SQLcl MCP 的全域單例，別的 session／視窗 connect 或 disconnect 後，
+  本 session 的 READY 已不代表連線仍是自己預期的那條（最壞：被切到別的 saved connection，SELECT 成功但查錯庫）。落點：
+  「連線 epoch」——任何 session 的 connect／disconnect **嘗試**（before hook；失敗的 connect 也可能改動全域狀態）都推進
+  epoch，寫在 `auto-loop-logs/ps-oracle-gate/connection-epoch.json`（temp＋rename，跨 OpenCode 行程可見：互動 TUI 與
+  ps-auto-loop 的 headless 行程共用同一檔）；session 完成前置時記下 `readyEpoch`；派 DB task 時 READY 且 readyEpoch＝目前
+  epoch 才放行，否則退回 NEED_LIST、擋下並告訴模型「共用連線已被其他 session／視窗改動，重做第 0 步」。代價：別人動過
+  連線後多做一次 list→connect（冪等）。e2e `epoch` 情境（假模型在前置完成後改寫 epoch 檔模擬另一行程 connect）＋單元測試。
+  (2) **每題重置的覆蓋率**（Must Verify，成立）：原 analyzer 只證明 task hook 覆蓋率，沒證明 chat.message 每題都有 fire。
+  落點：turn 識別改用該則 user 訊息 id（`turnId`，跨行程唯一——`opencode run --session` 續接是新行程，數字 turn 會歸零）；
+  analyzer 加 `turnMismatch`（chat.message 次數＝export 的 user 訊息數）與 `turnInvariantViolations`（每個已執行的 DB task
+  在同一 turnId 內、在它之前必須有 list 成功＋connect→READY），兩者都判定。e2e 加 `multi-turn`（run --session，跨行程）與
+  `multi-turn-serve`（`opencode serve` 同一行程對同一 session 連送兩題：第二則 chat.message 到來時 session 仍 READY，
+  斷言它被重置為 NEED_LIST 後才擋、再前置、再放行）——兩者在真 OpenCode 1.18.29 上 PASS。
+  (3) **ps-auditor 混合能力被過度 gate**（Medium，成立但暫不改）：閘門按 agent 能力（tools 表 run_sql）判定，不按任務意圖；
+  ps-auditor 任務 A 一個檔的 evidence 混有 CHUNK 與 SQL 兩種，檔級拆不開；OpenCode task 工具沒有 metadata 通道，只有自由文字
+  （不採）。影響範圍：只在「oracleMCP 有掛載但 connect 失敗」時 ps-auditor 的純 chunk 任務也被擋（未掛載時閘門退讓不受影響），
+  而第 0 步規則本就說 connect 失敗不派 DB 委派。決定：記為已知限制（SOP-21 第 8 條），拆 ps-auditor-source／ps-auditor-db
+  另開 issue 由管理者決定（牽動稽核協定：part 收據、evidence 分頁、派工規則）。
+  (4) **mcp.status 15 秒快取**（Medium，成立）：退讓與否是正確性判斷，不能用舊資料。落點：拿掉快取，每次即時查（只在 DB task
+  本來要被擋時才查，成本可忽略）；單元測試「failed 之後馬上 connected → 第二次就擋」。
+  (5) **SOP-12 舊敘述**（Low，成立）：L109 段的「主 agent 權限全關、第一個 subagent 開線」「先直接查、回未連線才 connect」與
+  現況相反——就地改為現況並標【已作廢】（SOP 是給人看的檔，這裡不套「只加不刪」）。
+  review 沒提、本輪對碼另發現：(a) `waitForDependencies` 等的是**所有** config 目錄的安裝，含全域設定目錄
+  `~/.config/opencode`——只放專案 `.opencode/.npmrc` 仍等 72 秒，全域目錄也放一份 `offline=true` 才 1.8 秒（SOP-21 步驟 1；
+  repo 外、不在 manifest）；(b) 背景 subagent 結果回灌（task.ts `injectBackgroundResult`）與 compaction 自動續行都以
+  `synthetic: true` 的 user 訊息走 `SessionPrompt.prompt` → 觸發 `chat.message`；OpenCode 自己把「全部 part 都 synthetic」
+  的訊息當非真實訊息（prompt.ts 對 title／summary 的判定），plugin 照辦不重置、analyzer 計數也排除；
+  (c) `opencode run --session` 續接是新行程，plugin 記憶體狀態與數字 turn 歸零——turn 識別改用 user 訊息 id；
+  (d) analyzer 對「祖先 READY 放行」的子 session 不記違反（subagent_depth > 1 才會發生）；(e) `.npmrc` 這種點檔在 Linux 維護端被
+  PowerShell 當隱藏檔，`ps-fs-doctor` 的 `Get-TransferFiles` 漏了它——加 `-Force` 並排除 OpenCode 產生的安裝痕跡（node_modules／
+  package*.json／bun.lock／.gitignore），manifest 59 檔。

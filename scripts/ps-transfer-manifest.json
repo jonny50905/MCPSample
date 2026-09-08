@@ -1,7 +1,13 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "6f26629",
+  "commit": "a31c946",
   "files": [
+    {
+      "path": ".opencode/.npmrc",
+      "lines": 6,
+      "sha256": "546cb9c184f3c1d5e4015e4612f02b631990c09f01859caa9989124114ba0d0b",
+      "bom": false
+    },
     {
       "path": ".opencode/agent/explore.md",
       "lines": 25,
@@ -124,8 +130,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3113,
-      "sha256": "e5c1860384070285ce0f525b3f5be8c61c620d0cd31fd3b1e591a5008138cc8f",
+      "lines": 3145,
+      "sha256": "2a46e0a41ce38940d542d87fcfff5300570f6c79b3ed80f93557678c8fac5c61",
       "bom": false
     },
     {
@@ -196,8 +202,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 694,
-      "sha256": "97c2e52b817002b06c53b2d77f9b7b438b0dc71af448217846e1e95134294136",
+      "lines": 712,
+      "sha256": "ef3e9f0d6e809171690c51443c43c57d8ff27664d8866982e7aa37d181d5f413",
       "bom": false
     },
     {
@@ -214,14 +220,14 @@
     },
     {
       "path": ".opencode/peoplesoft/test-scenarios.md",
-      "lines": 686,
-      "sha256": "8911f4f981f42ed4df9261cf604653594879f3a818298a8d5e30e584600f220b",
+      "lines": 687,
+      "sha256": "53d9dbf0c6014f357ae433e6105207b82fe0b82dda3d555a3875afce437fbed7",
       "bom": false
     },
     {
       "path": ".opencode/plugin/ps-oracle-preflight-gate.js",
-      "lines": 423,
-      "sha256": "269a203e37f081f93c4178c644327b7936ce28a39b3fcb52c18ae99d4be40d6b",
+      "lines": 489,
+      "sha256": "cf01634d4306fc998273250b178e034d6f5dce99c94d764740febd227e71d5e6",
       "bom": false
     },
     {
@@ -316,8 +322,8 @@
     },
     {
       "path": "scripts/ps-fs-doctor.ps1",
-      "lines": 308,
-      "sha256": "675ee59fb50363014d6a77f9a99cc7df1df9b8ce1edc16394f67964c51d7d2ce",
+      "lines": 312,
+      "sha256": "9729968422d9393139e813b5eec91d51b4bb3bfac3f3bc78a6124e7d7dfce977",
       "bom": true
     },
     {
@@ -340,14 +346,14 @@
     },
     {
       "path": "scripts/tests/test-auto-loop.ps1",
-      "lines": 707,
-      "sha256": "21237d9d5be0bfa5fe08b722d93e6a75af3341d8c06acbe9e76a95a96f90f4ee",
+      "lines": 710,
+      "sha256": "6b535c93831fccad7c884b1660d129b5245fb9cb281f7bed57ed476ab8c3aa48",
       "bom": true
     },
     {
       "path": "scripts/tests/test-oracle-gate-runtime.ps1",
-      "lines": 222,
-      "sha256": "b4838d2fa43b60ab68c201ec805efd81941cf7d1cd15b04cce9a1d19515f1430",
+      "lines": 267,
+      "sha256": "734f2b3741fb63b580d364bc8a42d1a793e02fe2a25d600fb008c94d6e066de4",
       "bom": true
     }
   ]

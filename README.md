@@ -483,7 +483,8 @@ G  全部正常
 - **順序類規則不靠 prompt**：主 agent「先 `list_connections` → `connect` 再派 DB 委派」
   由 `.opencode/plugin/ps-oracle-preflight-gate.js` 在執行期強制（擋 task、回
   `PS_ORACLE_PREFLIGHT_REQUIRED`）；plugin 零外部相依，`.opencode/.npmrc` 的
-  `offline=true` 讓斷網下的相依安裝秒失敗（實測少等 70 秒）。
+  `offline=true` 讓斷網下的相依安裝秒失敗（實測少等 70 秒；全域設定目錄
+  `~/.config/opencode` 也要一份，見 SOP-21）。
 
 ## 資安邊界
 

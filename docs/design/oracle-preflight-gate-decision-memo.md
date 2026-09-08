@@ -20,9 +20,10 @@
 
 ## 二、issue 沒提、對碼才發現的事
 
-- **相依安裝會拖住啟動**：`config.ts` 對每個 config 目錄 fork 一個 `npm install @opencode-ai/plugin@<版本>`；
-  `Plugin.init` 在有 plugin 時 `waitForDependencies()`。斷網沙箱實測：無 `.npmrc` 72 秒、`offline=true` 2 秒。
-  → 隨 plugin 一起搬 `.opencode/.npmrc`（`offline=true`）。
+- **相依安裝會拖住啟動**：`config.ts` 對每個 config 目錄（全域 `~/.config/opencode` ＋ 專案 `.opencode`）各 fork 一個
+  `npm install @opencode-ai/plugin@<版本>`；`Plugin.init` 在有 plugin 時 `waitForDependencies()` 等**全部**。斷網沙箱實測：
+  無 `.npmrc` 72 秒；只放專案那份仍 72 秒（全域目錄在等）；兩份都 `offline=true` 2 秒。
+  → 隨 plugin 一起搬 `.opencode/.npmrc`，並在全域設定目錄手動放一份（SOP-21 步驟 1）。
 - **舊式 plugin 載入器要求每個匯出都是函式**（`getLegacyPlugins`）：plugin 檔只能有一個具名匯出（情境 32 守衛）。
 - **`opencode run` 用 `process.env.PWD`** 決定專案目錄（run.ts:333）——自動化從別的 cwd 啟動時要設 PWD（e2e 執行器已處理；
   Windows cmd 不設 PWD，走 `process.cwd()`，`ps-auto-loop.ps1` 不受影響）。
@@ -36,3 +37,16 @@
 - oracleMCP 未掛載（`/mcp` 非 connected）退讓；狀態查不到（SDK 例外）保守仍擋。
 - 每則訊息重置；同回合中途斷線閘門看不到，靠 subagent 回 NOT_CONNECTED 把狀態退回 NEED_CONNECT。
 - observe 模式只給探測與緊急停用。
+
+## 四、外部 review（2026-09-08，五點）逐條
+
+| # | review 主張 | 核對 | 落點 |
+|---|---|---|---|
+| R1 | 連線是全域單例，per-session READY 會失真（別的 session connect／disconnect 後仍 READY；最壞查錯庫） | **成立**。L109 已定案單例；公司機 oracleMCP 若是遠端（VS Code 端 SQLcl），單例還跨 OpenCode 行程 | 連線 epoch：任何 connect／disconnect 嘗試推進 `connection-epoch.json`（跨行程）；READY 需 readyEpoch＝目前 epoch，否則退回 NEED_LIST 並擋。e2e `epoch`＋單元測試 |
+| R2 | analyzer 只證 task hook 覆蓋率，沒證 chat.message 每題都 fire；需要 per-turn 不變量與真正的多 turn 測試 | **成立** | turnId＝user 訊息 id；analyzer 加 turnMismatch／turnInvariantViolations（都判定）；e2e `multi-turn`（run --session）＋`multi-turn-serve`（serve 同行程兩題，斷言 READY→NEED_LIST 的重置） |
+| R3 | ps-auditor 混合能力，按 agent 能力判定會過度 gate；應拆 agent 或給 task 帶 metadata | **成立但暫不改**：task 工具無 metadata 通道；任務 A 檔級 evidence 混 CHUNK／SQL，拆不開；只在「MCP 有掛載但 connect 失敗」時受影響 | 記為已知限制（SOP-21 第 8 條 b）；拆 agent 另開 issue |
+| R4 | mcp.status 15 秒快取不能當正確性放行依據 | **成立** | 拿掉快取，每次即時查；單元測試 |
+| R5 | SOP-12 殘留舊協定敘述 | **成立** | 就地改為現況＋標【已作廢】 |
+
+review 沒提、本輪順手修的：`opencode run --session` 續接是**新行程**——plugin 的 in-memory 狀態與數字 turn 計數器都歸零，
+所以 turn 識別必須用 user 訊息 id；同時這也表示 headless 的每一次 run 都從 NEED_LIST 起步（與 per-turn 重置同義）。

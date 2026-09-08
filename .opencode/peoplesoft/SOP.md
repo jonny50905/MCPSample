@@ -496,22 +496,25 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 
 ```text
 □ 新協定（cookbook 連線生命週期已改版）：**誰都不准 disconnect**（headless 結束時
-  連線隨行程關閉）；connect 冪等（先直接查，回未連線錯誤才 connect 一次）；
-  ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害
+  連線隨行程關閉）；ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害。
+  【現況（issue #28／#29 後）】connect 只由主 agent 在第 0 步做（list_connections → connect，
+  每題無條件）；subagent 不 connect、回未連線只回 BLOCKED(NOT_CONNECTED)。舊寫法
+  「先直接查，回未連線錯誤才 connect 一次」已作廢
 □ 會查 oracleMCP 的委派同時 ≤ 3 維持（硬性 deny 落地後恢復；曾短暫壓到 1，
   那是 disconnect 真因未明時的暫時解）；**派本批第一個 oracleMCP 委派之前，主 agent 先
   list_connections → connect 一次**（issue #28 後 subagent 不再 connect，也不再要求第一個先單獨派）——
   ps-audit-batch／ps-audit／ps-deep-research／ps-audit-orchestrator／ps-contract-batch／ps-contract-verify 已同步
-□ 主 agent（ps-deep-research）的 oracleMCP 權限維持關閉：第一個 subagent 開的
-  連線，後面的 subagent 直接沿用，不需要 main 先開
+□ 【已作廢，保留供對照】主 agent 的 oracleMCP 權限全關、由第一個 subagent 開線——
+  issue #28 起反轉：主 agent 開 list_connections／connect（run_sql／disconnect 仍關），
+  subagent 只查；issue #29 起第 0 步由執行期閘門強制（SOP-21）
 □ 風暴判讀：auto-loop-logs\<領域>\*-audit-b*.out.txt 裡 oracleMCP_disconnect
   一批出現數十次且無查詢結果列＝有人還在 disconnect（舊版 agent 檔沒搬到）
 □ 硬性擋線（管理者要求）：四個帶 oracleMCP 的 subagent（ps-auditor／ps-ui-flow／
   ps-metadata-flow／ps-ae-flow）tools 表在 "oracleMCP_*": true **之後**加
   "oracleMCP_disconnect": false（OpenCode 規則：最後匹配者優先，順序不可顛倒）——
   不聽話的 subagent 也叫不到 disconnect；prompt 層的「不得 disconnect」只是第二道。
-  primary agent（ps-deep-research／ps-orchestrator／ps-audit-orchestrator）oracleMCP_*
-  全關；只有管理者的互動 session（build／general）還能 disconnect。本機 opencode.json
+  primary agent（ps-deep-research／ps-orchestrator／ps-audit-orchestrator）`oracleMCP_*: false`
+  之後只開 list_connections／connect（issue #28）；只有管理者的互動 session（build／general）還能 disconnect。本機 opencode.json
   若版本支援 per-tool permission 可再加 "oracleMCP_disconnect": "deny"，版本未驗證前
   不要加（config 驗證失敗會讓 agent 載入失敗，症狀同 L60「agent 未被認到」）
 ```
@@ -525,12 +528,20 @@ ps-oracle-preflight-gate.js`）——prompt 只剩第二道。部署與驗證程
 （成功）之前，任何會查 DB 的 subagent 委派（task 到 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）
 在執行前被擋下，模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED` 與下一步指示；純 ES＋Source 的委派不受影響；
 oracleMCP 未掛載時閘門退讓（交 ORACLE_MCP_DOWN 協定）。
+**連線 epoch**：連線是 SQLcl MCP 的全域單例（所有 session、所有 OpenCode 視窗共用），任何 session 的 connect／
+disconnect 嘗試都會推進 `auto-loop-logs\ps-oracle-gate\connection-epoch.json` 的 epoch；某 session 完成前置後若
+epoch 被別人推進過，它的 READY 作廢——下一次派 DB task 會被擋（訊息說明「共用連線已被其他 session／視窗改動」），
+重做 list→connect 即可。代價是多兩個冪等呼叫；換到的是「別的視窗把連線切走後，本視窗不會在錯的庫上查」。
 
 ```text
 □ 1. 搬檔：.opencode\plugin\ps-oracle-preflight-gate.js、.opencode\.npmrc（兩檔都在 manifest 內）、
      scripts\tests\test-oracle-gate-runtime.ps1（BOM）；跑 ps-fs-doctor 應報一致。
      .npmrc 的 offline=true 不可拿掉：OpenCode 每次啟動會在 .opencode 試裝 @opencode-ai/plugin，
      有 plugin 時會等它結束，斷網沒這行會多等到重試逾時（沙箱實測 72 秒）。
+     **全域設定目錄也要一份**：OpenCode 對 %USERPROFILE%\.config\opencode（放 opencode.json 的那個目錄）
+     做同一件事、一起等——在該目錄新建 .npmrc，內容一行 offline=true（repo 外，不在 manifest；沙箱實測
+     只放專案那份仍等 72 秒，兩份都放 2 秒）。之後啟動看 opencode --print-logs 有兩行
+     「background dependency install failed … only-if-cached」屬預期。
 □ 2. 有載入嗎：開任一 opencode session 後看 auto-loop-logs\ps-oracle-gate\_plugin.log 出現
      「loaded … mode=enforce agents=[…ps-ui-flow:DB…]」。沒有＝plugin 沒被載到（檔名／目錄／JS 語法），
      用 opencode --print-logs --log-level DEBUG 看 plugin 錯誤。
@@ -541,18 +552,25 @@ oracleMCP 未掛載時閘門退讓（交 ORACLE_MCP_DOWN 協定）。
      - 真 SQLcl 的成功回覆若被誤判（ok=false、failureMatch 有值）→ 回報維護 session 調整 FAILURE_PATTERNS
 □ 4. P1 探測（互動 TUI）：正常使用 ≥ 20 題後跑
      powershell -File scripts\tests\test-oracle-gate-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
-     判定 hookMismatch=0（閘門看到的 task 次數＝opencode export 的 task 件數＝hook 覆蓋率 100%）、
-     executedTaskBeforePreflight=0。blockedRuns＝模型錯序的次數（觀察值，不判定）。
+     判定四項都要 0：hookMismatch（閘門看到的 task 次數＝opencode export 的 task 件數＝task hook 覆蓋率 100%）、
+     turnMismatch（閘門看到的 chat.message 次數＝export 的 user 訊息數＝每題都有重置）、
+     turnInvariantViolations（每個已執行的 DB task 在同一題內、在它之前有 list 成功＋connect→READY）、
+     executedTaskBeforePreflight。blockedRuns（模型錯序被擋）、staleEpochBlocks（共用連線被別人動過而重做前置）＝觀察值。
+     多題互動一定要在**同一個視窗連問**（同一行程、同一 session），才驗得到「READY 的 session 被下一題重置」。
 □ 5. 30 次回歸（headless，opencode run；題目用 -Question／-QuestionFile 從本機帶，真實物件名不進 repo）：
      -Scenario B1 -Runs 30（需 DB 的題）／-Scenario B2（wiki 已驗證的題）／-Scenario B3（純 PeopleCode 題）
      每個都要 PASS；B3 附帶看 preflightRuns（R8：不需要 DB 也應做第 0 步，觀察值）。
 □ 6. 暫時關閉／探測模式：$env:PS_ORACLE_GATE_MODE='observe'（該次啟動）或 profile oracle.preflightGate: observe；
      observe 只記錄不擋（jsonl 的 decision=observe-would-block）。不要長期停在 observe。
-□ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn、target、state→next、decision
-     （allow／block／observe／observe-would-block）、basis（run_sql:enabled／disabled／unknown-agent）、
-     note（gate stands down／ancestor READY／NOT_CONNECTED 退回）、ok／failureMatch（list／connect 是否被判成功）。
-□ 8. 已知限制：連線在同一回合中途斷掉閘門看不到（靠 subagent 回 NOT_CONNECTED → 狀態退回 NEED_CONNECT）；
-     不認識的 subagent 名字一律當會查 DB（保守）；閘門只擋、不改參數、不代模型 connect。
+□ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（該則 user 訊息 id）、target、
+     state→next、decision（allow／block／observe／observe-would-block）、basis（run_sql:enabled／disabled／unknown-agent）、
+     note（gate stands down／ancestor READY／NOT_CONNECTED 退回／shared connection changed）、ok／failureMatch
+     （list／connect 是否被判成功）、epoch（connect／disconnect／task 當下的連線 epoch）。
+□ 8. 已知限制：(a) 連線在同一題中途斷掉閘門看不到（靠 subagent 回 NOT_CONNECTED → 狀態退回 NEED_CONNECT）；
+     (b) 閘門按 **agent 能力**（tools 表 run_sql）判定、不按任務意圖——ps-auditor 的純 chunk 解引用任務在
+     「oracleMCP 有掛載但 connect 失敗」時也會被擋（未掛載時退讓不受影響）；要拆 ps-auditor-source／ps-auditor-db
+     屬稽核協定變更，另案決定；(c) 不認識的 subagent 名字一律當會查 DB（保守）；(d) 閘門只擋、不改參數、不代模型 connect；
+     (e) epoch 檔是同一台機器、同一 repo 目錄內的行程共用；不同 repo 目錄各有一份。
 ```
 
 ## SOP-11 系統 CR 上線後的知識庫對齊

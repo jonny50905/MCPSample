@@ -680,6 +680,9 @@ Assert ($gImports.Count -gt 0 -and @($gImports | Where-Object { $_ -notmatch '^n
 Assert (@([regex]::Matches($gt, '(?m)^export\s')).Count -eq 1 -and $gt -match '(?m)^export const PsOraclePreflightGate = async') "plugin 只有一個具名匯出函式（OpenCode 舊式載入器要求每個匯出都是函式）"
 Assert ($gt -notmatch '(?i)bypass' -and $gt -notmatch '繞過') "plugin 無「繞過」類字串（SOP-3 安控）"
 Assert ($gt -match 'throw new Error\(message\)' -and $gt -notmatch 'out\.args\s*=(?!=)' -and $gt -notmatch 'args\.subagent_type\s*=(?!=)') "plugin 只擋不改參數（不對 out.args／subagent_type 賦值）"
+Assert ($gt.Contains('connection-epoch.json') -and $gt.Contains('readyEpoch') -and $gt -match 'shared connection changed since preflight' -and $gt -notmatch 'MCP_STATUS_TTL_MS') "plugin 有連線 epoch（跨 session／跨行程的共用連線變動偵測）且 mcp 狀態不快取"
+$rt = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1'))
+Assert ($rt -match 'turnInvariantViolations' -and $rt -match 'turnMismatch' -and $rt -match 'hookMismatch' -and $rt -match 'executedBeforePreflight') "runtime 回歸腳本判定 per-turn 不變量／turn 覆蓋率／task 覆蓋率／早於前置"
 $npmrc = Join-Path $repoRoot '.opencode/.npmrc'
 Assert ((Test-Path -LiteralPath $npmrc) -and ([System.IO.File]::ReadAllText($npmrc) -match '(?m)^offline=true\s*$')) ".opencode/.npmrc 含 offline=true（斷網時相依安裝秒失敗，plugin 照常載入）"
 $ag = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))
