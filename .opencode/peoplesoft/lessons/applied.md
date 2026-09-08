@@ -3142,4 +3142,5 @@
   (c) `opencode run --session` 續接是新行程，plugin 記憶體狀態與數字 turn 歸零——turn 識別改用 user 訊息 id；
   (d) analyzer 對「祖先 READY 放行」的子 session 不記違反（subagent_depth > 1 才會發生）；(e) `.npmrc` 這種點檔在 Linux 維護端被
   PowerShell 當隱藏檔，`ps-fs-doctor` 的 `Get-TransferFiles` 漏了它——加 `-Force` 並排除 OpenCode 產生的安裝痕跡（node_modules／
-  package*.json／bun.lock／.gitignore），manifest 59 檔。
+  package*.json／bun.lock／.gitignore），manifest 59 檔。守衛補情境 33：AST 抽出回歸腳本的 `Get-SessionVerdict` 餵固定 jsonl 樣本
+  （錯序被擋／observe 早於前置／epoch 過期／第二題沒重做前置→turnViol／synthetic 不算一題／祖先放行／不查 DB 不受判定）。

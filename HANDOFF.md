@@ -71,7 +71,8 @@ user 訊息 id（`turnId`）、analyzer 加 turnMismatch／turnInvariantViolatio
 (4) mcp.status 15 秒快取（Medium）→ 拿掉，每次即時查。(5) SOP-12 舊敘述（Low）→ 就地改為現況＋標【已作廢】。對碼另發現：**全域設定目錄
 `~/.config/opencode` 也要放 `.npmrc offline=true`**（`waitForDependencies` 等全部目錄；只放專案那份仍等 72 秒）——這是 repo 外的手動步驟
 （SOP-21 步驟 1）；全部 part 都 synthetic 的 user 訊息（背景 subagent 回灌／compaction 續行）不重置；`ps-fs-doctor` 的 `Get-TransferFiles`
-加 `-Force`（Linux 維護端把 `.npmrc` 當隱藏檔漏出 manifest）並排除 OpenCode 產生的安裝痕跡，manifest 59 檔。單元 8 組、e2e 9 情境（含 serve）全 PASS。
+加 `-Force`（Linux 維護端把 `.npmrc` 當隱藏檔漏出 manifest）並排除 OpenCode 產生的安裝痕跡，manifest 59 檔。單元 8 組、e2e 9 情境（含 serve）全 PASS；
+test-auto-loop 情境 33 用固定 jsonl 樣本驗回歸腳本的判定函式（含「第二題沒重做前置」→ turnViol）。
 
 ## 1. 管理者下一步（按序）
 
@@ -126,10 +127,10 @@ user 訊息 id（`turnId`）、analyzer 加 turnMismatch／turnInvariantViolatio
    | `.opencode/.npmrc` | 新增 | 6 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時） |
    | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce） | 106 | 本機已回填 FILL_ME 者只加 `preflightGate` 那 5 行（fs-doctor 報此檔 M 屬預期） |
    | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 追記＋舊敘述改現況＋SOP-21 部署與驗證） | 712 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115） | 3145 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115） | 3146 | |
    | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R15） | 687 | |
    | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 32） | 710 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 32＋情境 33） | 757 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
    | `scripts/ps-fs-doctor.ps1` | 修改（Get-TransferFiles 加 -Force、排除 OpenCode 安裝痕跡） | 312 | 存 UTF-8 with BOM；先搬它再重生對照才看得到 .npmrc |
    | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析） | 267 | 存 UTF-8 with BOM；用法見 SOP-21 |
    | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD a31c946，早一步屬預期） |

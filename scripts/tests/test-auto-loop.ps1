@@ -4,7 +4,8 @@
 #       ＋ lint fixture（[附錄] 守衛、ChunkId 誤判、[回灌] 陳舊、-EvidenceStats、-StrictAudit 未稽核）
 #       ＋ research 範圍債（#23：checkpoint ≠ discovery complete、GateVersion 4 舊收據作廢）
 #       ＋ lint 導覽主張守衛（#24：情境 28，在 docs/ps-research/zz-nav24-fixture 建臨時領域跑真 lint，結束自刪）
-#       ＋ Oracle 前置閘門 plugin（#29：情境 32，檔案形狀／零相依／單一匯出／npmrc offline／AGENTS 順序／DB 判定；有 node 時跑單元測試）
+#       ＋ Oracle 前置閘門 plugin（#29：情境 32，檔案形狀／零相依／單一匯出／npmrc offline／AGENTS 順序／DB 判定；有 node 時跑單元測試；
+#         情境 33，runtime 回歸腳本的判定函式餵固定 jsonl 樣本）
 # 注意：情境 22 會在 docs/ps-research/zz-l103-fixture 建臨時領域跑真 lint，結束自刪。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
@@ -703,6 +704,52 @@ if ($nodeCmd -and (Test-Path -LiteralPath $unit)) {
     Assert ($LASTEXITCODE -eq 0 -and $uo -match '# fail 0') "plugin 狀態機單元測試（node --test tests/oracle-gate/unit.test.mjs）全過"
 }
 else { Write-Host "  （跳過單元測試：沒有 node 或 tests/oracle-gate 未搬——它只在維護沙箱跑，公司機用 scripts/tests/test-oracle-gate-runtime.ps1）" }
+
+Write-Host "情境 33：閘門 runtime 回歸腳本的判定邏輯——AST 抽出 Get-SessionVerdict 餵固定 jsonl 樣本（issue #29 review：per-turn 不變量／turn 覆蓋率／epoch／synthetic／祖先）"
+$rtSrc = Get-Content (Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1') -Raw
+$rtTok = $null; $rtErr = $null
+$rtAst = [System.Management.Automation.Language.Parser]::ParseInput($rtSrc, [ref]$rtTok, [ref]$rtErr)
+$rtFuncs = $rtAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and @('Read-Jsonl', 'Get-SessionVerdict') -contains $a.Name -and $a.Parent -isnot [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)
+Assert ($rtFuncs.Count -eq 2) "runtime 腳本抽到 Read-Jsonl／Get-SessionVerdict 兩個函式（抽到 $($rtFuncs.Count)）"
+foreach ($f in $rtFuncs) { Invoke-Expression $f.Extent.Text }
+$global:gateDir = Join-Path $dir 'gate'
+New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
+function New-GateLog([string]$Id, [string[]]$Rows) { [System.IO.File]::WriteAllLines((Join-Path $gateDir ($Id + '.jsonl')), $Rows, (New-Object System.Text.UTF8Encoding($false))) }
+$chat = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","next":"NEED_LIST","mode":"enforce"}'
+$blk = '{"hook":"before","tool":"task","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_LIST","basis":"run_sql:enabled","decision":"block","blocked":1,"note":"mcp-status:connected"}'
+$listOk = '{"hook":"after","tool":"oracleMCP_list_connections","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","next":"NEED_CONNECT","ok":true}'
+$connOk = '{"hook":"after","tool":"oracleMCP_connect","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","next":"READY","ok":true,"epoch":"e1"}'
+$allow = '{"hook":"before","tool":"task","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"READY","basis":"run_sql:enabled","decision":"allow"}'
+$exec = '{"hook":"after","tool":"task","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","target":"ps-ui-flow","executed":true,"basis":"run_sql:enabled","next":"READY","notConnected":false}'
+New-GateLog 'ses_ok' @($chat, $blk, $listOk, $connOk, $allow, $exec)
+$v = Get-SessionVerdict 'ses_ok' ''
+Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.preflight -and $v.turnInvariantViolations -eq 0 -and $v.staleEpochBlocks -eq 0 -and $v.hookMismatch -eq 0) "錯序被擋→list→connect→執行：try=2 blk=1 exec=1 early=0 turnViol=0"
+New-GateLog 'ses_observe' @($chat, ($blk -replace '"decision":"block"', '"decision":"observe-would-block"'), ($exec -replace '"state":"READY"', '"state":"NEED_LIST"' -replace '"next":"READY"', '"next":"NEED_LIST"'))
+$v = Get-SessionVerdict 'ses_observe' ''
+Assert ($v.wouldBlock -eq 1 -and $v.executedBeforePreflight -eq 1 -and $v.turnInvariantViolations -eq 1 -and -not $v.preflight) "observe 模式：DB task 早於前置執行 → early=1、turnViol=1（判定 FAIL 的來源）"
+$stale = $blk -replace '"blocked":1,"note":"mcp-status:connected"', '"blocked":1,"note":"mcp-status:connected; shared connection changed since preflight (epoch e1 -> e2)"'
+New-GateLog 'ses_epoch' @($chat, $listOk, $connOk, $allow, $stale, $listOk, ($connOk -replace 'e1', 'e2'), $allow, $exec)
+$v = Get-SessionVerdict 'ses_epoch' ''
+Assert ($v.staleEpochBlocks -eq 1 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0) "共用連線被別人動過：stale=1、重做前置後執行不算違反"
+$chat2 = $chat -replace '"turnId":"m1","state":"NEED_LIST"', '"turnId":"m2","state":"READY"' -replace '"turn":1', '"turn":2'
+$exec2 = $exec -replace '"turnId":"m1"', '"turnId":"m2"' -replace '"turn":1', '"turn":2'
+New-GateLog 'ses_twoturn' @($chat, $listOk, $connOk, $allow, $exec, $chat2, ($allow -replace '"turnId":"m1"', '"turnId":"m2"'), $exec2)
+$v = Get-SessionVerdict 'ses_twoturn' ''
+Assert ($v.turns -eq 2 -and $v.executed -eq 2 -and $v.turnInvariantViolations -eq 1) "第二題沒重做 list→connect 就執行 DB task → turnViol=1（review 第 2 點：不能只看 task hook 覆蓋率）"
+$synth = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","next":"READY","synthetic":true,"note":"all parts synthetic: no reset"}'
+New-GateLog 'ses_synth' @($chat, $listOk, $connOk, $synth, $allow, $exec)
+$v = Get-SessionVerdict 'ses_synth' ''
+Assert ($v.turns -eq 1 -and $v.turnInvariantViolations -eq 0) "全部 part 都 synthetic 的訊息不算一題：turns=1、不違反"
+$childChat = $chat -replace 'ps-orchestrator', 'ps-audit-orchestrator'
+$childAllow = '{"hook":"before","tool":"task","agent":"ps-audit-orchestrator","turn":1,"turnId":"m1","target":"ps-auditor","state":"NEED_LIST","basis":"run_sql:enabled","decision":"allow","note":"ancestor READY ses_root"}'
+$childExec = '{"hook":"after","tool":"task","agent":"ps-audit-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","target":"ps-auditor","executed":true,"basis":"run_sql:enabled","next":"NEED_LIST","notConnected":false}'
+New-GateLog 'ses_child' @($childChat, $childAllow, $childExec)
+$v = Get-SessionVerdict 'ses_child' ''
+Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0 -and $v.executed -eq 1) "子 session 靠祖先 READY 放行：不記違反"
+$noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"run_sql:enabled"', '"basis":"run_sql:disabled"' -replace '"state":"READY"', '"state":"NEED_LIST"'
+New-GateLog 'ses_nodb' @($chat, $noDb)
+$v = Get-SessionVerdict 'ses_nodb' ''
+Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0) "不查 DB 的委派（basis=run_sql:disabled）不受判定"
 
 Remove-Item -Recurse -Force $dir
 Write-Host ""
