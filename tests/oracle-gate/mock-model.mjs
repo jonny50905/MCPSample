@@ -8,6 +8,9 @@
 //     compliant      list → connect → task → 收尾（第 0 步照做）
 //     stubborn       只會一直 task（不做前置），連續 4 次後放棄作答（驗證閘門不放行）
 //     nodb           直接派 ps-peoplecode-flow（不查 DB 的 subagent）→ 收尾（驗證不受閘門影響）
+//     connect-fail   task → 被擋 → list → connect（失敗）→ task → 被擋 → connect（失敗）→ task → 被擋 → 依第 0 步規則放棄 DB 委派、
+//                    回報「DB 連線建立失敗」（驗證閘門沒有「失敗幾次就放行」）
+//   劇本以「最後一則 user 訊息之後」的工具呼叫為準（同 session 多 turn 時每 turn 重新走劇本）
 //   MOCK_MODEL_LOG        每次請求追加一行 JSON
 import http from "node:http"
 import fs from "node:fs"
@@ -31,11 +34,12 @@ function toolNames(body) {
   return new Set((body.tools ?? []).map((t) => t?.function?.name).filter(Boolean))
 }
 
-// 把對話壓成「已發生的工具呼叫序列」：[{name, args, result}]
+// 把對話壓成「最後一則 user 訊息之後已發生的工具呼叫序列」：[{name, args, result}]
 function history(body) {
-  const calls = []
+  let calls = []
   const byId = new Map()
   for (const m of body.messages ?? []) {
+    if (m.role === "user") { calls = []; continue }
     if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
       for (const tc of m.tool_calls) {
         let args = {}
@@ -94,6 +98,15 @@ function primaryNext(calls) {
     case "nodb": {
       if (n === 0) return TASK("ps-peoplecode-flow")
       return { text: "DONE: " + JSON.stringify({ scenario, calls: calls.map((c) => c.name) }) }
+    }
+    case "connect-fail": {
+      if (n === 0) return TASK("ps-ui-flow")
+      const blockedTasks = calls.filter((c) => c.name === "task" && /PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
+      if (blockedTasks >= 3) return { text: "DB 連線建立失敗（ORA-12541: TNS:no listener）：本題不派 DB 委派，其餘部分照常作答。" + JSON.stringify(calls.map((c) => c.name)) }
+      const listed = calls.some((c) => c.name === "oracleMCP_list_connections")
+      if (last.name === "task") return listed ? CONNECT(pickConnection(lastListResult(calls))) : LIST
+      if (last.name === "oracleMCP_list_connections") return CONNECT(pickConnection(last.result))
+      return TASK("ps-ui-flow")
     }
     case "task-first":
     default: {

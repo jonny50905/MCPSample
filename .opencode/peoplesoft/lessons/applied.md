@@ -3111,3 +3111,31 @@
 - 待公司機驗：(a) `auto-loop-logs\ps-oracle-gate\_plugin.log` 有 loaded 行；(b) 啟動不再多等（.npmrc 生效）；
   (c) 真 SQLcl `list_connections`／`connect` 成功回覆不命中 FAILURE_PATTERNS（jsonl 的 `ok:true`、`next:READY`）；
   (d) `test-oracle-gate-runtime.ps1 -Scenario B1 -Runs 30` 判定 PASS；(e) 互動 20 題後 `-AnalyzeAll` hookMismatch＝0。
+- 追記（2026-09-08，外部 review 四輪後退版重寫）：review 先對 a31c946 提兩個 Must（連線是全域單例、per-session READY 看不到別的
+  session／視窗 connect 或 disconnect；analyzer 只證 task hook 覆蓋率、沒證每題都有 chat.message 重置）與三個 Medium／Low（ps-auditor
+  混合能力過度 gate、mcp.status 15 秒快取、SOP-12 舊敘述）；之後三輪修法（a94a616／dd54ab3／6d56a5f／886d6e2）被 review 判定偏離：
+  `connection-epoch.json`／`connection-state.json` 成了第二個 Oracle 真相來源、topology（local／remote、行程內／跨行程共用）未證實就先做
+  跨行程協調；「list／connect 失敗 ≥ 2 次就放行」與 `prt_` subtask 無條件退讓是 fail-open（前置未成功的 DB task 重新成為合法路徑）；
+  analyzer 把退讓／祖先放行標成豁免，executedTaskBeforePreflight=0 不再等價於「沒有 DB task 在前置前執行」。指定以 a31c946 為
+  基底重寫、只移植已證明安全的改善。落點（`aa9e42c` 退版：樹狀態＝a31c946、歷史保留；下一筆重寫）：
+  (1) 不變量縮到最小：每則真實訊息 NEED_LIST→NEED_CONNECT→READY 才准派會查 DB 的 subagent；唯一例外＝目標沒有 Oracle 能力；
+  oracleMCP 未掛載（每次即時查）退讓；其餘一律擋——沒有失敗次數放行、沒有 prt_ 退讓、沒有祖先放行（目前沒有任何能 task 的
+  subagent，這條是死碼且也是豁免，移除）、沒有跨 session／跨行程協調。
+  (2) 移植：turnId＝user 訊息 id、全 synthetic／同 id 訊息不重置、task 入場快照（`admitted`）、mcp.status 不快取＋回錯誤物件保守擋、
+  map 鍵 session:callID、await 後重判；e2e 加 multi-turn（run --session）／multi-turn-serve（serve 同行程兩題）／compaction-serve／
+  mcp-failed；analyzer 加 turnMismatch（真實題目 id 逐一比對）／turnInvariantViolations（同題內依序 list→connect→task，順序也判）／
+  orphanTurns／export 落檔 UTF-8（PS 5.1 CP950）／exit code／timeout／exportFailures／pscustomobject／-ExportPath；SOP-12 舊敘述改現況；
+  fs-doctor `Get-TransferFiles -Force`（.npmrc 進 manifest）；全域 `~/.config/opencode/.npmrc` 改為條件式（啟動仍多等才放）。
+  (3) analyzer 無豁免：oracleMCP 未掛載期間放行的 DB task 照算違反，另以 standDowns／earlyViaStandDown 標出來源——回歸要在
+  oracleMCP 掛載時跑（SOP-21 步驟 4／5、R12 註明）；不變量的意思不被實作反向改寫。
+  (4) 不移植、另案：connection-state／epoch（先做 SOP-21 步驟 9 的 topology 實驗 T1 跨行程／T2 同行程跨 session／T3 type 與
+  回覆原文，再決定 process-level 狀態或跨行程協調）；event hook 接「already connected」isError（R16 驗完真 SQLcl 回覆再決定）；
+  ps-auditor 混合能力（deterministic routing／capability 邊界，稽核協定變更）。
+  (5) connect 一直失敗現在的行為：三次 task 全擋（NEED_LIST→NEED_CONNECT→NEED_CONNECT，blocked 1→3，第三次錯誤訊息帶
+  「本題不派 DB 委派」提示）、零 SQL，模型依第 0 步規則回報「DB 連線建立失敗」——e2e `connect-fail` 鎖住這個行為。
+  驗證：單元 10 組（含「沒有 fail-open」「沒有祖先放行」「跨 session callID 不互撞」）、e2e 12 情境在真 OpenCode 1.18.29 全 PASS、
+  test-auto-loop 情境 32（加最小不變量守衛：plugin 不得含 connection-state／epoch／prt_／失敗放行／祖先查詢，analyzer 不得含豁免）
+  ＋情境 33（AST 抽 analyzer 餵固定 jsonl：錯序被擋／observe 早於前置／第二題沒重做前置／順序顛倒／synthetic／不查 DB／
+  未掛載放行照算違反／export id 比對／undo 孤兒／pscustomobject 加總）全 PASS。
+  教訓：不變量要小到一句話能證明；例外只准來自「能力不存在」這種確定性事實，不准來自重試次數；共用狀態在拿到 topology
+  證據之前不要先發明第二個真相來源；驗證指標不能被實作用「豁免」反向改寫。

@@ -496,22 +496,25 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 
 ```text
 □ 新協定（cookbook 連線生命週期已改版）：**誰都不准 disconnect**（headless 結束時
-  連線隨行程關閉）；connect 冪等（先直接查，回未連線錯誤才 connect 一次）；
-  ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害
+  連線隨行程關閉）；ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害。
+  【現況（issue #28／#29 後）】connect 只由主 agent 在第 0 步做（list_connections → connect，
+  每題無條件）；subagent 不 connect、回未連線只回 BLOCKED(NOT_CONNECTED)。舊寫法
+  「先直接查，回未連線錯誤才 connect 一次」已作廢
 □ 會查 oracleMCP 的委派同時 ≤ 3 維持（硬性 deny 落地後恢復；曾短暫壓到 1，
   那是 disconnect 真因未明時的暫時解）；**派本批第一個 oracleMCP 委派之前，主 agent 先
   list_connections → connect 一次**（issue #28 後 subagent 不再 connect，也不再要求第一個先單獨派）——
   ps-audit-batch／ps-audit／ps-deep-research／ps-audit-orchestrator／ps-contract-batch／ps-contract-verify 已同步
-□ 主 agent（ps-deep-research）的 oracleMCP 權限維持關閉：第一個 subagent 開的
-  連線，後面的 subagent 直接沿用，不需要 main 先開
+□ 【已作廢，保留供對照】主 agent 的 oracleMCP 權限全關、由第一個 subagent 開線——
+  issue #28 起反轉：主 agent 開 list_connections／connect（run_sql／disconnect 仍關），
+  subagent 只查；issue #29 起第 0 步由執行期閘門強制（SOP-21）
 □ 風暴判讀：auto-loop-logs\<領域>\*-audit-b*.out.txt 裡 oracleMCP_disconnect
   一批出現數十次且無查詢結果列＝有人還在 disconnect（舊版 agent 檔沒搬到）
 □ 硬性擋線（管理者要求）：四個帶 oracleMCP 的 subagent（ps-auditor／ps-ui-flow／
   ps-metadata-flow／ps-ae-flow）tools 表在 "oracleMCP_*": true **之後**加
   "oracleMCP_disconnect": false（OpenCode 規則：最後匹配者優先，順序不可顛倒）——
   不聽話的 subagent 也叫不到 disconnect；prompt 層的「不得 disconnect」只是第二道。
-  primary agent（ps-deep-research／ps-orchestrator／ps-audit-orchestrator）oracleMCP_*
-  全關；只有管理者的互動 session（build／general）還能 disconnect。本機 opencode.json
+  primary agent（ps-deep-research／ps-orchestrator／ps-audit-orchestrator）`oracleMCP_*: false`
+  之後只開 list_connections／connect（issue #28）；只有管理者的互動 session（build／general）還能 disconnect。本機 opencode.json
   若版本支援 per-tool permission 可再加 "oracleMCP_disconnect": "deny"，版本未驗證前
   不要加（config 驗證失敗會讓 agent 載入失敗，症狀同 L60「agent 未被認到」）
 ```
@@ -523,36 +526,76 @@ ps-oracle-preflight-gate.js`）——prompt 只剩第二道。部署與驗證程
 
 閘門做什麼：主 agent 在同一則訊息內未依序完成 `oracleMCP_list_connections`（成功）→ `oracleMCP_connect`
 （成功）之前，任何會查 DB 的 subagent 委派（task 到 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）
-在執行前被擋下，模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED` 與下一步指示；純 ES＋Source 的委派不受影響；
-oracleMCP 未掛載時閘門退讓（交 ORACLE_MCP_DOWN 協定）。
+在執行前被擋下，模型收到 `PS_ORACLE_PREFLIGHT_REQUIRED` 與下一步指示。不變量刻意很小、一句話能證明：
+
+```text
+每一則真實使用者訊息：NEED_LIST ─list 成功→ NEED_CONNECT ─connect 成功→ READY → 才准執行會查 DB 的 task
+唯一例外：目標 subagent 確定沒有 Oracle 能力（tools 表 oracleMCP_run_sql 最後匹配為 false）→ 不需要 READY
+環境層退讓：oracleMCP 未掛載（/mcp 非 connected，每次即時查不快取）＝整個環境沒有 Oracle 能力 → 放行並記 note
+其餘一律擋：connect／list 一直失敗仍擋（第 0 步規則：本題不派 DB 委派、其餘照常作答）；不跨 session、不跨行程協調
+```
+
+判定是**能力**不是任務意圖：`oracleMCP_*` 全關的 subagent（ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow）不受影響；
+ps-auditor 即使做純 chunk 任務也過閘門——要解決混合能力，走 deterministic routing／capability 邊界（另案），不在閘門打洞。
 
 ```text
 □ 1. 搬檔：.opencode\plugin\ps-oracle-preflight-gate.js、.opencode\.npmrc（兩檔都在 manifest 內）、
      scripts\tests\test-oracle-gate-runtime.ps1（BOM）；跑 ps-fs-doctor 應報一致。
      .npmrc 的 offline=true 不可拿掉：OpenCode 每次啟動會在 .opencode 試裝 @opencode-ai/plugin，
      有 plugin 時會等它結束，斷網沒這行會多等到重試逾時（沙箱實測 72 秒）。
+     搬完若啟動仍多等約 70 秒：OpenCode 對全域設定目錄（放 opencode.json 的 %USERPROFILE%\.config\opencode）
+     做同一件事、一起等——在該目錄新建 .npmrc，內容一行 offline=true（repo 外、不在 manifest；沙箱實測只放專案那份
+     仍等 72 秒，兩份都放 2 秒）。之後啟動 --print-logs 出現「background dependency install failed … only-if-cached」屬預期。
 □ 2. 有載入嗎：開任一 opencode session 後看 auto-loop-logs\ps-oracle-gate\_plugin.log 出現
      「loaded … mode=enforce agents=[…ps-ui-flow:DB…]」。沒有＝plugin 沒被載到（檔名／目錄／JS 語法），
      用 opencode --print-logs --log-level DEBUG 看 plugin 錯誤。
-□ 3. 快篩（一題）：新 session、ps-orchestrator、問一題需 DB 的問題。看
+□ 3. 快篩（一題＋同視窗第二題）：新 session、ps-orchestrator、問一題需 DB 的問題；接著同一視窗再問一題。看
      auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl：
      - 模型照做：after list_connections（next=NEED_CONNECT）→ after connect（next=READY）→ before task decision=allow
      - 模型錯序：before task decision=block（state=NEED_LIST）→ 之後 list→connect → before task allow
+     - 第二題：chat.message 列 state=READY→next=NEED_LIST（重置）、turnId 換成新的訊息 id，再走一次前置
+     - 第二題的 connect 是「已連線再 connect」：jsonl 應有 after 列且 ok:true。若沒有 after 列（SQLcl 回 isError）或
+       ok:false＋failureMatch，這題閘門不會開——回報維護 session（R16）；這是待驗項，不是已知可接受行為
      - 真 SQLcl 的成功回覆若被誤判（ok=false、failureMatch 有值）→ 回報維護 session 調整 FAILURE_PATTERNS
-□ 4. P1 探測（互動 TUI）：正常使用 ≥ 20 題後跑
+□ 4. P1 探測（互動 TUI）：同一視窗連問 ≥ 20 題後跑
      powershell -File scripts\tests\test-oracle-gate-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
-     判定 hookMismatch=0（閘門看到的 task 次數＝opencode export 的 task 件數＝hook 覆蓋率 100%）、
-     executedTaskBeforePreflight=0。blockedRuns＝模型錯序的次數（觀察值，不判定）。
-□ 5. 30 次回歸（headless，opencode run；題目用 -Question／-QuestionFile 從本機帶，真實物件名不進 repo）：
+     判定四項都要 0，且全部無豁免：hookMismatch（閘門看到的 task 次數＝opencode export 的 task 件數＝task hook 覆蓋率 100%）、
+     turnMismatch（export 裡每一則真實題目——有非 synthetic 的 text／file／agent／subtask part 的 user 訊息——都找得到同 id 的
+     chat.message；compaction／續行／背景回灌插入的 user 訊息不算題）、
+     turnInvariantViolations（每個已執行的 DB task 在同一題內、在它之前依序有 list 成功→connect→READY）、
+     executedTaskBeforePreflight（會查 DB 的 task 入場時 ≠ READY 卻執行了；oracleMCP 未掛載期間閘門放行的也算——
+     standDowns／earlyViaStandDown 會標出來源，那段期間的 session 排除掉或在掛載後重跑）。
+     blockedRuns（模型錯序被擋）、orphanTurns（chat.message 有、transcript 沒有：/undo 或 fork）＝觀察值。
+□ 5. 30 次回歸（headless，opencode run；oracleMCP 掛載中；題目用 -Question／-QuestionFile 從本機帶，真實物件名不進 repo）：
      -Scenario B1 -Runs 30（需 DB 的題）／-Scenario B2（wiki 已驗證的題）／-Scenario B3（純 PeopleCode 題）
      每個都要 PASS；B3 附帶看 preflightRuns（R8：不需要 DB 也應做第 0 步，觀察值）。
 □ 6. 暫時關閉／探測模式：$env:PS_ORACLE_GATE_MODE='observe'（該次啟動）或 profile oracle.preflightGate: observe；
      observe 只記錄不擋（jsonl 的 decision=observe-would-block）。不要長期停在 observe。
-□ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn、target、state→next、decision
-     （allow／block／observe／observe-would-block）、basis（run_sql:enabled／disabled／unknown-agent）、
-     note（gate stands down／ancestor READY／NOT_CONNECTED 退回）、ok／failureMatch（list／connect 是否被判成功）。
-□ 8. 已知限制：連線在同一回合中途斷掉閘門看不到（靠 subagent 回 NOT_CONNECTED → 狀態退回 NEED_CONNECT）；
-     不認識的 subagent 名字一律當會查 DB（保守）；閘門只擋、不改參數、不代模型 connect。
+□ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（該則 user 訊息 id）、callID
+     （同一次工具呼叫的 before／after 配對）、target、state→next、decision（allow／block／observe／observe-would-block）、
+     basis（run_sql:enabled／disabled／unknown-agent）、note（gate stands down: mcp-status:…／NOT_CONNECTED 退回／
+     connect before list／same message id: no reset／all parts synthetic: no reset）、ok／failureMatch（list／connect 是否被判成功）、
+     admitted（task 的 after 列：入場時的判定；該列的 turn／turnId／state 也是入場時的快照）。
+□ 8. 已知限制：
+     (a) 連線在同一題中途斷掉閘門看不到（靠 subagent 回 NOT_CONNECTED → 狀態退回 NEED_CONNECT）；
+     (b) READY 是 per-session：別的 session／視窗 connect 到不同連線名或 disconnect，本 session 的 READY 不會作廢——
+         閘門不做跨 session／跨行程協調；先做步驟 9 的 topology 實驗，再決定共用連線防護的設計（另案）；
+     (c) 閘門按 agent 能力判定：DB 連不上時 ps-auditor 的純 chunk 任務也被擋（第 0 步規則本就如此）；
+     (d) 不認識的 subagent 名字一律當會查 DB（保守）；閘門只擋、不改參數、不代模型 connect；
+     (e) 「已連線再 connect」若真 SQLcl 回 isError，閘門那題不會開（R16 待驗，驗完才決定要不要接 event hook）；
+     (f) command 的 agent 若是 subagent（本 repo 目前沒有這種 command），OpenCode 直接派的 subtask 被擋時整個 prompt 以錯誤
+         結束（fail-closed，模型沒有機會做前置）；
+     (g) 「oracleMCP 未掛載」看的是 OpenCode 存的 /mcp 狀態（1.18.29 只在 transport 斷線或 /mcp 手動切換時翻）：SQLcl 端
+         重啟後要在 /mcp 把 oracleMCP 關再開（或開新的 opencode 行程），狀態回 connected 閘門才會再管。
+□ 9. Topology 實驗（共用連線防護的前提；三個都做完回報維護 session，再設計，不先做）：
+     T1 兩個 OpenCode 行程：視窗 A（ps-orchestrator）問一題讓它 list→connect 到 DB_A、派完委派；另開視窗 B（新的 opencode
+        行程，用管理者的 build agent）不 connect、直接呼叫 oracleMCP_run_sql 執行
+        SELECT SYS_CONTEXT('USERENV','DB_NAME') FROM DUAL。
+        B 查得到＝兩個行程共用同一條 SQLcl 連線（跨行程單例）；B 回未連線＝連線只活在各自行程內（process-level）。
+     T2 同一行程兩個 session：視窗 A 問完一題後 /new 開第二個 session（build agent）不 connect 直接 run_sql——同上判讀。
+     T3 順手記三件事：opencode.json 的 oracleMCP type（local／remote）；已連線再 connect（同名）SQLcl 的回覆原文與是否 isError；
+        B 以 build agent connect 到不同連線名之後，回到 A 派 ps-ui-flow 查 DB_NAME 是哪一個。
+     結果寫回 SOP-12。共用連線防護（T1 共用→需要跨行程協調；只有 T2 共用→process-level 狀態即可）依結果另案設計。
 ```
 
 ## SOP-11 系統 CR 上線後的知識庫對齊
