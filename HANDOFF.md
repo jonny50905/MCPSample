@@ -220,9 +220,10 @@ wildcardDenyMix=[]、模型看得到 connect＋list_connections）與 R24（正�
 
 - **搬運**：公司網路封鎖 git，人工從 GitHub Raw 複製；`.ps1` 存 UTF-8 with BOM；搬完跑
   `scripts/ps-fs-doctor.ps1` 做 manifest 雜湊對照；維護端每批 push 前 `-WriteManifest`（公司機不跑）。
-  **每次 push 之後都要給管理者搬運清單**（管理者定案）：以上一次已搬的 HEAD 為基準列 `git diff --name-only` 中屬搬運集合的檔、
-  每檔的 raw 連結（釘在本次 HEAD）、cmd 可貼的 curl 指令、profile 只合併不覆蓋的提醒、搬完的驗證指令；不在搬運集合的檔（HANDOFF／
-  README／docs／tests）不列。公司機沒有 pwsh，指令一律寫 `powershell -NoProfile -ExecutionPolicy Bypass -File …`。
+  **每次 push 之後都要給管理者搬運清單**（管理者定案）：以上一次已搬的 HEAD 為基準列 `git diff --name-only` 中屬搬運集合的檔，
+  **用表格：檔名＋GitHub raw 連結（釘在本次 HEAD）＋備註**；**不要給 curl 或任何下載指令（公司會擋）**，管理者是點連結後人工複製；
+  另附 profile 只合併不覆蓋的提醒、搬完的驗證指令；不在搬運集合的檔（HANDOFF／README／docs／tests）不列。
+  公司機沒有 pwsh，指令一律寫 `powershell -NoProfile -ExecutionPolicy Bypass -File …`。
 - **模型檔衛生**：`scripts/ps-agent-doc-lint.ps1`（`-WriteManifest` 的前置）擋 issue 編號／日期／變更敘述進模型讀的檔；
   規則見 AGENTS.md 鐵律（L112）。
 - **研究產出 `docs/ps-research/**` 是公司機密**：只進內部 git，本 repo 不含。本機 `opencode.json`
