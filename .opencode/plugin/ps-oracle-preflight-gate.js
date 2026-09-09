@@ -74,8 +74,10 @@ const CALLS_MAX = 2000
 // connect／list_connections 回傳文字若命中以下樣式，視為「未成功」（狀態不前進）。
 // 只列不可能出現在成功訊息裡的樣式；保守寬鬆——誤判成功的後果是既有的 NOT_CONNECTED 復原路徑，
 // 誤判失敗的後果是閘門永遠不開，後者更糟。
+// 不列 ORA-nnnnn：SQLcl connect 成功的回覆帶一段說明文字，裡面剛好引用 ORA-nnnnn 錯誤碼（公司機實測）——用它判失敗會讓閘門永遠不開；
+// 改用「connection not connected／established／found」這種只會出現在失敗回覆的句型。
 const FAILURE_PATTERNS = [
-  /\bORA-\d{5}\b/,
+  /\bconnection not (?:connected|established|found)\b/i,
   /\bTNS-\d{5}\b/,
   /\bnot connected\b/i,
   /\bno (?:current |active )?connection\b/i,

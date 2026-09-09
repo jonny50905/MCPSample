@@ -104,7 +104,7 @@ test("狀態機：connect（profile 名）成功 → READY 才放行；list_conn
   await chat(hooks, S, "m1")
   await list(hooks, S, "l0") // 清單不是前置：成功也不改狀態
   await expectBlock(() => task(hooks, S, "t1"), "NEED_CONNECT")
-  await connect(hooks, S, "c1", "ORA-12541: TNS:no listener")
+  await connect(hooks, S, "c1", "Connection not established: ORA-12541 TNS:no listener")
   await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
   await call(hooks, S, "oracleMCP_connect", "c2", { content: [] }, { connection_name: "HR" })
   await expectBlock(() => task(hooks, S, "t3"), "NEED_CONNECT")
@@ -123,7 +123,7 @@ test("狀態機：connect（profile 名）成功 → READY 才放行；list_conn
   const rows = (id) => log.find((l) => l.hook === "after" && l.callID === id)
   assert.ok(rows("l0").ok === true && rows("l0").next === "NEED_CONNECT" && /informational/.test(rows("l0").note), "list 成功不前進：" + JSON.stringify(rows("l0")))
   assert.ok(rows("l2").ok === true && rows("l2").state === "READY" && rows("l2").next === "READY")
-  assert.equal(rows("c1").ok, false); assert.ok(rows("c1").failureMatch)
+  assert.equal(rows("c1").ok, false); assert.match(rows("c1").failureMatch, /connection not/)
   assert.equal(rows("c2").ok, "unknown"); assert.match(rows("c2").note, /empty tool output/); assert.equal(rows("c2").next, "NEED_CONNECT")
   assert.equal(rows("c3").ok, false); assert.equal(rows("c3").failureMatch, "isError")
   assert.equal(rows("c4").ok, true); assert.equal(rows("c4").next, "READY"); assert.equal(rows("c4").connection, "HR")
@@ -336,7 +336,7 @@ test("沒有 fail-open：connect／list 一直失敗，會查 DB 的 task 一律
   // connect 回 MCP isError → 只有 before（after 不會觸發）
   await before(hooks, S, "oracleMCP_connect", "c1", { connection_name: "HR" })
   await expectBlock(() => task(hooks, S, "t1", "ps-auditor"), "NEED_CONNECT")
-  await connect(hooks, S, "c2", "ORA-12541: TNS:no listener")
+  await connect(hooks, S, "c2", "connection not found: HR")
   await expectBlock(() => task(hooks, S, "t2", "ps-auditor"), "NEED_CONNECT")
   await before(hooks, S, "oracleMCP_connect", "c3", { connection_name: "HR" })
   await assert.rejects(() => task(hooks, S, "t3", "ps-auditor"), (e) => /目前狀態＝NEED_CONNECT/.test(e.message) && /已被擋 3 次/.test(e.message) && /DB 連線建立失敗/.test(e.message))
@@ -606,4 +606,21 @@ test("agent tools 表混寫 oracleMCP_* deny ＋ 個別工具 true：載入時�
   await chat(hooks, "ses_mix", "m1")
   await expectBlock(() => task(hooks, "ses_mix", "t1", "zz-mixed"), "NEED_CONNECT")
   assert.ok(last(dir, "ses_mix").dbCapable === true && last(dir, "ses_mix").basis === "run_sql:enabled")
+})
+
+test("成功回覆的說明文字引用 ORA-nnnnn 錯誤碼不算失敗（SQLcl 實際回覆）；失敗只認 connection not connected／established／found、TNS-nnnnn、not connected、error 開頭等句型", async () => {
+  const dir = tempProject()
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  await chat(hooks, S, "m1")
+  await connect(hooks, S, "c1", "Connected to HR.\nNote: if the connection drops you may see ORA-03113 or ORA-12541; reconnect with connect.")
+  let row = last(dir, S)
+  assert.ok(row.ok === true && row.failureMatch === undefined && row.next === "READY", JSON.stringify(row))
+  await task(hooks, S, "t1")
+  assert.equal(last(dir, S).decision, "allow")
+  for (const [id, text] of [["f1", "Connection not established"], ["f2", "connection NOT found: HR"], ["f3", "The connection is not connected"], ["f4", "TNS-12541: no listener"], ["f5", "Error: something"]]) {
+    await connect(hooks, S, id, text)
+    row = last(dir, S)
+    assert.ok(row.ok === false && row.failureMatch && row.next === "NEED_CONNECT", id + ": " + JSON.stringify(row))
+  }
+  await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
 })

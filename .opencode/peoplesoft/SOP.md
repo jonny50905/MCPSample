@@ -563,7 +563,9 @@ list 的 after 只記錄不改狀態（主 agent 只在 connect 兩次都失敗�
 - 上一題晚到的回覆（快照 turnId ≠ 目前 turnId）→ attribution=stale：connect 成功不替新題完成前置；task 回的
   NOT_CONNECTED 不把新題退回。disconnect 例外（連線真的斷了，一律退回 NEED_CONNECT）。task 在查 /mcp 狀態期間題目換了 → 擋（保守）。
 - 成功判定三態：after 有文字且不命中失敗樣式＝ok:true；命中或 isError＝ok:false；沒有文字（空輸出）＝ok:"unknown"。
-  false 與 unknown 都不前進。MCP isError 在 OpenCode 內會 throw、after 不觸發（＝失敗）。
+  false 與 unknown 都不前進。MCP isError 在 OpenCode 內會 throw、after 不觸發（＝失敗）。失敗樣式**不含 ORA-nnnnn**：SQLcl connect
+  成功的回覆帶一段說明文字、裡面剛好引用 ORA-nnnnn（公司機實測，用它判失敗會讓閘門永遠不開）；改認
+  `connection not connected／established／found`、TNS-nnnnn、not connected、no connection、failed to connect、error 開頭等只出現在失敗回覆的句型。
 - 能力是機械欄位 dbCapable（true／false；不認識的 agent＝true）；analyzer 只看它，不看 basis 說明字串。
 - connect 的目標在執行前比對 profile `oracle.connectionName`：未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；connection_name 與 profile
   不完全一致 → ORACLE_CONNECTION_MISMATCH。兩者都在工具執行前擋（connect 不會送到 SQLcl；observe 模式只記）。清單成員資格不驗

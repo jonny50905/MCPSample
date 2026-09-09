@@ -110,6 +110,9 @@ analyzer 的 turnInvariantViolations 只看 connect→READY、preflight＝有 co
 驗證：單元 20、e2e 17 情境全 PASS（connect-first 改 list-first：多做的 list 不算前置也不擋路；放棄路徑 list 一次附原文）、analyzer 對 17 個 e2e export
 判定一致（listCalls 只在 list-first／connect-fail／empty-connect／reconnect-fail 為 1）、test-auto-loop 全 PASS。公司機看 R23（`_plugin.log` 的
 wildcardDenyMix=[]、模型看得到 connect＋list_connections）與 R24（正常題目零 list、connect 的 connection 欄＝profile 值原樣）。
+**再追記（同日，公司機實測第六件）**：閘門失敗樣式 `ORA-\d{5}` 把 SQLcl connect 成功的回覆判成失敗（成功回覆的說明文字引用 ORA-nnnnn）→
+閘門永遠不開。管理者定案移除該行、改認 `connection not (connected|established|found)`；單元加回歸（成功文字含 ORA 碼 → READY）。
+搬運清單自此改表格（檔名＋raw 連結），不再給 curl（公司會擋）。
 
 ## 1. 管理者下一步（按序）
 
@@ -148,8 +151,8 @@ wildcardDenyMix=[]、模型看得到 connect＋list_connections）與 R24（正�
    | `.opencode/command/ps-audit.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋開場無條件 connect＋list→connect 順序） | 72 | |
    | `.opencode/agent/ps-deep-research.md` | 修改（三處 ≤ 3＋#24 導覽入口填法＋清除一次一個殘留＋L112 清理＋#27 Classic canonical＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 518 | |
    | `.opencode/agent/ps-audit-orchestrator.md` | 修改（≤ 3、首個先單獨派→#28 改主 agent connect＋L112 清理＋#28 連線歸主 agent＋#28 工具名兩種拼法＋底線拼法＋開場無條件 connect＋list→connect 順序） | 152 | |
-   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20＋SOP-12 追記＋SOP-12 再追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 655 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3067 | |
+   | `.opencode/peoplesoft/SOP.md` | 修改（只加 SOP-12 補述＋SOP-13 tier 1 門＋SOP-19＋SOP-20＋SOP-12 追記＋SOP-12 再追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 861 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（只加 L109＋L110＋L111＋L109 追記＋L112＋L113＋L114＋L114 追記＋底線拼法＋開場無條件 connect＋list→connect 順序） | 3230 | |
    | `scripts/ps-auto-loop.ps1` | 修改（#23：research 債＝相位＋畢業門＋進度尺＋#24 手術 prompt [導覽] 型＋#27 Classic canonical） | 2329 | 存 UTF-8 with BOM |
    | `scripts/ps-graduation.ps1` | 修改（GateVersion 3→4） | 191 | 存 UTF-8 with BOM；舊 tier 1 收據作廢屬預期 |
    | `scripts/tests/test-auto-loop.ps1` | 修改（情境 27＋情境 28 共 17 判定＋情境 29＋情境 30＋情境 31＋情境 31 拼法守衛＋底線拼法＋開場無條件 connect＋list→connect 順序） | 675 | 存 UTF-8 with BOM |
@@ -162,7 +165,7 @@ wildcardDenyMix=[]、模型看得到 connect＋list_connections）與 R24（正�
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；不變量只剩 connect→READY、list 只記錄、connect 目標執行前比對／嘗試作廢 READY／同題世代／報告解析／run_sql 三態／第 0 步提醒注入／wildcardDenyMix 警告） | 731 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行（含 reminder=on、wildcardDenyMix=[]） |
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；不變量只剩 connect→READY、list 只記錄、connect 目標執行前比對／嘗試作廢 READY／同題世代／報告解析／run_sql 三態／第 0 步提醒注入／wildcardDenyMix 警告） | 733 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行（含 reminder=on、wildcardDenyMix=[]） |
    | `.opencode/.npmrc` | 新增 | 4 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時）；啟動仍多等 70 秒才在全域設定目錄再放一份（SOP-21 步驟 1） |
    | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce；preflightReminder: on；connectionName 註解改「直接 connect 這個名字、不 list、原樣、閘門執行前比對」） | 111 | 本機已回填 FILL_ME 者只合併 oracle 區塊的註解、`preflightGate`、`preflightReminder`（fs-doctor 報此檔 M 屬預期）；**connectionName 必須與 SQLcl 已儲存連線名完全一致（實際連得上的那個名字，不是 list_connections 黏在一起的字串），否則所有 connect 在執行前被擋** |
    | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 逐工具明寫：list／connect／disconnect／run_sqlcl false、run_sql true；不再用 oracleMCP_* 萬用字元） | 144 | 上一批的 `"oracleMCP_*": false` 寫法在公司機會隱藏整個 MCP，**必須重搬** |
