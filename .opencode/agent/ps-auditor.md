@@ -13,12 +13,12 @@ tools:
   webfetch: false
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
-  # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／run_sqlcl，
+  # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／sqlcl_run，
   # 未連線就回 BLOCKED(NOT_CONNECTED)。逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）
   "oracleMCP_list_connections": false
   "oracleMCP_connect": false
   "oracleMCP_disconnect": false
-  "oracleMCP_run_sqlcl": false
+  "oracleMCP_sqlcl_run": false
   "oracleMCP_sql_run": true
   # PeoplecodeMetadata 可作任務 C 的反查角度（欄位用途／Component 搜尋）；
   # 證據解引用（任務 A）仍只認 ES／Source／oracleMCP 三個來源：

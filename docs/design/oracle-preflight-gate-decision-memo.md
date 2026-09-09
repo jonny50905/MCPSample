@@ -73,7 +73,7 @@ review 對 a31c946 的判定：核心 invariant 乾淨（DB-capable task 只在 
 | P1-2 | task 快照只修 log，NOT_CONNECTED 晚到會作廢新題的 READY | 成立 | 落地：NOT_CONNECTED 只在入場 turnId＝目前 turnId 時退狀態；「連線世代」屬第二批 |
 | P1-3 | per-session READY 不是共用連線有效性的保證 | 成立；記載限制不等於修復 | 另案（第二批）：SOP-21 已知限制 (b) 改寫為「不證明共用連線仍是預期連線、不證明查詢跑在正確 DB」；先做 topology 實驗 |
 | P1-4 | 每題無條件 connect ≠ 安全的 ensure-connected；「否則清單第一個」＝靜默連錯 DB | 連線選擇成立、先修；其餘是規格變更 | 落地：profile 必填且在清單裡，否則回「Oracle 連線未設定」、不 connect；不在閘門加「跳過 connect」的例外；ensure-connected／owner／DUAL 探測屬第二批 |
-| P2-1 | subagent Oracle 權限是排除清單，run_sqlcl 等仍開 | 成立（OpenCode permission `findLast` 最後匹配者優先；`disabled()` 把 deny 的工具從模型工具清單拿掉） | 落地：`"oracleMCP_*": false` → `"oracleMCP_sql_run": true`；e2e 驗 subagent 可見 Oracle 工具只剩 sql_run、主 agent 只剩 list_connections＋connect |
+| P2-1 | subagent Oracle 權限是排除清單，sqlcl_run 等仍開 | 成立（OpenCode permission `findLast` 最後匹配者優先；`disabled()` 把 deny 的工具從模型工具清單拿掉） | 落地：`"oracleMCP_*": false` → `"oracleMCP_sql_run": true`；e2e 驗 subagent 可見 Oracle 工具只剩 sql_run、主 agent 只剩 list_connections＋connect |
 | P2-2 | analyzer 用 basis 字串篩能力漏 unknown-agent；缺 callID 級配對；零違規≠可用 | 成立 | 落地：dbCapable 欄位、callMismatch（before／after／export parentID）、安全／可用兩條驗收、-ExpectDbTask |
 | P2-3 | MCP down 退讓與「絕不在 READY 前執行」矛盾；空輸出當成功 | 成立 | 落地：未掛載改為擋（ORACLE_MCP_DOWN 協定訊息，不重試）；三態 ok；文件不再宣稱環境層退讓；MCP isError 仍靠 OpenCode throw（after 不觸發＝失敗） |
 
@@ -114,7 +114,7 @@ analyzer／e2e 的「真實題目」判定看非 synthetic part，不受注入�
 
 | 問題 | 事實 | 決定 |
 |---|---|---|
-| 主 agent 說「沒有掛載 list_connections／connect」 | tools 表 `"oracleMCP_*": false` 之後再開個別 true；公司機 OpenCode 把整個 MCP 對該 agent 隱藏、true 救不回；沙箱 1.18.29 是最後匹配者優先——版本行為不同 | 逐工具明寫（主 agent：list／connect true、disconnect／sql_run／run_sqlcl false；DB subagent：sql_run true、其餘 false）；全關的 agent 才用萬用字元；閘門載入時記 wildcardDenyMix 警告；情境 31 擋混寫回流 |
+| 主 agent 說「沒有掛載 list_connections／connect」 | tools 表 `"oracleMCP_*": false` 之後再開個別 true；公司機 OpenCode 把整個 MCP 對該 agent 隱藏、true 救不回；沙箱 1.18.29 是最後匹配者優先——版本行為不同 | 逐工具明寫（主 agent：list／connect true、disconnect／sql_run／sqlcl_run false；DB subagent：sql_run true、其餘 false）；全關的 agent 才用萬用字元；閘門載入時記 wildcardDenyMix 警告；情境 31 擋混寫回流 |
 | list_connections 回 `Name:ABCReadonlyConnect string: {…}`，模型讀成 ABCReadonlyConnect | 名稱與連線字串黏在一起、沒有分隔；從清單挑名字必然讀錯 | 第 0 步不 list：直接 connect profile `oracle.connectionName`（原樣照抄；閘門在執行前比對）；list 只在 connect 兩次失敗後呼叫一次、把原文附給管理者核對 |
 | 閘門不變量 | NEED_LIST 這一段只是在要求一個沒有價值（且有害）的步驟 | 縮成 `NEED_CONNECT ─connect 成功→ READY`；list 的 after 只記錄不改狀態；disconnect／新訊息退回 NEED_CONNECT；analyzer turnInvariantViolations 只看 connect→READY，多 listCalls 觀察值 |
 

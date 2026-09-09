@@ -124,8 +124,8 @@ todoWrites／todoBlocks 觀察值。驗證：單元 23、e2e 19（no-todo／todo
 嚴格版寫成 SQLcl 拼法 `run-sql`）→ 3b3a5b8（補 `run_sql`）→ 03274d0（全樹底線定案鎖死）→ a31c946（plugin／analyzer 寫死）→ e0b1c75（允許清單
 `"oracleMCP_run_sql": true`）一路錯到 77d4dd0。影響：真名「沒列＝開」（subagent 能查所以沒察覺，主 agent 也能自己查）；plugin 的 sql_run
 after 列從未出現 → 公司機 analyzer dbTasksCompleted 永遠 0（B1 必 FAIL）。更正：全樹 `run_sql`→`sql_run`（七個 agent、plugin、analyzer、
-cookbook、test-scenarios、情境 31／32／33、假 MCP／e2e、歷史引文）；情境 31 擋回流。**待管理者確認 `run_sqlcl` 實名**（貼「列出所有名稱含
-oracleMCP 的工具全名」的結果）。細節 SOP-12 再追記、L115 追記。
+cookbook、test-scenarios、情境 31／32／33、假 MCP／e2e、歷史引文）；情境 31 擋回流。管理者隨後給了全名清單：`list_connections`／`connect`／`disconnect`／
+`sql_run`／`sqlcl_run`——`run_sqlcl` 也是錯的（對 subagent 沒關到），一併改成 `sqlcl_run`。細節 SOP-12 再追記、L115 追記。
 
 ## 1. 管理者下一步（按序）
 
@@ -181,7 +181,7 @@ oracleMCP 的工具全名」的結果）。細節 SOP-12 再追記、L115 追記
    | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；三層擋：先列 todo（todowrite 先於一切）→ 前置 connect→READY（list 只記錄、connect 目標執行前比對／嘗試作廢 READY／同題世代／報告解析／sql_run 三態）；第 0 步提醒注入；wildcardDenyMix 警告；失敗樣式不含 ORA-nnnnn） | 842 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行（含 reminder=on、todoFirst=on、wildcardDenyMix=[]） |
    | `.opencode/.npmrc` | 新增 | 4 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時）；啟動仍多等 70 秒才在全域設定目錄再放一份（SOP-21 步驟 1） |
    | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce；preflightReminder: on；todoFirst: on；connectionName 註解改「直接 connect 這個名字、不 list、原樣、閘門執行前比對」） | 115 | 本機已回填 FILL_ME 者只合併 oracle 區塊的註解、`preflightGate`、`preflightReminder`、`todoFirst`（fs-doctor 報此檔 M 屬預期）；**connectionName 必須與 SQLcl 已儲存連線名完全一致（實際連得上的那個名字，不是 list_connections 黏在一起的字串），否則所有 connect 在執行前被擋** |
-   | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 逐工具明寫：list／connect／disconnect／run_sqlcl false、sql_run true；不再用 oracleMCP_* 萬用字元） | 144 | 上一批的 `"oracleMCP_*": false` 寫法在公司機會隱藏整個 MCP，**必須重搬** |
+   | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 逐工具明寫：list／connect／disconnect／sqlcl_run false、sql_run true；不再用 oracleMCP_* 萬用字元） | 144 | 上一批的 `"oracleMCP_*": false` 寫法在公司機會隱藏整個 MCP，**必須重搬** |
    | `.opencode/agent/ps-metadata-flow.md` | 修改（同上） | 112 | 必須重搬 |
    | `.opencode/agent/ps-ae-flow.md` | 修改（同上） | 94 | 必須重搬 |
    | `.opencode/agent/ps-auditor.md` | 修改（同上） | 262 | 必須重搬 |
@@ -259,7 +259,7 @@ oracleMCP 的工具全名」的結果）。細節 SOP-12 再追記、L115 追記
 - **cmd 傳遞限制**：session prompt 禁半形雙引號與 `> < & | % ^`；findstr 對 UTF-8 中文不可靠，
   一律 `powershell Get-Content -Encoding UTF8`。
 - **oracleMCP 工具實名**（2026-09-09 更正）：`oracleMCP_list_connections`／`oracleMCP_connect`／`oracleMCP_disconnect`／`oracleMCP_sql_run`
-  （查詢；不是 run_sql）；`run_sqlcl` 待管理者核對。工具名只能來自公司機 /mcp 清單，不能從產品文件推（SOP-12 再追記）。
+  （查詢；不是 run_sql）／`oracleMCP_sqlcl_run`（不是 run_sqlcl；管理者 2026-09-09 給的全名清單）。工具名只能來自公司機 /mcp 清單，不能從產品文件推（SOP-12 再追記）。
 - **閘門測試（#29）**：`node --test tests/oracle-gate/unit.test.mjs`（狀態機 23 組）；`OPENCODE_BIN=<binary> node tests/oracle-gate/run-e2e.mjs`
   （真 OpenCode＋假 oracleMCP＋假模型，19 情境含 `list-first`／`multi-turn-serve`／`compaction-serve`／`stale-connect-serve`／`connect-fail`／
   `wrong-target`／`reconnect-fail`／`no-todo`／`todo-noconnect`；binary 由

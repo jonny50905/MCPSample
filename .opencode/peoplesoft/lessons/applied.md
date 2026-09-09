@@ -3150,7 +3150,7 @@
   （true／false／"unknown"：空輸出＝unknown 不前進，isError 物件＝false）；每列寫 dbCapable。(2) oracleMCP 未掛載改為擋（訊息走 ORACLE_MCP_DOWN
   協定：不重試、DB 部分如實回報、非 DB 部分改派沒有 Oracle 能力的 subagent）——不變量自此沒有環境層退讓，analyzer 不需要任何豁免類別。
   (3) 四個 DB subagent 的 Oracle 工具改允許清單（`"oracleMCP_*": false` → `"oracleMCP_sql_run": true`）：list_connections／connect／disconnect／
-  run_sqlcl 對 subagent 不可見（OpenCode permission 最後匹配者優先、deny 的工具不進模型的工具清單），cookbook「工具已關」成真；主 agent 只開
+  sqlcl_run 對 subagent 不可見（OpenCode permission 最後匹配者優先、deny 的工具不進模型的工具清單），cookbook「工具已關」成真；主 agent 只開
   list_connections＋connect。(4) 連線選擇：profile oracle.connectionName 必填且必須在清單裡，缺值／不在清單 → 主 agent 回「Oracle 連線未設定」、
   不 connect、不挑清單第一個（三個主 agent 第 0 步、cookbook、profile 註解、閘門擋下訊息同步）。(5) analyzer：能力看 dbCapable 欄位（舊紀錄由
   basis 推導，unknown-agent＝會查）；新增 callMismatch（同一 callID 的 before／after turnId 一致、且 export 裡該 task 所屬 assistant 訊息的
@@ -3208,7 +3208,7 @@
   主 agent 的 tools 表是 `"oracleMCP_*": false` 之後再開 `"oracleMCP_list_connections": true`／`connect: true`；管理者把萬用字元拔掉、
   逐工具寫 true／false 就正常。判定：公司機的 OpenCode 一遇到萬用字元 deny 就把整個 MCP 對該 agent 隱藏，後面的 true 救不回；沙箱的
   1.18.29 是「最後匹配者優先」——兩個版本行為不同，兩邊都安全的寫法只有逐工具明寫。落點：三個主 agent 與四個 DB subagent 的 Oracle 片段
-  全部逐工具明寫（主 agent：list／connect true、disconnect／sql_run／run_sqlcl false；subagent：sql_run true、其餘四個 false）；整個 MCP
+  全部逐工具明寫（主 agent：list／connect true、disconnect／sql_run／sqlcl_run false；subagent：sql_run true、其餘四個 false）；整個 MCP
   全關的 agent 保留萬用字元（全關就是要它不可見）；閘門載入時把「萬用字元 deny＋個別 true」的混寫記到 _plugin.log（wildcardDenyMix＋WARN）；
   情境 31 擋混寫回流、擋 DB／主 agent 檔出現 `"oracleMCP_*"`。(2) list_connections 回的名稱與連線字串黏在一起
   （`Name:ABCReadonlyConnect string: {…}`），模型把它讀成「ABCReadonlyConnect」、怎麼 connect 都失敗。管理者定案：**不呼叫 list_connections，
@@ -3249,6 +3249,7 @@
   `"oracleMCP_*": true`，沒拼過名字所以沒錯。L103 早記過模型自創的 `oracle_sql_run`——後綴對、前綴錯，當時沒回頭核對真名。影響：真名沒被
   列到 → 對每個 agent 都是「沒列＝開」（subagent 能查所以流程看似正常，主 agent 也能自己查，不該）；plugin 的 sql_run after 列從未出現 →
   analyzer dbTasksCompleted 在公司機永遠 0（B1 必 FAIL）、子 session 無 SQL 證據；DB 能力判定靠錯名的 true 誤打誤撞仍對。更正：全樹
-  `run_sql`→`sql_run`（含本檔歷史追記引文），情境 31 擋回流；`run_sqlcl` 待管理者貼 /mcp 清單核對。
+  `run_sql`→`sql_run`（含本檔歷史追記引文），情境 31 擋回流；管理者隨後給了全名清單（list_connections／connect／disconnect／sql_run／
+  sqlcl_run），`run_sqlcl` 同樣是錯的、對 subagent 其實沒關到，一併改成 `sqlcl_run`。
   教訓：工具名只能來自 /mcp 的實際清單，不能從產品文件推；chat 裡出現過的名字（哪怕是模型猜的、哪怕記在 L103）都要拿去核對；
   「沒列＝開」讓錯名不會立刻報錯，錯名會靜靜活很久。

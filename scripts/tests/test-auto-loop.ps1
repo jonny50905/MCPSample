@@ -628,16 +628,16 @@ foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator'
     Assert ((Get-AgentToolPerm $pf 'oracleMCP_connect') -eq 'true' -and (Get-AgentToolPerm $pf 'oracleMCP_list_connections') -eq 'true') "主 agent $pa：connect／list_connections 開"
     Assert ((Get-AgentToolPerm $pf 'oracleMCP_sql_run') -eq 'false' -and (Get-AgentToolPerm $pf 'oracleMCP_disconnect') -eq 'false') "主 agent $pa：sql_run／disconnect 關"
     $paTxt = [System.IO.File]::ReadAllText($pf)
-    Assert ($paTxt -notmatch '"oracleMCP_\*"' -and $paTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_connect":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false') "主 agent $pa：Oracle 逐工具明寫（list／connect true；disconnect／sql_run／run_sqlcl false），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
+    Assert ($paTxt -notmatch '"oracleMCP_\*"' -and $paTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_connect":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_sqlcl_run":\s*false') "主 agent $pa：Oracle 逐工具明寫（list／connect true；disconnect／sql_run／sqlcl_run false），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
 }
 $mixed = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md') | Where-Object { $t = [System.IO.File]::ReadAllText($_.FullName); ($t -match '"oracleMCP_\*":\s*false') -and ($t -match '(?m)^\s*"oracleMCP_[a-z_]+":\s*true') } | ForEach-Object { $_.Name })
 Assert ($mixed.Count -eq 0) "沒有 agent 混寫 oracleMCP_* deny ＋ 個別 oracleMCP_ 工具 true（某些 OpenCode 版本會因此把整個 MCP 對該 agent 隱藏，true 救不回）：$($mixed -join ',')"
 foreach ($sa in @('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor')) {
     $sf = Join-Path $repoRoot ".opencode/agent/$sa.md"
     Assert ((Get-AgentToolPerm $sf 'oracleMCP_sql_run') -eq 'true') "subagent $sa：sql_run 開"
-    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_list_connections') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_run_sqlcl') -eq 'false') "subagent $sa：Oracle 允許清單——connect／disconnect／list_connections／run_sqlcl 全關，只開 sql_run"
+    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_list_connections') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_sqlcl_run') -eq 'false') "subagent $sa：Oracle 允許清單——connect／disconnect／list_connections／sqlcl_run 全關，只開 sql_run"
     $saTxt = [System.IO.File]::ReadAllText($sf)
-    Assert ($saTxt -notmatch '"oracleMCP_\*"' -and $saTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_connect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*true') "subagent $sa：Oracle 逐工具明寫（list／connect／disconnect／run_sqlcl false、sql_run true），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
+    Assert ($saTxt -notmatch '"oracleMCP_\*"' -and $saTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_connect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_sqlcl_run":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*true') "subagent $sa：Oracle 逐工具明寫（list／connect／disconnect／sqlcl_run false、sql_run true），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
     Assert ($saTxt -notmatch '才 `list_connections`' -and $saTxt -notmatch '回未連線錯誤才 connect' -and $saTxt -match 'NOT_CONNECTED') "subagent $sa：硬規則段無「回未連線才 list→connect」殘留、含 NOT_CONNECTED"
 }
 $prof31 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
@@ -655,16 +655,16 @@ $rcTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesof
 Assert ($rcTxt -match 'blockedReason' -and $rcTxt -match 'NOT_CONNECTED' -and $rcTxt -match 'SCHEMA_UNRESOLVED' -and $rcTxt -match 'QUERY_TIMEOUT') "report-contract：blockedReason 封閉值域"
 $noSolo = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '先單獨派' } | ForEach-Object { $_.Name })
 Assert ($noSolo.Count -eq 0) "agent／command 不再有「先單獨派」：$($noSolo -join ',')"
-$hyPat = 'list' + '-connections|run' + '-sql|sql' + '-run'
+$hyPat = 'list' + '-connections|run' + '-sql|sql' + '-run|sqlcl' + '-run'
 $hy = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml | Where-Object { $_.Name -ne 'SOP.md' -and $_.Name -ne 'applied.md' -and ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 $hy += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1,*.json | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 Assert ($hy.Count -eq 0) "全樹 oracleMCP 工具名一律底線拼法（list_connections／sql_run）：$($hy -join ',')"
-# 查詢工具的實名是 sql_run（公司機 /mcp 核對）；舊錯名 run_ + sql 不得回流（SOP／applied 的歷史追記除外；run_sqlcl 不在此列）
-$oldName = 'run_' + 'sql(?!cl)'
+# oracleMCP 工具實名（公司機 /mcp 核對）：list_connections／connect／disconnect／sql_run／sqlcl_run；舊錯名 run_ + sql／run_ + sqlcl 不得回流（SOP／applied 的歷史追記除外）
+$oldName = 'run_' + 'sql'
 $oldHits = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml,*.js | Where-Object { $_.Name -ne 'SOP.md' -and $_.Name -ne 'applied.md' -and ([System.IO.File]::ReadAllText($_.FullName)) -match $oldName } | ForEach-Object { $_.Name })
 $oldHits += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1 | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $oldName } | ForEach-Object { $_.Name })
 if (([System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))) -match $oldName) { $oldHits += 'AGENTS.md' }
-Assert ($oldHits.Count -eq 0) "oracleMCP 查詢工具實名是 sql_run：模型讀的檔、plugin、scripts 不得再出現舊錯名（run_ + sql）：$($oldHits -join ',')"
+Assert ($oldHits.Count -eq 0) "oracleMCP 工具實名 sql_run／sqlcl_run：模型讀的檔、plugin、scripts 不得再出現舊錯名（run_ + sql／run_ + sqlcl）：$($oldHits -join ',')"
 $nextAction = @{ 'ps-orchestrator' = '先查 Entity Wiki'; 'ps-deep-research' = '歸戶提煉'; 'ps-audit-orchestrator' = 'audit-parts/manifest.txt' }
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))

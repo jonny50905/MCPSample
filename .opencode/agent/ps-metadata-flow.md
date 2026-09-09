@@ -17,12 +17,12 @@ tools:
   "PeoplecodeSource_*": true
   # PeopleTools metadata（排程 / 授權 / origin / Record 結構）用 oracleMCP 查，
   # 查詢一律照 oracle-query-cookbook.md 的樣板，只准 SELECT：
-  # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／run_sqlcl，
+  # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／sqlcl_run，
   # 未連線就回 BLOCKED(NOT_CONNECTED)。逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）
   "oracleMCP_list_connections": false
   "oracleMCP_connect": false
   "oracleMCP_disconnect": false
-  "oracleMCP_run_sqlcl": false
+  "oracleMCP_sqlcl_run": false
   "oracleMCP_sql_run": true
   # PeoplecodeMetadata：欄位用途反查（find_field_usage）／Component 關鍵字
   # 搜尋（search_component_metadata）——回傳只作定位線索，證據仍走 SQL／CHUNK：

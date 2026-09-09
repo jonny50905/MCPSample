@@ -434,7 +434,7 @@ connect 與 list_connections 才算通。管理者定案：公司機就是底線
 再追記（issue #29 外部 review 第二輪）：「否則清單第一個」作廢——profile `oracle.connectionName` 必填且必須在清單裡，缺值／不在清單
 → 主 agent 回「Oracle 連線未設定」、不 connect、不挑清單第一個（設定錯誤不能變成靜默連錯 DB；三個主 agent 第 0 步、cookbook、
 profile 註解、閘門擋下訊息同步）。四個 subagent 的 Oracle 工具改為允許清單（`"oracleMCP_*": false` 之後只開 `"oracleMCP_sql_run": true`）：
-list_connections／connect／disconnect／run_sqlcl 對 subagent 不可見；cookbook subagent 段「工具已關」自此為真。快篩加 R17／R18（SOP-21 步驟 3）。
+list_connections／connect／disconnect／sqlcl_run 對 subagent 不可見；cookbook subagent 段「工具已關」自此為真。快篩加 R17／R18（SOP-21 步驟 3）。
 
 ---
 
@@ -530,7 +530,7 @@ ps-oracle-preflight-gate.js`）——prompt 只剩第二道。部署與驗證程
 (1) **tools 表不得用 `"oracleMCP_*": false` 萬用字元 deny 再開個別工具**——公司機的 OpenCode 一遇到萬用字元 deny 就把整個 oracleMCP
 對該 agent 隱藏，後面的 `"oracleMCP_connect": true` 救不回（模型回報「本次工具環境中沒有掛載 list_connections 以及 connect」）；
 改成逐工具明寫 true／false 就正常。沙箱的 1.18.29 是「最後匹配者優先」，公司機版本不同、行為不同——兩邊都安全的寫法只有逐工具明寫。
-落點：三個主 agent（list_connections／connect true；disconnect／sql_run／run_sqlcl false）與四個 DB subagent（sql_run true、其餘四個 false）
+落點：三個主 agent（list_connections／connect true；disconnect／sql_run／sqlcl_run false）與四個 DB subagent（sql_run true、其餘四個 false）
 全部改逐工具；上面「硬性擋線」段的 `"oracleMCP_*": true 之後加 disconnect false` 寫法**作廢**。整個 MCP 全關的 agent（ps-peoplecode-flow／
 ps-sql-flow／ps-sqr-flow／general／scout／explore）保留 `"oracleMCP_*": false`（全關就是要它不可見）。閘門載入時把「萬用字元 deny＋個別 true」
 的混寫記到 `_plugin.log`（`wildcardDenyMix=[…]`＋WARN 行）；test-auto-loop 情境 31 擋混寫回流。
@@ -550,8 +550,9 @@ list 的 after 只記錄不改狀態；analyzer 的 turnInvariantViolations 只�
 （不該）；plugin 對 `sql_run` 的 after 列從未寫過 → 子 session 的 SQL 證據缺、analyzer 的 dbTasksCompleted 在公司機永遠 0（B1 可用判定必
 FAIL、R21 看不到 ok:true）；閘門的 DB 能力判定靠 `"oracleMCP_run_sql": true` 誤打誤撞仍正確。
 更正：全樹 `run_sql` → `sql_run`（七個 agent 的 tools 表、plugin、analyzer、cookbook、test-scenarios、情境 31／32／33、假 MCP／假模型／e2e、
-歷史追記的引文也一併改，避免再被抄回）；情境 31 加守衛擋 `run_sql`／`run-sql`／`sql-run` 回流。**待管理者確認**：`run_sqlcl` 是不是也是別的名字
-——請把「列出所有名稱含 oracleMCP 的工具全名」的結果貼給維護 session，對不上就再改一次。教訓：工具名只能來自 /mcp 的實際清單，
+歷史追記的引文也一併改，避免再被抄回）；情境 31 加守衛擋 `run_sql`／`run-sql`／`sql-run` 回流。管理者同日補上全名清單：
+`list_connections`／`connect`／`disconnect`／`sql_run`／`sqlcl_run`——`run_sqlcl` 也是錯的，已一併改成 `sqlcl_run`（同樣「沒列＝開」，
+之前對 subagent 其實沒關到）。教訓：工具名只能來自 /mcp 的實際清單，
 不能從產品文件推；chat 裡出現過的名字（哪怕是模型猜的）都要拿去核對。
 
 ## SOP-21 Oracle 前置閘門（plugin）部署與驗證（issue #29；L115）
@@ -602,9 +603,9 @@ list 的 after 只記錄不改狀態（主 agent 只在 connect 兩次都失敗�
 
 判定是**能力**不是任務意圖：`oracleMCP_*` 全關的 subagent（ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow）不受影響；
 ps-auditor 即使做純 chunk 任務也過閘門——要解決混合能力，走 deterministic routing／capability 邊界（另案），不在閘門打洞。
-四個會查 DB 的 subagent 的 Oracle 工具是**允許清單，逐工具明寫**（`"oracleMCP_list_connections"`／`connect`／`disconnect`／`run_sqlcl`
-各 false、`"oracleMCP_sql_run": true`）：list_connections／connect／disconnect／run_sqlcl 對 subagent 都不可見；主 agent 逐工具明寫
-list_connections＋connect true、disconnect／sql_run／run_sqlcl false。**不得用 `"oracleMCP_*": false` 再開個別工具**（公司機的 OpenCode 會因
+四個會查 DB 的 subagent 的 Oracle 工具是**允許清單，逐工具明寫**（`"oracleMCP_list_connections"`／`connect`／`disconnect`／`sqlcl_run`
+各 false、`"oracleMCP_sql_run": true`）：list_connections／connect／disconnect／sqlcl_run 對 subagent 都不可見；主 agent 逐工具明寫
+list_connections＋connect true、disconnect／sql_run／sqlcl_run false。**不得用 `"oracleMCP_*": false` 再開個別工具**（公司機的 OpenCode 會因
 萬用字元 deny 把整個 MCP 對該 agent 隱藏，true 救不回；SOP-12 再追記）；全關的 agent 才用萬用字元。
 主 agent 的 connect 目標＝profile `oracle.connectionName` **原樣照抄**；缺值／FILL_ME → 回「Oracle 連線未設定」、不 connect；不先 list、
 不從清單挑名字（設定錯誤不能變成靜默連錯 DB）。**閘門在執行前強制這條**：profile 未填、或 connect 的 connection_name 與 profile 不一致的
