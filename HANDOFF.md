@@ -98,6 +98,18 @@ audit-orchestrator 第一動作第 1 項；名字仍叫第 0 步）；(2) 閘門
 env PS_ORACLE_GATE_REMINDER／profile oracle.preflightReminder 可關；plugin 自己 connect 在 1.18.29 不可行（沒有 plugin 呼叫工具的 API）。
 驗證：單元 19、e2e 17 情境（每情境驗 export 的真實訊息帶提醒 part、模型請求看得到）、test-auto-loop 278 判定。公司機看 R22 與
 `-AnalyzeAll` 的 blockedRuns 是否下降；診斷「沒做第 0 步」先看 jsonl 的 before task 列是 block（閘門有擋）還是 allow／沒有紀錄（沒載到）。
+**再追記（2026-09-09，公司機實測第五輪：搬完 fbbb765 後兩件事）**：(1) 主 agent 回報「本次工具環境中沒有掛載 list_connections 以及 connect」
+——公司機的 OpenCode 一遇到 tools 表的 `"oracleMCP_*": false` 就把整個 MCP 對該 agent 隱藏，後面的個別 true 救不回（沙箱 1.18.29 是最後匹配者優先，
+版本行為不同；管理者拔掉萬用字元、逐工具寫 true／false 就正常）。三個主 agent＋四個 DB subagent 的 Oracle 片段全部改**逐工具明寫**（全關的
+agent 保留萬用字元）；閘門載入時把「萬用字元 deny＋個別 true」混寫記到 `_plugin.log`（`wildcardDenyMix=[…]`＋WARN）；情境 31 擋回流。
+(2) `list_connections` 把名稱與連線字串黏在一起回（`Name:ABCReadonlyConnect string: {…}`），模型讀成「ABCReadonlyConnect」、怎麼連都失敗。
+管理者定案：**不呼叫 list_connections，直接 connect profile `oracle.connectionName`（原樣照抄）**。落點：三個主 agent 的開線步驟（失敗再 connect 一次；
+仍失敗才 list 一次把原文附給管理者核對）、cookbook、/ps-audit、/ps-audit-batch、AGENTS.md、profile 註解；閘門不變量縮成 NEED_CONNECT→READY
+（NEED_LIST 移除；list 的 after 只記錄）、擋下訊息／connect 目標錯誤／提醒 part 改「呼叫 oracleMCP_connect（profile 值原樣；不必先 list、不從清單挑名字）」；
+analyzer 的 turnInvariantViolations 只看 connect→READY、preflight＝有 connect 成功、加 listCalls 觀察值（正常 0）；假 oracleMCP 的清單改仿真黏合格式。
+驗證：單元 20、e2e 17 情境全 PASS（connect-first 改 list-first：多做的 list 不算前置也不擋路；放棄路徑 list 一次附原文）、analyzer 對 17 個 e2e export
+判定一致（listCalls 只在 list-first／connect-fail／empty-connect／reconnect-fail 為 1）、test-auto-loop 全 PASS。公司機看 R23（`_plugin.log` 的
+wildcardDenyMix=[]、模型看得到 connect＋list_connections）與 R24（正常題目零 list、connect 的 connection 欄＝profile 值原樣）。
 
 ## 1. 管理者下一步（按序）
 
@@ -144,35 +156,38 @@ env PS_ORACLE_GATE_REMINDER／profile oracle.preflightReminder 可關；plugin �
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；fs-doctor 應報 56 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
    `.gitignore`、`HANDOFF.md`、`README.md` 不在搬運集合。
-1b. issue #29 執行期閘門（2026-09-08～09；1／1a 尚未搬的一起搬，manifest 只搬最新。**已依 886d6e2／d544ec3／e0b1c75／b8e7aba 搬過的檔要重搬**——
-    閘門、三個主 agent 檔、profile 註解、SOP、applied、test-scenarios、test-auto-loop、manifest 都改了）：
+1b. issue #29 執行期閘門（2026-09-08～09；1／1a 尚未搬的一起搬，manifest 只搬最新。**已依 886d6e2／d544ec3／e0b1c75／b8e7aba／fbbb765 搬過的檔要重搬**——
+    閘門、七個帶 Oracle 的 agent 檔（tools 逐工具明寫）、兩個 command、cookbook、profile 註解、SOP、applied、test-scenarios、test-auto-loop、
+    runtime 回歸腳本、manifest 都改了）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；含 connect 目標執行前比對／嘗試作廢 READY／同題世代／報告解析／run_sql 三態／第 0 步提醒注入） | 724 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行（含 reminder=on） |
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；不變量只剩 connect→READY、list 只記錄、connect 目標執行前比對／嘗試作廢 READY／同題世代／報告解析／run_sql 三態／第 0 步提醒注入／wildcardDenyMix 警告） | 731 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行（含 reminder=on、wildcardDenyMix=[]） |
    | `.opencode/.npmrc` | 新增 | 4 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時）；啟動仍多等 70 秒才在全域設定目錄再放一份（SOP-21 步驟 1） |
-   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce；preflightReminder: on；connectionName 註解改「必填、完全一致、閘門執行前比對」） | 112 | 本機已回填 FILL_ME 者只合併 oracle 區塊的註解、`preflightGate`、`preflightReminder`（fs-doctor 報此檔 M 屬預期）；**connectionName 必須與 SQLcl 已儲存連線名完全一致（大小寫、空白），否則所有 connect 在執行前被擋** |
-   | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 允許清單：`"oracleMCP_*": false` → `"oracleMCP_run_sql": true`） | 141 | 上一批（b8e7aba）已搬者不必重搬 |
-   | `.opencode/agent/ps-metadata-flow.md` | 修改（同上） | 109 | 上一批已搬者不必重搬 |
-   | `.opencode/agent/ps-ae-flow.md` | 修改（同上） | 91 | 上一批已搬者不必重搬 |
-   | `.opencode/agent/ps-auditor.md` | 修改（同上） | 259 | 上一批已搬者不必重搬 |
-   | `.opencode/agent/ps-orchestrator.md` | 修改（開線改為工作流第 2 步，獨立「## 第 0 步」章節移除） | 182 | |
-   | `.opencode/agent/ps-deep-research.md` | 修改（開線改為「啟動與續跑」第 0 項） | 515 | |
-   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（開線改為「第一動作」第 1 項） | 148 | |
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（主 agent 段第 2 步：CONNECTION_NOT_CONFIGURED，不挑清單第一個） | 638 | 上一批已搬者不必重搬 |
-   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 再追記＋SOP-21 整段：配對／三態／未掛載也擋／connect 目標強制／嘗試作廢／世代／完成定義／第 0 步兩層處置／R17～R22／內網最小驗收表／topology 實驗） | 828 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115＋四輪追記） | 3206 | |
-   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R22） | 694 | |
-   | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | 上一批已搬者不必重搬 |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 31 開線在工作流內＋情境 32 提醒注入守衛＋情境 33 假成功反例） | 842 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
-   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析；安全五項＋可用判定「報告 COMPLETE 且子 session run_sql 成功」；-ExpectDbTask） | 441 | 存 UTF-8 with BOM；用法見 SOP-21；上一批已搬者不必重搬 |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce；preflightReminder: on；connectionName 註解改「直接 connect 這個名字、不 list、原樣、閘門執行前比對」） | 111 | 本機已回填 FILL_ME 者只合併 oracle 區塊的註解、`preflightGate`、`preflightReminder`（fs-doctor 報此檔 M 屬預期）；**connectionName 必須與 SQLcl 已儲存連線名完全一致（實際連得上的那個名字，不是 list_connections 黏在一起的字串），否則所有 connect 在執行前被擋** |
+   | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 逐工具明寫：list／connect／disconnect／run_sqlcl false、run_sql true；不再用 oracleMCP_* 萬用字元） | 144 | 上一批的 `"oracleMCP_*": false` 寫法在公司機會隱藏整個 MCP，**必須重搬** |
+   | `.opencode/agent/ps-metadata-flow.md` | 修改（同上） | 112 | 必須重搬 |
+   | `.opencode/agent/ps-ae-flow.md` | 修改（同上） | 94 | 必須重搬 |
+   | `.opencode/agent/ps-auditor.md` | 修改（同上） | 262 | 必須重搬 |
+   | `.opencode/agent/ps-orchestrator.md` | 修改（tools 逐工具明寫；工作流第 2 步改直接 connect profile 值、不先 list、失敗兩次才 list 附原文） | 184 | 必須重搬 |
+   | `.opencode/agent/ps-deep-research.md` | 修改（同上；「啟動與續跑」第 0 項） | 517 | 必須重搬 |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（同上；「第一動作」第 1 項） | 151 | 必須重搬 |
+   | `.opencode/command/ps-audit.md` | 修改（開場直接 connect、不先 list 措辭） | 72 |  |
+   | `.opencode/command/ps-audit-batch.md` | 修改（同上） | 109 |  |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（主 agent 段第 1～2 步：直接 connect profile 值原樣、不先 list；list 只在兩次失敗後附原文） | 638 |  |
+   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 現況＋再追記（萬用字元隱藏整個 MCP／清單黏合）＋SOP-21 整段改 connect-only：配對／三態／未掛載也擋／connect 目標強制／嘗試作廢／世代／完成定義／第 0 步兩層處置／R17～R24／內網最小驗收表／topology 實驗） | 859 |  |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115＋五輪追記） | 3226 |  |
+   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7 R0／R1／R5／R8 改寫；§7a R9～R24） | 696 |  |
+   | `.opencode/peoplesoft/README.md` | 修改（目錄結構的 plugin 說明改 connect-only） | 308 |  |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 31 逐工具明寫＋混寫守衛＋開線直接 connect；情境 32 無 NEED_LIST／wildcardDenyMix；情境 33 list 不算前置） | 850 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
+   | `scripts/tests/test-oracle-gate-runtime.ps1` | 修改（turnInvariantViolations 只看 connect→READY；preflight＝有 connect 成功；listCalls 觀察值） | 442 | 存 UTF-8 with BOM；用法見 SOP-21 |
    | `scripts/ps-fs-doctor.ps1` | 修改（Get-TransferFiles 加 -Force、排除 OpenCode 安裝痕跡） | 312 | 存 UTF-8 with BOM；上一批已搬者不必重搬 |
-   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD b8e7aba，早一步屬預期） |
-   | `AGENTS.md` | 修改（開線步驟先於「先查 wiki」；plugin 零相依鐵律；未掛載也擋） | 92 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 359 | 最後搬；fs-doctor 應報全部一致（commit 欄＝產生時 HEAD，早一步屬預期） |
+   | `AGENTS.md` | 修改（第 0 步改直接 connect profile 連線名、不先 list；plugin 零相依鐵律；未掛載也擋） | 93 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
 
    `tests/oracle-gate/*`（沙箱單元／e2e 測試組）與 `docs/design/oracle-preflight-gate-decision-memo.md` 不搬。
-   搬完照 SOP-21 步驟 2～5 驗：`_plugin.log` 有 loaded（reminder=on）→ 快篩（一題＋同視窗第二題；看 R16 已連線再 connect、R17 工具可見性、
-   R18 連線名設定錯誤、R19 正向驗收反例、R20 再 connect、R21 一開多用、R22 提醒注入）→ 同一視窗互動 20 題後 `-AnalyzeAll`（安全五項無豁免，
+   搬完照 SOP-21 步驟 2～5 驗：`_plugin.log` 有 loaded（reminder=on、wildcardDenyMix=[]）→ 快篩（一題＋同視窗第二題；看 R16 已連線再 connect、
+   R17／R23 工具可見性、R18 連線名設定錯誤、R19 正向驗收反例、R20 再 connect、R21 一開多用、R22 提醒注入、R24 不 list 直接 connect）→ 同一視窗互動 20 題後 `-AnalyzeAll`（安全五項無豁免，
    oracleMCP 掛載中；blockedRuns 應明顯低於注入前）→ B1／B2／B3 各 30 次（B1 另判每 session ≥1 個「報告 COMPLETE 且子 session run_sql 成功」
    的 DB task）；再做步驟 9 的內網最小驗收與步驟 10 的 topology 實驗 T1～T3（R15），結果回報維護 session。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
@@ -225,8 +240,9 @@ env PS_ORACLE_GATE_REMINDER／profile oracle.preflightReminder 可關；plugin �
   「稽核 BLOCKED」「稽核輪次 N 合併完成」「本輪稽核新增 D 項 N 筆 > 上限」。
 - **cmd 傳遞限制**：session prompt 禁半形雙引號與 `> < & | % ^`；findstr 對 UTF-8 中文不可靠，
   一律 `powershell Get-Content -Encoding UTF8`。
-- **閘門測試（#29）**：`node --test tests/oracle-gate/unit.test.mjs`（狀態機 10 組）；`OPENCODE_BIN=<binary> node tests/oracle-gate/run-e2e.mjs`
-  （真 OpenCode＋假 oracleMCP＋假模型，12 情境含 `multi-turn-serve`／`compaction-serve`／`connect-fail`；binary 由
+- **閘門測試（#29）**：`node --test tests/oracle-gate/unit.test.mjs`（狀態機 20 組）；`OPENCODE_BIN=<binary> node tests/oracle-gate/run-e2e.mjs`
+  （真 OpenCode＋假 oracleMCP＋假模型，17 情境含 `list-first`／`multi-turn-serve`／`compaction-serve`／`stale-connect-serve`／`connect-fail`／
+  `wrong-target`／`reconnect-fail`；binary 由
   `npm pack opencode-linux-x64@1.18.29` 取得；`tests/oracle-gate/README.md`）。改 plugin 必跑兩者；改 agent 檔 tools 表也要跑
   （DB subagent 判定從 tools 表推導）。沙箱要點：OpenCode 用 `PWD` 決定專案目錄；`serve` 啟動後第一個請求可能掛住（執行器 20 秒逾時重試）；
   plugin 內不得出現 connection-state／epoch／prt_／失敗放行／祖先查詢（情境 32 守衛），analyzer 不得有豁免。

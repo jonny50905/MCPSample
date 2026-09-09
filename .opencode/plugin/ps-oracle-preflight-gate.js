@@ -1,7 +1,9 @@
 // ps-oracle-preflight-gate.js — Oracle 連線前置（第 0 步）的確定性閘門（OpenCode plugin）
 //
 // 不變量（與主 agent 第 0 步一致；每一則真實使用者訊息各自成立；沒有環境層退讓）：
-//   NEED_LIST ─ list_connections 成功 ─▶ NEED_CONNECT ─ connect 成功 ─▶ READY ─▶ 才准執行「會查 DB 的 subagent」委派（task）
+//   NEED_CONNECT ─ connect 成功（connection_name＝profile oracle.connectionName 原樣）─▶ READY ─▶ 才准執行「會查 DB 的 subagent」委派（task）
+//   list_connections 不是前置的一部分：SQLcl 清單把名稱和連線字串黏在一起（Name:<名>Connect string: {…}），模型從清單挑名字會讀錯；
+//   連線名只從 profile 拿。list 的 after 只記錄、不改狀態（主 agent 只在 connect 兩次都失敗時呼叫它，把清單原文附給管理者核對）。
 // 未 READY 就派會查 DB 的 subagent → 該 task 在執行前被擋（throw），模型收到 PS_ORACLE_PREFLIGHT_REQUIRED 與下一步指示，
 // 做完前置再用相同參數重派。模型選錯順序不會變成錯誤的執行。閘門只擋、不改參數、不代模型 connect。
 //
@@ -15,16 +17,16 @@
 //
 // connect 的目標在執行前強制比對：profile oracle.connectionName 未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；connect 的
 //   connection_name 與 profile 不完全一致 → ORACLE_CONNECTION_MISMATCH。兩者都在工具執行前擋（observe 模式只記錄）。清單成員資格
-//   不在這裡驗（SQLcl 清單格式待驗），由主 agent 第 0 步規則負責。
+//   不驗（清單格式不可靠），profile 值是連線名唯一的來源。
 // 連線嘗試與世代：每次准許執行的 connect 嘗試都 connectGen+1，並把 READY 退回 NEED_CONNECT——READY 只由「該次嘗試」的成功恢復；
 //   例外、timeout、無 after、被較晚的嘗試取代，都不會保留先前的成功證明。task 入場記下當時的 gen：之後又 connect 過（gen 已變）
 //   的 task 回 NOT_CONNECTED，不作廢新世代的 READY（同題內舊連線上的工作晚回，不算新連線斷了）。
 // task 回報解析：after 把子 agent 報告的 status（COMPLETE／PARTIAL／BLOCKED，其餘＝INVALID）、blockedReason、task 包裝的 state
 //   與子 session id 記到列上（analyzer 的「可用」判定用它，不用「沒回 NOT_CONNECTED」）；run_sql 的 after 也記三態 ok。
 //
-// 第 0 步提醒（注入，不是擋）：主 agent（tools 表有 list_connections＋connect 的 primary）的每一則真實使用者訊息，chat.message 會補一個
-//   synthetic text part：「先 list → connect（connection_name＝profile 值）→ 才准派會查 DB 的 subagent；工具清單沒有 oracleMCP_ 工具
-//   就走 ORACLE_MCP_DOWN」。提醒跟著訊息走（模型最看得到的位置），把「第 0 步常被略過」從 prompt 章節問題變成每題都在眼前的指令；
+// 第 0 步提醒（注入，不是擋）：主 agent（tools 表有 connect 的 primary）的每一則真實使用者訊息，chat.message 會補一個
+//   synthetic text part：「先 connect（connection_name＝profile 值原樣；不先 list、不從清單挑名字）→ 才准派會查 DB 的 subagent；
+//   工具清單沒有 oracleMCP_ 工具就走 ORACLE_MCP_DOWN」。提醒跟著訊息走（模型最看得到的位置），把「第 0 步常被略過」從 prompt 章節問題變成每題都在眼前的指令；
 //   不查 /mcp 狀態、不改狀態機——硬性保證仍是下面的擋。env PS_ORACLE_GATE_REMINDER=off 或 profile oracle.preflightReminder: off 可關。
 //
 // 呼叫配對（會影響狀態的呼叫都在 before 留入場快照，after 依 session:callID 配對）：
@@ -32,16 +34,18 @@
 //     不用「現在」的題目。沒有入場快照的 after → attribution=unknown，不前進。
 //   - after 的回覆若屬於上一題（快照 turnId ≠ 目前 turnId）→ attribution=stale：不拿它滿足新題的前置（上一題晚到的
 //     connect 成功不算數），也不拿它作廢新題的狀態（上一題晚到的 NOT_CONNECTED 不把新題退回）。disconnect 例外：連線真的
-//     斷了，一律退回 NEED_LIST。
+//     斷了，一律退回 NEED_CONNECT。
 //   - task 在 await（查 /mcp 狀態）期間題目換了 → 以「題目已換」擋下（保守），列上同時記入場題與決定時的題。
 // 成功判定三態：after 有文字且不命中失敗樣式＝成功（true）；命中或 isError＝失敗（false）；沒有文字（空輸出）＝未知
 //   （"unknown"）——失敗與未知都不前進。MCP isError 在 OpenCode 內會 throw、after 不觸發（＝失敗）。
 //
 // 狀態以 session 為單位：
-//   - 每則「真實」使用者訊息重置為 NEED_LIST（第 0 步「不因上一題已連過就省略」）；turnId＝該則 user 訊息 id（跨行程唯一）。
+//   - 每則「真實」使用者訊息重置為 NEED_CONNECT（第 0 步「不因上一題已連過就省略」）；turnId＝該則 user 訊息 id（跨行程唯一）。
 //     全部 part 都是 synthetic 的訊息（背景 subagent 結果回灌、compaction 續行）與同一 id 重複到達不重置。
 //   - subagent 報告 blockedReason=NOT_CONNECTED（同一題）→ 退回 NEED_CONNECT（重派前必須再 connect 一次）。
-//   - 本 session 呼叫 oracleMCP_disconnect → 退回 NEED_LIST。
+//   - 本 session 呼叫 oracleMCP_disconnect → 退回 NEED_CONNECT。
+// agent tools 表：逐工具明寫、不用 oracleMCP_* 萬用字元 deny 再開個別工具——某些 OpenCode 版本會因萬用字元 deny 把整個 MCP 對該 agent
+//   隱藏、後面的 true 救不回（公司機實測）。載入時把有這種混寫的 agent 記到 _plugin.log（wildcardDenyMix），判定本身不變。
 //
 // 模式：enforce（預設）＝擋；observe＝只記錄不擋（做 hook 覆蓋率探測時用）。
 //   環境變數 PS_ORACLE_GATE_MODE 優先，其次 customization-profile.yaml 的 oracle.preflightGate。
@@ -137,6 +141,13 @@ function toolEnabled(entries, tool) {
   return enabled
 }
 
+// 同一表裡「oracleMCP_* 萬用字元 deny」＋「個別 oracleMCP_ 工具 true」的混寫（見檔頭）
+function wildcardDenyMix(entries) {
+  const deny = entries.some(([k, v]) => k.startsWith(MCP_PREFIX) && k.includes("*") && v === false)
+  const allow = entries.some(([k, v]) => k.startsWith(MCP_PREFIX) && !k.includes("*") && v === true)
+  return deny && allow
+}
+
 function loadAgentCatalog(directory) {
   const dir = path.join(directory, AGENT_DIR_REL)
   const catalog = new Map()
@@ -154,7 +165,8 @@ function loadAgentCatalog(directory) {
       catalog.set(file.slice(0, -3), {
         mode: frontmatterValue(fm, "mode") ?? "all",
         db: toolEnabled(tools, TOOL_RUN_SQL),
-        connect: toolEnabled(tools, TOOL_LIST) && toolEnabled(tools, TOOL_CONNECT),
+        connect: toolEnabled(tools, TOOL_CONNECT),
+        wildcardDenyMix: wildcardDenyMix(tools),
       })
     } catch {
       // 讀不到的檔跳過；不在目錄裡的名字會被視為會查 DB（保守）
@@ -224,10 +236,11 @@ function buildReminder(profileName, dbTargets) {
   const targets = dbTargets.length ? dbTargets.join("／") : "會查 DB 的 subagent"
   const rule = profileUnset(profileName)
     ? "profile oracle.connectionName 目前未填（FILL_ME）：不要 connect、本題不派會查 DB 的委派，回報「Oracle 連線未設定」"
-    : `connection_name＝「${profileName}」，即 profile oracle.connectionName；其他值會被閘門擋下`
+    : `connection_name＝「${profileName}」原樣照抄，即 profile oracle.connectionName；不必先 list_connections、不要從清單挑名字；其他值會被閘門擋下`
   return (
-    "【Oracle 第 0 步（執行期閘門提醒）】回答本題之前，先依序呼叫 oracleMCP_list_connections → oracleMCP_connect（" + rule + "），" +
-    `兩者都成功後才准派會查 DB 的 subagent（${targets}）。每一題都要做，不因上一題連過就省略；沒做完就派會被擋下並要求補做。` +
+    "【Oracle 第 0 步（執行期閘門提醒）】回答本題之前，先呼叫 oracleMCP_connect（" + rule + "），" +
+    `成功後才准派會查 DB 的 subagent（${targets}）。每一題都要做，不因上一題連過就省略；沒做完就派會被擋下並要求補做。` +
+    "connect 失敗 → 再 connect 一次；仍失敗 → 本題不派會查 DB 的 subagent，回報「DB 連線建立失敗」並附 oracleMCP_list_connections 的原文供管理者核對 profile。" +
     "工具清單裡沒有 oracleMCP_ 工具（未掛載）→ 不派會查 DB 的 subagent，DB 部分回 ORACLE_MCP_DOWN。不查 DB 的部分照常作答。"
   )
 }
@@ -317,8 +330,9 @@ function profileUnset(profileName) {
 function connectRule(profileName) {
   const shown = profileUnset(profileName) ? "（目前是 FILL_ME／未填）" : `「${profileName}」`
   return (
-    "connection_name＝profile oracle.connectionName 的值" + shown + "，它必須出現在 list_connections 回的清單裡；" +
-    "profile 未填、FILL_ME 或不在清單 → 不要 connect、本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，不要自己挑清單第一個" +
+    "connection_name＝profile oracle.connectionName 的值" + shown + "原樣照抄；不必先 list_connections、不要從清單挑名字（清單把名稱和連線字串黏在一起，會讀錯）；" +
+    "profile 未填／FILL_ME → 不要 connect、本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>）」；" +
+    "connect 失敗 → 再 connect 一次，仍失敗才呼叫 list_connections 把清單原文附在回報裡讓管理者核對" +
     "（閘門會在執行前擋掉 connection_name ≠ profile 值的 connect）"
   )
 }
@@ -330,8 +344,8 @@ function connectProblem(profileName, target) {
       code: "ORACLE_CONNECTION_NOT_CONFIGURED",
       message:
         `ORACLE_CONNECTION_NOT_CONFIGURED：本次 oracleMCP_connect 未執行（被 Oracle 連線前置閘門擋下）。profile oracle.connectionName 未填` +
-        `（目前＝${profileName || "空"}）——請管理者在 .opencode/peoplesoft/customization-profile.yaml 回填 SQLcl 已儲存連線名（要和 list_connections 列出的名字完全一致）。` +
-        "模型：不要猜、不要改用清單裡的名字；本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，其餘部分照常作答。",
+        `（目前＝${profileName || "空"}）——請管理者在 .opencode/peoplesoft/customization-profile.yaml 回填 SQLcl 已儲存連線名（實際連得上的那個名字；list_connections 的清單只供核對，它把名稱和連線字串黏在一起）。` +
+        "模型：不要猜、不要從清單挑名字；本題不派 DB 委派，向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>）」，其餘部分照常作答。",
     }
   }
   if (!target) {
@@ -347,8 +361,8 @@ function connectProblem(profileName, target) {
       code: "ORACLE_CONNECTION_MISMATCH",
       message:
         `ORACLE_CONNECTION_MISMATCH：本次 oracleMCP_connect 未執行（被 Oracle 連線前置閘門擋下）。connect 目標「${target}」≠ profile oracle.connectionName「${profileName}」。` +
-        `只准連 profile 指定的連線：清單裡有「${profileName}」就用它重新呼叫 connect；清單裡沒有 → 不 connect、本題不派 DB 委派，` +
-        "向使用者回報「Oracle 連線未設定（profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」，其餘部分照常作答。",
+        `只准連 profile 指定的連線：用 connection_name＝「${profileName}」原樣重新呼叫 connect，不要從 list_connections 的清單挑名字（清單把名稱和連線字串黏在一起，會讀錯）。` +
+        "仍連不上 → 不派 DB 委派，向使用者回報「DB 連線建立失敗（<connect 回的錯誤>）」並附 list_connections 原文讓管理者核對 profile，其餘部分照常作答。",
     }
   }
   return undefined
@@ -359,21 +373,15 @@ function buildBlockMessage(target, state, blockedCount, profileName) {
     `${ERROR_CODE}：本次 task 未執行（被 Oracle 連線前置閘門擋下，不是權限問題）。` +
       `原因：第 0 步尚未完成，不得委派會查 DB 的 subagent「${target}」。目前狀態＝${state}。`,
   ]
-  if (state === "NEED_CONNECT") {
-    lines.push(
-      "下一步：list_connections 已完成，只差 oracleMCP_connect 成功——呼叫 oracleMCP_connect（" + connectRule(profileName) + "），" +
-        "成功後再用相同參數重新呼叫本次 task。connect 與 task 要依序分開呼叫，不要同一步並行。",
-    )
-  } else {
-    lines.push(
-      "下一步（依序）：1) oracleMCP_list_connections  2) oracleMCP_connect（" + connectRule(profileName) + "）。" +
-        "兩者都成功後，再用相同參數重新呼叫本次 task。三個呼叫要依序分開，不要同一步並行。",
-    )
-  }
+  lines.push(
+    "下一步：呼叫 oracleMCP_connect（" + connectRule(profileName) + "），成功後再用相同參數重新呼叫本次 task。" +
+      "connect 與 task 要依序分開呼叫，不要同一步並行。",
+  )
   if (blockedCount >= 3) {
     lines.push(
-      `（本輪已被擋 ${blockedCount} 次。list_connections／connect 若一直失敗，依第 0 步規則：本題不派 DB 委派，` +
-        "向使用者回報「DB 連線建立失敗（<connect 回的錯誤>）」；工具清單裡根本沒有 oracleMCP_ 工具則回報 ORACLE_MCP_DOWN。其餘部分照常作答。）",
+      `（本輪已被擋 ${blockedCount} 次。connect 若一直失敗，依第 0 步規則：本題不派 DB 委派，` +
+        "向使用者回報「DB 連線建立失敗（<connect 回的錯誤>）」，並呼叫一次 oracleMCP_list_connections 把清單原文附上讓管理者核對 profile 值；" +
+        "工具清單裡根本沒有 oracleMCP_ 工具則回報 ORACLE_MCP_DOWN。其餘部分照常作答。）",
     )
   }
   return lines.join("\n")
@@ -432,7 +440,7 @@ export const PsOraclePreflightGate = async (input) => {
   function getSession(sessionID) {
     let s = sessions.get(sessionID)
     if (!s) {
-      s = { state: "NEED_LIST", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0, connectGen: 0 }
+      s = { state: "NEED_CONNECT", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0, connectGen: 0 }
       sessions.set(sessionID, s)
     }
     return s
@@ -513,8 +521,11 @@ export const PsOraclePreflightGate = async (input) => {
   pluginLog(
     `loaded directory=${directory} mode=${readMode(directory)} reminder=${readReminder(directory)} agents=${JSON.stringify(
       [...catalog.entries()].map(([name, v]) => `${name}:${v.db ? "DB" : "noDB"}`),
-    )}`,
+    )} wildcardDenyMix=${JSON.stringify([...catalog.entries()].filter(([, v]) => v.wildcardDenyMix).map(([name]) => name))}`,
   )
+  for (const [name, v] of catalog.entries()) {
+    if (v.wildcardDenyMix) pluginLog(`WARN agent ${name}: tools 表混寫 oracleMCP_* deny ＋ 個別工具 true——某些版本會把整個 MCP 對它隱藏；請逐工具明寫`)
+  }
 
   return {
     "chat.message": async (msg, out) => {
@@ -537,11 +548,11 @@ export const PsOraclePreflightGate = async (input) => {
         return
       }
       const prev = s.state
-      s.state = "NEED_LIST"
+      s.state = "NEED_CONNECT"
       s.turn += 1
       s.turnId = typeof mid === "string" && mid ? mid : `${process.pid}-${s.turn}`
       s.blocked = 0
-      // 第 0 步提醒：只給有 list＋connect 的主 agent、且訊息 id 已知；補在使用者文字之後（synthetic），模型每題都看得到
+      // 第 0 步提醒：只給有 connect 的主 agent、且訊息 id 已知；補在使用者文字之後（synthetic），模型每題都看得到
       let reminder = false
       if (readReminder(directory) === "on" && typeof mid === "string" && mid && Array.isArray(parts)) {
         const entry = s.agent ? catalogFresh().get(s.agent) : undefined
@@ -650,12 +661,9 @@ export const PsOraclePreflightGate = async (input) => {
         ...(attribution === "stale" ? { stale: true, replyTurnId: s.turnId } : {}),
       }
       if (tool === TOOL_LIST) {
+        // 只記錄、不改狀態：清單不是前置的一部分（名稱與連線字串黏在一起，不能拿來挑名字）；主 agent 只在 connect 失敗後用它附原文給管理者
         const r = classifyResult(out)
-        let note
-        if (r.ok === true && attribution === "current" && s.state === "NEED_LIST") s.state = "NEED_CONNECT"
-        else if (r.ok === true && attribution === "stale") note = "stale reply from previous turn: not counted for this turn"
-        else if (r.ok === true && attribution === "unknown") note = "no entry snapshot for this callID: not counted"
-        else if (r.ok === "unknown") note = "empty tool output: not counted as success"
+        const note = "list_connections is informational: state unchanged" + (attribution === "stale" ? " (reply from previous turn)" : "")
         record(sessionID, { ...base, state: prev, entryState: entry ? entry.state : undefined, next: s.state, ok: r.ok, failureMatch: r.failureMatch || undefined, outputLength: r.textLength, note })
         return
       }
@@ -667,7 +675,6 @@ export const PsOraclePreflightGate = async (input) => {
           if (entry.gen !== s.connectGen) note = "superseded by a later connect attempt: not counted"
           else if (entry.target && target && entry.target !== target) note = "connect args differ from admission: not counted"
           else if (s.state === "NEED_CONNECT") s.state = "READY"
-          else if (s.state === "NEED_LIST") note = "connect before list_connections: list still required"
         } else if (r.ok === true && attribution === "stale") note = "stale reply from previous turn: not counted for this turn"
         else if (r.ok === true) note = "no entry snapshot for this callID: not counted"
         else if (r.ok === "unknown") note = "empty tool output: not counted as success"
@@ -683,7 +690,7 @@ export const PsOraclePreflightGate = async (input) => {
         return
       }
       if (tool === TOOL_DISCONNECT) {
-        s.state = "NEED_LIST"
+        s.state = "NEED_CONNECT"
         record(sessionID, {
           ...base, state: prev, next: s.state,
           note: "disconnect in this session" + (attribution === "stale" ? " (issued in a previous turn; the connection is gone regardless)" : ""),

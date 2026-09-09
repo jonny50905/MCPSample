@@ -627,25 +627,29 @@ foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator'
     $pf = Join-Path $repoRoot ".opencode/agent/$pa.md"
     Assert ((Get-AgentToolPerm $pf 'oracleMCP_connect') -eq 'true' -and (Get-AgentToolPerm $pf 'oracleMCP_list_connections') -eq 'true') "主 agent $pa：connect／list_connections 開"
     Assert ((Get-AgentToolPerm $pf 'oracleMCP_run_sql') -eq 'false' -and (Get-AgentToolPerm $pf 'oracleMCP_disconnect') -eq 'false') "主 agent $pa：run_sql／disconnect 關"
+    $paTxt = [System.IO.File]::ReadAllText($pf)
+    Assert ($paTxt -notmatch '"oracleMCP_\*"' -and $paTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_connect":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_run_sql":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false') "主 agent $pa：Oracle 逐工具明寫（list／connect true；disconnect／run_sql／run_sqlcl false），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
 }
+$mixed = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md') | Where-Object { $t = [System.IO.File]::ReadAllText($_.FullName); ($t -match '"oracleMCP_\*":\s*false') -and ($t -match '(?m)^\s*"oracleMCP_[a-z_]+":\s*true') } | ForEach-Object { $_.Name })
+Assert ($mixed.Count -eq 0) "沒有 agent 混寫 oracleMCP_* deny ＋ 個別 oracleMCP_ 工具 true（某些 OpenCode 版本會因此把整個 MCP 對該 agent 隱藏，true 救不回）：$($mixed -join ',')"
 foreach ($sa in @('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor')) {
     $sf = Join-Path $repoRoot ".opencode/agent/$sa.md"
     Assert ((Get-AgentToolPerm $sf 'oracleMCP_run_sql') -eq 'true') "subagent $sa：run_sql 開"
     Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_list_connections') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_run_sqlcl') -eq 'false') "subagent $sa：Oracle 允許清單——connect／disconnect／list_connections／run_sqlcl 全關，只開 run_sql"
     $saTxt = [System.IO.File]::ReadAllText($sf)
-    Assert ($saTxt -match '(?m)^\s*"oracleMCP_\*":\s*false\s*$' -and $saTxt -notmatch '(?m)^\s*"oracleMCP_\*":\s*true' -and ($saTxt.IndexOf('"oracleMCP_*": false') -lt $saTxt.IndexOf('"oracleMCP_run_sql": true'))) "subagent $sa：先 oracleMCP_* false 再 run_sql true（允許清單；最後匹配者優先，順序不可顛倒）"
+    Assert ($saTxt -notmatch '"oracleMCP_\*"' -and $saTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_connect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_run_sql":\s*true') "subagent $sa：Oracle 逐工具明寫（list／connect／disconnect／run_sqlcl false、run_sql true），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
     Assert ($saTxt -notmatch '才 `list_connections`' -and $saTxt -notmatch '回未連線錯誤才 connect' -and $saTxt -match 'NOT_CONNECTED') "subagent $sa：硬規則段無「回未連線才 list→connect」殘留、含 NOT_CONNECTED"
 }
 $prof31 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
 Assert ($prof31 -match '(?m)^\s*connectionName:\s*\S+') "profile：oracle.connectionName 欄位存在"
 $ckLc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/oracle-query-cookbook.md'))
 Assert ($ckLc -match '連線的擁有者是主 agent' -and $ckLc -match 'blockedReason=NOT_CONNECTED' -and $ckLc -match 'list_connections' -and $ckLc -match 'oracle\.connectionName' -and $ckLc -notmatch '第一個先單獨派\*\*，') "cookbook 生命週期：主 agent／subagent 兩段，先單獨派規則已移除"
-Assert ($ckLc -match 'CONNECTION_NOT_CONFIGURED' -and $ckLc -notmatch '或清單第一個') "cookbook：連線名缺值／不在清單 → 報設定錯誤，不挑清單第一個"
+Assert ($ckLc -match 'CONNECTION_NOT_CONFIGURED' -and $ckLc -match '原樣照抄' -and $ckLc -match '不先 list_connections' -and $ckLc -notmatch '或清單第一個') "cookbook：連線名＝profile 原樣照抄、不先 list、不從清單挑；缺值 → 報設定錯誤"
 $firstPick = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) + @(Get-Item (Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js')) + @(Get-Item (Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '否則(用)?清單第一個|則用清單第一個' } | ForEach-Object { $_.Name })
 Assert ($firstPick.Count -eq 0) "agent／command／plugin／profile 不再有「否則用清單第一個」（靜默連錯 DB 的來源）：$($firstPick -join ',')"
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt0 = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
-    Assert ($pt0 -match '不挑清單第一個' -and $pt0 -match 'Oracle 連線未設定') "主 agent $pa：第 0 步 profile 連線名缺值／不在清單 → 回報「Oracle 連線未設定」"
+    Assert ($pt0 -match '不要從清單挑名字' -and $pt0 -match '原樣照抄' -and $pt0 -match 'Oracle 連線未設定' -and $pt0 -notmatch '不挑清單第一個') "主 agent $pa：第 0 步 connect 用 profile 連線名原樣、不從清單挑名字；缺值 → 回報「Oracle 連線未設定」"
 }
 $rcTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/subagent-report-contract.md'))
 Assert ($rcTxt -match 'blockedReason' -and $rcTxt -match 'NOT_CONNECTED' -and $rcTxt -match 'SCHEMA_UNRESOLVED' -and $rcTxt -match 'QUERY_TIMEOUT') "report-contract：blockedReason 封閉值域"
@@ -660,7 +664,7 @@ foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator'
     $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
     Assert ($pt -match '開線（第 0 步' -and $pt -match '無條件' -and $pt -match 'oracleMCP_connect' -and $pt -notmatch '(?m)^## 第 0 步') "主 agent $pa：開線（第 0 步）是工作流裡的編號步驟，不再是獨立章節"
     $s0 = $pt.Substring($pt.IndexOf('開線（第 0 步')); $iL = $s0.IndexOf('oracleMCP_list_connections'); $iC = $s0.IndexOf('oracleMCP_connect'); $iN = $s0.IndexOf($nextAction[$pa])
-    Assert ($iL -ge 0 -and $iC -gt $iL -and $iN -gt $iC -and $s0 -notmatch 'read profile → connect') "主 agent $pa：開線步驟內先 list_connections 再 connect，且排在後續動作（$($nextAction[$pa])）之前"
+    Assert ($iC -ge 0 -and $iN -gt $iC -and ($iL -lt 0 -or $iL -gt $iC) -and $s0 -match '不要先呼叫 list_connections' -and $s0 -notmatch 'read profile → connect' -and $s0 -notmatch '順序固定 list → connect') "主 agent $pa：開線步驟＝直接 connect（不先 list；list 只在 connect 失敗後附清單原文給管理者），且排在後續動作（$($nextAction[$pa])）之前"
 }
 $cond = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '派出第一個.{0,12}之前.{0,6}先由你 connect|派出前先由你 connect|read profile → connect' } | ForEach-Object { $_.Name })
 Assert ($cond.Count -eq 0) "agent／command 不再有條件式 connect（派出第一個之前才 connect）：$($cond -join ',')"
@@ -684,8 +688,9 @@ Write-Host "情境 32：Oracle 前置閘門（plugin）——檔案形狀／零�
 $gp = Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js'
 Assert (Test-Path -LiteralPath $gp) "plugin 檔存在：.opencode/plugin/ps-oracle-preflight-gate.js"
 $gt = [System.IO.File]::ReadAllText($gp)
-foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_LIST', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded', 'preflightReminder', 'buildReminder', 'partId', 'synthetic: true')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
-Assert ($gt -match 'PS_ORACLE_GATE_REMINDER' -and $gt -match 'entry\.mode === "primary" && entry\.connect' -and $gt -match 'parts\.push\(\{ id: partId\(parts\)') "plugin：第 0 步提醒只注入有 list＋connect 的主 agent 的真實訊息（synthetic part），env／profile 可關"
+foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded', 'preflightReminder', 'buildReminder', 'partId', 'synthetic: true', 'wildcardDenyMix', 'list_connections is informational')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+Assert ($gt -notmatch 'NEED_LIST' -and $gt -match 'state: "NEED_CONNECT", agent: undefined' -and $gt -match 'connect: toolEnabled\(tools, TOOL_CONNECT\),' -and $gt -notmatch 'connect before list_connections') "plugin：不變量只剩 connect→READY（沒有 list 狀態；list_connections 的 after 只記錄不改狀態）；提醒對象＝有 connect 的主 agent"
+Assert ($gt -match 'PS_ORACLE_GATE_REMINDER' -and $gt -match 'entry\.mode === "primary" && entry\.connect' -and $gt -match 'parts\.push\(\{ id: partId\(parts\)') "plugin：第 0 步提醒只注入有 connect 的主 agent 的真實訊息（synthetic part），env／profile 可關"
 Assert ($gt -match 'connectProblem\(profileName, target\)' -and $gt -match 'throw new Error\(problem\.message\)' -and $gt -match 's\.connectGen \+= 1' -and $gt -match 'if \(s\.state === "READY"\) s\.state = "NEED_CONNECT"') "plugin：connect 在執行前比對 profile（未填／不一致 → 擋），每次嘗試世代 +1 並作廢 READY"
 $gImports = @([regex]::Matches($gt, '(?m)^import\s.*?from\s+"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 Assert ($gImports.Count -gt 0 -and @($gImports | Where-Object { $_ -notmatch '^node:' }).Count -eq 0) "plugin 只 import node: 內建模組（公司網路封鎖 npm）：$($gImports -join ',')"
@@ -697,13 +702,13 @@ Assert ($gt -match 'mounted === false' -and $gt -match 'buildDownMessage' -and $
 Assert ($gt -match 'entry\.turnId === s\.turnId' -and $gt -match 'attribution === "current"' -and $gt -match 'ok === "unknown"') "plugin：after 依 session:callID 配對入場快照；stale／unknown 不前進；空輸出＝未知"
 $rt = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1'))
 Assert ($rt -match 'turnInvariantViolations' -and $rt -match 'turnMismatch' -and $rt -match 'hookMismatch' -and $rt -match 'executedBeforePreflight' -and $rt -match 'exportFailures' -and $rt -match '\.export\.json' -and $rt -notmatch 'Test-Exempt' -and $rt -notmatch 'taskkill\.exe /PID \$p\.Id /T /F 2>\$null') "runtime 回歸腳本判定 per-turn 不變量／turn 覆蓋率／task 覆蓋率／早於前置／export 失敗，且無豁免；export 落檔讀 UTF-8；taskkill 不直接重導 stderr（PS 5.1 EAP=Stop）"
-Assert ($rt -match 'callMismatch' -and $rt -match 'Test-DbCapable' -and $rt -match 'taskParents' -and $rt -match 'dbTasksCompleted' -and $rt -match 'ExpectDbTask' -and $rt -notmatch 'earlyStandDown' -and $rt -notmatch "basis -eq 'run_sql:enabled'") "runtime 回歸腳本：dbCapable 欄位判定（不用 basis 字串）、callID 歸屬（before／after／export parentID）、安全與可用分開判"
+Assert ($rt -match 'callMismatch' -and $rt -match 'Test-DbCapable' -and $rt -match 'taskParents' -and $rt -match 'dbTasksCompleted' -and $rt -match 'ExpectDbTask' -and $rt -match 'listCalls' -and $rt -notmatch 'NEED_LIST' -and $rt -notmatch 'listIdx' -and $rt -notmatch 'earlyStandDown' -and $rt -notmatch "basis -eq 'run_sql:enabled'") "runtime 回歸腳本：dbCapable 欄位判定（不用 basis 字串）、callID 歸屬（before／after／export parentID）、安全與可用分開判"
 Assert ($rt -match 'Get-ChildSqlOk' -and $rt -match "reportStatus" -and $rt -match 'dbTasksCompletedNoSql' -and $rt -match 'tasksNotReturned' -and $rt -match 'connectBlocks' -and $rt -notmatch 'notConnected -ne \$true \}\)') "runtime 回歸腳本：完成＝報告 COMPLETE 且子 session run_sql 成功（不是「沒回 NOT_CONNECTED」）；另計 partial／blocked／invalid／completedNoSql／未返回／connect 被擋"
 $npmrc = Join-Path $repoRoot '.opencode/.npmrc'
 Assert ((Test-Path -LiteralPath $npmrc) -and ([System.IO.File]::ReadAllText($npmrc) -match '(?m)^offline=true\s*$')) ".opencode/.npmrc 含 offline=true（斷網時相依安裝秒失敗，plugin 照常載入）"
 $ag = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))
 $i0 = $ag.IndexOf('第 0 步'); $iw = $ag.IndexOf('docs/ps-research/wiki/')
-Assert ($i0 -ge 0 -and $iw -gt $i0 -and $ag -match 'ps-oracle-preflight-gate') "AGENTS.md：第 0 步（list→connect）寫在「先查 wiki」之前且提到閘門（無指令衝突）"
+Assert ($i0 -ge 0 -and $iw -gt $i0 -and $ag -match 'ps-oracle-preflight-gate' -and $ag -match '不先 list' -and $ag -notmatch 'list_connections → ') "AGENTS.md：第 0 步（直接 connect profile 連線名、不先 list）寫在「先查 wiki」之前且提到閘門（無指令衝突）"
 $prof32 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
 Assert ($prof32 -match '(?m)^\s*preflightGate:\s*enforce\b') "profile：oracle.preflightGate 預設 enforce"
 foreach ($f in (Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md'))) {
@@ -730,18 +735,18 @@ foreach ($f in $rtFuncs) { Invoke-Expression $f.Extent.Text }
 $global:gateDir = Join-Path $dir 'gate'
 New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
 function New-GateLog([string]$Id, [string[]]$Rows) { [System.IO.File]::WriteAllLines((Join-Path $gateDir ($Id + '.jsonl')), $Rows, (New-Object System.Text.UTF8Encoding($false))) }
-$chat = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","next":"NEED_LIST","mode":"enforce"}'
-$blk = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_LIST","mode":"enforce","basis":"run_sql:enabled","dbCapable":true,"decision":"block","blocked":1,"note":"mcp-status:connected"}'
-$listOk = '{"hook":"after","tool":"oracleMCP_list_connections","callID":"l1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_LIST","next":"NEED_CONNECT","ok":true}'
+$chat = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","next":"NEED_CONNECT","mode":"enforce"}'
+$blk = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_CONNECT","mode":"enforce","basis":"run_sql:enabled","dbCapable":true,"decision":"block","blocked":1,"note":"mcp-status:connected"}'
+$listOk = '{"hook":"after","tool":"oracleMCP_list_connections","callID":"l1","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":true,"note":"list_connections is informational: state unchanged"}'
 $connOk = '{"hook":"after","tool":"oracleMCP_connect","callID":"c1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","next":"READY","ok":true}'
 $allow = '{"hook":"before","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"READY","mode":"enforce","basis":"run_sql:enabled","dbCapable":true,"decision":"allow"}'
 $exec = '{"hook":"after","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","attribution":"current","admitted":"allow","target":"ps-ui-flow","executed":true,"basis":"run_sql:enabled","dbCapable":true,"next":"READY","notConnected":false,"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE","taskState":"completed","childSessionID":"ses_child_ok"}'
-$sqlOk = '{"hook":"after","tool":"oracleMCP_run_sql","callID":"q1","agent":"ps-ui-flow","turn":1,"turnId":"mc","attribution":"current","state":"NEED_LIST","next":"NEED_LIST","ok":true}'
+$sqlOk = '{"hook":"after","tool":"oracleMCP_run_sql","callID":"q1","agent":"ps-ui-flow","turn":1,"turnId":"mc","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":true}'
 New-GateLog 'ses_child_ok' @($sqlOk)
 New-GateLog 'ses_child_nosql' @(($sqlOk -replace '"ok":true', '"ok":false'))
 New-GateLog 'ses_ok' @($chat, $blk, $listOk, $connOk, $allow, $exec)
 $v = Get-SessionVerdict 'ses_ok' ''
-Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.preflight -and $v.turnInvariantViolations -eq 0 -and $v.callMismatch -eq 0 -and $v.dbTasksCompleted -eq 1 -and $v.hookMismatch -eq 0) "錯序被擋→list→connect→執行：try=2 blk=1 exec=1 early=0 turnViol=0 callMis=0 dbOk=1（報告 COMPLETE＋子 session run_sql 成功）"
+Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.preflight -and $v.turnInvariantViolations -eq 0 -and $v.callMismatch -eq 0 -and $v.dbTasksCompleted -eq 1 -and $v.hookMismatch -eq 0) "錯序被擋→connect→執行（中間多做的 list 只記錄）：try=2 blk=1 exec=1 early=0 turnViol=0 callMis=0 dbOk=1（報告 COMPLETE＋子 session run_sql 成功）"
 $ncExec = $exec -replace '"notConnected":false', '"notConnected":true' -replace '"next":"READY"', '"next":"NEED_CONNECT"' -replace '"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportStatus":"BLOCKED","blockedReason":"NOT_CONNECTED"'
 New-GateLog 'ses_nc' @($chat, $listOk, $connOk, $allow, $ncExec)
 $v = Get-SessionVerdict 'ses_nc' ''
@@ -760,28 +765,31 @@ $cblk = '{"hook":"before","tool":"oracleMCP_connect","callID":"c9","agent":"ps-o
 New-GateLog 'ses_notret' @($chat, $listOk, $cblk, $connOk, $allow)
 $v = Get-SessionVerdict 'ses_notret' ''
 Assert ($v.tasksNotReturned -eq 1 -and $v.connectBlocks -eq 1 -and $v.executed -eq 0) "放行但沒有 after 的 task → tasksNotReturned=1；connect 執行前被擋 → connectBlocks=1"
-New-GateLog 'ses_observe' @($chat, ($blk -replace '"decision":"block"', '"decision":"observe-would-block"'), ($exec -replace '"state":"READY"', '"state":"NEED_LIST"' -replace '"admitted":"allow"', '"admitted":"observe-would-block"' -replace '"next":"READY"', '"next":"NEED_LIST"'))
+New-GateLog 'ses_observe' @($chat, ($blk -replace '"decision":"block"', '"decision":"observe-would-block"'), ($exec -replace '"state":"READY"', '"state":"NEED_CONNECT"' -replace '"admitted":"allow"', '"admitted":"observe-would-block"' -replace '"next":"READY"', '"next":"NEED_CONNECT"'))
 $v = Get-SessionVerdict 'ses_observe' ''
 Assert ($v.wouldBlock -eq 1 -and $v.executedBeforePreflight -eq 1 -and $v.turnInvariantViolations -eq 1 -and -not $v.preflight) "observe 模式：DB task 早於前置執行 → early=1、turnViol=1（判定 FAIL 的來源）"
-$chat2 = $chat -replace '"turnId":"m1","state":"NEED_LIST"', '"turnId":"m2","state":"READY"' -replace '"turn":1', '"turn":2'
+$chat2 = $chat -replace '"turnId":"m1","state":"NEED_CONNECT"', '"turnId":"m2","state":"READY"' -replace '"turn":1', '"turn":2'
 $allow2 = $allow -replace '"turnId":"m1"', '"turnId":"m2"' -replace '"turn":1', '"turn":2' -replace '"callID":"t2"', '"callID":"t3"'
 $exec2 = $exec -replace '"turnId":"m1"', '"turnId":"m2"' -replace '"turn":1', '"turn":2' -replace '"callID":"t2"', '"callID":"t3"'
 New-GateLog 'ses_twoturn' @($chat, $listOk, $connOk, $allow, $exec, $chat2, $allow2, $exec2)
 $v = Get-SessionVerdict 'ses_twoturn' ''
-Assert ($v.turns -eq 2 -and $v.executed -eq 2 -and $v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 1) "第二題沒重做 list→connect 就執行 DB task → turnViol=1（不能只看 task hook 覆蓋率）"
+Assert ($v.turns -eq 2 -and $v.executed -eq 2 -and $v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 1) "第二題沒重做 connect 就執行 DB task → turnViol=1（不能只看 task hook 覆蓋率）"
 New-GateLog 'ses_order' @($chat, $connOk, $listOk, $allow, $exec)
 $v = Get-SessionVerdict 'ses_order' ''
-Assert ($v.turnInvariantViolations -eq 1) "connect→READY 出現在 list 成功之前 → turnViol=1（順序也判，不只看有沒有）"
+Assert ($v.turnInvariantViolations -eq 0 -and $v.preflight -and $v.listCalls -eq 1) "list 在 connect 之後（或根本不 list）都不違反：list_connections 不是前置，只計 listCalls 觀察值"
+New-GateLog 'ses_listonly' @($chat, $listOk, $allow, $exec)
+$v = Get-SessionVerdict 'ses_listonly' ''
+Assert ($v.turnInvariantViolations -eq 1 -and -not $v.preflight -and $v.listCalls -eq 1) "只有 list 成功、沒有 connect→READY 就執行 DB task → turnViol=1、preflight=false（清單不能代替 connect）"
 $synth = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","next":"READY","synthetic":true,"note":"all parts synthetic: no reset"}'
 $sameId = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","next":"READY","note":"same message id: no reset"}'
 New-GateLog 'ses_synth' @($chat, $listOk, $connOk, $synth, $sameId, $allow, $exec)
 $v = Get-SessionVerdict 'ses_synth' ''
 Assert ($v.turns -eq 1 -and $v.turnInvariantViolations -eq 0 -and $v.executedBeforePreflight -eq 0) "synthetic 訊息與同 id 重複到達不算一題：turns=1、不違反"
-$noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"run_sql:enabled"', '"basis":"run_sql:disabled"' -replace '"dbCapable":true', '"dbCapable":false' -replace '"state":"READY"', '"state":"NEED_LIST"'
+$noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"run_sql:enabled"', '"basis":"run_sql:disabled"' -replace '"dbCapable":true', '"dbCapable":false' -replace '"state":"READY"', '"state":"NEED_CONNECT"'
 New-GateLog 'ses_nodb' @($chat, $noDb)
 $v = Get-SessionVerdict 'ses_nodb' ''
 Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0 -and $v.executedDb -eq 0) "不查 DB 的委派（dbCapable=false）不受判定"
-$unk = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-new-agent"' -replace '"basis":"run_sql:enabled"', '"basis":"unknown-agent(default:DB)"' -replace '"state":"READY"', '"state":"NEED_LIST"'
+$unk = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-new-agent"' -replace '"basis":"run_sql:enabled"', '"basis":"unknown-agent(default:DB)"' -replace '"state":"READY"', '"state":"NEED_CONNECT"'
 New-GateLog 'ses_unknown' @($chat, $unk)
 $v = Get-SessionVerdict 'ses_unknown' ''
 Assert ($v.executedBeforePreflight -eq 1 -and $v.turnInvariantViolations -eq 1) "不認識的 agent（dbCapable=true）早於前置執行 → early=1（不是靠 basis 字串篩掉）"
@@ -793,7 +801,7 @@ $downBlk = $blk -replace '"note":"mcp-status:connected"', '"note":"oracleMCP not
 New-GateLog 'ses_mcpdown' @($chat, $downBlk)
 $v = Get-SessionVerdict 'ses_mcpdown' ''
 Assert ($v.blocked -eq 1 -and $v.mcpDownBlocks -eq 1 -and $v.executed -eq 0 -and $v.executedBeforePreflight -eq 0) "oracleMCP 未掛載 → 被擋（不放行）：blocked=1、mcpDownBlocks=1、early=0"
-$staleConn = '{"hook":"after","tool":"oracleMCP_connect","callID":"c9","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"stale","stale":true,"replyTurnId":"m2","state":"NEED_LIST","next":"NEED_LIST","ok":true}'
+$staleConn = '{"hook":"after","tool":"oracleMCP_connect","callID":"c9","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"stale","stale":true,"replyTurnId":"m2","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":true}'
 $unkConn = '{"hook":"after","tool":"oracleMCP_connect","callID":"c8","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":"unknown","note":"empty tool output: not counted as success"}'
 New-GateLog 'ses_stale' @($chat, $listOk, $unkConn, $staleConn)
 $v = Get-SessionVerdict 'ses_stale' ''

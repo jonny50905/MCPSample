@@ -1,6 +1,7 @@
 ﻿# test-oracle-gate-runtime.ps1 — Oracle 連線前置閘門的「執行紀錄」回歸（公司機；PowerShell 5.1 可跑）
 # 目的：不是看 prompt 文字，而是看每個 session 真正發生的工具順序——
-#       「已執行的 DB 委派（task）發生在 list_connections → connect 成功之前」的次數必須是 0，且正向題目真的有查到 DB。
+#       「已執行的 DB 委派（task）發生在 connect 成功之前」的次數必須是 0，且正向題目真的有查到 DB。
+#       （第 0 步只有 connect 一步：connection_name＝profile 值原樣；list_connections 不是前置——清單把名稱與連線字串黏在一起，不拿來挑名字）
 # 資料來源：閘門 plugin 的交易紀錄 auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl（每筆 hook 事件一行），
 #           並用 opencode export <sessionID> 的正式 transcript 交叉比對 task 件數、真實題目 id、每個 task 所屬的題目（hook 覆蓋率必須 100%）。
 # 用法：
@@ -18,7 +19,7 @@
 #   hookMismatch（閘門看到的 task 次數 ≠ transcript 的 task 件數）＝ 0（task hook 覆蓋率 100%）
 #   turnMismatch（transcript 裡的真實 user 訊息——有非 synthetic 的 text／file／agent／subtask part——找不到同 id 的 chat.message）＝ 0
 #     ——compaction／續行／背景回灌那種系統插入的 user 訊息不算題；/undo 刪掉的訊息不算漏（另計 orphanTurns 觀察值）
-#   turnInvariantViolations（已執行的 DB task 在「同一 turn 內」找不到依序先於它的 list_connections 成功→connect 成功→READY）＝ 0
+#   turnInvariantViolations（已執行的 DB task 在「同一 turn 內」找不到先於它的 connect 成功→READY；list_connections 不看）＝ 0
 #   callMismatch（同一 callID 的 before／after 列 turnId 不一致，或 transcript 裡該 task 所屬的 user 訊息 id ≠ before 列的 turnId）＝ 0
 #     ——證明每次呼叫的歸屬沒有被改標到別的題目，不只比件數
 #   另：export 失敗（exportFailures）與 run 結束碼非 0／逾時（runsWithBadExit）也判 FAIL——否則覆蓋率判定是空的
@@ -27,8 +28,8 @@
 #     oracleMCP_run_sql 成功（after 列 ok=true）——只有報告宣稱成功不算、「沒回 NOT_CONNECTED」不算；BLOCKED（任何 blockedReason）、
 #     INVALID（非契約 JSON／task_error）都不算完成，PARTIAL 另計。零違規但零完成不算過。B1 的題目要用預期能 COMPLETE 的固定題
 #   No（B3 預設）＝0 個會查 DB 的 task 執行；Any（B2／CUSTOM／-AnalyzeAll 預設）＝不判、只列數字
-# 附帶統計（不判定，供觀察）：blockedRuns＝模型先派 task 被擋的 session 數（＝錯序機率）；preflightRuns＝有依序完成 list→connect 的
-#   session 數（R8：不需要 DB 的題也應為 100%）；mcpDownBlocks＝oracleMCP 未掛載時被擋的 task（閘門不放行）；staleReplies＝上一題晚到的
+# 附帶統計（不判定，供觀察）：blockedRuns＝模型先派 task 被擋的 session 數（＝錯序機率）；preflightRuns＝有 connect 成功（READY）的
+#   session 數（R8：不需要 DB 的題也應為 100%）；listCalls＝list_connections 呼叫數（第 0 步不 list；只在 connect 失敗後附清單原文給管理者，正常為 0）；mcpDownBlocks＝oracleMCP 未掛載時被擋的 task（閘門不放行）；staleReplies＝上一題晚到的
 #   回覆（標 stale、不計入該題）；unknownResults＝list／connect 回空輸出（閘門不當成功——真 SQLcl 若如此回覆要回報維護 session）；
 #   orphanTurns＝chat.message 有、transcript 沒有的題（/undo）；unmatchedCalls＝閘門有 before、transcript 找不到同 callID 的 task；
 #   tasksNotReturned＝放行了但沒有 after 的 task（一直執行中／被中止）；connectBlocks＝connect 在執行前被擋（profile 未填或目標不一致）；
@@ -159,12 +160,12 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
     $notReturned = @($before | Where-Object { $_.decision -ne 'block' -and $_.callID -and -not $afterIds.ContainsKey([string]$_.callID) }).Count
     $connectBlocks = @($rows | Where-Object { $_.hook -eq 'before' -and $_.tool -eq 'oracleMCP_connect' -and $_.decision -eq 'block' }).Count
     $afters = @($rows | Where-Object { $_.hook -eq 'after' })
-    $listOk = @($afters | Where-Object { $_.tool -eq 'oracleMCP_list_connections' -and $_.ok -eq $true })
+    $listCalls = @($afters | Where-Object { $_.tool -eq 'oracleMCP_list_connections' }).Count
     $connOk = @($afters | Where-Object { $_.tool -eq 'oracleMCP_connect' -and $_.next -eq 'READY' })
-    $preflight = ($listOk.Count -gt 0 -and $connOk.Count -gt 0)
+    $preflight = ($connOk.Count -gt 0)
     $stale = @($rows | Where-Object { $_.stale -eq $true }).Count
     $unknownRes = @($afters | Where-Object { ($_.tool -eq 'oracleMCP_list_connections' -or $_.tool -eq 'oracleMCP_connect') -and [string]$_.ok -eq 'unknown' }).Count
-    # per-turn 不變量：每個已執行的 DB task，同一 turn 內、在它之前必須依序有 list 成功 → connect→READY
+    # per-turn 不變量：每個已執行的 DB task，同一 turn 內、在它之前必須有 connect→READY（list_connections 不是前置、不看）
     # turn 識別＝turnId（該則 user 訊息 id；opencode run --session 續接是新行程，數字 turn 會歸零）；task 列的 turnId 是入場快照
     $turnViol = 0
     # 真實 user 訊息才算一題：全部 part 都 synthetic 的（背景 subagent 回灌／compaction 續行）與同 id 重複到達的列 plugin 不重置、這裡也不計
@@ -173,13 +174,12 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
         $r = $rows[$k]
         if (-not ($r.hook -eq 'after' -and $r.tool -eq 'task' -and $r.executed -eq $true -and (Test-DbCapable $r))) { continue }
         $t = Get-TurnKey $r
-        $listIdx = -1; $connIdx = -1
+        $connIdx = -1
         for ($j = 0; $j -lt $k; $j++) {
             $q = $rows[$j]
             if ($q.hook -ne 'after') { continue }
             if ((Get-TurnKey $q) -ne $t) { continue }
-            if ($q.tool -eq 'oracleMCP_list_connections' -and $q.ok -eq $true -and $listIdx -lt 0) { $listIdx = $j }
-            if ($q.tool -eq 'oracleMCP_connect' -and $q.next -eq 'READY' -and $listIdx -ge 0 -and $j -gt $listIdx) { $connIdx = $j }
+            if ($q.tool -eq 'oracleMCP_connect' -and $q.next -eq 'READY') { $connIdx = $j }
         }
         if ($connIdx -lt 0) { $turnViol++ }
     }
@@ -239,7 +239,7 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
         sessionID = $SessionId; rows = $rows.Count; taskAttempts = $before.Count; blocked = $blocked.Count; mcpDownBlocks = $mcpDown.Count
         wouldBlock = $wouldBlock.Count; executed = $executed.Count; executedDb = $executedDb.Count; dbTasksCompleted = $dbOk.Count
         dbTasksPartial = $dbPartial.Count; dbTasksBlocked = $dbBlocked.Count; dbTasksInvalid = $dbInvalid.Count; dbTasksCompletedNoSql = $dbNoSql.Count
-        tasksNotReturned = $notReturned; connectBlocks = $connectBlocks
+        tasksNotReturned = $notReturned; connectBlocks = $connectBlocks; listCalls = $listCalls
         executedBeforePreflight = $early.Count
         preflight = $preflight; exportedTasks = $exportedTasks; hookMismatch = $mismatch; exportError = $exportErr
         turns = $chatRows.Count; exportedTurns = $exportedTurns; turnMismatch = $missingTurns; orphanTurns = $orphanTurns
@@ -253,7 +253,7 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
 function New-EmptyVerdict([string]$Label, [string]$Err) {
     return [pscustomobject]@{
         sessionID = $Label; rows = 0; taskAttempts = 0; blocked = 0; mcpDownBlocks = 0; wouldBlock = 0; executed = 0; executedDb = 0; dbTasksCompleted = 0
-        dbTasksPartial = 0; dbTasksBlocked = 0; dbTasksInvalid = 0; dbTasksCompletedNoSql = 0; tasksNotReturned = 0; connectBlocks = 0
+        dbTasksPartial = 0; dbTasksBlocked = 0; dbTasksInvalid = 0; dbTasksCompletedNoSql = 0; tasksNotReturned = 0; connectBlocks = 0; listCalls = 0
         executedBeforePreflight = 0; preflight = $false; exportedTasks = -1; hookMismatch = 0; exportError = $Err; turns = 0; exportedTurns = -1
         turnMismatch = 0; orphanTurns = 0; turnInvariantViolations = 0; callMismatch = 0; unmatchedCalls = 0; staleReplies = 0; unknownResults = 0
         exportFailures = 0; exitCode = -1; timedOut = $false; mode = ''
@@ -295,6 +295,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     $dbNoSql = ($verdicts | Measure-Object -Property dbTasksCompletedNoSql -Sum).Sum
     $notRet = ($verdicts | Measure-Object -Property tasksNotReturned -Sum).Sum
     $cblk = ($verdicts | Measure-Object -Property connectBlocks -Sum).Sum
+    $lcalls = ($verdicts | Measure-Object -Property listCalls -Sum).Sum
     $usabilityFail = 0
     if ($Expect -eq 'Yes') { $usabilityFail = @($verdicts | Where-Object { $_.dbTasksCompleted -eq 0 }).Count }
     if ($Expect -eq 'No') { $usabilityFail = $dbRuns }
@@ -306,7 +307,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
         blockedRuns = $blockedRuns; preflightRuns = $preflightRuns; sessionsWithoutTask = $noTask
         sessionsWithDbTaskOk = $dbOkRuns; sessionsWithDbTask = $dbRuns
         dbTasksCompleted = [int]$dbDone; dbTasksPartial = [int]$dbPart; dbTasksBlocked = [int]$dbBlk; dbTasksInvalid = [int]$dbInv
-        dbTasksCompletedNoSql = [int]$dbNoSql; tasksNotReturned = [int]$notRet; connectBlocks = [int]$cblk
+        dbTasksCompletedNoSql = [int]$dbNoSql; tasksNotReturned = [int]$notRet; connectBlocks = [int]$cblk; listCalls = [int]$lcalls
         mcpDownBlocks = [int]$down; staleReplies = [int]$stale; unknownResults = [int]$unknown; orphanTurns = [int]$orphan; unmatchedCalls = [int]$unmatched
         stamp = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     }
@@ -321,7 +322,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     if ([int]$dbNoSql -gt 0) { Write-Host ('注意：' + [int]$dbNoSql + ' 個 DB task 報告 COMPLETE 但子 session 沒有成功的 run_sql——只是宣稱成功，不計為完成') -ForegroundColor Yellow }
     if ([int]$cblk -gt 0) { Write-Host ('注意：' + [int]$cblk + ' 次 connect 在執行前被擋（profile oracle.connectionName 未填或與 connect 目標不一致）——看 jsonl 的 note') -ForegroundColor Yellow }
     Write-Host ('觀察：blockedRuns=' + $blockedRuns + '（模型先派 task 被擋）  preflightRuns=' + $preflightRuns + '  sessionsWithoutTask=' + $noTask +
-        '  mcpDownBlocks=' + [int]$down + '  staleReplies=' + [int]$stale + '  unknownResults=' + [int]$unknown + '  orphanTurns=' + [int]$orphan + '  unmatchedCalls=' + [int]$unmatched)
+        '  listCalls=' + [int]$lcalls + '（第 0 步不 list，正常為 0）  mcpDownBlocks=' + [int]$down + '  staleReplies=' + [int]$stale + '  unknownResults=' + [int]$unknown + '  orphanTurns=' + [int]$orphan + '  unmatchedCalls=' + [int]$unmatched)
     Write-Host ('摘要已寫：' + $out)
     if ([int]$down -gt 0) { Write-Host ('注意：有 ' + [int]$down + ' 個 task 因 oracleMCP 未掛載被擋——回歸請在 oracleMCP 掛載時跑') -ForegroundColor Yellow }
     if ([int]$unknown -gt 0) { Write-Host ('注意：有 ' + [int]$unknown + ' 次 list_connections／connect 回空輸出（閘門不當成功）——真 SQLcl 若如此回覆，把 jsonl 那列回報維護 session') -ForegroundColor Yellow }
@@ -329,7 +330,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     if ($exitBad -gt 0) { Write-Host ('注意：' + $exitBad + ' 次 run 結束碼非 0 或逾時強殺（看 runs\*.err.txt）') -ForegroundColor Yellow }
     $safeFail = ([int]$early -gt 0 -or [int]$mism -gt 0 -or [int]$tmism -gt 0 -or [int]$tviol -gt 0 -or [int]$cmis -gt 0 -or [int]$xfail -gt 0 -or $exitBad -gt 0)
     if ($safeFail) {
-        Write-Host '判定：FAIL（安全：DB 委派先於前置執行／task hook 覆蓋率不足／有題沒收到重置／同題內找不到 list→connect／呼叫歸屬被改標／export 失敗／run 異常結束）' -ForegroundColor Red
+        Write-Host '判定：FAIL（安全：DB 委派先於前置執行／task hook 覆蓋率不足／有題沒收到重置／同題內找不到 connect→READY／呼叫歸屬被改標／export 失敗／run 異常結束）' -ForegroundColor Red
         return 1
     }
     if ($usabilityFail -gt 0) {

@@ -13,10 +13,13 @@ tools:
   webfetch: false
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
-  "oracleMCP_*": false
-  # 連線的擁有者是主 agent：只開 list_connections 與 connect（派第一個 DB 委派前 connect 一次）；run_sql／disconnect 維持關閉
+  # Oracle：只開 connect（第 0 步）與 list_connections（connect 失敗時附清單原文給管理者核對用）；
+  # 逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見，後面的 true 救不回）
   "oracleMCP_list_connections": true
   "oracleMCP_connect": true
+  "oracleMCP_disconnect": false
+  "oracleMCP_run_sql": false
+  "oracleMCP_run_sqlcl": false
   "PeoplecodeMetadata_*": false
 ---
 
@@ -28,13 +31,13 @@ tools:
 
 ## 第一動作（禁止先說話）
 
-1. **開線（第 0 步；無條件；順序固定 list → connect；做完才做第 2 項）**：
-   `oracleMCP_list_connections` → `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。
-   profile 未填／FILL_ME／不在清單裡 → **不 connect、不猜、不挑清單第一個**，本批不派 DB 委派，part 檔記「Oracle 連線未設定
-   （profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」；清單為空 → part 檔記「SQLcl 沒有已儲存連線（list_connections 回空）」。
-   不判斷本批會不會用到 DB、不跳過 list 直接 connect（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`
-   （oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN）。connect 回錯誤 → 再 list 一次、再 connect 一次；仍失敗 → 本批不派 DB 委派，
-   記「DB 連線建立失敗（<錯誤>）」。自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
+1. **開線（第 0 步；無條件；直接 connect，不先 list；做完才做第 2 項）**：
+   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
+   ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本批不派 DB 委派，part 檔記「Oracle 連線未設定
+   （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**記進
+   part 檔讓管理者核對 profile 值（不要自己改名字），本批不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
+   不判斷本批會不會用到 DB（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN）。
+   自檢：第一個 task 委派之前，必須已出現一次 `oracleMCP_connect`。
 2. `read docs/ps-research/<領域>/audit-parts/manifest.txt`（領域＝指令參數）。
    manifest 是外環產生的**唯讀工單**：目標輪次、旗標、本批檔案清單
    （每檔 Evidence 列數、範圍切段、任務 B claims）、領域任務、唯一可寫

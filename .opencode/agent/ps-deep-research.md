@@ -14,10 +14,13 @@ tools:
   webfetch: false
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
-  "oracleMCP_*": false
-  # 連線的擁有者是主 agent：只開 list_connections 與 connect（派第一個 DB 委派前 connect 一次）；run_sql／disconnect 維持關閉
+  # Oracle：只開 connect（第 0 步）與 list_connections（connect 失敗時附清單原文給管理者核對用）；
+  # 逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見，後面的 true 救不回）
   "oracleMCP_list_connections": true
   "oracleMCP_connect": true
+  "oracleMCP_disconnect": false
+  "oracleMCP_run_sql": false
+  "oracleMCP_run_sqlcl": false
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
 ---
@@ -54,14 +57,13 @@ docs/ps-research/<領域>/
 
 ## 啟動與續跑（每次被呼叫先做這個）
 
-0. **開線（第 0 步；每次被呼叫、無條件；順序固定 list → connect；比本節其餘動作更早）**：
-   `oracleMCP_list_connections` → `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。
-   profile 未填／FILL_ME／不在清單裡 → **不 connect、不猜、不挑清單第一個**，本次不派 DB 委派，checklist／收據記「Oracle 連線未設定
-   （profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」；清單為空 → 記「SQLcl 沒有已儲存連線（list_connections 回空）」。
-   不判斷本次會不會用到 DB、不因為同一 session 已連過就省略、不跳過 list 直接 connect（回「已連線」也算成功）。
-   唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。connect 回錯誤 → 再 list 一次、
-   再 connect 一次；仍失敗 → 本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
-   自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
+0. **開線（第 0 步；每次被呼叫、無條件；直接 connect，不先 list；比本節其餘動作更早）**：
+   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
+   ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本次不派 DB 委派，checklist／收據記「Oracle 連線未設定
+   （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**記進
+   收據讓管理者核對 profile 值（不要自己改名字），本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
+   不判斷本次會不會用到 DB、不因為同一 session 已連過就省略（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`
+   （oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。自檢：第一個 task 委派之前，必須已出現一次 `oracleMCP_connect`。
 1. 指令含「歸戶提煉」或「entity 升級」→ **直接進提煉模式**，跳過本節其餘。
 2. 檢查 `docs/ps-research/<領域>/00-overview.md`：
    - **不存在** → 執行階段一（總覽）。

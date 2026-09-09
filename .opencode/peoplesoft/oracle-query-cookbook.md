@@ -56,12 +56,12 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
 ```text
 0. 工具清單裡沒有任何 oracleMCP_ 工具 → ORACLE_MCP_DOWN（規則 7a），不試 connect，如實回報。
    工具名（底線）：list_connections／connect／run_sql／disconnect
-1. list_connections     → 開場就做（無條件、不跳過）；取得已儲存連線名清單（不要自己編）；
+1. connect（帶連線名）   → 開場就做（無條件、不判斷本題會不會用到 DB）；連線名＝profile oracle.connectionName **原樣照抄**，
+                          **不先 list_connections、不從清單挑名字**（清單回傳的名稱與連線字串黏在一起，會讀錯）；
+                          profile 未填／FILL_ME → 不 connect → CONNECT_FAILED（CONNECTION_NOT_CONFIGURED），如實回報
+                          「Oracle 連線未設定（profile 值）」；回「已連線」也視為成功；失敗再 connect 一次；>30 秒無回應 → CONNECT_TIMEOUT
+2. list_connections     → 只在 connect 兩次都失敗時做：把清單**原文**附在回報裡讓管理者核對 profile 值（不要自己改名字）；
                           清單為空 → CONNECT_FAILED（NO_SAVED_CONNECTION），如實回報「SQLcl 沒有已儲存連線」
-2. connect（帶連線名）   → 緊接著做，不判斷本題會不會用到 DB；連線名＝profile oracle.connectionName，且必須出現在清單裡；
-                          profile 未填／FILL_ME／不在清單 → 不 connect、不挑清單第一個 → CONNECT_FAILED（CONNECTION_NOT_CONFIGURED），
-                          如實回報「Oracle 連線未設定（profile 值＋清單）」；回「已連線」也視為成功；失敗再 list → connect 一次；
-                          >30 秒無回應 → CONNECT_TIMEOUT
 3. 之後本題／本批的委派都不必再 connect。subagent 回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、
    重派一次；第二次仍 NOT_CONNECTED → 對使用者／收據如實寫「DB 連線建立失敗（<connect 的錯誤>）」，
    不得說成「DB 通道忙碌」

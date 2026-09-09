@@ -3204,3 +3204,23 @@
   e2e 17 情境全 PASS 並每情境驗 export 的真實訊息帶 synthetic 提醒 part、模型請求尾端看得到提醒、chat.message 列 reminder=true；
   test-auto-loop 278 判定。成效指標留給公司機：`-AnalyzeAll` 的 blockedRuns 應明顯下降（R22）。
   教訓：規則要放在模型真正執行的清單裡，不要放在它「應該讀」的章節裡；能跟著每則訊息走的提醒，勝過系統提示裡的任何粗體。
+- 追記（2026-09-09，公司機實測第五輪：搬完 fbbb765 後兩件事）：(1) 模型回報「本次工具環境中沒有掛載 list_connections 以及 connect」——
+  主 agent 的 tools 表是 `"oracleMCP_*": false` 之後再開 `"oracleMCP_list_connections": true`／`connect: true`；管理者把萬用字元拔掉、
+  逐工具寫 true／false 就正常。判定：公司機的 OpenCode 一遇到萬用字元 deny 就把整個 MCP 對該 agent 隱藏，後面的 true 救不回；沙箱的
+  1.18.29 是「最後匹配者優先」——兩個版本行為不同，兩邊都安全的寫法只有逐工具明寫。落點：三個主 agent 與四個 DB subagent 的 Oracle 片段
+  全部逐工具明寫（主 agent：list／connect true、disconnect／run_sql／run_sqlcl false；subagent：run_sql true、其餘四個 false）；整個 MCP
+  全關的 agent 保留萬用字元（全關就是要它不可見）；閘門載入時把「萬用字元 deny＋個別 true」的混寫記到 _plugin.log（wildcardDenyMix＋WARN）；
+  情境 31 擋混寫回流、擋 DB／主 agent 檔出現 `"oracleMCP_*"`。(2) list_connections 回的名稱與連線字串黏在一起
+  （`Name:ABCReadonlyConnect string: {…}`），模型把它讀成「ABCReadonlyConnect」、怎麼 connect 都失敗。管理者定案：**不呼叫 list_connections，
+  直接用 customization-profile.yaml 的 oracle.connectionName**。落點：三個主 agent 的開線步驟改「直接 connect（profile 值原樣照抄）；不要先
+  list、不從清單挑名字；失敗再 connect 一次；仍失敗才 list 一次把清單原文附在答覆給管理者核對」；cookbook 主 agent 段、/ps-audit、
+  /ps-audit-batch、AGENTS.md、profile 註解同步；閘門不變量縮成 NEED_CONNECT ─connect 成功→ READY（NEED_LIST 移除；list 的 after 只記錄、
+  note=list_connections is informational；disconnect／新訊息都退回 NEED_CONNECT）；擋下訊息、connect 目標錯誤訊息、提醒 part 都改成
+  「呼叫 oracleMCP_connect（connection_name＝「<profile 值>」原樣照抄；不必先 list_connections、不要從清單挑名字）」；analyzer 的
+  turnInvariantViolations 只看 connect→READY、preflight＝有 connect 成功、多一個 listCalls 觀察值（正常為 0）；假 oracleMCP 的清單改成仿真
+  SQLcl 的黏合格式、假模型劇本從不解析清單。
+  驗證：單元 20 組（含 list 不改狀態、只 list 不算前置、完全不 list 也能 READY、wildcardDenyMix 警告）；e2e 17 情境全 PASS（connect-first
+  改為 list-first：多做的 list 不算前置也不擋路；stale-connect-serve 改為第一題 connect 未回就送第二題；connect-fail／empty-connect／
+  reconnect-fail 放棄時 list 一次附清單原文）；test-auto-loop 情境 31／32／33 同步（情境 33 加「只 list 不算前置」「list 在 connect 之後不違反」）。
+  教訓：跨版本的權限表只寫最保守、不依賴匹配順序的形式（逐條明寫）；上游工具的輸出格式不可靠時，不要讓模型去解析它——把單一真相放進設定檔，
+  執行期只比對設定值；「先看清單再挑」這種看似安全的步驟，在格式黏合時反而是唯一的失敗來源。

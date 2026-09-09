@@ -7,6 +7,8 @@
 //   MOCK_ORACLE_EMPTY_CONNECT          =1 → connect 成功但回空 content（模擬「成功卻沒有文字」——閘門應判未知、不前進）
 //   MOCK_ORACLE_CONNECT_DELAY_FIRST_MS 第一次 connect 延遲 N 毫秒才回（模擬慢連線，讓下一題在它完成前送進來）
 //   MOCK_ORACLE_CONNECTIONS            逗號分隔的已儲存連線名（預設 HR_DEV,HR_UAT）
+// list_connections 的輸出仿真 SQLcl：每筆「Name:<名>Connect string: {…}」黏在一起、沒有分隔——模型從這裡挑名字會讀錯，
+// 所以第 0 步只 connect profile 的值；清單只在 connect 失敗後附原文給管理者核對。
 import fs from "node:fs"
 
 const names = String(process.env.MOCK_ORACLE_CONNECTIONS ?? "HR_DEV,HR_UAT").split(",").map((s) => s.trim()).filter(Boolean)
@@ -43,7 +45,7 @@ async function call(name, args) {
   log({ tool: name, args, connectedBefore: connected })
   switch (name) {
     case "list_connections":
-      return text(names.length ? "Saved connections:\n" + names.map((n) => "- " + n).join("\n") : "No saved connections")
+      return text(names.length ? names.map((n) => "Name:" + n + "Connect string: {jdbc:oracle:thin:@//db.example.internal:1521/" + n + "}").join("\n") : "No saved connections")
     case "connect": {
       connectCalls += 1
       if (connectCalls === 1 && delayFirst > 0) await wait(delayFirst)

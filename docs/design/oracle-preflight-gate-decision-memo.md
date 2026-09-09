@@ -109,3 +109,20 @@ review 的驗收結論採納：對「受控 subagent 自己開／關共用連線
 
 副作用與邊界：session 標題由第一則訊息生成時可能帶到提醒字樣（cosmetic）；提醒讓 blockedRuns 下降是機率行為，硬性保證仍只有擋；
 analyzer／e2e 的「真實題目」判定看非 synthetic part，不受注入影響。
+
+## 八、公司機第五輪：萬用字元 deny 隱藏整個 MCP、list_connections 清單黏合（2026-09-09）
+
+| 問題 | 事實 | 決定 |
+|---|---|---|
+| 主 agent 說「沒有掛載 list_connections／connect」 | tools 表 `"oracleMCP_*": false` 之後再開個別 true；公司機 OpenCode 把整個 MCP 對該 agent 隱藏、true 救不回；沙箱 1.18.29 是最後匹配者優先——版本行為不同 | 逐工具明寫（主 agent：list／connect true、disconnect／run_sql／run_sqlcl false；DB subagent：run_sql true、其餘 false）；全關的 agent 才用萬用字元；閘門載入時記 wildcardDenyMix 警告；情境 31 擋混寫回流 |
+| list_connections 回 `Name:ABCReadonlyConnect string: {…}`，模型讀成 ABCReadonlyConnect | 名稱與連線字串黏在一起、沒有分隔；從清單挑名字必然讀錯 | 第 0 步不 list：直接 connect profile `oracle.connectionName`（原樣照抄；閘門在執行前比對）；list 只在 connect 兩次失敗後呼叫一次、把原文附給管理者核對 |
+| 閘門不變量 | NEED_LIST 這一段只是在要求一個沒有價值（且有害）的步驟 | 縮成 `NEED_CONNECT ─connect 成功→ READY`；list 的 after 只記錄不改狀態；disconnect／新訊息退回 NEED_CONNECT；analyzer turnInvariantViolations 只看 connect→READY，多 listCalls 觀察值 |
+
+| 選項 | 可行？ | 取捨 |
+|---|---|---|
+| 閘門解析清單、驗 profile 值在不在清單裡 | 不採 | 清單格式黏合、不同 SQLcl 版本可能不同；解析錯誤會變成閘門永遠不開。profile 值就是唯一真相，connect 失敗本身就是驗證 |
+| 閘門依公司機語義重算工具可見性（萬用字元 deny＝整個 MCP 隱藏） | 不採 | 公司機版本與規則未證實；閘門只在載入時警告混寫，判定仍用 1.18.29 的最後匹配（混寫者保守視為會查 DB） |
+| 主 agent 保留 list_connections 工具 | 採 | 只作 connect 失敗後的診斷附件；正常題目零 list（R24 / listCalls=0） |
+
+驗證：單元 20、e2e 17（connect-first→list-first；stale-connect-serve 改成第一題 connect 未回就送第二題；放棄路徑 list 一次附清單）、
+test-auto-loop 情境 31／32／33。

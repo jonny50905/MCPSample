@@ -82,7 +82,7 @@ test("agent 目錄分類：只有 run_sql 開的 subagent 過閘門；不認識�
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
   for (const t of ["ps-ui-flow", "ps-metadata-flow", "ps-ae-flow", "ps-auditor", "some-unknown-agent"]) {
-    await expectBlock(() => task(hooks, S, "c", t), "NEED_LIST")
+    await expectBlock(() => task(hooks, S, "c", t), "NEED_CONNECT")
   }
   for (const t of ["ps-peoplecode-flow", "ps-sql-flow", "ps-sqr-flow", "explore", "general", "scout"]) {
     await task(hooks, S, "c", t)
@@ -98,32 +98,31 @@ test("agent 目錄分類：只有 run_sql 開的 subagent 過閘門；不認識�
   assert.ok(log.filter((l) => l.hook === "before").every((l) => l.turnId === "m1" && l.callID === "c"))
 })
 
-test("狀態機：list → connect → READY 才放行；connect 先於 list 不算；失敗樣式／isError／空輸出都不前進（三態）", async () => {
+test("狀態機：connect（profile 名）成功 → READY 才放行；list_connections 只記錄不改狀態；失敗樣式／isError／空輸出都不前進（三態）", async () => {
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await connect(hooks, S, "c0")
-  await expectBlock(() => task(hooks, S, "t1"), "NEED_LIST")
-  await list(hooks, S, "l1")
-  await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
+  await list(hooks, S, "l0") // 清單不是前置：成功也不改狀態
+  await expectBlock(() => task(hooks, S, "t1"), "NEED_CONNECT")
   await connect(hooks, S, "c1", "ORA-12541: TNS:no listener")
-  await expectBlock(() => task(hooks, S, "t3"), "NEED_CONNECT")
+  await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
   await call(hooks, S, "oracleMCP_connect", "c2", { content: [] }, { connection_name: "HR" })
-  await expectBlock(() => task(hooks, S, "t4"), "NEED_CONNECT")
+  await expectBlock(() => task(hooks, S, "t3"), "NEED_CONNECT")
   await call(hooks, S, "oracleMCP_connect", "c3", { content: [{ type: "text", text: "Connected" }], isError: true }, { connection_name: "HR" })
-  await expectBlock(() => task(hooks, S, "t5"), "NEED_CONNECT")
+  await expectBlock(() => task(hooks, S, "t4"), "NEED_CONNECT")
   await connect(hooks, S, "c4", "Already connected to HR")
-  await task(hooks, S, "t6")
+  await task(hooks, S, "t5")
   // READY 之後再 list／connect 一次（模型多做）不影響
   await list(hooks, S, "l2")
   await connect(hooks, S, "c5", "Already connected to HR")
-  await task(hooks, S, "t7")
+  await task(hooks, S, "t6")
   const log = readLog(dir, S)
   const blocks = log.filter((l) => l.decision === "block")
-  assert.deepEqual(blocks.map((b) => b.state), ["NEED_LIST", "NEED_CONNECT", "NEED_CONNECT", "NEED_CONNECT", "NEED_CONNECT"])
-  assert.deepEqual(blocks.map((b) => b.blocked), [1, 2, 3, 4, 5])
+  assert.deepEqual(blocks.map((b) => b.state), ["NEED_CONNECT", "NEED_CONNECT", "NEED_CONNECT", "NEED_CONNECT"])
+  assert.deepEqual(blocks.map((b) => b.blocked), [1, 2, 3, 4])
   const rows = (id) => log.find((l) => l.hook === "after" && l.callID === id)
-  assert.equal(rows("c0").note, "connect before list_connections: list still required")
+  assert.ok(rows("l0").ok === true && rows("l0").next === "NEED_CONNECT" && /informational/.test(rows("l0").note), "list 成功不前進：" + JSON.stringify(rows("l0")))
+  assert.ok(rows("l2").ok === true && rows("l2").state === "READY" && rows("l2").next === "READY")
   assert.equal(rows("c1").ok, false); assert.ok(rows("c1").failureMatch)
   assert.equal(rows("c2").ok, "unknown"); assert.match(rows("c2").note, /empty tool output/); assert.equal(rows("c2").next, "NEED_CONNECT")
   assert.equal(rows("c3").ok, false); assert.equal(rows("c3").failureMatch, "isError")
@@ -133,19 +132,25 @@ test("狀態機：list → connect → READY 才放行；connect 先於 list 不
   assert.equal(rows("c5").next, "READY")
   assert.ok(log.filter((l) => l.hook === "after" && /^oracleMCP_/.test(l.tool)).every((l) => l.attribution === "current" && l.turnId === "m1"))
   assert.deepEqual(log.filter((l) => l.decision === "allow" && l.tool === "task").map((l) => l.state), ["READY", "READY"])
+  // 完全不 list 也能 READY：第 0 步只有 connect 一步；擋下訊息只要求 connect、明說不必先 list
+  const S2 = "ses_nolist"
+  await chat(hooks, S2, "m1")
+  await assert.rejects(() => task(hooks, S2, "t0"), (e) => /目前狀態＝NEED_CONNECT/.test(e.message) && /呼叫 oracleMCP_connect（/.test(e.message) && /不必先 list_connections/.test(e.message) && !/1\) oracleMCP_list_connections/.test(e.message))
+  await connect(hooks, S2, "c1")
+  await task(hooks, S2, "t1")
+  assert.equal(last(dir, S2).decision, "allow")
+  assert.ok(!readLog(dir, S2).some((l) => l.tool === "oracleMCP_list_connections"))
 })
 
 test("沒有入場紀錄的 after（只送 after）：attribution=unknown、不前進；成對的呼叫才算", async () => {
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await after(hooks, S, "oracleMCP_list_connections", "ghost-l", mcpOk("- HR"))
   await after(hooks, S, "oracleMCP_connect", "ghost-c", mcpOk("Successfully connected to HR"), { connection_name: "HR" })
   let log = readLog(dir, S)
-  assert.deepEqual(log.filter((l) => l.hook === "after").map((l) => [l.attribution, l.ok, l.next]), [["unknown", true, "NEED_LIST"], ["unknown", true, "NEED_LIST"]])
-  assert.ok(log.filter((l) => l.hook === "after").every((l) => /no entry snapshot/.test(l.note)))
-  await expectBlock(() => task(hooks, S, "t1"), "NEED_LIST")
-  await list(hooks, S)
+  assert.deepEqual(log.filter((l) => l.hook === "after").map((l) => [l.attribution, l.ok, l.next]), [["unknown", true, "NEED_CONNECT"]])
+  assert.match(log.at(-1).note, /no entry snapshot/)
+  await expectBlock(() => task(hooks, S, "t1"), "NEED_CONNECT")
   await connect(hooks, S)
   await task(hooks, S, "t2")
   log = readLog(dir, S)
@@ -156,11 +161,10 @@ test("沒有入場紀錄的 after（只送 after）：attribution=unknown、不�
   assert.equal(row.admitted, "unknown"); assert.equal(row.attribution, "unknown"); assert.equal(row.dbCapable, true); assert.match(row.basis, /classified after/)
 })
 
-test("subagent 回 NOT_CONNECTED → 重派前必須再 connect；disconnect → 從頭；新訊息 → 重置（turnId＝訊息 id）", async () => {
+test("subagent 回 NOT_CONNECTED → 重派前必須再 connect；disconnect → 重連；新訊息 → 重置（turnId＝訊息 id）", async () => {
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await list(hooks, S)
   await connect(hooks, S)
   await task(hooks, S, "t1")
   await taskDone(hooks, S, "t1", NOT_CONNECTED)
@@ -168,17 +172,18 @@ test("subagent 回 NOT_CONNECTED → 重派前必須再 connect；disconnect →
   await connect(hooks, S, "c2")
   await task(hooks, S, "t3")
   await disconnect(hooks, S)
-  await expectBlock(() => task(hooks, S, "t4"), "NEED_LIST")
-  await list(hooks, S, "l2")
+  await expectBlock(() => task(hooks, S, "t4"), "NEED_CONNECT")
   await connect(hooks, S, "c3")
   await task(hooks, S, "t5")
   await chat(hooks, S, "m2")
-  await expectBlock(() => task(hooks, S, "t6"), "NEED_LIST")
+  await expectBlock(() => task(hooks, S, "t6"), "NEED_CONNECT")
   const log = readLog(dir, S)
   const nc = log.find((l) => l.hook === "after" && l.tool === "task" && l.callID === "t1")
   assert.ok(nc.notConnected === true && nc.next === "NEED_CONNECT" && nc.state === "READY" && nc.admitted === "allow" && nc.dbCapable === true && nc.attribution === "current")
+  const dc = log.find((l) => l.hook === "after" && l.tool === "oracleMCP_disconnect")
+  assert.ok(dc.state === "READY" && dc.next === "NEED_CONNECT", JSON.stringify(dc))
   const chats = log.filter((l) => l.hook === "chat.message")
-  assert.deepEqual(chats.map((c) => [c.turn, c.turnId, c.state, c.next]), [[1, "m1", "NEED_LIST", "NEED_LIST"], [2, "m2", "READY", "NEED_LIST"]])
+  assert.deepEqual(chats.map((c) => [c.turn, c.turnId, c.state, c.next]), [[1, "m1", "NEED_CONNECT", "NEED_CONNECT"], [2, "m2", "READY", "NEED_CONNECT"]])
   assert.equal(log.at(-1).turnId, "m2")
 })
 
@@ -190,10 +195,10 @@ test("observe 模式（env 優先、其次 profile）只記錄不擋；after 列
   assert.equal(last(dir, S).decision, "observe-would-block")
   await taskDone(hooks, S, "t1", NOT_CONNECTED)
   const row = last(dir, S)
-  assert.equal(row.executed, true); assert.equal(row.admitted, "observe-would-block"); assert.equal(row.state, "NEED_LIST"); assert.equal(row.dbCapable, true)
+  assert.equal(row.executed, true); assert.equal(row.admitted, "observe-would-block"); assert.equal(row.state, "NEED_CONNECT"); assert.equal(row.dbCapable, true)
   process.env.PS_ORACLE_GATE_MODE = "enforce"
   try {
-    await expectBlock(() => task(hooks, S, "t2"), "NEED_LIST")
+    await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
   } finally {
     delete process.env.PS_ORACLE_GATE_MODE
   }
@@ -206,8 +211,8 @@ test("oracleMCP 未掛載（absent／disabled／failed／needs_auth）→ 一樣
     const sid = "ses_" + mcp
     await chat(hooks, sid, "m1")
     await assert.rejects(() => task(hooks, sid, "c"), (e) => /PS_ORACLE_PREFLIGHT_REQUIRED/.test(e.message) && (down
-      ? /oracleMCP 未掛載/.test(e.message) && /ORACLE_MCP_DOWN/.test(e.message) && /ps-peoplecode-flow/.test(e.message) && !/list_connections  2\)/.test(e.message)
-      : /目前狀態＝NEED_LIST/.test(e.message) && !/未掛載/.test(e.message)))
+      ? /oracleMCP 未掛載/.test(e.message) && /ORACLE_MCP_DOWN/.test(e.message) && /ps-peoplecode-flow/.test(e.message) && !/目前狀態＝/.test(e.message)
+      : /目前狀態＝NEED_CONNECT/.test(e.message) && !/未掛載/.test(e.message)))
     const row = last(dir, sid)
     assert.equal(row.decision, "block")
     assert.equal(row.blocked, 1)
@@ -220,13 +225,12 @@ test("oracleMCP 未掛載（absent／disabled／failed／needs_auth）→ 一樣
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient({ statusSeq: ["failed", "connected"] }) })
   await chat(hooks, S, "m1")
   await assert.rejects(() => task(hooks, S, "c1"), /未掛載/)
-  await assert.rejects(() => task(hooks, S, "c2"), (e) => /目前狀態＝NEED_LIST/.test(e.message) && !/未掛載/.test(e.message))
+  await assert.rejects(() => task(hooks, S, "c2"), (e) => /目前狀態＝NEED_CONNECT/.test(e.message) && !/未掛載/.test(e.message))
   // 不查 DB 的委派與 READY 的 session 不查 mcp 狀態（client 一查就炸）
   const hooks2 = await PsOraclePreflightGate({ directory: dir, client: fakeClient({ mcp: "throw" }) })
   await chat(hooks2, "ses_noquery", "m1")
   await task(hooks2, "ses_noquery", "n1", "ps-peoplecode-flow")
   assert.equal(last(dir, "ses_noquery").decision, "allow")
-  await list(hooks2, "ses_noquery")
   await connect(hooks2, "ses_noquery")
   await task(hooks2, "ses_noquery", "n2")
   assert.equal(last(dir, "ses_noquery").decision, "allow")
@@ -236,7 +240,6 @@ test("全部 part 都 synthetic 的 user 訊息不重置；同一訊息 id 重�
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "msg_1")
-  await list(hooks, S)
   await connect(hooks, S)
   await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, { message: { id: "msg_synth" }, parts: [{ type: "text", text: "<task_result>…</task_result>", synthetic: true }] })
   await task(hooks, S, "t1")
@@ -249,7 +252,7 @@ test("全部 part 都 synthetic 的 user 訊息不重置；同一訊息 id 重�
   await task(hooks, S, "t2")
   assert.equal(last(dir, S).decision, "allow")
   await chat(hooks, S, "msg_2")
-  await expectBlock(() => task(hooks, S, "t3"), "NEED_LIST")
+  await expectBlock(() => task(hooks, S, "t3"), "NEED_CONNECT")
   log = readLog(dir, S)
   assert.equal(log.at(-1).turnId, "msg_2")
   assert.equal(log.filter((l) => l.hook === "chat.message" && l.mode).length, 2)
@@ -259,12 +262,10 @@ test("task 執行中使用者送下一題：after 列用入場快照；上一題
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await list(hooks, S, "l1")
   await connect(hooks, S, "c1")
   await task(hooks, S, "t1")
   // 下一題到了（狀態重置），新題自己做完前置
   await chat(hooks, S, "m2")
-  await list(hooks, S, "l2")
   await connect(hooks, S, "c2")
   // 舊題的 task 此時才回 NOT_CONNECTED
   await taskDone(hooks, S, "t1", NOT_CONNECTED)
@@ -280,14 +281,12 @@ test("task 執行中使用者送下一題：after 列用入場快照；上一題
   await expectBlock(() => task(hooks, S, "t3"), "NEED_CONNECT")
 })
 
-test("上一題晚到的 connect／list 成功回覆：標 stale、不拿來滿足新題的前置", async () => {
+test("上一題晚到的 connect 成功回覆：標 stale、不拿來滿足新題的前置；晚到的 list 只記錄；晚到的 disconnect 一律退回", async () => {
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await list(hooks, S, "l1")
   await before(hooks, S, "oracleMCP_connect", "c1", { connection_name: "HR" }) // A 題的 connect 開始，尚未完成
   await chat(hooks, S, "m2")
-  await list(hooks, S, "l2") // B 題 list 完成 → NEED_CONNECT
   await after(hooks, S, "oracleMCP_connect", "c1", mcpOk("Successfully connected to HR"), { connection_name: "HR" }) // A 題的 connect 此時才回
   let row = last(dir, S)
   assert.equal(row.attribution, "stale"); assert.equal(row.stale, true); assert.equal(row.turnId, "m1"); assert.equal(row.replyTurnId, "m2")
@@ -296,24 +295,22 @@ test("上一題晚到的 connect／list 成功回覆：標 stale、不拿來滿�
   await connect(hooks, S, "c2")
   await task(hooks, S, "t2")
   assert.equal(last(dir, S).decision, "allow")
-  // 晚到的 list 也一樣
+  // 晚到的 list：只記錄（清單不是前置，stale 與否都不改狀態）
   await chat(hooks, S, "m3")
   await before(hooks, S, "oracleMCP_list_connections", "l3")
   await chat(hooks, S, "m4")
-  await after(hooks, S, "oracleMCP_list_connections", "l3", mcpOk("- HR"))
+  await after(hooks, S, "oracleMCP_list_connections", "l3", mcpOk("Name:HRConnect string: {x}"))
   row = last(dir, S)
-  assert.equal(row.attribution, "stale"); assert.equal(row.turnId, "m3"); assert.equal(row.next, "NEED_LIST")
-  await expectBlock(() => task(hooks, S, "t3"), "NEED_LIST")
-  // 上一題發出的 disconnect 晚到：連線真的斷了，一律退回 NEED_LIST
-  await list(hooks, S, "l4")
+  assert.equal(row.attribution, "stale"); assert.equal(row.turnId, "m3"); assert.equal(row.next, "NEED_CONNECT"); assert.match(row.note, /informational.*previous turn/)
+  await expectBlock(() => task(hooks, S, "t3"), "NEED_CONNECT")
+  // 上一題發出的 disconnect 晚到：連線真的斷了，一律退回 NEED_CONNECT
   await before(hooks, S, "oracleMCP_disconnect", "d1")
   await chat(hooks, S, "m5")
-  await list(hooks, S, "l5")
   await connect(hooks, S, "c5")
   await after(hooks, S, "oracleMCP_disconnect", "d1", mcpOk("Disconnected"))
   row = last(dir, S)
-  assert.equal(row.attribution, "stale"); assert.equal(row.next, "NEED_LIST"); assert.match(row.note, /previous turn/)
-  await expectBlock(() => task(hooks, S, "t4"), "NEED_LIST")
+  assert.equal(row.attribution, "stale"); assert.equal(row.state, "READY"); assert.equal(row.next, "NEED_CONNECT"); assert.match(row.note, /previous turn/)
+  await expectBlock(() => task(hooks, S, "t4"), "NEED_CONNECT")
 })
 
 test("task 在查 /mcp 狀態的 await 期間題目換了：以「題目已換」擋下，列上同時記入場題與決定時的題", async () => {
@@ -322,12 +319,11 @@ test("task 在查 /mcp 狀態的 await 期間題目換了：以「題目已換�
   const client = fakeClient({ onStatus: async () => { await chat(hooks, S, "m2") } })
   hooks = await PsOraclePreflightGate({ directory: dir, client })
   await chat(hooks, S, "m1")
-  await expectBlock(() => task(hooks, S, "t1"), "NEED_LIST")
+  await expectBlock(() => task(hooks, S, "t1"), "NEED_CONNECT")
   const row = last(dir, S)
   assert.equal(row.turnId, "m1"); assert.equal(row.turnAtDecision, "m2"); assert.match(row.note, /turn changed during status check \(now m2\)/)
   // 新題照常做前置後放行（client 之後不再插事件）
   client.mcp.status = async () => ({ data: { oracleMCP: { status: "connected" } } })
-  await list(hooks, S)
   await connect(hooks, S)
   await task(hooks, S, "t2")
   assert.equal(last(dir, S).decision, "allow"); assert.equal(last(dir, S).turnId, "m2")
@@ -337,7 +333,6 @@ test("沒有 fail-open：connect／list 一直失敗，會查 DB 的 task 一律
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1", "ps-deep-research")
-  await list(hooks, S, "l")
   // connect 回 MCP isError → 只有 before（after 不會觸發）
   await before(hooks, S, "oracleMCP_connect", "c1", { connection_name: "HR" })
   await expectBlock(() => task(hooks, S, "t1", "ps-auditor"), "NEED_CONNECT")
@@ -348,27 +343,28 @@ test("沒有 fail-open：connect／list 一直失敗，會查 DB 的 task 一律
   let log = readLog(dir, S)
   assert.equal(log.filter((l) => l.hook === "before" && l.tool === "task" && l.decision === "allow").length, 0)
   assert.deepEqual(log.filter((l) => l.decision === "block").map((l) => l.blocked), [1, 2, 3])
-  // list 一直失敗：前兩次 isError（無 after）、第三次回錯誤文字 → 仍 NEED_LIST、仍擋
-  const S2 = "ses_nolist"
+  // list 成功再多次也不是前置：沒有 connect→READY 就一律擋（清單不能拿來挑名字，也不能代替 connect）
+  const S2 = "ses_listonly"
   await chat(hooks, S2, "m9", "ps-deep-research")
-  await before(hooks, S2, "oracleMCP_list_connections", "a")
-  await before(hooks, S2, "oracleMCP_list_connections", "b")
-  await after(hooks, S2, "oracleMCP_list_connections", "b", mcpOk("Error: cannot list"))
-  await expectBlock(() => task(hooks, S2, "t", "ps-auditor"), "NEED_LIST")
+  await list(hooks, S2, "a", "Name:HRConnect string: {jdbc:oracle:thin:@//h:1521/s}")
+  await list(hooks, S2, "b")
+  await call(hooks, S2, "oracleMCP_list_connections", "c", mcpOk("Error: cannot list"))
+  await expectBlock(() => task(hooks, S2, "t", "ps-auditor"), "NEED_CONNECT")
   log = readLog(dir, S2)
   assert.equal(log.filter((l) => l.decision === "allow").length, 0)
-  assert.ok(log.some((l) => l.tool === "oracleMCP_list_connections" && l.hook === "after" && l.ok === false))
+  const lists = log.filter((l) => l.tool === "oracleMCP_list_connections" && l.hook === "after")
+  assert.deepEqual(lists.map((l) => [l.ok, l.next]), [[true, "NEED_CONNECT"], [true, "NEED_CONNECT"], [false, "NEED_CONNECT"]])
+  assert.ok(lists.every((l) => /informational/.test(l.note)))
 })
 
 test("沒有祖先放行：父 session READY 不代表子 session READY；閘門不查 session.get", async () => {
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, "ses_root", "m1", "ps-deep-research")
-  await list(hooks, "ses_root")
   await connect(hooks, "ses_root")
   await task(hooks, "ses_root", "t", "ps-auditor")
   await chat(hooks, "ses_child", "mc", "ps-audit-orchestrator")
-  await expectBlock(() => task(hooks, "ses_child", "t", "ps-auditor"), "NEED_LIST")
+  await expectBlock(() => task(hooks, "ses_child", "t", "ps-auditor"), "NEED_CONNECT")
   assert.equal(last(dir, "ses_root").decision, "allow")
   assert.equal(last(dir, "ses_child").decision, "block")
 })
@@ -377,10 +373,7 @@ test("同一 callID 字串跨 session 不互撞（OpenAI 相容端點的 call_0�
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   const X = "ses_X", Y = "ses_Y"
-  for (const sid of [X, Y]) {
-    await chat(hooks, sid, "m" + sid)
-    await list(hooks, sid, "call_0")
-  }
+  for (const sid of [X, Y]) await chat(hooks, sid, "m" + sid)
   await connect(hooks, X, "call_0")
   await task(hooks, X, "call_1")
   await expectBlock(() => task(hooks, Y, "call_1"), "NEED_CONNECT")
@@ -392,23 +385,21 @@ test("同一 callID 字串跨 session 不互撞（OpenAI 相容端點的 call_0�
   assert.equal(last(dir, Y).turnId, "mses_Y"); assert.equal(last(dir, Y).admitted, "allow")
 })
 
-test("擋下訊息裡的連線規則：profile oracle.connectionName 有填就點名，沒填就說 FILL_ME；都不准自己挑清單第一個", async () => {
+test("擋下訊息裡的連線規則：profile oracle.connectionName 有填就點名（原樣照抄、不必先 list），沒填就說 FILL_ME；都不准從清單挑名字", async () => {
   const dir1 = tempProject({ connectionName: "HR_PROD" })
   const h1 = await PsOraclePreflightGate({ directory: dir1, client: fakeClient() })
   await chat(h1, S, "m1")
-  await assert.rejects(() => task(h1, S, "t1"), (e) => /「HR_PROD」/.test(e.message) && /不要自己挑清單第一個/.test(e.message) && !/否則清單第一個/.test(e.message))
+  await assert.rejects(() => task(h1, S, "t1"), (e) => /「HR_PROD」原樣照抄/.test(e.message) && /不要從清單挑名字/.test(e.message) && /不必先 list_connections/.test(e.message) && !/清單第一個/.test(e.message))
   const dir2 = tempProject({ connectionName: "FILL_ME" })
   const h2 = await PsOraclePreflightGate({ directory: dir2, client: fakeClient() })
   await chat(h2, S, "m1")
-  await list(h2, S)
-  await assert.rejects(() => task(h2, S, "t1"), (e) => /FILL_ME／未填/.test(e.message) && /只差 oracleMCP_connect/.test(e.message))
+  await assert.rejects(() => task(h2, S, "t1"), (e) => /FILL_ME／未填/.test(e.message) && /Oracle 連線未設定/.test(e.message) && !/清單第一個/.test(e.message))
 })
 
 test("connect 目標在執行前強制比對 profile：FILL_ME／未填 → ORACLE_CONNECTION_NOT_CONFIGURED；不一致 → ORACLE_CONNECTION_MISMATCH；一致才執行；observe 只記", async () => {
   const dir = tempProject({ connectionName: "HR_PROD" })
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await list(hooks, S)
   await assert.rejects(() => before(hooks, S, "oracleMCP_connect", "c1", { connection_name: "HR_UAT" }), (e) => /ORACLE_CONNECTION_MISMATCH/.test(e.message) && /「HR_UAT」≠ profile/.test(e.message) && /「HR_PROD」/.test(e.message))
   let row = last(dir, S)
   assert.equal(row.decision, "block"); assert.equal(row.note, "ORACLE_CONNECTION_MISMATCH"); assert.equal(row.connection, "HR_UAT"); assert.equal(row.profileConnection, "HR_PROD"); assert.equal(row.next, "NEED_CONNECT")
@@ -424,7 +415,6 @@ test("connect 目標在執行前強制比對 profile：FILL_ME／未填 → ORAC
   const dir2 = tempProject({ connectionName: "FILL_ME" })
   const h2 = await PsOraclePreflightGate({ directory: dir2, client: fakeClient() })
   await chat(h2, S, "m1")
-  await list(h2, S)
   await assert.rejects(() => before(h2, S, "oracleMCP_connect", "c1", { connection_name: "HR" }), (e) => /ORACLE_CONNECTION_NOT_CONFIGURED/.test(e.message) && /回填/.test(e.message))
   assert.equal(last(dir2, S).note, "ORACLE_CONNECTION_NOT_CONFIGURED")
   await expectBlock(() => task(h2, S, "t1"), "NEED_CONNECT")
@@ -432,7 +422,6 @@ test("connect 目標在執行前強制比對 profile：FILL_ME／未填 → ORAC
   const dir3 = tempProject({ connectionName: "FILL_ME", profileGate: "observe" })
   const h3 = await PsOraclePreflightGate({ directory: dir3, client: fakeClient() })
   await chat(h3, S, "m1")
-  await list(h3, S)
   await connect(h3, S, "c1", "Successfully connected to HR", "HR")
   const rows3 = readLog(dir3, S)
   const b3 = rows3.find((l) => l.hook === "before" && l.callID === "c1")
@@ -444,7 +433,6 @@ test("connect 嘗試作廢 READY：READY 後再 connect 失敗（isError，無 a
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await list(hooks, S)
   await connect(hooks, S, "c1")
   await task(hooks, S, "t1")
   assert.equal(last(dir, S).decision, "allow")
@@ -472,7 +460,6 @@ test("同題連線世代：同題兩個 task 在舊連線上，A 回 NOT_CONNECT
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await list(hooks, S)
   await connect(hooks, S, "c1") // gen 1
   await task(hooks, S, "tA")
   await task(hooks, S, "tB")
@@ -495,7 +482,6 @@ test("task 回報解析：COMPLETE／PARTIAL／BLOCKED(QUERY_TIMEOUT)／非 JSON
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
-  await list(hooks, S)
   await connect(hooks, S)
   const cases = [
     ["t1", wrap("ses_1", '{"task":"x","status":"COMPLETE","blockedReason":"NOT_APPLICABLE","findings":[]}'), { reportValid: true, reportStatus: "COMPLETE", blockedReason: "NOT_APPLICABLE", childSessionID: "ses_1", taskState: "completed", next: "READY" }],
@@ -541,8 +527,9 @@ test("第 0 步提醒注入：主 agent 的每則真實訊息補一個 synthetic
   assert.equal(out.parts[0].text, "兵役狀態有哪些選項？")
   const p = out.parts[1]
   assert.ok(p.synthetic === true && p.type === "text" && p.messageID === "m1" && p.sessionID === S && /^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/.test(p.id), JSON.stringify(p))
-  assert.match(p.text, /oracleMCP_list_connections → oracleMCP_connect/)
-  assert.match(p.text, /「HR_DEV」/)
+  assert.match(p.text, /先呼叫 oracleMCP_connect（connection_name＝「HR_DEV」原樣照抄/)
+  assert.match(p.text, /不必先 list_connections、不要從清單挑名字/)
+  assert.doesNotMatch(p.text, /list_connections → /)
   assert.match(p.text, /ps-ui-flow／?/)
   assert.ok(/ps-auditor/.test(p.text) && !/ps-peoplecode-flow/.test(p.text), "提醒列的是會查 DB 的 subagent")
   assert.equal(last(dir, S).reminder, true)
@@ -602,5 +589,21 @@ test("第 0 步提醒注入：主 agent 的每則真實訊息補一個 synthetic
   await h4["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, u5)
   assert.equal(u5.parts.length, 1)
   // 提醒不影響閘門本身：沒做前置照擋
-  await expectBlock(() => task(hooks, S, "t1"), "NEED_LIST")
+  await expectBlock(() => task(hooks, S, "t1"), "NEED_CONNECT")
+})
+
+test("agent tools 表混寫 oracleMCP_* deny ＋ 個別工具 true：載入時記 WARN 到 _plugin.log（本 repo 的 agent 都沒有混寫）；混寫者仍保守視為會查 DB", async () => {
+  const dir = tempProject()
+  fs.writeFileSync(path.join(dir, ".opencode", "agent", "zz-mixed.md"), '---\nmode: subagent\ntools:\n  "oracleMCP_*": false\n  "oracleMCP_run_sql": true\n---\nx\n')
+  const plogOf = (d) => fs.readFileSync(path.join(d, "auto-loop-logs", "ps-oracle-gate", "_plugin.log"), "utf8")
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  assert.match(plogOf(dir), /wildcardDenyMix=\["zz-mixed"\]/)
+  assert.match(plogOf(dir), /WARN agent zz-mixed: tools 表混寫/)
+  const clean = tempProject()
+  await PsOraclePreflightGate({ directory: clean, client: fakeClient() })
+  assert.match(plogOf(clean), /wildcardDenyMix=\[\]/)
+  assert.doesNotMatch(plogOf(clean), /WARN agent/)
+  await chat(hooks, "ses_mix", "m1")
+  await expectBlock(() => task(hooks, "ses_mix", "t1", "zz-mixed"), "NEED_CONNECT")
+  assert.ok(last(dir, "ses_mix").dbCapable === true && last(dir, "ses_mix").basis === "run_sql:enabled")
 })

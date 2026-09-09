@@ -79,17 +79,16 @@ oracle:
   # ALTER SESSION SET CURRENT_SCHEMA=<此值>（唯一准許的非 SELECT）。
   # 值為 FILL_ME 則跳過該步。
   currentSchema: FILL_ME
-  # 主 agent 開場 list_connections → connect 時要連的連線名（必須是 SQLcl 已儲存連線名之一，
-  # 與 list_connections 列出的名字完全一致——大小寫、空白都算）。
-  # FILL_ME／未填／不在清單裡 → 主 agent 不 connect、不挑清單第一個，回報「Oracle 連線未設定」——請回填。
+  # 主 agent 開場直接 connect 這個名字（不 list、不從清單挑；必須與 SQLcl 已儲存連線名完全一致——大小寫、空白都算）。
+  # FILL_ME／未填 → 主 agent 不 connect，回報「Oracle 連線未設定」——請回填。
   # 執行期閘門會在 connect 執行前比對：未填 → ORACLE_CONNECTION_NOT_CONFIGURED；不一致 → ORACLE_CONNECTION_MISMATCH（connect 不執行）。
   connectionName: FILL_ME
   # 執行期閘門（.opencode/plugin/ps-oracle-preflight-gate.js）的模式：
-  # enforce＝前置（list_connections → connect 成功）未完成就不准派會查 DB 的 subagent；
+  # enforce＝前置（connect 成功；connection_name＝上面的 connectionName 原樣）未完成就不准派會查 DB 的 subagent；
   # observe＝只記錄不擋（做 hook 覆蓋率探測或緊急停用時才用）。
   # 環境變數 PS_ORACLE_GATE_MODE 可臨時覆寫本值。
   preflightGate: enforce
-  # 第 0 步提醒：閘門在主 agent 的每一則使用者訊息後面補一段「先 list_connections → connect（connection_name＝上面的值）
+  # 第 0 步提醒：閘門在主 agent 的每一則使用者訊息後面補一段「先 connect（connection_name＝上面的值原樣；不先 list、不從清單挑名字）
   # 才准派會查 DB 的 subagent」（synthetic part，模型每題都看得到；不擋、不查狀態）。on（預設）／off。
   # 環境變數 PS_ORACLE_GATE_REMINDER 可臨時覆寫本值。
   preflightReminder: on

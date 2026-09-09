@@ -20,10 +20,13 @@ tools:
   webfetch: false
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
-  "oracleMCP_*": false
-  # 連線的擁有者是主 agent：只開 list_connections 與 connect（派第一個 DB 委派前 connect 一次）；run_sql／disconnect 維持關閉
+  # Oracle：只開 connect（第 0 步）與 list_connections（connect 失敗時附清單原文給管理者核對用）；
+  # 逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見，後面的 true 救不回）
   "oracleMCP_list_connections": true
   "oracleMCP_connect": true
+  "oracleMCP_disconnect": false
+  "oracleMCP_run_sql": false
+  "oracleMCP_run_sqlcl": false
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
 ---
@@ -40,14 +43,13 @@ tools:
    `business-domain-map.yaml`（或用 MCP `ps_get_customization_profile`）。
    解析 business domain 與搜尋模式（CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED /
    DELIVERED_ALLOWED）。規則詳見 `.opencode/skills/ps-business-discovery/SKILL.md`。
-2. **開線（第 0 步；每一題、無條件；順序固定 list → connect）**：
-   `oracleMCP_list_connections` → `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。
-   profile 未填／FILL_ME／不在清單裡 → **不 connect、不猜、不挑清單第一個**，本題不派 DB 委派，答覆寫「Oracle 連線未設定（profile
-   oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」；清單為空 → 答覆寫「SQLcl 沒有已儲存連線（list_connections 回空）」。
-   不判斷這題要不要查 DB、不問使用者、不因為上一題已連過就省略、不跳過 list 直接 connect（回「已連線」也算成功）。
-   唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 答覆末尾註明）。connect 回錯誤 → 再 list 一次、再 connect 一次；
-   仍失敗 → 本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，其餘部分照常作答。
-   自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
+2. **開線（第 0 步；每一題、無條件；直接 connect，不先 list）**：
+   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
+   ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本題不派 DB 委派，答覆寫「Oracle 連線未設定
+   （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**附在
+   答覆裡讓管理者核對 profile 值（不要自己改名字），本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，其餘部分照常作答。
+   不判斷這題要不要查 DB、不問使用者、不因為上一題已連過就省略（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`
+   （oracleMCP 未掛載 → 答覆末尾註明）。自檢：第一個 task 委派之前，必須已出現一次 `oracleMCP_connect`。
 3. **先查 Entity Wiki（若 `docs/ps-research/wiki/` 存在）**：
    read `wiki/index.md` → 以問題中的物件名 / 業務詞比對目錄與 aliases →
    read 命中的 entity 檔（最多 3 個），需要多跳沿 `[[連結]]` 再開

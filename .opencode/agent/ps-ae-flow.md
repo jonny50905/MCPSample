@@ -16,9 +16,12 @@ tools:
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
   # AE 結構（Section / Step 清單）用 oracleMCP 照 cookbook §5 查，只准 SELECT：
-  # Oracle 是允許清單：先全關再只開 run_sql（OpenCode 最後匹配者優先，順序不可顛倒）——
-  # 連線由主 agent 建；subagent 不 list_connections／connect／disconnect／run_sqlcl，未連線就回 BLOCKED(NOT_CONNECTED)
-  "oracleMCP_*": false
+  # Oracle：只開 run_sql（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／run_sqlcl，
+  # 未連線就回 BLOCKED(NOT_CONNECTED)。逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）
+  "oracleMCP_list_connections": false
+  "oracleMCP_connect": false
+  "oracleMCP_disconnect": false
+  "oracleMCP_run_sqlcl": false
   "oracleMCP_run_sql": true
   # PeoplecodeMetadata：get_ae_sql_metadata（aeApplid）取 AE SQL 中繼資料
   # ——免連線的定位／結構線索，證據仍走 SQL／CHUNK：
