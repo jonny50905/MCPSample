@@ -33,7 +33,8 @@
 #   回覆（標 stale、不計入該題）；unknownResults＝list／connect 回空輸出（閘門不當成功——真 SQLcl 若如此回覆要回報維護 session）；
 #   orphanTurns＝chat.message 有、transcript 沒有的題（/undo）；unmatchedCalls＝閘門有 before、transcript 找不到同 callID 的 task；
 #   tasksNotReturned＝放行了但沒有 after 的 task（一直執行中／被中止）；connectBlocks＝connect 在執行前被擋（profile 未填或目標不一致）；
-#   dbTasksPartial／dbTasksBlocked／dbTasksInvalid／dbTasksCompletedNoSql（報告 COMPLETE 但子 session 沒有成功的 run_sql）。
+#   dbTasksPartial／dbTasksBlocked／dbTasksInvalid／dbTasksCompletedNoSql（報告 COMPLETE 但子 session 沒有成功的 run_sql）；
+#   todoWrites＝todowrite 成功次數（先列 todo 層：每題至少 1）；todoBlocks＝todowrite 之前就開工被擋的次數（note=TODO_FIRST:…；＝模型跳過 todo 的機率）。
 # 注意：prompt 走 cmd.exe 命令列——題目禁用半形雙引號與 > < & | % ^（中文引號「」不受限）。
 param(
     [ValidateSet('B1', 'B2', 'B3', 'CUSTOM')][string]$Scenario = 'B1',
@@ -158,7 +159,9 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
     $afterIds = @{}
     foreach ($e in $executed) { if ($e.callID) { $afterIds[[string]$e.callID] = $true } }
     $notReturned = @($before | Where-Object { $_.decision -ne 'block' -and $_.callID -and -not $afterIds.ContainsKey([string]$_.callID) }).Count
-    $connectBlocks = @($rows | Where-Object { $_.hook -eq 'before' -and $_.tool -eq 'oracleMCP_connect' -and $_.decision -eq 'block' }).Count
+    $connectBlocks = @($rows | Where-Object { $_.hook -eq 'before' -and $_.tool -eq 'oracleMCP_connect' -and $_.decision -eq 'block' -and -not ([string]$_.note -match '^TODO_FIRST:') }).Count
+    $todoWrites = @($rows | Where-Object { $_.hook -eq 'after' -and $_.tool -eq 'todowrite' }).Count
+    $todoBlocks = @($rows | Where-Object { [string]$_.note -match '^TODO_FIRST:' -and ($_.decision -eq 'block' -or $_.decision -eq 'observe-would-block') }).Count
     $afters = @($rows | Where-Object { $_.hook -eq 'after' })
     $listCalls = @($afters | Where-Object { $_.tool -eq 'oracleMCP_list_connections' }).Count
     $connOk = @($afters | Where-Object { $_.tool -eq 'oracleMCP_connect' -and $_.next -eq 'READY' })
@@ -239,7 +242,7 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
         sessionID = $SessionId; rows = $rows.Count; taskAttempts = $before.Count; blocked = $blocked.Count; mcpDownBlocks = $mcpDown.Count
         wouldBlock = $wouldBlock.Count; executed = $executed.Count; executedDb = $executedDb.Count; dbTasksCompleted = $dbOk.Count
         dbTasksPartial = $dbPartial.Count; dbTasksBlocked = $dbBlocked.Count; dbTasksInvalid = $dbInvalid.Count; dbTasksCompletedNoSql = $dbNoSql.Count
-        tasksNotReturned = $notReturned; connectBlocks = $connectBlocks; listCalls = $listCalls
+        tasksNotReturned = $notReturned; connectBlocks = $connectBlocks; listCalls = $listCalls; todoWrites = $todoWrites; todoBlocks = $todoBlocks
         executedBeforePreflight = $early.Count
         preflight = $preflight; exportedTasks = $exportedTasks; hookMismatch = $mismatch; exportError = $exportErr
         turns = $chatRows.Count; exportedTurns = $exportedTurns; turnMismatch = $missingTurns; orphanTurns = $orphanTurns
@@ -253,7 +256,7 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
 function New-EmptyVerdict([string]$Label, [string]$Err) {
     return [pscustomobject]@{
         sessionID = $Label; rows = 0; taskAttempts = 0; blocked = 0; mcpDownBlocks = 0; wouldBlock = 0; executed = 0; executedDb = 0; dbTasksCompleted = 0
-        dbTasksPartial = 0; dbTasksBlocked = 0; dbTasksInvalid = 0; dbTasksCompletedNoSql = 0; tasksNotReturned = 0; connectBlocks = 0; listCalls = 0
+        dbTasksPartial = 0; dbTasksBlocked = 0; dbTasksInvalid = 0; dbTasksCompletedNoSql = 0; tasksNotReturned = 0; connectBlocks = 0; listCalls = 0; todoWrites = 0; todoBlocks = 0
         executedBeforePreflight = 0; preflight = $false; exportedTasks = -1; hookMismatch = 0; exportError = $Err; turns = 0; exportedTurns = -1
         turnMismatch = 0; orphanTurns = 0; turnInvariantViolations = 0; callMismatch = 0; unmatchedCalls = 0; staleReplies = 0; unknownResults = 0
         exportFailures = 0; exitCode = -1; timedOut = $false; mode = ''
@@ -296,6 +299,8 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     $notRet = ($verdicts | Measure-Object -Property tasksNotReturned -Sum).Sum
     $cblk = ($verdicts | Measure-Object -Property connectBlocks -Sum).Sum
     $lcalls = ($verdicts | Measure-Object -Property listCalls -Sum).Sum
+    $tdW = ($verdicts | Measure-Object -Property todoWrites -Sum).Sum
+    $tdB = ($verdicts | Measure-Object -Property todoBlocks -Sum).Sum
     $usabilityFail = 0
     if ($Expect -eq 'Yes') { $usabilityFail = @($verdicts | Where-Object { $_.dbTasksCompleted -eq 0 }).Count }
     if ($Expect -eq 'No') { $usabilityFail = $dbRuns }
@@ -307,7 +312,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
         blockedRuns = $blockedRuns; preflightRuns = $preflightRuns; sessionsWithoutTask = $noTask
         sessionsWithDbTaskOk = $dbOkRuns; sessionsWithDbTask = $dbRuns
         dbTasksCompleted = [int]$dbDone; dbTasksPartial = [int]$dbPart; dbTasksBlocked = [int]$dbBlk; dbTasksInvalid = [int]$dbInv
-        dbTasksCompletedNoSql = [int]$dbNoSql; tasksNotReturned = [int]$notRet; connectBlocks = [int]$cblk; listCalls = [int]$lcalls
+        dbTasksCompletedNoSql = [int]$dbNoSql; tasksNotReturned = [int]$notRet; connectBlocks = [int]$cblk; listCalls = [int]$lcalls; todoWrites = [int]$tdW; todoBlocks = [int]$tdB
         mcpDownBlocks = [int]$down; staleReplies = [int]$stale; unknownResults = [int]$unknown; orphanTurns = [int]$orphan; unmatchedCalls = [int]$unmatched
         stamp = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     }
@@ -322,7 +327,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     if ([int]$dbNoSql -gt 0) { Write-Host ('注意：' + [int]$dbNoSql + ' 個 DB task 報告 COMPLETE 但子 session 沒有成功的 run_sql——只是宣稱成功，不計為完成') -ForegroundColor Yellow }
     if ([int]$cblk -gt 0) { Write-Host ('注意：' + [int]$cblk + ' 次 connect 在執行前被擋（profile oracle.connectionName 未填或與 connect 目標不一致）——看 jsonl 的 note') -ForegroundColor Yellow }
     Write-Host ('觀察：blockedRuns=' + $blockedRuns + '（模型先派 task 被擋）  preflightRuns=' + $preflightRuns + '  sessionsWithoutTask=' + $noTask +
-        '  listCalls=' + [int]$lcalls + '（第 0 步不 list，正常為 0）  mcpDownBlocks=' + [int]$down + '  staleReplies=' + [int]$stale + '  unknownResults=' + [int]$unknown + '  orphanTurns=' + [int]$orphan + '  unmatchedCalls=' + [int]$unmatched)
+        '  listCalls=' + [int]$lcalls + '（第 0 步不 list，正常為 0）  todoWrites=' + [int]$tdW + '  todoBlocks=' + [int]$tdB + '（模型跳過 todo 被擋）  mcpDownBlocks=' + [int]$down + '  staleReplies=' + [int]$stale + '  unknownResults=' + [int]$unknown + '  orphanTurns=' + [int]$orphan + '  unmatchedCalls=' + [int]$unmatched)
     Write-Host ('摘要已寫：' + $out)
     if ([int]$down -gt 0) { Write-Host ('注意：有 ' + [int]$down + ' 個 task 因 oracleMCP 未掛載被擋——回歸請在 oracleMCP 掛載時跑') -ForegroundColor Yellow }
     if ([int]$unknown -gt 0) { Write-Host ('注意：有 ' + [int]$unknown + ' 次 list_connections／connect 回空輸出（閘門不當成功）——真 SQLcl 若如此回覆，把 jsonl 那列回報維護 session') -ForegroundColor Yellow }

@@ -39,6 +39,10 @@ tools:
 
 ## 工作流（每一題依序做、不跳步；第 2 步是硬性前置——執行期閘門會擋掉沒做完就派出的 DB 委派）
 
+**開工前先列 todo（`todowrite` 必須是本題的第一個工具呼叫）**：把下面 1～N 步逐項寫成 todo（第 2 步開線一項必在、排在任何 task 之前；
+status 先全 pending），然後一次做一項——開始標 in_progress、做完標 completed、等工具回來再做下一項。執行期閘門會擋下 todowrite
+之前的任何工具呼叫（`PS_TODO_FIRST_REQUIRED`）；todo 沒有開線一項也擋（補寫一次 todowrite 即可）。
+
 1. **載入環境設定**：Read `.opencode/peoplesoft/customization-profile.yaml` 與
    `business-domain-map.yaml`（或用 MCP `ps_get_customization_profile`）。
    解析 business domain 與搜尋模式（CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED /

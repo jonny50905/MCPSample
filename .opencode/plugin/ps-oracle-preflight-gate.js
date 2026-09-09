@@ -47,6 +47,15 @@
 // agent tools 表：逐工具明寫、不用 oracleMCP_* 萬用字元 deny 再開個別工具——某些 OpenCode 版本會因萬用字元 deny 把整個 MCP 對該 agent
 //   隱藏、後面的 true 救不回（公司機實測）。載入時把有這種混寫的 agent 記到 _plugin.log（wildcardDenyMix），判定本身不變。
 //
+// 先列 todo（工作流閘門，第二層擋）：主 agent（primary 且 tools 表有 connect）的每一題，第一個工具呼叫必須是 todowrite——列出本題步驟，
+//   其中一項是第 0 步（oracleMCP_connect…；profile 未填時是「回報 Oracle 連線未設定」）。todowrite 成功之前的任何其他工具（read／task／
+//   connect…）在執行前被擋（PS_TODO_FIRST_REQUIRED；task 也先被這層擋、輪不到前置閘門），todo 沒有第 0 步那一項也擋（TODO_NO_CONNECT_ITEM，
+//   補寫一次 todowrite 即可；同一題內一旦有過就黏住，之後只留未完成項的 todowrite 不會再擋）。
+//   為什麼：OpenCode 只對 claude 模型 id 注入 TodoWrite 規劃指令（session/prompt/anthropic.txt），其他模型 id 拿到的 default.txt 沒有任何 todo
+//   指令，先不先列 todo 是機率行為；公司機實測有 todo 的題模型才會一次做一項、等 connect 回來再派。這層只擋、不改參數、不代寫 todo；
+//   todoread／invalid 不擋；subagent session 與不在 agent 目錄的 agent 不管；observe 模式只記錄（hook=todo-first）。
+//   env PS_ORACLE_GATE_TODO=off 或 profile oracle.todoFirst: off 可關。
+//
 // 模式：enforce（預設）＝擋；observe＝只記錄不擋（做 hook 覆蓋率探測時用）。
 //   環境變數 PS_ORACLE_GATE_MODE 優先，其次 customization-profile.yaml 的 oracle.preflightGate。
 // 交易紀錄：<專案>/auto-loop-logs/ps-oracle-gate/<sessionID>.jsonl（只記 oracleMCP_*／task／訊息事件，不記工具輸出原文）；
@@ -65,7 +74,12 @@ const TOOL_CONNECT = MCP_PREFIX + "connect"
 const TOOL_DISCONNECT = MCP_PREFIX + "disconnect"
 const TOOL_RUN_SQL = MCP_PREFIX + "run_sql"
 const TOOL_TASK = "task"
+const TOOL_TODO_WRITE = "todowrite"
+const TODO_EXEMPT = new Set([TOOL_TODO_WRITE, "todoread", "invalid"])
 const ERROR_CODE = "PS_ORACLE_PREFLIGHT_REQUIRED"
+const TODO_CODE = "PS_TODO_FIRST_REQUIRED"
+// todo 裡「第 0 步」那一項的辨識：connect／連線／開線（profile 未填時的「回報 Oracle 連線未設定」也含「連線」）
+const CONNECT_ITEM_RX = /oracleMCP_connect|\bconnect\b|連線|開線/i
 const LOG_SUBDIR = path.join("auto-loop-logs", "ps-oracle-gate")
 const PROFILE_REL = path.join(".opencode", "peoplesoft", "customization-profile.yaml")
 const AGENT_DIR_REL = path.join(".opencode", "agent")
@@ -200,6 +214,18 @@ function readProfileOracle(directory) {
   return out
 }
 
+function readTodoFirst(directory) {
+  const env = String(process.env.PS_ORACLE_GATE_TODO ?? "").trim().toLowerCase()
+  if (env === "on" || env === "off") return env
+  const v = String(readProfileOracle(directory).todoFirst ?? "").toLowerCase()
+  if (v === "on" || v === "off") return v
+  return "on"
+}
+
+function todoConnectItem(todos) {
+  return (Array.isArray(todos) ? todos : []).some((t) => t && typeof t === "object" && CONNECT_ITEM_RX.test(String(t.content ?? "")))
+}
+
 function readReminder(directory) {
   const env = String(process.env.PS_ORACLE_GATE_REMINDER ?? "").trim().toLowerCase()
   if (env === "on" || env === "off") return env
@@ -234,13 +260,16 @@ function partId(parts) {
   return "prt_" + bytes.toString("hex") + tail
 }
 
-function buildReminder(profileName, dbTargets) {
+function buildReminder(profileName, dbTargets, todoFirst) {
   const targets = dbTargets.length ? dbTargets.join("／") : "會查 DB 的 subagent"
   const rule = profileUnset(profileName)
     ? "profile oracle.connectionName 目前未填（FILL_ME）：不要 connect、本題不派會查 DB 的委派，回報「Oracle 連線未設定」"
     : `connection_name＝「${profileName}」原樣照抄，即 profile oracle.connectionName；不必先 list_connections、不要從清單挑名字；其他值會被閘門擋下`
+  const todo = todoFirst
+    ? "本題的第一個工具呼叫必須是 todowrite：把要做的步驟列成 todo（其中一項＝下面的第 0 步，排在任何 task 之前），todowrite 之前的其他工具呼叫都會被擋下；之後依 todo 一次做一項（開始標 in_progress、做完標 completed，等工具回來再做下一項）。"
+    : ""
   return (
-    "【Oracle 第 0 步（執行期閘門提醒）】回答本題之前，先呼叫 oracleMCP_connect（" + rule + "），" +
+    "【Oracle 第 0 步（執行期閘門提醒）】" + todo + "回答本題之前，先呼叫 oracleMCP_connect（" + rule + "），" +
     `成功後才准派會查 DB 的 subagent（${targets}）。每一題都要做，不因上一題連過就省略；沒做完就派會被擋下並要求補做。` +
     "connect 失敗 → 再 connect 一次；仍失敗 → 本題不派會查 DB 的 subagent，回報「DB 連線建立失敗」並附 oracleMCP_list_connections 的原文供管理者核對 profile。" +
     "工具清單裡沒有 oracleMCP_ 工具（未掛載）→ 不派會查 DB 的 subagent，DB 部分回 ORACLE_MCP_DOWN。不查 DB 的部分照常作答。"
@@ -389,6 +418,26 @@ function buildBlockMessage(target, state, blockedCount, profileName) {
   return lines.join("\n")
 }
 
+// 先列 todo 的擋下訊息：reason＝NO_TODO（本題還沒 todowrite）／TODO_NO_CONNECT_ITEM（todo 沒有第 0 步那一項）
+function buildTodoMessage(tool, reason, blockedCount, profileName, dbTargets) {
+  const targets = dbTargets.length ? dbTargets.join("／") : "會查 DB 的 subagent"
+  const step0 = profileUnset(profileName)
+    ? "第 0 步：profile oracle.connectionName 未填（FILL_ME）→ 不 connect、本題不派會查 DB 的委派，回報「Oracle 連線未設定」"
+    : `第 0 步：oracleMCP_connect（connection_name＝「${profileName}」原樣照抄；不先 list_connections）`
+  const lines = [
+    `${TODO_CODE}：本次 ${tool} 未執行（被工作流閘門擋下，不是權限問題）。原因：` +
+      (reason === "TODO_NO_CONNECT_ITEM" ? "本題的 todo 已列，但沒有第 0 步（開線）那一項。" : "本題還沒用 todowrite 列出步驟就開工。"),
+    reason === "TODO_NO_CONNECT_ITEM"
+      ? `下一步：再呼叫一次 todowrite，補上「${step0}」一項（排在任何 task 委派之前，其餘項目照舊），然後再用相同參數重新呼叫本次 ${tool}。`
+      : `下一步：先單獨呼叫 todowrite，把本題要做的步驟逐項列成 todo（每項 content 具體、status 先全部 pending），其中必須有一項是「${step0}」且排在任何 task 委派（${targets}）之前；` +
+        `之後依 todo 順序一次做一項——開始一項先標 in_progress（同時只有一項）、做完標 completed，等每個工具回來再做下一項；然後再用相同參數重新呼叫本次 ${tool}。`,
+  ]
+  if (blockedCount >= 3) {
+    lines.push(`（本題已被擋 ${blockedCount} 次：todowrite 是內建工具，直接呼叫即可；不要改用其他工具、不要在同一步同時呼叫 todowrite 與其他工具。）`)
+  }
+  return lines.join("\n")
+}
+
 function buildDownMessage(target, basis, alternatives) {
   const alt = alternatives.length ? alternatives.join("／") : "（本專案沒有這種 subagent）"
   return [
@@ -442,7 +491,7 @@ export const PsOraclePreflightGate = async (input) => {
   function getSession(sessionID) {
     let s = sessions.get(sessionID)
     if (!s) {
-      s = { state: "NEED_CONNECT", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0, connectGen: 0 }
+      s = { state: "NEED_CONNECT", agent: undefined, turn: 0, turnId: `${process.pid}-0`, blocked: 0, connectGen: 0, todoWritten: false, todoConnect: false, todoBlocked: 0 }
       sessions.set(sessionID, s)
     }
     return s
@@ -495,6 +544,13 @@ export const PsOraclePreflightGate = async (input) => {
       .sort()
   }
 
+  // 先列 todo 的適用範圍：本 session 的 agent 已知，且是 tools 表有 connect 的主 agent（與提醒注入同範圍）
+  function todoScope(s) {
+    if (!s.agent) return false
+    const entry = catalogFresh().get(s.agent)
+    return !!entry && entry.mode === "primary" && entry.connect
+  }
+
   // 沒有 Oracle 能力的 subagent 名單（oracleMCP 未掛載時錯誤訊息用）
   function nonDbSubagents() {
     return [...catalogFresh().entries()]
@@ -521,7 +577,7 @@ export const PsOraclePreflightGate = async (input) => {
   }
 
   pluginLog(
-    `loaded directory=${directory} mode=${readMode(directory)} reminder=${readReminder(directory)} agents=${JSON.stringify(
+    `loaded directory=${directory} mode=${readMode(directory)} reminder=${readReminder(directory)} todoFirst=${readTodoFirst(directory)} agents=${JSON.stringify(
       [...catalog.entries()].map(([name, v]) => `${name}:${v.db ? "DB" : "noDB"}`),
     )} wildcardDenyMix=${JSON.stringify([...catalog.entries()].filter(([, v]) => v.wildcardDenyMix).map(([name]) => name))}`,
   )
@@ -554,13 +610,16 @@ export const PsOraclePreflightGate = async (input) => {
       s.turn += 1
       s.turnId = typeof mid === "string" && mid ? mid : `${process.pid}-${s.turn}`
       s.blocked = 0
+      s.todoWritten = false
+      s.todoConnect = false
+      s.todoBlocked = 0
       // 第 0 步提醒：只給有 connect 的主 agent、且訊息 id 已知；補在使用者文字之後（synthetic），模型每題都看得到
       let reminder = false
       if (readReminder(directory) === "on" && typeof mid === "string" && mid && Array.isArray(parts)) {
         const entry = s.agent ? catalogFresh().get(s.agent) : undefined
         if (entry && entry.mode === "primary" && entry.connect) {
           const profileName = String(readProfileOracle(directory).connectionName ?? "").trim()
-          parts.push({ id: partId(parts), sessionID, messageID: mid, type: "text", synthetic: true, text: buildReminder(profileName, dbSubagents()) })
+          parts.push({ id: partId(parts), sessionID, messageID: mid, type: "text", synthetic: true, text: buildReminder(profileName, dbSubagents(), readTodoFirst(directory) === "on") })
           reminder = true
         }
       }
@@ -572,6 +631,36 @@ export const PsOraclePreflightGate = async (input) => {
       const sessionID = info?.sessionID
       const callID = String(info?.callID ?? "")
       const args = out && typeof out === "object" && out.args && typeof out.args === "object" ? out.args : {}
+      if (tool === TOOL_TODO_WRITE) {
+        const s = getSession(sessionID)
+        putEntry(sessionID, callID, { tool, turn: s.turn, turnId: s.turnId, state: s.state })
+        record(sessionID, { hook: "before", tool, callID, ...stamp(s), state: s.state, decision: "allow", items: Array.isArray(args.todos) ? args.todos.length : 0 })
+        return
+      }
+      // 先列 todo：todowrite（含第 0 步一項）成功之前，主 agent 的其他工具一律擋（task 也在這裡先擋，輪不到前置閘門）
+      if (!TODO_EXEMPT.has(tool)) {
+        const s = getSession(sessionID)
+        if (readTodoFirst(directory) === "on" && todoScope(s) && !(s.todoWritten && s.todoConnect)) {
+          const mode = readMode(directory)
+          const reason = s.todoWritten ? "TODO_NO_CONNECT_ITEM" : "NO_TODO"
+          s.todoBlocked += 1
+          const row = { tool, callID, ...stamp(s), state: s.state, mode, note: "TODO_FIRST:" + reason, todoBlocked: s.todoBlocked }
+          if (tool === TOOL_TASK) {
+            row.target = String(args.subagent_type ?? "")
+            const cls = classifyTarget(row.target)
+            row.dbCapable = cls.gated
+            row.basis = cls.basis
+          }
+          if (mode === "observe") {
+            // 只記錄（hook=todo-first，不佔 before 列——task 的 before 列由下面的前置閘門記，件數才對得上 transcript）
+            record(sessionID, { hook: "todo-first", ...row, decision: "observe-would-block" })
+          } else {
+            record(sessionID, { hook: "before", ...row, decision: "block" })
+            const profileName = String(readProfileOracle(directory).connectionName ?? "").trim()
+            throw new Error(buildTodoMessage(tool, reason, s.todoBlocked, profileName, dbSubagents()))
+          }
+        }
+      }
       if (tool !== TOOL_TASK) {
         if (!tool.startsWith(MCP_PREFIX)) return
         const s = getSession(sessionID)
@@ -650,8 +739,28 @@ export const PsOraclePreflightGate = async (input) => {
     "tool.execute.after": async (info, out) => {
       const tool = String(info?.tool ?? "")
       const sessionID = info?.sessionID
-      if (tool !== TOOL_TASK && !tool.startsWith(MCP_PREFIX)) return
       const callID = String(info?.callID ?? "")
+      if (tool === TOOL_TODO_WRITE) {
+        // todo 成功：本題已列（黏住）；有第 0 步那一項才算齊（黏住）。上一題晚到的 todowrite 不算
+        const s = getSession(sessionID)
+        const entry = takeEntry(sessionID, callID)
+        const todos = info && info.args && Array.isArray(info.args.todos) ? info.args.todos : []
+        const connectItem = todoConnectItem(todos)
+        const attribution = entry ? (entry.turnId === s.turnId ? "current" : "stale") : "unknown"
+        if (attribution !== "stale") {
+          s.todoWritten = true
+          if (connectItem) s.todoConnect = true
+        }
+        record(sessionID, {
+          hook: "after", tool, callID, ...(entry ? { agent: s.agent, turn: entry.turn, turnId: entry.turnId } : stamp(s)), attribution,
+          ...(attribution === "stale" ? { stale: true, replyTurnId: s.turnId } : {}),
+          state: s.state, next: s.state, items: todos.length, connectItem,
+          inProgress: todos.filter((t) => t && t.status === "in_progress").length, completed: todos.filter((t) => t && t.status === "completed").length,
+          todoWritten: s.todoWritten, todoConnect: s.todoConnect,
+        })
+        return
+      }
+      if (tool !== TOOL_TASK && !tool.startsWith(MCP_PREFIX)) return
       const s = getSession(sessionID)
       const prev = s.state
       const entry = takeEntry(sessionID, callID)

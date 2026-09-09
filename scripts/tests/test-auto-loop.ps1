@@ -688,7 +688,8 @@ Write-Host "情境 32：Oracle 前置閘門（plugin）——檔案形狀／零�
 $gp = Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js'
 Assert (Test-Path -LiteralPath $gp) "plugin 檔存在：.opencode/plugin/ps-oracle-preflight-gate.js"
 $gt = [System.IO.File]::ReadAllText($gp)
-foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded', 'preflightReminder', 'buildReminder', 'partId', 'synthetic: true', 'wildcardDenyMix', 'list_connections is informational')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded', 'preflightReminder', 'buildReminder', 'partId', 'synthetic: true', 'wildcardDenyMix', 'list_connections is informational', 'todowrite', 'PS_TODO_FIRST_REQUIRED', 'TODO_NO_CONNECT_ITEM', 'readTodoFirst', 'PS_ORACLE_GATE_TODO')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+Assert ($gt -match 'TODO_EXEMPT = new Set\(\[TOOL_TODO_WRITE, "todoread", "invalid"\]\)' -and $gt -match 'todoScope\(s\)' -and $gt -match 'throw new Error\(buildTodoMessage\(' -and $gt -match 'hook: "todo-first"') "plugin：先列 todo 層——todowrite 之前的其他工具擋（todoread／invalid 除外）、只對有 connect 的主 agent、observe 只記 todo-first 列"
 Assert ($gt -notmatch 'NEED_LIST' -and $gt -match 'state: "NEED_CONNECT", agent: undefined' -and $gt -match 'connect: toolEnabled\(tools, TOOL_CONNECT\),' -and $gt -notmatch 'connect before list_connections') "plugin：不變量只剩 connect→READY（沒有 list 狀態；list_connections 的 after 只記錄不改狀態）；提醒對象＝有 connect 的主 agent"
 Assert ($gt -match 'PS_ORACLE_GATE_REMINDER' -and $gt -match 'entry\.mode === "primary" && entry\.connect' -and $gt -match 'parts\.push\(\{ id: partId\(parts\)') "plugin：第 0 步提醒只注入有 connect 的主 agent 的真實訊息（synthetic part），env／profile 可關"
 Assert ($gt -match 'connectProblem\(profileName, target\)' -and $gt -match 'throw new Error\(problem\.message\)' -and $gt -match 's\.connectGen \+= 1' -and $gt -match 'if \(s\.state === "READY"\) s\.state = "NEED_CONNECT"') "plugin：connect 在執行前比對 profile（未填／不一致 → 擋），每次嘗試世代 +1 並作廢 READY"
@@ -702,7 +703,7 @@ Assert ($gt -match 'mounted === false' -and $gt -match 'buildDownMessage' -and $
 Assert ($gt -match 'entry\.turnId === s\.turnId' -and $gt -match 'attribution === "current"' -and $gt -match 'ok === "unknown"') "plugin：after 依 session:callID 配對入場快照；stale／unknown 不前進；空輸出＝未知"
 $rt = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1'))
 Assert ($rt -match 'turnInvariantViolations' -and $rt -match 'turnMismatch' -and $rt -match 'hookMismatch' -and $rt -match 'executedBeforePreflight' -and $rt -match 'exportFailures' -and $rt -match '\.export\.json' -and $rt -notmatch 'Test-Exempt' -and $rt -notmatch 'taskkill\.exe /PID \$p\.Id /T /F 2>\$null') "runtime 回歸腳本判定 per-turn 不變量／turn 覆蓋率／task 覆蓋率／早於前置／export 失敗，且無豁免；export 落檔讀 UTF-8；taskkill 不直接重導 stderr（PS 5.1 EAP=Stop）"
-Assert ($rt -match 'callMismatch' -and $rt -match 'Test-DbCapable' -and $rt -match 'taskParents' -and $rt -match 'dbTasksCompleted' -and $rt -match 'ExpectDbTask' -and $rt -match 'listCalls' -and $rt -notmatch 'NEED_LIST' -and $rt -notmatch 'listIdx' -and $rt -notmatch 'earlyStandDown' -and $rt -notmatch "basis -eq 'run_sql:enabled'") "runtime 回歸腳本：dbCapable 欄位判定（不用 basis 字串）、callID 歸屬（before／after／export parentID）、安全與可用分開判"
+Assert ($rt -match 'callMismatch' -and $rt -match 'Test-DbCapable' -and $rt -match 'taskParents' -and $rt -match 'dbTasksCompleted' -and $rt -match 'ExpectDbTask' -and $rt -match 'listCalls' -and $rt -match 'todoBlocks' -and $rt -match 'todoWrites' -and $rt -notmatch 'NEED_LIST' -and $rt -notmatch 'listIdx' -and $rt -notmatch 'earlyStandDown' -and $rt -notmatch "basis -eq 'run_sql:enabled'") "runtime 回歸腳本：dbCapable 欄位判定（不用 basis 字串）、callID 歸屬（before／after／export parentID）、安全與可用分開判"
 Assert ($rt -match 'Get-ChildSqlOk' -and $rt -match "reportStatus" -and $rt -match 'dbTasksCompletedNoSql' -and $rt -match 'tasksNotReturned' -and $rt -match 'connectBlocks' -and $rt -notmatch 'notConnected -ne \$true \}\)') "runtime 回歸腳本：完成＝報告 COMPLETE 且子 session run_sql 成功（不是「沒回 NOT_CONNECTED」）；另計 partial／blocked／invalid／completedNoSql／未返回／connect 被擋"
 $npmrc = Join-Path $repoRoot '.opencode/.npmrc'
 Assert ((Test-Path -LiteralPath $npmrc) -and ([System.IO.File]::ReadAllText($npmrc) -match '(?m)^offline=true\s*$')) ".opencode/.npmrc 含 offline=true（斷網時相依安裝秒失敗，plugin 照常載入）"
@@ -711,6 +712,12 @@ $i0 = $ag.IndexOf('第 0 步'); $iw = $ag.IndexOf('docs/ps-research/wiki/')
 Assert ($i0 -ge 0 -and $iw -gt $i0 -and $ag -match 'ps-oracle-preflight-gate' -and $ag -match '不先 list' -and $ag -notmatch 'list_connections → ') "AGENTS.md：第 0 步（直接 connect profile 連線名、不先 list）寫在「先查 wiki」之前且提到閘門（無指令衝突）"
 $prof32 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
 Assert ($prof32 -match '(?m)^\s*preflightGate:\s*enforce\b') "profile：oracle.preflightGate 預設 enforce"
+Assert ($prof32 -match '(?m)^\s*todoFirst:\s*on\b' -and $prof32 -match 'PS_ORACLE_GATE_TODO') "profile：oracle.todoFirst 預設 on（env PS_ORACLE_GATE_TODO 可覆寫）"
+foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
+    $ptd = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
+    Assert ($ptd -match '先列 todo' -and $ptd -match 'todowrite' -and $ptd -match 'PS_TODO_FIRST_REQUIRED' -and ($ptd.IndexOf('先列 todo') -lt $ptd.IndexOf('**開線（第 0 步；'))) "主 agent $pa：工作流開頭寫明第一個工具呼叫是 todowrite（含開線一項），在開線步驟之前"
+}
+Assert ($ag -match 'todowrite' -and $ag -match 'PS_TODO_FIRST_REQUIRED') "AGENTS.md：先列 todo 規則與閘門錯誤碼"
 foreach ($f in (Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md'))) {
     $eff = Get-AgentToolPerm $f.FullName 'oracleMCP_run_sql'
     $isDb = ($eff -ne 'false')
@@ -841,6 +848,14 @@ $undoPath = Join-Path $dir 'export-undo.json'
 [System.IO.File]::WriteAllText($undoPath, $undoFx, (New-Object System.Text.UTF8Encoding($false)))
 $v = Get-SessionVerdict 'ses_twoturn' '' $undoPath
 Assert ($v.turnMismatch -eq 0 -and $v.orphanTurns -eq 1) "/undo 刪掉 m2 → 不算漏（turnMismatch=0）、只記 orphanTurns=1"
+# 先列 todo 層：todowrite 成功列與 TODO_FIRST 擋下列只計觀察值；被 todo 擋的 task 也是一次 task 嘗試（與 transcript 的 error 件對得上）、不算 connectBlocks
+$todoW = '{"hook":"after","tool":"todowrite","callID":"w1","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","items":3,"connectItem":true,"todoWritten":true,"todoConnect":true}'
+$todoBr = '{"hook":"before","tool":"read","callID":"r1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","mode":"enforce","note":"TODO_FIRST:NO_TODO","todoBlocked":1,"decision":"block"}'
+$todoBt = '{"hook":"before","tool":"task","callID":"t0","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_CONNECT","mode":"enforce","note":"TODO_FIRST:NO_TODO","todoBlocked":2,"dbCapable":true,"basis":"run_sql:enabled","decision":"block"}'
+$todoBc = '{"hook":"before","tool":"oracleMCP_connect","callID":"c0","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","mode":"enforce","note":"TODO_FIRST:NO_TODO","todoBlocked":3,"decision":"block"}'
+New-GateLog 'ses_todo' @($chat, $todoBr, $todoBt, $todoBc, $todoW, $connOk, $allow, $exec)
+$v = Get-SessionVerdict 'ses_todo' ''
+Assert ($v.todoWrites -eq 1 -and $v.todoBlocks -eq 3 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.connectBlocks -eq 0 -and $v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0 -and $v.dbTasksCompleted -eq 1) "先列 todo：todoWrites=1、todoBlocks=3（read／task／connect 各一）、被 todo 擋的 task 算 task 嘗試但不算 connectBlocks、安全 0 違反、dbOk=1"
 $sum = @($v, (Get-SessionVerdict 'ses_ok' '')) | Measure-Object -Property executedBeforePreflight -Sum
 Assert ($sum.Sum -eq 0) "verdict 是 pscustomobject：Measure-Object -Property 可加總（PS 5.1 對 hashtable 不行）"
 

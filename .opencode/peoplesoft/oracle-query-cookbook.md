@@ -54,6 +54,8 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
 **主 agent（ps-orchestrator／ps-deep-research／ps-audit-orchestrator）——每題／每批開場，無條件；做完才准查 wiki、委派、作答**：
 
 ```text
+先列 todo（todowrite）  → 本題／本批的第一個工具呼叫：把步驟列成 todo（第 1 步 connect 一項必在、排在任何 task 之前），一次做一項；
+                          閘門會擋下 todowrite 之前的任何工具（PS_TODO_FIRST_REQUIRED）
 0. 工具清單裡沒有任何 oracleMCP_ 工具 → ORACLE_MCP_DOWN（規則 7a），不試 connect，如實回報。
    工具名（底線）：list_connections／connect／run_sql／disconnect
 1. connect（帶連線名）   → 開場就做（無條件、不判斷本題會不會用到 DB）；連線名＝profile oracle.connectionName **原樣照抄**，

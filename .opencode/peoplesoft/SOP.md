@@ -567,6 +567,14 @@ list 的 after 只記錄不改狀態（主 agent 只在 connect 兩次都失敗�
   成功的回覆帶一段說明文字、裡面剛好引用 ORA-nnnnn（公司機實測，用它判失敗會讓閘門永遠不開）；改認
   `connection not connected／established／found`、TNS-nnnnn、not connected、no connection、failed to connect、error 開頭等只出現在失敗回覆的句型。
 - 能力是機械欄位 dbCapable（true／false；不認識的 agent＝true）；analyzer 只看它，不看 basis 說明字串。
+- **先列 todo（第二層擋；2026-09-09 公司機實測後加）**：主 agent 每題的第一個工具呼叫必須是 `todowrite`（列出步驟、含第 0 步開線一項）；
+  todowrite 成功之前的任何其他工具（read／task／connect…）在執行前被擋（`PS_TODO_FIRST_REQUIRED`），todo 沒有開線一項也擋
+  （TODO_NO_CONNECT_ITEM，補寫一次即可；同題內一旦有過就黏住）。為什麼要擋而不是寫規則：OpenCode 只對 model id 含 claude 的模型注入
+  TodoWrite 規劃指令（session/prompt/anthropic.txt），其他 id 拿到的 default.txt 沒有任何 todo 指令——先不先列 todo 是各模型的機率行為
+  （公司機：GPT-LUNA 多半會列、Claude Sonnet 多半不列；Sonnet 若走 OpenAI 相容端點且 id 不含 claude，一樣拿 default.txt）。有 todo 的題
+  模型才會一次做一項、等 connect 回來再派；沒有 todo 的題常 connect 還沒回就派 subagent → NOT_CONNECTED。這層只擋、不改參數、不代寫 todo；
+  todoread／invalid 不擋；subagent session 不管；observe 模式只記（hook=todo-first）。關：`PS_ORACLE_GATE_TODO=off` 或 profile
+  `oracle.todoFirst: off`。analyzer 觀察值 todoWrites（每題 ≥1）／todoBlocks（模型跳過 todo 被擋的次數）。
 - connect 的目標在執行前比對 profile `oracle.connectionName`：未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；connection_name 與 profile
   不完全一致 → ORACLE_CONNECTION_MISMATCH。兩者都在工具執行前擋（connect 不會送到 SQLcl；observe 模式只記）。清單成員資格不驗
   （清單格式不可靠），profile 值就是連線名唯一的來源。
@@ -646,6 +654,9 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
        你的文字原樣保留；jsonl 的 chat.message 列 reminder=true；主 agent 的第一個工具呼叫應是 connect（blockedRuns 應下降）
      - 不 list 直接 connect（R24）：正常題目的 jsonl 沒有 list_connections 列（`-AnalyzeAll` 的 listCalls=0）；connect 的 connection 欄＝profile 值
        原樣；有 list 列＝connect 失敗後的附清單動作（看前面的 connect 列）或模型多做（不擋、只記）
+     - 先列 todo（R25）：每題 jsonl 在 chat.message 之後的第一列是 todowrite（before allow → after items≥2、connectItem=true），TUI 上看得到
+       todo 清單；模型先開工 → 該工具列 decision=block、note=TODO_FIRST:NO_TODO，模型接著 todowrite 再重做（`-AnalyzeAll` 的 todoBlocks＝
+       跳過的次數，todoWrites ≥ 題數）
 □ 4. P1 探測（互動 TUI）：同一視窗連問 ≥ 20 題後跑
      powershell -File scripts\tests\test-oracle-gate-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
      安全五項都要 0，全部無豁免：hookMismatch（閘門看到的 task 次數＝opencode export 的 task 件數）、
@@ -665,7 +676,7 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
      每個都要 PASS：安全五項 0；可用——B1 每個 session 至少 1 個「完成」的 DB task（報告 COMPLETE 且子 session run_sql 成功；
      BLOCKED／INVALID／PARTIAL 不算，零違規但零完成不算過；B1 的題目要用預期能 COMPLETE 的固定題）、B3 0 個會查 DB 的 task
      （-ExpectDbTask Yes／No／Any 可覆寫）；B3 附帶看 preflightRuns（R8：不需要 DB 也應做第 0 步）。
-□ 6. 暫時關閉／探測模式：$env:PS_ORACLE_GATE_MODE='observe'（該次啟動）或 profile oracle.preflightGate: observe；
+□ 6. 暫時關閉／探測模式：$env:PS_ORACLE_GATE_MODE='observe'（該次啟動；只關先列 todo 層：$env:PS_ORACLE_GATE_TODO='off' 或 profile oracle.todoFirst: off）或 profile oracle.preflightGate: observe；
      observe 只記錄不擋（jsonl 的 decision=observe-would-block）。不要長期停在 observe。
 □ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（入場時的題目＝該則 user 訊息 id）、
      reminder（chat.message 列：這則訊息有沒有注入第 0 步提醒）、callID
@@ -705,6 +716,7 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
      | 測試 | 通過條件 |
      | 工具可見性（R17／R23） | 四個 DB subagent 的 Oracle 工具只有 run_sql；主 agent 只見 list_connections／connect；_plugin.log 的 wildcardDenyMix=[] |
      | 不 list 直接 connect（R24） | 正常題目零 list_connections 呼叫；connect 的 connection 欄＝profile 值原樣 |
+     | 先列 todo（R25） | 每題第一個工具是 todowrite（todoWrites ≥ 題數）；todoBlocks 只是觀察值（模型跳過 todo 被擋的次數） |
      | 一開多用（R21） | 主 agent 開線後，三個 DB 委派各自完成固定唯讀探測；任一結束不影響其餘查詢 |
      | 同視窗第二題（R16） | 已連線再 connect 的真實回覆被正確辨識（jsonl ok:true）；不會在 NEED_CONNECT 無限重試 |
      | 正向驗收反例（R19） | 故意回 BLOCKED(QUERY_TIMEOUT／SCHEMA_UNRESOLVED) 或不合法報告，dbTasksCompleted 必為 0 |

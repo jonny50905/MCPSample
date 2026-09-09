@@ -17,6 +17,8 @@
    `/ps-research <領域>`（ps-deep-research，輸出 docs/ps-research/）。
    在一般 agent 下則載入 `ps-business-discovery` skill 依其流程處理，
    重的檢索用 @ 委派給 ps-* subagent。
+   主 agent 每題的**第一個工具呼叫必須是 `todowrite`**（把步驟列成 todo、含開線一項，之後一次做一項）；
+   執行期閘門會擋下 todowrite 之前的其他工具（`PS_TODO_FIRST_REQUIRED`）。
    主 agent 工作流的**開線步驟（第 0 步）**（查 wiki、委派、作答之前）固定
    `oracleMCP_connect`（connection_name＝profile `oracle.connectionName`，不先 list、
    不從清單挑名字；無條件，見 agent 定義）；

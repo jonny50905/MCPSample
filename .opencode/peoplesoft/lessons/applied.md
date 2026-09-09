@@ -3228,3 +3228,18 @@
   ORA-nnnnn 錯誤碼；後果正是檔頭自己寫的「誤判失敗＝閘門永遠不開」。管理者定案：移除 ORA 那行，改認 `connection not (connected|established|found)`
   這種只出現在失敗回覆的句型（TNS-nnnnn、not connected、error 開頭等保留）。單元加一組回歸：成功文字引用 ORA 碼 → ok:true → READY，五種失敗句型
   → 不前進。教訓：失敗樣式只能列「不可能出現在成功訊息裡」的字串，錯誤碼本身不算——說明文字會引用它。
+- 追記（同日，公司機實測第七件：模型有機率沒先列 todo 就開工）：有 todo 的題模型一次做一項、等 connect 回來再派；沒有 todo 的題常 connect
+  還沒回就派第一個 subagent → NOT_CONNECTED。管理者觀察：GPT-LUNA 多半會先列、Claude Sonnet 多半不列。對碼：OpenCode 只對 model id 含
+  claude 的模型注入 TodoWrite 規劃指令（session/prompt/anthropic.txt「Use these tools VERY frequently」），gpt-4／o1／o3 走 beast.txt（要它印
+  markdown todo、不是工具），其他 id（含走 OpenAI 相容端點、id 不含 claude 的 Sonnet）拿 default.txt——沒有任何 todo 指令；唯一的提示是
+  todowrite 工具說明的「When in doubt, use it」。也就是說「先不先列 todo」是各模型自己的機率行為，prompt 無法做到 100%。落點（第三個
+  執行期閘門層，同一 plugin）：主 agent（primary 且 tools 表有 connect）每題第一個工具呼叫必須是 todowrite，且 todo 含第 0 步開線一項；
+  之前的任何工具（read／task／connect…）在執行前被擋（PS_TODO_FIRST_REQUIRED，訊息教它先 todowrite、列哪些項、一次做一項），todo 缺開線
+  一項也擋（TODO_NO_CONNECT_ITEM）；同題黏住、新訊息重置、synthetic 不重置、subagent／不認識的 agent 不管、observe 只記（hook=todo-first）、
+  env PS_ORACLE_GATE_TODO／profile oracle.todoFirst 可關。提醒 part 開頭加「第一個工具呼叫必須是 todowrite」；三個主 agent 工作流開頭、
+  cookbook、AGENTS.md、profile 同步；analyzer 加 todoWrites／todoBlocks 觀察值；情境 31／32／33 守衛。
+  驗證：單元 23 組（先列 todo 一組長測：read／task／connect 都擋、缺開線項擋、補寫放行、黏性、重置、stale、FILL_ME 變體、subagent／build 不管、
+  observe、env／profile 關）；e2e 19 情境（全部劇本先 todowrite，另驗每題 todowrite 先於第一個工具；no-todo：不寫 todo 就 connect 被擋、假 MCP
+  沒收到、todowrite 後才通；todo-noconnect：缺開線項被擋、補寫後通）；test-auto-loop 全 PASS。
+  教訓：「模型會不會先規劃」是模型與 system prompt 的函數，不是我們的 prompt 能控制的；要 100% 就把「先規劃」變成執行前的機械檢查——
+  第一個工具必須是 todowrite，跟第 0 步一樣用擋的。

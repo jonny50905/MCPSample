@@ -17,6 +17,9 @@
 //                    （驗證「已 READY 後再 connect」的嘗試會先作廢 READY，失敗就不放行）
 //   connect-fail／reconnect-probe：connect 若被閘門在執行前擋下（ORACLE_CONNECTION_NOT_CONFIGURED／MISMATCH），照第 0 步規則回報「Oracle 連線未設定」
 //   MOCK_MODEL_CONNECT_NAME 主 agent「讀到」的 profile 連線名（預設 HR_DEV）：劇本只 connect 這個名字（原樣），從不解析 list 的清單
+//   先列 todo：每一題（每則 user 訊息之後）主 agent 劇本都先 todowrite（三項，第一項＝第 0 步 connect），再照上面的劇本走；例外：
+//     no-todo         故意不寫 todo 就 connect → 被 PS_TODO_FIRST_REQUIRED 擋 → 才 todowrite → connect → task → 收尾
+//     todo-noconnect  todo 沒有第 0 步那一項 → connect 被擋（TODO_NO_CONNECT_ITEM）→ 補寫 todo → connect → task → 收尾
 //   劇本以「最後一則 user 訊息之後」的工具呼叫為準（同 session 多 turn 時每 turn 重新走劇本）
 //   MOCK_MODEL_LOG        每次請求追加一行 JSON（含該次請求可見的 task／oracleMCP_ 工具名——驗 subagent 的 Oracle 允許清單；
 //                         userText＝最後一則 user 訊息文字的尾端——驗閘門注入的第 0 步提醒有送到模型）
@@ -73,17 +76,37 @@ const TASK = (target) => ({ name: "task", args: { description: "query " + target
 const LIST = { name: "oracleMCP_list_connections", args: {} }
 const CONNECT = (name) => ({ name: "oracleMCP_connect", args: { connection_name: name } })
 
+const TODO_OK = { name: "todowrite", args: { todos: [
+  { content: "第 0 步：oracleMCP_connect（connection_name＝" + CONNECT_NAME + "，原樣）", status: "pending", priority: "high" },
+  { content: "派 ps-ui-flow 查 MIL_STATUS 的選項", status: "pending", priority: "medium" },
+  { content: "整理答覆", status: "pending", priority: "low" },
+] } }
+const TODO_NOCONNECT = { name: "todowrite", args: { todos: [
+  { content: "查 wiki", status: "pending", priority: "high" },
+  { content: "派 ps-ui-flow 查 MIL_STATUS 的選項", status: "pending", priority: "medium" },
+  { content: "整理答覆", status: "pending", priority: "low" },
+] } }
+
 function lastListResult(calls) {
   const l = [...calls].reverse().find((c) => c.name === "oracleMCP_list_connections")
   return l ? l.result : ""
 }
 
 // 主 agent 劇本：回傳下一個工具呼叫，或 {text} 收尾
-function primaryNext(calls, users) {
+function primaryNext(allCalls, users) {
+  const taskDone = allCalls.filter((c) => c.name === "task" && /task_result/.test(c.result) && !/PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
+  if (taskDone >= 1) return { text: "DONE: " + JSON.stringify({ scenario, calls: allCalls.map((c) => c.name) }) }
+  // 先列 todo：todowrite 不算「工作」呼叫，劇本步數只數其餘的
+  const todos = allCalls.filter((c) => c.name === "todowrite")
+  const calls = allCalls.filter((c) => c.name !== "todowrite")
+  if (scenario === "no-todo") {
+    if (todos.length === 0) return calls.length === 0 ? CONNECT(CONNECT_NAME) : TODO_OK
+  } else if (scenario === "todo-noconnect") {
+    if (todos.length === 0) return TODO_NOCONNECT
+    if (todos.length === 1) return calls.length === 0 ? CONNECT(CONNECT_NAME) : TODO_OK
+  } else if (todos.length === 0) return TODO_OK
   const n = calls.length
   const last = calls[n - 1]
-  const taskDone = calls.filter((c) => c.name === "task" && /task_result/.test(c.result) && !/PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
-  if (taskDone >= 1) return { text: "DONE: " + JSON.stringify({ scenario, calls: calls.map((c) => c.name) }) }
   const blockedByDown = last && last.name === "task" && /ORACLE_MCP_DOWN/.test(last.result) && /PS_ORACLE_PREFLIGHT_REQUIRED/.test(last.result)
   const blockedTasks = calls.filter((c) => c.name === "task" && /PS_ORACLE_PREFLIGHT_REQUIRED/.test(c.result)).length
   const listed = calls.some((c) => c.name === "oracleMCP_list_connections")
@@ -133,6 +156,12 @@ function primaryNext(calls, users) {
       if (n === 1) return CONNECT(CONNECT_NAME)
       if (blockedTasks >= 3) return giveUp("DB 連線建立失敗（再 connect 沒有成功）")
       if (last.name === "task") return CONNECT(CONNECT_NAME)
+      return TASK("ps-ui-flow")
+    }
+    case "no-todo":
+    case "todo-noconnect": {
+      // 被 todo 閘門擋掉的 connect 重來一次，之後照 compliant 走
+      if (last && last.name === "oracleMCP_connect" && /PS_TODO_FIRST_REQUIRED/.test(last.result)) return CONNECT(CONNECT_NAME)
       return TASK("ps-ui-flow")
     }
     case "task-first":
@@ -190,7 +219,7 @@ const server = http.createServer((req, res) => {
     if (tools.has("task")) next = primaryNext(calls, users)
     else if (tools.size > 0) next = subagentNext(calls, tools)
     else next = { text: /title/i.test(system) ? "mock title" : "ok" }
-    log({ url: req.url, stream: body.stream, users, tools: [...tools].filter((t) => /^(task|oracleMCP_)/.test(t)), calls: calls.map((c) => c.name), next: next.name ?? "text", userText: lastUser.slice(-600) })
+    log({ url: req.url, stream: body.stream, users, tools: [...tools].filter((t) => /^(task|oracleMCP_)/.test(t)), calls: calls.map((c) => c.name), next: next.name ?? "text", userText: lastUser.slice(-900) })
     if (body.stream === false) {
       res.writeHead(200, { "Content-Type": "application/json" })
       const message = next.text !== undefined

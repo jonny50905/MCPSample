@@ -31,6 +31,10 @@ tools:
 
 ## 第一動作（禁止先說話）
 
+**先列 todo（`todowrite` 必須是本批的第一個工具呼叫；不算說話）**：把下面 1～4 項寫成 todo（第 1 項開線一項必在、排在任何 task 之前；
+status 先全 pending），然後一次做一項——開始標 in_progress、做完標 completed、等工具回來再做下一項。執行期閘門會擋下 todowrite
+之前的任何工具呼叫（`PS_TODO_FIRST_REQUIRED`）；todo 沒有開線一項也擋（補寫一次 todowrite 即可）。
+
 1. **開線（第 0 步；無條件；直接 connect，不先 list；做完才做第 2 項）**：
    `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
    ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本批不派 DB 委派，part 檔記「Oracle 連線未設定

@@ -57,6 +57,10 @@ docs/ps-research/<領域>/
 
 ## 啟動與續跑（每次被呼叫先做這個）
 
+**先列 todo（`todowrite` 必須是本次的第一個工具呼叫）**：把本節 0～N 項與後續要做的事逐項寫成 todo（第 0 項開線一項必在、排在任何 task
+之前；status 先全 pending），然後一次做一項——開始標 in_progress、做完標 completed、等工具回來再做下一項。執行期閘門會擋下 todowrite
+之前的任何工具呼叫（`PS_TODO_FIRST_REQUIRED`）；todo 沒有開線一項也擋（補寫一次 todowrite 即可）。
+
 0. **開線（第 0 步；每次被呼叫、無條件；直接 connect，不先 list；比本節其餘動作更早）**：
    `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
    ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本次不派 DB 委派，checklist／收據記「Oracle 連線未設定

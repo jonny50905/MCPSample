@@ -126,3 +126,21 @@ analyzer／e2e 的「真實題目」判定看非 synthetic part，不受注入�
 
 驗證：單元 20、e2e 17（connect-first→list-first；stale-connect-serve 改成第一題 connect 未回就送第二題；放棄路徑 list 一次附清單）、
 test-auto-loop 情境 31／32／33。
+
+## 九、模型有機率沒先列 todo 就開工：第三層閘門「todowrite 先於一切」（2026-09-09）
+
+| 問題 | 事實 | 決定 |
+|---|---|---|
+| 有 todo 的題一次做一項、等 connect 回來再派；沒有 todo 的題 connect 未回就派 subagent → NOT_CONNECTED | 公司機：GPT-LUNA 多半先列、Claude Sonnet 多半不列 | 不靠 prompt，靠擋：主 agent 每題第一個工具呼叫必須是 todowrite（含第 0 步一項） |
+| 為什麼是機率 | OpenCode 只對 id 含 claude 的模型注入 TodoWrite 指令（anthropic.txt）；gpt-4／o1／o3 用 beast.txt（markdown todo，不是工具）；其他 id（含走相容端點的 Sonnet）拿 default.txt——零 todo 指令；工具說明只有「When in doubt, use it」 | 任何 prompt 措辭都做不到 100%；hook 層可以 |
+
+| 選項 | 可行？ | 取捨 |
+|---|---|---|
+| 在 agent 檔／提醒 part 加「先 todowrite」規則 | 採（第二道） | 同 L0：純 prose 對某些模型效力弱；只當說明，不當保證 |
+| plugin 擋 todowrite 之前的任何工具（PS_TODO_FIRST_REQUIRED） | 採 | 與第 0 步同一模式：只擋、不改參數、不代寫；task 也先被這層擋，輪不到前置閘門；todo 缺第 0 步一項也擋，補寫即可；同題黏住 |
+| 要求 todo 第一項就是 connect | 不採 | 工作流第 1 步是載入 profile；只要求「含開線一項且排在 task 之前」，順序交給 todo |
+| plugin 自己寫 todo | 不採 | 沒有 plugin 呼叫工具的 API（同 §七）；且 todo 內容該由模型依題目寫 |
+| 擋 assistant 純文字回覆（沒有工具就作答） | 不可行 | hook 看不到 assistant 文字；沒有工具呼叫就沒有「開工」，也沒有連線問題 |
+
+邊界：模型在同一步同時送 todowrite＋其他工具 → 其他工具仍被擋（after 未回）；重來一次即可。observe 模式只記 hook=todo-first 列，不佔 before 列
+（task 件數才與 transcript 對得上）。驗證：單元 23、e2e 19（no-todo／todo-noconnect）、test-auto-loop。

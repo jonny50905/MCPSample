@@ -31,14 +31,15 @@ function fakeClient({ mcp = "connected", statusSeq, onStatus } = {}) {
   }
 }
 
-function tempProject({ profileGate, connectionName = "HR", reminder } = {}) {
+// todoFirst 預設 off：既有的狀態機測試不受「先列 todo」這層影響；先列 todo 的測試自己開 on
+function tempProject({ profileGate, connectionName = "HR", reminder, todoFirst = "off" } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gate-unit-"))
   fs.mkdirSync(path.join(dir, ".opencode", "agent"), { recursive: true })
   fs.mkdirSync(path.join(dir, ".opencode", "peoplesoft"), { recursive: true })
   for (const f of fs.readdirSync(path.join(repoRoot, ".opencode", "agent"))) {
     fs.copyFileSync(path.join(repoRoot, ".opencode", "agent", f), path.join(dir, ".opencode", "agent", f))
   }
-  const profile = "searchPolicy:\n  defaultMode: CUSTOM_FIRST\noracle:\n  currentSchema: FILL_ME\n  connectionName: " + connectionName + "\n" + (profileGate ? `  preflightGate: ${profileGate}\n` : "") + (reminder ? `  preflightReminder: ${reminder}\n` : "") + "businessDomainMap: business-domain-map.yaml\n"
+  const profile = "searchPolicy:\n  defaultMode: CUSTOM_FIRST\noracle:\n  currentSchema: FILL_ME\n  connectionName: " + connectionName + "\n" + (profileGate ? `  preflightGate: ${profileGate}\n` : "") + (reminder ? `  preflightReminder: ${reminder}\n` : "") + `  todoFirst: ${todoFirst}\n` + "businessDomainMap: business-domain-map.yaml\n"
   fs.writeFileSync(path.join(dir, ".opencode", "peoplesoft", "customization-profile.yaml"), profile)
   return dir
 }
@@ -623,4 +624,108 @@ test("成功回覆的說明文字引用 ORA-nnnnn 錯誤碼不算失敗（SQLcl 
     assert.ok(row.ok === false && row.failureMatch && row.next === "NEED_CONNECT", id + ": " + JSON.stringify(row))
   }
   await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
+})
+
+test("先列 todo：主 agent 每題第一個工具呼叫必須是 todowrite（含第 0 步一項）；之前的 read／task／connect 都擋；補寫後放行且黏住；新訊息重置、synthetic 不重置；subagent／不認識的 agent 不管；observe 只記；env／profile 可關", async () => {
+  const dir = tempProject({ todoFirst: "on", connectionName: "HR_DEV" })
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  const todo = (h, sid, id, todos) => call(h, sid, "todowrite", id, { title: "t", output: JSON.stringify(todos), metadata: { todos } }, { todos })
+  const expectTodoBlock = (fn, reason) => assert.rejects(fn, (e) => /^PS_TODO_FIRST_REQUIRED/.test(e.message) && (reason === "NO_TODO" ? /還沒用 todowrite/.test(e.message) : /沒有第 0 步/.test(e.message)) && !/PS_ORACLE_PREFLIGHT_REQUIRED/.test(e.message) && /「HR_DEV」原樣照抄/.test(e.message))
+  await chat(hooks, S, "m1")
+  await expectTodoBlock(() => before(hooks, S, "read", "r1", { filePath: "x" }), "NO_TODO")
+  await expectTodoBlock(() => task(hooks, S, "t1"), "NO_TODO")
+  await expectTodoBlock(() => before(hooks, S, "oracleMCP_connect", "c1", { connection_name: "HR_DEV" }), "NO_TODO")
+  let rows = readLog(dir, S).filter((l) => /^TODO_FIRST:/.test(l.note ?? ""))
+  assert.deepEqual(rows.map((l) => [l.hook, l.tool, l.decision, l.note, l.todoBlocked]), [["before", "read", "block", "TODO_FIRST:NO_TODO", 1], ["before", "task", "block", "TODO_FIRST:NO_TODO", 2], ["before", "oracleMCP_connect", "block", "TODO_FIRST:NO_TODO", 3]])
+  assert.ok(rows[1].dbCapable === true && rows[1].target === "ps-ui-flow" && rows[1].turnId === "m1")
+  await assert.rejects(() => task(hooks, S, "t1"), /已被擋 4 次/)
+  // todoread／invalid 不擋
+  await before(hooks, S, "todoread", "tr", {})
+  await before(hooks, S, "invalid", "iv", {})
+  // todo 沒有第 0 步那一項 → 仍擋（理由不同）
+  await todo(hooks, S, "w1", [{ content: "查 wiki", status: "pending", priority: "high" }, { content: "派 ps-ui-flow", status: "pending", priority: "medium" }])
+  let row = last(dir, S)
+  assert.ok(row.hook === "after" && row.tool === "todowrite" && row.attribution === "current" && row.items === 2 && row.connectItem === false && row.todoWritten === true && row.todoConnect === false, JSON.stringify(row))
+  await expectTodoBlock(() => before(hooks, S, "read", "r2", {}), "TODO_NO_CONNECT_ITEM")
+  // 補寫（含開線一項）→ 放行；task 換前置閘門擋
+  await todo(hooks, S, "w2", [{ content: "第 0 步：oracleMCP_connect（connection_name＝HR_DEV）", status: "in_progress", priority: "high" }, { content: "派 ps-ui-flow", status: "pending", priority: "medium" }])
+  row = last(dir, S)
+  assert.ok(row.connectItem === true && row.todoConnect === true && row.inProgress === 1, JSON.stringify(row))
+  await before(hooks, S, "read", "r3", {})
+  await expectBlock(() => task(hooks, S, "t2"), "NEED_CONNECT")
+  await connect(hooks, S, "c2", "Successfully connected to HR_DEV", "HR_DEV")
+  await task(hooks, S, "t3")
+  assert.equal(last(dir, S).decision, "allow")
+  // 黏性：之後只留未完成項的 todowrite（沒有開線一項）不會再擋
+  await todo(hooks, S, "w3", [{ content: "整理答覆", status: "in_progress", priority: "low" }])
+  assert.ok(last(dir, S).connectItem === false && last(dir, S).todoConnect === true)
+  await before(hooks, S, "read", "r4", {})
+  // synthetic 訊息／同 id 不重置；新的一題重置
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, { message: { id: "ms" }, parts: [{ type: "text", text: "<task_result>…</task_result>", synthetic: true }] })
+  await chat(hooks, S, "m1")
+  await before(hooks, S, "read", "r5", {})
+  await chat(hooks, S, "m2")
+  await expectTodoBlock(() => before(hooks, S, "read", "r6", {}), "NO_TODO")
+  // 上一題晚到的 todowrite 不算
+  await before(hooks, S, "todowrite", "w-late", { todos: [{ content: "第 0 步：connect", status: "pending", priority: "high" }] })
+  await chat(hooks, S, "m3")
+  await after(hooks, S, "todowrite", "w-late", { output: "[]" }, { todos: [{ content: "第 0 步：connect", status: "pending", priority: "high" }] })
+  assert.ok(last(dir, S).attribution === "stale" && last(dir, S).todoWritten === false)
+  await expectTodoBlock(() => before(hooks, S, "read", "r7", {}), "NO_TODO")
+  // profile 未填：todo 的第 0 步是「回報 Oracle 連線未設定」也算那一項；擋下訊息寫的是未填的第 0 步
+  const dir2 = tempProject({ todoFirst: "on", connectionName: "FILL_ME" })
+  const h2 = await PsOraclePreflightGate({ directory: dir2, client: fakeClient() })
+  await chat(h2, S, "m1")
+  await assert.rejects(() => before(h2, S, "read", "r1", {}), /PS_TODO_FIRST_REQUIRED[\s\S]*profile oracle\.connectionName 未填（FILL_ME）→ 不 connect/)
+  await todo(h2, S, "w1", [{ content: "第 0 步：回報 Oracle 連線未設定（profile 未填）", status: "pending", priority: "high" }, { content: "作答", status: "pending", priority: "low" }])
+  assert.equal(last(dir2, S).todoConnect, true)
+  await before(h2, S, "read", "r2", {})
+  // subagent session／不在 agent 目錄的 agent（build）／agent 未知的 session 不管
+  await chat(hooks, "ses_child", "mc", "ps-ui-flow")
+  await call(hooks, "ses_child", "oracleMCP_run_sql", "q1", mcpOk("ROW_COUNT\n1"), { sql: "SELECT 1 FROM DUAL" })
+  assert.equal(last(dir, "ses_child").ok, true)
+  await chat(hooks, "ses_build", "mb", "build")
+  await before(hooks, "ses_build", "read", "r1", {})
+  await before(hooks, "ses_unknown", "read", "r1", {})
+  // observe：只記 hook=todo-first 的 would-block 列（不佔 before 列），照常往下走
+  const dir3 = tempProject({ todoFirst: "on", profileGate: "observe", connectionName: "HR_DEV" })
+  const h3 = await PsOraclePreflightGate({ directory: dir3, client: fakeClient() })
+  await chat(h3, S, "m1")
+  await before(h3, S, "read", "r1", {})
+  row = last(dir3, S)
+  assert.ok(row.hook === "todo-first" && row.tool === "read" && row.decision === "observe-would-block" && row.note === "TODO_FIRST:NO_TODO", JSON.stringify(row))
+  await task(h3, S, "t1")
+  const t1rows = readLog(dir3, S).filter((l) => l.callID === "t1")
+  assert.deepEqual(t1rows.map((l) => [l.hook, l.decision]), [["todo-first", "observe-would-block"], ["before", "observe-would-block"]])
+  // 關閉：env 優先；profile off
+  process.env.PS_ORACLE_GATE_TODO = "off"
+  try {
+    await chat(hooks, S, "m4")
+    await before(hooks, S, "read", "r8", {})
+  } finally {
+    delete process.env.PS_ORACLE_GATE_TODO
+  }
+  await expectTodoBlock(() => before(hooks, S, "read", "r9", {}), "NO_TODO")
+  const dir4 = tempProject({ connectionName: "HR_DEV" })
+  const h4 = await PsOraclePreflightGate({ directory: dir4, client: fakeClient() })
+  await chat(h4, S, "m1")
+  await before(h4, S, "read", "r1", {})
+  assert.match(fs.readFileSync(path.join(dir, "auto-loop-logs", "ps-oracle-gate", "_plugin.log"), "utf8"), /todoFirst=on/)
+})
+
+test("提醒 part：todoFirst=on 時開頭要求第一個工具呼叫是 todowrite（含第 0 步一項）；off 時不提；結尾句不變", async () => {
+  const dir = tempProject({ todoFirst: "on", connectionName: "HR_DEV" })
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  const out = userMsg("m1")
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, out)
+  assert.match(out.parts[1].text, /^【Oracle 第 0 步（執行期閘門提醒）】本題的第一個工具呼叫必須是 todowrite：/)
+  assert.match(out.parts[1].text, /排在任何 task 之前/)
+  assert.match(out.parts[1].text, /先呼叫 oracleMCP_connect（connection_name＝「HR_DEV」原樣照抄/)
+  assert.match(out.parts[1].text, /不查 DB 的部分照常作答。$/)
+  const dir2 = tempProject({ connectionName: "HR_DEV" })
+  const h2 = await PsOraclePreflightGate({ directory: dir2, client: fakeClient() })
+  const o2 = userMsg("m1")
+  await h2["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, o2)
+  assert.doesNotMatch(o2.parts[1].text, /todowrite/)
+  assert.match(o2.parts[1].text, /^【Oracle 第 0 步（執行期閘門提醒）】回答本題之前，先呼叫 oracleMCP_connect/)
 })

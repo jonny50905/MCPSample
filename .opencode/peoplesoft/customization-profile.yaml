@@ -92,6 +92,10 @@ oracle:
   # 才准派會查 DB 的 subagent」（synthetic part，模型每題都看得到；不擋、不查狀態）。on（預設）／off。
   # 環境變數 PS_ORACLE_GATE_REMINDER 可臨時覆寫本值。
   preflightReminder: on
+  # 先列 todo：主 agent 每題的第一個工具呼叫必須是 todowrite（列出步驟、含第 0 步開線一項），之前的其他工具在執行前被擋
+  # （PS_TODO_FIRST_REQUIRED）；有 todo 的題模型才會一次做一項、等 connect 回來再派。on（預設）／off。
+  # 環境變數 PS_ORACLE_GATE_TODO 可臨時覆寫本值。
+  todoFirst: on
 
 # 業務領域定義（Domain alias、rootObjectPolicy、fallback 政策）
 # 見同目錄 business-domain-map.yaml

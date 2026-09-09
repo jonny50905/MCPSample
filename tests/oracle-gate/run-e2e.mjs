@@ -5,6 +5,8 @@
 //             multi-turn | multi-turn-serve | compaction-serve | stale-connect-serve | wrong-target | not-configured | reconnect-fail
 //   第 0 步＝connect 一步（connection_name＝profile 值原樣）；list_connections 不是前置（清單把名稱與連線字串黏在一起，不拿來挑名字），
 //   閘門對它只記錄。list-first：模型多做了 list 也不算前置、照擋，connect 才放行。
+//   先列 todo（第二層擋）：每題第一個工具呼叫必須是 todowrite（含第 0 步一項）——每個情境的劇本都先 todowrite，另驗每題 todowrite 先於第一個工具；
+//   no-todo：不寫 todo 就 connect → 被 PS_TODO_FIRST_REQUIRED 擋、假 MCP 沒收到 → todowrite 後才通；todo-noconnect：todo 缺第 0 步 → 擋、補寫後通。
 //   mcp-down／mcp-failed：oracleMCP 停用／指令不存在（/mcp 狀態 disabled／failed）→ 會查 DB 的 task 一樣被擋，錯誤訊息走 ORACLE_MCP_DOWN 協定、零 SQL
 //   connect-fail：假 oracleMCP 的 connect 一律失敗（isError），驗證閘門沒有「失敗幾次就放行」——三次 task 全擋、零 SQL、模型依第 0 步規則放棄 DB 委派
 //                 （放棄時 list 一次把清單原文附在回報裡；閘門對這個 list 只記錄）
@@ -55,6 +57,8 @@ const SCENARIOS = {
   "wrong-target": { model: "connect-fail", mode: "enforce", mcp: true, profileConnection: "HR_UAT" },
   "not-configured": { model: "connect-fail", mode: "enforce", mcp: true, profileConnection: "FILL_ME" },
   "reconnect-fail": { model: "reconnect-probe", mode: "enforce", mcp: true, connectFailFrom: 2 },
+  "no-todo": { model: "no-todo", mode: "enforce", mcp: true },
+  "todo-noconnect": { model: "todo-noconnect", mode: "enforce", mcp: true },
 }
 
 function copyDir(src, dst) {
@@ -335,18 +339,32 @@ async function runScenario(name, sc, base, iteration) {
   if (exported) {
     for (const m of realPrompts) {
       const ps = m.parts ?? []
-      assertOk(ps.some((p) => p.type === "text" && p.synthetic !== true) && ps.some((p) => p.type === "text" && p.synthetic === true && /【Oracle 第 0 步（執行期閘門提醒）】回答本題之前，先呼叫 oracleMCP_connect（/.test(p.text ?? "") && !/list_connections → /.test(p.text ?? "") && /^prt_/.test(p.id ?? "")),
+      assertOk(ps.some((p) => p.type === "text" && p.synthetic !== true) && ps.some((p) => p.type === "text" && p.synthetic === true && /^【Oracle 第 0 步（執行期閘門提醒）】本題的第一個工具呼叫必須是 todowrite/.test(p.text ?? "") && /先呼叫 oracleMCP_connect（/.test(p.text ?? "") && !/list_connections → /.test(p.text ?? "") && /^prt_/.test(p.id ?? "")),
         "real user message keeps its own text and carries the synthetic step-0 reminder part; parts=" + JSON.stringify(ps.map((p) => [p.type, p.synthetic, (p.id ?? "").slice(0, 8)])), failures)
     }
   }
   const primaryRows = jsonl(modelLog).filter((r) => Array.isArray(r.tools) && r.tools.includes("task"))
-  assertOk(primaryRows.length >= 1 && primaryRows.every((r) => /【Oracle 第 0 步（執行期閘門提醒）】[\s\S]*不查 DB 的部分照常作答。$/.test(r.userText ?? "")), "every primary-agent model request sees the reminder at the end of the last user message; got " + JSON.stringify(primaryRows.slice(0, 2).map((r) => (r.userText ?? "").slice(-80))), failures)
+  assertOk(primaryRows.length >= 1 && primaryRows.every((r) => /【Oracle 第 0 步（執行期閘門提醒）】本題的第一個工具呼叫必須是 todowrite[\s\S]*不查 DB 的部分照常作答。$/.test(r.userText ?? "")), "every primary-agent model request sees the reminder (todo-first + step 0) at the end of the last user message; got " + JSON.stringify(primaryRows.slice(0, 2).map((r) => (r.userText ?? "").slice(-80))), failures)
   assertOk(chats.length >= 1 && chats.every((c) => c.reminder === true), "chat.message rows record reminder=true", failures)
   // 不變量（無豁免；只有 observe 探測例外）：每個已執行的會查 DB 的 task 入場時必須 READY——oracleMCP 未掛載時也一樣（被擋，不放行）
   const earlyDb = executed.filter((e) => e.dbCapable === true && e.state !== "READY")
   if (name !== "observe") assertEq(earlyDb.length, 0, "DB task executed before READY", failures)
   assertOk(before.every((b) => typeof b.dbCapable === "boolean") && executed.every((e) => typeof e.dbCapable === "boolean"), "every task row carries dbCapable", failures)
   assertOk(!gate.some((g) => g.state === "NEED_LIST" || g.next === "NEED_LIST"), "no NEED_LIST state anywhere (preflight is connect only)", failures)
+  // 先列 todo：每題至少一次 todowrite 成功（after 列，current），且（除兩個 todo 情境外）同題第一個非 todo 的 before 列之前已有含第 0 步的 todowrite；沒有 TODO_FIRST 擋
+  const todoWrites = gate.filter((g) => g.hook === "after" && g.tool === "todowrite")
+  const todoBlocks = gate.filter((g) => /^TODO_FIRST:/.test(g.note ?? ""))
+  const todoScenario = name === "no-todo" || name === "todo-noconnect"
+  assertOk(chats.length >= 1 && todoWrites.length >= chats.length && todoWrites.every((t) => t.attribution === "current" && t.items === 3), "every turn wrote a todo via todowrite (after row, current, 3 items); got " + JSON.stringify(todoWrites.map((t) => [t.turnId, t.items, t.connectItem])), failures)
+  for (const c of chats) {
+    const turnRows = gate.filter((g) => g.turnId === c.turnId && g.hook !== "chat.message")
+    const firstWork = turnRows.findIndex((g) => g.hook === "before" && g.tool !== "todowrite")
+    const firstTodo = turnRows.findIndex((g) => g.hook === "after" && g.tool === "todowrite" && g.connectItem === true)
+    if (!todoScenario) assertOk(firstWork < 0 || (firstTodo >= 0 && firstTodo < firstWork), `turn ${c.turnId}: todowrite with the step-0 item precedes the first tool call (todo@${firstTodo}, work@${firstWork})`, failures)
+  }
+  if (!todoScenario) assertEq(todoBlocks.length, 0, "no TODO_FIRST blocks", failures)
+  const todoParts = parts.filter((p) => p.tool === "todowrite")
+  assertOk(todoParts.length >= 1 && todoParts.every((p) => p.state?.status === "completed"), "todowrite tool parts completed in the export; got " + JSON.stringify(todoParts.map((p) => p.state?.status)), failures)
   const listRows = gate.filter((g) => g.hook === "after" && g.tool === "oracleMCP_list_connections")
   assertOk(listRows.every((g) => g.state === g.next && /informational/.test(g.note ?? "")), "list_connections after rows never change state; got " + JSON.stringify(listRows.map((g) => [g.state, g.next, g.note])), failures)
   const errParts = taskParts.filter((p) => p.state?.status === "error")
@@ -490,6 +508,23 @@ async function runScenario(name, sc, base, iteration) {
       const connParts = parts.filter((p) => p.tool === "oracleMCP_connect")
       assertOk(connParts.length >= 2 && connParts.every((p) => p.state?.status === "error" && new RegExp(code).test(p.state?.error ?? "")), "connect tool parts are errors carrying the code; got " + JSON.stringify(connParts.map((p) => [p.state?.status, (p.state?.error ?? "").slice(0, 60)])), failures)
       assertOk(exported && /Oracle 連線未設定/.test(assistantText(exported, sessionID)), "model reported the configuration error instead of guessing a connection", failures)
+      break
+    }
+    case "no-todo":
+    case "todo-noconnect": {
+      const reason = name === "no-todo" ? "TODO_FIRST:NO_TODO" : "TODO_FIRST:TODO_NO_CONNECT_ITEM"
+      assertOk(todoBlocks.length === 1 && todoBlocks[0].hook === "before" && todoBlocks[0].tool === "oracleMCP_connect" && todoBlocks[0].decision === "block" && todoBlocks[0].note === reason && todoBlocks[0].todoBlocked === 1, "first connect blocked by the todo-first layer (" + reason + "); got " + JSON.stringify(todoBlocks), failures)
+      assertEq(todoWrites.map((t) => [t.items, t.connectItem]), name === "no-todo" ? [[3, true]] : [[3, false], [3, true]], "todowrite rows", failures)
+      const cbIdx = gate.findIndex((g) => g === todoBlocks[0])
+      const okTodoIdx = gate.findIndex((g) => g.hook === "after" && g.tool === "todowrite" && g.connectItem === true)
+      const cAllowIdx = gate.findIndex((g) => g.hook === "before" && g.tool === "oracleMCP_connect" && g.decision === "allow")
+      assertOk(cbIdx >= 0 && okTodoIdx > cbIdx && cAllowIdx > okTodoIdx, `order: blocked connect (${cbIdx}) → todowrite with step 0 (${okTodoIdx}) → connect allowed (${cAllowIdx})`, failures)
+      assertEq(stateSeq, ["connect:NEED_CONNECT->READY"], "state sequence", failures)
+      assertEq(mcpSeq, ["connect", "run_sql"], "mock MCP never saw the blocked connect", failures)
+      assertEq(blocks.length, 0, "no preflight task blocks", failures); assertEq(executed.length, 1, "executed task", failures)
+      const connParts = parts.filter((p) => p.tool === "oracleMCP_connect")
+      assertOk(connParts.length === 2 && connParts[0].state?.status === "error" && /PS_TODO_FIRST_REQUIRED/.test(connParts[0].state?.error ?? "") && /todowrite/.test(connParts[0].state?.error ?? "") && connParts[1].state?.status === "completed", "first connect part is an error carrying PS_TODO_FIRST_REQUIRED, second completed; got " + JSON.stringify(connParts.map((p) => [p.state?.status, (p.state?.error ?? "").slice(0, 80)])), failures)
+      assertCompleted(project, executed, failures)
       break
     }
     case "reconnect-fail": {
