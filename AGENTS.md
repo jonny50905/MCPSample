@@ -17,7 +17,7 @@
    `/ps-research <領域>`（ps-deep-research，輸出 docs/ps-research/）。
    在一般 agent 下則載入 `ps-business-discovery` skill 依其流程處理，
    重的檢索用 @ 委派給 ps-* subagent。
-   主 agent 收到訊息的**第 0 步**（查 wiki、委派、作答之前）固定
+   主 agent 工作流的**開線步驟（第 0 步）**（查 wiki、委派、作答之前）固定
    `oracleMCP_list_connections` → `oracleMCP_connect`（無條件，見 agent 定義）；
    執行期由 `.opencode/plugin/ps-oracle-preflight-gate.js` 強制：前置未完成就
    委派會查 DB 的 subagent，該 task 會被擋下並回 `PS_ORACLE_PREFLIGHT_REQUIRED`

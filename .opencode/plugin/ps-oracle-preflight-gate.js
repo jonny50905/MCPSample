@@ -22,6 +22,11 @@
 // task 回報解析：after 把子 agent 報告的 status（COMPLETE／PARTIAL／BLOCKED，其餘＝INVALID）、blockedReason、task 包裝的 state
 //   與子 session id 記到列上（analyzer 的「可用」判定用它，不用「沒回 NOT_CONNECTED」）；run_sql 的 after 也記三態 ok。
 //
+// 第 0 步提醒（注入，不是擋）：主 agent（tools 表有 list_connections＋connect 的 primary）的每一則真實使用者訊息，chat.message 會補一個
+//   synthetic text part：「先 list → connect（connection_name＝profile 值）→ 才准派會查 DB 的 subagent；工具清單沒有 oracleMCP_ 工具
+//   就走 ORACLE_MCP_DOWN」。提醒跟著訊息走（模型最看得到的位置），把「第 0 步常被略過」從 prompt 章節問題變成每題都在眼前的指令；
+//   不查 /mcp 狀態、不改狀態機——硬性保證仍是下面的擋。env PS_ORACLE_GATE_REMINDER=off 或 profile oracle.preflightReminder: off 可關。
+//
 // 呼叫配對（會影響狀態的呼叫都在 before 留入場快照，after 依 session:callID 配對）：
 //   - list／connect／disconnect／task 的 before 記 (turn, turnId, state[, target, dbCapable, decision])；after 列用快照標題目，
 //     不用「現在」的題目。沒有入場快照的 after → attribution=unknown，不前進。
@@ -45,6 +50,7 @@
 //
 // 零外部相依（只用 node:fs／node:path；公司網路封鎖 npm）。OpenCode 自動載入 .opencode/plugin/*.js。
 
+import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -148,6 +154,7 @@ function loadAgentCatalog(directory) {
       catalog.set(file.slice(0, -3), {
         mode: frontmatterValue(fm, "mode") ?? "all",
         db: toolEnabled(tools, TOOL_RUN_SQL),
+        connect: toolEnabled(tools, TOOL_LIST) && toolEnabled(tools, TOOL_CONNECT),
       })
     } catch {
       // 讀不到的檔跳過；不在目錄裡的名字會被視為會查 DB（保守）
@@ -177,6 +184,52 @@ function readProfileOracle(directory) {
     // 沒有 profile 或讀不到 → 空
   }
   return out
+}
+
+function readReminder(directory) {
+  const env = String(process.env.PS_ORACLE_GATE_REMINDER ?? "").trim().toLowerCase()
+  if (env === "on" || env === "off") return env
+  const v = String(readProfileOracle(directory).preflightReminder ?? "").toLowerCase()
+  if (v === "on" || v === "off") return v
+  return "on"
+}
+
+const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+let idLast = 0n
+// 與 OpenCode 的 Identifier.ascending("part") 同形：prt_ + 6 byte（毫秒×4096＋同毫秒計數）hex + 14 碼 base62。
+// OpenCode 讀訊息時 part 依 id 排序：提醒要排在使用者文字之後，所以 id 一律取「現有 part 的最大 id＋1」與「現在」的較大者
+// （同一毫秒內 OpenCode 自己的計數可能比我們大，不能只看時間）。
+function partId(parts) {
+  const MASK48 = (1n << 48n) - 1n
+  // OpenCode 只寫入低 48 bit（6 byte），比較也在同一個空間做
+  let n = (BigInt(Date.now()) * 4096n + 1n) & MASK48
+  for (const p of Array.isArray(parts) ? parts : []) {
+    const m = typeof p?.id === "string" ? p.id.match(/^prt_([0-9a-f]{12})/) : null
+    if (m) {
+      const v = BigInt("0x" + m[1]) + 1n
+      if (v > n) n = v
+    }
+  }
+  if (n <= idLast) n = idLast + 1n
+  idLast = n
+  const bytes = Buffer.alloc(6)
+  for (let i = 0; i < 6; i++) bytes[i] = Number((n >> BigInt(40 - 8 * i)) & 0xffn)
+  const rnd = crypto.randomBytes(14)
+  let tail = ""
+  for (let i = 0; i < 14; i++) tail += BASE62[rnd[i] % 62]
+  return "prt_" + bytes.toString("hex") + tail
+}
+
+function buildReminder(profileName, dbTargets) {
+  const targets = dbTargets.length ? dbTargets.join("／") : "會查 DB 的 subagent"
+  const rule = profileUnset(profileName)
+    ? "profile oracle.connectionName 目前未填（FILL_ME）：不要 connect、本題不派會查 DB 的委派，回報「Oracle 連線未設定」"
+    : `connection_name＝「${profileName}」，即 profile oracle.connectionName；其他值會被閘門擋下`
+  return (
+    "【Oracle 第 0 步（執行期閘門提醒）】回答本題之前，先依序呼叫 oracleMCP_list_connections → oracleMCP_connect（" + rule + "），" +
+    `兩者都成功後才准派會查 DB 的 subagent（${targets}）。每一題都要做，不因上一題連過就省略；沒做完就派會被擋下並要求補做。` +
+    "工具清單裡沒有 oracleMCP_ 工具（未掛載）→ 不派會查 DB 的 subagent，DB 部分回 ORACLE_MCP_DOWN。不查 DB 的部分照常作答。"
+  )
 }
 
 function readMode(directory) {
@@ -424,6 +477,14 @@ export const PsOraclePreflightGate = async (input) => {
     return { gated: entry.db, basis: entry.db ? "run_sql:enabled" : "run_sql:disabled" }
   }
 
+  // 會查 DB 的 subagent 名單（提醒用）
+  function dbSubagents() {
+    return [...catalogFresh().entries()]
+      .filter(([, v]) => v.mode === "subagent" && v.db)
+      .map(([name]) => name)
+      .sort()
+  }
+
   // 沒有 Oracle 能力的 subagent 名單（oracleMCP 未掛載時錯誤訊息用）
   function nonDbSubagents() {
     return [...catalogFresh().entries()]
@@ -450,7 +511,7 @@ export const PsOraclePreflightGate = async (input) => {
   }
 
   pluginLog(
-    `loaded directory=${directory} mode=${readMode(directory)} agents=${JSON.stringify(
+    `loaded directory=${directory} mode=${readMode(directory)} reminder=${readReminder(directory)} agents=${JSON.stringify(
       [...catalog.entries()].map(([name, v]) => `${name}:${v.db ? "DB" : "noDB"}`),
     )}`,
   )
@@ -480,7 +541,17 @@ export const PsOraclePreflightGate = async (input) => {
       s.turn += 1
       s.turnId = typeof mid === "string" && mid ? mid : `${process.pid}-${s.turn}`
       s.blocked = 0
-      record(sessionID, { hook: "chat.message", ...stamp(s), state: prev, next: s.state, mode: readMode(directory) })
+      // 第 0 步提醒：只給有 list＋connect 的主 agent、且訊息 id 已知；補在使用者文字之後（synthetic），模型每題都看得到
+      let reminder = false
+      if (readReminder(directory) === "on" && typeof mid === "string" && mid && Array.isArray(parts)) {
+        const entry = s.agent ? catalogFresh().get(s.agent) : undefined
+        if (entry && entry.mode === "primary" && entry.connect) {
+          const profileName = String(readProfileOracle(directory).connectionName ?? "").trim()
+          parts.push({ id: partId(parts), sessionID, messageID: mid, type: "text", synthetic: true, text: buildReminder(profileName, dbSubagents()) })
+          reminder = true
+        }
+      }
+      record(sessionID, { hook: "chat.message", ...stamp(s), state: prev, next: s.state, mode: readMode(directory), reminder })
     },
 
     "tool.execute.before": async (info, out) => {

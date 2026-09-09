@@ -90,6 +90,14 @@ NOT_CONNECTED 不作廢新世代；task after 解析報告（reportStatus／bloc
 且子 session run_sql 成功。驗證：單元 18、e2e 17 情境（新增 wrong-target／not-configured／reconnect-fail）、analyzer 對真 export 一致、
 test-auto-loop 273 判定。**公司機注意**：profile `oracle.connectionName` 現在是硬性條件——必須與 SQLcl 已儲存連線名完全一致，未填或不一致時
 connect 根本不會執行；已填的值搬檔時不得被 FILL_ME 覆蓋。細節 L115 追記、memo §六、SOP-21 步驟 9 內網最小驗收表。
+**再追記（2026-09-09，公司機實測「第 0 步常被略過」）**：搬完 b8e7aba 後主 agent 仍常不開線就直接派 subagent（閘門擋下、要求補做，
+每題多一次來回）。管理者問為何開線要獨立一個第 0 步而不併進工作流——成立：獨立章節不是模型執行的計畫，工作流編號清單才是。兩層處置：
+(1) 三個主 agent 檔移除獨立「## 第 0 步」章節，開線改為工作流編號步驟（orchestrator 第 2 步、deep-research 啟動與續跑第 0 項、
+audit-orchestrator 第一動作第 1 項；名字仍叫第 0 步）；(2) 閘門在主 agent 的每一則真實使用者訊息後注入 synthetic 提醒 part（先 list→connect
+（connection_name＝profile 值）→ 才准派會查 DB 的 subagent；沒有 oracleMCP_ 工具就回 ORACLE_MCP_DOWN），不擋、不查狀態，
+env PS_ORACLE_GATE_REMINDER／profile oracle.preflightReminder 可關；plugin 自己 connect 在 1.18.29 不可行（沒有 plugin 呼叫工具的 API）。
+驗證：單元 19、e2e 17 情境（每情境驗 export 的真實訊息帶提醒 part、模型請求看得到）、test-auto-loop 278 判定。公司機看 R22 與
+`-AnalyzeAll` 的 blockedRuns 是否下降；診斷「沒做第 0 步」先看 jsonl 的 before task 列是 block（閘門有擋）還是 allow／沒有紀錄（沒載到）。
 
 ## 1. 管理者下一步（按序）
 
@@ -136,37 +144,37 @@ connect 根本不會執行；已填的值搬檔時不得被 FILL_ME 覆蓋。細
    | `scripts/ps-transfer-manifest.json` | 修改 | 342 | 最後搬；fs-doctor 應報 56 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
 
    `.gitignore`、`HANDOFF.md`、`README.md` 不在搬運集合。
-1b. issue #29 執行期閘門（2026-09-08；1／1a 尚未搬的一起搬，manifest 只搬最新。**已依 886d6e2／d544ec3／e0b1c75 搬過的檔要整批重搬**——
-    閘門、analyzer、agent 檔、profile 註解都改了）：
+1b. issue #29 執行期閘門（2026-09-08～09；1／1a 尚未搬的一起搬，manifest 只搬最新。**已依 886d6e2／d544ec3／e0b1c75／b8e7aba 搬過的檔要重搬**——
+    閘門、三個主 agent 檔、profile 註解、SOP、applied、test-scenarios、test-auto-loop、manifest 都改了）：
 
    | 檔案 | 新增／修改 | 行數 | 備註 |
    |---|---|---|---|
-   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；review 第三輪後：connect 目標執行前比對／嘗試作廢 READY／同題世代／報告解析／run_sql 三態） | 653 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行 |
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | 新增（新目錄 `.opencode\plugin\`；含 connect 目標執行前比對／嘗試作廢 READY／同題世代／報告解析／run_sql 三態／第 0 步提醒注入） | 724 | 存 UTF-8；OpenCode 自動載入；載入證據＝`auto-loop-logs\ps-oracle-gate\_plugin.log` 的 loaded 行（含 reminder=on） |
    | `.opencode/.npmrc` | 新增 | 4 | `offline=true`，不可省（否則有 plugin 時每次啟動多等到安裝重試逾時）；啟動仍多等 70 秒才在全域設定目錄再放一份（SOP-21 步驟 1） |
-   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce；connectionName 註解改「必填、完全一致、閘門執行前比對」） | 108 | 本機已回填 FILL_ME 者只合併 oracle 區塊的註解與 `preflightGate`（fs-doctor 報此檔 M 屬預期）；**connectionName 必須與 SQLcl 已儲存連線名完全一致（大小寫、空白），否則所有 connect 在執行前被擋** |
-   | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 允許清單：`"oracleMCP_*": false` → `"oracleMCP_run_sql": true`） | 141 | |
-   | `.opencode/agent/ps-metadata-flow.md` | 修改（同上） | 109 | |
-   | `.opencode/agent/ps-ae-flow.md` | 修改（同上） | 91 | |
-   | `.opencode/agent/ps-auditor.md` | 修改（同上） | 259 | |
-   | `.opencode/agent/ps-orchestrator.md` | 修改（第 0 步：connectionName 缺值／不在清單 → 回「Oracle 連線未設定」，不挑清單第一個） | 188 | |
-   | `.opencode/agent/ps-deep-research.md` | 修改（同上） | 519 | |
-   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（同上） | 153 | |
-   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（主 agent 段第 2 步：CONNECTION_NOT_CONFIGURED，不挑清單第一個） | 638 | |
-   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 再追記＋SOP-21 整段：配對／三態／未掛載也擋／connect 目標強制／嘗試作廢／世代／完成定義／R17～R21／內網最小驗收表／topology 實驗） | 809 | |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115＋三輪 review 追記） | 3190 | |
-   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R21） | 693 | |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle.preflightGate: enforce；preflightReminder: on；connectionName 註解改「必填、完全一致、閘門執行前比對」） | 112 | 本機已回填 FILL_ME 者只合併 oracle 區塊的註解、`preflightGate`、`preflightReminder`（fs-doctor 報此檔 M 屬預期）；**connectionName 必須與 SQLcl 已儲存連線名完全一致（大小寫、空白），否則所有 connect 在執行前被擋** |
+   | `.opencode/agent/ps-ui-flow.md` | 修改（Oracle 允許清單：`"oracleMCP_*": false` → `"oracleMCP_run_sql": true`） | 141 | 上一批（b8e7aba）已搬者不必重搬 |
+   | `.opencode/agent/ps-metadata-flow.md` | 修改（同上） | 109 | 上一批已搬者不必重搬 |
+   | `.opencode/agent/ps-ae-flow.md` | 修改（同上） | 91 | 上一批已搬者不必重搬 |
+   | `.opencode/agent/ps-auditor.md` | 修改（同上） | 259 | 上一批已搬者不必重搬 |
+   | `.opencode/agent/ps-orchestrator.md` | 修改（開線改為工作流第 2 步，獨立「## 第 0 步」章節移除） | 182 | |
+   | `.opencode/agent/ps-deep-research.md` | 修改（開線改為「啟動與續跑」第 0 項） | 515 | |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（開線改為「第一動作」第 1 項） | 148 | |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（主 agent 段第 2 步：CONNECTION_NOT_CONFIGURED，不挑清單第一個） | 638 | 上一批已搬者不必重搬 |
+   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 再追記＋SOP-21 整段：配對／三態／未掛載也擋／connect 目標強制／嘗試作廢／世代／完成定義／第 0 步兩層處置／R17～R22／內網最小驗收表／topology 實驗） | 828 | |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L115＋四輪追記） | 3206 | |
+   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7a R9～R22） | 694 | |
    | `.opencode/peoplesoft/README.md` | 修改（目錄結構加 plugin／.npmrc） | 308 | 上一批已搬者不必重搬 |
-   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 31 允許清單／不挑清單第一個＋情境 32 新欄位與強制比對＋情境 33 unknown-agent／callMismatch／export parentID／假成功反例） | 840 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
-   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析；安全五項＋可用判定「報告 COMPLETE 且子 session run_sql 成功」；-ExpectDbTask） | 441 | 存 UTF-8 with BOM；用法見 SOP-21 |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 31 開線在工作流內＋情境 32 提醒注入守衛＋情境 33 假成功反例） | 842 | 存 UTF-8 with BOM；情境 32 沒有 node 或沒搬 `tests/` 時跳過單元測試（正常） |
+   | `scripts/tests/test-oracle-gate-runtime.ps1` | 新增（執行紀錄回歸／P1 分析；安全五項＋可用判定「報告 COMPLETE 且子 session run_sql 成功」；-ExpectDbTask） | 441 | 存 UTF-8 with BOM；用法見 SOP-21；上一批已搬者不必重搬 |
    | `scripts/ps-fs-doctor.ps1` | 修改（Get-TransferFiles 加 -Force、排除 OpenCode 安裝痕跡） | 312 | 存 UTF-8 with BOM；上一批已搬者不必重搬 |
-   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD e0b1c75，早一步屬預期） |
-   | `AGENTS.md` | 修改（第 0 步先於「先查 wiki」；plugin 零相依鐵律；未掛載也擋） | 92 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 360 | 最後搬；fs-doctor 應報 59 檔一致（commit 欄＝產生時 HEAD b8e7aba，早一步屬預期） |
+   | `AGENTS.md` | 修改（開線步驟先於「先查 wiki」；plugin 零相依鐵律；未掛載也擋） | 92 | 根目錄，不在 manifest；opencode 每次 session 都讀 |
 
    `tests/oracle-gate/*`（沙箱單元／e2e 測試組）與 `docs/design/oracle-preflight-gate-decision-memo.md` 不搬。
-   搬完照 SOP-21 步驟 2～5 驗：`_plugin.log` 有 loaded → 快篩（一題＋同視窗第二題；看 R16 已連線再 connect、R17 工具可見性、
-   R18 連線名設定錯誤、R19 正向驗收反例、R20 再 connect、R21 一開多用）→ 同一視窗互動 20 題後 `-AnalyzeAll`（安全五項無豁免，
-   oracleMCP 掛載中）→ B1／B2／B3 各 30 次（B1 另判每 session ≥1 個「報告 COMPLETE 且子 session run_sql 成功」的 DB task）；
-   再做步驟 9 的內網最小驗收與步驟 10 的 topology 實驗 T1～T3（R15），結果回報維護 session。
+   搬完照 SOP-21 步驟 2～5 驗：`_plugin.log` 有 loaded（reminder=on）→ 快篩（一題＋同視窗第二題；看 R16 已連線再 connect、R17 工具可見性、
+   R18 連線名設定錯誤、R19 正向驗收反例、R20 再 connect、R21 一開多用、R22 提醒注入）→ 同一視窗互動 20 題後 `-AnalyzeAll`（安全五項無豁免，
+   oracleMCP 掛載中；blockedRuns 應明顯低於注入前）→ B1／B2／B3 各 30 次（B1 另判每 session ≥1 個「報告 COMPLETE 且子 session run_sql 成功」
+   的 DB task）；再做步驟 9 的內網最小驗收與步驟 10 的 topology 實驗 T1～T3（R15），結果回報維護 session。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log

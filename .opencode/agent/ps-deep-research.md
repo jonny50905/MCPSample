@@ -52,26 +52,22 @@ docs/ps-research/<領域>/
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
 
-## 第 0 步：開場先連 DB（每次被呼叫、無條件；順序固定 list → connect；比下面「啟動與續跑」更早）
-
-1. `oracleMCP_list_connections` → 取得 SQLcl 已儲存連線名清單（不要自己編名字）。
-2. `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。profile 未填／FILL_ME／不在清單裡
-   → **不 connect、不猜、不挑清單第一個**，本次不派 DB 委派，checklist／收據記「Oracle 連線未設定（profile oracle.connectionName＝<值>；
-   清單＝<list_connections 的結果>）」。清單為空 → 本次不派 DB 委派，checklist／收據記「SQLcl 沒有已儲存連線（list_connections 回空）」。
-
-不判斷本次會不會用到 DB、不等到要派 DB 委派才做、不因為同一 session 已連過就省略、不跳過 list 直接 connect
-（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。
-connect 回錯誤 → 再 list 一次、再 connect 一次；仍失敗 → 本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
-自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
-
 ## 啟動與續跑（每次被呼叫先做這個）
 
-0. 指令含「歸戶提煉」或「entity 升級」→ **直接進提煉模式**，跳過本節其餘。
-1. 檢查 `docs/ps-research/<領域>/00-overview.md`：
+0. **開線（第 0 步；每次被呼叫、無條件；順序固定 list → connect；比本節其餘動作更早）**：
+   `oracleMCP_list_connections` → `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。
+   profile 未填／FILL_ME／不在清單裡 → **不 connect、不猜、不挑清單第一個**，本次不派 DB 委派，checklist／收據記「Oracle 連線未設定
+   （profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」；清單為空 → 記「SQLcl 沒有已儲存連線（list_connections 回空）」。
+   不判斷本次會不會用到 DB、不因為同一 session 已連過就省略、不跳過 list 直接 connect（回「已連線」也算成功）。
+   唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。connect 回錯誤 → 再 list 一次、
+   再 connect 一次；仍失敗 → 本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
+   自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
+1. 指令含「歸戶提煉」或「entity 升級」→ **直接進提煉模式**，跳過本節其餘。
+2. 檢查 `docs/ps-research/<領域>/00-overview.md`：
    - **不存在** → 執行階段一（總覽）。
    - **存在** → read `checklist.md`，從**第一個未勾選項**繼續階段二。
      不重查已打勾項、不回讀已完成的 NN-*.md 內容。
-2. **舊格式遷移（一次性）**：00-overview.md 存在但 checklist.md 不存在
+3. **舊格式遷移（一次性）**：00-overview.md 存在但 checklist.md 不存在
    → 先把 overview「調查進度」與「Gaps 彙整」兩節內容照搬建立
    `checklist.md`（依 checklist 模板），之後所有狀態只改 checklist.md；
    00-overview.md 從此不再改動（舊節內容留著即可）。

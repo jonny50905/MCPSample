@@ -327,6 +327,17 @@ async function runScenario(name, sc, base, iteration) {
     for (const e of executed) assertOk(parents.get(e.callID) === e.turnId, `after-hook attribution: task ${e.callID} gate=${e.turnId} export=${parents.get(e.callID)}`, failures)
     for (const g of gate.filter((x) => x.hook === "before" && /^oracleMCP_/.test(x.tool))) if (parents.has(g.callID)) assertOk(parents.get(g.callID) === g.turnId, `oracle call attribution: ${g.tool} ${g.callID} gate=${g.turnId} export=${parents.get(g.callID)}`, failures)
   }
+  // 第 0 步提醒：每則真實題目在 export 裡多一個 synthetic text part（使用者文字保持原樣），模型的請求看得到它；chat.message 列 reminder=true
+  if (exported) {
+    for (const m of realPrompts) {
+      const ps = m.parts ?? []
+      assertOk(ps.some((p) => p.type === "text" && p.synthetic !== true) && ps.some((p) => p.type === "text" && p.synthetic === true && /oracleMCP_list_connections → oracleMCP_connect/.test(p.text ?? "") && /^prt_/.test(p.id ?? "")),
+        "real user message keeps its own text and carries the synthetic step-0 reminder part; parts=" + JSON.stringify(ps.map((p) => [p.type, p.synthetic, (p.id ?? "").slice(0, 8)])), failures)
+    }
+  }
+  const primaryRows = jsonl(modelLog).filter((r) => Array.isArray(r.tools) && r.tools.includes("task"))
+  assertOk(primaryRows.length >= 1 && primaryRows.every((r) => /【Oracle 第 0 步（執行期閘門提醒）】[\s\S]*不查 DB 的部分照常作答。$/.test(r.userText ?? "")), "every primary-agent model request sees the reminder at the end of the last user message; got " + JSON.stringify(primaryRows.slice(0, 2).map((r) => (r.userText ?? "").slice(-80))), failures)
+  assertOk(chats.length >= 1 && chats.every((c) => c.reminder === true), "chat.message rows record reminder=true", failures)
   // 不變量（無豁免；只有 observe 探測例外）：每個已執行的會查 DB 的 task 入場時必須 READY——oracleMCP 未掛載時也一樣（被擋，不放行）
   const earlyDb = executed.filter((e) => e.dbCapable === true && e.state !== "READY")
   if (name !== "observe") assertEq(earlyDb.length, 0, "DB task executed before READY", failures)

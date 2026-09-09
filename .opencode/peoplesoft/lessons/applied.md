@@ -3188,3 +3188,19 @@
   契約（R16／R20）、DB／schema 身分一致性。
   教訓：模型規則要落成執行前的機械檢查才是保證；「READY」是歷史證明，任何會改變資源的嘗試開始時就該作廢它；「完成」要綁到工具層
   的成功證據，不能綁到報告文字。
+- 追記（2026-09-09，公司機實測「第 0 步常被略過」）：搬完 b8e7aba 後管理者在 ps-orchestrator 問一題，主 agent 仍沒做開線就直接派 subagent
+  （閘門會擋下並要求補做，但每題多一次來回）；管理者問：為什麼開線要獨立一個第 0 步、不能併進工作流？——工作流其餘順序模型都照走，
+  唯獨獨立章節的第 0 步常被跳過。判定成立：「## 第 0 步」是 prompt 章節，工作流的編號清單才是模型真正照著走的計畫；L0（純 prose 規則對
+  小模型效力最弱）再一次應驗。兩層處置：(1) 三個主 agent 檔移除獨立章節，開線改成工作流裡的編號步驟（orchestrator 第 2 步、
+  deep-research 啟動與續跑第 0 項、audit-orchestrator 第一動作第 1 項），文件仍叫它第 0 步；情境 31 改驗「開線步驟在工作流內、
+  list 先於 connect、排在後續動作之前、沒有獨立 ## 第 0 步章節」。(2) 閘門在主 agent（primary 且 tools 表有 list＋connect）的每一則真實
+  使用者訊息後面注入一個 synthetic text part（OpenCode 自己也用 synthetic part 對模型下指令，例如 @agent 提及；part id 與 Identifier.ascending
+  同形 prt_…；export 看得到、使用者文字原樣保留）：「先 list→connect（connection_name＝「<profile 值>」）→ 才准派 <會查 DB 的 subagent 名單>；
+  每題都要做；沒做完就派會被擋；沒有 oracleMCP_ 工具就回 ORACLE_MCP_DOWN」。提醒跟著訊息走（模型最看得到的位置），不擋、不查 /mcp
+  狀態、不改狀態機；subagent session、全 synthetic 訊息、同 id 重複、不認識的 agent 不注入；env PS_ORACLE_GATE_REMINDER／profile
+  oracle.preflightReminder 可關。為什麼不讓 plugin 自己 connect（真正的確定性 owner）：OpenCode 1.18.29 沒有給 plugin 呼叫 MCP 工具的
+  API（server 只有 /experimental/tool 的 list／ids），MCP client 也不暴露給 plugin；owner 設計仍是第二批。
+  驗證：單元 19 組（提醒注入：主 agent 有／subagent 無／synthetic 無／同 id 無／build 無／FILL_ME 變體／env 與 profile 關閉／不影響擋）；
+  e2e 17 情境全 PASS 並每情境驗 export 的真實訊息帶 synthetic 提醒 part、模型請求尾端看得到提醒、chat.message 列 reminder=true；
+  test-auto-loop 278 判定。成效指標留給公司機：`-AnalyzeAll` 的 blockedRuns 應明顯下降（R22）。
+  教訓：規則要放在模型真正執行的清單裡，不要放在它「應該讀」的章節裡；能跟著每則訊息走的提醒，勝過系統提示裡的任何粗體。

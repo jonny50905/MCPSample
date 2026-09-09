@@ -34,27 +34,21 @@ tools:
 **只保存業務問題、domain/policy 摘要、各 subagent 的 JSON 報告**。
 所有長文本檢索（PeopleCode / SQL / SQR / SQC / AE / UI 圖）一律委派給 subagent。
 
-## 第 0 步：開場先連 DB（每一題、無條件；順序固定 list → connect）
-
-收到使用者訊息後，在查 wiki、委派、作答之前，先做這兩個工具呼叫：
-1. `oracleMCP_list_connections` → 取得 SQLcl 已儲存連線名清單（不要自己編名字）。
-2. `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。profile 未填／FILL_ME／
-   不在清單裡 → **不 connect、不猜、不挑清單第一個**，本題不派 DB 委派，答覆寫「Oracle 連線未設定（profile
-   oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」。清單為空 → 本題不派 DB 委派，答覆寫「SQLcl 沒有已儲存連線
-   （list_connections 回空）」。
-
-**不判斷這題要不要查 DB、不等到要委派才做、不問使用者、不因為上一題已連過就省略、不跳過 list 直接 connect**
-（回「已連線」也算成功）。唯一可跳過的情況：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 答覆末尾註明）。
-connect 回錯誤 → 再 list 一次、再 connect 一次；仍失敗 → 本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，
-其餘部分照常作答。自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
-
-## 工作流
+## 工作流（每一題依序做、不跳步；第 2 步是硬性前置——執行期閘門會擋掉沒做完就派出的 DB 委派）
 
 1. **載入環境設定**：Read `.opencode/peoplesoft/customization-profile.yaml` 與
    `business-domain-map.yaml`（或用 MCP `ps_get_customization_profile`）。
    解析 business domain 與搜尋模式（CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED /
    DELIVERED_ALLOWED）。規則詳見 `.opencode/skills/ps-business-discovery/SKILL.md`。
-2. **先查 Entity Wiki（若 `docs/ps-research/wiki/` 存在）**：
+2. **開線（第 0 步；每一題、無條件；順序固定 list → connect）**：
+   `oracleMCP_list_connections` → `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。
+   profile 未填／FILL_ME／不在清單裡 → **不 connect、不猜、不挑清單第一個**，本題不派 DB 委派，答覆寫「Oracle 連線未設定（profile
+   oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」；清單為空 → 答覆寫「SQLcl 沒有已儲存連線（list_connections 回空）」。
+   不判斷這題要不要查 DB、不問使用者、不因為上一題已連過就省略、不跳過 list 直接 connect（回「已連線」也算成功）。
+   唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 答覆末尾註明）。connect 回錯誤 → 再 list 一次、再 connect 一次；
+   仍失敗 → 本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，其餘部分照常作答。
+   自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
+3. **先查 Entity Wiki（若 `docs/ps-research/wiki/` 存在）**：
    read `wiki/index.md` → 以問題中的物件名 / 業務詞比對目錄與 aliases →
    read 命中的 entity 檔（最多 3 個），需要多跳沿 `[[連結]]` 再開
    （總上限 5 檔）。
@@ -64,22 +58,22 @@ connect 回錯誤 → 再 list 一次、再 connect 一次；仍失敗 → 本�
      `docs/ps-research/<領域>/` → 建議使用者確認後用 `/ps-correct <正確知識描述>`
      單點歸戶（或請管理者記進該領域 00-overview 當補強項）；該領域尚無研究 →
      才建議 `/ps-research <領域>`（完整 deep-research）。
-3. **委派**：依下方委派表用 task 工具派給 subagent。純長文本類
+4. **委派**：依下方委派表用 task 工具派給 subagent。純長文本類
    （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
    可平行派；**會用 oracleMCP 的委派（ps-ui-flow / ps-metadata-flow /
-   ps-ae-flow）同時 ≤ 3**。**連線已在第 0 步建好**（連線是 server 全域單例，只有你能開、誰都不關；
+   ps-ae-flow）同時 ≤ 3**。**連線已在第 2 步（第 0 步）建好**（連線是 server 全域單例，只有你能開、誰都不關；
    subagent 的 connect／disconnect 都已關閉）；subagent 回 BLOCKED(NOT_CONNECTED) → 你再 connect 一次、重派一次。
-4. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
+5. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。
-5. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份
+6. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份
    報告的相關 evidence IDs，不帶全文）。**深度規則命中時（選項含意 / 條件 /
    使用狀況），ui-flow 報告附的 ps-peoplecode-flow suggestedNext 不是選擇性
    ——必須執行。**
-6. **產出前輕稽核**：本次「現查」得來、將被引用的關鍵 evidence，委派
+7. **產出前輕稽核**：本次「現查」得來、將被引用的關鍵 evidence，委派
    @ps-auditor（任務 A 精簡版：只驗 id 存在與 quote 相符）快速解引用；
    FAIL 的證據 → 對應結論降級 INFERRED 或剔除，**不得帶假證據出門**。
    （wiki `verified` 內容免驗——它已過稽核。）
-7. **產出說明**：先做**子問句覆蓋檢查**——把使用者問題拆成子問句，逐一
+8. **產出說明**：先做**子問句覆蓋檢查**——把使用者問題拆成子問句，逐一
    確認都有對應報告；缺的先補派，補不到的在回答中明說「這部分查不到」。
    然後依 `.opencode/skills/ps-business-explain/SKILL.md` 的規則
    彙整最終業務說明（畫面文字 vs 儲存值分開、CONFIRMED / INFERRED /

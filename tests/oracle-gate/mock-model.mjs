@@ -17,7 +17,8 @@
 //                    （驗證「已 READY 後再 connect」的嘗試會先作廢 READY，失敗就不放行）
 //   connect-fail／reconnect-probe：connect 若被閘門在執行前擋下（ORACLE_CONNECTION_NOT_CONFIGURED／MISMATCH），照第 0 步規則回報「Oracle 連線未設定」
 //   劇本以「最後一則 user 訊息之後」的工具呼叫為準（同 session 多 turn 時每 turn 重新走劇本）
-//   MOCK_MODEL_LOG        每次請求追加一行 JSON（含該次請求可見的 task／oracleMCP_ 工具名——驗 subagent 的 Oracle 允許清單）
+//   MOCK_MODEL_LOG        每次請求追加一行 JSON（含該次請求可見的 task／oracleMCP_ 工具名——驗 subagent 的 Oracle 允許清單；
+//                         userText＝最後一則 user 訊息文字的尾端——驗閘門注入的第 0 步提醒有送到模型）
 import http from "node:http"
 import fs from "node:fs"
 
@@ -44,9 +45,10 @@ function toolNames(body) {
 function history(body) {
   let calls = []
   let users = 0
+  let lastUser = ""
   const byId = new Map()
   for (const m of body.messages ?? []) {
-    if (m.role === "user") { calls = []; users += 1; continue }
+    if (m.role === "user") { calls = []; users += 1; lastUser = contentText(m.content); continue }
     if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
       for (const tc of m.tool_calls) {
         let args = {}
@@ -61,7 +63,7 @@ function history(body) {
       if (e) e.result = contentText(m.content)
     }
   }
-  return { calls, users }
+  return { calls, users, lastUser }
 }
 
 function pickConnection(listResult) {
@@ -189,13 +191,13 @@ const server = http.createServer((req, res) => {
     let body = {}
     try { body = JSON.parse(raw || "{}") } catch {}
     const tools = toolNames(body)
-    const { calls, users } = history(body)
+    const { calls, users, lastUser } = history(body)
     const system = contentText((body.messages ?? []).find((m) => m.role === "system")?.content ?? "")
     let next
     if (tools.has("task")) next = primaryNext(calls, users)
     else if (tools.size > 0) next = subagentNext(calls, tools)
     else next = { text: /title/i.test(system) ? "mock title" : "ok" }
-    log({ url: req.url, stream: body.stream, users, tools: [...tools].filter((t) => /^(task|oracleMCP_)/.test(t)), calls: calls.map((c) => c.name), next: next.name ?? "text" })
+    log({ url: req.url, stream: body.stream, users, tools: [...tools].filter((t) => /^(task|oracleMCP_)/.test(t)), calls: calls.map((c) => c.name), next: next.name ?? "text", userText: lastUser.slice(-600) })
     if (body.stream === false) {
       res.writeHead(200, { "Content-Type": "application/json" })
       const message = next.text !== undefined

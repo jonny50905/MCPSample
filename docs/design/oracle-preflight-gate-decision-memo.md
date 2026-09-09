@@ -96,3 +96,16 @@ review 對 a31c946 的判定：核心 invariant 乾淨（DB-capable task 只在 
 
 review 的驗收結論採納：對「受控 subagent 自己開／關共用連線」的原始路徑，在受控配置下已切斷；「subagent 任何時候都能用正確 Oracle
 連線」仍不能宣告——共用連線持續有效性、跨 session 集中復原、真 SQLcl repeated-connect 契約、DB／schema 一致性是另一階段。
+
+## 七、「第 0 步常被略過」：併入工作流＋訊息注入提醒（2026-09-09，公司機實測後）
+
+| 選項 | 可行？ | 取捨 |
+|---|---|---|
+| 獨立「## 第 0 步」章節（原做法） | 已證明常被跳過 | 章節不是模型執行的計畫；工作流清單才是 |
+| 併入工作流編號步驟 | 採 | ps-orchestrator 第 2 步（載入 profile 之後、查 wiki 之前）、deep-research 啟動與續跑第 0 項、audit-orchestrator 第一動作第 1 項；名字保留「第 0 步」 |
+| 閘門在每則真實訊息注入 synthetic 提醒 part | 採 | OpenCode 的 `chat.message` hook 拿到的 parts 陣列在持久化前可加（OpenCode 自己用同一機制對模型下指令）；synthetic text part 會送給模型、export 看得到、不算「真實題目」的判定依據（有非 synthetic part 才算）；只給 primary 且有 list＋connect 的 agent；不擋、不查狀態；可關 |
+| plugin 自己做 list→connect（確定性 owner） | 1.18.29 不可行 | server 只有 `/experimental/tool`（list／ids），沒有呼叫工具的 route；MCP client 不暴露給 plugin；owner 設計屬第二批，且要同時解決共用連線的生命週期 |
+| 閘門把「派 task」自動改寫成「先 connect」 | 不採 | 閘門只擋不改參數（既定邊界）；改寫工具呼叫＝隱性副作用，review 已明確反對 |
+
+副作用與邊界：session 標題由第一則訊息生成時可能帶到提醒字樣（cosmetic）；提醒讓 blockedRuns 下降是機率行為，硬性保證仍只有擋；
+analyzer／e2e 的「真實題目」判定看非 synthetic part，不受注入影響。

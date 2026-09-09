@@ -655,11 +655,12 @@ $hyPat = 'list' + '-connections|run' + '-sql'
 $hy = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 $hy += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1,*.json | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 Assert ($hy.Count -eq 0) "全樹 oracleMCP 工具名一律底線拼法（list_connections／run_sql）：$($hy -join ',')"
+$nextAction = @{ 'ps-orchestrator' = '先查 Entity Wiki'; 'ps-deep-research' = '歸戶提煉'; 'ps-audit-orchestrator' = 'audit-parts/manifest.txt' }
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
-    Assert ($pt -match '第 0 步' -and $pt -match '無條件' -and $pt -match 'oracleMCP_connect') "主 agent $pa：開場無條件 connect（第 0 步）"
-    $s0 = $pt.Substring($pt.IndexOf('## 第 0 步')); $iL = $s0.IndexOf('oracleMCP_list_connections'); $iC = $s0.IndexOf('oracleMCP_connect')
-    Assert ($iL -ge 0 -and $iC -gt $iL -and $s0 -notmatch 'read profile → connect') "主 agent $pa：第 0 步先 list_connections 再 connect"
+    Assert ($pt -match '開線（第 0 步' -and $pt -match '無條件' -and $pt -match 'oracleMCP_connect' -and $pt -notmatch '(?m)^## 第 0 步') "主 agent $pa：開線（第 0 步）是工作流裡的編號步驟，不再是獨立章節"
+    $s0 = $pt.Substring($pt.IndexOf('開線（第 0 步')); $iL = $s0.IndexOf('oracleMCP_list_connections'); $iC = $s0.IndexOf('oracleMCP_connect'); $iN = $s0.IndexOf($nextAction[$pa])
+    Assert ($iL -ge 0 -and $iC -gt $iL -and $iN -gt $iC -and $s0 -notmatch 'read profile → connect') "主 agent $pa：開線步驟內先 list_connections 再 connect，且排在後續動作（$($nextAction[$pa])）之前"
 }
 $cond = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '派出第一個.{0,12}之前.{0,6}先由你 connect|派出前先由你 connect|read profile → connect' } | ForEach-Object { $_.Name })
 Assert ($cond.Count -eq 0) "agent／command 不再有條件式 connect（派出第一個之前才 connect）：$($cond -join ',')"
@@ -683,14 +684,15 @@ Write-Host "情境 32：Oracle 前置閘門（plugin）——檔案形狀／零�
 $gp = Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js'
 Assert (Test-Path -LiteralPath $gp) "plugin 檔存在：.opencode/plugin/ps-oracle-preflight-gate.js"
 $gt = [System.IO.File]::ReadAllText($gp)
-foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_LIST', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_LIST', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded', 'preflightReminder', 'buildReminder', 'partId', 'synthetic: true')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+Assert ($gt -match 'PS_ORACLE_GATE_REMINDER' -and $gt -match 'entry\.mode === "primary" && entry\.connect' -and $gt -match 'parts\.push\(\{ id: partId\(parts\)') "plugin：第 0 步提醒只注入有 list＋connect 的主 agent 的真實訊息（synthetic part），env／profile 可關"
 Assert ($gt -match 'connectProblem\(profileName, target\)' -and $gt -match 'throw new Error\(problem\.message\)' -and $gt -match 's\.connectGen \+= 1' -and $gt -match 'if \(s\.state === "READY"\) s\.state = "NEED_CONNECT"') "plugin：connect 在執行前比對 profile（未填／不一致 → 擋），每次嘗試世代 +1 並作廢 READY"
 $gImports = @([regex]::Matches($gt, '(?m)^import\s.*?from\s+"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 Assert ($gImports.Count -gt 0 -and @($gImports | Where-Object { $_ -notmatch '^node:' }).Count -eq 0) "plugin 只 import node: 內建模組（公司網路封鎖 npm）：$($gImports -join ',')"
 Assert (@([regex]::Matches($gt, '(?m)^export\s')).Count -eq 1 -and $gt -match '(?m)^export const PsOraclePreflightGate = async') "plugin 只有一個具名匯出函式（OpenCode 舊式載入器要求每個匯出都是函式）"
 Assert ($gt -notmatch '(?i)bypass' -and $gt -notmatch '繞過') "plugin 無「繞過」類字串（SOP-3 安控）"
 Assert ($gt -match 'throw new Error\(message\)' -and $gt -notmatch 'out\.args\s*=(?!=)' -and $gt -notmatch 'args\.subagent_type\s*=(?!=)') "plugin 只擋不改參數（不對 out.args／subagent_type 賦值）"
-Assert ($gt.Contains('turnId') -and $gt.Contains('admitted') -and $gt -notmatch 'MCP_STATUS_TTL_MS' -and $gt -notmatch 'connection-state' -and $gt -notmatch 'connection-epoch' -and $gt -notmatch 'prt_' -and $gt -notmatch 'gate stands down' -and $gt -notmatch 'readyAncestor' -and $gt -notmatch 'session\.get') "plugin 是最小不變量版：turnId／入場快照有、mcp 狀態不快取；沒有跨行程影子狀態、失敗次數放行、prt_ 退讓、祖先放行、環境層退讓（未掛載也擋）"
+Assert ($gt.Contains('turnId') -and $gt.Contains('admitted') -and $gt -notmatch 'MCP_STATUS_TTL_MS' -and $gt -notmatch 'connection-state' -and $gt -notmatch 'connection-epoch' -and $gt -notmatch 'startsWith\("prt_"\)' -and $gt -notmatch 'gate stands down' -and $gt -notmatch 'readyAncestor' -and $gt -notmatch 'session\.get') "plugin 是最小不變量版：turnId／入場快照有、mcp 狀態不快取；沒有跨行程影子狀態、失敗次數放行、prt_ 退讓、祖先放行、環境層退讓（未掛載也擋）"
 Assert ($gt -match 'mounted === false' -and $gt -match 'buildDownMessage' -and $gt -notmatch 'decision: "allow", note: "gate stands down') "plugin：oracleMCP 未掛載 → 擋（訊息走 ORACLE_MCP_DOWN 協定），不放行"
 Assert ($gt -match 'entry\.turnId === s\.turnId' -and $gt -match 'attribution === "current"' -and $gt -match 'ok === "unknown"') "plugin：after 依 session:callID 配對入場快照；stale／unknown 不前進；空輸出＝未知"
 $rt = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1'))

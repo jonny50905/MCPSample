@@ -691,3 +691,4 @@ R1／R8 的順序自此由閘門保證：模型錯序時 task 被擋（不執行
 | R19 | 正向驗收反例 | 故意讓 subagent 回 BLOCKED（例如暫時把 profile currentSchema 改壞 → SCHEMA_UNRESOLVED）或非契約 JSON，再 `-AnalyzeSession <id>` | dbTasksCompleted=0、dbTasksBlocked／dbTasksInvalid ≥ 1（完成＝報告 COMPLETE 且子 session run_sql 成功，宣稱不算） |
 | R20 | 已 READY 後再 connect | 同一題內讓主 agent再 connect 一次 | jsonl 第二個 connect 的 before 列 `state=READY`→`next=NEED_CONNECT`、gen+1；成功 → READY；SQLcl 回錯（沒有 after）→ 之後的 DB 委派全擋直到 connect 成功——回報回覆原文（R16 契約） |
 | R21 | 一開多用 | 主 agent 開線後連派三個 DB 委派（固定探測 SELECT 1 FROM DUAL） | 三個子 session 的 jsonl 各有 `run_sql` after 列 `ok:true`；任一結束不影響其餘；`-AnalyzeSession` 的 dbTasksCompleted=3 |
+| R22 | 第 0 步提醒注入 | 問一題後 `opencode export <sessionID>` | 你的那則 user 訊息有兩個 text part：你的原文＋synthetic「【Oracle 第 0 步（執行期閘門提醒）】…connection_name＝「<profile 值>」…」；jsonl 的 chat.message 列 `reminder=true`；主 agent 的第一個工具呼叫是 list_connections（≥20 題後 `-AnalyzeAll` 的 blockedRuns 應明顯低於未注入時） |

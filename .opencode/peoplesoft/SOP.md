@@ -568,6 +568,19 @@ list_connections／connect／disconnect／run_sqlcl 對 subagent 都不可見；
 不挑清單第一個（設定錯誤不能變成靜默連錯 DB）。**閘門在執行前強制這條**：profile 未填、或 connect 的 connection_name 與 profile 不一致的
 connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存連線名完全一致（大小寫、空白），已填的值搬檔時不得被 FILL_ME 覆蓋。
 
+**「第 0 步常被略過」的兩層處置**（公司機實測：主 agent 常不做開線就直接派 subagent；閘門把它擋下、要求補做，但每題多一次來回）：
+
+1. 開線不再是 agent 檔裡獨立的「## 第 0 步」章節，而是工作流裡的**編號步驟**（模型真正照著走的那份清單）：ps-orchestrator 工作流第 2 步
+   （第 1 步載入 profile 之後、先查 wiki 之前）、ps-deep-research「啟動與續跑」第 0 項、ps-audit-orchestrator「第一動作」第 1 項。
+   文件仍叫它「第 0 步」。
+2. 閘門在主 agent（tools 表有 list_connections＋connect 的 primary：ps-orchestrator／ps-deep-research／ps-audit-orchestrator）的**每一則真實
+   使用者訊息**後面補一個 synthetic text part：「先依序 list_connections → connect（connection_name＝「<profile 值>」）→ 兩者成功後才准派
+   會查 DB 的 subagent（名單）；每題都要做；沒做完就派會被擋下；工具清單沒有 oracleMCP_ 工具 → 不派、回 ORACLE_MCP_DOWN」。提醒跟著訊息走，
+   是模型最看得到的位置；它不擋、不查 /mcp 狀態、不改狀態機——硬性保證仍是擋。subagent session、全 synthetic 訊息（回灌／續行）、
+   同一 id 重複到達、不認識的 agent（build 等）不注入。使用者文字保持原樣（提醒是另一個 part）；export 裡看得到（R22）。
+   關閉：`$env:PS_ORACLE_GATE_REMINDER='off'` 或 profile `oracle.preflightReminder: off`。已知副作用：session 標題由第一則訊息產生時可能
+   帶到提醒字樣（cosmetic）。成效指標＝`-AnalyzeAll` 的 blockedRuns（模型錯序被擋的 session 數）應明顯下降。
+
 ```text
 □ 1. 搬檔：.opencode\plugin\ps-oracle-preflight-gate.js、.opencode\.npmrc（兩檔都在 manifest 內）、四個 subagent 與三個主 agent 的
      agent 檔、cookbook、profile（只合併 oracle 區塊的註解與 preflightGate）、scripts\tests\test-oracle-gate-runtime.ps1（BOM）；
@@ -578,8 +591,11 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
      做同一件事、一起等——在該目錄新建 .npmrc，內容一行 offline=true（repo 外、不在 manifest；沙箱實測只放專案那份
      仍等 72 秒，兩份都放 2 秒）。之後啟動 --print-logs 出現「background dependency install failed … only-if-cached」屬預期。
 □ 2. 有載入嗎：開任一 opencode session 後看 auto-loop-logs\ps-oracle-gate\_plugin.log 出現
-     「loaded … mode=enforce agents=[…ps-ui-flow:DB…]」。沒有＝plugin 沒被載到（檔名／目錄／JS 語法），
+     「loaded … mode=enforce reminder=on agents=[…ps-ui-flow:DB…]」。沒有＝plugin 沒被載到（檔名／目錄／JS 語法），
      用 opencode --print-logs --log-level DEBUG 看 plugin 錯誤。
+     「主 agent 沒做第 0 步就派 subagent」的判讀：看該 session 的 jsonl——before task 列 decision=block（state=NEED_LIST）＝閘門有擋、
+     模型接著會補 list→connect 再重派（安全，但每題多一次來回；提醒注入就是要把這個次數壓下去）；before task 列 decision=allow 且
+     state≠READY、或根本沒有 jsonl＝閘門沒在管（plugin 沒載到、或 observe 模式）——先看 _plugin.log。
 □ 3. 快篩（一題＋同視窗第二題）：新 session、ps-orchestrator、問一題需 DB 的問題；接著同一視窗再問一題。看
      auto-loop-logs\ps-oracle-gate\<sessionID>.jsonl：
      - 模型照做：after list_connections（next=NEED_CONNECT）→ after connect（next=READY）→ before task decision=allow
@@ -599,6 +615,8 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
        gen+1；SQLcl 若對它回錯誤（沒有 after），之後的 DB 委派會被擋直到 connect 成功——這就是 R16 待驗的契約，回報回覆原文
      - 一開多用（R21）：主 agent 開線後連派三個 DB 委派（固定探測 SELECT 1 FROM DUAL）→ 三個子 session 的 jsonl 各有 run_sql ok:true、
        任一結束不影響其餘（子 agent 沒有 disconnect）；`-AnalyzeSession` 顯示 dbTasksCompleted=3
+     - 提醒注入（R22）：`opencode export <sessionID>` 裡每一則你打的訊息都多一個 synthetic text part（「【Oracle 第 0 步（執行期閘門提醒）】…」），
+       你的文字原樣保留；jsonl 的 chat.message 列 reminder=true；主 agent 的第一個工具呼叫應是 list_connections（blockedRuns 應下降）
 □ 4. P1 探測（互動 TUI）：同一視窗連問 ≥ 20 題後跑
      powershell -File scripts\tests\test-oracle-gate-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
      安全五項都要 0，全部無豁免：hookMismatch（閘門看到的 task 次數＝opencode export 的 task 件數）、
@@ -619,7 +637,8 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
      （-ExpectDbTask Yes／No／Any 可覆寫）；B3 附帶看 preflightRuns（R8：不需要 DB 也應做第 0 步）。
 □ 6. 暫時關閉／探測模式：$env:PS_ORACLE_GATE_MODE='observe'（該次啟動）或 profile oracle.preflightGate: observe；
      observe 只記錄不擋（jsonl 的 decision=observe-would-block）。不要長期停在 observe。
-□ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（入場時的題目＝該則 user 訊息 id）、callID
+□ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（入場時的題目＝該則 user 訊息 id）、
+     reminder（chat.message 列：這則訊息有沒有注入第 0 步提醒）、callID
      （同一次工具呼叫的 before／after 配對）、target、state→next、decision（allow／block／observe／observe-would-block）、
      basis（run_sql:enabled／disabled／unknown-agent 說明）、dbCapable（機械判定）、attribution（current／stale／unknown）、
      stale／replyTurnId（晚到回覆：實際到達時的題目）、entryState、ok（true／false／"unknown"）／failureMatch／outputLength、

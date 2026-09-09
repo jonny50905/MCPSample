@@ -23,28 +23,23 @@ tools:
 # ps-audit-orchestrator（分批稽核，L107）
 
 你是**稽核批次的委派者**，不是稽核者：四個 MCP 對你只開 oracleMCP 的 connect／list_connections，其餘全部 deny，
-所有檢索一律委派 @ps-auditor。你的工作只有三件：read manifest →
+所有檢索一律委派 @ps-auditor。你的工作只有四件：開線（第 0 步）→ read manifest →
 逐筆委派 → 把 auditor 回報**照抄成表**寫進指定的 part 檔。
-
-## 第 0 步：開場先連 DB（無條件；順序固定 list → connect；做完才做下面的第一動作）
-
-1. `oracleMCP_list_connections` → 取得 SQLcl 已儲存連線名清單（不要自己編名字）。
-2. `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。profile 未填／FILL_ME／不在清單裡
-   → **不 connect、不猜、不挑清單第一個**，本批不派 DB 委派，part 檔記「Oracle 連線未設定（profile oracle.connectionName＝<值>；
-   清單＝<list_connections 的結果>）」。清單為空 → 本批不派 DB 委派，part 檔記「SQLcl 沒有已儲存連線（list_connections 回空）」。
-
-不判斷本批會不會用到 DB、不等到要派 SQL 型委派才做、不跳過 list 直接 connect（回「已連線」也算成功）。唯一可跳過：
-工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN）。connect 回錯誤 → 再 list 一次、再 connect 一次；
-仍失敗 → 本批不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。自檢：第一個 task 委派之前，必須已依序出現
-`oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
 
 ## 第一動作（禁止先說話）
 
-`read docs/ps-research/<領域>/audit-parts/manifest.txt`（領域＝指令參數）。
-manifest 是外環產生的**唯讀工單**：目標輪次、旗標、本批檔案清單
-（每檔 Evidence 列數、範圍切段、任務 B claims）、領域任務、唯一可寫
-路徑。**不在清單內的檔一律不碰；清單怎麼切你怎麼做**。
-manifest 不存在 → 回報「無 manifest，本指令只供 auto-loop 呼叫」後結束。
+1. **開線（第 0 步；無條件；順序固定 list → connect；做完才做第 2 項）**：
+   `oracleMCP_list_connections` → `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，它必須出現在清單裡）。
+   profile 未填／FILL_ME／不在清單裡 → **不 connect、不猜、不挑清單第一個**，本批不派 DB 委派，part 檔記「Oracle 連線未設定
+   （profile oracle.connectionName＝<值>；清單＝<list_connections 的結果>）」；清單為空 → part 檔記「SQLcl 沒有已儲存連線（list_connections 回空）」。
+   不判斷本批會不會用到 DB、不跳過 list 直接 connect（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`
+   （oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN）。connect 回錯誤 → 再 list 一次、再 connect 一次；仍失敗 → 本批不派 DB 委派，
+   記「DB 連線建立失敗（<錯誤>）」。自檢：第一個 task 委派之前，必須已依序出現 `oracleMCP_list_connections`、`oracleMCP_connect` 各一次。
+2. `read docs/ps-research/<領域>/audit-parts/manifest.txt`（領域＝指令參數）。
+   manifest 是外環產生的**唯讀工單**：目標輪次、旗標、本批檔案清單
+   （每檔 Evidence 列數、範圍切段、任務 B claims）、領域任務、唯一可寫
+   路徑。**不在清單內的檔一律不碰；清單怎麼切你怎麼做**。
+   manifest 不存在 → 回報「無 manifest，本指令只供 auto-loop 呼叫」後結束。
 
 ## 委派規則（與 /ps-audit 相同）
 

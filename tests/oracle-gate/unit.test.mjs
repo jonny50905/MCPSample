@@ -31,14 +31,14 @@ function fakeClient({ mcp = "connected", statusSeq, onStatus } = {}) {
   }
 }
 
-function tempProject({ profileGate, connectionName = "HR" } = {}) {
+function tempProject({ profileGate, connectionName = "HR", reminder } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gate-unit-"))
   fs.mkdirSync(path.join(dir, ".opencode", "agent"), { recursive: true })
   fs.mkdirSync(path.join(dir, ".opencode", "peoplesoft"), { recursive: true })
   for (const f of fs.readdirSync(path.join(repoRoot, ".opencode", "agent"))) {
     fs.copyFileSync(path.join(repoRoot, ".opencode", "agent", f), path.join(dir, ".opencode", "agent", f))
   }
-  const profile = "searchPolicy:\n  defaultMode: CUSTOM_FIRST\noracle:\n  currentSchema: FILL_ME\n  connectionName: " + connectionName + "\n" + (profileGate ? `  preflightGate: ${profileGate}\n` : "") + "businessDomainMap: business-domain-map.yaml\n"
+  const profile = "searchPolicy:\n  defaultMode: CUSTOM_FIRST\noracle:\n  currentSchema: FILL_ME\n  connectionName: " + connectionName + "\n" + (profileGate ? `  preflightGate: ${profileGate}\n` : "") + (reminder ? `  preflightReminder: ${reminder}\n` : "") + "businessDomainMap: business-domain-map.yaml\n"
   fs.writeFileSync(path.join(dir, ".opencode", "peoplesoft", "customization-profile.yaml"), profile)
   return dir
 }
@@ -530,4 +530,77 @@ test("task 回報解析：COMPLETE／PARTIAL／BLOCKED(QUERY_TIMEOUT)／非 JSON
   await call(hooks, C, "oracleMCP_run_sql", "q3", { content: [] }, { sql: "SELECT 1 FROM DUAL" })
   const q = readLog(dir, C).filter((l) => l.hook === "after")
   assert.deepEqual(q.map((l) => [l.callID, l.ok, l.attribution]), [["q1", true, "current"], ["q2", false, "current"], ["q3", "unknown", "current"]])
+})
+
+test("第 0 步提醒注入：主 agent 的每則真實訊息補一個 synthetic part；subagent／synthetic 訊息／同 id／不認識的 agent 不注入；不查 /mcp 狀態；env／profile 可關", async () => {
+  const dir = tempProject({ connectionName: "HR_DEV" })
+  const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
+  const out = userMsg("m1", "兵役狀態有哪些選項？")
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator", messageID: "m1" }, out)
+  assert.equal(out.parts.length, 2)
+  assert.equal(out.parts[0].text, "兵役狀態有哪些選項？")
+  const p = out.parts[1]
+  assert.ok(p.synthetic === true && p.type === "text" && p.messageID === "m1" && p.sessionID === S && /^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/.test(p.id), JSON.stringify(p))
+  assert.match(p.text, /oracleMCP_list_connections → oracleMCP_connect/)
+  assert.match(p.text, /「HR_DEV」/)
+  assert.match(p.text, /ps-ui-flow／?/)
+  assert.ok(/ps-auditor/.test(p.text) && !/ps-peoplecode-flow/.test(p.text), "提醒列的是會查 DB 的 subagent")
+  assert.equal(last(dir, S).reminder, true)
+  // 同 id 重複到達不再注入；synthetic-only 訊息不注入
+  const again = userMsg("m1")
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, again)
+  assert.equal(again.parts.length, 1)
+  const syn = { message: { id: "m2" }, parts: [{ type: "text", text: "<task_result>…</task_result>", synthetic: true }] }
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, syn)
+  assert.equal(syn.parts.length, 1)
+  // subagent session、不認識的 agent（build）不注入
+  const sub = userMsg("mc")
+  await hooks["chat.message"]({ sessionID: "ses_child", agent: "ps-ui-flow" }, sub)
+  assert.equal(sub.parts.length, 1)
+  const b = userMsg("mb")
+  await hooks["chat.message"]({ sessionID: "ses_build", agent: "build" }, b)
+  assert.equal(b.parts.length, 1)
+  assert.equal(last(dir, "ses_build").reminder, false)
+  // 兩個 part 的 id 不同、遞增；且一定排在使用者文字 part 之後——即使 OpenCode 在同一毫秒內已發了更大的計數
+  const o2 = userMsg("m3")
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, o2)
+  assert.notEqual(o2.parts[1].id, p.id)
+  assert.ok(o2.parts[1].id > p.id)
+  const big = (BigInt(Date.now() + 5) * 4096n + 4000n) & ((1n << 48n) - 1n)
+  const hex = big.toString(16).padStart(12, "0")
+  const o3 = { message: { id: "m5" }, parts: [{ id: "prt_" + hex + "AAAAAAAAAAAAAA", type: "text", text: "q" }] }
+  await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, o3)
+  assert.ok(o3.parts[1].id > o3.parts[0].id, `${o3.parts[1].id} must sort after ${o3.parts[0].id}`)
+  assert.equal(o3.parts[1].id.slice(4, 16), (big + 1n).toString(16).padStart(12, "0"))
+  // profile 未填：提醒改成「不要 connect」
+  const dir2 = tempProject({ connectionName: "FILL_ME" })
+  const h2 = await PsOraclePreflightGate({ directory: dir2, client: fakeClient() })
+  const u2 = userMsg("m1")
+  await h2["chat.message"]({ sessionID: S, agent: "ps-deep-research" }, u2)
+  assert.match(u2.parts[1].text, /未填/)
+  assert.match(u2.parts[1].text, /Oracle 連線未設定/)
+  // 提醒不查 /mcp 狀態（不影響狀態機、不消耗 status 呼叫）：未掛載的處置寫成靜態條款
+  const h3 = await PsOraclePreflightGate({ directory: dir, client: fakeClient({ mcp: "throw" }) })
+  const u3 = userMsg("m1")
+  await h3["chat.message"]({ sessionID: "ses_down", agent: "ps-audit-orchestrator" }, u3)
+  assert.equal(u3.parts.length, 2)
+  assert.match(u3.parts[1].text, /未掛載.*ORACLE_MCP_DOWN/)
+  // 關閉：env 優先
+  process.env.PS_ORACLE_GATE_REMINDER = "off"
+  try {
+    const u4 = userMsg("m4")
+    await hooks["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, u4)
+    assert.equal(u4.parts.length, 1)
+    assert.equal(last(dir, S).reminder, false)
+  } finally {
+    delete process.env.PS_ORACLE_GATE_REMINDER
+  }
+  // 關閉：profile
+  const dir4 = tempProject({ connectionName: "HR_DEV", reminder: "off" })
+  const h4 = await PsOraclePreflightGate({ directory: dir4, client: fakeClient() })
+  const u5 = userMsg("m1")
+  await h4["chat.message"]({ sessionID: S, agent: "ps-orchestrator" }, u5)
+  assert.equal(u5.parts.length, 1)
+  // 提醒不影響閘門本身：沒做前置照擋
+  await expectBlock(() => task(hooks, S, "t1"), "NEED_LIST")
 })
