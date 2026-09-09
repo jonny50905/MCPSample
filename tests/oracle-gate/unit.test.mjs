@@ -78,7 +78,7 @@ function readLog(dir, session) {
 }
 const last = (dir, session) => readLog(dir, session).at(-1)
 
-test("agent 目錄分類：只有 run_sql 開的 subagent 過閘門；不認識的名字保守視為會查 DB；每列都有 dbCapable", async () => {
+test("agent 目錄分類：只有 sql_run 開的 subagent 過閘門；不認識的名字保守視為會查 DB；每列都有 dbCapable", async () => {
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
@@ -94,7 +94,7 @@ test("agent 目錄分類：只有 run_sql 開的 subagent 過閘門；不認識�
   assert.ok(blocks.every((l) => l.dbCapable === true))
   const allows = log.filter((l) => l.decision === "allow")
   assert.equal(allows.length, 6)
-  assert.ok(allows.every((l) => l.dbCapable === false && l.basis === "run_sql:disabled"))
+  assert.ok(allows.every((l) => l.dbCapable === false && l.basis === "sql_run:disabled"))
   assert.ok(log.some((l) => l.basis === "unknown-agent(default:DB)" && l.dbCapable === true))
   assert.ok(log.filter((l) => l.hook === "before").every((l) => l.turnId === "m1" && l.callID === "c"))
 })
@@ -479,7 +479,7 @@ test("同題連線世代：同題兩個 task 在舊連線上，A 回 NOT_CONNECT
   await expectBlock(() => task(hooks, S, "tD"), "NEED_CONNECT")
 })
 
-test("task 回報解析：COMPLETE／PARTIAL／BLOCKED(QUERY_TIMEOUT)／非 JSON／task_error 都記到列上，只有 NOT_CONNECTED 退狀態；run_sql 的 after 記三態 ok", async () => {
+test("task 回報解析：COMPLETE／PARTIAL／BLOCKED(QUERY_TIMEOUT)／非 JSON／task_error 都記到列上，只有 NOT_CONNECTED 退狀態；sql_run 的 after 記三態 ok", async () => {
   const dir = tempProject()
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
@@ -510,11 +510,11 @@ test("task 回報解析：COMPLETE／PARTIAL／BLOCKED(QUERY_TIMEOUT)／非 JSON
   await task(hooks, S, "t9")
   await taskDone(hooks, S, "t9", wrap("ses_9", NOT_CONNECTED_JSON))
   assert.ok(last(dir, S).notConnected === true && last(dir, S).next === "NEED_CONNECT" && last(dir, S).reportStatus === "BLOCKED")
-  // 子 session 的 run_sql：成功／未連線／空輸出
+  // 子 session 的 sql_run：成功／未連線／空輸出
   const C = "ses_child"
-  await call(hooks, C, "oracleMCP_run_sql", "q1", mcpOk("ROW_COUNT\n1"), { sql: "SELECT 1 FROM DUAL" })
-  await call(hooks, C, "oracleMCP_run_sql", "q2", mcpOk("Error: Not connected to a database."), { sql: "SELECT 1 FROM DUAL" })
-  await call(hooks, C, "oracleMCP_run_sql", "q3", { content: [] }, { sql: "SELECT 1 FROM DUAL" })
+  await call(hooks, C, "oracleMCP_sql_run", "q1", mcpOk("ROW_COUNT\n1"), { sql: "SELECT 1 FROM DUAL" })
+  await call(hooks, C, "oracleMCP_sql_run", "q2", mcpOk("Error: Not connected to a database."), { sql: "SELECT 1 FROM DUAL" })
+  await call(hooks, C, "oracleMCP_sql_run", "q3", { content: [] }, { sql: "SELECT 1 FROM DUAL" })
   const q = readLog(dir, C).filter((l) => l.hook === "after")
   assert.deepEqual(q.map((l) => [l.callID, l.ok, l.attribution]), [["q1", true, "current"], ["q2", false, "current"], ["q3", "unknown", "current"]])
 })
@@ -595,7 +595,7 @@ test("第 0 步提醒注入：主 agent 的每則真實訊息補一個 synthetic
 
 test("agent tools 表混寫 oracleMCP_* deny ＋ 個別工具 true：載入時記 WARN 到 _plugin.log（本 repo 的 agent 都沒有混寫）；混寫者仍保守視為會查 DB", async () => {
   const dir = tempProject()
-  fs.writeFileSync(path.join(dir, ".opencode", "agent", "zz-mixed.md"), '---\nmode: subagent\ntools:\n  "oracleMCP_*": false\n  "oracleMCP_run_sql": true\n---\nx\n')
+  fs.writeFileSync(path.join(dir, ".opencode", "agent", "zz-mixed.md"), '---\nmode: subagent\ntools:\n  "oracleMCP_*": false\n  "oracleMCP_sql_run": true\n---\nx\n')
   const plogOf = (d) => fs.readFileSync(path.join(d, "auto-loop-logs", "ps-oracle-gate", "_plugin.log"), "utf8")
   const hooks = await PsOraclePreflightGate({ directory: dir, client: fakeClient() })
   assert.match(plogOf(dir), /wildcardDenyMix=\["zz-mixed"\]/)
@@ -606,7 +606,7 @@ test("agent tools 表混寫 oracleMCP_* deny ＋ 個別工具 true：載入時�
   assert.doesNotMatch(plogOf(clean), /WARN agent/)
   await chat(hooks, "ses_mix", "m1")
   await expectBlock(() => task(hooks, "ses_mix", "t1", "zz-mixed"), "NEED_CONNECT")
-  assert.ok(last(dir, "ses_mix").dbCapable === true && last(dir, "ses_mix").basis === "run_sql:enabled")
+  assert.ok(last(dir, "ses_mix").dbCapable === true && last(dir, "ses_mix").basis === "sql_run:enabled")
 })
 
 test("成功回覆的說明文字引用 ORA-nnnnn 錯誤碼不算失敗（SQLcl 實際回覆）；失敗只認 connection not connected／established／found、TNS-nnnnn、not connected、error 開頭等句型", async () => {
@@ -682,7 +682,7 @@ test("先列 todo：主 agent 每題第一個工具呼叫必須是 todowrite（�
   await before(h2, S, "read", "r2", {})
   // subagent session／不在 agent 目錄的 agent（build）／agent 未知的 session 不管
   await chat(hooks, "ses_child", "mc", "ps-ui-flow")
-  await call(hooks, "ses_child", "oracleMCP_run_sql", "q1", mcpOk("ROW_COUNT\n1"), { sql: "SELECT 1 FROM DUAL" })
+  await call(hooks, "ses_child", "oracleMCP_sql_run", "q1", mcpOk("ROW_COUNT\n1"), { sql: "SELECT 1 FROM DUAL" })
   assert.equal(last(dir, "ses_child").ok, true)
   await chat(hooks, "ses_build", "mb", "build")
   await before(hooks, "ses_build", "read", "r1", {})

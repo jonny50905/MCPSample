@@ -18,7 +18,7 @@ tools:
   "oracleMCP_list_connections": true
   "oracleMCP_connect": true
   "oracleMCP_disconnect": false
-  "oracleMCP_run_sql": false
+  "oracleMCP_sql_run": false
   "oracleMCP_run_sqlcl": false
   "PeoplecodeMetadata_*": false
 ---

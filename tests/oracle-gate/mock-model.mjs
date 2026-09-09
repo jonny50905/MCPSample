@@ -174,10 +174,10 @@ function primaryNext(allCalls, users) {
   }
 }
 
-// subagent 劇本：有 run_sql 就查一次再回 JSON；沒有（純 ES）直接回 JSON
+// subagent 劇本：有 sql_run 就查一次再回 JSON；沒有（純 ES）直接回 JSON
 function subagentNext(calls, tools) {
-  if (tools.has("oracleMCP_run_sql") && calls.length === 0) return { name: "oracleMCP_run_sql", args: { sql: "SELECT 1 FROM DUAL" } }
-  const sql = calls.find((c) => c.name === "oracleMCP_run_sql")
+  if (tools.has("oracleMCP_sql_run") && calls.length === 0) return { name: "oracleMCP_sql_run", args: { sql: "SELECT 1 FROM DUAL" } }
+  const sql = calls.find((c) => c.name === "oracleMCP_sql_run")
   const blocked = sql && /not connected/i.test(sql.result)
   const report = blocked
     ? { task: "mock", status: "BLOCKED", blockedReason: "NOT_CONNECTED", findings: [], dependencies: [], dynamicRuntimeWarnings: [], gaps: [] }

@@ -608,7 +608,7 @@ Assert ($ckSql -notmatch '(?m)^\s*HAVING') "canonical 不用 HAVING 丟列（hid
 $pfText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
 Assert ($pfText -match '(?m)^navigation:' -and $pfText -match '(?m)^\s*surfaces:\s*CLASSIC_ONLY' -and $pfText -match '(?m)^\s*identity:\s*MENU_COMPONENT\b' -and $pfText -match '(?m)^\s*labelLanguage:\s*ENG' -and $pfText -match '(?m)^\s*attrValType:\s*CLOB') "profile navigation 區塊：surfaces／identity／labelLanguage／attrValType"
 
-Write-Host "情境 31：oracleMCP 連線擁有權——主 agent 開 list_connections／connect、不開 run_sql／disconnect；subagent 只查、不能 connect／disconnect（tools 表最後匹配者優先）"
+Write-Host "情境 31：oracleMCP 連線擁有權——主 agent 開 list_connections／connect、不開 sql_run／disconnect；subagent 只查、不能 connect／disconnect（tools 表最後匹配者優先）"
 function Get-AgentToolPerm([string]$File, [string]$Tool) {
     $txt = [System.IO.File]::ReadAllText($File)
     $m = [regex]::Match($txt, '(?ms)^tools:\r?\n(.*?)(?=^[A-Za-z_]+:|^---|\z)')
@@ -626,18 +626,18 @@ function Get-AgentToolPerm([string]$File, [string]$Tool) {
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pf = Join-Path $repoRoot ".opencode/agent/$pa.md"
     Assert ((Get-AgentToolPerm $pf 'oracleMCP_connect') -eq 'true' -and (Get-AgentToolPerm $pf 'oracleMCP_list_connections') -eq 'true') "主 agent $pa：connect／list_connections 開"
-    Assert ((Get-AgentToolPerm $pf 'oracleMCP_run_sql') -eq 'false' -and (Get-AgentToolPerm $pf 'oracleMCP_disconnect') -eq 'false') "主 agent $pa：run_sql／disconnect 關"
+    Assert ((Get-AgentToolPerm $pf 'oracleMCP_sql_run') -eq 'false' -and (Get-AgentToolPerm $pf 'oracleMCP_disconnect') -eq 'false') "主 agent $pa：sql_run／disconnect 關"
     $paTxt = [System.IO.File]::ReadAllText($pf)
-    Assert ($paTxt -notmatch '"oracleMCP_\*"' -and $paTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_connect":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_run_sql":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false') "主 agent $pa：Oracle 逐工具明寫（list／connect true；disconnect／run_sql／run_sqlcl false），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
+    Assert ($paTxt -notmatch '"oracleMCP_\*"' -and $paTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_connect":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false') "主 agent $pa：Oracle 逐工具明寫（list／connect true；disconnect／sql_run／run_sqlcl false），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
 }
 $mixed = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md') | Where-Object { $t = [System.IO.File]::ReadAllText($_.FullName); ($t -match '"oracleMCP_\*":\s*false') -and ($t -match '(?m)^\s*"oracleMCP_[a-z_]+":\s*true') } | ForEach-Object { $_.Name })
 Assert ($mixed.Count -eq 0) "沒有 agent 混寫 oracleMCP_* deny ＋ 個別 oracleMCP_ 工具 true（某些 OpenCode 版本會因此把整個 MCP 對該 agent 隱藏，true 救不回）：$($mixed -join ',')"
 foreach ($sa in @('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor')) {
     $sf = Join-Path $repoRoot ".opencode/agent/$sa.md"
-    Assert ((Get-AgentToolPerm $sf 'oracleMCP_run_sql') -eq 'true') "subagent $sa：run_sql 開"
-    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_list_connections') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_run_sqlcl') -eq 'false') "subagent $sa：Oracle 允許清單——connect／disconnect／list_connections／run_sqlcl 全關，只開 run_sql"
+    Assert ((Get-AgentToolPerm $sf 'oracleMCP_sql_run') -eq 'true') "subagent $sa：sql_run 開"
+    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_list_connections') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_run_sqlcl') -eq 'false') "subagent $sa：Oracle 允許清單——connect／disconnect／list_connections／run_sqlcl 全關，只開 sql_run"
     $saTxt = [System.IO.File]::ReadAllText($sf)
-    Assert ($saTxt -notmatch '"oracleMCP_\*"' -and $saTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_connect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_run_sql":\s*true') "subagent $sa：Oracle 逐工具明寫（list／connect／disconnect／run_sqlcl false、run_sql true），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
+    Assert ($saTxt -notmatch '"oracleMCP_\*"' -and $saTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_connect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_run_sqlcl":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*true') "subagent $sa：Oracle 逐工具明寫（list／connect／disconnect／run_sqlcl false、sql_run true），不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）"
     Assert ($saTxt -notmatch '才 `list_connections`' -and $saTxt -notmatch '回未連線錯誤才 connect' -and $saTxt -match 'NOT_CONNECTED') "subagent $sa：硬規則段無「回未連線才 list→connect」殘留、含 NOT_CONNECTED"
 }
 $prof31 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
@@ -655,10 +655,16 @@ $rcTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesof
 Assert ($rcTxt -match 'blockedReason' -and $rcTxt -match 'NOT_CONNECTED' -and $rcTxt -match 'SCHEMA_UNRESOLVED' -and $rcTxt -match 'QUERY_TIMEOUT') "report-contract：blockedReason 封閉值域"
 $noSolo = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '先單獨派' } | ForEach-Object { $_.Name })
 Assert ($noSolo.Count -eq 0) "agent／command 不再有「先單獨派」：$($noSolo -join ',')"
-$hyPat = 'list' + '-connections|run' + '-sql'
-$hy = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
+$hyPat = 'list' + '-connections|run' + '-sql|sql' + '-run'
+$hy = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml | Where-Object { $_.Name -ne 'SOP.md' -and $_.Name -ne 'applied.md' -and ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 $hy += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1,*.json | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
-Assert ($hy.Count -eq 0) "全樹 oracleMCP 工具名一律底線拼法（list_connections／run_sql）：$($hy -join ',')"
+Assert ($hy.Count -eq 0) "全樹 oracleMCP 工具名一律底線拼法（list_connections／sql_run）：$($hy -join ',')"
+# 查詢工具的實名是 sql_run（公司機 /mcp 核對）；舊錯名 run_ + sql 不得回流（SOP／applied 的歷史追記除外；run_sqlcl 不在此列）
+$oldName = 'run_' + 'sql(?!cl)'
+$oldHits = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml,*.js | Where-Object { $_.Name -ne 'SOP.md' -and $_.Name -ne 'applied.md' -and ([System.IO.File]::ReadAllText($_.FullName)) -match $oldName } | ForEach-Object { $_.Name })
+$oldHits += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1 | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $oldName } | ForEach-Object { $_.Name })
+if (([System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))) -match $oldName) { $oldHits += 'AGENTS.md' }
+Assert ($oldHits.Count -eq 0) "oracleMCP 查詢工具實名是 sql_run：模型讀的檔、plugin、scripts 不得再出現舊錯名（run_ + sql）：$($oldHits -join ',')"
 $nextAction = @{ 'ps-orchestrator' = '先查 Entity Wiki'; 'ps-deep-research' = '歸戶提煉'; 'ps-audit-orchestrator' = 'audit-parts/manifest.txt' }
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
@@ -688,7 +694,7 @@ Write-Host "情境 32：Oracle 前置閘門（plugin）——檔案形狀／零�
 $gp = Join-Path $repoRoot '.opencode/plugin/ps-oracle-preflight-gate.js'
 Assert (Test-Path -LiteralPath $gp) "plugin 檔存在：.opencode/plugin/ps-oracle-preflight-gate.js"
 $gt = [System.IO.File]::ReadAllText($gp)
-foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_run_sql', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded', 'preflightReminder', 'buildReminder', 'partId', 'synthetic: true', 'wildcardDenyMix', 'list_connections is informational', 'todowrite', 'PS_TODO_FIRST_REQUIRED', 'TODO_NO_CONNECT_ITEM', 'readTodoFirst', 'PS_ORACLE_GATE_TODO')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+foreach ($must in @('PS_ORACLE_PREFLIGHT_REQUIRED', 'oracleMCP_list_connections', 'oracleMCP_connect', 'oracleMCP_sql_run', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'NEED_CONNECT', 'READY', 'subagent_type', 'observe', 'blockedReason', 'mcp.status', 'dbCapable', 'attribution', 'stale', '"unknown"', 'ORACLE_MCP_DOWN', 'turnAtDecision', 'takeEntry', 'ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'connectGen', 'parseReport', 'reportStatus', 'childSessionID', 'superseded', 'preflightReminder', 'buildReminder', 'partId', 'synthetic: true', 'wildcardDenyMix', 'list_connections is informational', 'todowrite', 'PS_TODO_FIRST_REQUIRED', 'TODO_NO_CONNECT_ITEM', 'readTodoFirst', 'PS_ORACLE_GATE_TODO')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
 Assert ($gt -match 'TODO_EXEMPT = new Set\(\[TOOL_TODO_WRITE, "todoread", "invalid"\]\)' -and $gt -match 'todoScope\(s\)' -and $gt -match 'throw new Error\(buildTodoMessage\(' -and $gt -match 'hook: "todo-first"') "plugin：先列 todo 層——todowrite 之前的其他工具擋（todoread／invalid 除外）、只對有 connect 的主 agent、observe 只記 todo-first 列"
 Assert ($gt -notmatch 'NEED_LIST' -and $gt -match 'state: "NEED_CONNECT", agent: undefined' -and $gt -match 'connect: toolEnabled\(tools, TOOL_CONNECT\),' -and $gt -notmatch 'connect before list_connections') "plugin：不變量只剩 connect→READY（沒有 list 狀態；list_connections 的 after 只記錄不改狀態）；提醒對象＝有 connect 的主 agent"
 Assert ($gt -match 'PS_ORACLE_GATE_REMINDER' -and $gt -match 'entry\.mode === "primary" && entry\.connect' -and $gt -match 'parts\.push\(\{ id: partId\(parts\)') "plugin：第 0 步提醒只注入有 connect 的主 agent 的真實訊息（synthetic part），env／profile 可關"
@@ -703,8 +709,8 @@ Assert ($gt -match 'mounted === false' -and $gt -match 'buildDownMessage' -and $
 Assert ($gt -match 'entry\.turnId === s\.turnId' -and $gt -match 'attribution === "current"' -and $gt -match 'ok === "unknown"') "plugin：after 依 session:callID 配對入場快照；stale／unknown 不前進；空輸出＝未知"
 $rt = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1'))
 Assert ($rt -match 'turnInvariantViolations' -and $rt -match 'turnMismatch' -and $rt -match 'hookMismatch' -and $rt -match 'executedBeforePreflight' -and $rt -match 'exportFailures' -and $rt -match '\.export\.json' -and $rt -notmatch 'Test-Exempt' -and $rt -notmatch 'taskkill\.exe /PID \$p\.Id /T /F 2>\$null') "runtime 回歸腳本判定 per-turn 不變量／turn 覆蓋率／task 覆蓋率／早於前置／export 失敗，且無豁免；export 落檔讀 UTF-8；taskkill 不直接重導 stderr（PS 5.1 EAP=Stop）"
-Assert ($rt -match 'callMismatch' -and $rt -match 'Test-DbCapable' -and $rt -match 'taskParents' -and $rt -match 'dbTasksCompleted' -and $rt -match 'ExpectDbTask' -and $rt -match 'listCalls' -and $rt -match 'todoBlocks' -and $rt -match 'todoWrites' -and $rt -notmatch 'NEED_LIST' -and $rt -notmatch 'listIdx' -and $rt -notmatch 'earlyStandDown' -and $rt -notmatch "basis -eq 'run_sql:enabled'") "runtime 回歸腳本：dbCapable 欄位判定（不用 basis 字串）、callID 歸屬（before／after／export parentID）、安全與可用分開判"
-Assert ($rt -match 'Get-ChildSqlOk' -and $rt -match "reportStatus" -and $rt -match 'dbTasksCompletedNoSql' -and $rt -match 'tasksNotReturned' -and $rt -match 'connectBlocks' -and $rt -notmatch 'notConnected -ne \$true \}\)') "runtime 回歸腳本：完成＝報告 COMPLETE 且子 session run_sql 成功（不是「沒回 NOT_CONNECTED」）；另計 partial／blocked／invalid／completedNoSql／未返回／connect 被擋"
+Assert ($rt -match 'callMismatch' -and $rt -match 'Test-DbCapable' -and $rt -match 'taskParents' -and $rt -match 'dbTasksCompleted' -and $rt -match 'ExpectDbTask' -and $rt -match 'listCalls' -and $rt -match 'todoBlocks' -and $rt -match 'todoWrites' -and $rt -notmatch 'NEED_LIST' -and $rt -notmatch 'listIdx' -and $rt -notmatch 'earlyStandDown' -and $rt -notmatch "basis -eq 'sql_run:enabled'") "runtime 回歸腳本：dbCapable 欄位判定（不用 basis 字串）、callID 歸屬（before／after／export parentID）、安全與可用分開判"
+Assert ($rt -match 'Get-ChildSqlOk' -and $rt -match "reportStatus" -and $rt -match 'dbTasksCompletedNoSql' -and $rt -match 'tasksNotReturned' -and $rt -match 'connectBlocks' -and $rt -notmatch 'notConnected -ne \$true \}\)') "runtime 回歸腳本：完成＝報告 COMPLETE 且子 session sql_run 成功（不是「沒回 NOT_CONNECTED」）；另計 partial／blocked／invalid／completedNoSql／未返回／connect 被擋"
 $npmrc = Join-Path $repoRoot '.opencode/.npmrc'
 Assert ((Test-Path -LiteralPath $npmrc) -and ([System.IO.File]::ReadAllText($npmrc) -match '(?m)^offline=true\s*$')) ".opencode/.npmrc 含 offline=true（斷網時相依安裝秒失敗，plugin 照常載入）"
 $ag = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))
@@ -719,10 +725,10 @@ foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator'
 }
 Assert ($ag -match 'todowrite' -and $ag -match 'PS_TODO_FIRST_REQUIRED') "AGENTS.md：先列 todo 規則與閘門錯誤碼"
 foreach ($f in (Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md'))) {
-    $eff = Get-AgentToolPerm $f.FullName 'oracleMCP_run_sql'
+    $eff = Get-AgentToolPerm $f.FullName 'oracleMCP_sql_run'
     $isDb = ($eff -ne 'false')
     $expected = (@('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor') -contains $f.BaseName)
-    Assert ($isDb -eq $expected) "DB subagent 判定（run_sql 最後匹配者，沒列＝開）：$($f.BaseName) run_sql=$eff → 過閘門=$isDb"
+    Assert ($isDb -eq $expected) "DB subagent 判定（sql_run 最後匹配者，沒列＝開）：$($f.BaseName) sql_run=$eff → 過閘門=$isDb"
 }
 $unit = Join-Path $repoRoot 'tests/oracle-gate/unit.test.mjs'
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
@@ -743,22 +749,22 @@ $global:gateDir = Join-Path $dir 'gate'
 New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
 function New-GateLog([string]$Id, [string[]]$Rows) { [System.IO.File]::WriteAllLines((Join-Path $gateDir ($Id + '.jsonl')), $Rows, (New-Object System.Text.UTF8Encoding($false))) }
 $chat = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","next":"NEED_CONNECT","mode":"enforce"}'
-$blk = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_CONNECT","mode":"enforce","basis":"run_sql:enabled","dbCapable":true,"decision":"block","blocked":1,"note":"mcp-status:connected"}'
+$blk = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_CONNECT","mode":"enforce","basis":"sql_run:enabled","dbCapable":true,"decision":"block","blocked":1,"note":"mcp-status:connected"}'
 $listOk = '{"hook":"after","tool":"oracleMCP_list_connections","callID":"l1","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":true,"note":"list_connections is informational: state unchanged"}'
 $connOk = '{"hook":"after","tool":"oracleMCP_connect","callID":"c1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","next":"READY","ok":true}'
-$allow = '{"hook":"before","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"READY","mode":"enforce","basis":"run_sql:enabled","dbCapable":true,"decision":"allow"}'
-$exec = '{"hook":"after","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","attribution":"current","admitted":"allow","target":"ps-ui-flow","executed":true,"basis":"run_sql:enabled","dbCapable":true,"next":"READY","notConnected":false,"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE","taskState":"completed","childSessionID":"ses_child_ok"}'
-$sqlOk = '{"hook":"after","tool":"oracleMCP_run_sql","callID":"q1","agent":"ps-ui-flow","turn":1,"turnId":"mc","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":true}'
+$allow = '{"hook":"before","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"READY","mode":"enforce","basis":"sql_run:enabled","dbCapable":true,"decision":"allow"}'
+$exec = '{"hook":"after","tool":"task","callID":"t2","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"READY","attribution":"current","admitted":"allow","target":"ps-ui-flow","executed":true,"basis":"sql_run:enabled","dbCapable":true,"next":"READY","notConnected":false,"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE","taskState":"completed","childSessionID":"ses_child_ok"}'
+$sqlOk = '{"hook":"after","tool":"oracleMCP_sql_run","callID":"q1","agent":"ps-ui-flow","turn":1,"turnId":"mc","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","ok":true}'
 New-GateLog 'ses_child_ok' @($sqlOk)
 New-GateLog 'ses_child_nosql' @(($sqlOk -replace '"ok":true', '"ok":false'))
 New-GateLog 'ses_ok' @($chat, $blk, $listOk, $connOk, $allow, $exec)
 $v = Get-SessionVerdict 'ses_ok' ''
-Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.preflight -and $v.turnInvariantViolations -eq 0 -and $v.callMismatch -eq 0 -and $v.dbTasksCompleted -eq 1 -and $v.hookMismatch -eq 0) "錯序被擋→connect→執行（中間多做的 list 只記錄）：try=2 blk=1 exec=1 early=0 turnViol=0 callMis=0 dbOk=1（報告 COMPLETE＋子 session run_sql 成功）"
+Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 2 -and $v.blocked -eq 1 -and $v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.preflight -and $v.turnInvariantViolations -eq 0 -and $v.callMismatch -eq 0 -and $v.dbTasksCompleted -eq 1 -and $v.hookMismatch -eq 0) "錯序被擋→connect→執行（中間多做的 list 只記錄）：try=2 blk=1 exec=1 early=0 turnViol=0 callMis=0 dbOk=1（報告 COMPLETE＋子 session sql_run 成功）"
 $ncExec = $exec -replace '"notConnected":false', '"notConnected":true' -replace '"next":"READY"', '"next":"NEED_CONNECT"' -replace '"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportStatus":"BLOCKED","blockedReason":"NOT_CONNECTED"'
 New-GateLog 'ses_nc' @($chat, $listOk, $connOk, $allow, $ncExec)
 $v = Get-SessionVerdict 'ses_nc' ''
 Assert ($v.executed -eq 1 -and $v.executedBeforePreflight -eq 0 -and $v.dbTasksCompleted -eq 0 -and $v.dbTasksBlocked -eq 1) "DB task 執行了但 subagent 回 NOT_CONNECTED → 安全 0 違反、可用 dbOk=0、blocked=1（零違規不等於可用）"
-# 假成功反例：BLOCKED(QUERY_TIMEOUT)／非 JSON（INVALID）／COMPLETE 但子 session 沒有成功的 run_sql／舊紀錄沒有 reportStatus——都不算完成
+# 假成功反例：BLOCKED(QUERY_TIMEOUT)／非 JSON（INVALID）／COMPLETE 但子 session 沒有成功的 sql_run／舊紀錄沒有 reportStatus——都不算完成
 $g4a = $exec -replace '"callID":"t2"', '"callID":"g1"' -replace '"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportStatus":"BLOCKED","blockedReason":"QUERY_TIMEOUT"'
 $g4b = $exec -replace '"callID":"t2"', '"callID":"g2"' -replace '"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportValid":false,"reportStatus":"INVALID"'
 $g4c = $exec -replace '"callID":"t2"', '"callID":"g3"' -replace '"childSessionID":"ses_child_ok"', '"childSessionID":"ses_child_nosql"'
@@ -792,11 +798,11 @@ $sameId = '{"hook":"chat.message","agent":"ps-orchestrator","turn":1,"turnId":"m
 New-GateLog 'ses_synth' @($chat, $listOk, $connOk, $synth, $sameId, $allow, $exec)
 $v = Get-SessionVerdict 'ses_synth' ''
 Assert ($v.turns -eq 1 -and $v.turnInvariantViolations -eq 0 -and $v.executedBeforePreflight -eq 0) "synthetic 訊息與同 id 重複到達不算一題：turns=1、不違反"
-$noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"run_sql:enabled"', '"basis":"run_sql:disabled"' -replace '"dbCapable":true', '"dbCapable":false' -replace '"state":"READY"', '"state":"NEED_CONNECT"'
+$noDb = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"sql_run:enabled"', '"basis":"sql_run:disabled"' -replace '"dbCapable":true', '"dbCapable":false' -replace '"state":"READY"', '"state":"NEED_CONNECT"'
 New-GateLog 'ses_nodb' @($chat, $noDb)
 $v = Get-SessionVerdict 'ses_nodb' ''
 Assert ($v.executedBeforePreflight -eq 0 -and $v.turnInvariantViolations -eq 0 -and $v.executedDb -eq 0) "不查 DB 的委派（dbCapable=false）不受判定"
-$unk = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-new-agent"' -replace '"basis":"run_sql:enabled"', '"basis":"unknown-agent(default:DB)"' -replace '"state":"READY"', '"state":"NEED_CONNECT"'
+$unk = $exec -replace '"target":"ps-ui-flow"', '"target":"ps-new-agent"' -replace '"basis":"sql_run:enabled"', '"basis":"unknown-agent(default:DB)"' -replace '"state":"READY"', '"state":"NEED_CONNECT"'
 New-GateLog 'ses_unknown' @($chat, $unk)
 $v = Get-SessionVerdict 'ses_unknown' ''
 Assert ($v.executedBeforePreflight -eq 1 -and $v.turnInvariantViolations -eq 1) "不認識的 agent（dbCapable=true）早於前置執行 → early=1（不是靠 basis 字串篩掉）"
@@ -851,7 +857,7 @@ Assert ($v.turnMismatch -eq 0 -and $v.orphanTurns -eq 1) "/undo 刪掉 m2 → �
 # 先列 todo 層：todowrite 成功列與 TODO_FIRST 擋下列只計觀察值；被 todo 擋的 task 也是一次 task 嘗試（與 transcript 的 error 件對得上）、不算 connectBlocks
 $todoW = '{"hook":"after","tool":"todowrite","callID":"w1","agent":"ps-orchestrator","turn":1,"turnId":"m1","attribution":"current","state":"NEED_CONNECT","next":"NEED_CONNECT","items":3,"connectItem":true,"todoWritten":true,"todoConnect":true}'
 $todoBr = '{"hook":"before","tool":"read","callID":"r1","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","mode":"enforce","note":"TODO_FIRST:NO_TODO","todoBlocked":1,"decision":"block"}'
-$todoBt = '{"hook":"before","tool":"task","callID":"t0","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_CONNECT","mode":"enforce","note":"TODO_FIRST:NO_TODO","todoBlocked":2,"dbCapable":true,"basis":"run_sql:enabled","decision":"block"}'
+$todoBt = '{"hook":"before","tool":"task","callID":"t0","agent":"ps-orchestrator","turn":1,"turnId":"m1","target":"ps-ui-flow","state":"NEED_CONNECT","mode":"enforce","note":"TODO_FIRST:NO_TODO","todoBlocked":2,"dbCapable":true,"basis":"sql_run:enabled","decision":"block"}'
 $todoBc = '{"hook":"before","tool":"oracleMCP_connect","callID":"c0","agent":"ps-orchestrator","turn":1,"turnId":"m1","state":"NEED_CONNECT","mode":"enforce","note":"TODO_FIRST:NO_TODO","todoBlocked":3,"decision":"block"}'
 New-GateLog 'ses_todo' @($chat, $todoBr, $todoBt, $todoBc, $todoW, $connOk, $allow, $exec)
 $v = Get-SessionVerdict 'ses_todo' ''

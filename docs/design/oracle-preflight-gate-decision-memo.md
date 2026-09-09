@@ -10,7 +10,7 @@
 | 1 | 順序只是 prompt 指令，執行是機率性的 | 成立。`task` 從回合一開始就在工具清單裡；情境 31 只驗文字 | 採納（根因） |
 | 2 | 用 `tool.execute.before` 擋 `task`，throw 即阻擋 | 成立。`session/tools.ts`：registry 工具（含 task）與 MCP 工具都先 `Plugin.trigger("tool.execute.before")` 再執行；hook 的 promise reject → AI SDK `tool-error` → `processor.failToolCall` 把 `error.message` 寫進 tool part，模型下一步看得到 | 採納 |
 | 3 | 狀態機 NEED_LIST→NEED_CONNECT→READY；擋而不改參數 | 成立。成功判定：MCP `isError` 會在 `McpCatalog.convertTool` throw，`tool.execute.after` 不觸發，所以 after 觸發＝成功；另加保守的失敗文字樣式（ORA-／TNS-／not connected…）防「成功回傳但內容是錯誤」 | 採納 |
-| 4 | 擋「所有 task」直到 READY | **不採**。ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow 的 tools 表 `oracleMCP_*: false`，不碰 DB；擋全部會讓 DB 掛掉時純 ES／Source 的題也無法委派，與第 0 步「非 DB 部分照常作答」矛盾。改為只擋 tools 表 `oracleMCP_run_sql` 為開的 subagent（最後匹配者優先、沒列＝開、不認識的名字＝開） | 修正 |
+| 4 | 擋「所有 task」直到 READY | **不採**。ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow 的 tools 表 `oracleMCP_*: false`，不碰 DB；擋全部會讓 DB 掛掉時純 ES／Source 的題也無法委派，與第 0 步「非 DB 部分照常作答」矛盾。改為只擋 tools 表 `oracleMCP_sql_run` 為開的 subagent（最後匹配者優先、沒列＝開、不認識的名字＝開） | 修正 |
 | 5 | 互動與 headless 的 hook 行為可能不同，要分開驗 | 原始碼是同一條路（`opencode run` 用 in-process server，`Server.Default().app.fetch`）；沙箱 e2e 已在 headless 驗過 7 情境。互動路徑仍列公司機驗證（`-AnalyzeAll`） | 部分採納 |
 | 6 | 先做「印每次 before 的探針」跑 20 次目測 | 改成機械判定：閘門交易紀錄的 task 次數 ＝ `opencode export` transcript 的 task 件數（逐 session）；observe 模式就是探針 | 修正 |
 | 7 | hook 覆蓋率不到 100% 就把前置移到模型迴圈外的 wrapper | 前提待驗：oracleMCP 若是 OpenCode 以 stdio 起的子行程，「目前連線」活在該行程內、行程外連不到；若是遠端（VS Code 端 SQLcl，SOP-12 的說法），wrapper 連得到但擋不住模型的順序。兩種情況 plugin 都是模型迴圈內唯一的確定性層。topology 由 SOP-21 步驟 9 的實驗定案 | 不採（記錄理由；topology 待驗） |
@@ -73,7 +73,7 @@ review 對 a31c946 的判定：核心 invariant 乾淨（DB-capable task 只在 
 | P1-2 | task 快照只修 log，NOT_CONNECTED 晚到會作廢新題的 READY | 成立 | 落地：NOT_CONNECTED 只在入場 turnId＝目前 turnId 時退狀態；「連線世代」屬第二批 |
 | P1-3 | per-session READY 不是共用連線有效性的保證 | 成立；記載限制不等於修復 | 另案（第二批）：SOP-21 已知限制 (b) 改寫為「不證明共用連線仍是預期連線、不證明查詢跑在正確 DB」；先做 topology 實驗 |
 | P1-4 | 每題無條件 connect ≠ 安全的 ensure-connected；「否則清單第一個」＝靜默連錯 DB | 連線選擇成立、先修；其餘是規格變更 | 落地：profile 必填且在清單裡，否則回「Oracle 連線未設定」、不 connect；不在閘門加「跳過 connect」的例外；ensure-connected／owner／DUAL 探測屬第二批 |
-| P2-1 | subagent Oracle 權限是排除清單，run_sqlcl 等仍開 | 成立（OpenCode permission `findLast` 最後匹配者優先；`disabled()` 把 deny 的工具從模型工具清單拿掉） | 落地：`"oracleMCP_*": false` → `"oracleMCP_run_sql": true`；e2e 驗 subagent 可見 Oracle 工具只剩 run_sql、主 agent 只剩 list_connections＋connect |
+| P2-1 | subagent Oracle 權限是排除清單，run_sqlcl 等仍開 | 成立（OpenCode permission `findLast` 最後匹配者優先；`disabled()` 把 deny 的工具從模型工具清單拿掉） | 落地：`"oracleMCP_*": false` → `"oracleMCP_sql_run": true`；e2e 驗 subagent 可見 Oracle 工具只剩 sql_run、主 agent 只剩 list_connections＋connect |
 | P2-2 | analyzer 用 basis 字串篩能力漏 unknown-agent；缺 callID 級配對；零違規≠可用 | 成立 | 落地：dbCapable 欄位、callMismatch（before／after／export parentID）、安全／可用兩條驗收、-ExpectDbTask |
 | P2-3 | MCP down 退讓與「絕不在 READY 前執行」矛盾；空輸出當成功 | 成立 | 落地：未掛載改為擋（ORACLE_MCP_DOWN 協定訊息，不重試）；三態 ok；文件不再宣稱環境層退讓；MCP isError 仍靠 OpenCode throw（after 不觸發＝失敗） |
 
@@ -87,7 +87,7 @@ review 對 a31c946 的判定：核心 invariant 乾淨（DB-capable task 只在 
 
 | # | review 主張 | 核對 | 處置 |
 |---|---|---|---|
-| F1 | analyzer 的「完成」＝沒回 NOT_CONNECTED，BLOCKED(QUERY_TIMEOUT／SCHEMA_UNRESOLVED)／非 JSON 都算成功（G4） | 成立 | plugin 的 task after 解析報告（status／blockedReason／taskState／childSessionID），子 session 的 run_sql after 記 ok；analyzer 完成＝COMPLETE 且子 session run_sql ok；PARTIAL／BLOCKED／INVALID／COMPLETE-無-SQL 分開計；情境 33 加假成功反例；e2e 正向情境驗子 session run_sql ok |
+| F1 | analyzer 的「完成」＝沒回 NOT_CONNECTED，BLOCKED(QUERY_TIMEOUT／SCHEMA_UNRESOLVED)／非 JSON 都算成功（G4） | 成立 | plugin 的 task after 解析報告（status／blockedReason／taskState／childSessionID），子 session 的 sql_run after 記 ok；analyzer 完成＝COMPLETE 且子 session sql_run ok；PARTIAL／BLOCKED／INVALID／COMPLETE-無-SQL 分開計；情境 33 加假成功反例；e2e 正向情境驗子 session sql_run ok |
 | F2 | connectionName 只是模型規則，plugin 未比對 connect 參數（G1） | 成立 | connect 的 before 在執行前比對 profile：未填 → NOT_CONFIGURED、不一致 → MISMATCH，工具不執行；快照存 validated target 供 after 核對；e2e wrong-target／not-configured |
 | F3 | 同題不同連線世代未隔離（G2） | 成立（hook 層可重現；真 host 排程未證實） | 採 review 選項 2 的 session 內版本：connect 嘗試世代、task 入場記世代、舊世代的 NOT_CONNECTED 不作廢新世代；跨 session 協調另案 |
 | F4 | 已 READY 後再 connect 失敗 READY 不作廢（G3） | 成立 | 嘗試開始即作廢 READY，只由該次嘗試成功恢復；較晚嘗試取代較早；e2e reconnect-fail。「同名已連線再 connect」的真 SQLcl 契約仍待 R16／R20 |
@@ -114,7 +114,7 @@ analyzer／e2e 的「真實題目」判定看非 synthetic part，不受注入�
 
 | 問題 | 事實 | 決定 |
 |---|---|---|
-| 主 agent 說「沒有掛載 list_connections／connect」 | tools 表 `"oracleMCP_*": false` 之後再開個別 true；公司機 OpenCode 把整個 MCP 對該 agent 隱藏、true 救不回；沙箱 1.18.29 是最後匹配者優先——版本行為不同 | 逐工具明寫（主 agent：list／connect true、disconnect／run_sql／run_sqlcl false；DB subagent：run_sql true、其餘 false）；全關的 agent 才用萬用字元；閘門載入時記 wildcardDenyMix 警告；情境 31 擋混寫回流 |
+| 主 agent 說「沒有掛載 list_connections／connect」 | tools 表 `"oracleMCP_*": false` 之後再開個別 true；公司機 OpenCode 把整個 MCP 對該 agent 隱藏、true 救不回；沙箱 1.18.29 是最後匹配者優先——版本行為不同 | 逐工具明寫（主 agent：list／connect true、disconnect／sql_run／run_sqlcl false；DB subagent：sql_run true、其餘 false）；全關的 agent 才用萬用字元；閘門載入時記 wildcardDenyMix 警告；情境 31 擋混寫回流 |
 | list_connections 回 `Name:ABCReadonlyConnect string: {…}`，模型讀成 ABCReadonlyConnect | 名稱與連線字串黏在一起、沒有分隔；從清單挑名字必然讀錯 | 第 0 步不 list：直接 connect profile `oracle.connectionName`（原樣照抄；閘門在執行前比對）；list 只在 connect 兩次失敗後呼叫一次、把原文附給管理者核對 |
 | 閘門不變量 | NEED_LIST 這一段只是在要求一個沒有價值（且有害）的步驟 | 縮成 `NEED_CONNECT ─connect 成功→ READY`；list 的 after 只記錄不改狀態；disconnect／新訊息退回 NEED_CONNECT；analyzer turnInvariantViolations 只看 connect→READY，多 listCalls 觀察值 |
 

@@ -1,5 +1,5 @@
 // mock-oracle-mcp.mjs — 假 SQLcl MCP server（stdio、JSON-RPC 2.0；只給沙箱端到端測試用）
-// 工具名與真 oracleMCP 相同：list_connections／connect／run_sql／disconnect。
+// 工具名與真 oracleMCP 相同：list_connections／connect／sql_run／disconnect。
 // 環境變數：
 //   MOCK_ORACLE_LOG                    每次 tools/call 追加一行 JSON（供交叉比對；在呼叫「開始」時寫）
 //   MOCK_ORACLE_CONNECT_FAIL           =1 → connect 回 isError（模擬連不上）
@@ -31,7 +31,7 @@ function send(msg) {
 const tools = [
   { name: "list_connections", description: "List saved SQLcl connections", inputSchema: { type: "object", properties: {} } },
   { name: "connect", description: "Connect to a saved connection", inputSchema: { type: "object", properties: { connection_name: { type: "string" } }, required: ["connection_name"] } },
-  { name: "run_sql", description: "Run a SQL statement", inputSchema: { type: "object", properties: { sql: { type: "string" } }, required: ["sql"] } },
+  { name: "sql_run", description: "Run a SQL statement", inputSchema: { type: "object", properties: { sql: { type: "string" } }, required: ["sql"] } },
   { name: "disconnect", description: "Disconnect", inputSchema: { type: "object", properties: {} } },
 ]
 
@@ -58,7 +58,7 @@ async function call(name, args) {
       if (process.env.MOCK_ORACLE_EMPTY_CONNECT === "1") return { content: [] }
       return text(already ? "Already connected to " + n : "Successfully connected to " + n)
     }
-    case "run_sql":
+    case "sql_run":
       if (!connected) return text("Error: Not connected to a database. Use connect first.", true)
       return text("ROW_COUNT\n1\n(query executed on " + connected + ")")
     case "disconnect":

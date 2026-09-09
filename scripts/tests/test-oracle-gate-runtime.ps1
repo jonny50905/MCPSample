@@ -25,7 +25,7 @@
 #   另：export 失敗（exportFailures）與 run 結束碼非 0／逾時（runsWithBadExit）也判 FAIL——否則覆蓋率判定是空的
 #   可用（依情境；-ExpectDbTask 覆寫）：
 #   Yes（B1 預設）＝每個 session 至少 1 個「完成」的 DB task：子 agent 報告 status=COMPLETE，且其子 session 的交易紀錄裡至少一個
-#     oracleMCP_run_sql 成功（after 列 ok=true）——只有報告宣稱成功不算、「沒回 NOT_CONNECTED」不算；BLOCKED（任何 blockedReason）、
+#     oracleMCP_sql_run 成功（after 列 ok=true）——只有報告宣稱成功不算、「沒回 NOT_CONNECTED」不算；BLOCKED（任何 blockedReason）、
 #     INVALID（非契約 JSON／task_error）都不算完成，PARTIAL 另計。零違規但零完成不算過。B1 的題目要用預期能 COMPLETE 的固定題
 #   No（B3 預設）＝0 個會查 DB 的 task 執行；Any（B2／CUSTOM／-AnalyzeAll 預設）＝不判、只列數字
 # 附帶統計（不判定，供觀察）：blockedRuns＝模型先派 task 被擋的 session 數（＝錯序機率）；preflightRuns＝有 connect 成功（READY）的
@@ -33,7 +33,7 @@
 #   回覆（標 stale、不計入該題）；unknownResults＝list／connect 回空輸出（閘門不當成功——真 SQLcl 若如此回覆要回報維護 session）；
 #   orphanTurns＝chat.message 有、transcript 沒有的題（/undo）；unmatchedCalls＝閘門有 before、transcript 找不到同 callID 的 task；
 #   tasksNotReturned＝放行了但沒有 after 的 task（一直執行中／被中止）；connectBlocks＝connect 在執行前被擋（profile 未填或目標不一致）；
-#   dbTasksPartial／dbTasksBlocked／dbTasksInvalid／dbTasksCompletedNoSql（報告 COMPLETE 但子 session 沒有成功的 run_sql）；
+#   dbTasksPartial／dbTasksBlocked／dbTasksInvalid／dbTasksCompletedNoSql（報告 COMPLETE 但子 session 沒有成功的 sql_run）；
 #   todoWrites＝todowrite 成功次數（先列 todo 層：每題至少 1）；todoBlocks＝todowrite 之前就開工被擋的次數（note=TODO_FIRST:…；＝模型跳過 todo 的機率）。
 # 注意：prompt 走 cmd.exe 命令列——題目禁用半形雙引號與 > < & | % ^（中文引號「」不受限）。
 param(
@@ -121,11 +121,11 @@ function Get-ExportCounts($Obj, [string]$SessionId) {
 # -ExportPath：測試用，直接讀 export JSON 檔而不呼叫 opencode
 function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$ExportPath = '') {
     $rows = @(Read-Jsonl (Join-Path $gateDir ($SessionId + '.jsonl')))
-    # 會查 DB：plugin 的機械欄位 dbCapable；舊紀錄沒有欄位時由 basis 推導——只有明確的 run_sql:disabled 才算不會查（不認識的 agent＝會查）
+    # 會查 DB：plugin 的機械欄位 dbCapable；舊紀錄沒有欄位時由 basis 推導——只有明確的 sql_run:disabled 才算不會查（不認識的 agent＝會查）
     function Test-DbCapable($row) {
         $p = $row.PSObject.Properties['dbCapable']
         if ($null -ne $p -and $null -ne $p.Value) { return [bool]$p.Value }
-        if ([string]$row.basis -eq 'run_sql:disabled') { return $false }
+        if ([string]$row.basis -eq 'sql_run:disabled') { return $false }
         return $true
     }
     function Get-TurnKey($row) { if ($row.turnId) { return [string]$row.turnId } return ([string]$row.pid + '-' + [string]$row.turn) }
@@ -137,12 +137,12 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
     $executedDb = @($executed | Where-Object { Test-DbCapable $_ })
     # 會查 DB 的 task 入場時狀態 ≠ READY 卻執行了＝違反（無豁免：observe 模式照算）
     $early = @($executedDb | Where-Object { $_.state -ne 'READY' })
-    # 可用：子 agent 報告 status=COMPLETE，且其子 session 的交易紀錄裡至少一個 run_sql 成功（ok=true）——「沒回 NOT_CONNECTED」不算成功；
+    # 可用：子 agent 報告 status=COMPLETE，且其子 session 的交易紀錄裡至少一個 sql_run 成功（ok=true）——「沒回 NOT_CONNECTED」不算成功；
     # 舊紀錄沒有 reportStatus 欄位 → 不算完成（INVALID）
     function Get-ChildSqlOk([string]$Child) {
         if ($Child -eq '') { return 0 }
         $rows2 = @(Read-Jsonl (Join-Path $gateDir ($Child + '.jsonl')))
-        return @($rows2 | Where-Object { $_.hook -eq 'after' -and $_.tool -eq 'oracleMCP_run_sql' -and $_.ok -eq $true }).Count
+        return @($rows2 | Where-Object { $_.hook -eq 'after' -and $_.tool -eq 'oracleMCP_sql_run' -and $_.ok -eq $true }).Count
     }
     $dbOk = @(); $dbPartial = @(); $dbBlocked = @(); $dbInvalid = @(); $dbNoSql = @()
     foreach ($e in $executedDb) {
@@ -324,7 +324,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     Write-Host ('可用（ExpectDbTask=' + $Expect + '）：sessionsWithDbTaskOk=' + $dbOkRuns + '/' + $verdicts.Count + '  sessionsWithDbTask=' + $dbRuns + '  usabilityFailures=' + $usabilityFail +
         '  dbTasks completed=' + [int]$dbDone + ' partial=' + [int]$dbPart + ' blocked=' + [int]$dbBlk + ' invalid=' + [int]$dbInv + ' completedNoSql=' + [int]$dbNoSql +
         '  tasksNotReturned=' + [int]$notRet + '  connectBlocks=' + [int]$cblk)
-    if ([int]$dbNoSql -gt 0) { Write-Host ('注意：' + [int]$dbNoSql + ' 個 DB task 報告 COMPLETE 但子 session 沒有成功的 run_sql——只是宣稱成功，不計為完成') -ForegroundColor Yellow }
+    if ([int]$dbNoSql -gt 0) { Write-Host ('注意：' + [int]$dbNoSql + ' 個 DB task 報告 COMPLETE 但子 session 沒有成功的 sql_run——只是宣稱成功，不計為完成') -ForegroundColor Yellow }
     if ([int]$cblk -gt 0) { Write-Host ('注意：' + [int]$cblk + ' 次 connect 在執行前被擋（profile oracle.connectionName 未填或與 connect 目標不一致）——看 jsonl 的 note') -ForegroundColor Yellow }
     Write-Host ('觀察：blockedRuns=' + $blockedRuns + '（模型先派 task 被擋）  preflightRuns=' + $preflightRuns + '  sessionsWithoutTask=' + $noTask +
         '  listCalls=' + [int]$lcalls + '（第 0 步不 list，正常為 0）  todoWrites=' + [int]$tdW + '  todoBlocks=' + [int]$tdB + '（模型跳過 todo 被擋）  mcpDownBlocks=' + [int]$down + '  staleReplies=' + [int]$stale + '  unknownResults=' + [int]$unknown + '  orphanTurns=' + [int]$orphan + '  unmatchedCalls=' + [int]$unmatched)
@@ -339,7 +339,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
         return 1
     }
     if ($usabilityFail -gt 0) {
-        if ($Expect -eq 'Yes') { Write-Host ('判定：FAIL（可用：' + $usabilityFail + ' 個 session 沒有任何「報告 COMPLETE 且子 session run_sql 成功」的 DB task——零違規不等於可用）') -ForegroundColor Red }
+        if ($Expect -eq 'Yes') { Write-Host ('判定：FAIL（可用：' + $usabilityFail + ' 個 session 沒有任何「報告 COMPLETE 且子 session sql_run 成功」的 DB task——零違規不等於可用）') -ForegroundColor Red }
         else { Write-Host ('判定：FAIL（可用：' + $usabilityFail + ' 個 session 派了會查 DB 的 task，但本情境預期不查 DB）') -ForegroundColor Red }
         return 1
     }

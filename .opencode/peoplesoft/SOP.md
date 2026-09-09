@@ -424,7 +424,7 @@ allow——headless 下 ask 等於擋，症狀是主 agent 卡在 connect、所�
 tools 表兩種拼法都開；profile 加 `oracle.connectionName`（SQLcl 已儲存連線名，管理者本機回填），主 agent 直接
 connect、不再依賴 list_connections；四個 subagent 硬規則段殘留的「回未連線才 list→connect」舊流程改為只回
 BLOCKED(NOT_CONNECTED)。快篩第 (0) 步再加一項：問主 agent「列出所有名稱含 oracleMCP 的工具全名」，看到
-connect 與 list_connections 才算通。管理者定案：公司機就是底線版，全樹一律寫 `list_connections`／`run_sql`，
+connect 與 list_connections 才算通。管理者定案：公司機就是底線版，全樹一律寫 `list_connections`／`sql_run`，
 連字號拼法全部移除、不再兩種都開。
 再追記（同日）：搬完後主 agent 仍常不 connect——「要派 DB 委派之前才 connect」是條件式規則，模型常跳過。改為無條件：
 三個主 agent 開場固定 read profile → `oracleMCP_connect`，做完才准查 wiki、委派、作答（agent 檔「第 0 步」；cookbook 主 agent 段、
@@ -433,7 +433,7 @@ connect 與 list_connections 才算通。管理者定案：公司機就是底線
 只用來在清單裡挑名字（有填且在清單裡用它，否則清單第一個）。快篩改看：前兩個 oracleMCP 呼叫依序是 list_connections、connect。
 再追記（issue #29 外部 review 第二輪）：「否則清單第一個」作廢——profile `oracle.connectionName` 必填且必須在清單裡，缺值／不在清單
 → 主 agent 回「Oracle 連線未設定」、不 connect、不挑清單第一個（設定錯誤不能變成靜默連錯 DB；三個主 agent 第 0 步、cookbook、
-profile 註解、閘門擋下訊息同步）。四個 subagent 的 Oracle 工具改為允許清單（`"oracleMCP_*": false` 之後只開 `"oracleMCP_run_sql": true`）：
+profile 註解、閘門擋下訊息同步）。四個 subagent 的 Oracle 工具改為允許清單（`"oracleMCP_*": false` 之後只開 `"oracleMCP_sql_run": true`）：
 list_connections／connect／disconnect／run_sqlcl 對 subagent 不可見；cookbook subagent 段「工具已關」自此為真。快篩加 R17／R18（SOP-21 步驟 3）。
 
 ---
@@ -509,7 +509,7 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
   connect 一次（profile 連線名原樣；不先 list）**（issue #28 後 subagent 不再 connect，也不再要求第一個先單獨派）——
   ps-audit-batch／ps-audit／ps-deep-research／ps-audit-orchestrator／ps-contract-batch／ps-contract-verify 已同步
 □ 【已作廢，保留供對照】主 agent 的 oracleMCP 權限全關、由第一個 subagent 開線——
-  issue #28 起反轉：主 agent 開 list_connections／connect（run_sql／disconnect 仍關），
+  issue #28 起反轉：主 agent 開 list_connections／connect（sql_run／disconnect 仍關），
   subagent 只查；issue #29 起第 0 步由執行期閘門強制（SOP-21）
 □ 風暴判讀：auto-loop-logs\<領域>\*-audit-b*.out.txt 裡 oracleMCP_disconnect
   一批出現數十次且無查詢結果列＝有人還在 disconnect（舊版 agent 檔沒搬到）
@@ -530,7 +530,7 @@ ps-oracle-preflight-gate.js`）——prompt 只剩第二道。部署與驗證程
 (1) **tools 表不得用 `"oracleMCP_*": false` 萬用字元 deny 再開個別工具**——公司機的 OpenCode 一遇到萬用字元 deny 就把整個 oracleMCP
 對該 agent 隱藏，後面的 `"oracleMCP_connect": true` 救不回（模型回報「本次工具環境中沒有掛載 list_connections 以及 connect」）；
 改成逐工具明寫 true／false 就正常。沙箱的 1.18.29 是「最後匹配者優先」，公司機版本不同、行為不同——兩邊都安全的寫法只有逐工具明寫。
-落點：三個主 agent（list_connections／connect true；disconnect／run_sql／run_sqlcl false）與四個 DB subagent（run_sql true、其餘四個 false）
+落點：三個主 agent（list_connections／connect true；disconnect／sql_run／run_sqlcl false）與四個 DB subagent（sql_run true、其餘四個 false）
 全部改逐工具；上面「硬性擋線」段的 `"oracleMCP_*": true 之後加 disconnect false` 寫法**作廢**。整個 MCP 全關的 agent（ps-peoplecode-flow／
 ps-sql-flow／ps-sqr-flow／general／scout／explore）保留 `"oracleMCP_*": false`（全關就是要它不可見）。閘門載入時把「萬用字元 deny＋個別 true」
 的混寫記到 `_plugin.log`（`wildcardDenyMix=[…]`＋WARN 行）；test-auto-loop 情境 31 擋混寫回流。
@@ -539,6 +539,20 @@ ps-sql-flow／ps-sqr-flow／general／scout／explore）保留 `"oracleMCP_*": f
 `customization-profile.yaml` 的 `oracle.connectionName`（**原樣照抄**，閘門在執行前比對）。list_connections 只剩一個用途：connect 兩次都失敗時
 呼叫一次、把清單**原文**附在答覆裡讓管理者核對 profile 值（不要自己改名字）。閘門不變量隨之縮成 `NEED_CONNECT ─connect 成功→ READY`，
 list 的 after 只記錄不改狀態；analyzer 的 turnInvariantViolations 只看 connect→READY、多一個 listCalls 觀察值（正常應為 0）。
+
+**2026-09-09 再追記（工具名更正：查詢工具實名是 `sql_run`，不是 `run_sql`）**：管理者以公司機 /mcp 核對，oracleMCP 的查詢工具全名是
+`oracleMCP_sql_run`。錯名的來源與經過（git 追溯）：ae72d49（2026-09-07，issue #28 嚴格版）第一次在 tools 表註解寫成 SQLcl 拼法 `run-sql`
+（從產品文件推的，沒有拿 /mcp 清單核對）→ 3b3a5b8 補成兩種拼法都開（多了 `run_sql`）→ 03274d0 定案「全樹底線拼法」時把錯名 `run_sql` 鎖進
+全樹 → a31c946 起 plugin／analyzer 寫死 `oracleMCP_run_sql` → e0b1c75 起四個 DB subagent 的允許清單寫 `"oracleMCP_run_sql": true`。
+在此之前 subagent 用 `"oracleMCP_*": true`，沒有拼過工具名，所以沒錯。L103（2026-08-31）其實早記過模型自創的 `oracle_sql_run`——後綴是對的、
+錯的只是前綴，當時沒有回頭拿它核對真名。
+影響：tools 表沒列到真名 → `sql_run` 對每個 agent 都是「沒列＝開」——DB subagent 照常能查（所以流程看起來能走），但主 agent 也能自己查
+（不該）；plugin 對 `sql_run` 的 after 列從未寫過 → 子 session 的 SQL 證據缺、analyzer 的 dbTasksCompleted 在公司機永遠 0（B1 可用判定必
+FAIL、R21 看不到 ok:true）；閘門的 DB 能力判定靠 `"oracleMCP_run_sql": true` 誤打誤撞仍正確。
+更正：全樹 `run_sql` → `sql_run`（七個 agent 的 tools 表、plugin、analyzer、cookbook、test-scenarios、情境 31／32／33、假 MCP／假模型／e2e、
+歷史追記的引文也一併改，避免再被抄回）；情境 31 加守衛擋 `run_sql`／`run-sql`／`sql-run` 回流。**待管理者確認**：`run_sqlcl` 是不是也是別的名字
+——請把「列出所有名稱含 oracleMCP 的工具全名」的結果貼給維護 session，對不上就再改一次。教訓：工具名只能來自 /mcp 的實際清單，
+不能從產品文件推；chat 裡出現過的名字（哪怕是模型猜的）都要拿去核對。
 
 ## SOP-21 Oracle 前置閘門（plugin）部署與驗證（issue #29；L115）
 
@@ -550,7 +564,7 @@ list 的 after 只記錄不改狀態；analyzer 的 turnInvariantViolations 只�
 每一則真實使用者訊息：NEED_CONNECT ─connect 成功（目標＝profile 值）→ READY → 才准執行會查 DB 的 task
 list_connections 不是前置：清單把名稱和連線字串黏在一起（Name:<名>Connect string: {…}），從清單挑名字會讀錯——連線名只從 profile 拿；
 list 的 after 只記錄不改狀態（主 agent 只在 connect 兩次都失敗時呼叫它、把清單原文附給管理者核對）
-唯一例外：目標 subagent 確定沒有 Oracle 能力（tools 表 oracleMCP_run_sql 最後匹配為 false）→ 不需要 READY
+唯一例外：目標 subagent 確定沒有 Oracle 能力（tools 表 oracleMCP_sql_run 最後匹配為 false）→ 不需要 READY
 沒有環境層退讓：oracleMCP 未掛載（/mcp 非 connected，每次即時查不快取）一樣擋，只是錯誤訊息改走 ORACLE_MCP_DOWN 協定
 （不得派會查 DB 的 subagent；DB 部分如實回報、非 DB 部分改派沒有 Oracle 能力的 subagent）；connect 一直失敗仍擋；
 不跨 session、不跨行程協調
@@ -583,14 +597,14 @@ list 的 after 只記錄不改狀態（主 agent 只在 connect 兩次都失敗�
 - task 入場記下當時的 gen：之後又 connect 過（gen 已變）的 task 回 NOT_CONNECTED，不作廢新世代的 READY（同題內舊連線上的工作晚回，
   不代表新連線斷了）；同世代的 NOT_CONNECTED 才退回 NEED_CONNECT。世代只在 session 內，跨 session 的復原協調另案。
 - task 的 after 解析子 agent 報告：status（COMPLETE／PARTIAL／BLOCKED；其餘＝INVALID）、blockedReason、task 包裝的 state
-  （completed／error）與子 session id；子 session 的 run_sql after 也記三態 ok。analyzer 的「完成」＝報告 COMPLETE **且**子 session
-  至少一個 run_sql 成功——只有報告宣稱成功、或只是「沒回 NOT_CONNECTED」都不算。
+  （completed／error）與子 session id；子 session 的 sql_run after 也記三態 ok。analyzer 的「完成」＝報告 COMPLETE **且**子 session
+  至少一個 sql_run 成功——只有報告宣稱成功、或只是「沒回 NOT_CONNECTED」都不算。
 
 判定是**能力**不是任務意圖：`oracleMCP_*` 全關的 subagent（ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow）不受影響；
 ps-auditor 即使做純 chunk 任務也過閘門——要解決混合能力，走 deterministic routing／capability 邊界（另案），不在閘門打洞。
 四個會查 DB 的 subagent 的 Oracle 工具是**允許清單，逐工具明寫**（`"oracleMCP_list_connections"`／`connect`／`disconnect`／`run_sqlcl`
-各 false、`"oracleMCP_run_sql": true`）：list_connections／connect／disconnect／run_sqlcl 對 subagent 都不可見；主 agent 逐工具明寫
-list_connections＋connect true、disconnect／run_sql／run_sqlcl false。**不得用 `"oracleMCP_*": false` 再開個別工具**（公司機的 OpenCode 會因
+各 false、`"oracleMCP_sql_run": true`）：list_connections／connect／disconnect／run_sqlcl 對 subagent 都不可見；主 agent 逐工具明寫
+list_connections＋connect true、disconnect／sql_run／run_sqlcl false。**不得用 `"oracleMCP_*": false` 再開個別工具**（公司機的 OpenCode 會因
 萬用字元 deny 把整個 MCP 對該 agent 隱藏，true 救不回；SOP-12 再追記）；全關的 agent 才用萬用字元。
 主 agent 的 connect 目標＝profile `oracle.connectionName` **原樣照抄**；缺值／FILL_ME → 回「Oracle 連線未設定」、不 connect；不先 list、
 不從清單挑名字（設定錯誤不能變成靜默連錯 DB）。**閘門在執行前強制這條**：profile 未填、或 connect 的 connection_name 與 profile 不一致的
@@ -639,7 +653,7 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
        ok:false＋failureMatch、或 ok:"unknown"（回空文字），這題閘門不會開——把那列回報維護 session（R16）；這是待驗項
      - 真 SQLcl 的成功回覆若被誤判（ok=false、failureMatch 有值）→ 回報維護 session 調整 FAILURE_PATTERNS
      - 工具可見性（R17）：問主 agent「列出所有名稱含 oracleMCP 的工具全名」→ 只有 list_connections、connect；
-       讓它派 ps-ui-flow 問同一句 → 只有 run_sql。模型說「沒有掛載」→ 看 _plugin.log 的 wildcardDenyMix（R23）
+       讓它派 ps-ui-flow 問同一句 → 只有 sql_run。模型說「沒有掛載」→ 看 _plugin.log 的 wildcardDenyMix（R23）
      - 連線名設定（R18）：把 profile oracle.connectionName 暫改成 SQLcl 沒有的名字再問一題 → 模型照 profile 值 connect（不先 list）、
        SQLcl 回錯；再 connect 一次仍錯 → 主 agent list 一次把清單原文附在答覆、回「DB 連線建立失敗」、本題不派 DB 委派；
        若模型改用別的名字 connect → jsonl 的 before connect 列 decision=block、note=ORACLE_CONNECTION_MISMATCH（未填則 NOT_CONFIGURED）、
@@ -648,7 +662,7 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
        `-AnalyzeSession <id>` 的 dbTasksCompleted 必須是 0（dbTasksBlocked／dbTasksInvalid ≥ 1）
      - 已 READY 後再 connect（R20）：同一題內主 agent 若再 connect 一次，jsonl 第二個 connect 的 before 列 state=READY→next=NEED_CONNECT、
        gen+1；SQLcl 若對它回錯誤（沒有 after），之後的 DB 委派會被擋直到 connect 成功——這就是 R16 待驗的契約，回報回覆原文
-     - 一開多用（R21）：主 agent 開線後連派三個 DB 委派（固定探測 SELECT 1 FROM DUAL）→ 三個子 session 的 jsonl 各有 run_sql ok:true、
+     - 一開多用（R21）：主 agent 開線後連派三個 DB 委派（固定探測 SELECT 1 FROM DUAL）→ 三個子 session 的 jsonl 各有 sql_run ok:true、
        任一結束不影響其餘（子 agent 沒有 disconnect）；`-AnalyzeSession` 顯示 dbTasksCompleted=3
      - 提醒注入（R22）：`opencode export <sessionID>` 裡每一則你打的訊息都多一個 synthetic text part（「【Oracle 第 0 步（執行期閘門提醒）】…」），
        你的文字原樣保留；jsonl 的 chat.message 列 reminder=true；主 agent 的第一個工具呼叫應是 connect（blockedRuns 應下降）
@@ -666,14 +680,14 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
      callMismatch（同一 callID 的 before／after 列 turnId 一致，且 export 裡該 task 所屬的 user 訊息 id＝before 列的 turnId）、
      executedTaskBeforePreflight（會查 DB 的 task 入場時 ≠ READY 卻執行了；未掛載期間也不會有——那些 task 是被擋的）。
      可用：-AnalyzeAll 不判，看 sessionsWithDbTaskOk 與 dbTasks completed／partial／blocked／invalid／completedNoSql 的分布是否合理
-     （有查 DB 的題應該有完成的 DB task；completedNoSql>0＝子 agent 宣稱 COMPLETE 但子 session 沒有成功的 run_sql，要看）。
+     （有查 DB 的題應該有完成的 DB task；completedNoSql>0＝子 agent 宣稱 COMPLETE 但子 session 沒有成功的 sql_run，要看）。
      觀察值：blockedRuns（模型錯序被擋）、listCalls（list_connections 呼叫數；第 0 步不 list，正常為 0）、mcpDownBlocks（未掛載被擋）、
      connectBlocks（connect 在執行前被擋：profile 未填或目標不一致）、
      staleReplies（上一題晚到的回覆）、unknownResults（回空輸出，>0 要回報）、tasksNotReturned（放行但沒有 after）、
      orphanTurns（/undo 或 fork）、unmatchedCalls（閘門有 before、export 沒有同 callID 的 task）。
 □ 5. 30 次回歸（headless，opencode run；oracleMCP 掛載中；題目用 -Question／-QuestionFile 從本機帶，真實物件名不進 repo）：
      -Scenario B1 -Runs 30（需 DB 的題）／-Scenario B2（wiki 已驗證的題）／-Scenario B3（純 PeopleCode 題）
-     每個都要 PASS：安全五項 0；可用——B1 每個 session 至少 1 個「完成」的 DB task（報告 COMPLETE 且子 session run_sql 成功；
+     每個都要 PASS：安全五項 0；可用——B1 每個 session 至少 1 個「完成」的 DB task（報告 COMPLETE 且子 session sql_run 成功；
      BLOCKED／INVALID／PARTIAL 不算，零違規但零完成不算過；B1 的題目要用預期能 COMPLETE 的固定題）、B3 0 個會查 DB 的 task
      （-ExpectDbTask Yes／No／Any 可覆寫）；B3 附帶看 preflightRuns（R8：不需要 DB 也應做第 0 步）。
 □ 6. 暫時關閉／探測模式：$env:PS_ORACLE_GATE_MODE='observe'（該次啟動；只關先列 todo 層：$env:PS_ORACLE_GATE_TODO='off' 或 profile oracle.todoFirst: off）或 profile oracle.preflightGate: observe；
@@ -681,12 +695,12 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
 □ 7. 判讀 jsonl 欄位：hook（chat.message／before／after）、tool、agent、turn／turnId（入場時的題目＝該則 user 訊息 id）、
      reminder（chat.message 列：這則訊息有沒有注入第 0 步提醒）、callID
      （同一次工具呼叫的 before／after 配對）、target、state→next、decision（allow／block／observe／observe-would-block）、
-     basis（run_sql:enabled／disabled／unknown-agent 說明）、dbCapable（機械判定）、attribution（current／stale／unknown）、
+     basis（sql_run:enabled／disabled／unknown-agent 說明）、dbCapable（機械判定）、attribution（current／stale／unknown）、
      stale／replyTurnId（晚到回覆：實際到達時的題目）、entryState、ok（true／false／"unknown"）／failureMatch／outputLength、
      connection（connect 的連線名）／profileConnection（比對用的 profile 值）、gen（connect 嘗試世代；task 列＝入場時的世代）、
      admitted（task 的 after 列：入場時的判定）、turnAtDecision（task 在查 /mcp 狀態期間題目換了）、
      reportValid／reportStatus（COMPLETE／PARTIAL／BLOCKED／INVALID）／blockedReason／taskState（task 包裝的 completed／error）／
-     childSessionID（子 session；其 jsonl 的 run_sql after 列 ok 是「真的查到 DB」的證據）、
+     childSessionID（子 session；其 jsonl 的 sql_run after 列 ok 是「真的查到 DB」的證據）、
      connect 的 before 列 decision（allow／block／observe-would-block）與 note（ORACLE_CONNECTION_NOT_CONFIGURED／ORACLE_CONNECTION_MISMATCH／
      connect attempt invalidates READY until it succeeds）、
      note（oracleMCP not mounted…／stale reply from previous turn…／superseded by a later connect attempt…／NOT_CONNECTED from an older
@@ -714,7 +728,7 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
          判定仍用 1.18.29 的最後匹配規則（混寫者保守視為會查 DB）。
 □ 9. 內網最小驗收（結果留在內網，回報維護 session 只需通過／不通過）：
      | 測試 | 通過條件 |
-     | 工具可見性（R17／R23） | 四個 DB subagent 的 Oracle 工具只有 run_sql；主 agent 只見 list_connections／connect；_plugin.log 的 wildcardDenyMix=[] |
+     | 工具可見性（R17／R23） | 四個 DB subagent 的 Oracle 工具只有 sql_run；主 agent 只見 list_connections／connect；_plugin.log 的 wildcardDenyMix=[] |
      | 不 list 直接 connect（R24） | 正常題目零 list_connections 呼叫；connect 的 connection 欄＝profile 值原樣 |
      | 先列 todo（R25） | 每題第一個工具是 todowrite（todoWrites ≥ 題數）；todoBlocks 只是觀察值（模型跳過 todo 被擋的次數） |
      | 一開多用（R21） | 主 agent 開線後，三個 DB 委派各自完成固定唯讀探測；任一結束不影響其餘查詢 |
@@ -725,10 +739,10 @@ connect 根本不會執行——所以 profile 的值必須與 SQLcl 已儲存�
      固定探測可用 SELECT 1 FROM DUAL；DB／schema 身分（SYS_CONTEXT）的比對結果只留內網。固定探測能驗連線，不等於所有業務查詢都通過。
 □ 10. Topology 實驗（共用連線防護的前提；三個都做完回報維護 session，再設計，不先做）：
      T1 兩個 OpenCode 行程：視窗 A（ps-orchestrator）問一題讓它 connect 到 DB_A、派完委派；另開視窗 B（新的 opencode
-        行程，用管理者的 build agent）不 connect、直接呼叫 oracleMCP_run_sql 執行
+        行程，用管理者的 build agent）不 connect、直接呼叫 oracleMCP_sql_run 執行
         SELECT SYS_CONTEXT('USERENV','DB_NAME') FROM DUAL。
         B 查得到＝兩個行程共用同一條 SQLcl 連線（跨行程單例）；B 回未連線＝連線只活在各自行程內（process-level）。
-     T2 同一行程兩個 session：視窗 A 問完一題後 /new 開第二個 session（build agent）不 connect 直接 run_sql——同上判讀。
+     T2 同一行程兩個 session：視窗 A 問完一題後 /new 開第二個 session（build agent）不 connect 直接 sql_run——同上判讀。
      T3 順手記三件事：opencode.json 的 oracleMCP type（local／remote）；已連線再 connect（同名）SQLcl 的回覆原文與是否 isError；
         B 以 build agent connect 到不同連線名之後，回到 A 派 ps-ui-flow 查 DB_NAME 是哪一個。
      結果寫回 SOP-12。共用連線防護（T1 共用→需要跨行程協調；只有 T2 共用→process-level 狀態即可）依結果另案設計。

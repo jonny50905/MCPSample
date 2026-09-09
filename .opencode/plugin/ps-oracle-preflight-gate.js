@@ -7,7 +7,7 @@
 // 未 READY 就派會查 DB 的 subagent → 該 task 在執行前被擋（throw），模型收到 PS_ORACLE_PREFLIGHT_REQUIRED 與下一步指示，
 // 做完前置再用相同參數重派。模型選錯順序不會變成錯誤的執行。閘門只擋、不改參數、不代模型 connect。
 //
-// 唯一的例外：目標 subagent 確定沒有 Oracle 能力（.opencode/agent/*.md 的 tools 表對 oracleMCP_run_sql 最後匹配為 false；
+// 唯一的例外：目標 subagent 確定沒有 Oracle 能力（.opencode/agent/*.md 的 tools 表對 oracleMCP_sql_run 最後匹配為 false；
 //   OpenCode 規則：最後匹配者優先、沒列＝預設開）→ 不需要 READY。判定依據是「能力」不是任務意圖：ps-auditor 即使做純 chunk
 //   任務也要過閘門；不在 agent 目錄的名字一律視為會查 DB（保守）。每一列都寫 dbCapable（true／false），analyzer 用它、不用說明字串。
 // oracleMCP 未掛載（/mcp 狀態非 connected；每次即時查、不快取）：一樣擋，只是錯誤訊息改為 ORACLE_MCP_DOWN 協定——不得委派
@@ -22,7 +22,7 @@
 //   例外、timeout、無 after、被較晚的嘗試取代，都不會保留先前的成功證明。task 入場記下當時的 gen：之後又 connect 過（gen 已變）
 //   的 task 回 NOT_CONNECTED，不作廢新世代的 READY（同題內舊連線上的工作晚回，不算新連線斷了）。
 // task 回報解析：after 把子 agent 報告的 status（COMPLETE／PARTIAL／BLOCKED，其餘＝INVALID）、blockedReason、task 包裝的 state
-//   與子 session id 記到列上（analyzer 的「可用」判定用它，不用「沒回 NOT_CONNECTED」）；run_sql 的 after 也記三態 ok。
+//   與子 session id 記到列上（analyzer 的「可用」判定用它，不用「沒回 NOT_CONNECTED」）；sql_run 的 after 也記三態 ok。
 //
 // 第 0 步提醒（注入，不是擋）：主 agent（tools 表有 connect 的 primary）的每一則真實使用者訊息，chat.message 會補一個
 //   synthetic text part：「先 connect（connection_name＝profile 值原樣；不先 list、不從清單挑名字）→ 才准派會查 DB 的 subagent；
@@ -72,7 +72,7 @@ const MCP_PREFIX = MCP_NAME + "_"
 const TOOL_LIST = MCP_PREFIX + "list_connections"
 const TOOL_CONNECT = MCP_PREFIX + "connect"
 const TOOL_DISCONNECT = MCP_PREFIX + "disconnect"
-const TOOL_RUN_SQL = MCP_PREFIX + "run_sql"
+const TOOL_SQL_RUN = MCP_PREFIX + "sql_run"
 const TOOL_TASK = "task"
 const TOOL_TODO_WRITE = "todowrite"
 const TODO_EXEMPT = new Set([TOOL_TODO_WRITE, "todoread", "invalid"])
@@ -180,7 +180,7 @@ function loadAgentCatalog(directory) {
       const tools = parseToolsMap(fm)
       catalog.set(file.slice(0, -3), {
         mode: frontmatterValue(fm, "mode") ?? "all",
-        db: toolEnabled(tools, TOOL_RUN_SQL),
+        db: toolEnabled(tools, TOOL_SQL_RUN),
         connect: toolEnabled(tools, TOOL_CONNECT),
         wildcardDenyMix: wildcardDenyMix(tools),
       })
@@ -533,7 +533,7 @@ export const PsOraclePreflightGate = async (input) => {
   function classifyTarget(target) {
     const entry = catalogFresh().get(target)
     if (!entry) return { gated: true, basis: "unknown-agent(default:DB)" }
-    return { gated: entry.db, basis: entry.db ? "run_sql:enabled" : "run_sql:disabled" }
+    return { gated: entry.db, basis: entry.db ? "sql_run:enabled" : "sql_run:disabled" }
   }
 
   // 會查 DB 的 subagent 名單（提醒用）
@@ -685,7 +685,7 @@ export const PsOraclePreflightGate = async (input) => {
           })
           return
         }
-        if (tool === TOOL_LIST || tool === TOOL_DISCONNECT || tool === TOOL_RUN_SQL) {
+        if (tool === TOOL_LIST || tool === TOOL_DISCONNECT || tool === TOOL_SQL_RUN) {
           putEntry(sessionID, callID, { tool, turn: s.turn, turnId: s.turnId, state: s.state })
         }
         record(sessionID, { hook: "before", tool, callID, ...stamp(s), state: s.state, decision: "observe" })
@@ -795,7 +795,7 @@ export const PsOraclePreflightGate = async (input) => {
         })
         return
       }
-      if (tool === TOOL_RUN_SQL) {
+      if (tool === TOOL_SQL_RUN) {
         const r = classifyResult(out)
         record(sessionID, { ...base, state: prev, next: s.state, ok: r.ok, failureMatch: r.failureMatch || undefined, outputLength: r.textLength })
         return

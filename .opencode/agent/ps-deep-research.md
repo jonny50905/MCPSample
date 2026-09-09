@@ -19,7 +19,7 @@ tools:
   "oracleMCP_list_connections": true
   "oracleMCP_connect": true
   "oracleMCP_disconnect": false
-  "oracleMCP_run_sql": false
+  "oracleMCP_sql_run": false
   "oracleMCP_run_sqlcl": false
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
