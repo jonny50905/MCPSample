@@ -99,14 +99,30 @@ if ($WriteManifest) {
         if ($g) { $commit = $g }
     }
     catch { }
+    # removed＝上一版 manifest 有、這一版搬運集合裡沒有的檔（維護端已刪除／改名的舊檔；沿用舊的 removed 清單，重新出現就移出）
+    # ——公司機的檢查 M 會把這些檔當「必須刪除的殘留」點名（舊 plugin 殘留會被 OpenCode 一起載入，只貼新檔不夠）
+    $current = @{}
+    foreach ($e in $entries) { $current[[string]$e.path] = $true }
+    $removed = @()
+    $prev = $null
+    try { if (Test-Path -LiteralPath $manifestPath) { $prev = (Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { }
+    if ($null -ne $prev) {
+        $prevPaths = @()
+        if ($null -ne $prev.files) { $prevPaths += @($prev.files | ForEach-Object { [string]$_.path }) }
+        if ($null -ne $prev.removed) { $prevPaths += @($prev.removed | ForEach-Object { [string]$_.path }) }
+        foreach ($pp in ($prevPaths | Sort-Object -Unique)) {
+            if ($pp -ne '' -and -not $current.ContainsKey($pp)) { $removed += [pscustomobject]@{ path = $pp; note = '維護端已刪除／改名：公司機必須刪除此檔' } }
+        }
+    }
     $doc = [pscustomobject]@{
-        note   = "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。"
-        commit = $commit
-        files  = $entries
+        note    = "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。"
+        commit  = $commit
+        files   = $entries
+        removed = $removed
     }
     [System.IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $doc -Depth 4),
         (New-Object System.Text.UTF8Encoding($false)))
-    Write-Host ("已寫入 manifest：" + $entries.Count + " 檔（commit " + $commit + "）") -ForegroundColor Green
+    Write-Host ("已寫入 manifest：" + $entries.Count + " 檔（commit " + $commit + "）；必刪舊檔 " + $removed.Count + " 個" + $(if ($removed.Count -gt 0) { "：" + (@($removed | ForEach-Object { $_.path }) -join ", ") } else { "" })) -ForegroundColor Green
     exit 0
 }
 
@@ -147,6 +163,18 @@ else {
                 $mBomBad++
             }
         }
+        # 必刪的舊檔還在＝殘留（舊 plugin 會被 OpenCode 一起載入；舊腳本會被誤跑）——一律點名
+        $mStale = 0
+        if ($null -ne $mf.removed) {
+            foreach ($r in @($mf.removed)) {
+                $rfull = Join-Path $root ([string]$r.path)
+                if ([System.IO.File]::Exists($rfull)) {
+                    Write-Host ("  !! 舊檔殘留（必須刪除）：" + $r.path + "（" + $r.note + "）") -ForegroundColor Red
+                    $mStale++
+                }
+            }
+        }
+        if ($mStale -gt 0) { $findings += 'R' }
         # 多出檔只在 -ShowExtras 時列（預設沉默：公司機的非鏡像內部檔案是
         # 常態，逐檔列出會把「搬檔完整與否」的真訊號淹掉）
         if ($ShowExtras) {
@@ -306,6 +334,7 @@ Write-Host "          B=檔名異常（變體/隱形字元，照上面列的檔�
 Write-Host "          D=內文 FEFF 污染（.ps1 可加 -FixBom 自動修）  E=真缺檔或路徑對不上（SOP-4）"
 Write-Host "          F=這次輸入的參數含隱形字元  S=腳本語法解析失敗（搬運不完整，重新複製整檔）"
 Write-Host "          M=搬運不完整（漏搬/版本不符/搬壞/BOM 缺——照檢查 M 列的檔逐一重搬）"
+Write-Host "          R=舊檔殘留（manifest removed 清單裡的檔還在本機——刪掉它，再重新載入 OpenCode）"
 Write-Host "          X=多出未列管檔（僅 -ShowExtras 時列出；預設不檢查）"
 Write-Host "          G=全部正常（另有原因，回報後續查）"
 Write-Host ("結論代號：" + ($codes -join '+')) -ForegroundColor Cyan

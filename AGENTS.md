@@ -16,15 +16,18 @@
 1. 問答走 `ps-orchestrator` agent（Tab 切換）；要**產完整業務文件**用
    `/ps-research <領域>`（ps-deep-research，輸出 docs/ps-research/）。
    在一般 agent 下則載入 `ps-business-discovery` skill 依其流程處理，
-   重的檢索用 @ 委派給 ps-* subagent。
-   主 agent 每題的**第一個工具呼叫必須是 `todowrite`**（把步驟列成 todo、含開線一項，之後一次做一項）；
-   執行期閘門會擋下 todowrite 之前的其他工具（`PS_TODO_FIRST_REQUIRED`）。
+   重的檢索用 task 委派給 ps-* **agent**（`.opencode/agent/*.md` 裡的名字）。
+   `.opencode/skills/*` 是 skill、不是可委派的 agent：授權／血緣／排程類（ps-security-flow／
+   ps-data-lineage／ps-process-flow）一律派 `ps-metadata-flow`，要用的 skill 寫進 task 文字。
    主 agent 工作流的**開線步驟（第 0 步）**（查 wiki、委派、作答之前）固定
-   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName`，不先 list、
-   不從清單挑名字；無條件，見 agent 定義）；
-   執行期由 `.opencode/plugin/ps-oracle-preflight-gate.js` 強制：前置未完成就
-   委派會查 DB 的 subagent，該 task 會被擋下並回 `PS_ORACLE_PREFLIGHT_REQUIRED`
-   （oracleMCP 未掛載也擋，訊息改走 ORACLE_MCP_DOWN 協定）。
+   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 原樣，不先 list、
+   不從清單挑名字；無條件，見 agent 定義），等 connect 回覆成功才派會查 DB 的 subagent。
+   執行期只有 `.opencode/plugin/ps-runtime-guard.js` 的兩個無狀態檢查：connect 的 connection_name
+   必須等於 profile 值（否則 `ORACLE_CONNECTION_NOT_CONFIGURED`／`ORACLE_CONNECTION_MISMATCH`，
+   工具不執行）、task 的 subagent_type 不得是 skill 名（`PS_TASK_TARGET_INVALID`）。**沒有派工前置
+   閘門**——順序是你的責任：先派 subagent 而 DB 未連 → 它回 `NOT_CONNECTED`，你再 connect 一次、
+   重派一次，只一次、不迴圈。工具清單裡沒有 oracleMCP_ 工具＝掛載故障 → 不猜工具名、不重派、
+   不多 connect，回報 ORACLE_MCP_DOWN，交管理者依 SOP-21 重掛；重掛後重新 connect，不沿用舊結論。
    第 0 步之後，問答一律**先查 `docs/ps-research/wiki/`**（已歸戶的已驗證知識），
    wiki 沒有或未驗證才現場檢索。
 2. 搜尋任何 PeopleSoft 物件前，先讀
@@ -79,11 +82,12 @@
   嚴禁外部 remote 或公開貼出。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。
-- `.opencode/plugin/*.js` 是 OpenCode 執行期閘門（模型迴圈內唯一的確定性層）：
+- `.opencode/plugin/*.js` 是 OpenCode 執行期的無狀態 guard 與診斷（connect 目標比對、task 目標
+  是不是 agent、oracleMCP 掛載診斷；**不是派工閘門**，不保存 READY／todo 狀態）：
   **零外部 import**（只准 `node:` 內建；公司網路封鎖 npm）、只擋不改參數；
   `.opencode/.npmrc` 的 `offline=true` 不可拿掉（否則有 plugin 時啟動會等
-  相依安裝逾時）。改 plugin 必跑 `node --test tests/oracle-gate/unit.test.mjs`
-  與 `tests/oracle-gate/run-e2e.mjs`（真 OpenCode＋假 oracleMCP＋假模型）。
+  相依安裝逾時）。改 plugin 必跑 `node --test tests/runtime-guard/unit.test.mjs`
+  與 `tests/runtime-guard/run-e2e.mjs`（真 OpenCode＋假 oracleMCP＋假模型）。
 - 規則修改走**最小新增**（只加不刪）、當天記 applied.md、
   團隊生效靠內部 git PR——實驗先行、規則後補，規則一律從
   觀察到的行為推導，不從規格書想像。

@@ -44,6 +44,10 @@ tools:
 | 執行方式（排程 / Run Control） | `.opencode/skills/ps-process-flow/SKILL.md` |
 | 授權（誰能進哪個畫面） | `.opencode/skills/ps-security-flow/SKILL.md` |
 
+本 agent 是這三份 skill 的**承載 agent**：委派方用 `subagent_type=ps-metadata-flow` 派工、在 task 文字指定要讀的
+SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被執行期 guard 擋下）。授權鏈用 `oracleMCP_sql_run`
+照 cookbook §4 查、物件 origin 照 §1——`ps_get_security_path`／`ps_get_object_origin` 只是協定角色，不是可呼叫的工具。
+
 ## 執行
 
 1. 依問題類型 Read 對應 SKILL.md 並遵守其中規則。

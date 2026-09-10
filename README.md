@@ -480,9 +480,10 @@ G  全部正常
   會產生「看得到、程式找不到」的假缺檔。
 - **檔案搬運後跑 `ps-fs-doctor`**：檢查 D 抓 BOM 污染、檢查 S 比對腳本行數，
   貼上被截斷會在這裡現形。
-- **順序類規則不靠 prompt**：主 agent「先 `list_connections` → `connect` 再派 DB 委派」
-  由 `.opencode/plugin/ps-oracle-preflight-gate.js` 在執行期強制（擋 task、回
-  `PS_ORACLE_PREFLIGHT_REQUIRED`）；plugin 零外部相依，`.opencode/.npmrc` 的
+- **執行期只擋參數，不擋順序**：`.opencode/plugin/ps-runtime-guard.js` 在執行前比對
+  `oracleMCP_connect` 的 connection_name 與 profile（`ORACLE_CONNECTION_MISMATCH`／`NOT_CONFIGURED`）、
+  擋 `task` 把 skill 名當 agent（`PS_TASK_TARGET_INVALID`），並記 oracleMCP 掛載診斷；派工順序是 agent 規則
+  （subagent 回 NOT_CONNECTED → 主 agent 重連重派一次）。plugin 零外部相依，`.opencode/.npmrc` 的
   `offline=true` 讓斷網下的相依安裝秒失敗（實測少等 70 秒）。
 
 ## 資安邊界

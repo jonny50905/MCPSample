@@ -21,7 +21,8 @@ manifest 是外環產生的唯讀工單：目標輪次、旗標、本批檔案�
   ——禁止把多檔、多範圍、A＋B 塞進同一委派。委派對象只准 @ps-auditor。
 - 併發：會查 oracleMCP 的（SQL 型證據重跑、任務 C）同時 ≤ 3——**連線已在你的第 0 步建好**
   （agent 規則：開場直接 connect profile 的連線名，無條件、不先 list；
-  subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次）；
+  subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次，只一次；
+  回 ORACLE_MCP_DOWN＝掛載故障，不猜工具名、不重派、不多 connect，交管理者重掛）；
   只用 ES＋Source 的同時 ≤ 6；總數 ≤ 6。不要全循序。
 - 任務 A 模板（只傳路徑，不貼內容）：
   `[任務] read docs/ps-research/$ARGUMENTS/<檔名> 執行任務 A（證據解引用），只驗 Evidence 附錄第 a~b 筆`

@@ -52,6 +52,12 @@ orchestrator 主 context 只累積小而結構化的報告。
    已取回並分析的行號區間；單位內未覆蓋的行號區間**必須**同時出現在
    `gaps`，不可默默省略。`quote` 節錄要挑**支撐 claim 的關鍵行**
    （判斷條件、寫入語句），不是 chunk 開頭幾行。
+10. `suggestedNext[].agent` 只能是 `.opencode/agent/` 裡存在且允許委派的 agent 名
+   （ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-auditor）。
+   skill 名（ps-security-flow／ps-data-lineage／ps-process-flow…）**不是**合法目標、不得直接轉成 task.subagent_type：
+   授權類建議寫 `{ "agent": "ps-metadata-flow", "task": "讀取 .opencode/skills/ps-security-flow/SKILL.md …" }`。
+   orchestrator 轉發前先核對；執行期 guard 會在 task 回覆末尾附註無效目標、並在 task 執行前擋下 skill 名——
+   這是路由錯誤，不得歸因為 Oracle 掛載或 DB 連線故障、不觸發重掛或重連。
 ```
 
 ## JSON 結構
@@ -150,7 +156,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `agent` | ✔ | 回報的 subagent 名稱 |
 | `task` | ✔ | 一句話重述任務（供 orchestrator 對帳） |
 | `status` | ✔ | COMPLETE：已回答；PARTIAL：部分回答（見 gaps）；BLOCKED：無法進行（工具失敗 / 查無） |
-| `blockedReason` | status≠COMPLETE 時必填 | 封閉值：NOT_CONNECTED（DB 連線未建，由主 agent 重建後重派）／ORACLE_MCP_DOWN（工具清單無 oracleMCP_）／QUERY_TIMEOUT（>30 秒無回應）／SCHEMA_UNRESOLVED（view/table not found 且 profile currentSchema=FILL_ME）／TOOL_ERROR／NO_EVIDENCE（查無）／BUDGET_EXCEEDED；COMPLETE 時 NOT_APPLICABLE |
+| `blockedReason` | status≠COMPLETE 時必填 | 封閉值：NOT_CONNECTED（SQL 工具回未連線；由主 agent 重連後重派一次）／ORACLE_MCP_DOWN（工具清單無 oracleMCP_：掛載故障，不猜名、不重試，由管理者重掛後重新驗證；不是 NOT_CONNECTED）／QUERY_TIMEOUT（>30 秒無回應）／SCHEMA_UNRESOLVED（view/table not found 且 profile currentSchema=FILL_ME）／TOOL_ERROR／NO_EVIDENCE（查無）／BUDGET_EXCEEDED；COMPLETE 時 NOT_APPLICABLE |
 | `searchScope` | ✔ | 實際使用的搜尋模式；用了 delivered fallback 必須在此如實回報 |
 | `coverage[]` | 長文本必填 | 程式單位、結構行號範圍、已分析行號區間；未覆蓋區間必同時列於 gaps |
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
@@ -159,7 +165,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `navigationEntries[]` | 選填（導覽類委派必填，可為空陣列） | Portal Registry 入口，**複數**；每筆帶 entryType／labels／visibility（值域見 `mcp-tool-contracts.md` §3）。空陣列＋gaps＝查無；未支援的 surface 記 gaps，不得省略 |
 | `dynamicRuntimeWarnings[]` | ✔（可為空陣列） | 所有 DYNAMIC_RUNTIME 事項集中列出 |
 | `gaps[]` | ✔（可為空陣列） | 未涵蓋範圍與原因（budget 到頂 / 與題無關 / 查無） |
-| `suggestedNext[]` | 選填 | 建議 orchestrator 的後續委派 |
+| `suggestedNext[]` | 選填 | 建議 orchestrator 的後續委派；`agent` 必須是存在且允許委派的 agent 名（硬規則 10），skill 名不是合法目標 |
 
 ## Orchestrator 端的使用規則
 

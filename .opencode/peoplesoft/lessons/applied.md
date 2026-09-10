@@ -3253,3 +3253,78 @@
   sqlcl_run），`run_sqlcl` 同樣是錯的、對 subagent 其實沒關到，一併改成 `sqlcl_run`。
   教訓：工具名只能來自 /mcp 的實際清單，不能從產品文件推；chat 裡出現過的名字（哪怕是模型猜的、哪怕記在 L103）都要拿去核對；
   「沒列＝開」讓錯名不會立刻報錯，錯名會靜靜活很久。
+
+### L116 閘門不是連線的必要條件——公司機能連線後，移除派工 preflight／todo 閘門，只留無狀態的參數 guard（issue #30，2026-09-10）
+
+- 症狀：L115 的執行期閘門把「每題 READY 才能派工」「第一個工具必須 todowrite」做成硬性前置，附帶每題重置、呼叫配對、
+  連線世代、synthetic 提醒、三層擋。公司機已能按流程連線之後，這些狀態成了維護成本與新的故障面（觀察值一長串、
+  每題多一次來回、假的連線有效性證明），而它們證明不了共用連線仍是預期連線。
+- 決定（管理者 issue #30）：移除流程閘門，不是設 observe——整個狀態機、提醒注入、todo 層、`PS_ORACLE_PREFLIGHT_REQUIRED`／
+  `PS_TODO_FIRST_REQUIRED` 都拿掉；舊 plugin `ps-oracle-preflight-gate.js` 刪除（manifest 加 removed 清單、fs-doctor 檢查 M 點名 R）。
+  保留的安全邊界：主 agent 只開 list_connections／connect、四個 DB subagent 只開 sql_run（逐工具明寫、`sql_run`／`sqlcl_run` 實名）；
+  connect 目標 guard 拆成獨立、小型、無狀態的檢查——只比對本次 `connection_name` 與 profile `oracle.connectionName`
+  （未填 → `ORACLE_CONNECTION_NOT_CONFIGURED`、不一致 → `ORACLE_CONNECTION_MISMATCH`，執行前 throw），不保存 READY／turn／世代、
+  不查 task 能力、不代模型 connect、不拿回覆文字決定派工。
+- 落點：新 plugin `.opencode/plugin/ps-runtime-guard.js`（guard＋#32 的 task 目標檢查＋#31 的診斷；紀錄目錄改
+  `auto-loop-logs/ps-runtime-guard/`）；profile 拿掉 `preflightGate`／`preflightReminder`／`todoFirst`，加 `connectGuard: enforce`、
+  `mcpAutoRecover: off`；三個主 agent、cookbook、AGENTS.md、/ps-audit、/ps-audit-batch 清掉「閘門會擋」「第一個工具必須 todowrite」
+  的承諾（todo 降為建議），寫清楚：先派後連 → subagent 回 NOT_CONNECTED → 收齊後重連、重派**一次**、不迴圈；工具不可用 → 不猜名、
+  不重派、不多 connect（交 #31 的恢復流程）；不再宣稱「模型錯序也一定不會派出 task」。
+  驗收改看合法報告、真實查詢成功與工具權限：`scripts/tests/test-oracle-runtime.ps1`（原 test-oracle-gate-runtime）完成定義不變
+  （報告 COMPLETE 且子 session sql_run ok），流程判定換成 reconnectLoops／downThenConnect／downThenRedispatch，保留覆蓋率三項
+  （hookMismatch／turnMismatch／callMismatch，用 messageID 歸屬）；`tests/runtime-guard/`（原 tests/oracle-gate）重寫。
+- 驗證：單元 10 組；e2e 13 情境（真 OpenCode 1.18.29：compliant／task-first（NOT_CONNECTED 重連一次、只一次 connect）／nodb／
+  connect-fail／wrong-target／not-configured／mcp-down／mcp-failed／skill-as-agent／suggested-skill／vanish-auto／vanish-observe／
+  transport-close）；test-auto-loop 情境 31～33 改寫，全部 PASS。
+- 教訓：機械保證要放在「參數限制」這種無狀態、可用一句話證明的位置；把流程順序做成狀態機，狀態本身就會變成第二個真相來源。
+  流程規則回到 agent 文字＋事後驗收（analyzer 擋「超過一次」），承認順序是機率行為，而不是用閘門假裝它是確定的。
+
+### L117 工具消失不是「SQLcl 已死」——同 host 的 MCP client／transport／工具目錄才是故障邊界，重掛是恢復手段不是根因修復（issue #31，2026-09-10）
+
+- 症狀（公司機實驗）：前一個 Oracle 查詢正常，下一個操作主／子 agent 都看不到 oracleMCP 工具；同視窗 `/new` 仍失敗；
+  CLI 仍顯示 enabled；另一視窗同時正常；只有在原視窗 `/mcps` 對 oracleMCP disconnect→connect 才恢復。框架回報一律 ORACLE_MCP_DOWN，
+  且 cookbook 7a 把「沒有工具」推論成「SQLcl／VS Code 已死、絕非暫時故障」——與現象矛盾。
+- 對碼（OpenCode 1.18.29 `mcp/index.ts`）：clients／status／defs 存在 instance 狀態；`watch()` 在 transport onclose 時刪 client、
+  狀態改 failed:"Connection closed" 並發 `mcp.tools.changed`；收到 tools/list_changed 會重抓目錄，抓到空陣列就把 defs 設成空、狀態仍
+  connected、同樣發 `mcp.tools.changed`；`tools()` 只回 connected 且有 defs 的 server——兩條路都會讓同 host 的每個 session 都看不到工具，
+  `/mcps` 的 disconnect→connect（`/mcp/{name}/disconnect`、`/mcp/{name}/connect`）重建 client 才恢復。plugin 的 SDK client 綁在同一個
+  server 行程，可以呼叫同一組路由；但 1.18.29 沒有 API 能列出 MCP 工具目錄或每個 agent 的最終工具清單（`/experimental/tool/ids`
+  只有內建工具）。模型呼叫看不到的工具會被 AI SDK 改判成 `invalid` 工具（`experimental_repairToolCall`），plugin 在 before hook
+  看得到「attempted 名字」——這是 host 判定的證據，不是 LLM 字串。
+- 落點：(A) 診斷（ps-runtime-guard）：`_mcp-diag.jsonl` 記 loaded（execPath／platform／instance id／目錄）、`mcp.tools.changed` 事件、
+  /mcp 狀態快照（runtimeStatus、遮罩後 statusError、toolCatalog 探測——1.18.29 記 not exposed、seenTools）、oracleMCP_ 工具 part 的
+  遮罩錯誤摘要、invalid 呼叫三種判讀（tools 表本來就關＝權限過濾；名字從沒執行過＝可能錯名；執行過的工具對允許它的 agent 消失＝目錄遺失），
+  只記名稱／計數／事件／遮罩摘要。(B) 人工恢復 SOP（SOP-21 步驟 4）：停派 → 等在途 → 留紀錄 → 只對受影響視窗重掛一次 → 確認工具 →
+  主 agent connect profile 目標 → subagent SELECT 1 FROM DUAL → schema → 只重派未完成唯讀工作一次；Timeout ≠ SQL 已停；不殺全域行程、
+  不動其他 host。(C) 受控自動重掛（預設 off）：只在 host 證據（狀態 failed；或 tools.changed 後執行過的工具對允許它的 agent 變成 invalid）
+  觸發；範圍＝同 host；多個 agent 同時報錯合併一次（evaluating／merged）；有 oracleMCP_ 呼叫在途先等（≤60 秒）；disabled／needs_auth／未設定
+  不碰；一次失敗即停（suppressed，直到人工恢復後有呼叫成功）；重掛後未驗證就再故障＝視為失敗；恢復世代記在列上、舊回覆不推翻新恢復；
+  恢復後在下一次 oracleMCP_／task 回覆附註「已重掛：重新 connect、SELECT 1 FROM DUAL」（plugin 拿不到呼叫工具的 API，DB 層驗證交 agent）。
+  (D) 語意：ORACLE_MCP_DOWN 保留為「本次工具不可用」，移除「一定已死、絕非暫時」的推論；NOT_CONNECTED 只在 SQL 工具回未連線；
+  工具不見不猜名、不重派、不多 connect；主 agent 只轉述子報告不得說成已獨立驗證；恢復後重新驗證、不沿用舊 DOWN 結論。
+- 驗證：單元（診斷、invalid 三判讀、受控重掛與五個邊界）；e2e vanish-auto（host A 目錄變空 → 新 session 看不到 → invalid → 重掛一次 → 恢復＋附註；
+  host B 全程正常、從未重掛）、vanish-observe（只記 would-remount）、transport-close（行程結束 → 事件觸發重掛 → 新 session 恢復）；
+  真 OpenCode 1.18.29。
+- 交付分開標示：**已降低故障影響**（診斷、人工 SOP、受控重掛）；**根因未修**（為什麼 transport 會關／目錄會變空，需要公司機的
+  `_mcp-diag.jsonl` 首次失效前後的事件序列才能定位；自動重掛在公司機版本開啟前要先驗 SOP-21 步驟 6）。
+- 教訓：「工具不見」有三個不同層（權限過濾、錯名、掛載失效），錯誤訊息長得一樣；先用 host 證據分層，再決定重掛——
+  拿 LLM 的字串當觸發條件會把權限問題也重啟掉。
+
+### L118 skill 不是 agent——名字看起來像委派目標，模型就會拿去委派（issue #32，2026-09-10）
+
+- 症狀：LLM 常送 `task(subagent_type=ps-security-flow)`，失敗（OpenCode：Unknown agent type）。它是 `.opencode/skills/` 的 skill，
+  正確承載者是 ps-metadata-flow；但 SKILL.md 的 frontmatter 只描述能力、內文標題寫「Subagent 模式」、工具段列了尚未實作的
+  `ps_get_security_path`／`ps_get_object_origin`，模型看到的名字與描述都像 agent。
+- 落點：SKILL.md frontmatter 明說「不是可供 task 委派的 agent，授權問題委派 ps-metadata-flow，不得使用 subagent_type=ps-security-flow」；
+  「Subagent 模式」→「承載 agent 與讀取方式」（含正確 task JSON）；工具段改成實際途徑（ps-metadata-flow 用 `oracleMCP_sql_run` 照 cookbook §4／§1；
+  契約角色標明不是可呼叫工具）；ps-metadata-flow 宣告自己是三份 skill 的承載 agent；ps-orchestrator 委派表把授權（Permission List／Role）
+  派 ps-metadata-flow、skill 放 prompt，新增「委派目標只能是 agent」段；deep-research 委派鏈補同一條；AGENTS.md 加一句；
+  report-contract 硬規則 10（`suggestedNext[].agent` 只能是 agent 名、skill 名不轉 subagent_type）。執行期：guard 在 task 執行前擋
+  `subagent_type=<skill 名>`（`PS_TASK_TARGET_INVALID`，訊息指出承載 agent，明說不是 Oracle 問題），task 回覆的報告 `suggestedNext` 含
+  skill 名或不存在的 agent 時在回覆末尾附註（報告本文不動、不轉發）；不新增 `.opencode/agent/ps-security-flow.md`、不 alias。
+  原生 `permission.task` 白名單記為可選硬化（SOP-21 步驟 9）：1.18.29 語法可用，但 skill 名匹配 `ps-*`，擋不住這個誤派，且公司機版本要先驗。
+  test-auto-loop 情境 31 加守衛：frontmatter／承載段／無可執行路由指向 skill 名／不新增同名 agent；情境 32 驗 guard 的 SKILL_CARRIER。
+- 驗證：單元（skill 名擋、承載 agent、suggestedNext 附註）；e2e skill-as-agent（誤派 → error 含承載者 → 改派 → COMPLETE、零多餘 connect）、
+  suggested-skill（報告帶 skill 名 → 回覆附註 → 改派）。
+- 教訓：模型可見的名字就是它的 API——skill 目錄名與 agent 名同一命名空間時，摘要第一句就要說「不是 agent」；
+  驗證要放在轉發之前（回覆附註）與執行之前（guard），錯誤要指出正確去向，不能被歸類成別的故障。

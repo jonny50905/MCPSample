@@ -126,6 +126,23 @@ todoWrites／todoBlocks 觀察值。驗證：單元 23、e2e 19（no-todo／todo
 after 列從未出現 → 公司機 analyzer dbTasksCompleted 永遠 0（B1 必 FAIL）。更正：全樹 `run_sql`→`sql_run`（七個 agent、plugin、analyzer、
 cookbook、test-scenarios、情境 31／32／33、假 MCP／e2e、歷史引文）；情境 31 擋回流。管理者隨後給了全名清單：`list_connections`／`connect`／`disconnect`／
 `sql_run`／`sqlcl_run`——`run_sqlcl` 也是錯的（對 subagent 沒關到），一併改成 `sqlcl_run`。細節 SOP-12 再追記、L115 追記。
+**追記（2026-09-10，issue #30／#31／#32；L116～L118）**：三件事一批做。(1) **派工閘門移除**（#30）：公司機已能按流程連線，
+「每題 READY 才能派工」「第一個工具必須 todowrite」的狀態機、每題重置、synthetic 提醒、三層擋全部拿掉——不是設 observe；舊 plugin
+`ps-oracle-preflight-gate.js` 與舊 analyzer `test-oracle-gate-runtime.ps1` **刪除**（manifest 加 `removed` 清單，fs-doctor 檢查 M 會把還在本機的
+舊檔點名為 R）。保留：主／子 agent 權限分工（tools 表不動）、connect 目標 guard（拆成無狀態檢查：只比對本次 connection_name 與 profile；
+`ORACLE_CONNECTION_NOT_CONFIGURED`／`MISMATCH`）。新 plugin `ps-runtime-guard.js`（紀錄目錄 `auto-loop-logs\ps-runtime-guard\`）。
+agent／cookbook／AGENTS／profile 清掉閘門承諾：NOT_CONNECTED → 主 agent 收齊後重連、重派**一次**；工具不可用 → 不猜名、不重派、不多 connect。
+analyzer 改名 `test-oracle-runtime.ps1`：完成定義不變（COMPLETE＋子 session sql_run ok），流程判定換成 reconnectLoops／downThenConnect／
+downThenRedispatch，覆蓋率三項保留（messageID 歸屬）。(2) **Oracle MCP 工具消失**（#31）：對碼 1.18.29——transport onclose 或 tools/list_changed
+抓到空目錄都會讓同 host 每個 session 看不到工具，`/mcps` 的 disconnect→connect 重建 client 才恢復；plugin 的 SDK client 綁同 host、可呼叫同一組
+路由，但 1.18.29 沒有 API 能列 MCP 工具目錄。落點：`_mcp-diag.jsonl` 診斷（事件、狀態快照、invalid 呼叫三種判讀、遮罩錯誤摘要）、SOP-21 人工恢復
+SOP、受控自動重掛（**預設 off**；只在 host 證據觸發、每個故障事件一次、在途先等、disabled／需授權不碰、失敗即停、恢復後回覆附註要重新 connect＋
+SELECT 1 FROM DUAL）、ORACLE_MCP_DOWN 語意改「本次工具不可用」（不再推論已死）。**根因未修**，只降低影響。(3) **skill 不是 agent**（#32）：
+ps-security-flow SKILL.md frontmatter 明說不是 agent、承載段＋正確 task JSON、工具段改實際途徑；ps-metadata-flow 宣告承載；orchestrator／
+deep-research 路由與「委派目標只能是 agent」段；契約硬規則 10（suggestedNext 只能是 agent 名）；guard 在 task 執行前擋 skill 名
+（`PS_TASK_TARGET_INVALID`，指出承載者）、報告 suggestedNext 無效時在回覆附註。不新增 agent、不 alias；原生 permission.task 記為可選硬化。
+驗證：單元 10 組、e2e 13 情境（真 OpenCode 1.18.29，含 host A 工具目錄變空／transport 關閉＋host B 正常）、test-auto-loop 情境 31～33 改寫全 PASS。
+搬運見 §1 步驟 1c。
 
 ## 1. 管理者下一步（按序）
 
@@ -207,6 +224,40 @@ cookbook、test-scenarios、情境 31／32／33、假 MCP／e2e、歷史引文�
    R25 先列 todo）→ 同一視窗互動 20 題後 `-AnalyzeAll`（安全五項無豁免，
    oracleMCP 掛載中；blockedRuns 應明顯低於注入前）→ B1／B2／B3 各 30 次（B1 另判每 session ≥1 個「報告 COMPLETE 且子 session sql_run 成功」
    的 DB task）；再做步驟 9 的內網最小驗收與步驟 10 的 topology 實驗 T1～T3（R15），結果回報維護 session。
+1c. issue #30／#31／#32（2026-09-10；1／1a／1b 尚未搬的一起搬，manifest 只搬最新）——**先刪再搬**：兩個舊檔刪掉，再貼新檔，最後重新啟動 opencode 行程
+    （`/new` 不會重載 plugin）；profile 只合併 oracle 區塊（拿掉 preflightGate／preflightReminder／todoFirst，加 connectGuard: enforce、
+    mcpAutoRecover: off；已填的 connectionName／currentSchema 不動）：
+
+   | 檔案 | 新增／修改／刪除 | 行數 | 備註 |
+   |---|---|---|---|
+   | `.opencode/plugin/ps-oracle-preflight-gate.js` | **刪除** | — | 舊閘門；不刪＝兩個 plugin 一起載入。fs-doctor 檢查 M 會報 R |
+   | `scripts/tests/test-oracle-gate-runtime.ps1` | **刪除** | — | 舊 analyzer（判 READY 順序），由 test-oracle-runtime.ps1 取代 |
+   | `.opencode/plugin/ps-runtime-guard.js` | 新增 | 813 | 存 UTF-8；三件無狀態的事（connect 目標 guard、task 目標檢查、oracleMCP 診斷＋受控重掛預設 off）；載入證據＝`auto-loop-logs\ps-runtime-guard\_plugin.log` 的 loaded 行 |
+   | `scripts/tests/test-oracle-runtime.ps1` | 新增（取代舊檔） | 470 | 存 UTF-8 with BOM；用法見 SOP-21 步驟 7 |
+   | `.opencode/peoplesoft/customization-profile.yaml` | 修改（oracle 區塊：移除三個閘門設定，加 connectGuard／mcpAutoRecover） | 113 | 本機已回填者只合併 oracle 區塊 |
+   | `.opencode/agent/ps-orchestrator.md` | 修改（閘門承諾清理；委派表授權→ps-metadata-flow；「委派目標只能是 agent」段；BLOCKED 轉譯） | 214 |  |
+   | `.opencode/agent/ps-deep-research.md` | 修改（同上；DOWN 語意；委派鏈補 skill≠agent） | 528 |  |
+   | `.opencode/agent/ps-audit-orchestrator.md` | 修改（閘門承諾清理；DOWN 語意） | 156 | 備用、未掛載，manifest 要對 |
+   | `.opencode/agent/ps-metadata-flow.md` | 修改（宣告承載 agent；契約角色不是工具） | 116 |  |
+   | `.opencode/agent/ps-auditor.md` | 修改（unavailable tool 語意加掛載故障一句） | 264 |  |
+   | `.opencode/command/ps-audit.md` | 修改（NOT_CONNECTED 只一次；DOWN 不重派） | 73 |  |
+   | `.opencode/command/ps-audit-batch.md` | 修改（同上） | 110 |  |
+   | `.opencode/skills/ps-security-flow/SKILL.md` | 修改（frontmatter 不是 agent；承載段＋task JSON；實際途徑） | 84 |  |
+   | `.opencode/peoplesoft/oracle-query-cookbook.md` | 修改（規則 7／7a 語意；主 agent 段去 todo 閘門、加 guard 一行） | 641 |  |
+   | `.opencode/peoplesoft/subagent-report-contract.md` | 修改（硬規則 10；blockedReason 語意） | 175 |  |
+   | `.opencode/peoplesoft/mcp-tool-contracts.md` | 修改（掛載故障一句） | 129 |  |
+   | `.opencode/peoplesoft/README.md` | 修改（plugin 一行） | 309 |  |
+   | `.opencode/peoplesoft/SOP.md` | 修改（SOP-12 再追記；SOP-21 整段重寫：guard、人工恢復 SOP、診斷判讀、自動重掛開啟條件、驗收、已知限制、可選硬化） | 791 |  |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改（L116／L117／L118） | 3330 |  |
+   | `.opencode/peoplesoft/test-scenarios.md` | 修改（§7 改寫、§7a R30～R42） | 692 |  |
+   | `AGENTS.md` | 修改（skill≠agent、guard 只擋兩件事、沒有派工閘門、測試路徑） | 99 | 根目錄，不在 manifest |
+   | `scripts/ps-fs-doctor.ps1` | 修改（manifest removed 清單＋檢查 M 的 R） | 341 | 存 UTF-8 with BOM |
+   | `scripts/tests/test-auto-loop.ps1` | 修改（情境 31～33 改寫） | 866 | 存 UTF-8 with BOM |
+   | `scripts/ps-transfer-manifest.json` | 修改 | 見搬運清單 | 最後搬；fs-doctor 應報一致且無 R |
+
+   `tests/runtime-guard/*`（原 tests/oracle-gate；沙箱測試組）、`docs/design/oracle-preflight-gate-decision-memo.md`（§十～§十二）不搬。
+   搬完照 SOP-21 步驟 1～3 驗（fs-doctor 無 R；`_plugin.log` loaded 行是 ps-runtime-guard；R30～R36），再做步驟 4／5 的人工恢復與診斷判讀；
+   自動重掛（R40）只在步驟 6 三點驗過後才開。回報維護 session：`-AnalyzeAll` 的覆蓋與行為六項、`_mcp-diag.jsonl` 首次失效前後的事件序列（根因定位需要）。
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。
 4. **b0 結束時看 `audit-parts\domain.md` 有沒有出現**：有＝agent 層病因確認已修；沒有＝看 log
@@ -260,12 +311,13 @@ cookbook、test-scenarios、情境 31／32／33、假 MCP／e2e、歷史引文�
   一律 `powershell Get-Content -Encoding UTF8`。
 - **oracleMCP 工具實名**（2026-09-09 更正）：`oracleMCP_list_connections`／`oracleMCP_connect`／`oracleMCP_disconnect`／`oracleMCP_sql_run`
   （查詢；不是 run_sql）／`oracleMCP_sqlcl_run`（不是 run_sqlcl；管理者 2026-09-09 給的全名清單）。工具名只能來自公司機 /mcp 清單，不能從產品文件推（SOP-12 再追記）。
-- **閘門測試（#29）**：`node --test tests/oracle-gate/unit.test.mjs`（狀態機 23 組）；`OPENCODE_BIN=<binary> node tests/oracle-gate/run-e2e.mjs`
-  （真 OpenCode＋假 oracleMCP＋假模型，19 情境含 `list-first`／`multi-turn-serve`／`compaction-serve`／`stale-connect-serve`／`connect-fail`／
-  `wrong-target`／`reconnect-fail`／`no-todo`／`todo-noconnect`；binary 由
-  `npm pack opencode-linux-x64@1.18.29` 取得；`tests/oracle-gate/README.md`）。改 plugin 必跑兩者；改 agent 檔 tools 表也要跑
-  （DB subagent 判定從 tools 表推導）。沙箱要點：OpenCode 用 `PWD` 決定專案目錄；`serve` 啟動後第一個請求可能掛住（執行器 20 秒逾時重試）；
-  plugin 內不得出現 connection-state／epoch／prt_／失敗放行／祖先查詢（情境 32 守衛），analyzer 不得有豁免。
+- **guard 測試（#30／#31／#32）**：`node --test tests/runtime-guard/unit.test.mjs`（10 組）；`OPENCODE_BIN=<binary> node tests/runtime-guard/run-e2e.mjs`
+  （真 OpenCode＋假 oracleMCP（含工具目錄變空／transport 關閉故障注入）＋假模型，13 情境：compliant／task-first／nodb／connect-fail／
+  wrong-target／not-configured／mcp-down／mcp-failed／skill-as-agent／suggested-skill／vanish-auto（host A＋B）／vanish-observe／transport-close；
+  binary 由 `npm pack opencode-linux-x64@1.18.29` 取得；`tests/runtime-guard/README.md`）。改 plugin 必跑兩者；改 agent 檔 tools 表也要跑
+  （dbCapable 從 tools 表推導）。沙箱要點：OpenCode 用 `PWD` 決定專案目錄；`serve` 啟動後第一個請求可能掛住（執行器 20 秒逾時重試）；
+  plugin 內不得出現派工狀態機（NEED_CONNECT／READY／turnId／todo）、synthetic 提醒、失敗放行、祖先查詢（情境 32 守衛），analyzer 不得有豁免。
+  紀錄：`auto-loop-logs\ps-runtime-guard\<sessionID>.jsonl`（session）與 `_mcp-diag.jsonl`（主機診斷、重掛決定）、`_plugin.log`（載入）。
 - **測試**：`pwsh -File scripts/tests/test-auto-loop.ps1`（28 個真實函式 AST 抽取、情境 27 含 #23、
   含 lint fixture）。改 auto-loop／lint 後必跑。
 
@@ -279,12 +331,11 @@ cookbook、test-scenarios、情境 31／32／33、假 MCP／e2e、歷史引文�
   「ps-audit-batch（agent ps-audit-orchestrator）」，80196ee 後實掛 ps-deep-research（僅註解性文字，
   該節對批次指令本就不適用）；`SOP.md` 未收 L104～L107 的操作知識（台帳刪除語義、分批稽核參數、
   log 訊號詞只在本檔 §3，而本檔不搬公司機）——建議下一波以「只加不刪」補一節進 SOP。
-- 閘門（#29）待公司機驗：真 SQLcl `connect`／`list_connections` 的成功回覆是否命中 FAILURE_PATTERNS（誤判會讓閘門永遠不開——
-  jsonl 看 `ok:false`＋`failureMatch`）；「已連線再 connect」是正常回覆還是 isError（R16：isError 時閘門那題不會開，驗完才決定要不要接
-  event hook）；互動 TUI 的 task／turn hook 覆蓋率（`-AnalyzeAll` 四項＝0）；`.npmrc offline` 是否真的讓啟動不再多等（仍多等 → 全域目錄再放一份）；
-  **topology 實驗 T1～T3**（SOP-21 步驟 9／R15）：兩個 opencode 行程是否共用同一條 SQLcl 連線、同行程兩個 session 是否共用、oracleMCP type——
-  共用連線防護（review Must #1）等這三個結果再設計，閘門目前 READY 是 per-session、看不到別的 session／視窗的 connect／disconnect。
-  已知限制：同回合中途斷線閘門看不到（靠 NOT_CONNECTED 退回）；DB 連不上時 ps-auditor 的純 chunk 任務也會被擋（第 0 步規則本就如此）；
-  command 的 agent 若是 subagent（目前沒有）被擋時整個 prompt 以錯誤結束（fail-closed）。
+- guard／MCP（#30／#31／#32）待公司機驗與未決：派工順序沒有機械保證（模型先派後連只會多一次 NOT_CONNECTED 來回；analyzer 擋「超過一次」）；
+  Oracle MCP 工具消失的**根因未定**——需要公司機 `_mcp-diag.jsonl` 首次失效前後的事件序列（tools.changed／快照狀態／invalid）才能定位，
+  目前只有診斷、人工 SOP、受控重掛（預設 off；公司機版本開啟前先驗 SOP-21 步驟 6）；1.18.29 拿不到 MCP 工具目錄與每個 agent 的最終工具清單；
+  受控重掛只驗「工具恢復」，DB 層（profile 目標、SELECT 1 FROM DUAL、schema）靠附註讓 agent 做；`.npmrc offline` 是否真的讓啟動不再多等；
+  **topology 實驗 T1～T3**（R42）仍待做，共用連線防護（有效性、集中復原、真 SQLcl repeated-connect 契約）另案。
+  原生 permission.task 白名單（SOP-21 步驟 9）只在公司機驗過語法後才啟用。
 - 舊掛起：已畢業領域貼 U 項工單；PENDING_MANUAL 人工 SQL（SOP-2 第 4 階）；`-GitCommit` 觀察期
   結束後恢復；畢業後端到端測試；opencode.json 的 doom_loop ask→deny。

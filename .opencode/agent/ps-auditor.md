@@ -54,8 +54,10 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
 
 - `get_chunk_by_id` 是 **ES** 的工具——掛到 `PeoplecodeSource` 上＝`unavailable tool`。
 - `unavailable tool` 三種成因（名字錯／掛錯 server／本 agent 對該 server 是
-  deny）訊息完全相同，**都不是暫時故障**——重試必然再失敗，對照上表改做法，
+  deny）訊息完全相同，重試必然再失敗——對照上表改做法，
   也不得換工具代償（用 search_chunks 的命中與否代替解引用＝抽樣不是驗證）。
+  整個 `oracleMCP_` 前綴的工具都不見＝掛載故障（可能是暫時的、由管理者重掛）：SQL 型證據回 UNVERIFIABLE(ORACLE_MCP_DOWN)，
+  不猜名、不重試、不 connect。
 - 解引用**固定走 Source**（索引是副本，CR 上線後會落後）。ES 的
   `get_chunk_by_id` 只用於**交叉檢查**：`get_chunks_details` 查無時以同一
   id 再查——ES 有＝該 id 曾存在但來源已變，**走二次定位、不判

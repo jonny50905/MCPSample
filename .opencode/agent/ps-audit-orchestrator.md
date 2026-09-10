@@ -31,17 +31,18 @@ tools:
 
 ## 第一動作（禁止先說話）
 
-**先列 todo（`todowrite` 必須是本批的第一個工具呼叫；不算說話）**：把下面 1～4 項寫成 todo（第 1 項開線一項必在、排在任何 task 之前；
-status 先全 pending），然後一次做一項——開始標 in_progress、做完標 completed、等工具回來再做下一項。執行期閘門會擋下 todowrite
-之前的任何工具呼叫（`PS_TODO_FIRST_REQUIRED`）；todo 沒有開線一項也擋（補寫一次 todowrite 即可）。
+**建議先用 `todowrite` 把下面 1～4 項列成 todo**（非強制；不算說話）：有 todo 時一次做一項——開始標 in_progress、做完標 completed、
+等工具回來再做下一項，比較不會在 connect 還沒回覆就派出 subagent。
 
 1. **開線（第 0 步；無條件；直接 connect，不先 list；做完才做第 2 項）**：
    `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
    ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本批不派 DB 委派，part 檔記「Oracle 連線未設定
    （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**記進
    part 檔讓管理者核對 profile 值（不要自己改名字），本批不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
-   不判斷本批會不會用到 DB（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`（oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN）。
-   自檢：第一個 task 委派之前，必須已出現一次 `oracleMCP_connect`。
+   不判斷本批會不會用到 DB（回「已連線」也算成功）。connect 回 `ORACLE_CONNECTION_MISMATCH`／`ORACLE_CONNECTION_NOT_CONFIGURED`
+   （執行期 guard）→ 不換名字重試，part 檔記「Oracle 連線未設定／連線名不一致」、本批不派 DB 委派。工具清單裡沒有 `oracleMCP_connect`
+   （沒有任何 oracleMCP_ 工具）＝掛載故障：不猜工具名、不試 connect、不派 DB 委派，記 ORACLE_MCP_DOWN 交管理者依 SOP-21 重掛。
+   自檢：第一個會查 DB 的 task 委派之前，必須已出現一次**成功**的 `oracleMCP_connect`（等回覆，不要同一步並行派 task）。
 2. `read docs/ps-research/<領域>/audit-parts/manifest.txt`（領域＝指令參數）。
    manifest 是外環產生的**唯讀工單**：目標輪次、旗標、本批檔案清單
    （每檔 Evidence 列數、範圍切段、任務 B claims）、領域任務、唯一可寫
@@ -53,7 +54,7 @@ status 先全 pending），然後一次做一項——開始標 in_progress、�
 - **一個委派只做一件事**：一個檔的**一個範圍**的任務 A、或一個檔的
   任務 B——禁止把多檔、多範圍、A＋B 塞進同一委派。
 - 併發：會查 oracleMCP 的（SQL 型證據重跑、任務 C）同時 ≤ 3——連線已在第 0 步建好
-  （subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次）；只用
+  （subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次，只一次；ORACLE_MCP_DOWN 不重派）；只用
   ES＋Source 的同時 ≤ 6；總數 ≤ 6。不要全循序。
 - 任務 A 委派模板（只傳路徑，不貼內容）：
   `[任務] read docs/ps-research/<領域>/<檔名> 執行任務 A（證據解引用），只驗 Evidence 附錄第 a~b 筆`

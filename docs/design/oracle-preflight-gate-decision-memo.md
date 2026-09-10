@@ -1,5 +1,7 @@
 # Oracle 前置閘門（issue #29）決策備忘——issue 主張逐條對碼
 
+> 2026-09-10 起：§一～§九是閘門時期的歷史；閘門已依 issue #30 移除，現況見 §十～§十二。
+
 日期：2026-09-08。對象：OpenCode 1.18.29（`anomalyco/opencode` tag v1.18.29 原始碼）。
 結論：採 plugin 執行期閘門；issue 的方向對，細節有五處與原始碼／框架既有規則不合，逐條記錄取捨。
 
@@ -144,3 +146,35 @@ test-auto-loop 情境 31／32／33。
 
 邊界：模型在同一步同時送 todowrite＋其他工具 → 其他工具仍被擋（after 未回）；重來一次即可。observe 模式只記 hook=todo-first 列，不佔 before 列
 （task 件數才與 transcript 對得上）。驗證：單元 23、e2e 19（no-todo／todo-noconnect）、test-auto-loop。
+
+## 十、移除派工閘門（issue #30，2026-09-10）
+
+| issue 主張 | 核對 | 處置 |
+|---|---|---|
+| 公司機已能按流程連線，流程閘門不該再是連線的必要條件 | 成立：閘門的每題重置／配對／世代／提醒／todo 三層都是為「模型錯序」做的補償，證明不了共用連線仍是預期連線 | 整個狀態機移除（不是 observe）；舊 plugin 刪除，manifest removed 清單＋fs-doctor R 檢查 |
+| 保留主／子 agent 權限分工與連線目標檢查 | 成立 | tools 表不動；connect 目標 guard 拆成無狀態檢查（只比對本次參數與 profile） |
+| 不再宣稱「模型錯序也一定不會派出 task」 | 成立 | agent 文字寫清楚 NOT_CONNECTED → 重連重派一次；analyzer 只擋「超過一次」（reconnectLoops） |
+| 驗收改看合法報告、真實查詢、工具權限 | 成立 | analyzer 完成定義不變（COMPLETE＋子 session sql_run ok）；流程判定換成 reconnectLoops／downThenConnect／downThenRedispatch；覆蓋率三項保留 |
+
+不採的選項：把舊 plugin 設 observe（狀態與提醒還在，不算簡化）；保留 turn／世代做「觀察」（沒有其他用途，只留 messageID 歸屬）。
+
+## 十一、Oracle MCP 工具消失：診斷、人工 SOP、受控重掛（issue #31，2026-09-10）
+
+| 選項 | 可行？ | 取捨 |
+|---|---|---|
+| plugin 以同 host 的 SDK client 呼叫 `/mcp/{name}/disconnect`＋`/connect` | 1.18.29 可行（與 `/mcps` 同一組路由；沙箱 e2e 驗過） | 採，但**預設 off**：公司機版本的路由與行為未驗（SOP-21 步驟 6 驗過才開） |
+| 以 LLM 的 ORACLE_MCP_DOWN 字串觸發重掛 | 不採 | 權限過濾、錯名也會產生同一個字串；只用 host 證據（狀態 failed；或先前執行過的工具對允許它的 agent 變成 invalid） |
+| 取得「最終送給模型的工具清單」 | 1.18.29 不可行（`/experimental/tool/ids` 只有內建工具；`tool.definition` hook 不含 MCP） | 記 not exposed；用 invalid 列與 R33 問法反推；較新版本若 ids 含 MCP 名就自動列出 |
+| 重掛後由 plugin 自己 connect＋SELECT 1 FROM DUAL 驗證 | 不可行（plugin 沒有呼叫工具的 API） | 在下一次 oracleMCP_／task 回覆附註要求 agent 做；guard 只驗「工具恢復」（下一次呼叫執行得到） |
+| 一次故障事件多次重試 | 不採 | 一次失敗即停；重掛後未驗證就再故障＝失敗；人工恢復後有呼叫成功才關閉故障事件 |
+
+根因狀態：**未確認**——只做了「降低故障影響」；需要公司機首次失效前後的 `_mcp-diag.jsonl` 事件序列。
+
+## 十二、skill 不是 agent（issue #32，2026-09-10）
+
+| 選項 | 可行？ | 取捨 |
+|---|---|---|
+| 新增 `.opencode/agent/ps-security-flow.md` 或 alias 接受誤派 | 不採 | 掩蓋路由錯誤、擴大 agent 數 |
+| 原生 `permission.task` 白名單 | 1.18.29 語法可用，但 skill 名匹配 `ps-*`，擋不住這個誤派；公司機版本未驗 | 記為可選硬化（SOP-21 步驟 9），不隨本批啟用 |
+| guard 在 task 執行前擋 skill 名、指出承載 agent；報告 suggestedNext 無效時在回覆附註 | 採 | 版本無關（hook 兩邊都有）；錯誤不被歸類成 Oracle 問題 |
+| 全框架 skill 改名 | 不採 | 範圍外；只改描述、承載段、路由與驗證 |

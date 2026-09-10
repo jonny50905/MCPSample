@@ -1,6 +1,6 @@
 {
-  "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。",
-  "commit": "2a9c118",
+  "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
+  "commit": "6b21125",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -28,32 +28,32 @@
     },
     {
       "path": ".opencode/agent/ps-audit-orchestrator.md",
-      "lines": 155,
-      "sha256": "72011dc6c03c2be0a29c9eb5c2988191012659fdc01668eeee119434a5819e91",
+      "lines": 156,
+      "sha256": "67055d65bd5dce4c6b56d6e992c792ee180dcf0810230c437e59a683992ab441",
       "bom": false
     },
     {
       "path": ".opencode/agent/ps-auditor.md",
-      "lines": 262,
-      "sha256": "4935b37def747dc20ac3f07d6939cded7116deb6978d5d7a0e67d8eb739f90c1",
+      "lines": 264,
+      "sha256": "05adee7c0e0aa5ea8a55d76d06d3108c8159faa0a13aa8916c787d78ee0433c6",
       "bom": false
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 521,
-      "sha256": "bdebcff7fabefbcfe692b77b790aed8a0312121f437a4931bc5b958469003239",
+      "lines": 528,
+      "sha256": "9f604d81a514071514bbe637a43d74616ada4852cebac44342f8070913fd7c2c",
       "bom": false
     },
     {
       "path": ".opencode/agent/ps-metadata-flow.md",
-      "lines": 112,
-      "sha256": "e943e1a6b9bc5de63bca1788cc1b5feae36f8d5e4c68e2c8f9ed130666a3d10b",
+      "lines": 116,
+      "sha256": "91474ed4a9f59e3783f0cf594b82aa6b71344e21d1de4ab1c18c37eb69c5231a",
       "bom": false
     },
     {
       "path": ".opencode/agent/ps-orchestrator.md",
-      "lines": 188,
-      "sha256": "e71f74a96abae3588fe6ee0884118810e1cc7dd6e6c7e0d1bd097fe083e39eed",
+      "lines": 214,
+      "sha256": "f6ec7635e43c119d692d9dd09dd5108656fcdd75d70b12634e00c02aa6814aed",
       "bom": false
     },
     {
@@ -88,14 +88,14 @@
     },
     {
       "path": ".opencode/command/ps-audit-batch.md",
-      "lines": 109,
-      "sha256": "066e31f46f096e8e4e575f37b0d0e962c34f3d98efbf8617759ba9dbed4dc185",
+      "lines": 110,
+      "sha256": "572d42bc4635487e0c809ee9aba3ff822eda4ef7c5b7ff1ee78da7390c5a1c2e",
       "bom": false
     },
     {
       "path": ".opencode/command/ps-audit.md",
-      "lines": 72,
-      "sha256": "b23f110e6086ea19099915fe163ca4f44f9a84fa86e79ce6d3e3b1d3b5c55410",
+      "lines": 73,
+      "sha256": "d7fd2c2424995b671c2ef52107f3d80798507089984ca0e2efd5f77c964a40b2",
       "bom": false
     },
     {
@@ -124,14 +124,14 @@
     },
     {
       "path": ".opencode/peoplesoft/customization-profile.yaml",
-      "lines": 115,
-      "sha256": "4bad65f9a08c536065b01c0237bcc2f156595767182ae6228c90042b587c1098",
+      "lines": 113,
+      "sha256": "9ab6189e6afe4077ce8377524c74164dd73e79ae93458c7e24aa96d331e292f8",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3255,
-      "sha256": "72dcc6af21b7ccceb65447ce114ffd836b36d5ed3eaf3920999289ac2c3cd535",
+      "lines": 3330,
+      "sha256": "f6b5ba56972cdc041db8a56f6564ac67bfcff161cdf20aaf1c90d4f370746327",
       "bom": false
     },
     {
@@ -142,14 +142,14 @@
     },
     {
       "path": ".opencode/peoplesoft/mcp-tool-contracts.md",
-      "lines": 128,
-      "sha256": "d1cb7f6011d61f8095a4d040d4d490afc12bb4b8956c4d13b89705a5cacf8041",
+      "lines": 129,
+      "sha256": "870fb8f81b2b909268c8ff98cb5c2eb8fbc5d3e4562bd213eb0d475103386227",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 640,
-      "sha256": "17e8b26c616a18f8f1a1751054f42a5cd0c6f0ebcd31a10c63a076a6e5b93893",
+      "lines": 641,
+      "sha256": "89c4194ce00c31f0d5fcb8120892c312e16fe4a5bb3aaa78b26c0458470e96db",
       "bom": false
     },
     {
@@ -160,8 +160,8 @@
     },
     {
       "path": ".opencode/peoplesoft/README.md",
-      "lines": 308,
-      "sha256": "8f781a0b7cf470a2fba0e1e17fa691e18033aa50fca6e22b6e53417b601b948d",
+      "lines": 309,
+      "sha256": "153e118e3982bc10f31c9eb9d919eae77fb91088a8d71b6855b4e4d4f4260524",
       "bom": false
     },
     {
@@ -202,14 +202,14 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 888,
-      "sha256": "1665559ae8baf47f14a2413ec6734d2b832421dc6bdf956e4bb8aad869a774b4",
+      "lines": 791,
+      "sha256": "157cb967ef76662075d41629fc2932f12a5af8dec160131706c06a9fb151949f",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/subagent-report-contract.md",
-      "lines": 169,
-      "sha256": "a1773053dd2c296c9e805f5d007b53862f47554a188436e803f2bf11cb3e95d9",
+      "lines": 175,
+      "sha256": "d925106f95478f9d1fdf5d489729a673c6dbc1a22845656d66be4afe6e49b2f4",
       "bom": false
     },
     {
@@ -220,14 +220,14 @@
     },
     {
       "path": ".opencode/peoplesoft/test-scenarios.md",
-      "lines": 697,
-      "sha256": "cfc33fd6706b35bae76360515a8dd7c3fd60fa8c8903366db095d97e05269b7e",
+      "lines": 692,
+      "sha256": "280774044664443079f566db2ab06ddca0b8c1702306cc953ba5dad643fbc2a6",
       "bom": false
     },
     {
-      "path": ".opencode/plugin/ps-oracle-preflight-gate.js",
-      "lines": 842,
-      "sha256": "2f592cb37d22f239f8b170f192b7db9476787af314d94f522f5f2759f7579eba",
+      "path": ".opencode/plugin/ps-runtime-guard.js",
+      "lines": 813,
+      "sha256": "c128f486f3b5077b94483438dd7e4f95944953344fb2cbda8fb42d7327550be4",
       "bom": false
     },
     {
@@ -274,8 +274,8 @@
     },
     {
       "path": ".opencode/skills/ps-security-flow/SKILL.md",
-      "lines": 62,
-      "sha256": "78e592bec513cad737771b6dcc48499954945d875ca5ad67bb9fffaa4fc5dfe4",
+      "lines": 84,
+      "sha256": "395ff6cb6684c3a4ba6a6b1afe5cdaa4e3671b24502bcdd9204b93d3fd027ce3",
       "bom": false
     },
     {
@@ -322,8 +322,8 @@
     },
     {
       "path": "scripts/ps-fs-doctor.ps1",
-      "lines": 312,
-      "sha256": "9729968422d9393139e813b5eec91d51b4bb3bfac3f3bc78a6124e7d7dfce977",
+      "lines": 341,
+      "sha256": "fdb1816619c61592d3e209d0364a09a752918ef805364cf429695cc8e945ff6e",
       "bom": true
     },
     {
@@ -346,15 +346,25 @@
     },
     {
       "path": "scripts/tests/test-auto-loop.ps1",
-      "lines": 871,
-      "sha256": "0b94cd22a720c84241077bb1857b7e1b4ed315dea919b94b4298bb714e58aef0",
+      "lines": 866,
+      "sha256": "bdd2cc534faf33319ecbd4af9deb546b0ec1cba6410558c7382a7f9e2f8a21ad",
       "bom": true
     },
     {
-      "path": "scripts/tests/test-oracle-gate-runtime.ps1",
-      "lines": 447,
-      "sha256": "6f1df48bdf42cb6188bf04199464031c2ce9ec9b01db2bf77c0f1f119dabf849",
+      "path": "scripts/tests/test-oracle-runtime.ps1",
+      "lines": 470,
+      "sha256": "6adfc52fc82001ac8165f6fefb23fec99bfaf4abc964ea61919a8cf73b2a775a",
       "bom": true
+    }
+  ],
+  "removed": [
+    {
+      "path": ".opencode/plugin/ps-oracle-preflight-gate.js",
+      "note": "維護端已刪除／改名：公司機必須刪除此檔"
+    },
+    {
+      "path": "scripts/tests/test-oracle-gate-runtime.ps1",
+      "note": "維護端已刪除／改名：公司機必須刪除此檔"
     }
   ]
 }

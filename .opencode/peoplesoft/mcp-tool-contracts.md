@@ -15,7 +15,8 @@
 | `PeoplecodeMetadata` | find_field_usage 等 | 只作定位線索，**不得作 evidence** |
 
 工具身分＝server 前綴＋工具名，兩個都對才叫對；`unavailable tool`
-（名字錯／掛錯 server／本 agent deny）不是暫時故障，重試必然再失敗。
+（名字錯／掛錯 server／本 agent deny）重試必然再失敗。整個 `oracleMCP_` 前綴的工具都不見則是
+掛載故障（ORACLE_MCP_DOWN，可由管理者重掛恢復）——同樣不猜名、不重試，交 SOP-21，重掛後重新驗證。
 解引用與 componentType 規則見 `progressive-source-retrieval.md` §6.0／§5.1。
 
 ## 角色 ↔ 現況

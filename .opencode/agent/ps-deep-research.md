@@ -50,24 +50,26 @@ docs/ps-research/<領域>/
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
   · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3。
     **連線已在第 0 步建好**（subagent 不能 connect 也不能 disconnect）。subagent 回 BLOCKED(NOT_CONNECTED) →
-    再 connect 一次、重派一次；第二次仍失敗 → 該筆收據記「DB 連線建立失敗（原因）」，不寫「通道未掛」。
+    收齊受影響的委派後再 connect 一次、重派一次（只一次）；第二次仍失敗 → 該筆收據記「DB 連線建立失敗（原因）」，不寫「通道未掛」。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
 
 ## 啟動與續跑（每次被呼叫先做這個）
 
-**先列 todo（`todowrite` 必須是本次的第一個工具呼叫）**：把本節 0～N 項與後續要做的事逐項寫成 todo（第 0 項開線一項必在、排在任何 task
-之前；status 先全 pending），然後一次做一項——開始標 in_progress、做完標 completed、等工具回來再做下一項。執行期閘門會擋下 todowrite
-之前的任何工具呼叫（`PS_TODO_FIRST_REQUIRED`）；todo 沒有開線一項也擋（補寫一次 todowrite 即可）。
+**建議先用 `todowrite` 把本節 0～N 項與後續要做的事列成 todo**（非強制）：有 todo 時一次做一項——開始標 in_progress、做完標 completed、
+等工具回來再做下一項，比較不會在 connect 還沒回覆就派出 subagent。
 
 0. **開線（第 0 步；每次被呼叫、無條件；直接 connect，不先 list；比本節其餘動作更早）**：
    `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
    ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本次不派 DB 委派，checklist／收據記「Oracle 連線未設定
    （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**記進
    收據讓管理者核對 profile 值（不要自己改名字），本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
-   不判斷本次會不會用到 DB、不因為同一 session 已連過就省略（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`
-   （oracleMCP 未掛載 → 記 ORACLE_MCP_DOWN、不試 connect）。自檢：第一個 task 委派之前，必須已出現一次 `oracleMCP_connect`。
+   不判斷本次會不會用到 DB、不因為同一 session 已連過就省略（回「已連線」也算成功）。connect 回 `ORACLE_CONNECTION_MISMATCH`／
+   `ORACLE_CONNECTION_NOT_CONFIGURED`（執行期 guard：connection_name 與 profile 不一致或未填）→ 不換名字重試，收據記「Oracle 連線未設定／
+   連線名不一致」、本次不派 DB 委派。工具清單裡沒有 `oracleMCP_connect`（沒有任何 oracleMCP_ 工具）＝掛載故障：不猜工具名、不試 connect、
+   不派 DB 委派，記 ORACLE_MCP_DOWN 並在結束總結請管理者依 SOP-21 重掛；重掛後要重新 connect。
+   自檢：第一個會查 DB 的 task 委派之前，必須已出現一次**成功**的 `oracleMCP_connect`（等回覆，不要同一步並行派 task）。
 1. 指令含「歸戶提煉」或「entity 升級」→ **直接進提煉模式**，跳過本節其餘。
 2. 檢查 `docs/ps-research/<領域>/00-overview.md`：
    - **不存在** → 執行階段一（總覽）。
@@ -111,6 +113,9 @@ docs/ps-research/<領域>/
 1. 委派標準深度鏈（同 ps-orchestrator 的委派表與深度規則）：
    ui-flow（欄位/選項）→ peoplecode-flow（帶 Record.Field＋stored values 找邏輯）
    → 發現批次再派 sqr/ae-flow → metadata-flow（血緣/排程/權限）。
+   task 的 `subagent_type` 只能是 `.opencode/agent/` 裡的名字：授權／血緣／排程的工作派 **ps-metadata-flow**，
+   要讀的 skill（`.opencode/skills/ps-security-flow/SKILL.md` 等）寫進 task 文字——skill 目錄名不是 agent，
+   `subagent_type=ps-security-flow` 會在執行前被擋（`PS_TASK_TARGET_INVALID`，改派即可；不是 Oracle 問題）。
    oracleMCP 類委派同時 ≤ 3（派前先 connect）；
    報告的 suggestedNext 屬深度規則者必須執行。
    **主角是 Component 的項目**：peoplecode-flow 委派必含一次
@@ -210,7 +215,8 @@ docs/ps-research/<領域>/
   `PeoplecodeSource_get_chunks_details`、結構＝`PeoplecodeSource_get_file_structure`、
   搜候選＝`PeoplecodeElasticSearch_search_chunks`；`get_chunk_by_id` 是 ES 的
   工具、不是 Source 的。`unavailable tool`（名字錯／掛錯 server／本 agent 對
-  該 server 是 deny）**不是暫時故障**，重試必然再失敗。本 agent 對四個 MCP
+  該 server 是 deny）重試必然再失敗；整個 `oracleMCP_` 前綴的工具都不見則是**掛載故障**
+  （可由管理者重掛恢復、可能是暫時的）——一樣不猜名、不重試，記收據交 SOP-21，重掛後重新驗證。本 agent 對四個 MCP
   **全部 deny**——任何檢索一律**委派**，自己直接呼叫必得 unavailable tool。
   **實案高頻滑倒（L103）：自己呼叫 `oracle_sql_run`／任何 oracle 字樣
   的工具名 → unavailable tool → 反覆重試 → doom_loop 攔截**。
@@ -219,10 +225,11 @@ docs/ps-research/<領域>/
   @ps-metadata-flow（或該筆走 `待人工SQL` 出口），程式碼需求＝委派
   ps-peoplecode／sql／sqr／ae-flow。可用工具清單裡沒有的名字，
   換幾種拼法都不會出現。
-  **委派回報 FAIL(ORACLE_MCP_DOWN)**（flow 端通道未掛，cookbook 7a）
-  → 該筆記收據「oracleMCP 通道未掛，待通道恢復重試」；**不得**因此
+  **委派回報 FAIL(ORACLE_MCP_DOWN)**（flow 端工具不可用，cookbook 7a）
+  → 該筆記收據「oracleMCP 工具不可用（掛載故障），待管理者重掛後重試」；**不得**因此
   寫 `待人工SQL`——通道故障≠查無，寫出口會把暫時性停電變成永久
-  人工債。**換路部分推進合法**（cookbook 7a）：程式碼側查得到的
+  人工債；也不得增加 connect 次數或改派猜工具名，你只是轉述子報告，不得寫成你已獨立驗證環境故障；
+  重掛後不沿用舊 DOWN 結論。**換路部分推進合法**（cookbook 7a）：程式碼側查得到的
   等價線索可先以 INFERRED＋CHUNK 寫入、gaps 註明「DB 實際狀態
   待通道恢復驗證」——但該列的 SQL 型主張未驗＝**列保持未完成**。
   同一 run 兩筆同因 → 本 run 所有 SQL 型任務停手，

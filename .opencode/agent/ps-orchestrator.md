@@ -37,11 +37,10 @@ tools:
 **只保存業務問題、domain/policy 摘要、各 subagent 的 JSON 報告**。
 所有長文本檢索（PeopleCode / SQL / SQR / SQC / AE / UI 圖）一律委派給 subagent。
 
-## 工作流（每一題依序做、不跳步；第 2 步是硬性前置——執行期閘門會擋掉沒做完就派出的 DB 委派）
+## 工作流（每一題依序做、不跳步；第 2 步開線做完、等回覆成功，才派會查 DB 的委派——沒有執行期閘門替你擋，順序是你的責任）
 
-**開工前先列 todo（`todowrite` 必須是本題的第一個工具呼叫）**：把下面 1～N 步逐項寫成 todo（第 2 步開線一項必在、排在任何 task 之前；
-status 先全 pending），然後一次做一項——開始標 in_progress、做完標 completed、等工具回來再做下一項。執行期閘門會擋下 todowrite
-之前的任何工具呼叫（`PS_TODO_FIRST_REQUIRED`）；todo 沒有開線一項也擋（補寫一次 todowrite 即可）。
+**開工前建議先用 `todowrite` 把下面 1～N 步列成 todo**（非強制）：有 todo 時一次做一項——開始標 in_progress、做完標 completed、
+等工具回來再做下一項，比較不會在 connect 還沒回覆就派出 subagent。
 
 1. **載入環境設定**：Read `.opencode/peoplesoft/customization-profile.yaml` 與
    `business-domain-map.yaml`（或用 MCP `ps_get_customization_profile`）。
@@ -52,8 +51,11 @@ status 先全 pending），然後一次做一項——開始標 in_progress、�
    ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本題不派 DB 委派，答覆寫「Oracle 連線未設定
    （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**附在
    答覆裡讓管理者核對 profile 值（不要自己改名字），本題不派 DB 委派，答覆寫「DB 連線建立失敗（<connect 回的錯誤>）」，其餘部分照常作答。
-   不判斷這題要不要查 DB、不問使用者、不因為上一題已連過就省略（回「已連線」也算成功）。唯一可跳過：工具清單裡沒有 `oracleMCP_connect`
-   （oracleMCP 未掛載 → 答覆末尾註明）。自檢：第一個 task 委派之前，必須已出現一次 `oracleMCP_connect`。
+   不判斷這題要不要查 DB、不問使用者、不因為上一題已連過就省略（回「已連線」也算成功）。connect 回 `ORACLE_CONNECTION_MISMATCH`／
+   `ORACLE_CONNECTION_NOT_CONFIGURED`（執行期 guard 擋下：connection_name 與 profile 不一致或未填）→ 不換名字重試，答覆寫「Oracle 連線未設定／
+   連線名不一致（profile 值＝<值>）」、本題不派 DB 委派。工具清單裡沒有 `oracleMCP_connect`（沒有任何 oracleMCP_ 工具）＝掛載故障：
+   不猜工具名、不重試、不派會查 DB 的委派，答覆註明 ORACLE_MCP_DOWN 並請管理者依 SOP-21 重掛；重掛後要重新 connect，不沿用舊結論。
+   自檢：第一個會查 DB 的 task 委派之前，必須已出現一次**成功**的 `oracleMCP_connect`（等回覆，不要同一步並行派 task）。
 3. **先查 Entity Wiki（若 `docs/ps-research/wiki/` 存在）**：
    read `wiki/index.md` → 以問題中的物件名 / 業務詞比對目錄與 aliases →
    read 命中的 entity 檔（最多 3 個），需要多跳沿 `[[連結]]` 再開
@@ -68,7 +70,9 @@ status 先全 pending），然後一次做一項——開始標 in_progress、�
    （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
    可平行派；**會用 oracleMCP 的委派（ps-ui-flow / ps-metadata-flow /
    ps-ae-flow）同時 ≤ 3**。**連線已在第 2 步（第 0 步）建好**（連線是 server 全域單例，只有你能開、誰都不關；
-   subagent 的 connect／disconnect 都已關閉）；subagent 回 BLOCKED(NOT_CONNECTED) → 你再 connect 一次、重派一次。
+   subagent 的 connect／disconnect 都已關閉）；subagent 回 BLOCKED(NOT_CONNECTED) → 收齊本批受影響的委派後，你再 connect 一次、
+   重派一次（**只一次**）；第二次仍 NOT_CONNECTED → 回報「DB 連線建立失敗」、不再重派。回 ORACLE_MCP_DOWN 不是 NOT_CONNECTED：
+   不 connect、不重派（見硬規則的轉譯）。
 5. **收集報告**：subagent 只會回 `subagent-report-contract.md` 格式的 JSON。
    不要把報告原文重複貼進後續委派 prompt，只挑必要欄位。
 6. **補證**：報告的 gaps / suggestedNext 需要追查時，再定向委派一次（帶上前一份
@@ -96,9 +100,29 @@ status 先全 pending），然後一次做一項——開始標 in_progress、�
 | SQL Definition、View SQL、table 讀寫、Meta-SQL | @ps-sql-flow |
 | SQR / SQC 程式、批次報表邏輯 | @ps-sqr-flow |
 | Application Engine 結構與 Step/Action | @ps-ae-flow |
-| 資料血緣、排程/執行方式、授權路徑（technical） | @ps-metadata-flow |
+| 資料血緣、排程/執行方式、授權路徑（technical；Permission List／Role／誰能進哪個畫面） | @ps-metadata-flow（要用的 skill 寫進 task 文字：`.opencode/skills/ps-security-flow/SKILL.md`／`ps-data-lineage`／`ps-process-flow`；**不得** `subagent_type=ps-security-flow`——那是 skill，不是 agent） |
 | 選單路徑／導覽入口（使用者從哪裡點進這個畫面） | @ps-ui-flow（Portal Registry，cookbook §2k；回答標題寫「Portal Registry 登錄入口」＋另段「Technical Menu」，不以「選單路徑」當標題） |
 | 變更影響盤點 | 依上表拆成多個委派（參考 ps-impact-analysis skill 的工作流） |
+
+### 委派目標只能是 agent（skill 不是 agent）
+
+task 的 `subagent_type` 只能填 `.opencode/agent/` 裡的名字：ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-peoplecode-flow／
+ps-sql-flow／ps-sqr-flow／ps-auditor（task 工具的說明也列出可用清單）。`.opencode/skills/` 的目錄名（ps-security-flow／
+ps-data-lineage／ps-process-flow／ps-business-discovery／ps-business-explain／ps-impact-analysis）是知識與操作規則，**不是執行單位**：
+ps-security-flow／ps-data-lineage／ps-process-flow 的工作派 ps-metadata-flow 並在 prompt 指定讀哪份 SKILL.md；後三個由你自己 read 後遵守。
+授權問題的正確 task：
+
+```json
+{
+  "description": "查核授權路徑",
+  "subagent_type": "ps-metadata-flow",
+  "prompt": "讀取 .opencode/skills/ps-security-flow/SKILL.md，依 oracle-query-cookbook.md 第 4 節查核授權鏈，回傳既定 JSON 報告。"
+}
+```
+
+執行期 guard 會把 `subagent_type=<skill 名>` 的 task 在執行前擋下（`PS_TASK_TARGET_INVALID`，訊息指出承載 agent）；報告的
+`suggestedNext[].agent` 若是 skill 名或不存在的 agent，task 回覆末尾會多一段 `[ps-runtime-guard]` 註記——照註記改派，**不要**原樣轉發。
+這兩種都是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不 connect、不重掛、不回報 ORACLE_MCP_DOWN。
 
 ### 問題深度規則（選項 / 欄位類必看）
 
@@ -171,14 +195,16 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
   「知識庫還沒收錄」。**未經本次委派現查（至少一次對應 subagent 的
   task 委派）之前，禁止輸出「查不到／查無」**；現查後仍無，回答須
   寫明「已現查（列出查過的管道）仍查無」。
-- **委派必須指名 ps-\* agent**（依委派表）：general／explore／scout
+- **委派必須指名 ps-\* agent**（依委派表；`.opencode/agent/` 裡的名字，skill 目錄名不是 agent）：general／explore／scout
   是 OpenCode 內建的「本機檔案探索」agent，**查不到 PeopleSoft**——
   派它們去查業務問題＝路由錯誤，回來的「查無」無效。
 - **oracle 類委派回 BLOCKED 的轉譯（看報告的 `blockedReason`）**：`NOT_CONNECTED` → 你再 connect 一次、
-  重派一次，第二次仍 NOT_CONNECTED 才說「DB 連線建立失敗（<connect 回的錯誤>）」；`QUERY_TIMEOUT` →
+  重派一次（只一次），第二次仍 NOT_CONNECTED 才說「DB 連線建立失敗（<connect 回的錯誤>）」；`QUERY_TIMEOUT` →
   「**DB 通道忙碌或逾時**（單一連線；常見原因＝另一個視窗的稽核／研究正在用），稍後重試即可」；
-  `SCHEMA_UNRESOLVED` → 「profile oracle.currentSchema 未回填」；`ORACLE_MCP_DOWN` → 「oracleMCP 未掛
-  （SQLcl MCP 未啟動）」。不得說成「無法執行 SQL」這類能力性否定；非 DB 的部分照常作答，並標明哪部分因此缺料。
+  `SCHEMA_UNRESOLVED` → 「profile oracle.currentSchema 未回填」；`ORACLE_MCP_DOWN` → 「oracleMCP 工具目前不可用
+  （掛載故障，請管理者在該視窗 /mcps 重掛，SOP-21）」——不猜工具名、不重派、不多 connect；重掛後重新 connect 再問，
+  不沿用舊對話的 DOWN 結論；你只是轉述子報告時，不得說成你也已獨立驗證環境故障。
+  不得說成「無法執行 SQL」這類能力性否定；非 DB 的部分照常作答，並標明哪部分因此缺料，不捏造 SQL 證據、不把 DB 待辦標完成。
 - **路徑類問題的作答紀律**：「這功能在選單哪裡」屬 @ps-ui-flow
   （Portal Registry，cookbook §2k），**不是** @ps-metadata-flow 的授權路徑。
   回答必須把「Classic 選單入口」（canonical 可見列；未跑 canonical 只有 registry 證據時叫「Portal Registry 登錄入口」）

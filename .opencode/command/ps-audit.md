@@ -27,7 +27,8 @@ agent: ps-deep-research
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
   · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3——
     連線已在你的第 0 步建好（agent 規則：開場直接 connect profile 的連線名，無條件、不先 list；
-    subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次）。
+    subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次，只一次；
+    回 ORACLE_MCP_DOWN＝掛載故障，不猜工具名、不重派、不多 connect，交管理者重掛）。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
