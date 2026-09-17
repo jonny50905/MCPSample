@@ -9,7 +9,7 @@
   "requirements": [
     { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
       "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "STATIC", "properties": ["primaryObject", "origin"] },
-    { "id": "R03", "slot": "S01", "checklistRefs": ["C01"], "factKind": "RELATED.OBJECTS", "required": true,
+    { "id": "R03", "slot": "S01", "checklistRefs": ["C01", "C02"], "factKind": "RELATED.OBJECTS", "required": true,
       "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
     { "id": "R06", "slot": "S02", "checklistRefs": ["C02"], "factKind": "DATA.FLOW", "required": true,
       "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },

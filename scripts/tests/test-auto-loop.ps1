@@ -13,9 +13,9 @@ $ErrorActionPreference = 'Stop'
 $src = Get-Content (Join-Path $repoRoot "scripts/ps-auto-loop.ps1") -Raw
 $tokens = $null; $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($src, [ref]$tokens, [ref]$errs)
-$wanted = @('Get-ResearchDebt', 'Test-ResearchScopeOk', 'Get-RowIdentity', 'Get-ChecklistInventory', 'Invoke-ChecklistReconcile', 'Test-RowStillRepresented', 'Get-CanonicalObject', 'Invoke-DItemGovernance', 'Get-OrderFingerprint', 'Get-SurgeryLedger', 'Save-SurgeryLedger', 'Select-SurgeryBatch', 'Get-ActionableSurgicalCount', 'Get-NnHeadKeys', 'Get-NnGuardSnapshot', 'Invoke-NnDestructionGuard', 'Invoke-ArchiveDedup', 'Invoke-ChecklistArchiveCommit', 'Get-SessionFailureKind', 'Get-AuditLedger', 'Save-AuditLedger', 'Get-ClaimSample', 'New-AuditManifest', 'Test-AuditPart', 'Read-DomainPart', 'Add-ChecklistRows', 'Set-ChecklistRoundAndFlag', 'Invoke-AuditMerge')
+$wanted = @('Get-ResearchDebt', 'Test-ResearchScopeOk', 'Get-RowIdentity', 'Get-ChecklistInventory', 'Invoke-ChecklistReconcile', 'Test-RowStillRepresented', 'Get-CanonicalObject', 'Invoke-DItemGovernance', 'Get-OrderFingerprint', 'Get-SurgeryLedger', 'Save-SurgeryLedger', 'Select-SurgeryBatch', 'Get-ActionableSurgicalCount', 'Get-NnHeadKeys', 'Get-NnGuardSnapshot', 'Invoke-NnDestructionGuard', 'Invoke-ArchiveDedup', 'Invoke-ChecklistArchiveCommit', 'Get-SessionFailureKind', 'Get-AuditLedger', 'Save-AuditLedger', 'Get-ClaimSample', 'New-AuditManifest', 'Test-AuditPart', 'Read-DomainPart', 'Add-ChecklistRows', 'Set-ChecklistRoundAndFlag', 'Invoke-AuditMerge', 'Get-SuppFenceSnapshot', 'Restore-SuppFence', 'Invoke-GitSnapshot')
 $funcs = $ast.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $wanted -contains $a.Name }, $true)
-if ($funcs.Count -ne 28) { throw "抽不到二十八個函式（抽到 $($funcs.Count)）" }
+if ($funcs.Count -ne 31) { throw "抽不到三十一個函式（抽到 $($funcs.Count)）" }
 foreach ($f in $funcs) { Invoke-Expression $f.Extent.Text }
 function Write-Log([string]$msg) { }
 
@@ -884,6 +884,12 @@ $promptBad = @()
 foreach ($pn in @('sPrompt', 'dPrompt', 'uPrompt')) { if (-not $promptLits.ContainsKey($pn) -or -not (Test-PsOcPromptSafe -PromptText $promptLits[$pn])) { $promptBad += $pn } }
 Assert ($promptBad.Count -eq 0 -and $promptLits['sPrompt'].Contains('A > B > C')) "auto-loop：三個 session 提示字串常值（surgery／提煉／升級）都過 Test-PsOcPromptSafe（含 A > B > C 的 surgery 提示不會被閘門擋下；閘門只擋 CR／LF／雙引號／%）（$($promptBad -join ','))"
 Assert ($al -match 'capabilities\.json' -and $al -match 'Get-SuppFenceSnapshot' -and $al -match 'Restore-SuppFence' -and $al -match 'PsSuppIntakeRejected') "auto-loop 迷你圈：能力目錄缺檔守衛、補研究圍欄快照／還原（模型寫的 request／result／wiki 檔不入庫）、intake 拒收寫 log"
+# 圍籬不再無條件刪 requests／results 的新增檔：先用 intake 那把尺驗身分（別的行程正常提交的要留著）
+Assert ($al -match 'Test-PsSuppRequestFile -LiteralPath \$f\.FullName' -and $al -match 'Test-PsSuppResultFile -LiteralPath \$f\.FullName' -and $al -match '-RequestsDir \$suppReqDir -ResultsDir \$suppResDir' -and $al -notmatch '(?m)^\s+if \(-not \$Snapshot\.ContainsKey\(\$f\.FullName\)\) \{\s*$\r?\n\s+Remove-Item') "圍籬：requests／results 的新增檔先驗身分（Test-PsSuppRequestFile／Test-PsSuppResultFile），不再一律 Remove-Item"
+# 已合併的 attempt 永不重派：兩個站點（下一 run 的回收、本 run 末端的 safe point）都用內容比對取代 hash 相等
+Assert (([regex]::Matches($al, 'Test-PsSuppMergePresent -NnPath')).Count -ge 2 -and $al -match '同一 NN 本 run 已有合併，\$rid 留到下次 run' -and $al -match '合併後檔案又被改動，內容仍在，照發布' -and $al -match '\$mergedNn\[\[string\]\$mf\.TargetFiles\[0\]\] = \$true') "迷你圈：同一 NN 一個 run 只合併一張（其餘留到下次、不算 attempts）；已合併的 attempt 靠 Test-PsSuppMergePresent 在兩個站點判定，hash 動了但內容還在就照發布"
+# git 快照：不准拿 git 印出的檔名比前綴（core.quotepath 會把中文路徑跳脫成八進位）
+Assert ($al -notmatch 'StartsWith\(\$cand\)' -and $al -match 'git -C \$root diff --cached --name-only -- \$cand') "Invoke-GitSnapshot：逐候選路徑各問 git 一次，不解析 git 印出的檔名"
 Assert (([regex]::Matches($al, 'if \(\$(sr|dr|ur)\.SlotBusy\)')).Count -ge 6 -and $al -match "FailureKind -eq 'SLOT_BUSY'\) \{ \`$stopReason") "auto-loop：slot 被占用（等滿一天）不算 session 跑過——稽核批次不計 attempts、手術／提煉／升級中止、主迴圈停機原因寫明 slot（不冒充逾時）"
 Assert ($al -match "--command ps-supplement" -and $al -match 'Merge-PsSuppReceipt' -and $al -match 'Restore-PsSuppBytes' -and $al -match 'Publish-PsSuppResult' -and $al -match 'Add-PsSuppChecklistDRow' -and $al -match 'Set-PsSuppWikiStale') "auto-loop 迷你圈：模型只寫收據，合併／lint 回歸還原／發布／D 列／wiki 標記全在外環"
 $aa = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/ps-auto-all.ps1'))
@@ -914,11 +920,80 @@ if (Test-Path -LiteralPath $sw) {
     Assert ($swt -match '"\*\.ps-runtime/spec/\*/attempts/\*": allow' -and $swt -match '"\*\.ps-runtime/spec/\*/attempts/\*/fragment\.md": allow' -and $swt -notmatch '"\.ps-runtime/spec/\*": allow') "ps-spec-worker：讀寫圍欄縮到 attempts 子樹（不含 receipts／plans／outputs／job.json）；pattern 以 * 開頭，巢狀或非 git 目錄的前綴也能命中"
 }
 else { Assert $false "ps-spec-worker.md 存在" }
+# ── 圍籬單元測試（AST 抽真函式）：別的行程在 session 期間正常提交的 request／result 要留著，模型偽造的才刪 ──
+. (Join-Path $repoRoot 'scripts/ps-knowledge-lib.ps1')
+. (Join-Path $repoRoot 'scripts/ps-supplemental-lib.ps1')
+$fenceCap = Get-PsSuppCapabilities -Root $repoRoot
+$fenceRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('fence-test-' + [guid]::NewGuid().ToString('N'))
+$fReq = Join-Path $fenceRoot 'requests'
+$fRes = Join-Path $fenceRoot 'results'
+$fWiki = Join-Path $fenceRoot 'wiki'
+foreach ($fd in @($fReq, $fRes, $fWiki)) { New-Item -ItemType Directory -Path $fd -Force | Out-Null }
+function New-FenceRequest([string]$ObjName, [string]$Dir) {
+    $nd = (Test-PsSuppNeed -Need (ConvertTo-PsSuppNeed -Target ('COMPONENT:' + $ObjName) -FactKind 'UI.NAVIGATION' -Properties 'entries') -Capabilities $fenceCap).Need
+    $wk = Get-PsSuppWorkKey -Need $nd
+    $ro = New-PsSuppRequestObject -Need $nd -Consumer (Test-PsSuppConsumer -Consumer $null).Consumer -Domain 'zz-fence' -WorkKey $wk -Generation 1 -AsOf ([datetime]::UtcNow)
+    $rid = [string]$ro.requestId
+    [System.IO.File]::WriteAllText((Join-Path $Dir ($rid + '.json')), ((ConvertTo-PsKnJson -Value $ro) + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    return $rid
+}
+$ridOld = New-FenceRequest 'TW_DEMO_K0' $fReq
+[System.IO.File]::WriteAllText((Join-Path $fWiki 'TW_DEMO_W0.md'), "---`nname: TW_DEMO_W0`n---`n", (New-Object System.Text.UTF8Encoding($false)))
+$fenceSnapU = Get-SuppFenceSnapshot -Dirs @($fReq, $fRes, $fWiki)
+# session 期間：別的行程提交一張新 request、外環發布一份合法 result；模型偽造一張 request 與一份 result、動了 wiki、刪了既有 request
+$ridNew = New-FenceRequest 'TW_DEMO_K1' $fReq
+$fakeReq = 'S-' + ('a' * 24) + '-g1.json'
+[System.IO.File]::WriteAllText((Join-Path $fReq $fakeReq), ('{"schemaVersion":1,"requestId":"S-' + ('b' * 24) + '-g1","workKey":"x","generation":1,"domain":"zz-fence","need":{}}'), (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText((Join-Path $fRes ($ridOld + '.json')), ('{"schemaVersion":1,"requestId":"' + $ridOld + '","workKey":"x","domain":"zz-fence","outcome":"RESOLVED","dispositionCode":"RESEARCHED"}'), (New-Object System.Text.UTF8Encoding($false)))
+$fakeRes = 'S-' + ('c' * 24) + '-g1.json'
+[System.IO.File]::WriteAllText((Join-Path $fRes $fakeRes), ('{"schemaVersion":1,"requestId":"S-' + ('c' * 24) + '-g1","outcome":"DONE"}'), (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText((Join-Path $fWiki 'TW_DEMO_W1.md'), "x`n", (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText((Join-Path $fWiki 'TW_DEMO_W0.md'), "改壞了`n", (New-Object System.Text.UTF8Encoding($false)))
+Remove-Item -LiteralPath (Join-Path $fReq ($ridOld + '.json')) -Force
+$fenceOut = Restore-SuppFence -Snapshot $fenceSnapU -Dirs @($fReq, $fRes, $fWiki) -RequestsDir $fReq -ResultsDir $fRes -Capabilities $fenceCap
+$fenceV = @($fenceOut)
+$fenceNamed = @($fenceV | Where-Object { $_ -match [regex]::Escape($ridNew) })
+Assert ((Test-Path -LiteralPath (Join-Path $fReq ($ridNew + '.json'))) -and (Test-Path -LiteralPath (Join-Path $fRes ($ridOld + '.json'))) -and $fenceNamed.Count -eq 0) "圍籬：session 期間別的行程正常提交的 request 與合法 result 留著，且不算違規（不再誤刪 ps-spec -Plan／ps-supplemental -Submit 的檔）"
+Assert ((-not (Test-Path -LiteralPath (Join-Path $fReq $fakeReq))) -and (-not (Test-Path -LiteralPath (Join-Path $fRes $fakeRes))) -and (-not (Test-Path -LiteralPath (Join-Path $fWiki 'TW_DEMO_W1.md')))) "圍籬：驗不過的 request（ID_MISMATCH）與 result（OUTCOME）刪除；wiki 的新增檔規則不變"
+Assert ((Test-Path -LiteralPath (Join-Path $fReq ($ridOld + '.json'))) -and ([System.IO.File]::ReadAllText((Join-Path $fWiki 'TW_DEMO_W0.md')) -match 'name: TW_DEMO_W0') -and $fenceV.Count -eq 5) "圍籬：既有檔被刪／被改寫一律還原；違規恰五筆（偽造 request、偽造 result、wiki 新增、wiki 改寫、request 被刪）"
+Remove-Item -LiteralPath $fenceRoot -Recurse -Force -ErrorAction SilentlyContinue
+# ── git 快照回歸（中文領域名）：core.quotepath 會把非 ASCII 路徑跳脫，拿 git 的輸出比前綴就永遠比不中 ──
+$gitCmd = Get-Command git -ErrorAction SilentlyContinue
+if ($null -ne $gitCmd) {
+    $gitRepo = Join-Path ([System.IO.Path]::GetTempPath()) ('gitsnap-test-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $gitRepo -Force | Out-Null
+    & git -C $gitRepo init -q 2>&1 | Out-Null
+    & git -C $gitRepo config user.email 'zz-test@example.invalid' 2>&1 | Out-Null
+    & git -C $gitRepo config user.name 'zz test' 2>&1 | Out-Null
+    & git -C $gitRepo config commit.gpgsign false 2>&1 | Out-Null
+    $gitDomDir = Join-Path (Join-Path (Join-Path $gitRepo 'docs') 'ps-research') '職缺測試'
+    New-Item -ItemType Directory -Path $gitDomDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $gitDomDir '03-TW_DEMO_G.md'), "# 03 功能甲（TW_DEMO_G）`n", (New-Object System.Text.UTF8Encoding($false)))
+    $saveRoot = $global:root
+    $saveDomain = $global:Domain
+    $global:root = $gitRepo
+    $global:Domain = '職缺測試'
+    $global:GitCommit = $true
+    Invoke-GitSnapshot -Note '單元測試'
+    $gitLog = (& git -C $gitRepo log --oneline 2>&1 | Out-String)
+    $global:root = $saveRoot
+    $global:Domain = $saveDomain
+    $global:GitCommit = $false
+    Assert ($gitLog -match 'kb\(auto\)') "Invoke-GitSnapshot：中文領域目錄真的 commit 出來（不解析 git 印出的檔名，core.quotepath 的八進位跳脫不影響）"
+    Remove-Item -LiteralPath $gitRepo -Recurse -Force -ErrorAction SilentlyContinue
+}
+else { Write-Host "  SKIP：PATH 沒有 git——Invoke-GitSnapshot 的中文領域回歸測試略過（公司機由人工 -GitCommit 實測）" }
+
 # 合成識別字守衛：新檔案裡出現的 TW_ 樣式物件名只能是合成集合（真實物件名永遠不進 repo）
-$synthOk = '^TW_(DEMO(_[A-Z0-9]*)?|X{1,3}|[A-H]|NEW|OLD|STALE|OUT|ROOT2|NOWHERE\d*|NOPE|ANOTHER|MIL\d*|MILITARY_DATA|NAV\w*)$'
+# 合成集合＝一眼看得出是 fixture 的名字（單字母、字母＋序號、GOOD／BAD、DEMO_／NAV_ 前綴…）；
+# 真實物件名（形如 TW_<業務縮寫>_<業務縮寫>）永遠不在集合裡，寫進 repo 就會被這條擋下
+$synthOk = '^TW_(DEMO(_[A-Z0-9]*)?|X{1,3}|XYZ|[A-HIMNS]|F\d+|K\d+|NEW(OBJ|\d*)|OLD|STALE|OUT|ROOT2|NOWHERE\d*|NOPE|ANOTHER|MIL\d*|MILITARY_DATA|NAV\w*|GOOD|BAD)$'
 $synthFiles = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Include 'ps-knowledge*.ps1', 'ps-supplemental*.ps1', 'ps-spec*.ps1', 'ps-session-lib.ps1', 'test-knowledge.ps1', 'test-supplemental.ps1', 'test-spec.ps1' -Recurse -File)
 $synthFiles += @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/peoplesoft/spec') -Include '*.md', '*.json' -Recurse -File)
-foreach ($n in @('.opencode/peoplesoft/knowledge-retrieval-contract.md', '.opencode/peoplesoft/supplemental-contract.md', '.opencode/command/ps-supplement.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-worker.md')) { $fp = Join-Path $repoRoot $n; if (Test-Path -LiteralPath $fp) { $synthFiles += (Get-Item -LiteralPath $fp) } }
+# 守衛範圍也涵蓋追蹤檔與決策 memo、外環腳本與本測試自己：掃除真實物件名時，不能又在這些檔裡原文寫一次
+$designDir = Join-Path $repoRoot 'docs/design'
+if (Test-Path -LiteralPath $designDir) { $synthFiles += @(Get-ChildItem -Path (Join-Path $designDir '*.md') -File -ErrorAction SilentlyContinue) }
+foreach ($n in @('.opencode/peoplesoft/knowledge-retrieval-contract.md', '.opencode/peoplesoft/supplemental-contract.md', '.opencode/command/ps-supplement.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-worker.md', 'HANDOFF.md', 'scripts/ps-auto-loop.ps1', 'scripts/ps-auto-all.ps1', 'scripts/tests/test-auto-loop.ps1')) { $fp = Join-Path $repoRoot $n; if (Test-Path -LiteralPath $fp) { $synthFiles += (Get-Item -LiteralPath $fp) } }
 $synthBad = @()
 foreach ($sf in $synthFiles) {
     foreach ($m in [regex]::Matches([System.IO.File]::ReadAllText($sf.FullName), '\bTW_[A-Z0-9_]+\b')) { if ($m.Value -notmatch $synthOk) { $synthBad += ($sf.Name + ':' + $m.Value) } }

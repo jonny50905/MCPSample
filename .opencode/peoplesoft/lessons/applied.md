@@ -3431,3 +3431,25 @@
   factKind／9-07、WRITE_DEFERRED／容量／parser 形狀）；test-auto-loop 情境 34 的 worker 三條；`-Doctor` SPEC1-0-03。
 - 教訓：指紋忽略什麼，切片與驗收就不能依賴什麼——同一份現況文字算指紋、切片、標條目、驗收；每個「延後」都要有自己的結論碼；
   permission pattern 以 `*` 開頭才不受 worktree 相對路徑前綴影響；收據永遠是完整的（部分處置＝拆分，不是收據）。
+
+### L124 修正也要過同一道對抗審查——第二輪抓到修法本身帶進來的三個回歸（issue #33～#36 對抗審查修正第二輪，2026-09-17）
+
+- 症狀：修正 diff 再跑一輪 Opus 對抗審查（六鏡頭 → 兩名 refuter），19 項提出、14 項確認。三項是修法自己帶進來的回歸：
+  Invoke-GitSnapshot 新加的「只 commit 有 staged 變更的路徑」拿 git 印出的檔名比前綴，git 預設 core.quotepath 把中文路徑跳脫成
+  `"docs/ps-research/\350..."`，永遠比不中 → 中文領域的快照靜默停止；`Get-PsSpProp` 改 `return ,` 後漏改一處接管線的呼叫，
+  需求引用 ≥2 個 checklist 的需求包一律被拒；補研究圍欄把 session 期間別的行程（`ps-spec -Plan`、`ps-supplemental -Submit`）
+  合法建立的 request 當模型違規刪掉。三項是修法沒修到位：已合併未發布的復原只認「檔案完全沒動」，同 run 兩張 request 打同一個
+  NN 就失效、雙重合併照舊；契約「第一行必須以 `## ` 開頭」對不上 OpenCode read 的真實輸出（每行有 `行號: ` 前綴）；
+  ENTITY.DETAIL 規劃只看 wiki 等級、gate 卻混入 NN 等級，首次 -Gate 就誤報 7-22。一項自打嘴巴：掃除非合成名的同時把它原文寫進 HANDOFF。
+- 根因：修法沒有跑在會踩到的真實條件下（中文路徑、多 checklistRef 的需求包、並行的合法寫入者）；靜態守衛只擋了 `@(函式)` 一種形狀；
+  契約文字沒對照工具的真實輸出就寫。
+- 落點：`ps-auto-loop`（同 run 同 NN 只合併一張；已合併的 attempt 以「收據內容是否仍在 NN」判定、永不重派；圍欄對 requests／results
+  的新增檔先驗身分再決定；Invoke-GitSnapshot 逐候選路徑問 git、不解析檔名）；`ps-supplemental-lib`（`Test-PsSuppMergePresent`、
+  `Test-PsSuppRequestFile`／`Test-PsSuppResultFile` 與 intake 共用）；`ps-spec-lib`（checklistRefs 先指派；ENTITY.DETAIL 的 LiveGrades
+  只看 wiki）；`test-ps51-static`（comma-return 函式接管線＝BLOCK）；契約／orchestrator／test-scenarios（去掉 `行號: ` 前綴後的
+  第一個內容行）；合成識別字守衛擴到 HANDOFF／docs/design／auto-loop 腳本；範例包 pack-b 加雙 checklistRefs。
+- 驗證：test-supplemental 新增 6 判定（合併痕跡四態、request／result 檔驗證）；test-auto-loop 情境 34 新增 7 判定（圍欄三個單元測試、
+  中文目錄真 git repo 的快照回歸）；test-spec 情境 1 雙 checklistRefs 正例＋情境 21（ENTITY.DETAIL 首次 -Gate 無 7-22、wiki 標紅才出）；
+  靜態守衛以合成函式驗過三種形狀。
+- 教訓：修法要用會踩到的真實條件驗（非 ASCII 路徑、多值欄位、並行寫入者），不是只用讓測試綠的 fixture；守衛規則寫完先用反例
+  確認它真的會擋；凡是要模型照字面做的自檢，先看工具的真實輸出再寫；掃除機敏字串時連交接文件一起掃。

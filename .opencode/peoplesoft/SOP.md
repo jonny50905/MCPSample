@@ -823,9 +823,11 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
    ＞ 索引中以目標為主物件的 NN 所在領域 ＞ 目錄掃描；零候選＝`ROUTING_REQUIRED`（加 hint，領域須有 00-overview）。
    `-GitCommit` 只 commit request 檔到內部 git（永不 push）。
 2. **執行**：`ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]`（迷你圈；exit 4＝完成）；
-   `ps-auto-all` 在每個領域判收據前若有 pending 會自動先跑。每 run 至多 2 張（`-SupplementalPerRun`）；
-   每張 attempts 上限 2（工單檔數＝attempts；session 崩潰也算一次）。模型（`/ps-supplement`，掛 ps-deep-research）
-   只寫收據；外環驗收、只追加地合併進目標 NN、合併後 lint 缺料違規變多即還原（outcome 記 LINT_REGRESSION）。
+   `ps-auto-all` 在每個領域判收據前若有 pending 會自動先跑。每 run 至多 2 張（`-SupplementalPerRun`）、
+   同一個 NN 一個 run 只合併一張（其餘留到下次 run，仍 pending、不算 attempts）；
+   每張 attempts 上限 2（工單檔數＝attempts；session 崩潰也算一次）；已合併的 attempt 只補發布、永不重派（不會二次合併）。
+   模型（`/ps-supplement`，掛 ps-deep-research）只寫收據；外環驗收、只追加地合併進目標 NN、
+   合併後 lint 缺料違規變多即還原（outcome 記 LINT_REGRESSION）。
 3. **目標尚無 NN**：迷你圈不派 session，改在該領域 checklist 寫一列 `D<輪次>-<序>` 新發現（`-Status` 顯示
    `WAITING_RESEARCH`）；等研究相位（`/ps-research` 或 auto-loop）建檔後再跑迷你圈。
 4. **結果**：`-Status [-Domain]`、`-Result -RequestId <id>`；outcome ∈ RESOLVED／PARTIAL／UNRESOLVED／OUT_OF_SCOPE／SUPERSEDED；
@@ -838,7 +840,10 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
    auto-loop）在跑：外環會等最多一天（每 5 分鐘印一行心跳），等滿才回 SLOT_BUSY 停機且不計 attempts——看 log 是誰占著、錯開即可。
    迷你圈遇未預期例外 → `SUPP1-3-03`（exit 2）：已合併的不回退、未發布的留在 parts 下次續跑；request 檔寫不進（`SUPP1-1-06`）
    稍後重送同一 need 即可。auto-loop 只認通過 intake 驗證的 request（id／workKey／need 對不上的列在 log 的「intake 拒收」，
-   不會被派工）；迷你圈期間模型寫進 `supplemental/requests|results/`、`wiki/` 的檔案一律還原、記 fenceViolations 並作廢該次。
+   不會被派工）；迷你圈期間的圍籬盯著 `supplemental/requests|results/` 與 `wiki/`：既有檔被改寫或刪除一律還原，
+   `wiki/` 的新增檔一律刪除，`requests|results/` 的新增檔先驗身分（檔名文法、requestId＝檔名、schemaVersion／need／
+   workKey 重算；result 另驗 outcome 值域）——驗得過＝窗口期間 `ps-supplemental.ps1 -New／-Submit` 或 `ps-spec.ps1 -Plan`
+   正常提交的檔，留著且不算違規，驗不過才刪。只有真違規記 fenceViolations 並作廢該次 attempt。
 6. **回報維護端**只給 `SUPP1-<stage>-<code>[-<count>]` 與 enum。
 
 ## SOP-24 Spec 引擎——私有需求包接入與 job 執行（issue #34／#35）

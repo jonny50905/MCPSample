@@ -3,7 +3,8 @@
 # 阻擋（exit 1）：三元 ?:、??、??=、?.、&&／|| 管線鏈、ForEach-Object -Parallel、ConvertFrom-Json -AsHashtable／-Depth、
 #   -Encoding utf8NoBOM／utf8BOM／ansi、三段以上 Join-Path（含 -AdditionalChildPath）、Split-Path -LeafBase、Test-Json、
 #   [IO.File]::Move 三參數、[IO.Path]::GetRelativePath、解析錯誤、缺 UTF-8 BOM（5.1 無 BOM 會把中文誤解析）、
-#   @(函式 …) 直接包住以 `return , $arr` 回傳的函式（空陣列時 Count 會是 1；要先指派再 @()）。
+#   @(函式 …) 直接包住以 `return , $arr` 回傳的函式（空陣列時 Count 會是 1；要先指派再 @()）、
+#   把以 `return , $arr` 回傳的函式接在管線第一段（整個陣列只會當成一個物件往下送；要先指派再 foreach）。
 # 警告（只計數）：Get-Date -Format（永遠依目前文化，民國曆環境 yyyy 會變 115；改用 .ToString('<fmt>', InvariantCulture)）、
 #   DateTime.ToString('<日期格式>') 未給文化參數、Get-Content 未指定 -Encoding UTF8。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -51,6 +52,14 @@ foreach ($f in $files) {
                     $cn = [string]$pes[0].GetCommandName()
                     if ($cn -ne '' -and $commaReturnFns.ContainsKey($cn)) { $problems += "${rel}:$ln @($cn …) 直接包住 return , 陣列 的函式（空陣列時 Count=1）；改成先指派再 @(變數)" }
                 }
+            }
+        }
+        elseif ($tn -eq 'PipelineAst') {
+            # 管線第一段就是 return , 陣列 的函式（不論在不在 @() 裡）：整個陣列只會被當成一個物件往下送
+            $pes = @($n.PipelineElements)
+            if ($pes.Count -gt 1 -and $pes[0] -is [System.Management.Automation.Language.CommandAst]) {
+                $cn = [string]$pes[0].GetCommandName()
+                if ($cn -ne '' -and $commaReturnFns.ContainsKey($cn)) { $problems += "${rel}:$ln $cn … | … 把 return , 陣列 的函式接進管線（整個陣列只會當成一個物件，下游收到的 `$_ 是整個陣列）；改成先指派再 foreach" }
             }
         }
         elseif ($tn -eq 'InvokeMemberExpressionAst') {

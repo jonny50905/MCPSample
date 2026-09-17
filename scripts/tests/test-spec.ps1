@@ -4,7 +4,7 @@
 #       pack 驗證負例、兩套 pack 對同一合成 NN 產不同 spec、EXTRACT facts、COMPOSE manifest／context／條目列舉、
 #       假 worker（合格／不合格／超長／含模板行／來源改變）、input.json 快照與來源改變拒收（不記 attempt）、receipt 鍵含指紋、
 #       re-plan 重用收據、WAITING_KNOWLEDGE／WAITING_AUDIT 不重送、render parity、render 前來源重驗、gate 覆蓋與 UNKNOWN debt、
-#       drill tuple 形狀、doctor stage 0、jobId 文法、結論碼形狀。
+#       drill tuple 形狀、doctor stage 0、jobId 文法、結論碼形狀、一條需求引用多個 checklist、ENTITY.DETAIL 的現況等級只看 wiki。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
 . (Join-Path $repoRoot 'scripts/ps-knowledge-lib.ps1')
@@ -198,7 +198,8 @@ Write-Host "情境 1：pack 驗證"
 $va = Test-PsSpPack -PackDir (Join-Path $priv 'pack-a') -Capabilities $caps
 Assert ($va.Ok -and $va.Signed -and $va.Requirements.Count -eq 11 -and $va.Markers.Count -eq 7) "pack-a 合法：11 requirements、7 個模板標記、已簽核"
 $vb = Test-PsSpPack -PackDir (Join-Path $priv 'pack-b') -Capabilities $caps
-Assert ($vb.Ok -and $vb.Requirements.Count -eq 9 -and $va.ContentHash -cne $vb.ContentHash -and $va.BindingHash -cne $vb.BindingHash) "pack-b 合法（含 UNSUPPORTED、ALL／NOT 條件、context.record）；content／binding hash 與 A 不同"
+$vbR03 = @(); if (@($vb.Requirements).Count -gt 0) { $vbR03 = @(@($vb.Requirements | Where-Object { $_.id -eq 'R03' })[0].checklistRefs) }
+Assert ($vb.Ok -and $vb.Requirements.Count -eq 9 -and $vbR03.Count -eq 2 -and $vbR03[0] -eq 'C01' -and $vbR03[1] -eq 'C02' -and $va.ContentHash -cne $vb.ContentHash -and $va.BindingHash -cne $vb.BindingHash) "pack-b 合法（含 UNSUPPORTED、ALL／NOT 條件、context.record、R03 引用兩個 checklist）；content／binding hash 與 A 不同"
 function New-BadPack([string]$Name, [scriptblock]$Mutate, [string]$Template = '') {
     $d = Join-Path $priv $Name
     New-Item -ItemType Directory -Path $d -Force | Out-Null
@@ -232,6 +233,9 @@ $r = New-BadPack 'bad-op' { param($p) $p.requirements[0].applicability = ([pscus
 Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'BAD_OP') "負例：applicability op 不在值域"
 $r = New-BadPack 'bad-ref' { param($p) $p.requirements[0].applicability = ([pscustomobject]@{ op = 'FACT_TRUE'; fact = 'GAPS.items' }) }
 Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'BAD_FACT_REF') "負例：引用的 factKind 沒有 requirement 產出"
+$r = New-BadPack 'multi-ck' { param($p) $p.requirements[0].checklistRefs = @('C01', 'C02'); $p.requirements[2].checklistRefs = @('C01') }
+$mck = @(); if (@($r.Requirements).Count -gt 0) { $mck = @(@($r.Requirements)[0].checklistRefs) }
+Assert ($r.Ok -and $mck.Count -eq 2 -and $mck[0] -eq 'C01' -and $mck[1] -eq 'C02' -and ($r.Errors -join ';') -notmatch 'CHECKLIST_') "正例：一條 requirement 引用兩個 checklist（C02 只由它引用）→ 兩個都算已引用，不併成一個字串（CHECKLIST_UNKNOWN／UNREFERENCED 都不發）"
 $r = New-BadPack 'unsigned' { param($p) $p.reviewedVersion = 0 }
 Assert ($r.Ok -and -not $r.Signed) "reviewedVersion ≠ packVersion：結構合法但未簽核"
 $c = Invoke-Cli @{ ValidatePack = $true; Pack = 'unsigned' }
@@ -866,6 +870,44 @@ $tf4 = Test-PsSpFragment -LiteralPath $fragP -Items $itemsF -Files $filesF -Cap 
 Assert ($tf1.Ok -and $tf1.Closure -eq 'COMPLETE' -and @($tf1.Covered).Count -eq 5 -and $tf1.Unresolved -eq 2 -and @($tf1.Rows).Count -eq 3 -and @($tf1.Rejected).Count -eq 1 -and $tf1.Present -eq 'TRUE') "驗收收：來源條目 #1、3;#4；證據 檔#E1、NOT_APPLICABLE（＝UNRESOLVED）、片段檔路徑前綴；未採用 #5"
 Assert ($tf2.Ok -and $tf2.Closure -eq 'COMPLETE' -and @($tf2.Rejected).Count -eq 5 -and $tf2.Present -eq 'FALSE') "未採用來源條目以 ; 列多個（1;2;3;4;5）→ 五筆 rejected、closure COMPLETE、present FALSE"
 Assert ((-not $tf3.Ok) -and (@($tf3.Reasons) -contains 'NO_COVERAGE') -and (-not $tf4.Ok) -and (@($tf4.Reasons) -contains 'ITEM_UNKNOWN') -and (@($tf4.Reasons) -contains 'EVIDENCE_UNKNOWN') -and (@($tf4.Reasons) -contains 'ENUM')) "仍拒收：兩表皆空（NO_COVERAGE）、條目不在列舉、證據不在讀取集合、值域外"
+
+# ── 情境 21：ENTITY.DETAIL 的現況等級只看 wiki（與規劃時同一組來源）──
+Write-Host "情境 21：ENTITY.DETAIL policy=AUDITED：wiki AUDITED_CLEAN、引用它的 NN UNAUDITED → 規劃後沒動任何東西，首次 -Gate 不得出現 7-22；wiki 被標紅才出"
+$packG = Join-Path $priv 'pack-g'
+Copy-Item -LiteralPath (Join-Path $priv 'pack-b') -Destination $packG -Recurse
+$pgT = [System.IO.File]::ReadAllText((Join-Path $packG 'pack.json'))
+$pgT = $pgT.Replace('"packId": "pack-b"', '"packId": "pack-g"')
+$pgT = $pgT.Replace('"fact": "DATA.FLOW.writes" }, "cardinality": "ANY", "evidencePolicy": "STATIC"', '"fact": "DATA.FLOW.writes" }, "cardinality": "ANY", "evidencePolicy": "AUDITED", "context": { "record": "PS_DEMO_TBL" }')
+[System.IO.File]::WriteAllText((Join-Path $packG 'pack.json'), $pgT, (New-Object System.Text.UTF8Encoding($false)))
+$auditG = [System.IO.File]::ReadAllBytes($auditP)
+$tg = [System.IO.File]::ReadAllText($auditP)
+[System.IO.File]::WriteAllText($auditP, $tg.Replace('| 03-TW_DEMO_A.md | 3 | 0 | 0 | 2 | 0 | 🟢 |', '| 03-TW_DEMO_A.md | 未稽核 | | | | | ⛔ |'), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-g'; Component = 'TW_DEMO_A'; Pack = 'pack-g' }
+$dirsG = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-g' -JobId 'job-g'
+$planG = Read-PsSpPlan -Dirs $dirsG -PlanRef ([string](Read-PsSpJob -Dirs $dirsG).currentPlanRef)
+$idxG = Read-PsKnowledgeIndex -Root $root
+$ctxG = Get-PsSpNnCtx -Root $root -Index $idxG -Domain '測試領域' -File '03-TW_DEMO_A.md' -Cache @{}
+$fG = @($planG.facts | Where-Object { $_.factKind -eq 'ENTITY.DETAIL' })
+$r07G = @($planG.requirements | Where-Object { $_.id -eq 'R07' })[0]
+$srcG = Test-PsSpSources -Root $root -Dirs $dirsG -Plan $planG -Index $idxG
+Assert ($c -match '^SPEC1-2-01-\d+$' -and [string]$ctxG.Grade -eq 'UNAUDITED' -and $fG.Count -eq 1 -and [string]$fG[0].subject -eq 'PS_DEMO_TBL' -and [string]$fG[0].grade -eq 'AUDITED_CLEAN' -and @($r07G.needs).Count -eq 0 -and [int]$srcG.Mismatch -eq 0 -and [string]$srcG.LiveGrades['ENTITY.DETAIL@PS_DEMO_TBL'] -eq 'AUDITED_CLEAN') "規劃與 gate 用同一組來源：NN UNAUDITED、wiki AUDITED_CLEAN → fact 等級與 LiveGrades 都是 AUDITED_CLEAN（TARGET NN 的等級不混入）"
+$c = Invoke-Cli @{ Gate = $true; JobId = 'job-g' }
+$curG = Read-PsSpJsonFile -LiteralPath $dirsG.CurrentFile
+$gG = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsG.Outputs (([string]$curG.gateGeneration).Substring(0, 16).ToLowerInvariant())) 'gate.json')
+$c2 = Invoke-Cli @{ Render = $true; JobId = 'job-g' }
+$c3 = Invoke-Cli @{ Gate = $true; JobId = 'job-g' }
+$curG2 = Read-PsSpJsonFile -LiteralPath $dirsG.CurrentFile
+$gG2 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsG.Outputs (([string]$curG2.gateGeneration).Substring(0, 16).ToLowerInvariant())) 'gate.json')
+Assert ($c -match '^SPEC1-7-02-\d+$' -and $c2 -eq 'SPEC1-6-01' -and $c3 -match '^SPEC1-7-02-\d+$' -and (@($gG.findings | Where-Object { $_.code -eq '7-22' })).Count -eq 0 -and (@($gG.findings | Where-Object { $_.code -eq '7-13' })).Count -eq 0 -and (@($gG2.findings | Where-Object { $_.code -eq '7-22' })).Count -eq 0) "規劃後什麼都沒變：首次 -Gate 與 -Render 後再 -Gate 都沒有 7-22（也沒有 7-13）"
+$tg2 = [System.IO.File]::ReadAllText($auditP)
+$hdrG = "| 檔案 | 類型 | 內容 | 原因 | 處置 |`n|---|---|---|---|---|"
+[System.IO.File]::WriteAllText($auditP, $tg2.Replace($hdrG, ($hdrG + "`n| 03-TW_DEMO_A.md | FAIL | 附錄 #1 的 ChunkId $uuid1 對不上 | 證據不符 | 重查 |")), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Gate = $true; JobId = 'job-g' }
+$curG3 = Read-PsSpJsonFile -LiteralPath $dirsG.CurrentFile
+$gG3 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsG.Outputs (([string]$curG3.gateGeneration).Substring(0, 16).ToLowerInvariant())) 'gate.json')
+$f22G = @($gG3.findings | Where-Object { $_.code -eq '7-22' -and $_.requirementId -eq 'R07' })
+Assert ($c -match '^SPEC1-7-02-\d+$' -and $script:lastExit -eq 1 -and $f22G.Count -eq 1 -and [string]$f22G[0].factKind -eq 'ENTITY.DETAIL' -and [string]$f22G[0].c -eq 'PARTIAL') "wiki 的 ChunkId 被稽核標 FAIL（effective STALE_BY_SOURCE）→ ENTITY.DETAIL 的 7-22 照常出（c=PARTIAL）"
+[System.IO.File]::WriteAllBytes($auditP, $auditG)
 
 Remove-Item -Recurse -Force $root
 Write-Host ""

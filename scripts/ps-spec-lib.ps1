@@ -297,7 +297,8 @@ function Test-PsSpPack {
         if ($seenR.ContainsKey($id)) { $r.Errors += ('DUP_ID：requirement ' + $id) } else { $seenR[$id] = $true }
         $slot = [string](Get-PsSpProp $q 'slot')
         if ($slots -notcontains $slot) { $r.Errors += ('SLOT_UNKNOWN：' + $where + ' slot=' + $slot) }
-        $crefs = @(Get-PsSpProp $q 'checklistRefs' | ForEach-Object { [string]$_ })
+        $crefsRaw = Get-PsSpProp $q 'checklistRefs'
+        $crefs = @(); if ($null -ne $crefsRaw) { foreach ($cx in @($crefsRaw)) { $crefs += [string]$cx } }
         foreach ($c in $crefs) { if ($cks -notcontains $c) { $r.Errors += ('CHECKLIST_UNKNOWN：' + $where + ' ' + $c) } else { $refC[$c] = $true } }
         $fk = [string](Get-PsSpProp $q 'factKind')
         $mode = 'UNSUPPORTED'
@@ -1942,7 +1943,7 @@ function Invoke-PsSpRun {
 # ── 評估（render 與 gate 共用）────────────────────────────────────
 
 # 來源重驗：facts 的 sourceRefs（節 hash／檔 hash）＋現行 plan 各單位的收據指紋（只看現行單位綁定的收據；PENDING／BLOCKED 單位不算來源已變）。
-# 回 @{ Mismatch; Status; Facts; LiveGrades }；LiveGrades＝factId／unitId → 依現況知識索引重算的來源最低等級（gate 用來抓規劃後的等級下降）
+# 回 @{ Mismatch; Status; Facts; LiveGrades }；LiveGrades＝factId／unitId → 依現況知識索引重算的來源最低等級（gate 用來抓規劃後的等級下降；ENTITY.DETAIL 只取 role=WIKI，與規劃時同一組來源）
 function Test-PsSpSources {
     param([string]$Root, $Dirs, $Plan, $Index)
     $cache = @{}
@@ -1954,6 +1955,9 @@ function Test-PsSpSources {
     foreach ($f in @($Plan.facts)) {
         $ok = $true
         $grades = @()
+        # ENTITY.DETAIL 的規劃時等級只取 wiki（New-PsSpExtractFacts：grade = $wg），gate／render 必須用同一組來源；
+        # 否則引用該 Record 的 NN 等級會混進 LiveGrades，規劃後什麼都沒變也會誤開 7-22（來源變動仍照常比 hash）。
+        $wikiOnlyGrade = ([string]$f.factKind -eq 'ENTITY.DETAIL')
         foreach ($sr in @($f.sourceRefs)) {
             $role = [string]$sr.role
             if ($role -eq 'WIKI' -or $role -eq 'OVERVIEW') {
@@ -1963,8 +1967,8 @@ function Test-PsSpSources {
                 continue
             }
             $c = Get-PsSpNnCtx -Root $Root -Index $Index -Domain ([string]$sr.domain) -File ([string]$sr.file) -Cache $cache
-            if ($null -eq $c) { $ok = $false; $grades += 'MISSING'; continue }
-            $grades += [string]$c.Grade
+            if ($null -eq $c) { $ok = $false; if (-not $wikiOnlyGrade) { $grades += 'MISSING' }; continue }
+            if (-not $wikiOnlyGrade) { $grades += [string]$c.Grade }
             if ([string]$sr.section -eq '') { if ($c.Hash -cne [string]$sr.hash) { $ok = $false }; continue }
             $live = Get-PsSpSection -Ctx $c -Name ([string]$sr.section) -Level ([int]$sr.level)
             if ($null -eq $live -or [string]$live.hash -cne [string]$sr.sectionHash) { $ok = $false }

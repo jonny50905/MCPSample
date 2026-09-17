@@ -175,8 +175,14 @@ deep-research 路由與「委派目標只能是 agent」段；契約硬規則 10
 無標籤、wiki 檔路徑、模型寫的 request／result 入庫、request 未驗證、情境 34 讀 .gitignore）；Spec 引擎 28 項提出、13 項確認（派工行號漂移是 blocker）
 全部修正（駁回的 15 項也一併修），裁決記 memo §11。修法全在 L122／L123；被駁回但成本低的也順手修。寫測試時抓到新陷阱：`return , $arr` 的函式被
 `@(函式)` 直接包住時空陣列數成 1——三處改先指派，test-ps51-static 新增 BLOCK 規則。全套測試組（含情境 11～20、情境 9、情境 34 補強）
-在 pwsh 7.6 全綠；**公司機 PS 5.1 仍未實跑**。`TW_JO_OPEN` 這個名字曾在 6466d07／c441e04 的 memo 與守衛 regex 出現，本輪已移除；
-若它是真實物件名，需要改寫這兩個 commit 的歷史（見 §4）。搬運清單見 §1 步驟 1d。
+在 pwsh 7.6 全綠；**公司機 PS 5.1 仍未實跑**。先前 memo 與守衛 regex 曾出現一個非合成的 TW_ 物件名（6466d07／c441e04），本輪已移除；若確認它是真實物件名，
+需要改寫這兩個 commit 的歷史（見 §4）。搬運清單見 §1 步驟 1d。
+
+**追記（2026-09-17，對抗審查修正第二輪）**：修正 diff 再跑一輪 Opus 對抗審查（六鏡頭 find 與 refuter 全用 Opus）：19 項提出、
+14 項確認，合併成六件事（memo §11.3、L124）——三項是修法帶進來的回歸（git 快照對中文路徑靜默失效、≥2 個 checklistRefs 的需求包被拒、
+圍欄刪掉別的行程合法建立的 request），三項是修法沒修到位（同 run 同 NN 兩張 request 的雙重合併、契約首行自檢對不上 read 的真實輸出、
+ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF）。全部修正；test-supplemental＋6、test-auto-loop 情境 34＋7（含中文目錄
+真 git repo 的快照回歸）、test-spec 情境 21；全套在 pwsh 7.6 全綠；公司機 PS 5.1 仍未實跑。搬運見 §1 步驟 1d（行數已更新）。
 
 ## 1. 管理者下一步（按序）
 
@@ -305,13 +311,13 @@ deep-research 路由與「委派目標只能是 agent」段；契約硬規則 10
    | `.opencode/command/ps-spec-batch.md` | 新增 | 18 | PARTIAL 處置規則 |
    | `.opencode/command/ps-supplement.md` | 新增 | 27 | 第 0 步先於 read 工單；空表／格內直線規則 |
    | `.opencode/peoplesoft/README.md` | 修改 | 330 | 目錄 |
-   | `.opencode/peoplesoft/SOP.md` | 修改 | 866 | SOP-22～24（含 slot 等待、SUPP1-3-03／1-06、SPEC 9-07／7-22／4-07／3-07） |
-   | `.opencode/peoplesoft/knowledge-retrieval-contract.md` | 新增 | 123 | pattern 字元類別、limit 直接用、首行前綴自檢、wiki 路徑、有效性 → 標籤 |
-   | `.opencode/peoplesoft/lessons/applied.md` | 修改 | 3433 | L119～L123 |
+   | `.opencode/peoplesoft/SOP.md` | 修改 | 871 | SOP-22～24（含 slot 等待、SUPP1-3-03／1-06、SPEC 9-07／7-22／4-07／3-07） |
+   | `.opencode/peoplesoft/knowledge-retrieval-contract.md` | 新增 | 124 | pattern 字元類別、limit 直接用、首行前綴自檢、wiki 路徑、有效性 → 標籤 |
+   | `.opencode/peoplesoft/lessons/applied.md` | 修改 | 3455 | L119～L123 |
    | `.opencode/peoplesoft/spec/capabilities.json` | 新增 | 37 |  |
    | `.opencode/peoplesoft/spec/examples/pack-a/pack.json` | 新增 | 33 |  |
    | `.opencode/peoplesoft/spec/examples/pack-a/template-bound.md` | 新增 | 31 |  |
-   | `.opencode/peoplesoft/spec/examples/pack-b/pack.json` | 新增 | 30 |  |
+   | `.opencode/peoplesoft/spec/examples/pack-b/pack.json` | 新增 | 30 | ；R03 引用兩個 checklist（內容變、行數同） |
    | `.opencode/peoplesoft/spec/examples/pack-b/template-bound.md` | 新增 | 19 |  |
    | `.opencode/peoplesoft/spec/generic.manifest.json` | 新增 | 66 | `-Doctor -WriteGenericManifest` 重生（12 檔） |
    | `.opencode/peoplesoft/spec/pack.schema.json` | 新增 | 52 |  |
@@ -324,20 +330,20 @@ deep-research 路由與「委派目標只能是 agent」段；契約硬規則 10
    | `AGENTS.md` | 修改 | 106 | 知識層／補研究／Spec 三段 |
    | `scripts/ps-agent-doc-lint.ps1` | 修改 | 47 | 模型讀的檔只留規則（issue 編號／日期／變更敘述詞阻擋） |
    | `scripts/ps-auto-all.ps1` | 修改 | 272 | 保留名、preflight -Check、迷你圈 exit 1 進保險絲 |
-   | `scripts/ps-auto-loop.ps1` | 修改 | 2589 | -SupplementalOnly 迷你圈（try／catch、圍欄快照／還原、已合併未發布復原）、SLOT_BUSY 不計 attempts、三個 safe point |
+   | `scripts/ps-auto-loop.ps1` | 修改 | 2650 | -SupplementalOnly 迷你圈（try／catch、圍欄快照／還原、已合併未發布復原）、SLOT_BUSY 不計 attempts、三個 safe point |
    | `scripts/ps-knowledge-lib.ps1` | 新增 | 1083 | 知識索引 lib（create-only 三態、索引節名用實際標題、續篇欄） |
    | `scripts/ps-knowledge.ps1` | 新增 | 92 | `-Rebuild/-Check/-Find/-Slice`；結論碼 KNOW1 |
    | `scripts/ps-session-lib.ps1` | 新增 | 224 | Invoke-PsOcSession＋session slot 鎖（等一天、心跳）；prompt 閘門只擋 CR／LF／"／% |
-   | `scripts/ps-spec-lib.ps1` | 新增 | 2374 | Spec 引擎 lib（派工重定位、live grade 7-22、PARTIAL_SPLIT 4-07、WRITE_DEFERRED 3-07、parser 寬鬆） |
+   | `scripts/ps-spec-lib.ps1` | 新增 | 2378 | Spec 引擎 lib（派工重定位、live grade 7-22、PARTIAL_SPLIT 4-07、WRITE_DEFERRED 3-07、parser 寬鬆） |
    | `scripts/ps-spec.ps1` | 新增 | 273 | `-ValidatePack/-Plan/-Run/-Render/-Gate/-Doctor`；-RuntimeRoot 驗證 9-07 |
-   | `scripts/ps-supplemental-lib.ps1` | 新增 | 1120 | 補研究協定 lib（intake 驗證、WRITE_FAILED、FOREIGN_RESULT、wiki 只改 frontmatter、DOMAIN_MISSING） |
+   | `scripts/ps-supplemental-lib.ps1` | 新增 | 1193 | 補研究協定 lib（intake 驗證、WRITE_FAILED、FOREIGN_RESULT、wiki 只改 frontmatter、DOMAIN_MISSING） |
    | `scripts/ps-supplemental.ps1` | 新增 | 131 | `-New/-Submit/-Status/-Result`；結論碼 SUPP1（含 1-06） |
    | `scripts/ps-transfer-manifest.json` | 修改 | 519 | 最後搬；fs-doctor 應報 84 檔一致（commit 欄＝產生時 HEAD，早一步屬預期） |
-   | `scripts/tests/test-auto-loop.ps1` | 修改 | 931 | 情境 34（.gitignore 缺檔跳過、提示常值閘門、worker 工具與圍欄、slot、契約 pattern） |
+   | `scripts/tests/test-auto-loop.ps1` | 修改 | 1006 | 情境 34（.gitignore 缺檔跳過、提示常值閘門、worker 工具與圍欄、slot、契約 pattern）；情境 34 圍籬單元測試與中文目錄快照回歸 |
    | `scripts/tests/test-knowledge.ps1` | 新增 | 338 | 知識索引測試組 |
-   | `scripts/tests/test-ps51-static.ps1` | 新增 | 115 | PS 5.1 靜態守衛（新增 `@(函式)` 包 `return ,` BLOCK、ToString 日期格式警告） |
-   | `scripts/tests/test-spec.ps1` | 新增 | 873 | Spec 測試組（情境 11～20 新增） |
-   | `scripts/tests/test-supplemental.ps1` | 新增 | 486 | 補研究測試組（情境 9：intake／callee／wiki／DOMAIN_MISSING／空表） |
+   | `scripts/tests/test-ps51-static.ps1` | 新增 | 124 | PS 5.1 靜態守衛（新增 `@(函式)` 包 `return ,` BLOCK、ToString 日期格式警告） |
+   | `scripts/tests/test-spec.ps1` | 新增 | 915 | Spec 測試組（情境 11～20 新增） |
+   | `scripts/tests/test-supplemental.ps1` | 新增 | 509 | 補研究測試組（情境 9：intake／callee／wiki／DOMAIN_MISSING／空表）；合併痕跡與 request／result 檔驗證 |
 
 2. 清殘留：`auto-loop-logs\<領域>\audit-ledger.json`、`docs\ps-research\<領域>\audit-parts\`。
 3. 重跑 `ps-auto-loop.ps1 -Domain <領域> -Tier 2`。

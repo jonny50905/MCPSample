@@ -28,4 +28,4 @@
 - 派工時條目行號依現況文字重算（同節 hash 相同 ⇒ 相對位置不變）；驗收只對照該 attempt 工單列出的條目。
 - 派工前就知道裝不下（條目數＋7 >150、切片超限）直接拆分，不派 session；session 回報 CONTEXT_OVERFLOW＝容量事件，不計 attempt。
 - `-Render` 重跑 byte 相同；來源變動時 current.json 不換；`-Gate` 只更新 current.json 的 gate 指標（`-Doctor` 讀最新一次 gate）。
-- gate／render 的等級看現況知識索引（每個動詞都先重建 STALE 索引）：規劃後等級低於政策＝7-22，不會發 SPEC_COMPLETE。
+- gate／render 的等級看現況知識索引（每個動詞都先重建 STALE 索引）：規劃後等級低於政策＝7-22，不會發 SPEC_COMPLETE；ENTITY.DETAIL 規劃與 gate 都只看 wiki 等級（引用它的 NN 等級不算），所以 NN 未稽核不會誤開 7-22。

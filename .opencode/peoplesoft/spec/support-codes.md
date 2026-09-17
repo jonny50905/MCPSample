@@ -102,7 +102,7 @@ stage：0 integrity／1 pack／2 plan／3 dispatch／4 accept／5 knowledge／6 
 | 7 | 18 | BLOCKED（finding：單位或知識被擋） | — |
 | 7 | 19 | WAITING（finding：WAITING_KNOWLEDGE／WAITING_AUDIT／ROUTING_REQUIRED） | — |
 | 7 | 21 | COVERAGE（finding：a＝已納入列數，c＝closure；PARTIAL／UNKNOWN 為 debt） | — |
-| 7 | 22 | GRADE_DROPPED（finding：規劃時等級符合 evidencePolicy，gate／render 時依現況知識索引重算的來源等級已低於政策——稽核標紅、待補列或稽核後改檔；a＝fact 或單位數，c＝現況等級；重跑稽核或修 NN 後 -Plan） | — |
+| 7 | 22 | GRADE_DROPPED（finding：規劃時等級符合 evidencePolicy，gate／render 時依現況知識索引重算的來源等級已低於政策——稽核標紅、待補列或稽核後改檔；a＝fact 或單位數，c＝現況等級；ENTITY.DETAIL 的來源等級只看 wiki，與規劃時同一組來源；重跑稽核或修 NN 後 -Plan） | — |
 | 8 | 01 | MAPPING_UNSIGNED：reviewedVersion≠packVersion（-ValidatePack／-Gate 的結論碼；gate.json 亦列 finding） | 1 |
 | 9 | 01 | BAD_ARGS | 2 |
 | 9 | 02 | ENV：環境錯（找不到 docs/ps-research、能力目錄、索引無法讀取、未預期例外） | 2 |

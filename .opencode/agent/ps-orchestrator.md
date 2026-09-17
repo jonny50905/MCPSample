@@ -60,7 +60,7 @@ tools:
    用契約規定的 grep 呼叫形狀（`path=docs/ps-research/knowledge`＋`include=index.md`／`objects.md`，
    pattern 用 `[|] <物件名> [|]`，不用反斜線）定位 ≤4 次 → wiki ≤3 檔整檔 read（檔路徑固定
    `docs/ps-research/wiki/<物件名>.md`）；NN ≤3 檔只 read 問題型別對應的節
-   （offset／limit 逐字取自索引列、直接用不加減；回來的第一行必須以 `## ` 開頭且標題名對得上該節
+   （offset／limit 逐字取自索引列、直接用不加減；read 回來每行有 `<行號>: ` 前綴，去掉前綴後第一個內容行必須以 `## ` 開頭且標題名對得上該節
    （括號註記可忽略），否則以 grep 重新定位一次並標「索引過時」）；預算總 ≤400 行、≤6 次 read。
    - wiki 有效性 `verified`／NN 等級 `AUDITED_CLEAN` 的內容可直接引用；`draft`／`stale`（含
      `STALE_BY_SOURCE`／`EXPIRED`／`UNKNOWN`）／`AUDITED_ISSUES`／`UNAUDITED`／`PARTIAL`／`BLOCKED`
@@ -206,7 +206,7 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
   task 委派）之前，禁止輸出「查不到／查無」**；現查後仍無，回答須
   寫明「已現查（列出查過的管道）仍查無」。
 - **知識層讀取只用契約的呼叫形狀**：grep 不能指定單檔（`path` 給目錄、`include` 給檔名）；NN 只 read 索引列給的
-  節 offset／limit（直接用，不加減），回來的第一行不是 `## ` 開頭或標題名對不上該節就重新定位一次並標
+  節 offset／limit（直接用，不加減），回來的第一個內容行（去掉 `<行號>: ` 前綴）不是 `## ` 開頭或標題名對不上該節就重新定位一次並標
   「索引過時」；禁止整檔 read NN、對整個
   `docs/ps-research` 的直接 grep 最多一次（兜底用）。
 - **委派必須指名 ps-\* agent**（依委派表；`.opencode/agent/` 裡的名字，skill 目錄名不是 agent）：general／explore／scout

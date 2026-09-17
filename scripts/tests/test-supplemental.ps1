@@ -326,8 +326,14 @@ $mg3 = Merge-PsSuppReceipt -NnPath $copyCrlf -Receipt $recv -RequestId $rid1
 $bytes3 = [System.IO.File]::ReadAllBytes($copyCrlf)
 $text3 = [System.IO.File]::ReadAllText($copyCrlf)
 Assert ($bytes3[0] -eq 0xEF -and $bytes3[1] -eq 0xBB -and $text3 -match "`r`n" -and $text3 -notmatch "(?<!`r)`n" -and $mg3.HashAfter -ceq $mg.HashAfter) "CRLF＋BOM 原檔：合併後仍 CRLF＋BOM，正規化 hash 與 LF 版相同"
+# 合併痕跡在不在（外環判斷「已合併但 result 沒發布」的那次合併有沒有被回捲，用它取代 hash 相等）
+Assert ((Test-PsSuppMergePresent -NnPath $nnPath -Receipt $recv -Capabilities $cap) -and (Test-PsSuppMergePresent -NnPath $nnPath -ReceiptPath $rcGood -Capabilities $cap)) "合併痕跡：合併後機器參照與事實敘述都在 → present（收據物件／收據路徑兩種呼叫法皆可）"
+$nnTouched = Read-PsKnText -LiteralPath $nnPath
+Assert (Test-PsSuppMergePresent -NnText ($nnTouched + "`n- **INFERRED**：同 run 下一張 request 又追加的一條`n") -Receipt $recv -Capabilities $cap) "合併痕跡：檔案之後又被別張 request 合併過（hash 已不同）→ 內容仍在，present"
+Assert (-not (Test-PsSuppMergePresent -NnPath $nnPath -ReceiptPath (Join-Path $root 'no-such-receipt.md') -Capabilities $cap)) "合併痕跡：收據檔不在＝無法證明 → absent"
 # 還原
 Assert ((Restore-PsSuppBytes -LiteralPath $nnPath -Bytes $mg.BytesBefore) -and ((Get-PsKnFileHash -LiteralPath $nnPath) -ceq $mg.HashBefore)) "還原：BytesBefore 寫回 → hash 回到合併前"
+Assert (-not (Test-PsSuppMergePresent -NnPath $nnPath -Receipt $recv -Capabilities $cap)) "合併痕跡：合併被還原（回捲）→ absent，外環據此當成沒合併過、照常重派"
 $mgAgain = Merge-PsSuppReceipt -NnPath $nnPath -Receipt $recv -RequestId $rid1
 Assert ($mgAgain.HashAfter -ceq $mg.HashAfter) "還原後再合併 → 同一結果（合併只依原檔與收據）"
 $empty = @{ Facts = @(); Evidence = @() }
@@ -455,6 +461,23 @@ $accepted = @($acceptedRaw)
 $ids = @($accepted | ForEach-Object { $_.RequestId })
 $rejTxt = ($PsSuppIntakeRejected -join ';')
 Assert (($ids -contains $rid1) -and ($ids -notcontains $badId) -and ($ids -notcontains $fakeId) -and $rejTxt -match ([regex]::Escape($badId) + '\.json：ID_MISMATCH') -and $rejTxt -match ([regex]::Escape($fakeId) + '\.json：WORKKEY')) "intake：requestId 與檔名不符 → ID_MISMATCH；requestId 與 workKey 對不上 → WORKKEY；兩者都不進清單、合法的照常"
+# 單檔版的同一把尺（迷你圈圍籬拿它判斷「session 期間新增的 request 是不是別的行程正常提交的」）
+$schemaId = 'S-' + ('d' * 24) + '-g1'
+Write-Utf8 (Join-Path $dirs.Requests ($schemaId + '.json')) @((($raw1 -replace [regex]::Escape($rid1), $schemaId) -replace '("schemaVersion"\s*:\s*)1', '${1}2')) $false
+$vGood = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($rid1 + '.json')) -Capabilities $cap
+$vBadId = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($badId + '.json')) -Capabilities $cap
+$vFake = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($fakeId + '.json')) -Capabilities $cap
+$vSchema = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($schemaId + '.json')) -Capabilities $cap
+$vName = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests 'not-a-request.json') -Capabilities $cap
+Assert ($vGood.Ok -and $vGood.RequestId -ceq $rid1 -and $vGood.Generation -eq 1 -and (-not $vBadId.Ok) -and $vBadId.Reason -eq 'ID_MISMATCH' -and (-not $vFake.Ok) -and $vFake.Reason -eq 'WORKKEY' -and (-not $vSchema.Ok) -and $vSchema.Reason -eq 'SCHEMA' -and (-not $vName.Ok) -and $vName.Reason -eq 'NAME') "Test-PsSuppRequestFile：合格／ID_MISMATCH／WORKKEY／SCHEMA／檔名文法不符——intake 與圍籬共用"
+$resOk = Join-Path $dirs.Results ($rid1 + '.json')
+$vResGood = Test-PsSuppResultFile -LiteralPath $resOk
+$badRes = 'S-' + ('e' * 24) + '-g1'
+Write-Utf8 (Join-Path $dirs.Results ($badRes + '.json')) @('{"schemaVersion":1,"requestId":"' + $badRes + '","outcome":"DONE"}') $false
+$vResBad = Test-PsSuppResultFile -LiteralPath (Join-Path $dirs.Results ($badRes + '.json'))
+Assert ($vResGood.Ok -and (-not $vResBad.Ok) -and $vResBad.Reason -eq 'OUTCOME') "Test-PsSuppResultFile：合格 result 過、outcome 不在值域 → OUTCOME"
+Remove-Item -LiteralPath (Join-Path $dirs.Results ($badRes + '.json')) -Force
+Remove-Item -LiteralPath (Join-Path $dirs.Requests ($schemaId + '.json')) -Force
 Remove-Item -LiteralPath (Join-Path $dirs.Requests ($badId + '.json')) -Force
 Remove-Item -LiteralPath (Join-Path $dirs.Requests ($fakeId + '.json')) -Force
 $factsRev = @{ relatedObjects = @(@{ name = 'TWSQR_DEMO'; role = '被呼叫（由排程執行的反向關係）' }) }

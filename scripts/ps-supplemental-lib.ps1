@@ -188,9 +188,60 @@ function Read-PsSuppJsonFile {
     try { return ($t | ConvertFrom-Json -ErrorAction Stop) } catch { return $null }
 }
 
+# 單一 request 檔的 intake 驗證（Get-PsSuppRequests 與迷你圈圍籬共用的同一把尺）：
+# 檔名文法 ^S-<24hex>-g<n>.json$；可解析成 JSON；body requestId＝檔名且合文法；schemaVersion；
+# domain 是單一目錄名且非保留名；generation ≥1；-Capabilities 有給時再依能力目錄重驗 need、重算 workKey
+# （須與 body 的 workKey 及 requestId 前 24 hex 一致）。回 @{ Ok; Reason; Obj; RequestId; WorkKey; Generation; Domain }；
+# Reason ∈ NAME／NOT_JSON／ID_MISMATCH／SCHEMA／DOMAIN／GENERATION／NEED／WORKKEY。
+function Test-PsSuppRequestFile {
+    param([string]$LiteralPath, $Capabilities = $null)
+    $r = @{ Ok = $false; Reason = ''; Obj = $null; RequestId = ''; WorkKey = ''; Generation = 0; Domain = '' }
+    $name = [System.IO.Path]::GetFileName($LiteralPath)
+    if ($name -notmatch '^S-[0-9a-f]{24}-g\d+\.json$') { $r.Reason = 'NAME'; return $r }
+    $o = Read-PsSuppJsonFile -LiteralPath $LiteralPath
+    if ($null -eq $o) { $r.Reason = 'NOT_JSON'; return $r }
+    $r.Obj = $o
+    $base = $name.Substring(0, $name.Length - 5)
+    $rid = [string]$o.requestId
+    $dom = [string]$o.domain
+    $gen = 0
+    if ($rid -notmatch $script:PsSuppRequestIdRx -or $rid -cne $base) { $r.Reason = 'ID_MISMATCH'; return $r }
+    if ([string]$o.schemaVersion -ne '1') { $r.Reason = 'SCHEMA'; return $r }
+    if ($dom -eq '' -or $dom -match '[\\/]' -or $dom.Contains('..') -or ($script:PsKnReservedNames -contains $dom)) { $r.Reason = 'DOMAIN'; return $r }
+    if (-not [int]::TryParse([string]$o.generation, [ref]$gen) -or $gen -lt 1) { $r.Reason = 'GENERATION'; return $r }
+    if ($null -ne $Capabilities) {
+        $vn = Test-PsSuppNeed -Need (ConvertFrom-PsSuppNeedObject -Obj $o.need) -Capabilities $Capabilities
+        if (-not $vn.Ok) { $r.Reason = 'NEED'; return $r }
+        $wk = Get-PsSuppWorkKey -Need $vn.Need
+        if ($wk -cne [string]$o.workKey -or $rid.Substring(2, 24) -cne $wk.Substring(0, 24).ToLowerInvariant()) { $r.Reason = 'WORKKEY'; return $r }
+    }
+    $r.RequestId = $rid
+    $r.WorkKey = [string]$o.workKey
+    $r.Generation = $gen
+    $r.Domain = $dom
+    $r.Ok = $true
+    return $r
+}
+
+# 單一 result 檔的身分驗證（迷你圈圍籬用；result 的權威在 Publish-PsSuppResult 的 create-only）：
+# 檔名文法；可解析成 JSON；body requestId＝檔名；outcome 在值域。回 @{ Ok; Reason; Obj }。
+function Test-PsSuppResultFile {
+    param([string]$LiteralPath)
+    $r = @{ Ok = $false; Reason = ''; Obj = $null }
+    $name = [System.IO.Path]::GetFileName($LiteralPath)
+    if ($name -notmatch '^S-[0-9a-f]{24}-g\d+\.json$') { $r.Reason = 'NAME'; return $r }
+    $o = Read-PsSuppJsonFile -LiteralPath $LiteralPath
+    if ($null -eq $o) { $r.Reason = 'NOT_JSON'; return $r }
+    $r.Obj = $o
+    $base = $name.Substring(0, $name.Length - 5)
+    if ([string]$o.requestId -cne $base) { $r.Reason = 'ID_MISMATCH'; return $r }
+    if ($script:PsSuppOutcomes -notcontains [string]$o.outcome) { $r.Reason = 'OUTCOME'; return $r }
+    $r.Ok = $true
+    return $r
+}
+
 # 全部 request：@( @{ Path; RequestId; WorkKey; Generation; Domain; Obj } )，依 requestId Ordinal 排序。
-# Research 端 intake 驗證（每次讀取都做）：檔名＝body requestId＝文法；schemaVersion；domain 是單一目錄名且非保留名；
-# need 依能力目錄重驗；workKey 重算相符且與 requestId 前 24 hex 一致；generation ≥1。不符者不進清單，
+# Research 端 intake 驗證（每次讀取都做）＝Test-PsSuppRequestFile。不符者不進清單，
 # 記在 $script:PsSuppIntakeRejected（檔名：原因）供外環 log。-Capabilities 未給時自 Root 讀能力目錄；讀不到就略過 need 驗證。
 function Get-PsSuppRequests {
     param([string]$Root, $Capabilities = $null)
@@ -203,27 +254,9 @@ function Get-PsSuppRequests {
     $names = @($files | ForEach-Object { $_.Name })
     foreach ($n in (Sort-PsKnOrdinal -Items $names)) {
         $p = Join-Path $d.Requests $n
-        $o = Read-PsSuppJsonFile -LiteralPath $p
-        if ($null -eq $o) { $script:PsSuppIntakeRejected += ($n + '：NOT_JSON'); continue }
-        $base = $n.Substring(0, $n.Length - 5)
-        $rid = [string]$o.requestId
-        $dom = [string]$o.domain
-        $why = ''
-        $gen = 0
-        if ($rid -notmatch $script:PsSuppRequestIdRx -or $rid -cne $base) { $why = 'ID_MISMATCH' }
-        elseif ([string]$o.schemaVersion -ne '1') { $why = 'SCHEMA' }
-        elseif ($dom -eq '' -or $dom -match '[\\/]' -or $dom.Contains('..') -or ($script:PsKnReservedNames -contains $dom)) { $why = 'DOMAIN' }
-        elseif (-not [int]::TryParse([string]$o.generation, [ref]$gen) -or $gen -lt 1) { $why = 'GENERATION' }
-        elseif ($null -ne $Capabilities) {
-            $vn = Test-PsSuppNeed -Need (ConvertFrom-PsSuppNeedObject -Obj $o.need) -Capabilities $Capabilities
-            if (-not $vn.Ok) { $why = 'NEED' }
-            else {
-                $wk = Get-PsSuppWorkKey -Need $vn.Need
-                if ($wk -cne [string]$o.workKey -or $rid.Substring(2, 24) -cne $wk.Substring(0, 24).ToLowerInvariant()) { $why = 'WORKKEY' }
-            }
-        }
-        if ($why -ne '') { $script:PsSuppIntakeRejected += ($n + '：' + $why); continue }
-        $list += , (@{ Path = $p; RequestId = $rid; WorkKey = [string]$o.workKey; Generation = $gen; Domain = $dom; Obj = $o })
+        $v = Test-PsSuppRequestFile -LiteralPath $p -Capabilities $Capabilities
+        if (-not $v.Ok) { $script:PsSuppIntakeRejected += ($n + '：' + $v.Reason); continue }
+        $list += , (@{ Path = $p; RequestId = $v.RequestId; WorkKey = $v.WorkKey; Generation = $v.Generation; Domain = $v.Domain; Obj = $v.Obj })
     }
     return , $list
 }
@@ -857,6 +890,46 @@ function Merge-PsSuppReceipt {
     $res.Ok = $true
     $res.Reason = 'MERGED'
     return $res
+}
+
+# 合併痕跡還在不在（外環用來判斷「上一輪已合併但 result 沒發布」的那次合併有沒有被回捲）：
+# 把收據的每一條追加證據「機器參照」與每一條追加事實「敘述」拿去目標 NN 的文字裡做 Ordinal 子字串搜尋，
+# 全部都在＝內容還在（檔案可能又被同 run 的下一張 request 合併過而 hash 變了，但這次的東西沒掉）；
+# 少一條就當成沒合併過（例如 checklist 回滾把整個領域目錄 checkout 回去了），交給外環重派。
+# 表格節的敘述在合併時會以全形直線｜拆格再拼成一列，所以這裡同樣逐格比對；空白格與空敘述略過。
+# 收據沒有任何證據與事實（NOTHING_TO_MERGE）＝沒東西可回捲＝視為仍在。
+# NN 讀不到、收據檔不存在／給不出解析結果＝無法證明＝回 $false（外環照舊視為未合併）。
+function Test-PsSuppMergePresent {
+    param([string]$NnPath = '', $NnText = $null, $Receipt = $null, [string]$ReceiptPath = '', $Capabilities = $null)
+    # $NnText 不加 [string] 型別：5.1 的 [string]$x = $null 會變成空字串，分不出「沒給」與「空檔」
+    $text = $null
+    if ($null -ne $NnText -and ([string]$NnText) -ne '') { $text = [string]$NnText }
+    if ($null -eq $text) {
+        if ($NnPath -eq '' -or -not [System.IO.File]::Exists($NnPath)) { return $false }
+        $text = Read-PsKnText -LiteralPath $NnPath
+    }
+    if ($null -eq $text) { return $false }
+    $rc = $Receipt
+    if ($null -eq $rc) {
+        if ($ReceiptPath -eq '' -or -not [System.IO.File]::Exists($ReceiptPath)) { return $false }
+        $rc = Test-PsSuppReceipt -LiteralPath $ReceiptPath -Capabilities $Capabilities
+    }
+    if ($null -eq $rc) { return $false }
+    $tokens = @()
+    foreach ($e in @($rc.Evidence)) {
+        if ($null -eq $e) { continue }
+        $t = ([string]$e.Ref).Trim()
+        if ($t -ne '') { $tokens += $t }
+    }
+    foreach ($f in @($rc.Facts)) {
+        if ($null -eq $f) { continue }
+        foreach ($cell in (([string]$f.Text) -split '｜')) {
+            $t = $cell.Trim()
+            if ($t -ne '') { $tokens += $t }
+        }
+    }
+    foreach ($t in $tokens) { if ($text.IndexOf($t, [System.StringComparison]::Ordinal) -lt 0) { return $false } }
+    return $true
 }
 
 # 還原原 bytes：也走 tmp → Replace／Move（半路被殺不會留下 0 byte 的 NN）

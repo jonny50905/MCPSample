@@ -427,3 +427,17 @@ auto-all／auto-loop 三處改「先指派再 @()」，test-ps51-static 新增 B
 | 21／27／23／28／24／26 | worker 圍欄涵蓋整個 job 樹、worktree 相對前綴、websearch 等未關 | tools 補關 list／patch／websearch／skill／todowrite／lsp（1.18.29 沒有 codesearch／todoread）；read `*.ps-runtime/spec/*/attempts/*`、edit `*.ps-runtime/spec/*/attempts/*/fragment.md`，寬 pattern 移除 |
 | 22 | -RuntimeRoot 在 repo 外 worker 全 deny | 派真 worker 時 RuntimeRoot 必須＝`<Root>/.ps-runtime/spec`，否則 `9-07` |
 | 25 | 派工前不檢查容量 | 條目數＋7 > 150 直接拆分、不派 session |
+
+### 11.3 修正 diff 的第二輪（六鏡頭 find 與 refuter 全用 Opus；19 項提出、14 項確認 → 6 件事）
+
+| 件 | 發現 | 裁決／修法 |
+|---|---|---|
+| A | 已合併未發布的復原只認檔案 hash 沒動；同 run 兩張 request 打同一 NN → 第一張不發布、下次重派、雙重合併 | 同 run 同 NN 只合併一張；已合併 attempt 永不重派——`Test-PsSuppMergePresent`（收據的證據參照與事實敘述仍在 NN）成立就發布（hash 移動用現況 hash），不成立（被回捲）才重派 |
+| B | 圍欄把 session 期間別的行程合法建立的 request／result 當違規刪掉（`ps-spec -Plan`、`ps-supplemental -Submit` 不取 session slot） | requests／results 新增檔先過 `Test-PsSuppRequestFile`／`Test-PsSuppResultFile`（與 intake 共用）：合格留著不算違規、不合格刪；既有檔改寫／刪除仍還原；wiki 不變 |
+| C | Invoke-GitSnapshot 拿 git 印出的檔名比前綴，core.quotepath 讓中文路徑永遠比不中 → 快照靜默停止（blocker） | 逐候選路徑 `git diff --cached --name-only -- <path>` 判有無輸出，不解析檔名；情境 34 用中文目錄的真 git repo 回歸 |
+| D | `Get-PsSpProp` 改 `return ,` 後漏改 `Test-PsSpPack` 的管線呼叫：≥2 個 checklistRefs 的需求包一律 SPEC1-1-03（blocker） | 先指派再 foreach；pack-b 範例與測試加雙 checklistRefs；靜態守衛新增「comma-return 函式接管線」BLOCK |
+| E | 契約「第一行必須以 `## ` 開頭」對不上 read 真實輸出（`<content>` 後每行 `行號: ` 前綴；自 1.18.29 binary 核對） | 契約／orchestrator／test-scenarios 改成去掉前綴後的第一個內容行，且行號須等於 offset |
+| F | ENTITY.DETAIL 規劃只看 wiki 等級、gate 的 LiveGrades 混入 NN 等級 → 首次 -Gate 誤報 7-22 且無法消除 | LiveGrades 對 ENTITY.DETAIL 只採 WIKI 來源；情境 21 |
+| G | 掃除非合成名時把它原文寫進 HANDOFF | 改寫敘述；合成識別字守衛擴到 HANDOFF／docs/design／auto-loop 腳本與測試 |
+
+駁回 5 項不採（復原只讀最後一個 attempt 的 outcome、Evidence 附錄前綴規則、`/ps-supplement` 的 `｜` 禁令、worker 跨 attempt 圍欄 ×2）；其中 `/ps-supplement` 的分格例外順手補上。

@@ -1035,14 +1035,19 @@ function Invoke-GitSnapshot {
         }
         if ($paths.Count -eq 0) { return }
         & git -C $root add -- @paths 2>&1 | Out-Null
-        $staged = (& git -C $root diff --cached --name-only -- @paths 2>&1 | Out-String)
-        if ([string]::IsNullOrWhiteSpace($staged)) { return }
-        $stagedFiles = @($staged -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
-        $n = $stagedFiles.Count
         # commit 的 pathspec 只給「真的有 staged 變更」的那幾個路徑：目錄存在但 git 不認識任何檔（例如空的 supplemental/）
-        # 會讓 git commit 整個 pathspec 失敗、什麼都沒 commit
+        # 會讓 git commit 整個 pathspec 失敗、什麼都沒 commit。
+        # 判定方式＝逐個候選路徑各問 git 一次，**絕不解析 git 印出的檔名**：core.quotepath 會把非 ASCII 路徑
+        # 整條包成雙引號＋八進位跳脫（中文領域名永遠比不中），5.1 又以主控台編碼解碼 git 的 UTF-8 輸出。
         $commitPaths = @()
-        foreach ($cand in $paths) { foreach ($sf in $stagedFiles) { if ($sf.Trim().StartsWith($cand)) { if ($commitPaths -notcontains $cand) { $commitPaths += $cand }; break } } }
+        $n = 0
+        foreach ($cand in $paths) {
+            $one = (& git -C $root diff --cached --name-only -- $cand 2>&1 | Out-String)
+            if ([string]::IsNullOrWhiteSpace($one)) { continue }
+            $commitPaths += $cand
+            $oneLines = @($one -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
+            $n += $oneLines.Count
+        }
         if ($commitPaths.Count -eq 0) { return }
         $msg = "kb(auto): $Domain $Note"
         $out = (& git -C $root commit -m $msg -- @commitPaths 2>&1 | Out-String)
@@ -1697,6 +1702,10 @@ function Invoke-KnowledgePublish {
 }
 
 # ── 模型不准寫的目錄圍籬（迷你圈用）：session 前拍「檔名→bytes」快照，session 後新增的刪、改過的還原 ──
+# 例外只有一條：requests／results 這兩個目錄在 session 期間另有**合法的並行寫入者**（ps-supplemental.ps1 -New／-Submit、
+# ps-spec.ps1 -Plan 的 KnowledgeNeed；兩者都不持研究鎖，也不需要 session slot），所以新增檔先驗身分——
+# 驗得過＝別人正常提交的檔，留著且不算違規；驗不過＝模型偽造的垃圾，照舊刪掉並記違規。
+# wiki／既有檔（被改寫或被刪除）的規則不變：一律還原並記違規。
 function Get-SuppFenceSnapshot {
     param([string[]]$Dirs)
     $snap = @{}
@@ -1709,14 +1718,34 @@ function Get-SuppFenceSnapshot {
     return $snap
 }
 function Restore-SuppFence {
-    param($Snapshot, [string[]]$Dirs)
+    param($Snapshot, [string[]]$Dirs, [string]$RequestsDir = '', [string]$ResultsDir = '', $Capabilities = $null)
     $violations = @()
     foreach ($d in $Dirs) {
         if (-not (Test-Path -LiteralPath $d)) { continue }
+        $isReq = ($RequestsDir -ne '' -and ([string]$d) -ceq $RequestsDir)
+        $isRes = ($ResultsDir -ne '' -and ([string]$d) -ceq $ResultsDir)
         foreach ($f in @(Get-ChildItem -LiteralPath $d -File -Recurse -ErrorAction SilentlyContinue)) {
             if (-not $Snapshot.ContainsKey($f.FullName)) {
+                $keep = $false
+                $why = ''
+                if ($isReq) {
+                    $vq = Test-PsSuppRequestFile -LiteralPath $f.FullName -Capabilities $Capabilities
+                    $keep = $vq.Ok
+                    $why = [string]$vq.Reason
+                }
+                elseif ($isRes) {
+                    $vs = Test-PsSuppResultFile -LiteralPath $f.FullName
+                    $keep = $vs.Ok
+                    $why = [string]$vs.Reason
+                }
+                if ($keep) {
+                    Write-Log "補研究圍籬：$($f.Name) 是 session 期間別的行程正常提交的檔（身分驗得過）→ 留著，不算違規"
+                    continue
+                }
                 Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue
-                $violations += ('新增：' + $f.Name)
+                $tag = '新增：' + $f.Name
+                if ($why -ne '') { $tag = $tag + '（' + $why + '）' }
+                $violations += $tag
                 continue
             }
             $now = [System.IO.File]::ReadAllBytes($f.FullName)
@@ -1757,6 +1786,7 @@ if ($SupplementalOnly) {
     $domainOk = ((Test-Path -LiteralPath (Join-Path $dir '00-overview.md')) -and (Test-Path -LiteralPath (Join-Path $dir 'checklist.md')))
     $results = 0
     $handled = @{}
+    $mergedNn = @{}   # 本 run 已合併過的 NN 檔名（同一個 NN 一個 run 只合併一張 request，見下面的守衛）
     $round = Get-PsSuppChecklistRound -DomainDir $dir
     if ($round -lt 0) { $round = 0 }
     $suppReqDir = Join-Path $root 'docs/ps-research/supplemental/requests'
@@ -1778,18 +1808,31 @@ if ($SupplementalOnly) {
     foreach ($p in $pending) {
         $rid = $p.RequestId
         $need = $p.Request.need
-        # 上一輪已合併但 result 未發布（行程在合併後、發布前死亡）：outcome 自述 merged＋受影響檔 hash 仍＝hashAfter → 直接發布，不再派 session
+        # 上一輪已合併但 result 未發布（行程在合併後、發布前死亡、或同 run 的下一張 request 又動了同一個 NN）：
+        # outcome 自述 merged＋收據內容仍在目標 NN → 直接發布，不再派 session（已合併的 attempt 永遠不重派，否則會二次合併）。
+        # 判定用 Test-PsSuppMergePresent（內容比對）而不是 hash 相等：hash 一被別人改動就永遠對不上，那正是雙重合併的來源。
         $attPrev = Get-PsSuppAttempts -DomainDir $dir -RequestId $rid
         $lo = $attPrev.LastOutcome
         if ($null -ne $lo -and [bool]$lo.merged -and [string]$lo.terminal -ne '' -and [string]$lo.targetFile -ne '') {
-            $still = ([System.IO.File]::Exists((Join-Path $dir ([string]$lo.targetFile))) -and ((Get-PsKnFileHash -LiteralPath (Join-Path $dir ([string]$lo.targetFile))) -ceq [string]$lo.hashAfter))
-            if ($still) {
+            $nnPrev = Join-Path $dir ([string]$lo.targetFile)
+            $rcPrev = Join-Path (Get-PsSuppPartsDir -DomainDir $dir) ($rid + '.a' + $attPrev.LastN + '.md')
+            $rcPrevObj = $null
+            if ([System.IO.File]::Exists($rcPrev)) { $rcPrevObj = Test-PsSuppReceipt -LiteralPath $rcPrev -Capabilities $suppCap }
+            $present = $false
+            if ($null -ne $rcPrevObj) { $present = Test-PsSuppMergePresent -NnPath $nnPrev -Receipt $rcPrevObj -Capabilities $suppCap }
+            if ($present) {
                 $affPrev = @()
                 foreach ($a in @($lo.affected)) { if ($null -ne $a) { $affPrev += , (@{ file = [string]$a.file; hashBefore = [string]$a.hashBefore; hashAfter = [string]$a.hashAfter; sections = @($a.sections); evidenceRows = @($a.evidenceRows) }) } }
-                $handled[$rid] = @{ Request = $p.Request; Terminal = [string]$lo.terminal; Code = [string]$lo.code; Affected = $affPrev; Attempts = $attPrev.Count; TargetName = $p.TargetName; TargetFile = [string]$lo.targetFile }
+                $hashNowPrev = Get-PsKnFileHash -LiteralPath $nnPrev
+                if ($hashNowPrev -cne [string]$lo.hashAfter) {
+                    foreach ($a in $affPrev) { if ([string]$a.file -ceq [string]$lo.targetFile) { $a.hashAfter = $hashNowPrev } }
+                    Write-Log "補研究：$rid 合併後檔案又被改動，內容仍在，照發布"
+                }
+                $handled[$rid] = @{ Request = $p.Request; Terminal = [string]$lo.terminal; Code = [string]$lo.code; Affected = $affPrev; Attempts = $attPrev.Count; TargetName = $p.TargetName; TargetFile = [string]$lo.targetFile; Receipt = $rcPrevObj }
                 Write-Log "補研究：$rid 上一輪 a$($attPrev.LastN) 已合併但未發布 → 本 run 直接發布（不派 session）"
                 continue
             }
+            Write-Log "補研究：$rid 上一輪 a$($attPrev.LastN) 自述已合併，但收據內容已不在目標 NN（合併被回捲）→ 視為未合併，照常重派"
         }
         if (-not $domainOk) {
             $resX = New-PsSuppResult -Request $p.Request -Outcome 'OUT_OF_SCOPE' -Disposition 'NOT_IN_DOMAIN' -AuditRound $round -Affected @() -Attempts $p.Attempts
@@ -1817,6 +1860,11 @@ if ($SupplementalOnly) {
             Write-Log "補研究：$rid 目標尚無 NN → WAITING_RESEARCH（checklist D 列：$drTxt）"
             continue
         }
+        # 同一個 NN 一個 run 只合併一張 request：第二張的合併會讓第一張的 hashAfter 永遠對不上，
+        # 那張就發不出 result、下次又被重派＝同樣的事實被合併兩次。留到下次 run（仍 pending，不寫工單、不算 attempts）
+        $nnBusy = $false
+        foreach ($tf in $targetFiles) { if ($mergedNn.ContainsKey([string]$tf)) { $nnBusy = $true } }
+        if ($nnBusy) { Write-Log "補研究：同一 NN 本 run 已有合併，$rid 留到下次 run"; continue }
         if ($dispatched -ge $SupplementalPerRun) { Write-Log "補研究：$rid 留待下次（本 run 已派 $SupplementalPerRun 張）"; continue }
         $dispatched++
         $attemptNo = $p.Attempts + 1
@@ -1860,7 +1908,7 @@ if ($SupplementalOnly) {
                 Write-Log "補研究：$rid session 直接改寫了目標 NN $targetFileS——已還原 session 前內容（模型只准寫收據）"
             }
         }
-        $fence = Restore-SuppFence -Snapshot $fenceSnap -Dirs @($suppReqDir, $suppResDir, $wikiDirS)
+        $fence = Restore-SuppFence -Snapshot $fenceSnap -Dirs @($suppReqDir, $suppResDir, $wikiDirS) -RequestsDir $suppReqDir -ResultsDir $suppResDir -Capabilities $suppCap
         if ($fence.Count -gt 0) {
             $outcome.fenceViolations = @($fence)
             Write-Log "補研究：$rid session 動了不准寫的目錄（已還原／刪除 $($fence.Count) 檔）：$($fence -join '、')——本 attempt 不合格"
@@ -1903,6 +1951,7 @@ if ($SupplementalOnly) {
                     }
                     if ($lintOk) {
                         $outcome.merged = $true
+                        if ($mg.Changed) { $mergedNn[[string]$mf.TargetFiles[0]] = $true }
                         $affected += , (@{ file = $mf.TargetFiles[0]; hashBefore = $mg.HashBefore; hashAfter = $mg.HashAfter; sections = @($mg.Sections); evidenceRows = @($mg.EvidenceRows) })
                         if ($disp -eq 'RESEARCHED') {
                             $terminal = 'PARTIAL'
@@ -1931,14 +1980,26 @@ if ($SupplementalOnly) {
         $outcome.affected = @($affected)
         if ($affected.Count -gt 0) { $outcome.hashBefore = [string]$affected[0].hashBefore; $outcome.hashAfter = [string]$affected[0].hashAfter }
         $null = Write-PsSuppOutcome -DomainDir $dir -RequestId $rid -AttemptNo $attemptNo -Outcome $outcome
-        if ($terminal -ne '') { $handled[$rid] = @{ Request = $p.Request; Terminal = $terminal; Code = $code; Affected = $affected; Attempts = $attemptNo; TargetName = $targetName; TargetFile = $mf.TargetFiles[0] } }
+        if ($terminal -ne '') { $handled[$rid] = @{ Request = $p.Request; Terminal = $terminal; Code = $code; Affected = $affected; Attempts = $attemptNo; TargetName = $targetName; TargetFile = $mf.TargetFiles[0]; Receipt = $recv } }
     }
-    # safe point：發布本 run 合格的結果（受影響檔 hash 仍＝hashAfter 才發）
+    # safe point：發布本 run 合格的結果。受影響檔 hash 仍＝hashAfter 就直接發；
+    # hash 動了（同 run 的下一張 request 合併進同一個 NN、或別的行程改了檔）只要本次合併的內容還在就照發，
+    # 並把 affected 的 hashAfter 換成現值——不然那張 result 永遠發不出去、下一 run 重派＝同樣的事實合併兩次。
     foreach ($rid in @($handled.Keys)) {
         $h = $handled[$rid]
         $still = $true
-        foreach ($a in $h.Affected) { if ((Get-PsKnFileHash -LiteralPath (Join-Path $dir $a.file)) -cne $a.hashAfter) { $still = $false } }
-        if (-not $still) { Write-Log "補研究：$rid 受影響檔在發布前又被改動 → 本 run 不發 result（下次重驗）"; continue }
+        foreach ($a in $h.Affected) {
+            $af = Join-Path $dir $a.file
+            $hashNow = Get-PsKnFileHash -LiteralPath $af
+            if ($hashNow -ceq [string]$a.hashAfter) { continue }
+            if (Test-PsSuppMergePresent -NnPath $af -Receipt $h.Receipt -Capabilities $suppCap) {
+                $a.hashAfter = $hashNow
+                Write-Log "補研究：$rid 合併後檔案又被改動，內容仍在，照發布"
+                continue
+            }
+            $still = $false
+        }
+        if (-not $still) { Write-Log "補研究：$rid 受影響檔在發布前又被改動且合併內容已不在 → 本 run 不發 result（下次重驗）"; continue }
         $resH = New-PsSuppResult -Request $h.Request -Outcome $h.Terminal -Disposition $h.Code -AuditRound $round -Affected $h.Affected -Attempts $h.Attempts
         $pub = Publish-PsSuppResult -Root $root -Result $resH
         if (-not $pub.Ok) { Write-Log "補研究：$rid result 寫入失敗（$($pub.Reason)）——outcome 已記合併，下一 run 會直接重試發布"; continue }
