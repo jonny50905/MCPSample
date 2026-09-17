@@ -59,7 +59,7 @@ searchPolicy:
 namingSemantics:
   # 物件名前綴（與上方 customPrefixes 對應；此處記語意）
   prefixes:
-    TW_: 台灣在地化客製——強烈的客製訊號（判定仍以 objectOrigins 為準）
+    TW_: 客製物件全域前綴（與 customPrefixes 同義）——強烈的客製訊號；不含地區、語系或國別意義（判定仍以 objectOrigins 為準）
 
   # 代碼／縮寫（可能出現在物件名、欄位值、Translate 值、資料內容）
   codes:

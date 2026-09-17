@@ -984,10 +984,26 @@ if ($null -ne $gitCmd) {
 }
 else { Write-Host "  SKIP：PATH 沒有 git——Invoke-GitSnapshot 的中文領域回歸測試略過（公司機由人工 -GitCommit 實測）" }
 
-# 合成識別字守衛：新檔案裡出現的 TW_ 樣式物件名只能是合成集合（真實物件名永遠不進 repo）
+# 合成識別字守衛：新檔案裡出現的「客製前綴物件名」只能是合成集合（真實客製物件名永遠不進 repo）。
+# 前綴取自 customization-profile.yaml 的 customPrefixes（客製物件全域前綴，沒有地區或語系意義；profile 缺檔時退回 TW_）。
 # 合成集合＝一眼看得出是 fixture 的名字（單字母、字母＋序號、GOOD／BAD、DEMO_／NAV_ 前綴…）；
 # 真實物件名（形如 TW_<業務縮寫>_<業務縮寫>）永遠不在集合裡，寫進 repo 就會被這條擋下
-$synthOk = '^TW_(DEMO(_[A-Z0-9]*)?|X{1,3}|XYZ|[A-HIMNS]|F\d+|K\d+|NEW(OBJ|\d*)|OLD|STALE|OUT|ROOT2|NOWHERE\d*|NOPE|ANOTHER|MIL\d*|MILITARY_DATA|NAV\w*|GOOD|BAD)$'
+$customPrefixes = @()
+$profilePath = Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'
+if (Test-Path -LiteralPath $profilePath) {
+    $inList = $false
+    foreach ($pl in [System.IO.File]::ReadAllLines($profilePath, (New-Object System.Text.UTF8Encoding($false)))) {
+        if ($pl -match '^\s*customPrefixes:\s*$') { $inList = $true; continue }
+        if ($inList) {
+            if ($pl -match '^\s*-\s*([A-Za-z0-9_]+)\s*$') { $customPrefixes += $Matches[1]; continue }
+            if ($pl -match '^\s*(#|$)') { continue }
+            $inList = $false
+        }
+    }
+}
+if ($customPrefixes.Count -eq 0) { $customPrefixes = @('TW_') }
+$prefixAlt = (@($customPrefixes | ForEach-Object { [regex]::Escape($_) }) -join '|')
+$synthOk = '^(' + $prefixAlt + ')(DEMO(_[A-Z0-9]*)?|X{1,3}|XYZ|[A-HIMNS]|F\d+|K\d+|NEW(OBJ|\d*)|OLD|STALE|OUT|ROOT2|NOWHERE\d*|NOPE|ANOTHER|MIL\d*|MILITARY_DATA|NAV\w*|GOOD|BAD)$'
 $synthFiles = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Include 'ps-knowledge*.ps1', 'ps-supplemental*.ps1', 'ps-spec*.ps1', 'ps-session-lib.ps1', 'test-knowledge.ps1', 'test-supplemental.ps1', 'test-spec.ps1' -Recurse -File)
 $synthFiles += @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/peoplesoft/spec') -Include '*.md', '*.json' -Recurse -File)
 # 守衛範圍也涵蓋追蹤檔與決策 memo、外環腳本與本測試自己：掃除真實物件名時，不能又在這些檔裡原文寫一次
@@ -996,9 +1012,9 @@ if (Test-Path -LiteralPath $designDir) { $synthFiles += @(Get-ChildItem -Path (J
 foreach ($n in @('.opencode/peoplesoft/knowledge-retrieval-contract.md', '.opencode/peoplesoft/supplemental-contract.md', '.opencode/command/ps-supplement.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-worker.md', 'HANDOFF.md', 'scripts/ps-auto-loop.ps1', 'scripts/ps-auto-all.ps1', 'scripts/tests/test-auto-loop.ps1')) { $fp = Join-Path $repoRoot $n; if (Test-Path -LiteralPath $fp) { $synthFiles += (Get-Item -LiteralPath $fp) } }
 $synthBad = @()
 foreach ($sf in $synthFiles) {
-    foreach ($m in [regex]::Matches([System.IO.File]::ReadAllText($sf.FullName), '\bTW_[A-Z0-9_]+\b')) { if ($m.Value -notmatch $synthOk) { $synthBad += ($sf.Name + ':' + $m.Value) } }
+    foreach ($m in [regex]::Matches([System.IO.File]::ReadAllText($sf.FullName), ('\b(' + $prefixAlt + ')[A-Z0-9_]+\b'))) { if ($m.Value -notmatch $synthOk) { $synthBad += ($sf.Name + ':' + $m.Value) } }
 }
-Assert ($synthBad.Count -eq 0) "合成識別字守衛：新檔案的 TW_ 物件名全在合成集合（$(($synthBad | Select-Object -Unique) -join ','))"
+Assert ($synthBad.Count -eq 0) "合成識別字守衛：新檔案的客製前綴物件名全在合成集合（前綴取自 profile customPrefixes）（$(($synthBad | Select-Object -Unique) -join ','))"
 
 Remove-Item -Recurse -Force $dir
 Write-Host ""
