@@ -1,5 +1,5 @@
 ﻿# ps-agent-doc-lint.ps1 — 模型讀的檔只留規則（唯讀檢查）
-# 範圍：.opencode/agent、skills、command、peoplesoft/*.md（SOP／README／test-scenarios 除外）、report-templates。
+# 範圍：.opencode/agent、skills、command、peoplesoft/*.md（SOP／README／test-scenarios 除外）、report-templates、peoplesoft/spec/*.md。
 # 阻擋：issue 編號、日期、變更敘述詞（審查發現／已廢止／舊版／暫時解／追記／同日／根因未明）。
 #       這些是給人看的歷史，只能放 lessons/applied.md、SOP.md、HANDOFF.md、commit 訊息。
 # 警告：教訓編號 L<nn>（既有慣例，先只計數不擋）。
@@ -8,7 +8,7 @@
 param([string]$Root = (Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference = 'Stop'
 $globs = @('.opencode/agent/*.md', '.opencode/skills/*/SKILL.md', '.opencode/command/*.md',
-           '.opencode/peoplesoft/*.md', '.opencode/peoplesoft/report-templates/*.md')
+           '.opencode/peoplesoft/*.md', '.opencode/peoplesoft/report-templates/*.md', '.opencode/peoplesoft/spec/*.md')
 $exclude = @('SOP.md', 'README.md', 'test-scenarios.md')
 $block = @(
     @{ Kind = 'issue 編號'; Rx = '(?i)issue\s*#\d+' },

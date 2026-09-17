@@ -62,6 +62,14 @@ Mark every statement with its confidence:
 Do not present an INFERRED or DYNAMIC_RUNTIME statement as fact.
 Do not include claims that have no evidence ID.
 
+Source labels (closed set; knowledge-retrieval-contract.md §5):
+  wiki（已驗證）／wiki（人工審定）／NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）／
+  NN：…（AUDITED_ISSUES｜UNAUDITED｜PARTIAL，未經現查）／NN：…（索引過時）／本次現查.
+  A claim sourced only from an NN below AUDITED_CLEAN (and no verified wiki entry)
+  is either re-verified by delegation or labelled 未經現查 — never presented as fact.
+  Evidence references are copied verbatim from the NN appendix (full 36-char ChunkId / SQL).
+  End every answer with the fixed 「## 來源表」 (| 子問句 | 來源 | 等級 | 證據參照 | 現查 |).
+
 If the evidence is insufficient to answer part of the question, say which part
 and which flow skill should be run to fill the gap.
 

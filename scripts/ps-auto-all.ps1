@@ -63,7 +63,7 @@ function Get-QueuePreflightErrors {
         $key = $d.ToLowerInvariant()
         if ($seen.ContainsKey($key)) { $problems += "重複領域（trim/大小寫後）：$d"; continue }
         $seen[$key] = $true
-        if ($key -eq 'wiki') { $problems += "保留名（共用 Entity Wiki 目錄）：$d" }
+        if (@('wiki', 'knowledge', 'supplemental', 'spec') -contains $key) { $problems += "保留名（docs/ps-research 底下的共用目錄 wiki／knowledge／supplemental／spec）：$d" }
         if ($d -match '[<>:"/\\|?*&%^`]') { $problems += "含 path/cmd 不安全字元：$d" }
         if ($d.Contains('..')) { $problems += "含「..」：$d" }
         if ($d.StartsWith('-')) { $problems += "以「-」開頭（會被當參數旗標吃掉）：$d" }
@@ -87,7 +87,9 @@ function Get-QueuePreflightErrors {
 }
 
 # ── 環境自檢：缺任何依賴＝automation 不可信，直接 exit 2 ─────
-foreach ($dep in @($autoLoopPath, $lintPath, $gradLibPath)) {
+$knLibPath = Join-Path $PSScriptRoot "ps-knowledge-lib.ps1"
+$suppLibPath = Join-Path $PSScriptRoot "ps-supplemental-lib.ps1"
+foreach ($dep in @($autoLoopPath, $lintPath, $gradLibPath, $knLibPath, $suppLibPath, (Join-Path $PSScriptRoot "ps-session-lib.ps1"))) {
     if (-not (Test-Path -LiteralPath $dep)) {
         Write-BatchLog "SYSTEM ERROR：缺 $dep（人工搬運不完整？）"
         exit 2
@@ -96,6 +98,12 @@ foreach ($dep in @($autoLoopPath, $lintPath, $gradLibPath)) {
 . $gradLibPath
 if ($GraduationSchemaVersion -ne 2) {
     Write-BatchLog "SYSTEM ERROR：ps-graduation.ps1 版本不符（schemaVersion=$GraduationSchemaVersion）"
+    exit 2
+}
+. $knLibPath
+. $suppLibPath
+if ($PsKnowledgeLibVersion -ne 1 -or $PsSupplementalLibVersion -ne 1) {
+    Write-BatchLog "SYSTEM ERROR：共用 lib 版本不符（knowledge=$PsKnowledgeLibVersion supplemental=$PsSupplementalLibVersion）"
     exit 2
 }
 if (-not (Test-Path -LiteralPath $queuePath)) {
@@ -120,6 +128,17 @@ if ($pfErrors.Count -gt 0) {
     Write-BatchLog "SYSTEM ERROR：preflight $($pfErrors.Count) 項違規——整批不跑，修 research-domains.txt 後重來"
     exit 2
 }
+
+# ── 知識索引 preflight：STALE／MISSING 即重建（本機快取；失敗只記，不停批）─────
+try {
+    $kc = Test-PsKnowledgeIndex -Root $root -LogRoot $logRoot
+    if ($kc.State -ne 'CURRENT') {
+        $kr = Publish-PsKnowledgeIndex -Root $root -LogRoot $logRoot
+        Write-BatchLog "知識索引 $($kc.State) → 已重建（nn=$($kr.nn) wiki=$($kr.wiki) published=$($kr.published)）"
+    }
+    else { Write-BatchLog "知識索引 CURRENT" }
+}
+catch { Write-BatchLog "知識索引檢查例外（不停批）：$($_.Exception.Message)" }
 
 # ── 主迴圈（嚴格 sequential）─────────────────────────────────
 $batchStart = Get-Date
@@ -153,6 +172,26 @@ foreach ($d in $domains) {
     }
 
     $domainDir = Join-Path $researchRoot $d
+    # 補研究（收據判定之前）：有 pending 且 domain==D 的 request → 先跑迷你圈（預期 exit 4；
+    # 迷你圈改了 NN → 收據失效 → 下面照常 RUN → 稽核重驗 → 畢業）
+    $spPending = @()
+    try { $spPending = @(Get-PsSuppPending -Root $root -Domain $d -DomainDir $domainDir -MaxAttempts 2) } catch { $spPending = @() }
+    if ($spPending.Count -gt 0) {
+        Write-BatchLog "$tag 補研究 pending $($spPending.Count) 張 → 先跑迷你圈"
+        $argSp = '-NoProfile -File "{0}" -Domain "{1}" -Tier {2} -SupplementalOnly' -f $autoLoopPath, $d, $pass
+        if ($GitCommit) { $argSp += ' -GitCommit' }
+        if ($Model -ne '') { $argSp += ' -Model "{0}"' -f $Model }
+        $codeSp = $null
+        try {
+            $pSp = Start-Process -FilePath "powershell.exe" -ArgumentList $argSp -WorkingDirectory $root -NoNewWindow -PassThru -Wait
+            $codeSp = $pSp.ExitCode
+        }
+        catch { $codeSp = $null }
+        if ($codeSp -eq 4) { Write-BatchLog "$tag 補研究迷你圈完成（exit 4）——接著照常判收據" }
+        elseif ($codeSp -eq 1) { Write-BatchLog "$tag 補研究迷你圈 exit 1 → NEEDS_ATTENTION（不影響本領域研究）"; $counts.NEEDS_ATTENTION++ }
+        elseif ($codeSp -eq 3) { Write-BatchLog "$tag 補研究迷你圈 exit 3：互斥鎖被外部持有 → 停批"; $counts.MUTEX_BUSY++; $stopBatch = $true; $stopWhy = "互斥鎖被外部持有"; $counts.NOT_RUN++; continue }
+        else { Write-BatchLog "$tag 補研究迷你圈 exit=$(if ($null -eq $codeSp) {'（啟動失敗／崩潰）'} else {$codeSp}) → SYSTEM ERROR，停批"; $counts.SYSTEM_ERROR++; $stopBatch = $true; $stopWhy = "補研究迷你圈 system error（exit=$codeSp）：$d"; $counts.NOT_RUN++; continue }
+    }
     if (-not $Force) {
         $rc = Test-GraduationReceipt -DomainDir $domainDir -Domain $d `
             -LintScriptPath $lintPath -GateScriptPath $gradLibPath -RequiredTier $pass

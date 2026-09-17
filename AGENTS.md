@@ -6,7 +6,8 @@
   兩段式畢業、環境紀律、資安邊界）。
 - `.opencode/`：框架本體——skills（ps-*）、subagent 定義（agent/）、
   環境設定與協定（peoplesoft/）。架構總覽：`.opencode/peoplesoft/README.md`。
-- `scripts/`：確定性外環（lint／auto-loop／auto-all／收據／fs-doctor）。
+- `scripts/`：確定性外環（lint／auto-loop／auto-all／收據／fs-doctor／知識索引 ps-knowledge／
+  補研究 ps-supplemental／Spec 引擎 ps-spec；共用 lib：ps-knowledge-lib／ps-session-lib／ps-supplemental-lib／ps-spec-lib）。
 - `src/`：與本框架無關的舊有 .NET 範例，不維護、不在文件範圍。
 
 ## PeopleSoft 問題的處理方式
@@ -28,8 +29,11 @@
    閘門**——順序是你的責任：先派 subagent 而 DB 未連 → 它回 `NOT_CONNECTED`，你再 connect 一次、
    重派一次，只一次、不迴圈。工具清單裡沒有 oracleMCP_ 工具＝掛載故障 → 不猜工具名、不重派、
    不多 connect，回報 ORACLE_MCP_DOWN，交管理者依 SOP-21 重掛；重掛後重新 connect，不沿用舊結論。
-   第 0 步之後，問答一律**先查 `docs/ps-research/wiki/`**（已歸戶的已驗證知識），
-   wiki 沒有或未驗證才現場檢索。
+   第 0 步之後，問答一律**先查知識層**——`docs/ps-research/wiki/`（已歸戶的已驗證知識）與
+   `docs/ps-research/<領域>/NN-*.md`（已稽核的研究文件），照
+   `.opencode/peoplesoft/knowledge-retrieval-contract.md`：以 `docs/ps-research/knowledge/index.md`
+   定位（grep 用 `path=目錄`＋`include=檔名`）、只讀對應節、標來源等級、答覆附 `## 來源表`；
+   知識沒有或等級不足才現場檢索。
 2. 搜尋任何 PeopleSoft 物件前，先讀
    `.opencode/peoplesoft/customization-profile.yaml` 與 `business-domain-map.yaml`；
    `TW_` 是強客製訊號但非唯一判斷。**未命中已定義領域時，改用
@@ -78,8 +82,11 @@
   `ps-fs-doctor -Domain <領域>`（檢查 D 抓雙 BOM/FEFF 污染）。
 - 使用者受公司規範限制**無法提供真實檔名與機敏值**——以編號、
   類別、遮罩值溝通，不要追問原文。
-- 研究產出（docs/ps-research/**）是公司機密：只進**內部** git，
-  嚴禁外部 remote 或公開貼出。
+- 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
+  （.ps-runtime/**）是公司機密：研究產出只進**內部** git，後兩者連內部 git 都不進（已 gitignore，
+  知識索引 docs/ps-research/knowledge/ 同為本機快取），嚴禁外部 remote 或公開貼出；
+  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
+  不回報路徑、物件名、hash、requestId。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。
 - `.opencode/plugin/*.js` 是 OpenCode 執行期的無狀態 guard 與診斷（connect 目標比對、task 目標

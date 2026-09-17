@@ -478,15 +478,23 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   4. [次要] `reviewed: true` 的檔只被追加、未被改寫；事實變更走
      Invalidated 節（作廢不刪除）
 
-### I2 問答 wiki-first 與來源標註
-- **輸入**：問一個 wiki 已有 `verified` 資料的問題（如 E1 同題）
+### I2 問答知識層（wiki＋NN）讀取與來源標註
+- **輸入**：問一個 wiki 已有 `verified` 資料、且該物件有 AUDITED_CLEAN NN 的問題（如 E1 同題）；
+  先跑 `scripts\ps-knowledge.ps1 -Rebuild`
 - **檢查點**：
-  1. [主要] transcript 顯示先讀 `wiki/index.md` 並開啟命中的 entity 檔，
-     未從零重新檢索
-  2. [主要] 回答對每項結論標註來源（wiki（已驗證）／本次現查）
-  3. [致命] `draft` / `stale` 內容沒有被當成已驗證事實直接引用
-     （有現查確認或如實標註）
-  4. [次要] wiki 查無時，回答末尾建議對該領域跑 /ps-research 歸戶
+  1. [主要] transcript 顯示先以 grep 定位 `docs/ps-research/knowledge/index.md`
+     （呼叫形狀：path=docs/ps-research/knowledge、include=index.md、pattern 含 `\| <物件名> \|`），
+     再開啟命中的 wiki 檔與 NN 節，未從零重新檢索
+  2. [致命] grep 呼叫形狀符合契約：沒有對單一檔案路徑下 grep、沒有整檔 read NN
+     （read 帶 offset／limit，回來的第一行是該節 `## ` 標題）
+  3. [主要] 回答對每項結論標註契約第 5 節的封閉來源標籤；結尾有 `## 來源表`，每列以 regex 驗：
+     `^\| .+ \| .+ \| (AUDITED_CLEAN|AUDITED_ISSUES|UNAUDITED|PARTIAL|BLOCKED|wiki verified|wiki draft|wiki stale|索引過時|現查) \| .+ \| (是|否) \|$`
+     且等級不在 {AUDITED_CLEAN, wiki verified} 的列現查＝是
+  4. [致命] `draft`／`stale` 與 NN 等級非 AUDITED_CLEAN 的內容沒有被當成已驗證事實直接引用
+     （來源表該列現查＝是，或如實標「未經現查」）
+  5. [次要] 索引不存在時答覆註明「知識索引未建」並仍能以一次直接 grep 兜底
+  6. [次要] 知識查無且物件已有 NN 時，回答末尾印出 `ps-supplemental.ps1 -New …` 指令；
+     領域無研究才建議 /ps-research；回報維護端只給 PASS／FAIL 與結論碼
 
 ## J 類：auto-loop 外環畢業門（確定性——不需模型，fixture 模擬即可測）
 
@@ -629,6 +637,16 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
 
 ---
 
+### J7 知識索引／補研究／Spec 外環（issue #33～#36；沙箱測試組即驗，公司機只回報結論碼）
+- **輸入**：`scripts\tests\test-knowledge.ps1`、`test-supplemental.ps1`、`test-spec.ps1`、`test-ps51-static.ps1`、`test-auto-loop.ps1`（情境 34）
+- **檢查點**：
+  1. [致命] 五個測試組全部印「全部情境 PASS」（公司機用 `powershell -NoProfile -ExecutionPolicy Bypass -File …`）
+  2. [致命] 索引重建確定性：連跑兩次 `ps-knowledge.ps1 -Rebuild` 後 `-Check` 回 CURRENT（結論碼 KNOW1-2-01）
+  3. [致命] 補研究 request 同 need 重提交回 PENDING、不建第二個檔（SUPP1-1-02）；結果 create-only（重跑迷你圈不覆寫）
+  4. [主要] `ps-auto-loop -SupplementalOnly` 在沒有 pending 時 exit 4 且結論碼 SUPP1-3-02；有 pending 且目標無 NN 時 checklist 多一列 D 列、不派 session
+  5. [主要] Spec：`-Render` 連跑兩次 spec.md 位元組相同；改動來源 NN 後 `-Render` 回 SOURCE_CHANGED 類結論碼且 current.json 不變
+  6. [次要] 結論碼一律符合 `^(KNOW|SUPP|SPEC)1-\d-\d\d(-\d+)?$`，不含路徑／檔名／物件名／hash
+
 ## 5. 快速健檢子集（Smoke Set）
 
 時間有限時先跑這 9 題：**A1、A3、A5、B2、B4、C1、D1、E1、F2**。
@@ -690,3 +708,25 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | R40 | 受控自動重掛 | 只在 SOP-21 步驟 6 驗證通過後 `oracle.mcpAutoRecover: on`，再重現 R38 | `_mcp-diag.jsonl`：remount-start → remount-ok（gen=1）→ verified-by-call；下一題第一個 oracleMCP 回覆附「已重掛（恢復世代 1）…重新 connect…SELECT 1 FROM DUAL」註記，主 agent 照做；多個 agent 同時報錯只一次（merged）；remount-failed／suppressed 出現＝停止，走 R39；另一視窗沒有 recovery 列 |
 | R41 | 權限過濾不重掛 | 誘導主 agent（tools 表 sql_run false）呼叫 oracleMCP_sql_run | session jsonl invalid 列 `allowedByAgent=false`、note 含 permission-filtered；`_mcp-diag.jsonl` 沒有 recovery 候選；模型改派 subagent |
 | R42 | Topology 實驗 | SOP-21 步驟 8(e)／原 T1～T3：兩個 opencode 行程（A 已 connect，B 用 build agent 不 connect 直接 sql_run `SELECT SYS_CONTEXT('USERENV','DB_NAME') FROM DUAL`）；同一行程 /new 第二個 session；記 oracleMCP type、同名再 connect 的回覆、B 換連線名後 A 查到的 DB_NAME | 三組結果回報維護 session、寫回 SOP-12——共用連線防護依結果另案設計 |
+
+### 7b. 知識索引／補研究／Spec（issue #33～#36；公司機手動，只回報 PASS／FAIL、結論碼、enum）
+
+| # | 情境 | 操作 | 預期訊號（回報只給右欄的碼與 enum） |
+|---|---|---|---|
+| K1 | 索引建置 | `ps-knowledge.ps1 -Rebuild` 再 `-Check` | 第一次 KNOW1-1-01；`-Check` KNOW1-2-01（CURRENT）；`docs\ps-research\knowledge\index.md` 存在且 `git status` 看不到它 |
+| K2 | 索引過時 | 手動改任一 NN 一個字後 `-Check` | KNOW1-2-02-1（STALE，變動檔數 1）；`auto-loop-logs\knowledge-doctor.txt` 有檔名；`-Rebuild` 後回 CURRENT |
+| K3 | 問答用索引 | I2 同題 | transcript 的 grep 呼叫 path=docs/ps-research/knowledge、include=index.md；read 帶 offset／limit；答覆有 `## 來源表`；等級 enum 只出現契約值 |
+| K4 | 稽核後未改 | 跑過一輪稽核（auto-loop audit 相位）後 `-Rebuild` | 領域目錄出現 `audit-done.json`（進內部 git）；index.md 該領域 NN 等級 AUDITED_CLEAN／AUDITED_ISSUES（不再 UNAUDITED） |
+| S1 | 提交補研究 | `ps-supplemental.ps1 -New -Target COMPONENT:<已研究物件> -FactKind DATA.FLOW -Properties reads` | SUPP1-1-01；再提交同 need → SUPP1-1-02；`-Status` → SUPP1-2-01-<n> 且該列 PENDING |
+| S2 | 迷你圈 | `ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly -GitCommit` | exit 4；log 有「補研究：<id> attempt a1 工單已寫」與 SESSION(supp-a1)；結束 SUPP1-3-01-<n>；`-Result` → SUPP1-4-01-1（RESEARCHED） |
+| S3 | 合併形狀 | 看 S2 目標 NN | 只追加：附錄新列編號承接、事實在對應節末、無 `[[` 新增於相關物件列；`ps-doc-lint -CoverageOnly` 缺料違規不增加 |
+| S4 | 目標無 NN | `-New -Target COMPONENT:<領域內尚未研究的物件> … -DomainHint <領域>` 後跑迷你圈 | 不派 session；checklist 多一列 `D<輪次>-<序> 新發現 …：補研究 <id>（稽核）`；`-Status` 該列 WAITING_RESEARCH；D 項治理不刪它 |
+| S5 | 收據不合格 | 故意在收據寫 `[[X]]`（沙箱已驗；公司機看 outcome） | outcome.json receiptValid=false、receiptErrors 列出原因；attempts+1；兩次後 `-Result` → UNRESOLVED／WORKER_FAILED |
+| S6 | slot 互斥 | 迷你圈與另一個 ps-spec -Run 同時啟動 | 後到者 log「session slot 被占用」並在等待上限後撤回工單、不消耗 attempts |
+| P1 | 需求包驗證 | 複製 examples/pack-a 為 `.ps-private\spec\demo\`，`ps-spec.ps1 -ValidatePack -Pack demo` | SPEC1-1-01；改壞一個 checklist id 未被引用 → SPEC1-1-xx（≠01）；`git status` 看不到 `.ps-private` |
+| P2 | 規劃 | `-Plan -JobId demo1 -Component <已研究 Component> -Pack demo` | SPEC1-2-01；`.ps-runtime\spec\demo1\plans\<hash>\plan.json` 存在；缺事實時 `supplemental\requests\` 多出 consumer=SPEC 的 request |
+| P3 | 執行與驗收 | `-Run` | 每個 unit 一個 SESSION(spec-…)；不合格 fragment 不計 receipt；來源 NN 中途被改 → 該 unit 拒收且 attempts 不增；WAITING_* 時 exit 0 |
+| P4 | 產出 | `-Render` 兩次、`-Gate` | 兩次 spec.md 位元組相同；gate verdict ∈ SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED；改 NN 後 `-Render` → SOURCE_CHANGED 類碼、current.json 不變 |
+| P5 | generic 完整性 | 改 `scripts\ps-spec-lib.ps1` 一個字後 `-Doctor -JobId demo1` | SPEC1-0-01；還原後回 SPEC1-0-xx OK |
+| P6 | 機密邊界 | 任何回報 | 只回報結論碼與 drill tuple（opaque id、factKind、模式、計數、enum）；不貼 spec.md、不貼 pack.json、不貼 NN 內容 |
+

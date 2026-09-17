@@ -2,6 +2,7 @@
 # 設計：確定性外環（本腳本）＋模型內步（opencode run 新鮮 session）＋確定性驗收（lint／checklist 解析）
 # 用法：.\scripts\ps-auto-loop.ps1 -Domain 轉職
 #       .\scripts\ps-auto-loop.ps1 -Domain 轉職 -MaxCycles 12 -Model "provider/model-id"
+#       .\scripts\ps-auto-loop.ps1 -Domain 轉職 -SupplementalOnly       # 只處理補研究 request（迷你圈；exit 4）
 #
 # opencode headless 事實（v1.17.15 原始碼確認）：
 #   - run 訊息裡的 "/指令" 不展開（slash 只在互動編輯器）——用 --command <名> 帶入，
@@ -79,7 +80,11 @@ param(
     [switch]$Preflight,            # 只檢查環境／相位／lint／收據並列印，不啟動 session、不取鎖
     # 每圈結束 commit 一次該領域目錄（L83）：session 崩在半路是這個系統的
     # 常態故障，有還原點才敢讓它無人看管。**只 commit、永不 push**。
-    [switch]$GitCommit
+    [switch]$GitCommit,
+    # 補研究迷你圈（-SupplementalOnly）：獨立 run，主迴圈一行不動；每 run 最多處理幾張工單；逾時 0＝沿用 ResearchTimeoutMin
+    [switch]$SupplementalOnly,
+    [int]$SupplementalPerRun = 2,
+    [int]$SupplementalTimeoutMin = 0
 )
 
 # ── 參數消毒（L28）：尾部空白/點＝Win32 假缺檔陷阱；隱形字元直接拒跑 ──
@@ -136,6 +141,16 @@ if (-not (Test-Path -LiteralPath $gradLibPath)) {
 . $gradLibPath
 if ($GraduationSchemaVersion -ne 2) {
     Write-Error "ps-graduation.ps1 版本不符（schemaVersion=$GraduationSchemaVersion，本腳本要求 2）——人工搬運不完整？"; exit 2
+}
+
+# ── 共用 lib（知識索引／session 啟動／補研究）——缺檔或版本不符同樣在取鎖前快炸
+foreach ($libName in @('ps-knowledge-lib.ps1', 'ps-session-lib.ps1', 'ps-supplemental-lib.ps1')) {
+    $libPath = Join-Path $PSScriptRoot $libName
+    if (-not (Test-Path -LiteralPath $libPath)) { Write-Error "缺 scripts/$libName（人工搬運不完整？）"; exit 2 }
+    . $libPath
+}
+if ($PsKnowledgeLibVersion -ne 1 -or $PsSessionLibVersion -ne 1 -or $PsSupplementalLibVersion -ne 1) {
+    Write-Error "共用 lib 版本不符（knowledge=$PsKnowledgeLibVersion session=$PsSessionLibVersion supplemental=$PsSupplementalLibVersion）——人工搬運不完整？"; exit 2
 }
 
 function Write-Log([string]$msg) {
@@ -865,121 +880,18 @@ function Get-SessionFailureKind {
 }
 
 # ── 開一個新鮮 opencode session（逾時整樹強殺）────────────
+# 實作在 scripts/ps-session-lib.ps1（Invoke-PsOcSession：cmd.exe shim、rc 檔真實結束碼、.Handle 快取、心跳與沉默判讀、
+# taskkill 整樹強殺、容量事件標籤、session slot 互斥鎖）；本函式只是薄包裝——呼叫點與回傳形狀不變。
 # $ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'
-# 注意：prompt 走 cmd.exe 命令列——內容禁用半形雙引號與 cmd 特殊字元
-# （> < & | % ^），中文引號「」不受限；多行內容一律壓成單行。
+# 注意：prompt 走 cmd.exe 命令列——內容禁用半形雙引號與 cmd 特殊字元（> < & | % ^），中文引號「」不受限；多行內容一律壓成單行。
+# session slot：同機同時只跑一個 headless session（ps-spec／補研究迷你圈取同一把鎖）；等不到 slot（最多等 TimeoutMin 分）
+# ＝視同逾時（TimedOut=$true、FailureKind=SLOT_BUSY），沿用既有的逾時熔絲。
 function Invoke-Opencode {
     param([string]$ExtraArgs, [string]$PromptText, [int]$TimeoutMin, [string]$Tag)
-    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $outFile = Join-Path $logRoot ("{0}-{1}.out.txt" -f $stamp, $Tag)
-    $errFile = Join-Path $logRoot ("{0}-{1}.err.txt" -f $stamp, $Tag)
-    # 結束碼落檔（L49）：**不相信 Process 物件的 .ExitCode**——PowerShell 的
-    # -PassThru 物件在只用 WaitForExit(ms) 等待時 .ExitCode 常為 $null，而
-    # $null -eq 0 為 false ＝ 每個正常 session 都被判成錯誤（假的「連續 2 次
-    # session 錯誤」停機、SESSION_OK 恆假＝永不畢業）。改讓 cmd 把 ERRORLEVEL
-    # 寫進檔案——同框架哲學：**要可觀測的事實，不要 API 承諾**。
-    $rcFile = Join-Path $logRoot ("{0}-{1}.rc.txt" -f $stamp, $Tag)
-    $inner = '"' + $ocPath + '" run '
-    if ($Model -ne "") { $inner += '--model "' + $Model + '" ' }
-    if ($ExtraArgs -ne "") { $inner += $ExtraArgs + ' ' }
-    $inner += '--title "auto-' + $Tag + '" '
-    $inner += '"' + $PromptText + '" 1> "' + $outFile + '" 2> "' + $errFile + '"'
-    # %^ERRORLEVEL% ＋ call：延後展開，取得的才是 opencode 的真實結束碼
-    $inner += ' & call echo %^ERRORLEVEL% > "' + $rcFile + '"'
-    Write-Log "SESSION($Tag) 啟動：$ExtraArgs ｜ $PromptText"
-    $p = Start-Process -FilePath "cmd.exe" -ArgumentList ('/d /s /c "' + $inner + '"') `
-        -WorkingDirectory $root -NoNewWindow -PassThru
-    # L49：**必須先取用 .Handle** 把行程 handle 快取住，否則 -PassThru 物件在
-    # 只用 WaitForExit(ms) 等待時，.ExitCode 會是 $null（PowerShell 已知行為）
-    # ——而 $null -eq 0 為 false，等於「每個正常結束的 session 都被判成錯誤」，
-    # 導致假的「連續 2 次 session 錯誤」停機，且 SESSION_OK 永遠假＝永不畢業。
-    try { $null = $p.Handle } catch { }
-    # 心跳（L46 附帶）：session 期間 opencode 輸出全被重導到檔案，console 會
-    # 完全安靜——每 5 分鐘印一行「還活著＋已耗時」，同時累積真實耗時數據
-    # 供調整 timeout（逾時是熔絲不是效能參數，要照實測值設）
-    $sessStart = Get-Date
-    $lastBeat = $sessStart
-    $done = $false
-    while (((Get-Date) - $sessStart).TotalMinutes -lt $TimeoutMin) {
-        if ($p.WaitForExit(30000)) { $done = $true; break }
-        if (((Get-Date) - $lastBeat).TotalMinutes -ge 5) {
-            $mins = [int]((Get-Date) - $sessStart).TotalMinutes
-            # 沉默停滯偵測（確定性、只警告不強殺）：輸出檔多久沒長大——
-            # 「持續吐字」＝模型在生成；「久無新輸出」＝多半卡在工具呼叫
-            # （實案：auditor 逐檔委派後靜止 30 分，疑 oracleMCP 通道死）
-            $lastOut = $sessStart
-            foreach ($lf in @($outFile, $errFile)) {
-                if (Test-Path -LiteralPath $lf) {
-                    $wt = (Get-Item -LiteralPath $lf).LastWriteTime
-                    if ($wt -gt $lastOut) { $lastOut = $wt }
-                }
-            }
-            $silent = [int]((Get-Date) - $lastOut).TotalMinutes
-            # 門檻照**實測基線**設（L48）：委派期間 subagent 輸出不流到父行程
-            # stderr，實測健康的 audit 沉默可達 30 分（總計 35 分完成）——
-            # 門檻設 10 分會每次都叫，把真訊號淹掉。20 分才提、且措辭中性
-            $note = if ($silent -ge 20) { "；輸出已靜止 $silent 分（委派期間長時間無輸出屬常態，實測健康可達 30 分；接近逾時上限仍無輸出才需依 SOP-12 查 oracleMCP 通道）" } else { "" }
-            Write-Log "SESSION($Tag) 進行中…已 $mins 分（逾時上限 $TimeoutMin 分）$note"
-            $lastBeat = Get-Date
-        }
-    }
-    if (-not $done) { $done = $p.WaitForExit(1000) }
-    if ($done) {
-        # 無參數版：確保行程狀態與 ExitCode 完全就緒（配合上方 .Handle 快取）
-        try { $p.WaitForExit() } catch { }
-        try { $p.Refresh() } catch { }
-    }
-    if (-not $done) {
-        & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
-        # 強殺當下就下判讀（L59）：使用者事後翻心跳行才能拼出「卡死 vs 跑得久」，
-        # 而那兩種的處置完全相反——一個要查通道、一個要調上限。輸出檔的
-        # mtime 是現成的可觀測事實，判讀寫在強殺那一行，不必事後考古。
-        $killSilent = -1
-        $lastOutK = $sessStart
-        foreach ($lf in @($outFile, $errFile)) {
-            if (Test-Path -LiteralPath $lf) {
-                $wt = (Get-Item -LiteralPath $lf).LastWriteTime
-                if ($wt -gt $lastOutK) { $lastOutK = $wt }
-            }
-        }
-        $killSilent = [int]((Get-Date) - $lastOutK).TotalMinutes
-        Write-Log "SESSION($Tag) 逾時 $TimeoutMin 分，已整樹強制結束（狀態在檔案，無損）"
-        if ($killSilent -le 5) {
-            Write-Log "SESSION($Tag) 判讀：強殺當下輸出仍在增加（靜止僅 $killSilent 分）＝**上限太短，不是卡死**——把 -$(if ($Tag -eq 'audit') { 'AuditTimeoutMin' } else { 'ResearchTimeoutMin' }) 調高後重跑，不要去查 MCP 通道"
-        }
-        elseif ($killSilent -ge 20) {
-            Write-Log "SESSION($Tag) 判讀：輸出已靜止 $killSilent 分才被強殺＝**疑似卡在工具呼叫**——依 SOP-12 查 oracleMCP／模型服務通道，調高上限沒有用"
-        }
-        else {
-            Write-Log "SESSION($Tag) 判讀：強殺當下靜止 $killSilent 分（介於兩者之間）——先看 out 檔尾端停在哪個步驟再決定調上限或查通道"
-        }
-        $fkT = Get-SessionFailureKind -OutFile $outFile -ErrFile $errFile
-        if ($fkT -ne 'NONE') { Write-Log "SESSION($Tag) 容量事件：$fkT（out/err 含 context 溢出字樣）——逾時前已撞 context 上限，調時間無用；見 SOP-10 校正宣告 limit 與 L106" }
-        return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fkT }
-    }
-    # 優先讀落檔的結束碼（可觀測事實），讀不到才退回 Process 物件
-    $code = $null
-    if (Test-Path -LiteralPath $rcFile) {
-        $rcTxt = (Get-Content -LiteralPath $rcFile -Raw -ErrorAction SilentlyContinue)
-        if ($rcTxt) {
-            $rcTxt = $rcTxt.Trim()
-            $parsed = 0
-            if ([int]::TryParse($rcTxt, [ref]$parsed)) { $code = $parsed }
-        }
-    }
-    if ($null -eq $code) {
-        try { $code = $p.ExitCode } catch { $code = $null }
-    }
-    if ($null -eq $code) {
-        # 仍讀不到＝環境層面拿不到結束碼；**視為 0（正常）並大聲記錄**——
-        # 反向（視為錯誤）已實證會把健康的 run 誤停（L49）
-        Write-Log "SESSION($Tag) 警告：ExitCode 讀不到，視為 0（正常結束）——若後續行為異常請回報此行"
-        $code = 0
-    }
-    Write-Log "SESSION($Tag) 結束 exit=$code 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
-    $fk = Get-SessionFailureKind -OutFile $outFile -ErrFile $errFile
-    if ($fk -ne 'NONE') { Write-Log "SESSION($Tag) 容量事件：$fk（out/err 含 context 溢出字樣；exit=$code 不代表沒事——子代理溢出多半 exit 0）——無此字樣≠無溢出；處置見 SOP-10／L106，不要只調 timeout" }
-    return @{ TimedOut = $false; ExitCode = $code; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fk }
+    $tpn = 'ResearchTimeoutMin'
+    if ($Tag -like 'audit*') { $tpn = 'AuditTimeoutMin' }
+    return (Invoke-PsOcSession -OcPath $ocPath -Root $root -LogRoot $logRoot -Model $Model -ExtraArgs $ExtraArgs `
+        -PromptText $PromptText -TimeoutMin $TimeoutMin -Tag $Tag -Log ${function:Write-Log} -SlotWaitMin $TimeoutMin -TimeoutParamName $tpn)
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
@@ -1083,6 +995,14 @@ if ($Preflight) {
     Write-Host "手術節流  ：一批 $SurgeryBatchSize 筆 × 一圈 $MaxSurgeryPerCycle 批＝本圈最多 $($SurgeryBatchSize * $MaxSurgeryPerCycle) 筆"
     Write-Host "git 快照  ：$(if ($GitCommit) { '開（每圈 commit 該領域目錄，永不 push）' } else { '關（加 -GitCommit 開啟）' })"
     Write-Host "log 位置  ：$logRoot"
+    try {
+        $spPend = Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir
+        $spWait = @($spPend | Where-Object { (Find-PsSuppTargetNn -DomainDir $dir -TargetName $_.TargetName).Count -eq 0 }).Count
+        Write-Host "補研究待處理：$($spPend.Count) 張（其中 $spWait 張目標尚無 NN＝等研究相位建檔）——執行：-SupplementalOnly"
+    }
+    catch { Write-Host "補研究待處理：（讀取失敗：$($_.Exception.Message)）" }
+    $kc = Test-PsKnowledgeIndex -Root $root -LogRoot (Join-Path $root 'auto-loop-logs')
+    Write-Host "知識索引  ：$($kc.State)（safe point 會自動重建；手動：scripts\ps-knowledge.ps1 -Rebuild）"
     Write-Host "=== 檢查結束（未啟動任何 session）===" -ForegroundColor Cyan
     exit 0
 }
@@ -1097,14 +1017,19 @@ function Invoke-GitSnapshot {
     param([string]$Note)
     if (-not $GitCommit) { return }
     try {
-        $rel = "docs/ps-research/$Domain"
-        $relWiki = "docs/ps-research/wiki"
-        & git -C $root add -- $rel $relWiki 2>&1 | Out-Null
-        $staged = (& git -C $root diff --cached --name-only -- $rel $relWiki 2>&1 | Out-String)
+        # 快照範圍三處一致：領域目錄、共用 wiki、補研究 request／result（docs/ps-research/supplemental）；
+        # 不存在的路徑不能進 pathspec（git 會整個 add 失敗）
+        $paths = @()
+        foreach ($cand in @("docs/ps-research/$Domain", 'docs/ps-research/wiki', 'docs/ps-research/supplemental')) {
+            if (Test-Path -LiteralPath (Join-Path $root $cand)) { $paths += $cand }
+        }
+        if ($paths.Count -eq 0) { return }
+        & git -C $root add -- @paths 2>&1 | Out-Null
+        $staged = (& git -C $root diff --cached --name-only -- @paths 2>&1 | Out-String)
         if ([string]::IsNullOrWhiteSpace($staged)) { return }
         $n = @($staged -split "`r?`n" | Where-Object { $_.Trim() -ne '' }).Count
         $msg = "kb(auto): $Domain $Note"
-        $out = (& git -C $root commit -m $msg -- $rel $relWiki 2>&1 | Out-String)
+        $out = (& git -C $root commit -m $msg -- @paths 2>&1 | Out-String)
         if ($LASTEXITCODE -eq 0) { Write-Log "GIT 快照：$msg（$n 檔）" }
         else { Write-Log "GIT 快照失敗（不中斷）：$($out.Trim())" }
     }
@@ -1118,7 +1043,7 @@ function Invoke-GitSnapshot {
 # 批次由 ps-auto-all 以**子行程**逐領域呼叫本腳本——行程死亡時 OS 自動
 # 回收鎖（前任死亡＝AbandonedMutexException＝視為取得），無 stale lock。
 # 互動式 OpenCode 問答不經此鎖，靠 SOP-12／SOP-14 操作紀律。
-# exit code 語意：0 畢業（收據已寫）／1 未畢業／2 環境或收據錯誤／3 鎖被占用
+# exit code 語意：0 畢業（收據已寫）／1 未畢業／2 環境或收據錯誤／3 鎖被占用／4 補研究迷你圈完成（-SupplementalOnly）
 $mutex = $null
 $mutexHeld = $false
 try {
@@ -1713,6 +1638,13 @@ function Invoke-AuditRound {
     Write-Log "稽核輪次 $target 合併完成：$($mg.Files) 檔、A 列 $($mg.ARows)、D 列 $($mg.DRows)、BLOCKED $($mg.Blocked.Count)$(if ($mg.Blocked.Count -gt 0) { '（' + ($mg.Blocked -join '、') + '——記分卡標未稽核，lint 擋畢業）' } else { '' })"
     $done = Join-Path $logRoot ("audit-r{0}.done.json" -f $target)
     Copy-Item -LiteralPath $auditLedgerPath -Destination $done -Force
+    # 領域目錄另存一份 audit-done.json（進內部 git；非 .md → 不進畢業 contentHash、lint 不掃）：
+    # 各機的知識索引用它判「稽核後未改」（hashSinceAudit），不必依賴本機 auto-loop-logs
+    try {
+        $doneText = [System.IO.File]::ReadAllText($done)
+        if (-not (Write-PsKnAtomicText -LiteralPath (Join-Path $dir 'audit-done.json') -Text $doneText -Bom $false)) { Write-Log "audit-done.json 寫入延後（目標被其他行程開著）——索引暫以 auto-loop-logs 的 done 檔判定" }
+    }
+    catch { Write-Log "audit-done.json 寫入例外（不中斷）：$($_.Exception.Message)" }
     Remove-Item -LiteralPath $auditLedgerPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $auditPartsDir -Recurse -Force -ErrorAction SilentlyContinue
     return @{ TimedOut = $false; ExitCode = 0; ErrFile = $null; OutFile = $null; FailureKind = 'NONE'; RoundComplete = $true }
@@ -1733,11 +1665,213 @@ function Invoke-AuditBatchSession {
     return $sr
 }
 
+# ── 知識索引發布（safe point；try/catch 不中斷）──────────────────
+# 索引是本機快取（gitignore）：啟動歸檔 commit 後、每圈末 git 快照前、收據＋提煉後各發布一次；
+# 失敗只記 log——索引過時只影響問答的定位與等級顯示，內容永遠讀原檔。
+function Invoke-KnowledgePublish {
+    param([string]$Note)
+    try {
+        $kr = Publish-PsKnowledgeIndex -Root $root -LogRoot (Join-Path $root 'auto-loop-logs')
+        if ($kr.published) { Write-Log "知識索引：已重建（$Note；領域 $($kr.domains)／NN $($kr.nn)／wiki $($kr.wiki)／物件 $($kr.objects)）" }
+        else { Write-Log "知識索引：PUBLISH_DEFERRED（$Note；目標被其他行程開著，舊索引保留）" }
+    }
+    catch { Write-Log "知識索引重建例外（不中斷）：$($_.Exception.Message)" }
+}
+
+# ── 補研究迷你圈（-SupplementalOnly）─────────────────────────────
+# 獨立於主迴圈：不加相位、不碰 research／audit 的熔絲與 drain；每張 request 一個 session（--command ps-supplement）；
+# 模型只寫收據，合併／發布／wiki 標記全由外環確定性完成；結果只在本 run 末端 safe point 發布。
+# attempts＝工單檔數（outcome 缺＝crash 也算一次）；用盡（2）→ UNRESOLVED。目標尚無 NN → 只在 checklist 寫 D 列（等研究相位建檔）。
+# exit 4＝迷你圈完成（不論處理幾張）；exit 2＝環境錯；exit 3＝鎖被占用（同主迴圈）
+if ($SupplementalOnly) {
+    $suppTimeout = $SupplementalTimeoutMin
+    if ($suppTimeout -le 0) { $suppTimeout = $ResearchTimeoutMin }
+    Write-Log "=== 補研究迷你圈啟動：領域=$Domain 每 run ≤$SupplementalPerRun 張 逾時 $suppTimeout 分 ==="
+    Invoke-KnowledgePublish -Note "補研究前"
+    $suppIndex = Read-PsKnowledgeIndex -Root $root
+    $suppCap = Get-PsSuppCapabilities -Root $root
+    $domainOk = ((Test-Path -LiteralPath (Join-Path $dir '00-overview.md')) -and (Test-Path -LiteralPath (Join-Path $dir 'checklist.md')))
+    $results = 0
+    $handled = @{}
+    $round = Get-PsSuppChecklistRound -DomainDir $dir
+    if ($round -lt 0) { $round = 0 }
+    # 被新世代取代、尚無 result 的舊 request → SUPERSEDED
+    foreach ($old in (Get-PsSuppSuperseded -Root $root -Domain $Domain)) {
+        $attOld = (Get-PsSuppAttempts -DomainDir $dir -RequestId $old.RequestId).Count
+        $resOld = New-PsSuppResult -Request $old.Obj -Outcome 'SUPERSEDED' -Disposition 'SUPERSEDED' -AuditRound $round -Affected @() -Attempts $attOld
+        if ((Publish-PsSuppResult -Root $root -Result $resOld).Ok) {
+            $results++
+            Write-Log "補研究：$($old.RequestId) → SUPERSEDED（新世代已提交）"
+            $null = Move-PsSuppPartsDone -DomainDir $dir -LogDir $logRoot -RequestId $old.RequestId
+        }
+    }
+    $pending = Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2
+    $dispatched = 0
+    foreach ($p in $pending) {
+        $rid = $p.RequestId
+        $need = $p.Request.need
+        if (-not $domainOk) {
+            $resX = New-PsSuppResult -Request $p.Request -Outcome 'OUT_OF_SCOPE' -Disposition 'NOT_IN_DOMAIN' -AuditRound $round -Affected @() -Attempts $p.Attempts
+            if ((Publish-PsSuppResult -Root $root -Result $resX).Ok) { $results++; Write-Log "補研究：$rid → OUT_OF_SCOPE／NOT_IN_DOMAIN（領域沒有 00-overview／checklist）" }
+            continue
+        }
+        if ($p.Exhausted) {
+            $attX = Get-PsSuppAttempts -DomainDir $dir -RequestId $rid
+            $codeX = 'WORKER_FAILED'
+            if ($null -eq $attX.LastOutcome) { $codeX = 'CRASH' }
+            $resX = New-PsSuppResult -Request $p.Request -Outcome 'UNRESOLVED' -Disposition $codeX -AuditRound $round -Affected @() -Attempts $attX.Count
+            if ((Publish-PsSuppResult -Root $root -Result $resX).Ok) {
+                $results++
+                Write-Log "補研究：$rid → UNRESOLVED／$codeX（attempts 用盡）"
+                $null = Move-PsSuppPartsDone -DomainDir $dir -LogDir $logRoot -RequestId $rid
+            }
+            continue
+        }
+        $targetName = $p.TargetName
+        $targetFiles = Find-PsSuppTargetNn -DomainDir $dir -TargetName $targetName
+        if ($targetFiles.Count -eq 0) {
+            $dr = Add-PsSuppChecklistDRow -DomainDir $dir -ObjectName $targetName -RequestId $rid
+            $drTxt = $dr.Reason
+            if ($dr.Added) { $drTxt = $drTxt + '：' + $dr.Row }
+            Write-Log "補研究：$rid 目標尚無 NN → WAITING_RESEARCH（checklist D 列：$drTxt）"
+            continue
+        }
+        if ($dispatched -ge $SupplementalPerRun) { Write-Log "補研究：$rid 留待下次（本 run 已派 $SupplementalPerRun 張）"; continue }
+        $dispatched++
+        $attemptNo = $p.Attempts + 1
+        $mf = New-PsSuppManifest -Root $root -Request $p.Request -Domain $Domain -DomainDir $dir -AttemptNo $attemptNo -Index $suppIndex -Capabilities $suppCap
+        if (-not $mf.Created) { Write-Log "補研究：$rid 工單 a$attemptNo 已存在（並行迷你圈？）→ 跳過"; continue }
+        Write-Log "補研究：$rid attempt a$attemptNo 工單已寫（目標 $($mf.TargetFiles -join '、')；callee $($mf.CalleeFiles.Count) 檔）"
+        $snapS = Get-NnGuardSnapshot
+        $preInvS = Get-ChecklistInventory
+        $preTotalS = Get-ItemTotal
+        $lintBefore = Invoke-Lint -Coverage
+        $nb = 0
+        $mB = [regex]::Match($lintBefore.Raw, '(?m)^FAIL：(\d+) 項違規')
+        if ($mB.Success) { $nb = [int]$mB.Groups[1].Value }
+        $sr = Invoke-Opencode -ExtraArgs '--command ps-supplement' -PromptText $Domain -TimeoutMin $suppTimeout -Tag ("supp-a" + $attemptNo)
+        if ($sr.SlotBusy) {
+            # 沒有真的跑 session：撤回工單檔（attempts 不該被 slot 競爭吃掉），本 run 提前結束
+            Remove-Item -LiteralPath $mf.ManifestPath -Force -ErrorAction SilentlyContinue
+            Write-Log "補研究：session slot 被占用，$rid 的 a$attemptNo 撤回，本 run 提前結束"
+            break
+        }
+        $outcome = @{ timedOut = $sr.TimedOut; exitCode = $sr.ExitCode; failureKind = $sr.FailureKind; receiptValid = $false; disposition = ''; merged = $false; lintRegression = $false; destructionRestored = 0; integrityFail = $false; receiptErrors = @() }
+        $restored = Invoke-NnDestructionGuard -Snap $snapS -Tag ("supp-a" + $attemptNo)
+        $outcome.destructionRestored = $restored
+        $null = Invoke-PostSessionReconcile -PreInv $preInvS -PreRound $round -Tag ("supp-a" + $attemptNo)
+        $recv = Test-PsSuppReceipt -LiteralPath $mf.ReceiptPath -Capabilities $suppCap
+        $outcome.receiptValid = $recv.Ok
+        $outcome.disposition = $recv.Disposition
+        $outcome.receiptErrors = @($recv.Errors)
+        $affected = @()
+        $terminal = ''
+        $code = ''
+        if ($recv.Ok -and $restored -eq 0) {
+            $disp = $recv.Disposition
+            if ($disp -eq 'ALREADY_COVERED' -and -not (Test-PsSuppAlreadyCovered -TargetFacts $mf.TargetFacts -FactKind ([string]$need.factKind) -Capabilities $suppCap)) {
+                $outcome.receiptValid = $false
+                $outcome.receiptErrors += 'ALREADY_COVERED 不成立（目標 NN 相關節空洞或缺）'
+                Write-Log "補研究：$rid 收據 ALREADY_COVERED 不成立——目標節空洞，視為未達標"
+            }
+            elseif ($disp -eq 'NOT_IN_DOMAIN') { $terminal = 'OUT_OF_SCOPE'; $code = 'NOT_IN_DOMAIN' }
+            elseif ($disp -eq 'UNSUPPORTED') { $terminal = 'OUT_OF_SCOPE'; $code = 'UNSUPPORTED' }
+            elseif ($disp -eq 'ALREADY_COVERED') { $terminal = 'RESOLVED'; $code = 'ALREADY_COVERED' }
+            else {
+                $nnPath = Join-Path $dir $mf.TargetFiles[0]
+                $mg = Merge-PsSuppReceipt -NnPath $nnPath -Receipt $recv -RequestId $rid
+                if (-not $mg.Ok) { Write-Log "補研究：$rid 合併失敗（$($mg.Reason)）"; $outcome.receiptErrors += ('合併失敗：' + $mg.Reason) }
+                else {
+                    $lintOk = $true
+                    if ($mg.Changed) {
+                        $lintAfter = Invoke-Lint -Coverage
+                        $na = 0
+                        $mA = [regex]::Match($lintAfter.Raw, '(?m)^FAIL：(\d+) 項違規')
+                        if ($mA.Success) { $na = [int]$mA.Groups[1].Value }
+                        if ($na -gt $nb) {
+                            $lintOk = $false
+                            $null = Restore-PsSuppBytes -LiteralPath $nnPath -Bytes $mg.BytesBefore
+                            $outcome.lintRegression = $true
+                            Write-Log "補研究：$rid 合併後 lint 缺料違規 $nb→$na 增加 → 還原 NN、本 attempt 記 LINT_REGRESSION"
+                        }
+                    }
+                    if ($lintOk) {
+                        $outcome.merged = $true
+                        $affected += , (@{ file = $mf.TargetFiles[0]; hashBefore = $mg.HashBefore; hashAfter = $mg.HashAfter; sections = @($mg.Sections); evidenceRows = @($mg.EvidenceRows) })
+                        if ($disp -eq 'RESEARCHED') {
+                            $terminal = 'PARTIAL'
+                            foreach ($f in $recv.Facts) { if ($f.Confidence -eq 'CONFIRMED') { $terminal = 'RESOLVED' } }
+                            $code = 'RESEARCHED'
+                        }
+                        else { $terminal = 'UNRESOLVED'; $code = 'NO_EVIDENCE' }
+                        Write-Log "補研究：$rid 合併完成（節 $($mg.Sections -join '、')；附錄 +$($mg.EvidenceRows.Count) 列）"
+                    }
+                }
+            }
+        }
+        elseif (-not $recv.Ok) { Write-Log "補研究：$rid 收據未達標：$($recv.Errors -join '；')" }
+        # 完整性（每個 session 之後都驗）：checklist 骨架與項目總數
+        $integ = Test-ChecklistIntegrity -PreTotal $preTotalS
+        if ($integ.Lost.Count -gt 0) {
+            $outcome.integrityFail = $true
+            Write-Log "補研究：$rid session 後 checklist 完整性 FAIL（$($integ.Lost -join '；')）——本 request 不發 result"
+            $null = Invoke-ChecklistRecovery
+            $terminal = ''
+        }
+        $null = Write-PsSuppOutcome -DomainDir $dir -RequestId $rid -AttemptNo $attemptNo -Outcome $outcome
+        if ($terminal -ne '') { $handled[$rid] = @{ Request = $p.Request; Terminal = $terminal; Code = $code; Affected = $affected; Attempts = $attemptNo; TargetName = $targetName; TargetFile = $mf.TargetFiles[0] } }
+    }
+    # safe point：發布本 run 合格的結果（受影響檔 hash 仍＝hashAfter 才發）
+    foreach ($rid in @($handled.Keys)) {
+        $h = $handled[$rid]
+        $still = $true
+        foreach ($a in $h.Affected) { if ((Get-PsKnFileHash -LiteralPath (Join-Path $dir $a.file)) -cne $a.hashAfter) { $still = $false } }
+        if (-not $still) { Write-Log "補研究：$rid 受影響檔在發布前又被改動 → 本 run 不發 result（下次重驗）"; continue }
+        $resH = New-PsSuppResult -Request $h.Request -Outcome $h.Terminal -Disposition $h.Code -AuditRound $round -Affected $h.Affected -Attempts $h.Attempts
+        $pub = Publish-PsSuppResult -Root $root -Result $resH
+        if (-not $pub.Ok) { Write-Log "補研究：$rid result 寫入失敗"; continue }
+        $results++
+        $dupTxt = ''
+        if ($pub.Existed) { $dupTxt = '（既有，冪等）' }
+        Write-Log "補研究：$rid → $($h.Terminal)／$($h.Code)$dupTxt"
+        $null = Move-PsSuppPartsDone -DomainDir $dir -LogDir $logRoot -RequestId $rid
+        if ($h.Affected.Count -gt 0) {
+            $links = @()
+            $tf = Get-PsKnNnFacts -LiteralPath (Join-Path $dir $h.TargetFile) -Domain $Domain
+            if ($null -ne $tf) { $links = @($tf.links) }
+            $ws = Set-PsSuppWikiStale -Root $root -TargetName $h.TargetName -LinkedNames $links -RequestId $rid -SourceLabel ("$Domain/" + $h.TargetFile)
+            if (($ws.Stale + $ws.Invalidated) -gt 0) { Write-Log "補研究：$rid wiki 標記 stale $($ws.Stale)／reviewed 追加 Invalidated $($ws.Invalidated)" }
+        }
+    }
+    # 本 run 才用盡 attempts 的 → UNRESOLVED
+    foreach ($p2 in (Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2)) {
+        if (-not $p2.Exhausted) { continue }
+        $att2 = Get-PsSuppAttempts -DomainDir $dir -RequestId $p2.RequestId
+        $code2 = 'WORKER_FAILED'
+        if ($null -eq $att2.LastOutcome) { $code2 = 'CRASH' }
+        $res2 = New-PsSuppResult -Request $p2.Request -Outcome 'UNRESOLVED' -Disposition $code2 -AuditRound $round -Affected @() -Attempts $att2.Count
+        if ((Publish-PsSuppResult -Root $root -Result $res2).Ok) {
+            $results++
+            Write-Log "補研究：$($p2.RequestId) → UNRESOLVED／$code2（attempts 用盡）"
+            $null = Move-PsSuppPartsDone -DomainDir $dir -LogDir $logRoot -RequestId $p2.RequestId
+        }
+    }
+    Invoke-KnowledgePublish -Note "補研究後"
+    Invoke-GitSnapshot -Note "補研究迷你圈（results=$results）"
+    $pendingAfter = @(Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2).Count
+    Write-Log "SUPPLEMENTAL：results=$results pending=$pendingAfter"
+    Write-Log "=== 補研究迷你圈結束（exit 4）==="
+    if ($results -gt 0 -or $dispatched -gt 0) { Write-Host "結論代號：SUPP1-3-01-$results" } else { Write-Host "結論代號：SUPP1-3-02" }
+    $mutex.ReleaseMutex(); $mutex.Dispose()
+    exit 4
+}
+
 # ── 主迴圈 ──────────────────────────────────────────────────
 Write-Log "=== auto-loop 啟動：領域=$Domain MaxCycles=$MaxCycles Model=$(if($Model){$Model}else{'(全域預設)'}) ==="
 # 啟動即結清歸檔（issue #13）：人工跑過 /ps-audit 的殘留已勾列在此搬進
 # archive——外環是唯一歸檔者，不分列是誰打的勾
 $null = Invoke-ChecklistArchiveCommit
+Invoke-KnowledgePublish -Note "啟動"
 $corruptStreak = 0
 $timeoutStreak = 0
 $errorStreak = 0
@@ -2269,6 +2403,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     }
     # 每圈一個還原點（L83）：session 崩在半路是常態故障，
     # 有 commit 才敢讓它無人看管——只 commit、永不 push。
+    Invoke-KnowledgePublish -Note "第 $cycle 圈末"
     Invoke-GitSnapshot -Note "第 $cycle 圈 $phase｜$gitNoteLint｜$(if ($graduated) { "畢業 tier $Tier" } else { '未畢業' })"
 }
 
@@ -2317,6 +2452,7 @@ if ($graduated) {
             $null = Invoke-PostSessionReconcile -PreInv $uPreInv -PreRound $final.Round -Tag "distill-upgrade"
             Write-Log "entity 升級 session 結束（tier 2）"
         }
+        Invoke-KnowledgePublish -Note "收據與提煉後"
         Invoke-GitSnapshot -Note "歸戶提煉收尾（餘 $wm 待歸戶）"
     }
     else {

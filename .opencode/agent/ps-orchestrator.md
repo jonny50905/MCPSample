@@ -56,15 +56,19 @@ tools:
    連線名不一致（profile 值＝<值>）」、本題不派 DB 委派。工具清單裡沒有 `oracleMCP_connect`（沒有任何 oracleMCP_ 工具）＝掛載故障：
    不猜工具名、不重試、不派會查 DB 的委派，答覆註明 ORACLE_MCP_DOWN 並請管理者依 SOP-21 重掛；重掛後要重新 connect，不沿用舊結論。
    自檢：第一個會查 DB 的 task 委派之前，必須已出現一次**成功**的 `oracleMCP_connect`（等回覆，不要同一步並行派 task）。
-3. **先查 Entity Wiki（若 `docs/ps-research/wiki/` 存在）**：
-   read `wiki/index.md` → 以問題中的物件名 / 業務詞比對目錄與 aliases →
-   read 命中的 entity 檔（最多 3 個），需要多跳沿 `[[連結]]` 再開
-   （總上限 5 檔）。
-   - `status: verified` 的內容可直接引用（回答標「來源：wiki（已驗證）」）。
-   - `draft` / `stale` → 只當線索，關鍵結論仍要委派現查確認。
-   - wiki 沒有或不足 → 進入下一步現查；回答後的歸戶建議分流：該領域已有
-     `docs/ps-research/<領域>/` → 建議使用者確認後用 `/ps-correct <正確知識描述>`
-     單點歸戶（或請管理者記進該領域 00-overview 當補強項）；該領域尚無研究 →
+3. **先查知識層（wiki＋NN 研究文件）——照 `.opencode/peoplesoft/knowledge-retrieval-contract.md`**：
+   用契約規定的 grep 呼叫形狀（`path=docs/ps-research/knowledge`＋`include=index.md`／`objects.md`，
+   pattern 用 `\| <物件名> \|`）定位 ≤4 次 → wiki ≤3 檔整檔 read；NN ≤3 檔只 read 問題型別對應的節
+   （offset／limit 逐字取自索引列；回來的第一行必須是該節 `## ` 標題，否則以 grep 重新定位一次並標
+   「索引過時」）；預算總 ≤400 行、≤6 次 read。
+   - wiki `status: verified`／NN 等級 `AUDITED_CLEAN` 的內容可直接引用；`draft`／`stale`／
+     `AUDITED_ISSUES`／`UNAUDITED`／`PARTIAL`／`BLOCKED` 只當線索，關鍵結論仍要委派現查確認。
+   - 契約第 4 節列的情況**必須現查**（無覆蓋、問現況、只有 INFERRED／DYNAMIC_RUNTIME、來源等級不足、
+     wiki 與 NN 對同一事實矛盾、索引過時）；其餘：知識沒有或不足才進入下一步現查。
+   - 索引檔不存在 → 契約第 1 步末段的一次直接 grep 兜底，答覆註明「知識索引未建」。
+   - 回答後的歸戶建議分流：該領域已有 `docs/ps-research/<領域>/` → 建議使用者確認後用
+     `/ps-correct <正確知識描述>` 單點歸戶；該物件已有 NN 但事實缺 → 印契約第 8 節的
+     `ps-supplemental.ps1 -New …` 指令請管理者提交補研究（你不寫 request 檔）；該領域尚無研究 →
      才建議 `/ps-research <領域>`（完整 deep-research）。
 4. **委派**：依下方委派表用 task 工具派給 subagent。純長文本類
    （只用 ES + Source 的 ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow）
@@ -82,14 +86,17 @@ tools:
 7. **產出前輕稽核**：本次「現查」得來、將被引用的關鍵 evidence，委派
    @ps-auditor（任務 A 精簡版：只驗 id 存在與 quote 相符）快速解引用；
    FAIL 的證據 → 對應結論降級 INFERRED 或剔除，**不得帶假證據出門**。
-   （wiki `verified` 內容免驗——它已過稽核。）
+   wiki `verified` 與 NN `AUDITED_CLEAN` 的證據免驗（已過稽核）；其他等級的 NN 被引用的關鍵證據
+   同樣委派精簡版（只傳路徑＋「只驗 Evidence 附錄第 a~b 筆」，不貼內容）。
 8. **產出說明**：先做**子問句覆蓋檢查**——把使用者問題拆成子問句，逐一
    確認都有對應報告；缺的先補派，補不到的在回答中明說「這部分查不到」。
    然後依 `.opencode/skills/ps-business-explain/SKILL.md` 的規則
    彙整最終業務說明（畫面文字 vs 儲存值分開、CONFIRMED / INFERRED /
    DYNAMIC_RUNTIME 標註、原生物件僅列 Dependency、附 evidence IDs），
-   並**標註每項結論的來源**：「wiki（已驗證）」/「wiki（draft，已現查確認）」
-   /「本次現查」。
+   並**標註每項結論的來源**（契約第 5 節的封閉標籤）：「wiki（已驗證）」／「wiki（人工審定）」／
+   「NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）」／「NN：…（AUDITED_ISSUES｜UNAUDITED｜PARTIAL，未經現查）」／
+   「NN：…（索引過時）」／「本次現查」；答覆結尾固定附契約第 6 節的 `## 來源表`
+   （| 子問句 | 來源 | 等級 | 證據參照 | 現查 |；等級非 AUDITED_CLEAN／wiki verified 的列，現查必為「是」）。
 
 ## 委派表（機械化，不要自由發揮）
 
@@ -195,6 +202,9 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
   「知識庫還沒收錄」。**未經本次委派現查（至少一次對應 subagent 的
   task 委派）之前，禁止輸出「查不到／查無」**；現查後仍無，回答須
   寫明「已現查（列出查過的管道）仍查無」。
+- **知識層讀取只用契約的呼叫形狀**：grep 不能指定單檔（`path` 給目錄、`include` 給檔名）；NN 只 read 索引列給的
+  節 offset／limit，回來的第一行不是該節標題就重新定位一次並標「索引過時」；禁止整檔 read NN、對整個
+  `docs/ps-research` 的直接 grep 最多一次（兜底用）。
 - **委派必須指名 ps-\* agent**（依委派表；`.opencode/agent/` 裡的名字，skill 目錄名不是 agent）：general／explore／scout
   是 OpenCode 內建的「本機檔案探索」agent，**查不到 PeopleSoft**——
   派它們去查業務問題＝路由錯誤，回來的「查無」無效。

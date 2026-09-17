@@ -3328,3 +3328,55 @@
   suggested-skill（報告帶 skill 名 → 回覆附註 → 改派）。
 - 教訓：模型可見的名字就是它的 API——skill 目錄名與 agent 名同一命名空間時，摘要第一句就要說「不是 agent」；
   驗證要放在轉發之前（回覆附註）與執行之前（guard），錯誤要指出正確去向，不能被歸類成別的故障。
+
+### L119 已稽核的研究文件對問答不可見——只查 wiki 的檢索，讓 NN 變成寫完就沒人讀的成品（issue #33，2026-09-17）
+
+- 症狀：問答（ps-orchestrator 第 3 步）只讀 `wiki/index.md` 與 entity 檔；deep-research 更明文「不回讀已完成的 NN」。
+  NN 檔經 lint／稽核／畢業，卻從未被當成檢索來源；wiki 只有畢業後提煉的摘要，問細節（欄位、資料流、批次）就得重新現查。
+- 根因：沒有「哪個 NN 的哪一節在第幾行、品質如何」的定位層，模型面對整棵 `docs/ps-research` 只能整檔 read 或亂 grep，
+  小模型會超 context、也分不清 PARTIAL／未稽核與 AUDITED 的差別。
+- 落點：`scripts/ps-knowledge-lib.ps1`＋`ps-knowledge.ps1`（確定性索引：NN 節 offset／limit、等級、wiki 有效性、物件彙總；
+  本機快取 gitignore；`-Rebuild/-Check/-Find/-Slice`；結論碼 KNOW1）；auto-loop 三個 safe point 自動發布、稽核合併另存
+  領域 `audit-done.json`（進內部 git，各機判「稽核後未改」）；auto-all preflight `-Check`。模型側：
+  `knowledge-retrieval-contract.md`（grep 不能指定單檔→`path=目錄`＋`include=檔名`；`名@offset/limit` 讀節、雙端自檢＋一次重定位；
+  預算；必現查條件含 wiki／NN 矛盾；封閉來源標籤；固定 `## 來源表`）；ps-orchestrator 第 3／7／8 步與硬規則、
+  ps-business-explain／discovery、AGENTS.md、README、test-scenarios I2、/ps-correct 提示 -Rebuild。
+- 驗證：`scripts/tests/test-knowledge.ps1`（86 判定）；agent-doc-lint 零阻擋；test-auto-loop 情境 34。
+- 教訓：內容永遠讀原檔、索引只給定位與旗標（可重建的投影，不是第二份真相）；grep／read 的呼叫形狀要寫進契約而不是
+  留給模型發揮；「查不到」的門檻不變——知識層只是把現查的次數降下來，不是取代現查。
+
+### L120 跨迴路補研究——研究外環的入口只有五種 session，「指定 NN＋指定問題」沒有門（issue #36，2026-09-17）
+
+- 症狀：問答或 Spec 發現某個已研究物件缺一件事實（例：匯入檔格式），只能重跑整個領域研究或人工改 NN；
+  checklist 列型別封閉（A／U／D／調查項），外部塞列會被債務判定、Unticked 門、身分調帳誤判。
+- 根因：外環與模型之間沒有「資料化的需求」——需求以文字進 checklist 就變成模型的自由發揮，也把消費端身分（誰要、為什麼要）
+  帶進研究端。
+- 落點：`scripts/ps-supplemental-lib.ps1`＋`ps-supplemental.ps1`（request＝need 的 canonical JSON 決定 requestId、create-only、
+  Submit 時路由、-Resubmit 世代；收據三張表驗收；確定性只追加合併、附錄編號承接、缺節插入、CRLF＋BOM 保留；result
+  create-only 冪等；完成層 RESEARCHED／AUDITED／GRADUATED／PROJECTED；wiki stale／reviewed 標記；結論碼 SUPP1）；
+  `ps-auto-loop -SupplementalOnly` 獨立迷你圈（不加相位、不碰熔絲；exit 4；lint 缺料回歸即還原；目標無 NN 寫 D 列；
+  發布只在 run 末端 safe point）；`ps-session-lib.ps1`（Invoke-Opencode 抽成 lib＋session slot 互斥鎖）；auto-all 收據判定前
+  先跑迷你圈、保留名加 knowledge／supplemental／spec；`/ps-supplement` 指令＋`supplemental-contract.md`；快照 stage 三處路徑。
+- 驗證：`scripts/tests/test-supplemental.ps1`（102 判定：驗證負例、並行提交只一檔、路由五態、合併確定性、D 列、
+  完成邊界、CLI 結論碼形狀）；test-auto-loop 情境 34。
+- 教訓：跨迴路的東西一律「資料進、資料出」（request／result 都是封閉欄位）；模型只寫 delta 收據，合併與發布由外環做，
+  不讓 worker 改寫 NN；attempts 用檔案數推導，不信任 JSON 裡的狀態；發布放在 rollback 窗之外的 safe point。
+
+### L121 Spec 的分母是 Component＋私有需求包，不是整個領域；外環要驗指紋而不是驗簽名（issue #34／#35，2026-09-17）
+
+- 症狀：Legacy Contract 分支以整個領域 NN 為分母（共用 Record 出現在任一 NN 資料流就升成單位），沒有 Component＋需求的入口；
+  單一對話產整份 Spec 與早期 Research 同病（超 context、片段不合格）；沙箱實跑證實 `-Accept` 會把 NN 已改、fragment 未重寫的
+  舊片段簽成 DONE。公司 Template／Checklist 是機密，不能以文字進 repo。
+- 根因：需求沒有資料化（factKind／屬性／適用條件／基數／證據政策），外環只能用「檔案存在＋簽名」當驗收，抓不到來源已變。
+- 落點：`scripts/ps-spec-lib.ps1`＋`ps-spec.ps1`（`-ValidatePack/-Plan/-Run/-Render/-Gate/-Doctor`；per-job 鎖；
+  pending＝plan＋splits－指紋相符 receipts；`input.json` 先寫、驗收重算、來源變即拒收不記 attempt；capacity 事件拆分；
+  render parity 與來源重驗；gate 覆蓋與 UNKNOWN 債；doctor stage 0 generic hash；結論碼 SPEC1＋drill tuple）；
+  `.opencode/peoplesoft/spec/`（capabilities.json 能力目錄、pack.schema.json、support-codes.md 含 CAP-REQ、
+  troubleshooting-matrix.md、examples 兩套合成需求包、generic.manifest.json）；`ps-spec-worker` agent（grep／glob／task／
+  bash 關、MCP 全 deny、`permission.read/edit` 逐路徑只開 `.ps-runtime/spec`）＋`/ps-spec-batch`；`.ps-private/`
+  與 `.ps-runtime/` gitignore；補研究消費端規則（WAITING_AUDIT 不重送、UNRESOLVED→BLOCKED_KNOWLEDGE）。
+  #17 分支不合併：通用函式（章節／表格解析、SELECT-only、ID、gate result）逐字取用改前綴；分母、renderer、-Accept 重寫。
+- 驗證：`scripts/tests/test-spec.ps1`；`test-ps51-static.ps1`（AST 守衛：三元／??／?.／&&／-Parallel／-AsHashtable／
+  utf8NoBOM／三段 Join-Path／-LeafBase／Test-Json／Move 三參數／GetRelativePath／BOM）；test-auto-loop 情境 34。
+- 教訓：「做完」的判定要對輸入指紋，不對輸出簽名；私有映射與 generic 引擎分層，機密只在私有層、驗證只回結論碼；
+  能力目錄是封閉的——不在目錄的需求是 UNSUPPORTED＋申請單，不是讓模型自由組表。

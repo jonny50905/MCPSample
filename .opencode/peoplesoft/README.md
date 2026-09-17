@@ -23,6 +23,10 @@
 │  ├─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
 │  ├─ oracle-query-cookbook.md         oracleMCP 的 PeopleTools 查詢樣板（SELECT-only）
 │  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
+│  ├─ knowledge-retrieval-contract.md  問答讀取 wiki＋NN 研究文件的契約（索引定位、片段讀取、來源表）
+│  ├─ supplemental-contract.md         補研究收據契約（事實類別→委派鏈、三張表、硬規則）
+│  ├─ spec/                            Spec 引擎公開部分：capabilities.json（能力目錄）、pack.schema.json、
+│  │                                   support-codes.md（KNOW1／SUPP1／SPEC1 結論碼＋CAP-REQ）、troubleshooting-matrix.md、examples/
 │  ├─ report-templates/
 │  │  ├─ overview-template.md          Deep research 總覽模板（階段一寫完即凍結）
 │  │  ├─ checklist-template.md         調查進度狀態檔模板（唯一反覆改寫的小檔）
@@ -43,7 +47,8 @@
 │  ├─ ps-sqr-flow.md                   Subagent：SQR / SQC
 │  ├─ ps-ae-flow.md                    Subagent：Application Engine
 │  ├─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
-│  └─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
+│  ├─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
+│  └─ ps-spec-worker.md                Primary（只由 ps-spec 外環以 --command ps-spec-batch 啟動）：Spec 片段組表，只讀 .ps-runtime/spec、只寫 fragment.md
 ├─ plugin/
 │  └─ ps-runtime-guard.js             OpenCode 執行期無狀態 guard＋診斷：connect 的 connection_name 必須等於 profile 值
 │                                      （ORACLE_CONNECTION_MISMATCH／NOT_CONFIGURED）、task 的 subagent_type 不得是 skill 名
@@ -53,7 +58,9 @@
 │  ├─ ps-research.md                   /ps-research <領域> — 文件生成（可續跑）
 │  ├─ ps-audit.md                      /ps-audit <領域> — 稽核 + 回灌 checklist
 │  ├─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓並本機立即生效（團隊走 PR）
-│  └─ ps-correct.md                    /ps-correct <正確知識> — 人工指正的業務知識更新 wiki（human 來源＋verified）
+│  ├─ ps-correct.md                    /ps-correct <正確知識> — 人工指正的業務知識更新 wiki（human 來源＋verified）
+│  ├─ ps-supplement.md                 /ps-supplement <領域> — 補研究（auto-loop -SupplementalOnly 專用；依工單只寫收據）
+│  └─ ps-spec-batch.md                 /ps-spec-batch <jobId>-<attemptId> — Spec 片段（ps-spec -Run 專用；只寫 fragment.md）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -180,8 +187,8 @@ reviewed；內容：Observations ＋ typed Relations `[[wikilink]]`）。
 ```text
 研究：deep-research 每查完一項 → 物件發現「歸戶」到 wiki
       （先查重 grep 檔名＋aliases → 就地更新，同物件永遠一個檔）
-問答：orchestrator 先讀 wiki/index.md → 命中 entity 檔直接引用
-      （verified 免重查）→ wiki 沒有才委派現查 → 回答標註來源
+問答：orchestrator 依 knowledge-retrieval-contract 以 knowledge/index.md 定位 wiki 與 NN
+      → verified／AUDITED_CLEAN 直接引用 → 不足才委派現查 → 回答標來源＋## 來源表
 修正：答錯的事實修在 entity 檔（作廢不刪除）→ 之後每次問答都對
 CR：系統改版上線 → 重建 ES 索引 → audit 找出失效證據 → research 更新（SOP-11）
 ```
@@ -191,6 +198,20 @@ flat RAG 約 6~8 F1；確定性 index-first 檢索是地端模型的可靠路徑
 `[[wikilink]]` 是純文字，backlink 用 grep 即可重建——**不需要任何工具**。
 Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
 見 SOP-7；`.obsidian/` 要 gitignore）。
+
+## 知識索引、補研究與 Spec（三個確定性外環，公司機只回報結論碼）
+
+```text
+知識索引  scripts/ps-knowledge.ps1 -Rebuild|-Check|-Find|-Slice
+          docs/ps-research/knowledge/{index.md,objects.md,index.json}＝本機快取（gitignore）；只記定位與等級，
+          內容永遠讀原檔；auto-loop safe point 自動重建；pull 後／ps-correct 後手跑 -Rebuild
+補研究    scripts/ps-supplemental.ps1 -New|-Submit|-Status|-Result  → docs/ps-research/supplemental/requests/（進內部 git）
+          scripts/ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly → /ps-supplement 收據 → 外環合併 NN → results/（exit 4）
+          目標尚無 NN → checklist D 列（等研究相位）；ps-auto-all 在收據判定前自動先跑迷你圈
+Spec      scripts/ps-spec.ps1 -ValidatePack|-Plan|-Run|-Render|-Gate|-Doctor（需求包在 .ps-private/spec/<packId>/，
+          狀態在 .ps-runtime/spec/<jobId>/，兩者 gitignore）；分母＝Component＋私有需求包，不是整個領域
+結論碼    KNOW1／SUPP1／SPEC1-<stage>-<code>[-<count>]（spec/support-codes.md）——維護端只看這一行
+```
 
 ## 稽核與教訓迴路
 

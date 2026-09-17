@@ -237,7 +237,7 @@ tier 1 **不保證每句話能回溯驗證**——證據 id 格式、機器參�
 
 ## 腳本
 
-五個是框架本體，兩個是前一個專案的遺留。全部 PowerShell 5.1、**UTF-8 with
+框架本體有下列腳本與函式庫（函式庫不直接執行），兩個是前一個專案的遺留。全部 PowerShell 5.1、**UTF-8 with
 BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` 反推 repo 根；
 放錯資料夾會印 WARN）。
 
@@ -248,6 +248,11 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-auto-all.ps1` | 多領域批次排程 | log |
 | `ps-graduation.ps1` | 收據的寫入與驗證（函式庫，不直接執行） | 收據 |
 | `ps-fs-doctor.ps1` | 檔案系統健檢 | 唯讀（`-FixBom` 例外） |
+| `ps-knowledge.ps1`（＋`ps-knowledge-lib.ps1`） | 知識索引：NN／wiki 的定位與等級（問答讀取契約用） | `docs/ps-research/knowledge/`（本機快取，gitignore） |
+| `ps-supplemental.ps1`（＋`ps-supplemental-lib.ps1`） | 補研究 request 提交／狀態／結果；執行在 `ps-auto-loop -SupplementalOnly` | `docs/ps-research/supplemental/requests/` |
+| `ps-spec.ps1`（＋`ps-spec-lib.ps1`） | Spec 引擎：私有需求包驗證、規劃、外環、render、gate、doctor | `.ps-runtime/spec/`（gitignore） |
+| `ps-session-lib.ps1` | opencode headless session 啟動＋session slot 互斥鎖（函式庫） | log |
+| `tests/test-*.ps1` | 測試組：auto-loop、knowledge、supplemental、spec、ps51-static、oracle-runtime | 臨時目錄 |
 | `test-mcp-tools-list.ps1`<br>`test-elasticsearch-mcp-tools-list.ps1` | **遺留**，與本框架無關 | — |
 
 ---
@@ -431,6 +436,22 @@ dot-source。hash 計算與收據驗證**只有這一份真相**，禁止在別�
 
 改動 `ps-auto-loop` 的畢業門判定時，**必須手動 bump `GraduationGateVersion`**
 ——門邏輯不在任何 hash 覆蓋內。
+
+---
+
+### `ps-knowledge.ps1`／`ps-supplemental.ps1`／`ps-spec.ps1` — 知識索引、補研究、Spec
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-knowledge.ps1 -Rebuild          # pull 後／ps-correct 後；auto-loop 會自動
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-knowledge.ps1 -Check            # CURRENT／STALE／MISSING
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-supplemental.ps1 -New -Target COMPONENT:<物件> -FactKind <碼> -Properties <a,b> [-DomainHint <領域>]
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]   # 迷你圈，exit 4
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-spec.ps1 -ValidatePack -Pack <packId>   # 之後 -Plan／-Run／-Render／-Gate／-Doctor
+```
+
+三者的最後一行都是**結論代號**（`KNOW1／SUPP1／SPEC1-<stage>-<code>[-<count>]`，碼表
+`.opencode/peoplesoft/spec/support-codes.md`）——對維護端只回報這一行與 enum 值，不回報路徑、物件名、hash。
+問答怎麼用索引見 `.opencode/peoplesoft/knowledge-retrieval-contract.md`；補研究與 Spec 的操作見 SOP-22～SOP-24。
 
 ---
 

@@ -26,3 +26,13 @@ docs/ps-research/*/graduation.json
 
 # 分批稽核暫存（L107）：輪次未合併時會殘留 part-*.md／domain.md，不入庫（L109）
 docs/ps-research/*/audit-parts/
+
+# 知識索引＝本機快取（含單機收據欄；各機 pull 後重建：ps-knowledge -Rebuild）
+docs/ps-research/knowledge/
+
+# 補研究 session 暫存（manifest／收據／outcome；結果發布後搬到 auto-loop-logs）
+docs/ps-research/*/supplemental-parts/
+
+# Spec：私有需求包（公司 Template／Checklist 映射）與 job 執行狀態——永不入庫
+.ps-private/
+.ps-runtime/

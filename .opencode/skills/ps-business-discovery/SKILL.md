@@ -25,6 +25,10 @@ ps-sqr-flow、ps-ae-flow、ps-data-lineage、ps-process-flow、ps-security-flow�
 4. **未命中 domain ≠ 不能查**：不得以「此領域不存在／不支援」拒答，
    改用 profile 的 `searchPolicy.defaultMode` 走同樣的搜尋順序，
    並在輸出註明未命中、建議把該領域補進 business-domain-map.yaml。
+5. 搜尋之前先查知識層（wiki＋NN 研究文件）：依
+   `.opencode/peoplesoft/knowledge-retrieval-contract.md` 用 grep 定位
+   `docs/ps-research/knowledge/index.md`（path=目錄、include=檔名）；命中即可直接鎖定
+   業務根物件與所屬領域，再依契約第 4 節決定是否仍需現查。
 
 ## 搜尋順序
 

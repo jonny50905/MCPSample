@@ -6,6 +6,7 @@
 #       ＋ lint 導覽主張守衛（#24：情境 28，在 docs/ps-research/zz-nav24-fixture 建臨時領域跑真 lint，結束自刪）
 #       ＋ Oracle 前置閘門 plugin（#29：情境 32，檔案形狀／零相依／單一匯出／npmrc offline／AGENTS 順序／DB 判定／最小不變量守衛；有 node 時跑單元測試；
 #         情境 33，runtime 回歸腳本的判定函式餵固定 jsonl 樣本——無豁免）
+#       ＋知識索引／補研究／Spec 共用地基（#33～#36：情境 34，.gitignore／快照路徑／保留名／lib 版本守衛／契約引用／合成識別字）
 # 注意：情境 22 會在 docs/ps-research/zz-l103-fixture 建臨時領域跑真 lint，結束自刪。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
@@ -667,7 +668,7 @@ $oldHits = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Inc
 $oldHits += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1 | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $oldName } | ForEach-Object { $_.Name })
 if (([System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))) -match $oldName) { $oldHits += 'AGENTS.md' }
 Assert ($oldHits.Count -eq 0) "oracleMCP 工具實名 sql_run／sqlcl_run：模型讀的檔、plugin、scripts 不得再出現舊錯名（run_ + sql／run_ + sqlcl）：$($oldHits -join ',')"
-$nextAction = @{ 'ps-orchestrator' = '先查 Entity Wiki'; 'ps-deep-research' = '歸戶提煉'; 'ps-audit-orchestrator' = 'audit-parts/manifest.txt' }
+$nextAction = @{ 'ps-orchestrator' = '先查知識層'; 'ps-deep-research' = '歸戶提煉'; 'ps-audit-orchestrator' = 'audit-parts/manifest.txt' }
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
     Assert ($pt -match '開線（第 0 步' -and $pt -match '無條件' -and $pt -match 'oracleMCP_connect' -and $pt -notmatch '(?m)^## 第 0 步') "主 agent $pa：開線（第 0 步）是工作流裡的編號步驟，不再是獨立章節"
@@ -859,6 +860,51 @@ $v = Get-SessionVerdict 'ses_synth' ''
 Assert ($v.turns -eq 1 -and $v.dbTasksCompleted -eq 1) "synthetic 訊息不算一題：turns=1"
 $sum = @($v, (Get-SessionVerdict 'ses_ok' '')) | Measure-Object -Property dbTasksCompleted -Sum
 Assert ($sum.Sum -eq 2) "verdict 是 pscustomobject：Measure-Object -Property 可加總（PS 5.1 對 hashtable 不行）"
+
+
+# ── 情境 34：知識索引／補研究／Spec 的共用地基守衛（issue #33～#36）────────
+Write-Host "情境 34：知識索引／補研究／Spec 共用地基——.gitignore 四行、快照三處路徑、auto-all 保留名與迷你圈、共用 lib 版本守衛、模型檔契約引用、合成識別字、新測試組存在（issue #33～#36）"
+$gi = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.gitignore'))
+foreach ($must in @('docs/ps-research/knowledge/', 'docs/ps-research/*/supplemental-parts/', '.ps-private/', '.ps-runtime/')) { Assert ($gi -match ('(?m)^' + [regex]::Escape($must) + '\s*$')) ".gitignore 含 $must" }
+$al = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/ps-auto-loop.ps1'))
+Assert ($al -match "foreach \(\`$cand in @\(`"docs/ps-research/\`$Domain`", 'docs/ps-research/wiki', 'docs/ps-research/supplemental'\)\)" -and $al -notmatch 'git -C \$root add -- \$rel \$relWiki') "auto-loop 快照 stage 三處路徑（領域／wiki／supplemental），不存在的路徑不進 pathspec"
+Assert ($al -match '\[switch\]\$SupplementalOnly' -and $al -match '(?m)^\s+exit 4\s*$' -and $al -match 'Invoke-KnowledgePublish -Note "啟動"' -and $al -match 'Invoke-KnowledgePublish -Note "第 \$cycle 圈末"' -and $al -match 'Invoke-KnowledgePublish -Note "收據與提煉後"' -and $al -match "Join-Path \`$dir 'audit-done\.json'") "auto-loop：-SupplementalOnly 迷你圈（exit 4）、三個 safe point 發布索引、稽核合併另存領域 audit-done.json"
+Assert ($al -match 'Invoke-PsOcSession -OcPath \$ocPath' -and $al -match "'ps-knowledge-lib\.ps1', 'ps-session-lib\.ps1', 'ps-supplemental-lib\.ps1'" -and $al -match '\$PsSessionLibVersion -ne 1') "auto-loop：Invoke-Opencode 是 ps-session-lib 的薄包裝；三個共用 lib 缺檔／版本守衛在取鎖前"
+Assert ($al -match "--command ps-supplement" -and $al -match 'Merge-PsSuppReceipt' -and $al -match 'Restore-PsSuppBytes' -and $al -match 'Publish-PsSuppResult' -and $al -match 'Add-PsSuppChecklistDRow' -and $al -match 'Set-PsSuppWikiStale') "auto-loop 迷你圈：模型只寫收據，合併／lint 回歸還原／發布／D 列／wiki 標記全在外環"
+$aa = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/ps-auto-all.ps1'))
+Assert ($aa -match "@\('wiki', 'knowledge', 'supplemental', 'spec'\) -contains \`$key" -and $aa -match '-SupplementalOnly' -and $aa -match 'Test-PsKnowledgeIndex' -and $aa -match 'Get-PsSuppPending') "auto-all：保留名四個、preflight 知識索引、收據判定前先跑補研究迷你圈（exit 4）"
+foreach ($lib in @('ps-knowledge-lib', 'ps-session-lib', 'ps-supplemental-lib', 'ps-spec-lib')) {
+    $lp = Join-Path $repoRoot ('scripts/' + $lib + '.ps1')
+    Assert ((Test-Path -LiteralPath $lp) -and ([System.IO.File]::ReadAllText($lp)) -match '(?m)^\$script:Ps\w+LibVersion = 1') "共用 lib $lib 存在且有版本守衛"
+}
+foreach ($t in @('test-knowledge', 'test-supplemental', 'test-spec', 'test-ps51-static')) { Assert (Test-Path -LiteralPath (Join-Path $repoRoot ('scripts/tests/' + $t + '.ps1'))) "測試組 $t.ps1 存在" }
+$orch = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/agent/ps-orchestrator.md'))
+Assert ($orch -match 'knowledge-retrieval-contract\.md' -and $orch -match '## 來源表' -and $orch -match 'ps-supplemental\.ps1 -New' -and $orch -match 'AUDITED_CLEAN' -and $orch -notmatch '先查 Entity Wiki') "orchestrator：第 3 步改為契約（索引定位、來源表、補研究指令、等級），不再只查 wiki"
+$kc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/knowledge-retrieval-contract.md'))
+Assert ($kc -match 'include="index\.md"' -and $kc -match 'include="objects\.md"' -and $kc -match 'path="docs/ps-research/knowledge"' -and $kc -match 'limit=<limit>\+1' -and $kc -match '\| 子問句 \| 來源 \| 等級 \| 證據參照 \| 現查 \|') "讀取契約：grep 呼叫形狀（path＝目錄、include＝檔名）、read offset／limit、來源表欄名"
+$sc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/supplemental-contract.md'))
+Assert ($sc -match '\| 處置 \| 查法收據 \|' -and $sc -match '\| 節 \| 信心 \| 敘述 \| 證據# \|' -and $sc -match '\| 位置 \| 說明 \| 機器參照 \|' -and $sc -match 'ps-peoplecode-flow' -and $sc -match '不是研究模式') "補研究契約：三張表欄名、委派鏈、不是研究模式"
+$sup = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/command/ps-supplement.md'))
+Assert ($sup -match '(?m)^agent: ps-deep-research' -and $sup -match 'supplemental-parts/current\.manifest\.md' -and $sup -match '不是研究模式' -and $sup -match '已寫') "ps-supplement 指令：掛 ps-deep-research、第一動作 read 工單、只寫收據"
+$capJ = $null
+try { $capJ = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/spec/capabilities.json')) | ConvertFrom-Json } catch { $capJ = $null }
+Assert ($null -ne $capJ -and @($capJ.factKinds.PSObject.Properties).Count -eq 15 -and @($capJ.targetTypes).Count -eq 10 -and $capJ.factKinds.'DATA.FILE_INPUT'.mode -eq 'COMPOSE' -and $capJ.factKinds.'DATA.FILE_INPUT'.follow -eq $true) "能力目錄：15 個 factKind、10 個 target 型別、DATA.FILE_INPUT 為 COMPOSE＋follow"
+$sw = Join-Path $repoRoot '.opencode/agent/ps-spec-worker.md'
+if (Test-Path -LiteralPath $sw) {
+    $swt = [System.IO.File]::ReadAllText($sw)
+    Assert ($swt -match '(?m)^\s+grep: false' -and $swt -match '(?m)^\s+glob: false' -and $swt -match '(?m)^\s+task: false' -and $swt -match '(?m)^\s+bash: false' -and $swt -match '"oracleMCP_sql_run": false' -and $swt -match '"PeoplecodeSource_\*": false' -and $swt -match '(?m)^permission:' -and $swt -match '\.ps-runtime/spec/\*') "ps-spec-worker：grep／glob／task／bash 關、MCP 全 deny、permission 逐路徑只開 .ps-runtime/spec"
+}
+else { Assert $false "ps-spec-worker.md 存在" }
+# 合成識別字守衛：新檔案裡出現的 TW_ 樣式物件名只能是合成集合（真實物件名永遠不進 repo）
+$synthOk = '^TW_(DEMO(_[A-Z0-9]+)?|X{1,3}|[A-H]|NEW|OLD|STALE|OUT|ROOT2|NOWHERE\d*|ANOTHER|MIL\d*|MILITARY_DATA|JO_OPEN|NAV\w*)$'
+$synthFiles = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Include 'ps-knowledge*.ps1', 'ps-supplemental*.ps1', 'ps-spec*.ps1', 'ps-session-lib.ps1', 'test-knowledge.ps1', 'test-supplemental.ps1', 'test-spec.ps1' -Recurse -File)
+$synthFiles += @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/peoplesoft/spec') -Include '*.md', '*.json' -Recurse -File)
+foreach ($n in @('.opencode/peoplesoft/knowledge-retrieval-contract.md', '.opencode/peoplesoft/supplemental-contract.md', '.opencode/command/ps-supplement.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-worker.md')) { $fp = Join-Path $repoRoot $n; if (Test-Path -LiteralPath $fp) { $synthFiles += (Get-Item -LiteralPath $fp) } }
+$synthBad = @()
+foreach ($sf in $synthFiles) {
+    foreach ($m in [regex]::Matches([System.IO.File]::ReadAllText($sf.FullName), '\bTW_[A-Z0-9_]+\b')) { if ($m.Value -notmatch $synthOk) { $synthBad += ($sf.Name + ':' + $m.Value) } }
+}
+Assert ($synthBad.Count -eq 0) "合成識別字守衛：新檔案的 TW_ 物件名全在合成集合（$(($synthBad | Select-Object -Unique) -join ','))"
 
 Remove-Item -Recurse -Force $dir
 Write-Host ""

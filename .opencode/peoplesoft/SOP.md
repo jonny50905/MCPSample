@@ -789,3 +789,71 @@ ps-ui-flow 只跑 cookbook §2k-C canonical query、原樣回傳。管理者做�
    驗證結果（觀察值、日期）記進 applied.md 該課的追記，profile 註解只留結論。
 4. 之後 Fluid 上線、換 portal、換語系、換 PeopleTools 版本時只改 profile，不改 cookbook 與 agent。
 5. 改 `ps-doc-lint.ps1`／`ps-contract-lib.ps1` 後必跑 `test-auto-loop.ps1`（情境 28／30）與 `test-contract.ps1`。
+
+## SOP-22 知識索引（Knowledge Index）——問答讀 NN 研究文件的定位層（issue #33）
+
+問答不再只看 wiki：`docs/ps-research/<領域>/NN-*.md`（已 lint／稽核／畢業的研究文件）經
+`scripts\ps-knowledge.ps1` 編成索引，ps-orchestrator 依 `.opencode/peoplesoft/knowledge-retrieval-contract.md`
+用固定的 grep／read 呼叫形狀定位、只讀對應節、標來源等級、答覆附 `## 來源表`。
+
+1. **索引是本機快取**：`docs/ps-research/knowledge/{index.md,objects.md,index.json}`，已 gitignore
+   （含單機收據欄，不能跨機共用）。內部 git 的 `.gitignore` 也要加同樣四行：
+   `docs/ps-research/knowledge/`、`docs/ps-research/*/supplemental-parts/`、`.ps-private/`、`.ps-runtime/`。
+2. **何時重建**：`git pull` 之後、`/ps-correct` 之後、懷疑過時時手跑
+   `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-knowledge.ps1 -Rebuild`；
+   ps-auto-loop 在三個 safe point（啟動歸檔後、每圈末快照前、收據＋提煉後）自動重建，ps-auto-all preflight
+   `-Check` 到 STALE／MISSING 也自動重建——正常批次不必手跑。
+3. **檢查**：`-Check` 印 `KNOWLEDGE_CHECK：CURRENT|STALE|MISSING`（exit 0／1／2）；STALE 只在結論碼帶變動檔數，
+   檔名寫到 `auto-loop-logs\knowledge-doctor.txt`（本機看）。`-Find <詞>`、`-Slice <NN> -Section <節>` 供人工核對定位。
+4. **等級與有效性**（封閉值，見契約）：NN `AUDITED_CLEAN`／`AUDITED_ISSUES`／`UNAUDITED`／`PARTIAL`／`BLOCKED`；
+   wiki `verified`／`draft`／`stale`／`STALE_BY_SOURCE`／`EXPIRED`。「稽核後未改」靠領域目錄的 `audit-done.json`
+   （每次稽核合併由外環寫、進內部 git）；舊領域第一次合併後才有，之前只以本機 `auto-loop-logs` 的 done 檔判定。
+5. **驗收**：test-scenarios I2（含 grep 呼叫形狀的致命檢查點與來源表 regex）；沙箱 `scripts\tests\test-knowledge.ps1`。
+6. **回報維護端**只給結論碼 `KNOW1-<stage>-<code>[-<count>]` 與 enum（碼表 `.opencode/peoplesoft/spec/support-codes.md`），
+   不給路徑、物件名、hash。
+
+## SOP-23 補研究（Supplemental Research）——指定 NN＋指定問題的定向補查（issue #36）
+
+給三種來源用：問答查不到而物件已有 NN（orchestrator 會印指令）、Spec 規劃器缺事實（自動提交）、人工 QA。
+request／result 是資料檔（無自由文字），研究只回答 generic need；消費端的 requirementRef 等身分不會進 Research 端。
+
+1. **提交**：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 -New -Target COMPONENT:<物件> -FactKind <碼> -Properties <a,b> [-Context "operation=IMPORT"] [-EvidencePolicy AUDITED] [-DomainHint <領域>] [-GitCommit]`
+   （碼與屬性見 `.opencode/peoplesoft/spec/capabilities.json`）。requestId 由 need 決定：同 need 重提交回 PENDING、
+   不建檔；既有結果為終局時要重跑加 `-Resubmit`（建新世代，舊世代由迷你圈標 SUPERSEDED）。路由：`-DomainHint`
+   ＞ 索引中以目標為主物件的 NN 所在領域 ＞ 目錄掃描；零候選＝`ROUTING_REQUIRED`（加 hint，領域須有 00-overview）。
+   `-GitCommit` 只 commit request 檔到內部 git（永不 push）。
+2. **執行**：`ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]`（迷你圈；exit 4＝完成）；
+   `ps-auto-all` 在每個領域判收據前若有 pending 會自動先跑。每 run 至多 2 張（`-SupplementalPerRun`）；
+   每張 attempts 上限 2（工單檔數＝attempts；session 崩潰也算一次）。模型（`/ps-supplement`，掛 ps-deep-research）
+   只寫收據；外環驗收、只追加地合併進目標 NN、合併後 lint 缺料違規變多即還原（outcome 記 LINT_REGRESSION）。
+3. **目標尚無 NN**：迷你圈不派 session，改在該領域 checklist 寫一列 `D<輪次>-<序>` 新發現（`-Status` 顯示
+   `WAITING_RESEARCH`）；等研究相位（`/ps-research` 或 auto-loop）建檔後再跑迷你圈。
+4. **結果**：`-Status [-Domain]`、`-Result -RequestId <id>`；outcome ∈ RESOLVED／PARTIAL／UNRESOLVED／OUT_OF_SCOPE／SUPERSEDED；
+   完成層 RESEARCHED（result 存在）→ AUDITED（affected 檔 AUDITED_CLEAN 且該領域稽核輪次 > 完成時輪次——等下一輪全量稽核）
+   → GRADUATED（本機收據）→ PROJECTED（wiki 有效）。受影響的非 reviewed wiki 標 `status: stale`；reviewed 的在
+   Invalidated 追加一行請人工覆核。合併後收據無效＝下一輪稽核重驗、畢業重驗（ps-auto-all 會自動 RUN）。
+5. **排錯**：`auto-loop-logs\<領域>\supplemental-done\<requestId>.a<n>.outcome.json`（timedOut／exitCode／failureKind／
+   receiptValid／receiptErrors／merged／lintRegression／destructionRestored／integrityFail）；未發布的 parts 在
+   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占（SLOT_BUSY）＝另一個 headless session 在跑，錯開即可。
+6. **回報維護端**只給 `SUPP1-<stage>-<code>[-<count>]` 與 enum。
+
+## SOP-24 Spec 引擎——私有需求包接入與 job 執行（issue #34／#35）
+
+分母＝**目標 Component＋公司私有需求包**（不是整個領域）；公司 Template／Checklist 原文與映射只放
+`.ps-private\spec\<packId>\`（gitignore、fs-doctor 不列管、不進任何 git）；job 狀態在 `.ps-runtime\spec\<jobId>\`。
+generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worker agent／command）禁改，`-Doctor` stage 0 機械驗。
+
+1. **接入（一次）**：複製 `.opencode\peoplesoft\spec\examples\pack-a\` 為 `.ps-private\spec\<packId>\`；對照公司 Template
+   逐章節在 `template-bound.md` 插 `{{slot:Sxx}}` 並登錄 `slots`；對照 Checklist 逐項登錄 `C<nn>`，每項映射到 ≥1 個
+   requirement（factKind 從 capabilities.json 挑；挑不到填 `UNSUPPORTED`，並用 support-codes.md 的 CAP-REQ 表單向維護端申請，
+   不附原文）；`ps-spec.ps1 -ValidatePack -Pack <packId>`；`scripts\tests\test-spec.ps1` 全綠；對一個已研究的 Component 跑
+   `-Plan／-Run／-Render／-Gate`；內部覆核後填 `reviewedVersion`（≠ `packVersion` 時 `SPEC1-8-01`，不出貨）。
+2. **跑 job**：`-Plan -JobId <小寫id> -Component <名> -Pack <packId> [-DomainHint]` → `-Run`（每個 unit 一個 worker session，
+   共用 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
+   的迷你圈與下一輪稽核後重跑 `-Run`）→ `-Render` → `-Gate`（verdict SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED）。
+   產出 `.ps-runtime\spec\<jobId>\outputs\<generation>\{spec.md,trace.md,gate.json}`；重 render 位元組相同；來源 NN 改了就
+   `SOURCE_CHANGED`，要重 plan。
+3. **排錯**：`-Doctor -JobId <id> [-Drill <stage>-<code>]` 只印 opaque tuple；責任分工見 `troubleshooting-matrix.md`
+   （1／8 私有映射、2／3／4／6／7 引擎、5 Research、0 搬運完整性）。
+4. **回報維護端**只給 `SPEC1-<stage>-<code>[-<count>]` 與 drill tuple；template／checklist 原文與 `.ps-private` 內容不出公司。
+5. 改 `ps-spec*.ps1`／`spec\**` 後必跑 `test-spec.ps1`、`test-ps51-static.ps1`（5.1 語法紀律與 BOM）、`test-auto-loop.ps1`（情境 34）。

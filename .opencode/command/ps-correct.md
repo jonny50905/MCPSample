@@ -18,9 +18,10 @@ $ARGUMENTS
 3. frontmatter：`status: verified`、`reviewed: true`、更新
    `last_verified`；aliases 補上指正中出現的稱呼。
 4. 相關 NN 檔含舊敘述者同步修正（僅該敘述，其他一字不動）。
-5. 回覆兩點提醒：(a) 重啟後問答立即引用此條目；(b) 團隊生效需
+5. 回覆三點提醒：(a) 重啟後問答立即引用此條目；(b) 團隊生效需
    commit 走**內部 git PR 審核**（審核者看 diff 裁決——與 /ps-lesson
-   同一套治理，本流程內不設額外人工蓋章步驟）。
+   同一套治理，本流程內不設額外人工蓋章步驟）；(c) 知識索引是本機快取，
+   請管理者跑 `scripts\ps-knowledge.ps1 -Rebuild`，索引裡的 wiki 狀態列才會更新。
 
 唯一例外：指正與現有 `verified` 條目衝突且無法並存 → 兩案並陳寫入
 該檔、回覆請管理者裁決，不逕自覆蓋。
