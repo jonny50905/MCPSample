@@ -896,7 +896,7 @@ if (Test-Path -LiteralPath $sw) {
 }
 else { Assert $false "ps-spec-worker.md 存在" }
 # 合成識別字守衛：新檔案裡出現的 TW_ 樣式物件名只能是合成集合（真實物件名永遠不進 repo）
-$synthOk = '^TW_(DEMO(_[A-Z0-9]+)?|X{1,3}|[A-H]|NEW|OLD|STALE|OUT|ROOT2|NOWHERE\d*|ANOTHER|MIL\d*|MILITARY_DATA|JO_OPEN|NAV\w*)$'
+$synthOk = '^TW_(DEMO(_[A-Z0-9]*)?|X{1,3}|[A-H]|NEW|OLD|STALE|OUT|ROOT2|NOWHERE\d*|NOPE|ANOTHER|MIL\d*|MILITARY_DATA|JO_OPEN|NAV\w*)$'
 $synthFiles = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Include 'ps-knowledge*.ps1', 'ps-supplemental*.ps1', 'ps-spec*.ps1', 'ps-session-lib.ps1', 'test-knowledge.ps1', 'test-supplemental.ps1', 'test-spec.ps1' -Recurse -File)
 $synthFiles += @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/peoplesoft/spec') -Include '*.md', '*.json' -Recurse -File)
 foreach ($n in @('.opencode/peoplesoft/knowledge-retrieval-contract.md', '.opencode/peoplesoft/supplemental-contract.md', '.opencode/command/ps-supplement.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-worker.md')) { $fp = Join-Path $repoRoot $n; if (Test-Path -LiteralPath $fp) { $synthFiles += (Get-Item -LiteralPath $fp) } }

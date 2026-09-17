@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "packId": "pack-a",
+  "packVersion": 1,
+  "reviewedVersion": 1,
+  "template": "template-bound.md",
+  "slots": ["S01", "S02", "S03", "S04", "S05", "S06", "S07"],
+  "checklist": ["C01", "C02", "C03", "C04", "C05", "C06", "C07"],
+  "requirements": [
+    { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "AUDITED" },
+    { "id": "R02", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.NAVIGATION", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R05", "slot": "S02", "checklistRefs": ["C02"], "factKind": "UI.FIELD_INVENTORY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R08", "slot": "S03", "checklistRefs": ["C03"], "factKind": "BEHAVIOR.RULES", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R20", "slot": "S03", "checklistRefs": ["C03"], "factKind": "BEHAVIOR.VALIDATIONS", "required": true,
+      "applicability": { "op": "FACT_TRUE", "fact": "BEHAVIOR.RULES.rules" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R10", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FLOW", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R18", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.RECORD_USAGE", "required": false,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FLOW.tables" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R12", "slot": "S05", "checklistRefs": ["C05"], "factKind": "PROCESS.EXECUTION", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R14", "slot": "S05", "checklistRefs": ["C05"], "factKind": "SECURITY.ACCESS", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "ANY" },
+    { "id": "R15", "slot": "S06", "checklistRefs": ["C06"], "factKind": "RELATED.OBJECTS", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R17", "slot": "S07", "checklistRefs": ["C07"], "factKind": "DATA.FILE_INPUT", "required": true,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FILE_INPUT.present" }, "cardinality": "ANY", "evidencePolicy": "STATIC" }
+  ]
+}

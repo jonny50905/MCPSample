@@ -144,6 +144,31 @@ deep-research 路由與「委派目標只能是 agent」段；契約硬規則 10
 驗證：單元 10 組、e2e 13 情境（真 OpenCode 1.18.29，含 host A 工具目錄變空／transport 關閉＋host B 正常）、test-auto-loop 情境 31～33 改寫全 PASS。
 搬運見 §1 步驟 1c。
 
+**追記（2026-09-17，issue #33～#36）**：管理者要求「不受 issue 作者的 Part B 與協作者提案左右，客觀判定怎麼解」。四題全部成立
+（#33 問答只查 wiki、NN 對問答不可見；#34 Spec 分母＝整個領域、需求無法以資料跨界；#35 Spec 無外環且 -Accept 會把舊片段簽成 DONE；
+#36 外環沒有「指定 NN＋指定問題」的入口），#17 功能分支不合併、只逐字取用通用函式。設計與對抗審查裁決在
+`docs/design/knowledge-spec-decision-memo.md`（不搬）。落地：
+- **#33 知識索引**：`scripts/ps-knowledge-lib.ps1`＋`ps-knowledge.ps1`（本機快取 `docs/ps-research/knowledge/`，gitignore；`-Rebuild/-Check/-Find/-Slice`；
+  結論碼 KNOW1）；模型側 `.opencode/peoplesoft/knowledge-retrieval-contract.md`（grep `path=目錄`＋`include=檔名`、`名@offset/limit` 讀節＋雙端自檢、
+  預算、必現查條件、封閉來源標籤、固定 `## 來源表`）；ps-orchestrator 第 3／7／8 步與硬規則；auto-loop 三個 safe point 自動重建、稽核合併另存
+  領域 `audit-done.json`（進內部 git）；SOP-22、test-scenarios I2／K1～K4。
+- **#36 補研究**：`scripts/ps-supplemental-lib.ps1`＋`ps-supplemental.ps1`（request＝need 的 canonical JSON 決定 id、create-only、Submit 時路由、
+  `-Resubmit` 世代；結論碼 SUPP1）；`ps-auto-loop -SupplementalOnly` 獨立迷你圈（exit 4；模型只寫收據，外環驗收／只追加合併／lint 回歸還原／
+  發布／wiki stale／checklist D 列）；`/ps-supplement`＋`supplemental-contract.md`；ps-auto-all 收據判定前先跑迷你圈；SOP-23、test-scenarios S1～S6。
+- **共用地基**：`scripts/ps-session-lib.ps1`（Invoke-Opencode 抽成 lib＋`Global\MCPSample-OpencodeSession` slot 鎖，auto-loop 薄包裝、呼叫點不變）；
+  `.gitignore` 加 `docs/ps-research/knowledge/`、`docs/ps-research/*/supplemental-parts/`、`.ps-private/`、`.ps-runtime/`（**內部 git 要加同樣四行**）；
+  快照 stage 三處路徑；auto-all 保留名 knowledge／supplemental／spec。
+- **#34／#35 Spec 引擎**：`scripts/ps-spec-lib.ps1`＋`ps-spec.ps1`（`-ValidatePack/-Plan/-Run/-Render/-Gate/-Doctor [-Drill]`；分母＝Component＋私有需求包；
+  per-job 鎖；receipts 以輸入指紋為鍵、來源變即拒收不記 attempt；render parity；結論碼 SPEC1）；`.opencode/peoplesoft/spec/`（capabilities.json、
+  pack.schema.json、support-codes.md 含 CAP-REQ、troubleshooting-matrix.md、examples/pack-a／pack-b、generic.manifest.json）；`ps-spec-worker` agent
+  （grep／glob／task／bash 關、MCP 全 deny、`permission.read/edit` 逐路徑只開 `.ps-runtime/spec`）＋`/ps-spec-batch`；私有需求包在 `.ps-private/spec/<packId>/`
+  （公司機自建，永不入庫）；SOP-24、test-scenarios P1～P6。
+- **測試組**：`scripts/tests/test-knowledge.ps1`（86）、`test-supplemental.ps1`（102）、`test-spec.ps1`（110）、`test-ps51-static.ps1`（AST 5.1 語法紀律＋BOM）、
+  test-auto-loop 情境 34；全部在沙箱 pwsh 7.6 全綠；**公司機（PS 5.1）尚未實跑**——首跑先 `ps-fs-doctor` 再各測試組，回報只給結論碼與 PASS／FAIL。
+  OpenCode 1.18.29 事實已從公司機同版 binary 核對：read 的 permission 以專案相對路徑比對、last-match-wins；grep／glob 的 permission 比對的是搜尋
+  pattern 不是路徑（所以 worker 用 tools 關掉 grep／glob）。
+- 教訓 L119～L121；搬運清單見 §1 步驟 1c。
+
 ## 1. 管理者下一步（按序）
 
 1. 搬 5 檔（核對欄：行數＝編輯器總行數，允許 ±1 行尾差異）：

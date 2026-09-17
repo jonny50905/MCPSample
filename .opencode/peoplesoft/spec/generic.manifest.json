@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
+  "files": [
+    {
+      "path": ".opencode/agent/ps-spec-worker.md",
+      "sha256": "85A4A48D8BD2D46F2D5B329BF7AC0526FEE24552807256C5DD8B852648A11308",
+      "lines": 72
+    },
+    {
+      "path": ".opencode/command/ps-spec-batch.md",
+      "sha256": "103B4EA3BAED0F5C267729F048839657DC8DBA1590185D6E984512CE3D57D96D",
+      "lines": 19
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/capabilities.json",
+      "sha256": "67E7A913080F50A6E268F245744D730F147DB683AFF100BDBCA87ED7BFE01573",
+      "lines": 38
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-a/pack.json",
+      "sha256": "A54BDA5D2278A1CB1471C42C1CA5077703DD57AF0DAC5D3DD4915B5C7EA1D8E1",
+      "lines": 34
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-a/template-bound.md",
+      "sha256": "475B5714806F963A2E5A3A67B2A529994BEA606F7D779FE2863F2A1872ECD518",
+      "lines": 32
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-b/pack.json",
+      "sha256": "F471163A2B9BD1F7920AB56FB1C530AF2770672DB53EA211F9F9016D956F1800",
+      "lines": 31
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-b/template-bound.md",
+      "sha256": "5FD342F4B44049C596094C1DD80C8CAE7F108F8204B5DE89BA8C3EFD8A863715",
+      "lines": 20
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/pack.schema.json",
+      "sha256": "914B443E4E65EDF81E8F39D41C7D5E353DA06CC1C76AA9EEEC5581C8C65612D1",
+      "lines": 53
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/support-codes.md",
+      "sha256": "243C16F32BC6F0AE7A78FC0C6F496E5115318E52132E2A37CAC44C566B24BA1C",
+      "lines": 140
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
+      "sha256": "002AEAA343B5BD7A7EE31F29306926ED61290C0972A513797FBAE205FC15E69F",
+      "lines": 29
+    },
+    {
+      "path": "scripts/ps-spec-lib.ps1",
+      "sha256": "1AA29D7470F0091926B46308F81A4239F25DF96519A4F34E94841DF9080431D1",
+      "lines": 2122
+    },
+    {
+      "path": "scripts/ps-spec.ps1",
+      "sha256": "8E879F2C7D2D7D944A600FD832AA1602129466BAB4BEDB41E335ADA2E11D4702",
+      "lines": 242
+    }
+  ]
+}

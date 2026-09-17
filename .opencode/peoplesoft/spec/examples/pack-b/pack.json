@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "packId": "pack-b",
+  "packVersion": 2,
+  "reviewedVersion": 2,
+  "template": "template-bound.md",
+  "slots": ["S01", "S02", "S03", "S04"],
+  "checklist": ["C01", "C02", "C03", "C04", "C05"],
+  "requirements": [
+    { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "STATIC", "properties": ["primaryObject", "origin"] },
+    { "id": "R03", "slot": "S01", "checklistRefs": ["C01"], "factKind": "RELATED.OBJECTS", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R06", "slot": "S02", "checklistRefs": ["C02"], "factKind": "DATA.FLOW", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R07", "slot": "S02", "checklistRefs": ["C02"], "factKind": "ENTITY.DETAIL", "required": false,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FLOW.writes" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R09", "slot": "S02", "checklistRefs": ["C02"], "factKind": "DATA.RECORD_USAGE", "required": true,
+      "applicability": { "op": "ALL", "args": [ { "op": "FACT_TRUE", "fact": "DATA.FLOW.tables" }, { "op": "NOT", "arg": { "op": "FACT_FALSE", "fact": "DATA.FLOW.writes" } } ] },
+      "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC", "context": { "record": "PS_DEMO_TBL" } },
+    { "id": "R11", "slot": "S03", "checklistRefs": ["C03"], "factKind": "GAPS", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "ANY" },
+    { "id": "R13", "slot": "S03", "checklistRefs": ["C03"], "factKind": "EVIDENCE.APPENDIX", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "ANY" },
+    { "id": "R16", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FILE_OUTPUT", "required": false,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FILE_OUTPUT.present" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R19", "slot": "S04", "checklistRefs": ["C05"], "factKind": "UNSUPPORTED", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "ANY" }
+  ]
+}

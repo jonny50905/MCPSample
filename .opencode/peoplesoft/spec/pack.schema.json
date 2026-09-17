@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Spec Definition Pack（私有需求包 pack.json）",
+  "description": "文件級 schema：描述 .ps-private/spec/<packId>/pack.json 的形狀。實際驗證由 scripts/ps-spec-lib.ps1 的 Test-PsSpPack（PowerShell 5.1 手寫 validator）執行；本檔只供閱讀與編輯器提示。pack 只含 opaque ID、capability 代碼、slot id、條件、基數與證據政策——公司 Template／Checklist 原文只在模板副本（template-bound.md）與內部人員手上，不進本 repo。validator 另外保證：ID 唯一、每個 checklist id 至少被一個 requirement 引用、每個 slot 在模板出現且模板每個 {{slot:Sxx}} 標記都在 slots、factKind／properties／context 在 capabilities.json 目錄內、applicability 依賴無環（自我引用允許＝驗收後再判）、reviewedVersion≠packVersion 時 gate 標 8-01。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "packId", "packVersion", "reviewedVersion", "template", "slots", "checklist", "requirements"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "packId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$", "description": "與目錄名相同；小寫英數與連字號" },
+    "packVersion": { "type": "integer", "minimum": 1, "description": "每次改 requirements／slots／模板都遞增" },
+    "reviewedVersion": { "type": "integer", "minimum": 0, "description": "內部人員核可的 packVersion；不等於 packVersion → SPEC1-8-01 MAPPING_UNSIGNED" },
+    "template": { "type": "string", "description": "pack 目錄內的模板副本檔名（只插 {{slot:Sxx}} 標記）；不得含路徑分隔符" },
+    "slots": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^S[0-9]{2,4}$" } },
+    "checklist": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" }, "description": "公司 Checklist 逐項的 opaque id；每項須被 ≥1 requirement 的 checklistRefs 引用" },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "slot", "checklistRefs", "factKind", "required", "applicability", "cardinality", "evidencePolicy"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^R[0-9]{2,4}$" },
+          "slot": { "type": "string", "pattern": "^S[0-9]{2,4}$", "description": "必須在 slots 內；同 slot 的 requirements 依 pack 順序串接成該 slot 的內容" },
+          "checklistRefs": { "type": "array", "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" } },
+          "factKind": { "type": "string", "description": "capabilities.json factKinds 的鍵，或字面值 UNSUPPORTED（目錄挑不到；gate 列 7-17）" },
+          "required": { "type": "boolean" },
+          "applicability": { "$ref": "#/definitions/applicability" },
+          "cardinality": { "type": "string", "enum": ["ONE", "ANY", "ALL_DISCOVERED"], "description": "ALL_DISCOVERED：COMPOSE 需 closure COMPLETE、EXTRACT 需來源表存在" },
+          "evidencePolicy": { "type": "string", "enum": ["AUDITED", "STATIC", "ANY"], "description": "AUDITED＝來源 NN 等級 AUDITED_CLEAN；STATIC＝AUDITED_CLEAN／AUDITED_ISSUES／UNAUDITED；ANY＝含 PARTIAL／BLOCKED" },
+          "properties": { "type": "array", "items": { "type": "string" }, "description": "可選；限縮該 factKind 的 properties（缺＝目錄全部）；也用於 KnowledgeNeed" },
+          "context": { "type": "object", "additionalProperties": { "type": "string" }, "description": "可選；鍵限 capabilities.json contextKeys（operation／mode／page／record／field／process）；DATA.RECORD_USAGE 與 ENTITY.DETAIL 以 record 限縮到單一 Record" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "description": "三值邏輯（TRUE／FALSE／UNKNOWN）；FALSE＝不適用（N/A），UNKNOWN 永不變 N/A（gate 列 7-15 debt）。fact 寫 <factKind>.<property>；COMPOSE 事實的 present 由驗收後的片段決定（有列＝TRUE、無列且 closure COMPLETE＝FALSE、否則 UNKNOWN）",
+      "properties": {
+        "op": { "type": "string", "enum": ["ALWAYS", "FACT_TRUE", "FACT_FALSE", "ALL", "ANY", "NOT"] },
+        "fact": { "type": "string", "pattern": "^[A-Z][A-Z_.]*\\.[A-Za-z]+$", "description": "FACT_TRUE／FACT_FALSE 用；factKind 須由本 pack 某個 requirement 產出" },
+        "args": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/applicability" }, "description": "ALL／ANY 用" },
+        "arg": { "$ref": "#/definitions/applicability", "description": "NOT 用" }
+      }
+    }
+  }
+}
