@@ -403,7 +403,7 @@ Invoke-GitSnapshot 只 commit 有暫存檔的路徑；`limit` 直接用＋只檢
 另外在寫測試時抓到一類新陷阱：`return , $arr` 的函式被 `@(函式 …)` 直接包住時，空陣列會數成 1（`@(f)` 得到 `@(@())`）——
 auto-all／auto-loop 三處改「先指派再 @()」，test-ps51-static 新增 BLOCK 規則。
 
-### 11.2 Spec 引擎（28 項提出；全部依原發現修正，等第二輪 refuter 裁決另記）
+### 11.2 Spec 引擎（28 項提出、13 項兩名 refuter 都確認：行號漂移 ×3、零單位 render ×2、規劃時等級、RECORD hashAfter、Get-PsSpProp、時間戳、gate 指標、factKind、歷史收據、拆分回傳；其餘 15 項被駁回但一併修掉）
 
 | # | 發現 | 修法（落點） |
 |---|---|---|

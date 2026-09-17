@@ -172,8 +172,8 @@ deep-research 路由與「委派目標只能是 agent」段；契約硬規則 10
 **追記（2026-09-17，對抗審查修正）**：實作後跑兩個獨立的對抗審查 workflow（六鏡頭 find → 每項兩名 refuter，refuter 以 Opus 跑；
 管理者指定「VERIFY 用 Opus」）。知識索引／補研究／auto-loop：32 項提出、13 項兩名 refuter 都確認（create-only 把 sharing violation 當
 輸掉競賽、中斷重跑雙重合併、工單指標寫不進、prompt 閘門擋掉手術提示、SLOT_BUSY 當逾時、迷你圈 exit 1 被 auto-all 吞掉、wiki 有效性
-無標籤、wiki 檔路徑、模型寫的 request／result 入庫、request 未驗證、情境 34 讀 .gitignore）；Spec 引擎 28 項（派工行號漂移是 blocker）
-全部修正，裁決另記 memo §11。修法全在 L122／L123；被駁回但成本低的也順手修。寫測試時抓到新陷阱：`return , $arr` 的函式被
+無標籤、wiki 檔路徑、模型寫的 request／result 入庫、request 未驗證、情境 34 讀 .gitignore）；Spec 引擎 28 項提出、13 項確認（派工行號漂移是 blocker）
+全部修正（駁回的 15 項也一併修），裁決記 memo §11。修法全在 L122／L123；被駁回但成本低的也順手修。寫測試時抓到新陷阱：`return , $arr` 的函式被
 `@(函式)` 直接包住時空陣列數成 1——三處改先指派，test-ps51-static 新增 BLOCK 規則。全套測試組（含情境 11～20、情境 9、情境 34 補強）
 在 pwsh 7.6 全綠；**公司機 PS 5.1 仍未實跑**。`TW_JO_OPEN` 這個名字曾在 6466d07／c441e04 的 memo 與守衛 regex 出現，本輪已移除；
 若它是真實物件名，需要改寫這兩個 commit 的歷史（見 §4）。搬運清單見 §1 步驟 1d。
