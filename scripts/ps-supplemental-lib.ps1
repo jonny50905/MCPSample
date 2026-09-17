@@ -188,21 +188,42 @@ function Read-PsSuppJsonFile {
     try { return ($t | ConvertFrom-Json -ErrorAction Stop) } catch { return $null }
 }
 
-# 全部 request：@( @{ Path; RequestId; WorkKey; Generation; Domain; Obj } )，依 requestId Ordinal 排序
+# 全部 request：@( @{ Path; RequestId; WorkKey; Generation; Domain; Obj } )，依 requestId Ordinal 排序。
+# Research 端 intake 驗證（每次讀取都做）：檔名＝body requestId＝文法；schemaVersion；domain 是單一目錄名且非保留名；
+# need 依能力目錄重驗；workKey 重算相符且與 requestId 前 24 hex 一致；generation ≥1。不符者不進清單，
+# 記在 $script:PsSuppIntakeRejected（檔名：原因）供外環 log。-Capabilities 未給時自 Root 讀能力目錄；讀不到就略過 need 驗證。
 function Get-PsSuppRequests {
-    param([string]$Root)
+    param([string]$Root, $Capabilities = $null)
     $d = Get-PsSuppDirs -Root $Root
     $list = @()
+    $script:PsSuppIntakeRejected = @()
     if (-not [System.IO.Directory]::Exists($d.Requests)) { return , $list }
+    if ($null -eq $Capabilities) { try { $Capabilities = Get-PsSuppCapabilities -Root $Root } catch { $Capabilities = $null } }
     $files = @(Get-ChildItem -LiteralPath $d.Requests -File -Filter '*.json' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^S-[0-9a-f]{24}-g\d+\.json$' })
     $names = @($files | ForEach-Object { $_.Name })
     foreach ($n in (Sort-PsKnOrdinal -Items $names)) {
         $p = Join-Path $d.Requests $n
         $o = Read-PsSuppJsonFile -LiteralPath $p
-        if ($null -eq $o) { continue }
+        if ($null -eq $o) { $script:PsSuppIntakeRejected += ($n + '：NOT_JSON'); continue }
+        $base = $n.Substring(0, $n.Length - 5)
+        $rid = [string]$o.requestId
+        $dom = [string]$o.domain
+        $why = ''
         $gen = 0
-        [void][int]::TryParse([string]$o.generation, [ref]$gen)
-        $list += , (@{ Path = $p; RequestId = [string]$o.requestId; WorkKey = [string]$o.workKey; Generation = $gen; Domain = [string]$o.domain; Obj = $o })
+        if ($rid -notmatch $script:PsSuppRequestIdRx -or $rid -cne $base) { $why = 'ID_MISMATCH' }
+        elseif ([string]$o.schemaVersion -ne '1') { $why = 'SCHEMA' }
+        elseif ($dom -eq '' -or $dom -match '[\\/]' -or $dom.Contains('..') -or ($script:PsKnReservedNames -contains $dom)) { $why = 'DOMAIN' }
+        elseif (-not [int]::TryParse([string]$o.generation, [ref]$gen) -or $gen -lt 1) { $why = 'GENERATION' }
+        elseif ($null -ne $Capabilities) {
+            $vn = Test-PsSuppNeed -Need (ConvertFrom-PsSuppNeedObject -Obj $o.need) -Capabilities $Capabilities
+            if (-not $vn.Ok) { $why = 'NEED' }
+            else {
+                $wk = Get-PsSuppWorkKey -Need $vn.Need
+                if ($wk -cne [string]$o.workKey -or $rid.Substring(2, 24) -cne $wk.Substring(0, 24).ToLowerInvariant()) { $why = 'WORKKEY' }
+            }
+        }
+        if ($why -ne '') { $script:PsSuppIntakeRejected += ($n + '：' + $why); continue }
+        $list += , (@{ Path = $p; RequestId = $rid; WorkKey = [string]$o.workKey; Generation = $gen; Domain = $dom; Obj = $o })
     }
     return , $list
 }
@@ -320,12 +341,14 @@ function Submit-PsSupplementalRequest {
     $obj = New-PsSuppRequestObject -Need $need -Consumer $vc.Consumer -Domain $route.Domain -WorkKey $wk -Generation $gen -AsOf $AsOf
     $path = Join-Path $d.Requests ([string]$obj.requestId + '.json')
     $ok = Write-PsKnCreateOnlyText -LiteralPath $path -Text ((ConvertTo-PsKnJson -Value $obj) + "`n")
-    if ($ok) { return @{ requestId = [string]$obj.requestId; state = 'CREATED'; domain = $route.Domain; created = $true; reason = $route.Reason; errors = @(); path = $path } }
-    # Move 輸家：讀贏家、回其身分
-    $winner = Read-PsSuppJsonFile -LiteralPath $path
-    $wd = ''
-    if ($null -ne $winner) { $wd = [string]$winner.domain }
-    return @{ requestId = [string]$obj.requestId; state = 'PENDING'; domain = $wd; created = $false; reason = 'RACE_LOST'; errors = @(); path = $path }
+    if ($ok -eq $true) { return @{ requestId = [string]$obj.requestId; state = 'CREATED'; domain = $route.Domain; created = $true; reason = $route.Reason; errors = @(); path = $path } }
+    # $false＝Move 輸家：讀贏家、回其身分；$null（或贏家檔讀不到）＝寫入延後，不能假裝有 request 在等
+    $winner = $null
+    if ($ok -eq $false) { $winner = Read-PsSuppJsonFile -LiteralPath $path }
+    if ($null -eq $winner) {
+        return @{ requestId = [string]$obj.requestId; state = 'WRITE_FAILED'; domain = $route.Domain; created = $false; reason = 'WRITE_DEFERRED'; errors = @('request 檔寫入失敗（目標被別的行程開著？）——稍後重新提交'); path = $path }
+    }
+    return @{ requestId = [string]$obj.requestId; state = 'PENDING'; domain = [string]$winner.domain; created = $false; reason = 'RACE_LOST'; errors = @(); path = $path }
 }
 
 # ── attempts（manifest 檔數＝attempts；outcome 缺＝crash 也算一次）───────
@@ -359,8 +382,8 @@ function Get-PsSuppAttempts {
 
 # 待處理：domain==D、無 result、非被 supersede、attempts<MaxAttempts。回 @( @{ Request; Path; RequestId; Attempts; TargetName } )
 function Get-PsSuppPending {
-    param([string]$Root, [string]$Domain, [string]$DomainDir, [int]$MaxAttempts = 2)
-    $all = Get-PsSuppRequests -Root $Root
+    param([string]$Root, [string]$Domain, [string]$DomainDir, [int]$MaxAttempts = 2, $Capabilities = $null)
+    $all = Get-PsSuppRequests -Root $Root -Capabilities $Capabilities
     $maxGenByKey = @{}
     foreach ($r in $all) { if (-not $maxGenByKey.ContainsKey($r.WorkKey) -or $r.Generation -gt $maxGenByKey[$r.WorkKey]) { $maxGenByKey[$r.WorkKey] = $r.Generation } }
     $out = @()
@@ -376,8 +399,8 @@ function Get-PsSuppPending {
 
 # 被新世代取代、尚無 result 的舊 request（domain==D）：外環發 SUPERSEDED
 function Get-PsSuppSuperseded {
-    param([string]$Root, [string]$Domain)
-    $all = Get-PsSuppRequests -Root $Root
+    param([string]$Root, [string]$Domain, $Capabilities = $null)
+    $all = Get-PsSuppRequests -Root $Root -Capabilities $Capabilities
     $maxGenByKey = @{}
     foreach ($r in $all) { if (-not $maxGenByKey.ContainsKey($r.WorkKey) -or $r.Generation -gt $maxGenByKey[$r.WorkKey]) { $maxGenByKey[$r.WorkKey] = $r.Generation } }
     $out = @()
@@ -409,10 +432,11 @@ function Get-PsSuppCallees {
     $out = @()
     $roles = @($Capabilities.followRoles)
     $types = @($Capabilities.followTypes)
+    # 角色以「開頭」比對（呼叫／啟動／排程／執行…）：「被呼叫」「由 X 啟動」是反向關係，不是 callee
+    $roleRx = '^(' + ((@($roles | ForEach-Object { [regex]::Escape([string]$_) })) -join '|') + ')'
     foreach ($ro in @($TargetFacts.relatedObjects)) {
-        $hit = $false
-        foreach ($r in $roles) { if (([string]$ro.role).IndexOf($r) -ge 0) { $hit = $true; break } }
-        if (-not $hit) { continue }
+        $roleText = ([string]$ro.role).Trim()
+        if ($roleText -notmatch $roleRx) { continue }
         $name = [string]$ro.name
         $type = ''
         if ($null -ne $Index) {
@@ -504,8 +528,9 @@ function New-PsSuppManifest {
     $text = $sb.ToString()
     $okM = Write-PsKnCreateOnlyText -LiteralPath $manifestPath -Text $text
     $current = Join-Path $parts 'current.manifest.md'
-    $okC = Write-PsKnAtomicText -LiteralPath $current -Text $text -Bom $false
-    return @{ ManifestPath = $manifestPath; CurrentPath = $current; ReceiptPath = (Join-Path $parts ($rid + '.a' + $AttemptNo + '.md')); ReceiptRel = $receiptRel; TargetFiles = @($targetFiles); CalleeFiles = @($calleeFiles); Text = $text; Created = $okM; CurrentWritten = $okC; TargetFacts = $targetFacts }
+    $okC = $false
+    if ($okM -eq $true) { $okC = Write-PsKnAtomicText -LiteralPath $current -Text $text -Bom $false }
+    return @{ ManifestPath = $manifestPath; CurrentPath = $current; ReceiptPath = (Join-Path $parts ($rid + '.a' + $AttemptNo + '.md')); ReceiptRel = $receiptRel; TargetFiles = @($targetFiles); CalleeFiles = @($calleeFiles); Text = $text; Created = ($okM -eq $true); CreateDeferred = ($null -eq $okM); CurrentWritten = $okC; TargetFacts = $targetFacts }
 }
 
 function Write-PsSuppOutcome {
@@ -834,11 +859,27 @@ function Merge-PsSuppReceipt {
     return $res
 }
 
+# 還原原 bytes：也走 tmp → Replace／Move（半路被殺不會留下 0 byte 的 NN）
 function Restore-PsSuppBytes {
-    param([string]$LiteralPath, [byte[]]$Bytes)
+    param([string]$LiteralPath, [byte[]]$Bytes, [int]$Retries = 5)
     if ($null -eq $Bytes) { return $false }
-    [System.IO.File]::WriteAllBytes($LiteralPath, $Bytes)
-    return $true
+    $tmp = $LiteralPath + '.tmp-' + [guid]::NewGuid().ToString('N')
+    [System.IO.File]::WriteAllBytes($tmp, $Bytes)
+    for ($try = 1; $try -le $Retries; $try++) {
+        try {
+            if ([System.IO.File]::Exists($LiteralPath)) {
+                $bak = $LiteralPath + '.bak-' + [guid]::NewGuid().ToString('N')
+                try { [System.IO.File]::Replace($tmp, $LiteralPath, $bak) }
+                catch [System.PlatformNotSupportedException] { [System.IO.File]::Delete($LiteralPath); [System.IO.File]::Move($tmp, $LiteralPath) }
+                if ([System.IO.File]::Exists($bak)) { [System.IO.File]::Delete($bak) }
+            }
+            else { [System.IO.File]::Move($tmp, $LiteralPath) }
+            return $true
+        }
+        catch { Start-Sleep -Milliseconds (200 * $try) }
+    }
+    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    return $false
 }
 
 # ── result 發布（create-only；已存在＝冪等成功）───────────────────
@@ -866,14 +907,20 @@ function New-PsSuppResult {
     }
 }
 
+# result 只由 Research 迷你圈寫；已存在＝冪等成功（但必須是同一 workKey／domain 的 result——不同就是別人寫的，回 Ok=$false 讓外環記違規）
 function Publish-PsSuppResult {
     param([string]$Root, $Result)
     $d = Get-PsSuppDirs -Root $Root
     $p = Join-Path $d.Results ([string]$Result.requestId + '.json')
-    if ([System.IO.File]::Exists($p)) { return @{ Ok = $true; Existed = $true; Path = $p } }
+    if ([System.IO.File]::Exists($p)) {
+        $ex = Read-PsSuppJsonFile -LiteralPath $p
+        if ($null -ne $ex -and [string]$ex.workKey -ceq [string]$Result.workKey -and [string]$ex.domain -ceq [string]$Result.domain -and ($script:PsSuppOutcomes -contains [string]$ex.outcome)) { return @{ Ok = $true; Existed = $true; Path = $p } }
+        return @{ Ok = $false; Existed = $true; Path = $p; Reason = 'FOREIGN_RESULT' }
+    }
     $ok = Write-PsKnCreateOnlyText -LiteralPath $p -Text ((ConvertTo-PsKnJson -Value $Result) + "`n")
-    if ($ok) { return @{ Ok = $true; Existed = $false; Path = $p } }
-    return @{ Ok = ([System.IO.File]::Exists($p)); Existed = $true; Path = $p }
+    if ($ok -eq $true) { return @{ Ok = $true; Existed = $false; Path = $p } }
+    if ($ok -eq $false) { return @{ Ok = $true; Existed = $true; Path = $p } }
+    return @{ Ok = $false; Existed = $false; Path = $p; Reason = 'WRITE_DEFERRED' }
 }
 
 # ── 消費端：完成邊界（RESEARCHED／AUDITED／GRADUATED／PROJECTED）────
@@ -951,9 +998,17 @@ function Set-PsSuppWikiStale {
             if (Write-PsKnAtomicText -LiteralPath $p -Text $new -Bom $false) { $r.Invalidated++; $r.Files += $p }
         }
         else {
-            if ($raw -match '(?m)^status:\s*stale\b') { continue }
-            $new = [regex]::Replace($raw, '(?m)^(status:\s*)\S+', '${1}stale', 1)
-            if ($new -ceq $raw) { continue }
+            # 只改 frontmatter（第一個 --- 到第二個 ---）裡的第一個 status: 列；用 Regex 實例的 Replace(input, replacement, count)
+            # （靜態 [regex]::Replace 沒有 count 參數：多給的 1 會被當成 RegexOptions.IgnoreCase）
+            $fmEnd = -1
+            if ($raw.StartsWith('---')) { $fmEnd = $raw.IndexOf($eol + '---', 3) }
+            if ($fmEnd -lt 0) { continue }
+            $fm = $raw.Substring(0, $fmEnd)
+            if ($fm -match '(?m)^status:\s*stale\b') { continue }
+            $rx = New-Object System.Text.RegularExpressions.Regex('(?m)^(status:\s*)\S+')
+            $fmNew = $rx.Replace($fm, '${1}stale', 1)
+            if ($fmNew -ceq $fm) { continue }
+            $new = $fmNew + $raw.Substring($fmEnd)
             if (Write-PsKnAtomicText -LiteralPath $p -Text $new -Bom $false) { $r.Stale++; $r.Files += $p }
         }
     }
@@ -1038,9 +1093,9 @@ function Add-PsSuppChecklistDRow {
 # ── 狀態總覽（CLI -Status）────────────────────────────────────────
 
 function Get-PsSuppStatus {
-    param([string]$Root, [string]$Domain = '')
+    param([string]$Root, [string]$Domain = '', $Capabilities = $null)
     $d = Get-PsSuppDirs -Root $Root
-    $all = Get-PsSuppRequests -Root $Root
+    $all = Get-PsSuppRequests -Root $Root -Capabilities $Capabilities
     $maxGenByKey = @{}
     foreach ($r in $all) { if (-not $maxGenByKey.ContainsKey($r.WorkKey) -or $r.Generation -gt $maxGenByKey[$r.WorkKey]) { $maxGenByKey[$r.WorkKey] = $r.Generation } }
     $out = @()
@@ -1052,6 +1107,7 @@ function Get-PsSuppStatus {
         $domDir = Join-Path $d.Research $r.Domain
         if ($null -ne $res) { $state = [string]$res.outcome }
         elseif ($r.Generation -lt $maxGenByKey[$r.WorkKey]) { $state = 'SUPERSEDED_PENDING' }
+        elseif (-not [System.IO.File]::Exists((Join-Path $domDir '00-overview.md'))) { $state = 'DOMAIN_MISSING' }
         else {
             $att = (Get-PsSuppAttempts -DomainDir $domDir -RequestId $r.RequestId).Count
             if ((Find-PsSuppTargetNn -DomainDir $domDir -TargetName ([string]$r.Obj.need.target.name)).Count -eq 0) { $state = 'WAITING_RESEARCH' }

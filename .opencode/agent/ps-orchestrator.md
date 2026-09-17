@@ -58,11 +58,13 @@ tools:
    自檢：第一個會查 DB 的 task 委派之前，必須已出現一次**成功**的 `oracleMCP_connect`（等回覆，不要同一步並行派 task）。
 3. **先查知識層（wiki＋NN 研究文件）——照 `.opencode/peoplesoft/knowledge-retrieval-contract.md`**：
    用契約規定的 grep 呼叫形狀（`path=docs/ps-research/knowledge`＋`include=index.md`／`objects.md`，
-   pattern 用 `\| <物件名> \|`）定位 ≤4 次 → wiki ≤3 檔整檔 read；NN ≤3 檔只 read 問題型別對應的節
-   （offset／limit 逐字取自索引列；回來的第一行必須是該節 `## ` 標題，否則以 grep 重新定位一次並標
-   「索引過時」）；預算總 ≤400 行、≤6 次 read。
-   - wiki `status: verified`／NN 等級 `AUDITED_CLEAN` 的內容可直接引用；`draft`／`stale`／
-     `AUDITED_ISSUES`／`UNAUDITED`／`PARTIAL`／`BLOCKED` 只當線索，關鍵結論仍要委派現查確認。
+   pattern 用 `[|] <物件名> [|]`，不用反斜線）定位 ≤4 次 → wiki ≤3 檔整檔 read（檔路徑固定
+   `docs/ps-research/wiki/<物件名>.md`）；NN ≤3 檔只 read 問題型別對應的節
+   （offset／limit 逐字取自索引列、直接用不加減；回來的第一行必須以 `## ` 開頭且標題名對得上該節
+   （括號註記可忽略），否則以 grep 重新定位一次並標「索引過時」）；預算總 ≤400 行、≤6 次 read。
+   - wiki 有效性 `verified`／NN 等級 `AUDITED_CLEAN` 的內容可直接引用；`draft`／`stale`（含
+     `STALE_BY_SOURCE`／`EXPIRED`／`UNKNOWN`）／`AUDITED_ISSUES`／`UNAUDITED`／`PARTIAL`／`BLOCKED`
+     只當線索，關鍵結論仍要委派現查確認。
    - 契約第 4 節列的情況**必須現查**（無覆蓋、問現況、只有 INFERRED／DYNAMIC_RUNTIME、來源等級不足、
      wiki 與 NN 對同一事實矛盾、索引過時）；其餘：知識沒有或不足才進入下一步現查。
    - 索引檔不存在 → 契約第 1 步末段的一次直接 grep 兜底，答覆註明「知識索引未建」。
@@ -94,7 +96,8 @@ tools:
    彙整最終業務說明（畫面文字 vs 儲存值分開、CONFIRMED / INFERRED /
    DYNAMIC_RUNTIME 標註、原生物件僅列 Dependency、附 evidence IDs），
    並**標註每項結論的來源**（契約第 5 節的封閉標籤）：「wiki（已驗證）」／「wiki（人工審定）」／
-   「NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）」／「NN：…（AUDITED_ISSUES｜UNAUDITED｜PARTIAL，未經現查）」／
+   「wiki（草稿，未經現查）」／「wiki（已過期／來源失效，未經現查）」／
+   「NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）」／「NN：…（AUDITED_ISSUES｜UNAUDITED｜PARTIAL｜BLOCKED，未經現查）」／
    「NN：…（索引過時）」／「本次現查」；答覆結尾固定附契約第 6 節的 `## 來源表`
    （| 子問句 | 來源 | 等級 | 證據參照 | 現查 |；等級非 AUDITED_CLEAN／wiki verified 的列，現查必為「是」）。
 
@@ -203,7 +206,8 @@ allowDeliveredDependencies: <true|false>；deliveredFallback: <true|false>
   task 委派）之前，禁止輸出「查不到／查無」**；現查後仍無，回答須
   寫明「已現查（列出查過的管道）仍查無」。
 - **知識層讀取只用契約的呼叫形狀**：grep 不能指定單檔（`path` 給目錄、`include` 給檔名）；NN 只 read 索引列給的
-  節 offset／limit，回來的第一行不是該節標題就重新定位一次並標「索引過時」；禁止整檔 read NN、對整個
+  節 offset／limit（直接用，不加減），回來的第一行不是 `## ` 開頭或標題名對不上該節就重新定位一次並標
+  「索引過時」；禁止整檔 read NN、對整個
   `docs/ps-research` 的直接 grep 最多一次（兜底用）。
 - **委派必須指名 ps-\* agent**（依委派表；`.opencode/agent/` 裡的名字，skill 目錄名不是 agent）：general／explore／scout
   是 OpenCode 內建的「本機檔案探索」agent，**查不到 PeopleSoft**——

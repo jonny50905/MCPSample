@@ -864,15 +864,31 @@ Assert ($sum.Sum -eq 2) "verdict 是 pscustomobject：Measure-Object -Property �
 
 # ── 情境 34：知識索引／補研究／Spec 的共用地基守衛（issue #33～#36）────────
 Write-Host "情境 34：知識索引／補研究／Spec 共用地基——.gitignore 四行、快照三處路徑、auto-all 保留名與迷你圈、共用 lib 版本守衛、模型檔契約引用、合成識別字、新測試組存在（issue #33～#36）"
-$gi = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.gitignore'))
-foreach ($must in @('docs/ps-research/knowledge/', 'docs/ps-research/*/supplemental-parts/', '.ps-private/', '.ps-runtime/')) { Assert ($gi -match ('(?m)^' + [regex]::Escape($must) + '\s*$')) ".gitignore 含 $must" }
+$giPath = Join-Path $repoRoot '.gitignore'
+if (Test-Path -LiteralPath $giPath) {
+    $gi = [System.IO.File]::ReadAllText($giPath)
+    foreach ($must in @('docs/ps-research/knowledge/', 'docs/ps-research/*/supplemental-parts/', '.ps-private/', '.ps-runtime/')) { Assert ($gi -match ('(?m)^' + [regex]::Escape($must) + '\s*$')) ".gitignore 含 $must" }
+}
+else { Write-Host "  SKIP：.gitignore 不在搬運集合（公司機沒有這個檔）——四行守衛只在有 .gitignore 的環境驗；公司機由 ps-fs-doctor 檢查" }
 $al = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/ps-auto-loop.ps1'))
 Assert ($al -match "foreach \(\`$cand in @\(`"docs/ps-research/\`$Domain`", 'docs/ps-research/wiki', 'docs/ps-research/supplemental'\)\)" -and $al -notmatch 'git -C \$root add -- \$rel \$relWiki') "auto-loop 快照 stage 三處路徑（領域／wiki／supplemental），不存在的路徑不進 pathspec"
 Assert ($al -match '\[switch\]\$SupplementalOnly' -and $al -match '(?m)^\s+exit 4\s*$' -and $al -match 'Invoke-KnowledgePublish -Note "啟動"' -and $al -match 'Invoke-KnowledgePublish -Note "第 \$cycle 圈末"' -and $al -match 'Invoke-KnowledgePublish -Note "收據與提煉後"' -and $al -match "Join-Path \`$dir 'audit-done\.json'") "auto-loop：-SupplementalOnly 迷你圈（exit 4）、三個 safe point 發布索引、稽核合併另存領域 audit-done.json"
-Assert ($al -match 'Invoke-PsOcSession -OcPath \$ocPath' -and $al -match "'ps-knowledge-lib\.ps1', 'ps-session-lib\.ps1', 'ps-supplemental-lib\.ps1'" -and $al -match '\$PsSessionLibVersion -ne 1') "auto-loop：Invoke-Opencode 是 ps-session-lib 的薄包裝；三個共用 lib 缺檔／版本守衛在取鎖前"
+Assert ($al -match 'Invoke-PsOcSession -OcPath \$ocPath' -and $al -match "'ps-knowledge-lib\.ps1', 'ps-session-lib\.ps1', 'ps-supplemental-lib\.ps1'" -and $al -match '\$PsSessionLibVersion -ne 1' -and $al -match '-SlotWaitMin 1440') "auto-loop：Invoke-Opencode 是 ps-session-lib 的薄包裝（slot 等待上限一天）；三個共用 lib 缺檔／版本守衛在取鎖前"
+. (Join-Path $repoRoot 'scripts/ps-session-lib.ps1')
+$promptLits = @{}
+foreach ($pn in @('sPrompt', 'dPrompt', 'uPrompt')) {
+    $pm = [regex]::Match($al, '(?m)^\s*\$' + $pn + ' = "(?<p>[^"]*)"\s*$')
+    if ($pm.Success) { $promptLits[$pn] = $pm.Groups['p'].Value }
+}
+$promptBad = @()
+foreach ($pn in @('sPrompt', 'dPrompt', 'uPrompt')) { if (-not $promptLits.ContainsKey($pn) -or -not (Test-PsOcPromptSafe -PromptText $promptLits[$pn])) { $promptBad += $pn } }
+Assert ($promptBad.Count -eq 0 -and $promptLits['sPrompt'].Contains('A > B > C')) "auto-loop：三個 session 提示字串常值（surgery／提煉／升級）都過 Test-PsOcPromptSafe（含 A > B > C 的 surgery 提示不會被閘門擋下；閘門只擋 CR／LF／雙引號／%）（$($promptBad -join ','))"
+Assert ($al -match 'capabilities\.json' -and $al -match 'Get-SuppFenceSnapshot' -and $al -match 'Restore-SuppFence' -and $al -match 'PsSuppIntakeRejected') "auto-loop 迷你圈：能力目錄缺檔守衛、補研究圍欄快照／還原（模型寫的 request／result／wiki 檔不入庫）、intake 拒收寫 log"
+Assert (([regex]::Matches($al, 'if \(\$(sr|dr|ur)\.SlotBusy\)')).Count -ge 6 -and $al -match "FailureKind -eq 'SLOT_BUSY'\) \{ \`$stopReason") "auto-loop：slot 被占用（等滿一天）不算 session 跑過——稽核批次不計 attempts、手術／提煉／升級中止、主迴圈停機原因寫明 slot（不冒充逾時）"
 Assert ($al -match "--command ps-supplement" -and $al -match 'Merge-PsSuppReceipt' -and $al -match 'Restore-PsSuppBytes' -and $al -match 'Publish-PsSuppResult' -and $al -match 'Add-PsSuppChecklistDRow' -and $al -match 'Set-PsSuppWikiStale') "auto-loop 迷你圈：模型只寫收據，合併／lint 回歸還原／發布／D 列／wiki 標記全在外環"
 $aa = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/ps-auto-all.ps1'))
 Assert ($aa -match "@\('wiki', 'knowledge', 'supplemental', 'spec'\) -contains \`$key" -and $aa -match '-SupplementalOnly' -and $aa -match 'Test-PsKnowledgeIndex' -and $aa -match 'Get-PsSuppPending') "auto-all：保留名四個、preflight 知識索引、收據判定前先跑補研究迷你圈（exit 4）"
+Assert ($aa -match '補研究迷你圈 exit 1（未預期崩潰）→ NEEDS_ATTENTION（連續失敗' -and $aa -match '含補研究迷你圈崩潰') "auto-all：迷你圈 exit 1 算一次失敗並進連續失敗保險絲（不是靜靜地 NEEDS_ATTENTION 後繼續）"
 foreach ($lib in @('ps-knowledge-lib', 'ps-session-lib', 'ps-supplemental-lib', 'ps-spec-lib')) {
     $lp = Join-Path $repoRoot ('scripts/' + $lib + '.ps1')
     Assert ((Test-Path -LiteralPath $lp) -and ([System.IO.File]::ReadAllText($lp)) -match '(?m)^\$script:Ps\w+LibVersion = 1') "共用 lib $lib 存在且有版本守衛"
@@ -881,7 +897,8 @@ foreach ($t in @('test-knowledge', 'test-supplemental', 'test-spec', 'test-ps51-
 $orch = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/agent/ps-orchestrator.md'))
 Assert ($orch -match 'knowledge-retrieval-contract\.md' -and $orch -match '## 來源表' -and $orch -match 'ps-supplemental\.ps1 -New' -and $orch -match 'AUDITED_CLEAN' -and $orch -notmatch '先查 Entity Wiki') "orchestrator：第 3 步改為契約（索引定位、來源表、補研究指令、等級），不再只查 wiki"
 $kc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/knowledge-retrieval-contract.md'))
-Assert ($kc -match 'include="index\.md"' -and $kc -match 'include="objects\.md"' -and $kc -match 'path="docs/ps-research/knowledge"' -and $kc -match 'limit=<limit>\+1' -and $kc -match '\| 子問句 \| 來源 \| 等級 \| 證據參照 \| 現查 \|') "讀取契約：grep 呼叫形狀（path＝目錄、include＝檔名）、read offset／limit、來源表欄名"
+Assert ($kc -match 'include="index\.md"' -and $kc -match 'include="objects\.md"' -and $kc -match 'path="docs/ps-research/knowledge"' -and $kc -match 'limit=<limit>\)' -and $kc -notmatch 'limit>\+1' -and $kc -match '\| 子問句 \| 來源 \| 等級 \| 證據參照 \| 現查 \|') "讀取契約：grep 呼叫形狀（path＝目錄、include＝檔名）、read offset／limit 原值不加減、來源表欄名"
+Assert ($kc -match '\[\|\] <物件名> \[\|\]' -and $kc -notmatch '\\\| <物件名> \\\|' -and $orch -match '\[\|\] <物件名> \[\|\]' -and $kc -match 'docs/ps-research/wiki/<物件名>\.md' -and $kc -match 'STALE_BY_SOURCE' -and $kc -match 'wiki（草稿，未經現查）' -and $orch -match 'BLOCKED，未經現查') "讀取契約／orchestrator：cell 錨定 pattern 用字元類別（不靠反斜線）、wiki 檔路徑規則、有效性 EXPIRED／STALE_BY_SOURCE／UNKNOWN 的處理與封閉標籤齊全"
 $sc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/supplemental-contract.md'))
 Assert ($sc -match '\| 處置 \| 查法收據 \|' -and $sc -match '\| 節 \| 信心 \| 敘述 \| 證據# \|' -and $sc -match '\| 位置 \| 說明 \| 機器參照 \|' -and $sc -match 'ps-peoplecode-flow' -and $sc -match '不是研究模式') "補研究契約：三張表欄名、委派鏈、不是研究模式"
 $sup = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/command/ps-supplement.md'))
@@ -893,10 +910,12 @@ $sw = Join-Path $repoRoot '.opencode/agent/ps-spec-worker.md'
 if (Test-Path -LiteralPath $sw) {
     $swt = [System.IO.File]::ReadAllText($sw)
     Assert ($swt -match '(?m)^\s+grep: false' -and $swt -match '(?m)^\s+glob: false' -and $swt -match '(?m)^\s+task: false' -and $swt -match '(?m)^\s+bash: false' -and $swt -match '"oracleMCP_sql_run": false' -and $swt -match '"PeoplecodeSource_\*": false' -and $swt -match '(?m)^permission:' -and $swt -match '\.ps-runtime/spec/\*') "ps-spec-worker：grep／glob／task／bash 關、MCP 全 deny、permission 逐路徑只開 .ps-runtime/spec"
+    Assert ($swt -match '(?m)^\s+websearch: false' -and $swt -match '(?m)^\s+skill: false' -and $swt -match '(?m)^\s+todowrite: false' -and $swt -match '(?m)^\s+lsp: false') "ps-spec-worker：websearch／skill／todowrite／lsp 也關（片段內容不得外流、不得召 skill）"
+    Assert ($swt -match '"\*\.ps-runtime/spec/\*/attempts/\*": allow' -and $swt -match '"\*\.ps-runtime/spec/\*/attempts/\*/fragment\.md": allow' -and $swt -notmatch '"\.ps-runtime/spec/\*": allow') "ps-spec-worker：讀寫圍欄縮到 attempts 子樹（不含 receipts／plans／outputs／job.json）；pattern 以 * 開頭，巢狀或非 git 目錄的前綴也能命中"
 }
 else { Assert $false "ps-spec-worker.md 存在" }
 # 合成識別字守衛：新檔案裡出現的 TW_ 樣式物件名只能是合成集合（真實物件名永遠不進 repo）
-$synthOk = '^TW_(DEMO(_[A-Z0-9]*)?|X{1,3}|[A-H]|NEW|OLD|STALE|OUT|ROOT2|NOWHERE\d*|NOPE|ANOTHER|MIL\d*|MILITARY_DATA|JO_OPEN|NAV\w*)$'
+$synthOk = '^TW_(DEMO(_[A-Z0-9]*)?|X{1,3}|[A-H]|NEW|OLD|STALE|OUT|ROOT2|NOWHERE\d*|NOPE|ANOTHER|MIL\d*|MILITARY_DATA|NAV\w*)$'
 $synthFiles = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Include 'ps-knowledge*.ps1', 'ps-supplemental*.ps1', 'ps-spec*.ps1', 'ps-session-lib.ps1', 'test-knowledge.ps1', 'test-supplemental.ps1', 'test-spec.ps1' -Recurse -File)
 $synthFiles += @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/peoplesoft/spec') -Include '*.md', '*.json' -Recurse -File)
 foreach ($n in @('.opencode/peoplesoft/knowledge-retrieval-contract.md', '.opencode/peoplesoft/supplemental-contract.md', '.opencode/command/ps-supplement.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-worker.md')) { $fp = Join-Path $repoRoot $n; if (Test-Path -LiteralPath $fp) { $synthFiles += (Get-Item -LiteralPath $fp) } }

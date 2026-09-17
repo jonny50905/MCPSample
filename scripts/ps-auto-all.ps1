@@ -175,7 +175,8 @@ foreach ($d in $domains) {
     # 補研究（收據判定之前）：有 pending 且 domain==D 的 request → 先跑迷你圈（預期 exit 4；
     # 迷你圈改了 NN → 收據失效 → 下面照常 RUN → 稽核重驗 → 畢業）
     $spPending = @()
-    try { $spPending = @(Get-PsSuppPending -Root $root -Domain $d -DomainDir $domainDir -MaxAttempts 2) } catch { $spPending = @() }
+    # 先指派再 @()：函式以 return , $arr 回傳，直接 @(函式) 在空陣列時會數成 1
+    try { $spPendingRaw = Get-PsSuppPending -Root $root -Domain $d -DomainDir $domainDir -MaxAttempts 2; $spPending = @($spPendingRaw) } catch { $spPending = @() }
     if ($spPending.Count -gt 0) {
         Write-BatchLog "$tag 補研究 pending $($spPending.Count) 張 → 先跑迷你圈"
         $argSp = '-NoProfile -File "{0}" -Domain "{1}" -Tier {2} -SupplementalOnly' -f $autoLoopPath, $d, $pass
@@ -188,9 +189,15 @@ foreach ($d in $domains) {
         }
         catch { $codeSp = $null }
         if ($codeSp -eq 4) { Write-BatchLog "$tag 補研究迷你圈完成（exit 4）——接著照常判收據" }
-        elseif ($codeSp -eq 1) { Write-BatchLog "$tag 補研究迷你圈 exit 1 → NEEDS_ATTENTION（不影響本領域研究）"; $counts.NEEDS_ATTENTION++ }
-        elseif ($codeSp -eq 3) { Write-BatchLog "$tag 補研究迷你圈 exit 3：互斥鎖被外部持有 → 停批"; $counts.MUTEX_BUSY++; $stopBatch = $true; $stopWhy = "互斥鎖被外部持有"; $counts.NOT_RUN++; continue }
-        else { Write-BatchLog "$tag 補研究迷你圈 exit=$(if ($null -eq $codeSp) {'（啟動失敗／崩潰）'} else {$codeSp}) → SYSTEM ERROR，停批"; $counts.SYSTEM_ERROR++; $stopBatch = $true; $stopWhy = "補研究迷你圈 system error（exit=$codeSp）：$d"; $counts.NOT_RUN++; continue }
+        elseif ($codeSp -eq 1) {
+            # 迷你圈沒有語意上的 exit 1（只有 2／3／4）：exit 1＝未被 try/catch 接住的崩潰——記 NEEDS_ATTENTION 並計入連敗熔絲，不靜默
+            $consecFail++
+            Write-BatchLog "$tag 補研究迷你圈 exit 1（未預期崩潰）→ NEEDS_ATTENTION（連續失敗 $consecFail/$MaxConsecutiveFailures）——看 auto-loop-logs/$d/ 的 supp-* out/err"
+            $counts.NEEDS_ATTENTION++
+            if ($MaxConsecutiveFailures -gt 0 -and $consecFail -ge $MaxConsecutiveFailures) { $stopBatch = $true; $stopWhy = "連續 $consecFail 次失敗（含補研究迷你圈崩潰）——先人工查再續跑"; continue }
+        }
+        elseif ($codeSp -eq 3) { Write-BatchLog "$tag 補研究迷你圈 exit 3：互斥鎖被外部持有 → 停批"; $counts.MUTEX_BUSY++; $stopBatch = $true; $stopWhy = "互斥鎖被外部持有"; continue }
+        else { Write-BatchLog "$tag 補研究迷你圈 exit=$(if ($null -eq $codeSp) {'（啟動失敗／崩潰）'} else {$codeSp}) → SYSTEM ERROR，停批"; $counts.SYSTEM_ERROR++; $stopBatch = $true; $stopWhy = "補研究迷你圈 system error（exit=$codeSp）：$d"; continue }
     }
     if (-not $Force) {
         $rc = Test-GraduationReceipt -DomainDir $domainDir -Domain $d `

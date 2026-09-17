@@ -28,7 +28,8 @@
 | RELATED.OBJECTS | @ps-metadata-flow（帶 ps-data-lineage skill）→ @ps-peoplecode-flow | 同上 |
 
 工單類別不在表內（GAPS、EVIDENCE.APPENDIX、ENTITY.DETAIL 由外環直接抽取，不會發工單）→ 處置 `UNSUPPORTED`。
-會查 oracleMCP 的委派同時 ≤3；連線已在你的第 0 步建好；BLOCKED(NOT_CONNECTED) 只重連重派一次。
+會查 oracleMCP 的委派同時 ≤3；Oracle 連線由你在第 0 步建立（照你 system prompt 的第 0 步，比 read 工單更早）；
+BLOCKED(NOT_CONNECTED) 只重連重派一次。
 
 ## 3. 收據（唯一可寫；路徑照工單「## 輸出」）
 
@@ -67,11 +68,33 @@
   資料流 3 格（表｜操作｜來源；信心由信心欄補上）、相關物件 2 格（物件｜角色）。條列節（行為邏輯、未解事項）與
   文字節（功能定位、執行方式、權限）寫一句完整敘述。
 - 機器參照只准三種：完整 36 字元 ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。ChunkId 不得縮寫。
+- **空表**：處置不是 RESEARCHED 時（NO_EVIDENCE／ALREADY_COVERED／NOT_IN_DOMAIN／UNSUPPORTED），「## 追加事實」與
+  「## 追加證據」兩張表仍要出現，只留表頭列與分隔列，不寫任何資料列（不寫「無」列、不寫「（空）」）。
+- **格內不得出現 `|` 或 `｜`**（表格節敘述的固定分格除外）：SQL 的字串連接 `||` 改寫成 `CONCAT()`，
+  選項值之間用 `/` 分隔，文字裡的「或」用字寫出，不用直線。
 - 只追加、不改寫：你補的事實會被追加到 NN 該節末尾；與既有敘述矛盾時照實寫你查到的，矛盾由稽核處理。
+
+查無時的收據長這樣（兩張空表只有表頭與分隔列；查法收據必填）：
+
+```markdown
+## 處置
+| 處置 | 查法收據 |
+|---|---|
+| NO_EVIDENCE | ps-peoplecode-flow 搜 TW_DEMO_A 全部事件 2 頁無 File 物件；ps-sqr-flow 搜 TWSQR_DEMO 無 open／read 段 |
+
+## 追加事實
+| 節 | 信心 | 敘述 | 證據# |
+|---|---|---|---|
+
+## 追加證據
+| 位置 | 說明 | 機器參照 |
+|---|---|---|
+```
 
 ## 4. 硬規則
 
 - 本指令**不是研究模式**：不讀 checklist、不從未勾項續跑、不寫 checklist／90-audit／log／NN／wiki。
 - **必須** read 工單列出的 NN 節（系統提示的「不回讀已完成 NN」在此不適用）——補研究就是要知道既有寫了什麼。
 - 寫收據用整檔 write，寫完 read 回來確認三張表都在，再結束。最終回覆只准一行：「已寫 <收據路徑>」。
-- 不得反問、不得婉拒、不得先輸出計畫；第一個回應必須是 read 工單的工具呼叫。
+- 不得反問、不得婉拒、不得先輸出計畫；第 0 步（Oracle 連線）照你 system prompt 先做，接著就 read 工單
+  （兩者之間不做別的事）。

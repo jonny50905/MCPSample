@@ -152,6 +152,10 @@ foreach ($libName in @('ps-knowledge-lib.ps1', 'ps-session-lib.ps1', 'ps-supplem
 if ($PsKnowledgeLibVersion -ne 1 -or $PsSessionLibVersion -ne 1 -or $PsSupplementalLibVersion -ne 1) {
     Write-Error "共用 lib 版本不符（knowledge=$PsKnowledgeLibVersion session=$PsSessionLibVersion supplemental=$PsSupplementalLibVersion）——人工搬運不完整？"; exit 2
 }
+$capabilitiesPath = Join-Path $root (Join-Path '.opencode' (Join-Path 'peoplesoft' (Join-Path 'spec' 'capabilities.json')))
+if (-not (Test-Path -LiteralPath $capabilitiesPath)) {
+    Write-Error "缺 .opencode/peoplesoft/spec/capabilities.json（能力目錄；人工搬運不完整？）"; exit 2
+}
 
 function Write-Log([string]$msg) {
     $line = "[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $msg
@@ -884,14 +888,15 @@ function Get-SessionFailureKind {
 # taskkill 整樹強殺、容量事件標籤、session slot 互斥鎖）；本函式只是薄包裝——呼叫點與回傳形狀不變。
 # $ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'
 # 注意：prompt 走 cmd.exe 命令列——內容禁用半形雙引號與 cmd 特殊字元（> < & | % ^），中文引號「」不受限；多行內容一律壓成單行。
-# session slot：同機同時只跑一個 headless session（ps-spec／補研究迷你圈取同一把鎖）；等不到 slot（最多等 TimeoutMin 分）
-# ＝視同逾時（TimedOut=$true、FailureKind=SLOT_BUSY），沿用既有的逾時熔絲。
+# session slot：同機同時只跑一個 headless session（ps-spec／補研究迷你圈取同一把鎖）。持研究鎖的本迴圈是主要使用者，
+# 別人（ps-spec -Run、另一個迷你圈）用完就會讓出——所以最多等一天（每 5 分鐘印一行心跳），session 逾時從取得 slot 起算；
+# 等不到才回 SlotBusy（TimedOut=$true、FailureKind=SLOT_BUSY），沿用既有逾時熔絲——不會把別人正常的一小時 session 算成本迴圈逾時。
 function Invoke-Opencode {
     param([string]$ExtraArgs, [string]$PromptText, [int]$TimeoutMin, [string]$Tag)
     $tpn = 'ResearchTimeoutMin'
     if ($Tag -like 'audit*') { $tpn = 'AuditTimeoutMin' }
     return (Invoke-PsOcSession -OcPath $ocPath -Root $root -LogRoot $logRoot -Model $Model -ExtraArgs $ExtraArgs `
-        -PromptText $PromptText -TimeoutMin $TimeoutMin -Tag $Tag -Log ${function:Write-Log} -SlotWaitMin $TimeoutMin -TimeoutParamName $tpn)
+        -PromptText $PromptText -TimeoutMin $TimeoutMin -Tag $Tag -Log ${function:Write-Log} -SlotWaitMin 1440 -TimeoutParamName $tpn)
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
@@ -1021,15 +1026,26 @@ function Invoke-GitSnapshot {
         # 不存在的路徑不能進 pathspec（git 會整個 add 失敗）
         $paths = @()
         foreach ($cand in @("docs/ps-research/$Domain", 'docs/ps-research/wiki', 'docs/ps-research/supplemental')) {
-            if (Test-Path -LiteralPath (Join-Path $root $cand)) { $paths += $cand }
+            $full = Join-Path $root $cand
+            if (-not (Test-Path -LiteralPath $full)) { continue }
+            # 半寫殘留（*.tmp-<guid>／*.bak-<guid>，超過 10 分鐘的）先清掉，才不會被 git add 掃進內部 git
+            [void](Remove-PsKnTempFiles -Directory $full)
+            foreach ($sub in @(Get-ChildItem -LiteralPath $full -Directory -ErrorAction SilentlyContinue)) { [void](Remove-PsKnTempFiles -Directory $sub.FullName) }
+            $paths += $cand
         }
         if ($paths.Count -eq 0) { return }
         & git -C $root add -- @paths 2>&1 | Out-Null
         $staged = (& git -C $root diff --cached --name-only -- @paths 2>&1 | Out-String)
         if ([string]::IsNullOrWhiteSpace($staged)) { return }
-        $n = @($staged -split "`r?`n" | Where-Object { $_.Trim() -ne '' }).Count
+        $stagedFiles = @($staged -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
+        $n = $stagedFiles.Count
+        # commit 的 pathspec 只給「真的有 staged 變更」的那幾個路徑：目錄存在但 git 不認識任何檔（例如空的 supplemental/）
+        # 會讓 git commit 整個 pathspec 失敗、什麼都沒 commit
+        $commitPaths = @()
+        foreach ($cand in $paths) { foreach ($sf in $stagedFiles) { if ($sf.Trim().StartsWith($cand)) { if ($commitPaths -notcontains $cand) { $commitPaths += $cand }; break } } }
+        if ($commitPaths.Count -eq 0) { return }
         $msg = "kb(auto): $Domain $Note"
-        $out = (& git -C $root commit -m $msg -- @paths 2>&1 | Out-String)
+        $out = (& git -C $root commit -m $msg -- @commitPaths 2>&1 | Out-String)
         if ($LASTEXITCODE -eq 0) { Write-Log "GIT 快照：$msg（$n 檔）" }
         else { Write-Log "GIT 快照失敗（不中斷）：$($out.Trim())" }
     }
@@ -1519,6 +1535,7 @@ function Invoke-AuditRound {
         $ledger.wiki = @($wp)
         $null = New-AuditManifest -TargetRound $target -FullSweep $fullSweep -Files @() -BatchIndex 0 -BatchTotal 0 -DomainTasks $true -WikiPicks $wp
         $sr = Invoke-AuditBatchSession -Tag "audit-b0"
+        if ($sr.SlotBusy) { Write-Log "稽核批次 0：session slot 被占用（已等一天）沒有真的跑——不計 attempts，本輪稽核中止"; Save-AuditLedger -Ledger $ledger; return $sr }
         $batchesRun++
         # stdout 回收（同檔案批次）：domain.md 不存在但 stdout 含「## 完整性」就整份當 domain.md
         $domPath = Join-Path $auditPartsDir "domain.md"
@@ -1555,11 +1572,12 @@ function Invoke-AuditRound {
         $batch = @($pending | Select-Object -First $k)
         $bi++
         $files = @()
-        foreach ($f in $batch) { $e = $ledger.files[$f]; $files += @{ Name = $f; Rows = $e.rows; PageSize = [Math]::Max(1, $e.pageSize); Claims = @(Get-ClaimSample -Path (Join-Path $dir $f) -Max 5) } }
+        foreach ($f in $batch) { $e = $ledger.files[$f]; $claimSample = Get-ClaimSample -Path (Join-Path $dir $f) -Max 5; $files += @{ Name = $f; Rows = $e.rows; PageSize = [Math]::Max(1, $e.pageSize); Claims = @($claimSample) } }
         $totalB = [int][Math]::Ceiling($pending.Count / [double]$k)
         $null = New-AuditManifest -TargetRound $target -FullSweep $fullSweep -Files $files -BatchIndex $bi -BatchTotal $totalB -DomainTasks $false -WikiPicks @()
         Write-Log "稽核第 $bi 批（待驗 $($pending.Count) 檔、以 K=$k 估餘 $totalB 批）：$($batch -join '、')｜列數 $(($files | ForEach-Object { $_.Rows }) -join ',')"
         $sr = Invoke-AuditBatchSession -Tag "audit-b$bi"
+        if ($sr.SlotBusy) { Write-Log "稽核第 $bi 批：session slot 被占用（已等一天）沒有真的跑——不計 attempts，本輪稽核中止"; Save-AuditLedger -Ledger $ledger; return $sr }
         $batchesRun++
         $exp = @{}
         foreach ($f in $batch) { $exp[$f] = [int]$ledger.files[$f].rows }
@@ -1678,15 +1696,61 @@ function Invoke-KnowledgePublish {
     catch { Write-Log "知識索引重建例外（不中斷）：$($_.Exception.Message)" }
 }
 
+# ── 模型不准寫的目錄圍籬（迷你圈用）：session 前拍「檔名→bytes」快照，session 後新增的刪、改過的還原 ──
+function Get-SuppFenceSnapshot {
+    param([string[]]$Dirs)
+    $snap = @{}
+    foreach ($d in $Dirs) {
+        if (-not (Test-Path -LiteralPath $d)) { continue }
+        foreach ($f in @(Get-ChildItem -LiteralPath $d -File -Recurse -ErrorAction SilentlyContinue)) {
+            $snap[$f.FullName] = [System.IO.File]::ReadAllBytes($f.FullName)
+        }
+    }
+    return $snap
+}
+function Restore-SuppFence {
+    param($Snapshot, [string[]]$Dirs)
+    $violations = @()
+    foreach ($d in $Dirs) {
+        if (-not (Test-Path -LiteralPath $d)) { continue }
+        foreach ($f in @(Get-ChildItem -LiteralPath $d -File -Recurse -ErrorAction SilentlyContinue)) {
+            if (-not $Snapshot.ContainsKey($f.FullName)) {
+                Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue
+                $violations += ('新增：' + $f.Name)
+                continue
+            }
+            $now = [System.IO.File]::ReadAllBytes($f.FullName)
+            if ([System.Convert]::ToBase64String($now) -cne [System.Convert]::ToBase64String($Snapshot[$f.FullName])) {
+                $null = Restore-PsSuppBytes -LiteralPath $f.FullName -Bytes $Snapshot[$f.FullName]
+                $violations += ('改寫：' + $f.Name)
+            }
+        }
+    }
+    foreach ($k in @($Snapshot.Keys)) {
+        if (-not (Test-Path -LiteralPath $k)) {
+            $null = Restore-PsSuppBytes -LiteralPath $k -Bytes $Snapshot[$k]
+            $violations += ('刪除：' + [System.IO.Path]::GetFileName($k))
+        }
+    }
+    return , $violations
+}
+
 # ── 補研究迷你圈（-SupplementalOnly）─────────────────────────────
 # 獨立於主迴圈：不加相位、不碰 research／audit 的熔絲與 drain；每張 request 一個 session（--command ps-supplement）；
 # 模型只寫收據，合併／發布／wiki 標記全由外環確定性完成；結果只在本 run 末端 safe point 發布。
 # attempts＝工單檔數（outcome 缺＝crash 也算一次）；用盡（2）→ UNRESOLVED。目標尚無 NN → 只在 checklist 寫 D 列（等研究相位建檔）。
 # exit 4＝迷你圈完成（不論處理幾張）；exit 2＝環境錯；exit 3＝鎖被占用（同主迴圈）
+# 迷你圈整段包在 try/catch：任何未預期例外＝環境錯（exit 2，釋放研究鎖），不讓 powershell.exe 以 exit 1 收場被 ps-auto-all 當成軟失敗
 if ($SupplementalOnly) {
+  try {
     $suppTimeout = $SupplementalTimeoutMin
     if ($suppTimeout -le 0) { $suppTimeout = $ResearchTimeoutMin }
     Write-Log "=== 補研究迷你圈啟動：領域=$Domain 每 run ≤$SupplementalPerRun 張 逾時 $suppTimeout 分 ==="
+    # 半寫殘留（超過 10 分鐘的 *.tmp-／*.bak-）先掃掉：領域目錄、wiki、supplemental requests／results
+    foreach ($sweep in @($dir, (Join-Path $root 'docs/ps-research/wiki'), (Join-Path $root 'docs/ps-research/supplemental/requests'), (Join-Path $root 'docs/ps-research/supplemental/results'))) {
+        $swept = Remove-PsKnTempFiles -Directory $sweep
+        if ($swept -gt 0) { Write-Log "補研究：清掉 $swept 個半寫殘留檔（$sweep）" }
+    }
     Invoke-KnowledgePublish -Note "補研究前"
     $suppIndex = Read-PsKnowledgeIndex -Root $root
     $suppCap = Get-PsSuppCapabilities -Root $root
@@ -1695,8 +1759,11 @@ if ($SupplementalOnly) {
     $handled = @{}
     $round = Get-PsSuppChecklistRound -DomainDir $dir
     if ($round -lt 0) { $round = 0 }
+    $suppReqDir = Join-Path $root 'docs/ps-research/supplemental/requests'
+    $suppResDir = Join-Path $root 'docs/ps-research/supplemental/results'
+    $wikiDirS = Join-Path $root 'docs/ps-research/wiki'
     # 被新世代取代、尚無 result 的舊 request → SUPERSEDED
-    foreach ($old in (Get-PsSuppSuperseded -Root $root -Domain $Domain)) {
+    foreach ($old in (Get-PsSuppSuperseded -Root $root -Domain $Domain -Capabilities $suppCap)) {
         $attOld = (Get-PsSuppAttempts -DomainDir $dir -RequestId $old.RequestId).Count
         $resOld = New-PsSuppResult -Request $old.Obj -Outcome 'SUPERSEDED' -Disposition 'SUPERSEDED' -AuditRound $round -Affected @() -Attempts $attOld
         if ((Publish-PsSuppResult -Root $root -Result $resOld).Ok) {
@@ -1705,11 +1772,25 @@ if ($SupplementalOnly) {
             $null = Move-PsSuppPartsDone -DomainDir $dir -LogDir $logRoot -RequestId $old.RequestId
         }
     }
-    $pending = Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2
+    $pending = Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2 -Capabilities $suppCap
+    foreach ($rj in @($PsSuppIntakeRejected)) { Write-Log "補研究：intake 拒收 $rj（request 檔身分／need／workKey 不符——不處理、不算 attempts）" }
     $dispatched = 0
     foreach ($p in $pending) {
         $rid = $p.RequestId
         $need = $p.Request.need
+        # 上一輪已合併但 result 未發布（行程在合併後、發布前死亡）：outcome 自述 merged＋受影響檔 hash 仍＝hashAfter → 直接發布，不再派 session
+        $attPrev = Get-PsSuppAttempts -DomainDir $dir -RequestId $rid
+        $lo = $attPrev.LastOutcome
+        if ($null -ne $lo -and [bool]$lo.merged -and [string]$lo.terminal -ne '' -and [string]$lo.targetFile -ne '') {
+            $still = ([System.IO.File]::Exists((Join-Path $dir ([string]$lo.targetFile))) -and ((Get-PsKnFileHash -LiteralPath (Join-Path $dir ([string]$lo.targetFile))) -ceq [string]$lo.hashAfter))
+            if ($still) {
+                $affPrev = @()
+                foreach ($a in @($lo.affected)) { if ($null -ne $a) { $affPrev += , (@{ file = [string]$a.file; hashBefore = [string]$a.hashBefore; hashAfter = [string]$a.hashAfter; sections = @($a.sections); evidenceRows = @($a.evidenceRows) }) } }
+                $handled[$rid] = @{ Request = $p.Request; Terminal = [string]$lo.terminal; Code = [string]$lo.code; Affected = $affPrev; Attempts = $attPrev.Count; TargetName = $p.TargetName; TargetFile = [string]$lo.targetFile }
+                Write-Log "補研究：$rid 上一輪 a$($attPrev.LastN) 已合併但未發布 → 本 run 直接發布（不派 session）"
+                continue
+            }
+        }
         if (-not $domainOk) {
             $resX = New-PsSuppResult -Request $p.Request -Outcome 'OUT_OF_SCOPE' -Disposition 'NOT_IN_DOMAIN' -AuditRound $round -Affected @() -Attempts $p.Attempts
             if ((Publish-PsSuppResult -Root $root -Result $resX).Ok) { $results++; Write-Log "補研究：$rid → OUT_OF_SCOPE／NOT_IN_DOMAIN（領域沒有 00-overview／checklist）" }
@@ -1740,25 +1821,50 @@ if ($SupplementalOnly) {
         $dispatched++
         $attemptNo = $p.Attempts + 1
         $mf = New-PsSuppManifest -Root $root -Request $p.Request -Domain $Domain -DomainDir $dir -AttemptNo $attemptNo -Index $suppIndex -Capabilities $suppCap
+        if ($mf.CreateDeferred) { Write-Log "補研究：$rid 工單 a$attemptNo 寫入延後（目標被別的行程開著）——本 run 提前結束"; break }
         if (-not $mf.Created) { Write-Log "補研究：$rid 工單 a$attemptNo 已存在（並行迷你圈？）→ 跳過"; continue }
+        if (-not $mf.CurrentWritten) {
+            # current.manifest.md 指標沒換成功＝模型會讀到舊工單：撤回本 attempt 的工單檔（不消耗 attempts），本 run 提前結束
+            Remove-Item -LiteralPath $mf.ManifestPath -Force -ErrorAction SilentlyContinue
+            Write-Log "補研究：$rid 的 current.manifest.md 寫入延後（PUBLISH_DEFERRED），a$attemptNo 撤回，本 run 提前結束"
+            break
+        }
         Write-Log "補研究：$rid attempt a$attemptNo 工單已寫（目標 $($mf.TargetFiles -join '、')；callee $($mf.CalleeFiles.Count) 檔）"
         $snapS = Get-NnGuardSnapshot
         $preInvS = Get-ChecklistInventory
         $preTotalS = Get-ItemTotal
+        # 模型不得寫的目錄（supplemental requests／results、wiki）先拍快照：session 後新增的刪、改過的還原、記違規
+        $fenceSnap = Get-SuppFenceSnapshot -Dirs @($suppReqDir, $suppResDir, $wikiDirS)
         $lintBefore = Invoke-Lint -Coverage
         $nb = 0
         $mB = [regex]::Match($lintBefore.Raw, '(?m)^FAIL：(\d+) 項違規')
         if ($mB.Success) { $nb = [int]$mB.Groups[1].Value }
         $sr = Invoke-Opencode -ExtraArgs '--command ps-supplement' -PromptText $Domain -TimeoutMin $suppTimeout -Tag ("supp-a" + $attemptNo)
         if ($sr.SlotBusy) {
-            # 沒有真的跑 session：撤回工單檔（attempts 不該被 slot 競爭吃掉），本 run 提前結束
+            # 沒有真的跑 session：撤回工單檔與指標（attempts 不該被 slot 競爭吃掉），本 run 提前結束
             Remove-Item -LiteralPath $mf.ManifestPath -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $mf.CurrentPath -Force -ErrorAction SilentlyContinue
             Write-Log "補研究：session slot 被占用，$rid 的 a$attemptNo 撤回，本 run 提前結束"
             break
         }
-        $outcome = @{ timedOut = $sr.TimedOut; exitCode = $sr.ExitCode; failureKind = $sr.FailureKind; receiptValid = $false; disposition = ''; merged = $false; lintRegression = $false; destructionRestored = 0; integrityFail = $false; receiptErrors = @() }
+        $outcome = @{ timedOut = $sr.TimedOut; exitCode = $sr.ExitCode; failureKind = $sr.FailureKind; receiptValid = $false; disposition = ''; merged = $false; lintRegression = $false; destructionRestored = 0; nnMutated = $false; fenceViolations = @(); integrityFail = $false; receiptErrors = @(); terminal = ''; code = ''; targetFile = ''; hashBefore = ''; hashAfter = ''; affected = @() }
         $restored = Invoke-NnDestructionGuard -Snap $snapS -Tag ("supp-a" + $attemptNo)
         $outcome.destructionRestored = $restored
+        # 目標 NN 被模型直接改寫（破壞防衛只抓掏空／掉節）：位元組與快照不同就還原快照——合併只准由外環做在 session 前的內容上
+        $targetFileS = $mf.TargetFiles[0]
+        if ($snapS.ContainsKey($targetFileS)) {
+            $nowBytes = [System.IO.File]::ReadAllBytes((Join-Path $dir $targetFileS))
+            if ([System.Convert]::ToBase64String($nowBytes) -cne [System.Convert]::ToBase64String($snapS[$targetFileS].Bytes)) {
+                $null = Restore-PsSuppBytes -LiteralPath (Join-Path $dir $targetFileS) -Bytes $snapS[$targetFileS].Bytes
+                $outcome.nnMutated = $true
+                Write-Log "補研究：$rid session 直接改寫了目標 NN $targetFileS——已還原 session 前內容（模型只准寫收據）"
+            }
+        }
+        $fence = Restore-SuppFence -Snapshot $fenceSnap -Dirs @($suppReqDir, $suppResDir, $wikiDirS)
+        if ($fence.Count -gt 0) {
+            $outcome.fenceViolations = @($fence)
+            Write-Log "補研究：$rid session 動了不准寫的目錄（已還原／刪除 $($fence.Count) 檔）：$($fence -join '、')——本 attempt 不合格"
+        }
         $null = Invoke-PostSessionReconcile -PreInv $preInvS -PreRound $round -Tag ("supp-a" + $attemptNo)
         $recv = Test-PsSuppReceipt -LiteralPath $mf.ReceiptPath -Capabilities $suppCap
         $outcome.receiptValid = $recv.Ok
@@ -1767,7 +1873,7 @@ if ($SupplementalOnly) {
         $affected = @()
         $terminal = ''
         $code = ''
-        if ($recv.Ok -and $restored -eq 0) {
+        if ($recv.Ok -and $restored -eq 0 -and $fence.Count -eq 0) {
             $disp = $recv.Disposition
             if ($disp -eq 'ALREADY_COVERED' -and -not (Test-PsSuppAlreadyCovered -TargetFacts $mf.TargetFacts -FactKind ([string]$need.factKind) -Capabilities $suppCap)) {
                 $outcome.receiptValid = $false
@@ -1818,6 +1924,12 @@ if ($SupplementalOnly) {
             $null = Invoke-ChecklistRecovery
             $terminal = ''
         }
+        # outcome 自述本 attempt 的終局與受影響檔（發布前行程死亡時，下一 run 據此直接發布而不重派）
+        $outcome.terminal = $terminal
+        $outcome.code = $code
+        $outcome.targetFile = $mf.TargetFiles[0]
+        $outcome.affected = @($affected)
+        if ($affected.Count -gt 0) { $outcome.hashBefore = [string]$affected[0].hashBefore; $outcome.hashAfter = [string]$affected[0].hashAfter }
         $null = Write-PsSuppOutcome -DomainDir $dir -RequestId $rid -AttemptNo $attemptNo -Outcome $outcome
         if ($terminal -ne '') { $handled[$rid] = @{ Request = $p.Request; Terminal = $terminal; Code = $code; Affected = $affected; Attempts = $attemptNo; TargetName = $targetName; TargetFile = $mf.TargetFiles[0] } }
     }
@@ -1829,7 +1941,7 @@ if ($SupplementalOnly) {
         if (-not $still) { Write-Log "補研究：$rid 受影響檔在發布前又被改動 → 本 run 不發 result（下次重驗）"; continue }
         $resH = New-PsSuppResult -Request $h.Request -Outcome $h.Terminal -Disposition $h.Code -AuditRound $round -Affected $h.Affected -Attempts $h.Attempts
         $pub = Publish-PsSuppResult -Root $root -Result $resH
-        if (-not $pub.Ok) { Write-Log "補研究：$rid result 寫入失敗"; continue }
+        if (-not $pub.Ok) { Write-Log "補研究：$rid result 寫入失敗（$($pub.Reason)）——outcome 已記合併，下一 run 會直接重試發布"; continue }
         $results++
         $dupTxt = ''
         if ($pub.Existed) { $dupTxt = '（既有，冪等）' }
@@ -1844,7 +1956,7 @@ if ($SupplementalOnly) {
         }
     }
     # 本 run 才用盡 attempts 的 → UNRESOLVED
-    foreach ($p2 in (Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2)) {
+    foreach ($p2 in (Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2 -Capabilities $suppCap)) {
         if (-not $p2.Exhausted) { continue }
         $att2 = Get-PsSuppAttempts -DomainDir $dir -RequestId $p2.RequestId
         $code2 = 'WORKER_FAILED'
@@ -1858,12 +1970,20 @@ if ($SupplementalOnly) {
     }
     Invoke-KnowledgePublish -Note "補研究後"
     Invoke-GitSnapshot -Note "補研究迷你圈（results=$results）"
-    $pendingAfter = @(Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2).Count
+    $pendingAfterList = Get-PsSuppPending -Root $root -Domain $Domain -DomainDir $dir -MaxAttempts 2 -Capabilities $suppCap
+    $pendingAfter = @($pendingAfterList).Count
     Write-Log "SUPPLEMENTAL：results=$results pending=$pendingAfter"
     Write-Log "=== 補研究迷你圈結束（exit 4）==="
     if ($results -gt 0 -or $dispatched -gt 0) { Write-Host "結論代號：SUPP1-3-01-$results" } else { Write-Host "結論代號：SUPP1-3-02" }
-    $mutex.ReleaseMutex(); $mutex.Dispose()
-    exit 4
+  }
+  catch {
+    Write-Log "補研究迷你圈例外（exit 2）：$($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)"
+    Write-Host "結論代號：SUPP1-3-03"
+    try { $mutex.ReleaseMutex(); $mutex.Dispose() } catch { }
+    exit 2
+  }
+  $mutex.ReleaseMutex(); $mutex.Dispose()
+  exit 4
 }
 
 # ── 主迴圈 ──────────────────────────────────────────────────
@@ -2012,6 +2132,8 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
 
     # 保險絲：逾時（強殺後先驗檔案一致性——FAIL 即停機進人工，不進下一圈）
     if ($r.TimedOut) {
+        # slot 被占用一天＝沒有 session 跑過、沒有半寫檔：不是逾時熔絲的事，直接停機說清楚
+        if ($r.FailureKind -eq 'SLOT_BUSY') { $stopReason = "session slot 被別的 headless session 占用超過一天（ps-spec -Run 或另一個補研究迷你圈沒讓出？）——確認後再啟動"; break }
         # 破壞防衛先跑（L103）：強殺半寫的 NN 檔能確定性還原就還原，
         # 別讓一致性檢查對「已可救回」的傷停機
         $null = Invoke-NnDestructionGuard -Snap $nnSnap -Tag "$phase-強殺後"
@@ -2162,6 +2284,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
         $null = Invoke-NnDestructionGuard -Snap $sNnSnap -Tag "surgery-第$surgeryRound批"
         # 手術 session 也在保險絲與一致性檢查的守備範圍（原本 $sr 沒人看＝
         # 強殺後半寫狀態恰好發生在唯一沒人看的路徑上）
+        if ($sr.SlotBusy) { Write-Log "手術 session：slot 被占用超過一天沒有真的跑——本圈手術中止（不計熔絲）"; break }
         if ($sr.TimedOut) {
             $fsProblems = Test-FsConsistency -HadChecklist $preHadChecklist -PreItemTotal $preItemTotal
             if ($fsProblems.Count -gt 0) {
@@ -2437,6 +2560,7 @@ if ($graduated) {
             $dPreInv = Get-ChecklistInventory
             $dr = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $dPrompt `
                 -TimeoutMin $ResearchTimeoutMin -Tag "distill"
+            if ($dr.SlotBusy) { Write-Log "歸戶提煉：session slot 被占用超過一天沒有真的跑——本輪提煉中止"; break }
             # 提煉 session 規則上不碰 checklist——調帳在此是守門不是修復
             $null = Invoke-PostSessionReconcile -PreInv $dPreInv -PreRound $final.Round -Tag "distill-$distillRound"
             $wm2 = Get-WikiMissing
@@ -2450,7 +2574,7 @@ if ($graduated) {
             $ur = Invoke-Opencode -ExtraArgs '--agent ps-deep-research' -PromptText $uPrompt `
                 -TimeoutMin $ResearchTimeoutMin -Tag "distill-upgrade"
             $null = Invoke-PostSessionReconcile -PreInv $uPreInv -PreRound $final.Round -Tag "distill-upgrade"
-            Write-Log "entity 升級 session 結束（tier 2）"
+            if ($ur.SlotBusy) { Write-Log "entity 升級：session slot 被占用超過一天沒有真的跑——跳過（下次畢業續跑）" } else { Write-Log "entity 升級 session 結束（tier 2）" }
         }
         Invoke-KnowledgePublish -Note "收據與提煉後"
         Invoke-GitSnapshot -Note "歸戶提煉收尾（餘 $wm 待歸戶）"

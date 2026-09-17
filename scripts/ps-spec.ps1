@@ -6,7 +6,8 @@
 #                powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -Gate -JobId <jobId>
 #                powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -Doctor [-JobId <jobId>] [-Drill <stage>-<code>] [-WriteGenericManifest]
 # 路徑：pack＝<PrivateRoot>/<packId>/（預設 .ps-private/spec/）；job＝<RuntimeRoot>/<jobId>/（預設 .ps-runtime/spec/）；兩者皆 gitignore。
-# 只讀 docs/ps-research/**、docs/ps-research/knowledge/index.json（STALE 即重建）、.ps-private；只寫 .ps-runtime/spec/<jobId>/、
+#       -RuntimeRoot 只供測試（-FakeWorker）：worker 的 command 與 permission 把工單路徑固定在 <Root>/.ps-runtime/spec/，派真 worker 時不是預設值＝SPEC1-9-07。
+# 只讀 docs/ps-research/**、docs/ps-research/knowledge/index.json（每個動詞都先 check，STALE 即重建：等級要看現況）、.ps-private；只寫 .ps-runtime/spec/<jobId>/、
 # docs/ps-research/supplemental/requests/（KnowledgeNeed）、docs/ps-research/knowledge/（重建）、.opencode/peoplesoft/spec/generic.manifest.json（-WriteGenericManifest）。
 # 永不寫 NN／wiki／checklist。worker session：opencode run --command ps-spec-batch "<jobId>-<attemptId>"（agent ps-spec-worker 只寫 fragment.md）。
 # 最後一行永遠是唯一結論碼 SPEC1-<stage>-<code>[-<count>]（碼表 .opencode/peoplesoft/spec/support-codes.md；不含路徑／物件名／hash）；
@@ -82,7 +83,12 @@ if ($Doctor) {
         $idx = Read-PsKnowledgeIndex -Root $Root
         $planObj = Read-PsSpPlan -Dirs $dirs -PlanRef ([string]$job.currentPlanRef)
         $cur = Read-PsSpJsonFile -LiteralPath $dirs.CurrentFile
-        if ($null -ne $cur) { $gateObj = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirs.Outputs (([string]$cur.generation).Substring(0, 16).ToLowerInvariant())) 'gate.json') }
+        if ($null -ne $cur) {
+            # gate 指標（最後一次 -Gate／-Render 評估的世代）優先於 render 指標
+            $gg = [string](Get-PsSpProp $cur 'gateGeneration')
+            if ($gg -eq '') { $gg = [string]$cur.generation }
+            if ($gg.Length -ge 16) { $gateObj = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirs.Outputs ($gg.Substring(0, 16).ToLowerInvariant())) 'gate.json') }
+        }
         $units = 0; $receipts = 0; $pending = 0; $blocked = 0; $waiting = 0; $changed = 0
         if ($null -ne $planObj -and $null -ne $idx) {
             foreach ($s in (Get-PsSpUnitStatus -Root $Root -Dirs $dirs -Plan $planObj -Index $idx)) {
@@ -152,20 +158,30 @@ try {
             if ($id.State -eq 'AMBIGUOUS') { $code = 'SPEC1-2-04-' + @($id.Candidates).Count; $exitCode = 1; throw 'DONE' }
             if ($id.State -eq 'HINT_MISS') { $code = 'SPEC1-2-05'; $exitCode = 1; throw 'DONE' }
             if ($hint -ne '') {
-                # 目標尚無 NN：以 DomainHint 提交 KnowledgeNeed（Research 相位建檔），job 進 WAITING_KNOWLEDGE
+                # 目標尚無 NN：以 DomainHint 提交 KnowledgeNeed（Research 相位建檔），並寫一個只含該 need 的 plan（無 facts／units）——
+                # 之後 -Run 回 5-01 等待、result 到達回 5-06，重跑 -Plan 才真正抽取（planHash 隨 need 狀態變）
+                $needRid = Get-PsSpNeedRequirementId -PackV $v
                 $need = [ordered]@{ target = [ordered]@{ type = 'COMPONENT'; name = $Component.Trim().ToUpperInvariant() }; context = [ordered]@{}; factKind = 'UI.COMPONENT_IDENTITY'; properties = @('primaryObject', 'origin', 'status', 'functionName'); evidencePolicy = 'ANY'; freshness = 'CURRENT' }
-                $rs = Resolve-PsSpNeed -Root $Root -Need $need -JobId $JobId -RequirementId 'R00' -DomainHint $hint -Reason 'MISSING' -Index $idx
+                $rs = Resolve-PsSpNeed -Root $Root -Need $need -JobId $JobId -RequirementId $needRid -DomainHint $hint -Reason 'MISSING' -Index $idx
                 Say ('SPEC：need=' + $rs.State)
                 if ($rs.State -eq 'ROUTING_REQUIRED') { $code = 'SPEC1-5-07-1'; $exitCode = 1; throw 'DONE' }
                 if ($rs.State -eq 'INVALID') { $code = 'SPEC1-5-08-1'; $exitCode = 1; throw 'DONE' }
-                if ($rs.State -eq 'BLOCKED_KNOWLEDGE') { $code = 'SPEC1-5-05-1'; $exitCode = 1; throw 'DONE' }
-                $job.phase = 'WAITING_KNOWLEDGE'; $job.lastCode = 'SPEC1-5-01-1'
-                [void](Write-PsSpJob -Dirs $dirs -Job $job)
-                $code = 'SPEC1-5-01-1'; $exitCode = 0; throw 'DONE'
+                $needState = 'WAITING_KNOWLEDGE'
+                if ($rs.State -eq 'BLOCKED_KNOWLEDGE') { $needState = 'BLOCKED_KNOWLEDGE' }
+                $np2 = New-PsSpNeedOnlyPlan -PackV $v -JobId $JobId -Component $Component -Domain $hint -Need $need -Resolve $rs -State $needState
+                $wp = Write-PsSpPlan -Dirs $dirs -Plan $np2
+                if ($wp.Deferred) { $code = 'SPEC1-2-07'; $exitCode = 1; throw 'DONE' }
+                Say ('SPEC：plan=' + $wp.PlanRef + ' created=' + $wp.Created + ' domain=' + $hint + ' facts=0 units=0（身分 need：' + $needState + '）')
+                $job.domain = $hint; $job.currentPlanRef = $wp.PlanRef; $job.phase = Get-PsSpPhaseFromPlan -Plan $np2
+                if ($needState -eq 'BLOCKED_KNOWLEDGE') { $code = 'SPEC1-5-05-1'; $exitCode = 1 } else { $code = 'SPEC1-5-01-1'; $exitCode = 0 }
+                $job.lastCode = $code
+                if (-not (Write-PsSpJob -Dirs $dirs -Job $job)) { $code = 'SPEC1-2-07'; $exitCode = 1 }
+                throw 'DONE'
             }
             $code = 'SPEC1-2-03'; $exitCode = 1; throw 'DONE'
         }
         $wp = Write-PsSpPlan -Dirs $dirs -Plan $np.Plan
+        if ($wp.Deferred) { Say 'SPEC：plan.json 寫入延遲（WRITE_DEFERRED）'; $code = 'SPEC1-2-07'; $exitCode = 1; throw 'DONE' }
         $s = $np.Summary
         Say ('SPEC：plan=' + $wp.PlanRef + ' created=' + $wp.Created + ' domain=' + [string]$np.Plan.domain + ' facts=' + $s.facts + ' units=' + $s.units + ' unknown=' + $s.unknown + ' unsupported=' + $s.unsupported)
         Say ('SPEC：knowledge submitted=' + $s.submitted + ' resubmitted=' + $s.resubmitted + ' pending=' + $s.pending + ' waitingAudit=' + $s.waitingAudit + ' blocked=' + $s.blocked + ' routing=' + $s.routing)
@@ -187,6 +203,9 @@ try {
     $v = Test-PsSpPack -PackDir $packDirs.PackDir -Capabilities $caps
     if (-not $v.Ok) { foreach ($e in $v.Errors) { Say ('PACK：' + $e) }; $code = 'SPEC1-1-03-' + $v.Errors.Count; $exitCode = 1; throw 'DONE' }
     if ($v.ContentHash -cne [string]$planObj.contentHash) { Say 'SPEC：pack 內容（contentHash）已變，plan 過期 → 重跑 -Plan'; $code = 'SPEC1-2-08'; $exitCode = 1; throw 'DONE' }
+    # 等級是稽核／checklist／audit-done 的性質，不是 NN bytes 的性質：每個動詞都用現況索引（STALE 即重建），gate 才抓得到規劃後的等級下降
+    $chk = Test-PsKnowledgeIndex -Root $Root
+    if ($chk.State -ne 'CURRENT') { $pub = Publish-PsKnowledgeIndex -Root $Root; Say ('SPEC：知識索引 ' + $chk.State + ' → 重建 published=' + $pub.published) }
     $idx = Read-PsKnowledgeIndex -Root $Root
     if ($null -eq $idx) { Say 'SYSTEM ERROR：知識索引不存在（先 -Plan）'; throw 'ENV' }
     if ($Run) {
@@ -195,13 +214,20 @@ try {
             $fw = [System.IO.Path]::GetFullPath($FakeWorker)
             $dispatch = {
                 param($a)
-                & $fw -AttemptDir $a.AttemptDir -ManifestPath $a.ManifestPath -FragmentPath $a.FragmentPath | Out-Null
+                # 假 worker 以標準輸出一行 FAILURE_KIND=<kind> 模擬 session 層事件（真 session 由 out／err 檔判 CONTEXT_OVERFLOW）
+                $outLines = @(& $fw -AttemptDir $a.AttemptDir -ManifestPath $a.ManifestPath -FragmentPath $a.FragmentPath | ForEach-Object { [string]$_ })
                 $ec = $LASTEXITCODE
                 if ($null -eq $ec) { $ec = 0 }
-                return @{ TimedOut = $false; ExitCode = [int]$ec; FailureKind = 'FAKE'; SlotBusy = $false }
+                $fk = 'FAKE'
+                foreach ($ol in $outLines) { $m = [regex]::Match($ol, '^FAILURE_KIND=([A-Z_]+)$'); if ($m.Success) { $fk = $m.Groups[1].Value } }
+                return @{ TimedOut = $false; ExitCode = [int]$ec; FailureKind = $fk; SlotBusy = $false }
             }.GetNewClosure()
         }
         else {
+            # 真 worker：command 與 permission 把工單固定在 <Root>/.ps-runtime/spec/<jobId>/attempts/<attemptId>/，RuntimeRoot 不是預設值就派不動
+            $rtExpected = [System.IO.Path]::GetFullPath((Join-Path $Root (Join-Path '.ps-runtime' 'spec'))).TrimEnd('\', '/')
+            $rtActual = [System.IO.Path]::GetFullPath($dirs.RuntimeRoot).TrimEnd('\', '/')
+            if (-not [string]::Equals($rtActual, $rtExpected, [System.StringComparison]::OrdinalIgnoreCase)) { Say 'SPEC：-RuntimeRoot 只供測試（-FakeWorker）；派 worker session 時 job 目錄必須是 <Root>/.ps-runtime/spec/'; $code = 'SPEC1-9-07'; $exitCode = 2; throw 'DONE' }
             $oc = Get-PsOcPath
             if ($oc.Path -eq '') { Say ('SYSTEM ERROR：' + $oc.Error); $code = 'SPEC1-3-05'; $exitCode = 2; throw 'DONE' }
             $ocPath = $oc.Path
@@ -213,10 +239,16 @@ try {
                 return @{ TimedOut = [bool]$sr.TimedOut; ExitCode = [int]$sr.ExitCode; FailureKind = [string]$sr.FailureKind; SlotBusy = [bool]$sr.SlotBusy }
             }.GetNewClosure()
         }
+        $prevPhase = [string]$job.phase
         $job.phase = 'RUNNING'
         [void](Write-PsSpJob -Dirs $dirs -Job $job)
-        $rr = Invoke-PsSpRun -Root $Root -Dirs $dirs -Plan $planObj -PackV $v -Capabilities $caps -JobId $JobId -MaxSessions $MaxSessions -Dispatch $dispatch -Log { param($m) Write-Host $m } -Index $idx
-        Say ('SPEC：sessions=' + $rr.Sessions + ' accepted=' + $rr.Accepted + ' invalid=' + $rr.Invalid + ' splits=' + $rr.Splits + ' pending=' + $rr.Pending + ' blocked=' + $rr.Blocked + ' waiting=' + $rr.Waiting + ' sourceChanged=' + $rr.SourceChanged + ' replan=' + $rr.Replan)
+        $rr = $null
+        try { $rr = Invoke-PsSpRun -Root $Root -Dirs $dirs -Plan $planObj -PackV $v -Capabilities $caps -JobId $JobId -MaxSessions $MaxSessions -Dispatch $dispatch -Log { param($m) Write-Host $m } -Index $idx }
+        finally {
+            # 任何離開路徑（含例外）都不得把 job.json 留在 RUNNING
+            if ($null -eq $rr) { $job.phase = $prevPhase; $job.lastCode = 'SPEC1-9-02'; [void](Write-PsSpJob -Dirs $dirs -Job $job) }
+        }
+        Say ('SPEC：sessions=' + $rr.Sessions + ' accepted=' + $rr.Accepted + ' invalid=' + $rr.Invalid + ' splits=' + $rr.Splits + ' pending=' + $rr.Pending + ' blocked=' + $rr.Blocked + ' waiting=' + $rr.Waiting + ' sourceChanged=' + $rr.SourceChanged + ' replan=' + $rr.Replan + ' writeDeferred=' + $rr.WriteDeferred)
         if ($rr.Code -match '^SPEC1-5-0[14]-(\d+)$') { Say ('SPEC：' + $rr.Phase + ' n=' + $Matches[1]) }
         $job.phase = $rr.Phase; $job.lastCode = $rr.Code
         [void](Write-PsSpJob -Dirs $dirs -Job $job)

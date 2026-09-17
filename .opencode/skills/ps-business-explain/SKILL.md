@@ -63,8 +63,11 @@ Do not present an INFERRED or DYNAMIC_RUNTIME statement as fact.
 Do not include claims that have no evidence ID.
 
 Source labels (closed set; knowledge-retrieval-contract.md §5):
-  wiki（已驗證）／wiki（人工審定）／NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）／
-  NN：…（AUDITED_ISSUES｜UNAUDITED｜PARTIAL，未經現查）／NN：…（索引過時）／本次現查.
+  wiki（已驗證）／wiki（人工審定）／wiki（草稿，未經現查）／wiki（已過期／來源失效，未經現查）／
+  NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）／NN：…（AUDITED_ISSUES｜UNAUDITED｜PARTIAL｜BLOCKED，未經現查）／
+  NN：…（索引過時）／本次現查.
+  Index effectiveness stale／STALE_BY_SOURCE／EXPIRED／UNKNOWN all map to the 已過期／來源失效 label
+  and to 等級 `wiki stale` in the 來源表.
   A claim sourced only from an NN below AUDITED_CLEAN (and no verified wiki entry)
   is either re-verified by delegation or labelled 未經現查 — never presented as fact.
   Evidence references are copied verbatim from the NN appendix (full 36-char ChunkId / SQL).

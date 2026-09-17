@@ -13,14 +13,16 @@
 ## 1. 定位（≤4 次 grep；只准下列呼叫形狀）
 
 grep 工具不能指定單一檔案（path 只認目錄），所以一律 `path=目錄`＋`include=檔名`。
-pattern 用 `\| <物件名> \|`（cell 錨定）才不會撈到別的物件的引用欄。
+pattern 用 `[|] <物件名> [|]`（cell 錨定：直線放在字元類別裡，不用反斜線——反斜線經工具參數傳遞
+容易掉，掉了 `|` 就變成「或」而命中整檔）才不會撈到別的物件的引用欄。
 
-1. `grep(pattern="\| <物件名> \|", path="docs/ps-research/knowledge", include="index.md")`
+1. `grep(pattern="[|] <物件名> [|]", path="docs/ps-research/knowledge", include="index.md")`
    → 命中列可能來自「## Wiki」表（欄：物件／類型／狀態／有效性／人工／last_verified／來源數／引用NN／aliases）
-   或「## NN」表（欄：領域／檔／主物件／等級／狀態／稽核／節（名@offset/limit）／證據／缺口／待補／hash）。
+   或「## NN」表（欄：領域／檔／主物件／續篇／等級／狀態／稽核／節（名@offset/limit）／證據／缺口／待補／hash；
+   主物件欄永遠是純物件名，續篇檔另以「續篇」欄標「是」）。
 2. 沒中 → `grep(pattern="<業務詞或 alias>", path="docs/ps-research/knowledge", include="index.md")`
    （命中 Wiki 表的 aliases 欄或 NN 表的主物件欄）。
-3. 沒中 → `grep(pattern="\| <物件名> \|", path="docs/ps-research/knowledge", include="objects.md")`
+3. 沒中 → `grep(pattern="[|] <物件名> [|]", path="docs/ps-research/knowledge", include="objects.md")`
    （物件彙總：類型／主物件於／引用NN數／引用於）→ 取「主物件於」或「引用於」的 `領域/檔`，
    回到 index.md 的 NN 列取節 offset／limit（再一次 grep，pattern=該檔名）。
 4. 仍沒中、或 index.md 不存在 →
@@ -30,7 +32,8 @@ pattern 用 `\| <物件名> \|`（cell 錨定）才不會撈到別的物件的�
 
 ## 2. 挑選
 
-- Wiki 列 ≤3（整檔 read；`status`／有效性看索引列）。
+- Wiki 列 ≤3（整檔 read；檔路徑固定 `docs/ps-research/wiki/<物件名>.md`，物件名逐字取自 Wiki 列第一欄；
+  `status`／有效性看索引列，不看檔內）。
 - NN 列 ≤3：等級順序 `AUDITED_CLEAN` ＞ `AUDITED_ISSUES` ＞ `UNAUDITED` ＞ `PARTIAL` ＞ `BLOCKED`；
   同級取稽核輪次新者。同主物件的續篇檔（`-2.md`）算同一個 NN 名額。
 - 等級意義：`AUDITED_CLEAN`＝COMPLETE、最新記分卡零 FAIL 零 DISPUTED、無待補、稽核後未改；
@@ -48,11 +51,13 @@ pattern 用 `\| <物件名> \|`（cell 錨定）才不會撈到別的物件的�
 | 在哪裡進入、功能定位 | 功能定位（含導覽入口／Technical Menu） |
 | 要證據參照 | Evidence 附錄 |
 
-呼叫：`read(filePath="docs/ps-research/<領域>/<檔>", offset=<offset>, limit=<limit>+1)`
-（offset／limit 逐字取自 NN 列「節」欄的 `節名@offset/limit`；`@缺`＝該節不存在，不讀）。
+呼叫：`read(filePath="docs/ps-research/<領域>/<檔>", offset=<offset>, limit=<limit>)`
+（offset／limit 逐字取自 NN 列「節」欄的 `節名@offset/limit`，**直接用、不加減**——limit 已含該節標題到
+節末的行數；`@缺`＝該節不存在，不讀）。
 
-**雙端自檢（每次 read 都做）**：回來的第一行必須是該節的 `## <節名>` 標題，最後一行必須是
-下一個 `## ` 標題或檔尾。任一不符、或 read 回 `Offset … out of range` → 以
+**首行自檢（每次 read 都做）**：回來的第一行必須以 `## ` 開頭，而且去掉空白與括號註記後的標題名
+要以索引「節」欄的節名開頭（`## Evidence 附錄`、`## 未解事項（gaps）` 都算對上）。只檢查第一行，
+不檢查最後一行。第一行不符、或 read 回 `Offset … out of range` → 以
 `grep(pattern="^## <節名>", path="docs/ps-research/<領域>", include="<NN 檔名>")` 重新定位**一次**
 （取第一筆的行號當 offset、limit 同原值），並把該檔等級視為 `UNAUDITED`、來源標「索引過時」。
 
@@ -71,12 +76,18 @@ pattern 用 `\| <物件名> \|`（cell 錨定）才不會撈到別的物件的�
   （wiki `reviewed: true` 或 `human:<日期>` 較新只影響並陳順序，不免除現查）。
 - 來源標了「索引過時」。
 
+Wiki 列的有效性欄只有 `verified` 算已驗證；`draft` 是草稿；`stale`／`STALE_BY_SOURCE`／`EXPIRED`／`UNKNOWN`
+一律視同 stale（來源 NN 被稽核判 FAIL、超過有效期、或無法判定），只當線索、必現查。
+
 其餘情況：知識（wiki＋NN）沒有或不足才現查——這是既有的「wiki 沒有才現查」規則的擴大版。
 
 ## 5. 來源標註（每項結論）
 
-`wiki（已驗證）`／`wiki（人工審定）`／`NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）`／
-`NN：<領域>/<檔>（AUDITED_ISSUES｜UNAUDITED｜PARTIAL，未經現查）`／`NN：<領域>/<檔>（索引過時）`／`本次現查`。
+`wiki（已驗證）`／`wiki（人工審定）`／`wiki（草稿，未經現查）`／`wiki（已過期／來源失效，未經現查）`／
+`NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）`／`NN：<領域>/<檔>（AUDITED_ISSUES｜UNAUDITED｜PARTIAL｜BLOCKED，未經現查）`／
+`NN：<領域>/<檔>（索引過時）`／`本次現查`。
+索引有效性 → 標籤：`verified`＝wiki（已驗證）（人工欄「是」＝wiki（人工審定））；`draft`＝wiki（草稿，未經現查）；
+`stale`／`STALE_BY_SOURCE`／`EXPIRED`／`UNKNOWN`＝wiki（已過期／來源失效，未經現查）。
 證據參照逐字複製 NN 附錄的 ChunkId（完整 36 字元）或 SQL；不得自己改寫。
 
 ## 6. 答覆結尾固定「## 來源表」
@@ -90,7 +101,8 @@ pattern 用 `\| <物件名> \|`（cell 錨定）才不會撈到別的物件的�
 ```
 
 封閉值：等級 ∈ {AUDITED_CLEAN, AUDITED_ISSUES, UNAUDITED, PARTIAL, BLOCKED, wiki verified, wiki draft,
-wiki stale, 索引過時, 現查}；現查 ∈ {是, 否}。等級不是 `AUDITED_CLEAN` 也不是 `wiki verified` 的列，
+wiki stale, 索引過時, 現查}；現查 ∈ {是, 否}。索引有效性 `stale`／`STALE_BY_SOURCE`／`EXPIRED`／`UNKNOWN`
+在來源表一律寫 `wiki stale`。等級不是 `AUDITED_CLEAN` 也不是 `wiki verified` 的列，
 現查必為「是」。每列來源與證據參照不得空白。
 
 ## 7. 產出前輕稽核（第 7 步的縮減）

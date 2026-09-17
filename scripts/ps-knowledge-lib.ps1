@@ -80,24 +80,24 @@ function New-PsKnRandomHex {
 
 # ── canonical JSON（insertion order、LF、2 空格、非 ASCII 原樣；-SortKeys 時逐層 Ordinal 排序鍵，供 workKey 等跨機 hash）────────
 
+# 逃逸只針對需要逃逸的字元做一次 regex 取代（逐字元 foreach 在 5.1 是 O(n) 慢路徑：300 個 NN 的索引要數十秒）
+$script:PsKnJsonEscapeRx = New-Object System.Text.RegularExpressions.Regex('["\\\u0000-\u001f\u2028\u2029]')
+$script:PsKnJsonEscapeEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+    param($m)
+    $code = [int][char]($m.Value[0])
+    if ($code -eq 34) { return '\"' }
+    if ($code -eq 92) { return '\\' }
+    if ($code -eq 8) { return '\b' }
+    if ($code -eq 12) { return '\f' }
+    if ($code -eq 10) { return '\n' }
+    if ($code -eq 13) { return '\r' }
+    if ($code -eq 9) { return '\t' }
+    return ('\u' + $code.ToString('x4'))
+}
 function ConvertTo-PsKnJsonString {
     param([string]$Value)
-    $sb = New-Object System.Text.StringBuilder
-    [void]$sb.Append('"')
-    foreach ($ch in $Value.ToCharArray()) {
-        $code = [int]$ch
-        if ($code -eq 34) { [void]$sb.Append('\"') }
-        elseif ($code -eq 92) { [void]$sb.Append('\\') }
-        elseif ($code -eq 8) { [void]$sb.Append('\b') }
-        elseif ($code -eq 12) { [void]$sb.Append('\f') }
-        elseif ($code -eq 10) { [void]$sb.Append('\n') }
-        elseif ($code -eq 13) { [void]$sb.Append('\r') }
-        elseif ($code -eq 9) { [void]$sb.Append('\t') }
-        elseif ($code -lt 32 -or $code -eq 0x2028 -or $code -eq 0x2029) { [void]$sb.Append('\u').Append($code.ToString('x4')) }
-        else { [void]$sb.Append($ch) }
-    }
-    [void]$sb.Append('"')
-    return $sb.ToString()
+    if ($null -eq $Value) { $Value = '' }
+    return ('"' + $script:PsKnJsonEscapeRx.Replace($Value, $script:PsKnJsonEscapeEvaluator) + '"')
 }
 
 function ConvertTo-PsKnJson {
@@ -112,16 +112,18 @@ function ConvertTo-PsKnJson {
     if ($Value -is [double] -or $Value -is [single]) { return ([double]$Value).ToString('R', [System.Globalization.CultureInfo]::InvariantCulture) }
     if ($Value -is [decimal]) { return ([decimal]$Value).ToString([System.Globalization.CultureInfo]::InvariantCulture) }
     if ($Value -is [string]) { return (ConvertTo-PsKnJsonString -Value $Value) }
+    # PowerShell 7 的 ConvertFrom-Json 會把 ISO 時間字串轉成 DateTime（5.1 保留字串）：回寫時一律化回 UTC ISO 字串，兩種 runtime 寫出同樣的 JSON
+    if ($Value -is [datetime]) { return (ConvertTo-PsKnJsonString -Value (Get-PsKnUtcStamp -At $Value)) }
     if ($Value -is [System.Collections.IDictionary]) {
-        $keys = @()
-        foreach ($k in $Value.Keys) { $keys += [string]$k }
+        $keys = New-Object System.Collections.Generic.List[string]
+        foreach ($k in $Value.Keys) { $keys.Add([string]$k) }
         if ($keys.Count -eq 0) { return '{}' }
-        if ($SortKeys) { $keys = Sort-PsKnOrdinal -Items $keys }
-        $parts = @()
+        if ($SortKeys) { $keys = Sort-PsKnOrdinal -Items $keys.ToArray() }
+        $parts = New-Object System.Collections.Generic.List[string]
         foreach ($k in $keys) {
-            $parts += ($pad2 + (ConvertTo-PsKnJsonString -Value $k) + ': ' + (ConvertTo-PsKnJson -Value $Value[$k] -Indent ($Indent + 2) -SortKeys:$SortKeys))
+            $parts.Add($pad2 + (ConvertTo-PsKnJsonString -Value $k) + ': ' + (ConvertTo-PsKnJson -Value $Value[$k] -Indent ($Indent + 2) -SortKeys:$SortKeys))
         }
-        return ('{' + "`n" + ($parts -join (',' + "`n")) + "`n" + $pad + '}')
+        return ('{' + "`n" + ([string]::Join((',' + "`n"), $parts)) + "`n" + $pad + '}')
     }
     if ($Value -is [System.Management.Automation.PSCustomObject]) {
         $od = [ordered]@{}
@@ -129,12 +131,10 @@ function ConvertTo-PsKnJson {
         return (ConvertTo-PsKnJson -Value $od -Indent $Indent -SortKeys:$SortKeys)
     }
     if ($Value -is [System.Collections.IEnumerable]) {
-        $items = @()
-        foreach ($it in $Value) { $items += , $it }
-        if ($items.Count -eq 0) { return '[]' }
-        $parts = @()
-        foreach ($it in $items) { $parts += ($pad2 + (ConvertTo-PsKnJson -Value $it -Indent ($Indent + 2) -SortKeys:$SortKeys)) }
-        return ('[' + "`n" + ($parts -join (',' + "`n")) + "`n" + $pad + ']')
+        $parts = New-Object System.Collections.Generic.List[string]
+        foreach ($it in $Value) { $parts.Add($pad2 + (ConvertTo-PsKnJson -Value $it -Indent ($Indent + 2) -SortKeys:$SortKeys)) }
+        if ($parts.Count -eq 0) { return '[]' }
+        return ('[' + "`n" + ([string]::Join((',' + "`n"), $parts)) + "`n" + $pad + ']')
     }
     return (ConvertTo-PsKnJsonString -Value ([string]$Value))
 }
@@ -186,22 +186,34 @@ function Write-PsKnAtomicText {
     return $true
 }
 
-# create-only 目標：tmp → Move；目標已存在 → 回 $false（不覆寫、不拋）
+# create-only 目標：tmp → Move。三態回傳：$true＝建立成功；$false＝目標已存在（輸家；不覆寫、不拋）；
+# $null＝Move 因 sharing violation 等 IOException 失敗而目標並不存在（重試 5 次、200ms 退避後仍失敗）＝WRITE_DEFERRED，
+# 呼叫端不得把它當成「輸家」（沒有贏家檔可讀）——要以 $null -eq 判斷。
 function Write-PsKnCreateOnlyText {
-    param([string]$LiteralPath, [string]$Text)
+    param([string]$LiteralPath, [string]$Text, [int]$Retries = 5)
     $dir = [System.IO.Path]::GetDirectoryName($LiteralPath)
     if (-not [System.IO.Directory]::Exists($dir)) { [void][System.IO.Directory]::CreateDirectory($dir) }
     if ([System.IO.File]::Exists($LiteralPath)) { return $false }
     $tmp = $LiteralPath + '.tmp-' + [guid]::NewGuid().ToString('N')
     [System.IO.File]::WriteAllText($tmp, $Text, (New-Object System.Text.UTF8Encoding($false)))
-    try {
-        [System.IO.File]::Move($tmp, $LiteralPath)
-        return $true
+    $lastErr = ''
+    for ($try = 1; $try -le $Retries; $try++) {
+        try {
+            [System.IO.File]::Move($tmp, $LiteralPath)
+            return $true
+        }
+        catch [System.IO.IOException] {
+            $lastErr = $_.Exception.Message
+            if ([System.IO.File]::Exists($LiteralPath)) {
+                Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+                return $false
+            }
+            if ($try -lt $Retries) { Start-Sleep -Milliseconds (200 * $try) }
+        }
     }
-    catch [System.IO.IOException] {
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-        return $false
-    }
+    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    Write-Host ("PUBLISH_DEFERRED：" + $LiteralPath + "（" + $lastErr + "）")
+    return $null
 }
 
 # 清掉半寫殘留（crash 時留下的 *.tmp-<guid>／*.bak-<guid>）；只清超過 MinAgeMinutes 的，避免掃到別的行程正在寫的 tmp
@@ -283,7 +295,8 @@ function Get-PsKnTableRows {
 # 節是否空洞：去 HTML 註解、<占位>、「同前／略／unchanged」後無內容（同 ps-doc-lint Test-SectionHollow）
 function Test-PsKnHollow {
     param([string[]]$Lines, [int]$Start, [int]$End)
-    if ($Start -lt 1 -or $Start -gt $End) { return $true }
+    # Start＝標題行；End＝下一標題前一行。標題緊接下一標題（無空行）時 Start==End＝沒有內文
+    if ($Start -lt 1 -or $Start -ge $End) { return $true }
     $body = ($Lines[($Start) .. ([Math]::Min($End, $Lines.Count) - 1)]) -join "`n"
     if ($Start -ge $Lines.Count) { return $true }
     $body = [regex]::Replace($body, '<!--.*?-->', '', 'Singleline')
@@ -311,7 +324,7 @@ function Get-PsKnWikilinks {
 
 $script:PsKnUuidRx = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 $script:PsKnNnSections = @('相關物件', '功能定位', '畫面與欄位', '行為邏輯', '資料流', '執行方式', '權限', '未解事項', 'Evidence附錄')
-$script:PsKnSectionDisplay = @{ '相關物件' = '相關物件'; '功能定位' = '功能定位'; '畫面與欄位' = '畫面與欄位'; '行為邏輯' = '行為邏輯'; '資料流' = '資料流'; '執行方式' = '執行方式'; '權限' = '權限'; '未解事項' = '未解事項'; 'Evidence附錄' = 'Evidence' }
+$script:PsKnSectionDisplay = @{ '相關物件' = '相關物件'; '功能定位' = '功能定位'; '畫面與欄位' = '畫面與欄位'; '行為邏輯' = '行為邏輯'; '資料流' = '資料流'; '執行方式' = '執行方式'; '權限' = '權限'; '未解事項' = '未解事項'; 'Evidence附錄' = 'Evidence 附錄' }
 
 # 從 sections 陣列取第一個符合（名稱鍵＋層級）的範圍；找不到回 $null
 function Get-PsKnSectionRange {
@@ -329,9 +342,11 @@ function Test-PsKnIsNnFile {
     return ($Name -match '^\d\d-' -and $Name -notmatch '^(00|90)-' -and $Name -match '\.md$')
 }
 
+# -Text：已讀入的內容（呼叫端要 hash／行／節位描述同一份位元組時用它，避免兩次讀檔之間檔案被原子替換）；空＝自 LiteralPath 讀
 function Get-PsKnNnFacts {
-    param([string]$LiteralPath, [string]$Domain)
-    $text = Read-PsKnText -LiteralPath $LiteralPath
+    param([string]$LiteralPath, [string]$Domain, [string]$Text = '')
+    $text = $Text
+    if ($text -eq '') { $text = Read-PsKnText -LiteralPath $LiteralPath }
     if ($null -eq $text) { return $null }
     $lines = Get-PsKnLines -Text $text
     $name = [System.IO.Path]::GetFileName($LiteralPath)
@@ -395,13 +410,15 @@ function Get-PsKnNnFacts {
     if ($null -ne $sec) {
         $rows = Get-PsKnTableRows -Lines $lines -Start $sec.Start -End $sec.End
         $f.fieldRows = $rows.Count
-        $body = ($lines[($sec.Start) .. ([Math]::Min($sec.End, $lines.Count) - 1)]) -join "`n"
+        $body = ''
+        if ($sec.End -gt $sec.Start) { $body = ($lines[($sec.Start) .. ([Math]::Min($sec.End, $lines.Count) - 1)]) -join "`n" }
         if ($body -match '（無') { $f.fieldsNotApplicable = $true }
     }
     # 行為邏輯
     $sec = Find-PsKnSection -Headings $heads -Key '行為邏輯'
     if ($null -ne $sec) {
-        $body = ($lines[($sec.Start) .. ([Math]::Min($sec.End, $lines.Count) - 1)]) -join "`n"
+        $body = ''
+        if ($sec.End -gt $sec.Start) { $body = ($lines[($sec.Start) .. ([Math]::Min($sec.End, $lines.Count) - 1)]) -join "`n" }
         foreach ($k in @('CONFIRMED', 'INFERRED', 'DYNAMIC_RUNTIME')) {
             $f.behaviorCounts[$k] = ([regex]::Matches($body, ('\b' + $k + '\b'))).Count
         }
@@ -770,16 +787,18 @@ function Build-PsKnowledgeIndex {
     param([string]$Root, [string]$LogRoot = '', [datetime]$AsOf = (Get-Date))
     $researchRoot = Join-Path $Root (Join-Path 'docs' 'ps-research')
     if ($LogRoot -eq '') { $LogRoot = Join-Path $Root 'auto-loop-logs' }
-    $inputs = @()   # "相對路徑`n hash" 供世代 hash
+    $inputs = New-Object System.Collections.Generic.List[string]   # "相對路徑`n hash" 供世代 hash
     $idx = [ordered]@{
-        schemaVersion = $script:PsKnowledgeSchemaVersion; generation = ''; builtAt = $AsOf.ToString('yyyy-MM-ddTHH:mm:ssK')
+        schemaVersion = $script:PsKnowledgeSchemaVersion; generation = ''
+        builtAt = $AsOf.ToString("yyyy-MM-dd'T'HH':'mm':'ssK", [System.Globalization.CultureInfo]::InvariantCulture)
         domains = @(); nn = @(); objects = @(); wiki = @()
     }
     $wikiDir = Join-Path $researchRoot 'wiki'
     $wikiByName = [ordered]@{}
-    $allFailedRefs = @()
+    $allFailedRefs = New-Object System.Collections.Generic.List[string]
     $auditByDomain = [ordered]@{}
-    $nnList = @()
+    $nnList = New-Object System.Collections.Generic.List[object]
+    $domList = New-Object System.Collections.Generic.List[object]
     foreach ($dd in (Get-PsKnDomainDirs -ResearchRoot $researchRoot)) {
         $domain = [System.IO.Path]::GetFileName($dd)
         $ov = Get-PsKnOverviewFacts -LiteralPath (Join-Path $dd '00-overview.md')
@@ -788,12 +807,12 @@ function Build-PsKnowledgeIndex {
         $rc = Get-PsKnReceiptFacts -DomainDir $dd
         $done = Get-PsKnAuditDoneFacts -LogDir (Join-Path $LogRoot $domain) -DomainDir $dd
         $auditByDomain[$domain] = $au
-        foreach ($u in $au.failedRefs) { if ($allFailedRefs -notcontains $u) { $allFailedRefs += $u } }
-        if ($ov.exists) { $inputs += ($domain + '/00-overview.md' + "`n" + $ov.hash) }
-        if ($au.exists) { $inputs += ($domain + '/90-audit.md' + "`n" + $au.hash) }
-        if ($cl.exists) { $inputs += ($domain + '/checklist.md' + "`n" + $cl.hash) }
-        if ($rc.exists) { $inputs += ($domain + '/graduation.json' + "`n" + $rc.hash) }
-        if ($done.exists) { $inputs += ($domain + '/audit-done.json' + "`n" + $done.hash) }
+        foreach ($u in $au.failedRefs) { if (-not $allFailedRefs.Contains([string]$u)) { $allFailedRefs.Add([string]$u) } }
+        if ($ov.exists) { $inputs.Add($domain + '/00-overview.md' + "`n" + $ov.hash) }
+        if ($au.exists) { $inputs.Add($domain + '/90-audit.md' + "`n" + $au.hash) }
+        if ($cl.exists) { $inputs.Add($domain + '/checklist.md' + "`n" + $cl.hash) }
+        if ($rc.exists) { $inputs.Add($domain + '/graduation.json' + "`n" + $rc.hash) }
+        if ($done.exists) { $inputs.Add($domain + '/audit-done.json' + "`n" + $done.hash) }
         $files = @()
         foreach ($f in @(Get-ChildItem -LiteralPath $dd -File -ErrorAction SilentlyContinue)) { if (Test-PsKnIsNnFile -Name $f.Name) { $files += $f.Name } }
         $files = Sort-PsKnOrdinal -Items $files
@@ -802,7 +821,7 @@ function Build-PsKnowledgeIndex {
             $nn = Get-PsKnNnFacts -LiteralPath (Join-Path $dd $name) -Domain $domain
             if ($null -eq $nn) { continue }
             $nnCount++
-            $inputs += ($domain + '/' + $name + "`n" + $nn.hash)
+            $inputs.Add($domain + '/' + $name + "`n" + $nn.hash)
             $gr = Get-PsKnNnGrade -Nn $nn -Audit $au -Checklist $cl -AuditDone $done
             $tier = 0; $receiptStale = $true
             if ($rc.exists -and $rc.files.Contains($name)) { if ([string]$rc.files[$name] -ceq $nn.hash) { $tier = $rc.tier; $receiptStale = $false } }
@@ -817,55 +836,58 @@ function Build-PsKnowledgeIndex {
                 behaviorCounts = $nn.behaviorCounts; dataFlow = @($nn.dataFlow); executionHollow = $nn.executionHollow; permissionHollow = $nn.permissionHollow
                 gaps = $nn.gaps; evidenceCount = $nn.evidence.Count; evidenceKinds = $nn.evidenceKinds; links = @($nn.links)
             }
-            $nnList += , $entry
+            $nnList.Add($entry)
         }
-        $idx.domains += , ([ordered]@{
+        $domList.Add([ordered]@{
                 domain = $domain; nnCount = $nnCount; overview = $ov.exists; auditRound = $au.round; auditExists = $au.exists
                 checklistRound = $cl.round; pendingRepairs = $cl.pendingRepairs.Count; pendingD = $cl.pendingD; pendingPlain = $cl.pendingPlain
                 receiptTier = $rc.tier; receiptExists = $rc.exists; functionMap = @($ov.functionMap); domainGate = @($au.domainGate); auditDoneSource = $done.source
             })
     }
-    $idx.nn = @($nnList)
+    # List → 陣列一律用 ToArray()（pwsh 7 對 List[object] 內含 OrderedDictionary 時 @() 會拋 Argument types do not match）
+    $idx.domains = $domList.ToArray()
+    $idx.nn = $nnList.ToArray()
     # wiki
-    $wikiList = @()
+    $wikiList = New-Object System.Collections.Generic.List[object]
     if ([System.IO.Directory]::Exists($wikiDir)) {
         $wf = @()
         foreach ($f in @(Get-ChildItem -LiteralPath $wikiDir -File -ErrorAction SilentlyContinue)) { if ($f.Extension -eq '.md' -and $f.Name -ne 'index.md') { $wf += $f.Name } }
         foreach ($name in (Sort-PsKnOrdinal -Items $wf)) {
             $w = Get-PsKnWikiFacts -LiteralPath (Join-Path $wikiDir $name)
             if ($null -eq $w) { continue }
-            $inputs += ('wiki/' + $name + "`n" + $w.hash)
-            $w.effective = Get-PsKnWikiEffective -Wiki $w -FailedRefs $allFailedRefs -AsOf $AsOf
-            $w.referencedBy = @()
-            foreach ($e in $nnList) { if ($e.links -contains $w.name) { $w.referencedBy += ($e.domain + '/' + $e.file) } }
+            $inputs.Add('wiki/' + $name + "`n" + $w.hash)
+            $w.effective = Get-PsKnWikiEffective -Wiki $w -FailedRefs $allFailedRefs.ToArray() -AsOf $AsOf
+            $refBy = New-Object System.Collections.Generic.List[string]
+            foreach ($e in $nnList) { if ($e.links -contains $w.name) { $refBy.Add($e.domain + '/' + $e.file) } }
+            $w.referencedBy = $refBy.ToArray()
             $w.path = ('docs/ps-research/wiki/' + $name)
             $wikiByName[$w.name] = $w
-            $wikiList += , $w
+            $wikiList.Add($w)
         }
     }
-    $idx.wiki = @($wikiList)
+    $idx.wiki = $wikiList.ToArray()
     # objects：(物件, NN) 一列；類型：wiki → 功能地圖 → UNKNOWN
     $typeByObject = @{}
     foreach ($d in $idx.domains) { foreach ($fm in $d.functionMap) { if ($fm.type -ne '' -and -not $typeByObject.ContainsKey($fm.object)) { $typeByObject[$fm.object] = $fm.type } } }
-    $objs = @()
+    $objs = New-Object System.Collections.Generic.List[object]
     foreach ($e in $nnList) {
         $seen = @{}
-        $cands = @()
-        $cands += , @($e.primaryObject, '主物件', 1)
-        foreach ($ro in $e.relatedObjects) { $cands += , @($ro.name, $ro.role, $ro.line) }
-        foreach ($l in $e.links) { $cands += , @($l, '連結', 0) }
+        $cands = New-Object System.Collections.Generic.List[object]
+        $cands.Add(@($e.primaryObject, '主物件', 1))
+        foreach ($ro in $e.relatedObjects) { $cands.Add(@($ro.name, $ro.role, $ro.line)) }
+        foreach ($l in $e.links) { $cands.Add(@($l, '連結', 0)) }
         foreach ($c in $cands) {
             $n = [string]$c[0]
             if ($n -eq '' -or $seen.ContainsKey($n)) { continue }
             $seen[$n] = $true
             $t = 'UNKNOWN'
             if ($wikiByName.Contains($n)) { $t = $wikiByName[$n].type } elseif ($typeByObject.ContainsKey($n)) { $t = $typeByObject[$n] }
-            $objs += , ([ordered]@{ object = $n; type = $t; domain = $e.domain; file = $e.file; role = [string]$c[1]; grade = $e.grade; line = [int]$c[2] })
+            $objs.Add([ordered]@{ object = $n; type = $t; domain = $e.domain; file = $e.file; role = [string]$c[1]; grade = $e.grade; line = [int]$c[2] })
         }
     }
-    $idx.objects = @($objs)
+    $idx.objects = $objs.ToArray()
     # 世代 hash：所有輸入（路徑＋hash）Ordinal 排序後 SHA256
-    $sorted = Sort-PsKnOrdinal -Items $inputs
+    $sorted = Sort-PsKnOrdinal -Items $inputs.ToArray()
     $idx.generation = Get-PsKnTextHash -Text (($sorted -join "`n") + "`n")
     $idx.inputCount = $inputs.Count
     return $idx
@@ -897,7 +919,7 @@ function ConvertTo-PsKnowledgeIndexMd {
     [void]$sb.Append('# 知識索引（機械產生，勿手改）').Append($nl).Append($nl)
     [void]$sb.Append('generation：' + $Index.generation.Substring(0, 16) + '　建置：' + $Index.builtAt + '　領域 ' + $Index.domains.Count + '　NN ' + $Index.nn.Count + '　wiki ' + $Index.wiki.Count + '　schema ' + $Index.schemaVersion).Append($nl).Append($nl)
     [void]$sb.Append('用法（讀取契約：.opencode/peoplesoft/knowledge-retrieval-contract.md）：grep（pattern=物件名或 alias，path=docs/ps-research/knowledge，include=index.md）取列；').Append($nl)
-    [void]$sb.Append('NN 列的「節」欄＝節名@offset/limit（read 該 NN 檔時直接用 offset 與 limit；@缺＝該節不存在）；片段第一行必須是該節標題，否則以 grep 重新定位；').Append($nl)
+    [void]$sb.Append('NN 列的「節」欄＝節名@offset/limit（read 該 NN 檔時 offset 與 limit 原樣用；@缺＝該節不存在）；片段第一行必須是該節標題（以節名為前綴比對），否則以 grep 重新定位一次；續篇欄「是」＝同主物件的續篇檔。').Append($nl)
     [void]$sb.Append('等級：AUDITED_CLEAN（可直接引用）／AUDITED_ISSUES／UNAUDITED／PARTIAL／BLOCKED（只當線索，關鍵結論要現查）。物件彙總表在同目錄 objects.md。重建：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-knowledge.ps1 -Rebuild').Append($nl).Append($nl)
     [void]$sb.Append('## 領域').Append($nl).Append($nl)
     [void]$sb.Append('| 領域 | NN 數 | 稽核輪次 | 待補 | 未建 NN | tier（本機） |').Append($nl)
@@ -916,8 +938,8 @@ function ConvertTo-PsKnowledgeIndexMd {
         [void]$sb.Append('| ' + (ConvertTo-PsKnCell $w.name) + ' | ' + (ConvertTo-PsKnCell $w.type) + ' | ' + $w.status + ' | ' + $w.effective + ' | ' + $rev + ' | ' + (ConvertTo-PsKnCell $w.lastVerified) + ' | ' + $w.sources.Count + ' | ' + $w.referencedBy.Count + ' | ' + (ConvertTo-PsKnCell ($w.aliases -join '、')) + ' |').Append($nl)
     }
     [void]$sb.Append($nl).Append('## NN').Append($nl).Append($nl)
-    [void]$sb.Append('| 領域 | 檔 | 主物件 | 等級 | 狀態 | 稽核 | 節（名@offset/limit） | 證據 | 缺口 | 待補 | hash |').Append($nl)
-    [void]$sb.Append('|---|---|---|---|---|---|---|---|---|---|---|').Append($nl)
+    [void]$sb.Append('| 領域 | 檔 | 主物件 | 續篇 | 等級 | 狀態 | 稽核 | 節（名@offset/limit） | 證據 | 缺口 | 待補 | hash |').Append($nl)
+    [void]$sb.Append('|---|---|---|---|---|---|---|---|---|---|---|---|').Append($nl)
     foreach ($e in $Index.nn) {
         $secParts = @()
         $shown = @{}
@@ -937,9 +959,10 @@ function ConvertTo-PsKnowledgeIndexMd {
         if ([int]$e.duplicateSections -gt 0) { $secParts += ('重複標題×' + $e.duplicateSections) }
         $h8 = ''
         if ($e.hash.Length -ge 8) { $h8 = $e.hash.Substring(0, 8) }
-        $obj = $e.primaryObject
-        if ($e.file -match '-\d+\.md$') { $obj = $obj + '（續篇）' }
-        [void]$sb.Append('| ' + (ConvertTo-PsKnCell $e.domain) + ' | ' + (ConvertTo-PsKnCell $e.file) + ' | ' + (ConvertTo-PsKnCell $obj) + ' | ' + $e.grade + ' | ' + $e.status + ' | ' + (Get-PsKnLightText $e) + ' | ' + (ConvertTo-PsKnCell ($secParts -join ';')) + ' | ' + $e.evidenceCount + ' | ' + $e.gaps + ' | ' + $e.pendingRepairs + ' | ' + $h8 + ' |').Append($nl)
+        # 主物件欄保持純物件名（契約的 cell 錨定 pattern 才能命中續篇）；續篇另欄標示
+        $cont = '否'
+        if ($e.file -match '-\d+\.md$') { $cont = '是' }
+        [void]$sb.Append('| ' + (ConvertTo-PsKnCell $e.domain) + ' | ' + (ConvertTo-PsKnCell $e.file) + ' | ' + (ConvertTo-PsKnCell $e.primaryObject) + ' | ' + $cont + ' | ' + $e.grade + ' | ' + $e.status + ' | ' + (Get-PsKnLightText $e) + ' | ' + (ConvertTo-PsKnCell ($secParts -join ';')) + ' | ' + $e.evidenceCount + ' | ' + $e.gaps + ' | ' + $e.pendingRepairs + ' | ' + $h8 + ' |').Append($nl)
     }
     return $sb.ToString()
 }
@@ -950,7 +973,7 @@ function ConvertTo-PsKnowledgeObjectsMd {
     $sb = New-Object System.Text.StringBuilder
     $nl = "`n"
     [void]$sb.Append('# 物件索引（機械產生，勿手改）').Append($nl).Append($nl)
-    [void]$sb.Append('generation：' + $Index.generation.Substring(0, 16) + '　物件 ' + $Index.objects.Count + '　用法：grep（pattern=\| <物件名> \|，path=docs/ps-research/knowledge，include=objects.md）；找到檔名後回 index.md 的 NN 列取節 offset/limit').Append($nl).Append($nl)
+    [void]$sb.Append('generation：' + $Index.generation.Substring(0, 16) + '　物件 ' + $Index.objects.Count + '　用法：grep（pattern=[|] <物件名> [|]，path=docs/ps-research/knowledge，include=objects.md）；找到檔名後回 index.md 的 NN 列取節 offset/limit').Append($nl).Append($nl)
     [void]$sb.Append('## 物件').Append($nl).Append($nl)
     [void]$sb.Append('| 物件 | 類型 | 主物件於 | 引用NN數 | 引用於（角色；最多 10） |').Append($nl)
     [void]$sb.Append('|---|---|---|---|---|').Append($nl)

@@ -5,7 +5,8 @@
 #       ——同一台機器同一時間只跑一個 headless session（各外環各持自己的鎖：research 全域鎖／spec 逐 job 鎖，
 #       但都用同一個模型服務與 oracleMCP 單通道）。
 # 純函式庫：dot-source 無副作用。PowerShell 5.1 紀律：無三元／??／&&；Join-Path 兩參數；-LiteralPath。
-# prompt 走 cmd.exe 命令列：禁半形雙引號與 cmd 特殊字元（> < & | % ^）、禁換行；中文引號「」不受限。
+# prompt 走 cmd.exe 命令列、放在半形雙引號裡：真正會壞的是半形雙引號（結束引號）、% （即使在引號內 cmd 也展開 %VAR%）與換行；
+# > < & | ^ 在雙引號內是普通字元（不當重導向、不當中繼字元），照舊可用；中文引號「」不受限。
 
 $script:PsSessionLibVersion = 1
 $script:PsOcSessionSlotName = 'Global\MCPSample-OpencodeSession'
@@ -47,11 +48,12 @@ function Get-PsOcFailureKind {
     return 'NONE'
 }
 
-# prompt 是否能安全放進 cmd.exe 命令列（單行、無半形雙引號與 cmd 中繼字元）
+# prompt 是否能安全放進 cmd.exe 命令列的雙引號引數：只擋真的會壞的三種——半形雙引號、%（cmd 在引號內也展開 %VAR%）、換行。
+# > < & | ^ 在雙引號內是普通字元（手術 prompt 就含「A > B > C」），不擋。
 function Test-PsOcPromptSafe {
     param([string]$PromptText)
     if ($null -eq $PromptText -or $PromptText -eq '') { return $false }
-    if ($PromptText -match '[\r\n"<>&|%^]') { return $false }
+    if ($PromptText -match '[\r\n"%]') { return $false }
     return $true
 }
 
@@ -67,9 +69,14 @@ function Enter-PsOcSessionSlot {
     try { $held = $m.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $held = $true }
     $started = Get-Date
     if (-not $held -and $WaitMin -gt 0) {
-        if ($null -ne $Log) { & $Log ('session slot 被占用（另一個 headless session 正在跑）——最多等 ' + $WaitMin + ' 分') }
+        if ($null -ne $Log) { & $Log ('session slot 被占用（另一個 headless session 正在跑：ps-auto-loop／ps-spec -Run／補研究迷你圈）——最多等 ' + $WaitMin + ' 分，取得後逾時才起算') }
+        $lastBeat = Get-Date
         while (-not $held -and ((Get-Date) - $started).TotalMinutes -lt $WaitMin) {
             try { $held = $m.WaitOne(30000) } catch [System.Threading.AbandonedMutexException] { $held = $true }
+            if (-not $held -and $null -ne $Log -and ((Get-Date) - $lastBeat).TotalMinutes -ge 5) {
+                & $Log ('session slot 仍被占用…已等 ' + [int]((Get-Date) - $started).TotalMinutes + ' 分（上限 ' + $WaitMin + ' 分）')
+                $lastBeat = Get-Date
+            }
         }
     }
     $slot.WaitedSec = [int]((Get-Date) - $started).TotalSeconds
@@ -109,7 +116,7 @@ function Invoke-PsOcSession {
     $outFile = Join-Path $LogRoot ('{0}-{1}.out.txt' -f $stamp, $Tag)
     $errFile = Join-Path $LogRoot ('{0}-{1}.err.txt' -f $stamp, $Tag)
     if (-not (Test-PsOcPromptSafe -PromptText $PromptText)) {
-        L "SESSION($Tag) 拒啟動：prompt 含換行、半形雙引號或 cmd 中繼字元（> < & | % ^）——外環組 prompt 的錯，不是模型"
+        L "SESSION($Tag) 拒啟動：prompt 含換行、半形雙引號或 %（cmd 在雙引號內也會展開 %VAR%）——外環組 prompt 的錯，不是模型"
         return @{ TimedOut = $false; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'PROMPT_UNSAFE'; SlotBusy = $false; SlotWaitedSec = 0 }
     }
     $slot = Enter-PsOcSessionSlot -WaitMin $SlotWaitMin -Log $Log

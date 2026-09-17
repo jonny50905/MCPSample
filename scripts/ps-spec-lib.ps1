@@ -29,6 +29,7 @@ $script:PsSpMaxFragmentLines = 150
 $script:PsSpMaxContextFileLines = 150
 $script:PsSpMaxContextTotalLines = 400
 $script:PsSpMaxAttempts = 2
+$script:PsSpFragmentOverheadLines = 7
 $script:PsSpFragmentSection = '事實'
 $script:PsSpRejectSection = '未採用'
 $script:PsSpRejectHeader = @('來源條目', '原因')
@@ -132,13 +133,15 @@ function Get-PsSpPropNames {
     foreach ($p in $Obj.PSObject.Properties) { $names += $p.Name }
     return , $names
 }
+# 以 return , 回傳：陣列值（含空陣列）原樣回，不被管線拆開（空清單＝FALSE、單元素清單仍是清單）；純量與 $null 照舊。
+# 呼叫端不得寫 @(Get-PsSpProp …)（空陣列會變成 Count 1）：先指派再 @($x)。
 function Get-PsSpProp {
     param($Obj, [string]$Name)
     if ($null -eq $Obj) { return $null }
-    if ($Obj -is [System.Collections.IDictionary]) { if ($Obj.Contains($Name)) { return $Obj[$Name] }; return $null }
+    if ($Obj -is [System.Collections.IDictionary]) { if ($Obj.Contains($Name)) { return , $Obj[$Name] }; return $null }
     $p = $Obj.PSObject.Properties[$Name]
     if ($null -eq $p) { return $null }
-    return $p.Value
+    return , $p.Value
 }
 function Test-PsSpInt { param($V) return ($V -is [int] -or $V -is [long] -or $V -is [int16] -or $V -is [byte]) }
 
@@ -192,7 +195,7 @@ function Get-PsSpApplicabilityRefs {
     if ($null -eq $App) { return , $refs }
     $op = ([string](Get-PsSpProp $App 'op')).ToUpperInvariant()
     if ($op -eq 'FACT_TRUE' -or $op -eq 'FACT_FALSE') { $f = [string](Get-PsSpProp $App 'fact'); if ($f -ne '') { $refs += $f } }
-    elseif ($op -eq 'ALL' -or $op -eq 'ANY') { foreach ($a in @(Get-PsSpProp $App 'args')) { $refs += (Get-PsSpApplicabilityRefs -App $a) } }
+    elseif ($op -eq 'ALL' -or $op -eq 'ANY') { $args0 = Get-PsSpProp $App 'args'; foreach ($a in @($args0)) { $refs += (Get-PsSpApplicabilityRefs -App $a) } }
     elseif ($op -eq 'NOT') { $refs += (Get-PsSpApplicabilityRefs -App (Get-PsSpProp $App 'arg')) }
     return , $refs
 }
@@ -215,7 +218,8 @@ function Test-PsSpApplicabilitySyntax {
         elseif (@($FactKindProps[$fk]) -notcontains $prop) { $errs += ('BAD_FACT_REF：' + $Where + ' property 不在目錄：' + $f) }
     }
     elseif ($op -eq 'ALL' -or $op -eq 'ANY') {
-        $args0 = @(Get-PsSpProp $App 'args')
+        $argsRaw = Get-PsSpProp $App 'args'
+        $args0 = @($argsRaw)
         if ($args0.Count -eq 0) { $errs += ('BAD_OP：' + $Where + ' ' + $op + ' 無 args') }
         $i = 0
         foreach ($a in $args0) { $i++; $errs += (Test-PsSpApplicabilitySyntax -App $a -Where ($Where + '.args[' + $i + ']') -FactKindProps $FactKindProps -Depth ($Depth + 1)) }
@@ -412,12 +416,14 @@ function Test-PsSpApplicability {
         }
         'ALL' {
             $anyU = $false
-            foreach ($a in @(Get-PsSpProp $App 'args')) { $v = Test-PsSpApplicability -App $a -FactValues $FactValues; if ($v -eq 'FALSE') { return 'FALSE' }; if ($v -eq 'UNKNOWN') { $anyU = $true } }
+            $args0 = Get-PsSpProp $App 'args'
+            foreach ($a in @($args0)) { $v = Test-PsSpApplicability -App $a -FactValues $FactValues; if ($v -eq 'FALSE') { return 'FALSE' }; if ($v -eq 'UNKNOWN') { $anyU = $true } }
             if ($anyU) { return 'UNKNOWN' }; return 'TRUE'
         }
         'ANY' {
             $anyU = $false
-            foreach ($a in @(Get-PsSpProp $App 'args')) { $v = Test-PsSpApplicability -App $a -FactValues $FactValues; if ($v -eq 'TRUE') { return 'TRUE' }; if ($v -eq 'UNKNOWN') { $anyU = $true } }
+            $args0 = Get-PsSpProp $App 'args'
+            foreach ($a in @($args0)) { $v = Test-PsSpApplicability -App $a -FactValues $FactValues; if ($v -eq 'TRUE') { return 'TRUE' }; if ($v -eq 'UNKNOWN') { $anyU = $true } }
             if ($anyU) { return 'UNKNOWN' }; return 'FALSE'
         }
     }
@@ -490,7 +496,8 @@ function Get-PsSpNnCtx {
     $path = Join-Path (Join-Path (Join-Path $Root (Join-Path 'docs' 'ps-research')) $Domain) $File
     $text = Read-PsKnText -LiteralPath $path
     if ($null -eq $text) { return $null }
-    $ctx = @{ Domain = $Domain; File = $File; Rel = ('docs/ps-research/' + $Domain + '/' + $File); Path = $path; Text = $text; Lines = (Get-PsKnLines -Text $text); Facts = (Get-PsKnNnFacts -LiteralPath $path -Domain $Domain); Entry = $null; Grade = 'UNAUDITED'; Hash = (Get-PsKnTextHash -Text $text) }
+    # 只讀一次：hash／行／節位移全部來自同一份文字（並行的補研究合併是原子替換檔案，兩次讀會拿到撕裂的快照）
+    $ctx = @{ Domain = $Domain; File = $File; Rel = ('docs/ps-research/' + $Domain + '/' + $File); Path = $path; Text = $text; Lines = (Get-PsKnLines -Text $text); Facts = (Get-PsKnNnFacts -LiteralPath $path -Domain $Domain -Text $text); Entry = $null; Grade = 'UNAUDITED'; Hash = (Get-PsKnTextHash -Text $text) }
     if ($null -ne $Index) { foreach ($e in @($Index.nn)) { if ([string]$e.domain -ceq $Domain -and [string]$e.file -ceq $File) { $ctx.Entry = $e; $ctx.Grade = [string]$e.grade; break } } }
     if ($null -eq $ctx.Entry) { $ctx.Grade = 'UNAUDITED' }
     if ($null -ne $Cache) { $Cache[$key] = $ctx }
@@ -535,10 +542,10 @@ function Get-PsSpCallees {
     $out = @()
     $roles = @($Capabilities.followRoles | ForEach-Object { [string]$_ })
     $types = @($Capabilities.followTypes | ForEach-Object { [string]$_ })
+    # 角色以「開頭」比對（與 Get-PsSuppCallees 同款）：「被呼叫」「由 X 啟動」是反向關係，不是 callee
+    $roleRx = '^(' + ((@($roles | ForEach-Object { [regex]::Escape($_) })) -join '|') + ')'
     foreach ($ro in @($Ctx.Facts.relatedObjects)) {
-        $hit = $false
-        foreach ($r in $roles) { if (([string]$ro.role).IndexOf($r) -ge 0) { $hit = $true; break } }
-        if (-not $hit) { continue }
+        if (([string]$ro.role).Trim() -notmatch $roleRx) { continue }
         $name = [string]$ro.name
         $type = ''
         $files = @()
@@ -901,10 +908,20 @@ function Resolve-PsSpNeed {
     $r.Outcome = [string]$res.outcome
     if ($r.Outcome -eq 'RESOLVED' -or $r.Outcome -eq 'PARTIAL') {
         if ($Reason -eq 'GRADE' -or $Reason -eq 'CALLEE') { $r.State = 'WAITING_AUDIT'; return $r }
-        # 事實仍缺：hash≠hashAfter 才重送；相同＝研究結果抽不出事實
-        $hashAfter = ''
-        foreach ($a in @($res.affected)) { if ($TargetFile -eq '' -or [string]$a.file -ceq $TargetFile) { $hashAfter = [string]$a.hashAfter; break } }
-        if ($hashAfter -ne '' -and $CurrentHash -ne '' -and $hashAfter -ceq $CurrentHash) { $r.State = 'BLOCKED_KNOWLEDGE'; $r.Reason = 'NOT_EXTRACTABLE'; return $r }
+        # 事實仍缺：result 寫過的檔（affected[]）現況 hash 都仍＝hashAfter（或 affected 為空）＝研究結果抽不出事實 → BLOCKED；
+        # 任一 affected 檔在 result 之後又變過才重送。比的是 result 自己建檔的那些檔（RECORD need 的 affected 是該 Record 的 NN，不是 Component 的 NN）。
+        $dom = [string]$res.domain
+        if ($dom -eq '') { $dom = $DomainHint }
+        $anyChanged = $false
+        foreach ($a in @($res.affected)) {
+            $af = [string]$a.file
+            if ($af -eq '') { continue }
+            $ap = Join-Path (Join-Path (Join-Path $Root (Join-Path 'docs' 'ps-research')) $dom) $af
+            if (-not [System.IO.File]::Exists($ap)) { $ap = Join-Path (Join-Path (Join-Path $Root (Join-Path 'docs' 'ps-research')) 'wiki') $af }
+            $liveHash = Get-PsKnFileHash -LiteralPath $ap
+            if ($liveHash -cne [string]$a.hashAfter) { $anyChanged = $true }
+        }
+        if (-not $anyChanged) { $r.State = 'BLOCKED_KNOWLEDGE'; $r.Reason = 'NOT_EXTRACTABLE'; return $r }
         if ($NoSubmit) { $r.State = 'RESUBMIT_REQUIRED'; return $r }
         $s = Submit-PsSupplementalRequest -Root $Root -Need $Need -Consumer $consumer -DomainHint $DomainHint -Resubmit
         $r.RequestId = [string]$s.requestId
@@ -1161,6 +1178,34 @@ function New-PsSpPlan {
     return $out
 }
 
+# 身分尚無 NN（-DomainHint 已提交 KnowledgeNeed）時的 plan：無 facts／units，每個 requirement 都處於 need 狀態（State），need 掛在
+# 第一個 UI.COMPONENT_IDENTITY requirement（沒有就第一個）。-Run 對它回 5-01（等待）／5-06（result 到達＝重規劃）；-Render／-Gate 照常（7-19）。
+function New-PsSpNeedOnlyPlan {
+    param($PackV, [string]$JobId, [string]$Component, [string]$Domain, $Need, $Resolve, [string]$State)
+    $comp = $Component.Trim().ToUpperInvariant()
+    $plan = [ordered]@{
+        schemaVersion = $script:PsSpecSchemaVersion; planHash = ''; jobId = $JobId; packId = $PackV.PackId; packVersion = $PackV.PackVersion; contentHash = $PackV.ContentHash
+        component = $comp; domain = $Domain; identity = [ordered]@{ files = @(); reason = 'NEED'; candidates = @() }
+        callees = @(); requirements = @(); facts = @(); units = @(); findings = @()
+    }
+    $needRid = Get-PsSpNeedRequirementId -PackV $PackV
+    foreach ($q in $PackV.Requirements) {
+        $st = $State
+        if ([string]$q.mode -eq 'UNSUPPORTED') { $st = 'UNSUPPORTED'; $plan.findings += , ([ordered]@{ code = '2-06'; requirementId = $q.id; factKind = $q.factKind; mode = 'UNSUPPORTED' }) }
+        $re = [ordered]@{ id = $q.id; slot = $q.slot; checklistRefs = @($q.checklistRefs); factKind = $q.factKind; mode = $q.mode; required = $q.required; cardinality = $q.cardinality; evidencePolicy = $q.evidencePolicy; applicability = $q.applicability; properties = @($q.properties); context = $q.context; applicable = 'UNKNOWN'; state = $st; facts = @(); units = @(); needs = @() }
+        if ([string]$q.id -eq $needRid) { $re.needs += , ([ordered]@{ requirementId = $q.id; factKind = [string]$Need.factKind; target = [ordered]@{ type = [string]$Need.target.type; name = [string]$Need.target.name }; reason = 'MISSING'; grade = 'MISSING'; state = $State; requestId = [string]$Resolve.RequestId; outcome = [string]$Resolve.Outcome; unitId = ''; sourceHash = '' }) }
+        $plan.requirements += , $re
+    }
+    $plan.planHash = Get-PsKnTextHash -Text (ConvertTo-PsKnJson -Value $plan -SortKeys)
+    return $plan
+}
+function Get-PsSpNeedRequirementId {
+    param($PackV)
+    foreach ($q in $PackV.Requirements) { if ([string]$q.factKind -eq 'UI.COMPONENT_IDENTITY') { return [string]$q.id } }
+    if (@($PackV.Requirements).Count -gt 0) { return [string]$PackV.Requirements[0].id }
+    return 'R00'
+}
+
 function Get-PsSpPlanRef { param($Plan) return ([string]$Plan.planHash).Substring(0, 16).ToLowerInvariant() }
 
 # immutable：plans/<planRef>/plan.json（create-only；已存在＝重用）。回 @{ PlanRef; Created; Path }
@@ -1173,7 +1218,9 @@ function Write-PsSpPlan {
     foreach ($k in $Plan.Keys) { $obj[[string]$k] = $Plan[$k] }
     $obj['createdAt'] = Get-PsKnUtcStamp
     $ok = Write-PsKnCreateOnlyText -LiteralPath $p -Text ((ConvertTo-PsKnJson -Value $obj) + "`n")
-    return @{ PlanRef = $ref; Created = $ok; Path = $p }
+    # $true＝新建；$false＝同 planHash 已存在（重用）；$null＝WRITE_DEFERRED（重試後仍寫不進，plan 不存在，job 不得指向它）
+    if ($null -eq $ok) { return @{ PlanRef = $ref; Created = $false; Deferred = $true; Path = $p } }
+    return @{ PlanRef = $ref; Created = [bool]$ok; Deferred = $false; Path = $p }
 }
 function Read-PsSpPlan {
     param($Dirs, [string]$PlanRef)
@@ -1184,7 +1231,11 @@ function Read-PsSpJob { param($Dirs) return (Read-PsSpJsonFile -LiteralPath $Dir
 function Write-PsSpJob {
     param($Dirs, $Job)
     $o = [ordered]@{}
-    foreach ($k in (Get-PsSpPropNames $Job)) { $o[[string]$k] = (Get-PsSpProp $Job $k) }
+    foreach ($k in (Get-PsSpPropNames $Job)) {
+        $v = Get-PsSpProp $Job $k
+        if ($v -is [datetime]) { $v = Get-PsKnUtcStamp -At $v }
+        $o[[string]$k] = $v
+    }
     $o['updatedAt'] = Get-PsKnUtcStamp
     return (Write-PsKnAtomicText -LiteralPath $Dirs.JobFile -Text ((ConvertTo-PsKnJson -Value $o) + "`n") -Bom $false)
 }
@@ -1204,10 +1255,11 @@ function Get-PsSpPhaseFromPlan {
 
 # ── 指紋、拆分、收據、判定 ────────────────────────────────────────
 
-# 指紋：單位＋part＋各節（name/level/內容 hash）＋條目（n/file/kind）的 canonical -SortKeys JSON SHA256。
+# 指紋：單位＋part＋factKind＋各節（name/level/內容 hash）＋條目（n/file/kind）的 canonical -SortKeys JSON SHA256。
 # 不含檔案整體 hash 與行號：讀取節之外的改動、或只是行號漂移（前面的節長了）不使收據失效；證據參照用附錄列號（#n）而非行號，所以不怕漂移。
+# 含 factKind：同 requirement 換成同文法的另一個 COMPOSE 類別（表頭／值域不同）時舊收據不得重用。
 function Get-PsSpFingerprint {
-    param([string]$UnitId, [string]$Part, $Files, $Items)
+    param([string]$UnitId, [string]$Part, $Files, $Items, [string]$FactKind = '')
     $fs = @()
     foreach ($f in @($Files)) {
         $ss = @()
@@ -1216,7 +1268,7 @@ function Get-PsSpFingerprint {
     }
     $is = @()
     foreach ($i in @($Items)) { $is += , ([ordered]@{ n = [int]$i.n; file = [string]$i.file; kind = [string]$i.kind }) }
-    return (Get-PsKnTextHash -Text (ConvertTo-PsKnJson -Value ([ordered]@{ unitId = $UnitId; part = $Part; files = @($fs); items = @($is) }) -SortKeys))
+    return (Get-PsKnTextHash -Text (ConvertTo-PsKnJson -Value ([ordered]@{ unitId = $UnitId; part = $Part; factKind = $FactKind; files = @($fs); items = @($is) }) -SortKeys))
 }
 
 function Get-PsSpSplitPath { param($Dirs, [string]$PlanRef, [string]$UnitKey) return (Join-Path (Join-Path (Join-Path $Dirs.Plans $PlanRef) 'splits') ($UnitKey + '.json')) }
@@ -1242,16 +1294,46 @@ function Get-PsSpEffectiveUnits {
     return , $out
 }
 
-# 容量事件：把 part 對半（≤1 條目＝不可拆 → blockedCapacity）。回 @{ Ok; Parts; Blocked }
-function Write-PsSpSplit {
-    param($Dirs, $Plan, $Eu)
-    $ref = Get-PsSpPlanRef -Plan $Plan
-    $u = $Eu.Unit
-    $p = Get-PsSpSplitPath -Dirs $Dirs -PlanRef $ref -UnitKey ([string]$u.unitKey)
+# 既有 splits 檔：@{ Path; Parts=@(part/items/blockedCapacity); MaxN }
+function Read-PsSpSplitParts {
+    param($Dirs, $Plan, [string]$UnitKey)
+    $p = Get-PsSpSplitPath -Dirs $Dirs -PlanRef (Get-PsSpPlanRef -Plan $Plan) -UnitKey $UnitKey
     $sp = Read-PsSpJsonFile -LiteralPath $p
     $parts = @()
     $maxN = 0
     if ($null -ne $sp) { foreach ($x in @($sp.parts)) { $parts += , ([ordered]@{ part = [string]$x.part; items = @($x.items | ForEach-Object { [int]$_ }); blockedCapacity = [bool]$x.blockedCapacity }); $m = [regex]::Match([string]$x.part, '^p(\d+)$'); if ($m.Success -and [int]$m.Groups[1].Value -gt $maxN) { $maxN = [int]$m.Groups[1].Value } } }
+    return @{ Path = $p; Parts = @($parts); MaxN = $maxN }
+}
+
+# 部分處置（片段合格但只處置了部分條目）：已處置條目成 part A（呼叫端替它寫收據），未處置條目成 part B 重派；不記 attempt。
+# 回 @{ Ok; PartA; PartB; ItemsA; ItemsB }（Ok=$false＝寫不進 splits 檔或無法拆）
+function Write-PsSpPartialSplit {
+    param($Dirs, $Plan, $Eu, $Covered)
+    $u = $Eu.Unit
+    $ex = Read-PsSpSplitParts -Dirs $Dirs -Plan $Plan -UnitKey ([string]$u.unitKey)
+    $cov = @{}
+    foreach ($n in @($Covered)) { $cov[[int]$n] = $true }
+    $a = @(); $b = @(); $itemsA = @(); $itemsB = @()
+    foreach ($i in @($Eu.Items)) { if ($cov.ContainsKey([int]$i.n)) { $a += [int]$i.n; $itemsA += , $i } else { $b += [int]$i.n; $itemsB += , $i } }
+    if ($a.Count -eq 0 -or $b.Count -eq 0) { return @{ Ok = $false; PartA = ''; PartB = ''; ItemsA = @(); ItemsB = @() } }
+    $rest = @()
+    foreach ($x in $ex.Parts) { if ([string]$x.part -ne [string]$Eu.Part) { $rest += , $x } }
+    $pa = 'p' + ($ex.MaxN + 1); $pb = 'p' + ($ex.MaxN + 2)
+    $rest += , ([ordered]@{ part = $pa; items = @($a); blockedCapacity = $false })
+    $rest += , ([ordered]@{ part = $pb; items = @($b); blockedCapacity = $false })
+    $obj = [ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; unitId = [string]$u.unitId; parts = @($rest) }
+    $ok = Write-PsKnAtomicText -LiteralPath $ex.Path -Text ((ConvertTo-PsKnJson -Value $obj) + "`n") -Bom $false
+    return @{ Ok = [bool]$ok; PartA = $pa; PartB = $pb; ItemsA = @($itemsA); ItemsB = @($itemsB) }
+}
+
+# 容量事件：把 part 對半（≤1 條目＝不可拆 → blockedCapacity）。回 @{ Ok; Parts; Blocked }；Ok=$false＝splits 檔寫不進（呼叫端停止本輪，不得重派同一 part）
+function Write-PsSpSplit {
+    param($Dirs, $Plan, $Eu)
+    $u = $Eu.Unit
+    $ex = Read-PsSpSplitParts -Dirs $Dirs -Plan $Plan -UnitKey ([string]$u.unitKey)
+    $p = $ex.Path
+    $parts = @($ex.Parts)
+    $maxN = $ex.MaxN
     $items = @($Eu.Items | ForEach-Object { [int]$_.n })
     $rest = @()
     foreach ($x in $parts) { if ([string]$x.part -ne [string]$Eu.Part) { $rest += , $x } }
@@ -1269,7 +1351,7 @@ function Write-PsSpSplit {
     }
     $obj = [ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; unitId = [string]$u.unitId; parts = @($rest) }
     $ok = Write-PsKnAtomicText -LiteralPath $p -Text ((ConvertTo-PsKnJson -Value $obj) + "`n") -Bom $false
-    return @{ Ok = $ok; Parts = @($rest); Blocked = $blocked }
+    return @{ Ok = [bool]$ok; Parts = @($rest); Blocked = $blocked }
 }
 
 function Get-PsSpReceiptName { param([string]$UnitKey, [string]$Part, [string]$Fingerprint) $k = $UnitKey; if ($Part -ne 'p0') { $k = $k + '~' + $Part }; return ($k + '.' + $Fingerprint.Substring(0, 16).ToLowerInvariant() + '.json') }
@@ -1299,13 +1381,16 @@ function Get-PsSpNextAttemptId {
     return ('a' + ($max + 1).ToString('0000'))
 }
 
-# 現況讀取集合（依 plan 的 readSet 重讀節；節消失＝hash 空）。回 @{ Files; Fingerprint; Changed; Ctxs }
+# 現況讀取集合（依 plan 的 readSet 以節名／層級在現況文字重找節；節消失＝hash 空）。回 @{ Files; Fingerprint; Changed; Ctxs; Items }
+# Items＝條目在現況文字的行號（派工切片、工單條目表、驗收都用它，不用 plan 行號）：指紋不含行號，讀取節之外的改動會讓行號漂移；
+#   同節內容 hash 相同 ⇒ 節內相對位置不變 ⇒ 現況行號＝plan 行號＋（現況節起點－plan 節起點），且該行必須仍是該節的可計數條目，否則＝來源已變（Changed）。
 function Get-PsSpLiveInput {
     param([string]$Root, $Eu, $Index, $Cache)
     $u = $Eu.Unit
     $files = @()
     $changed = $false
     $ctxs = @{}
+    $pairs = @()
     foreach ($f in @($u.readSet)) {
         $c = Get-PsSpNnCtx -Root $Root -Index $Index -Domain ([string]$f.domain) -File ([string]$f.file) -Cache $Cache
         $secs = @()
@@ -1315,16 +1400,39 @@ function Get-PsSpLiveInput {
             if ($null -eq $live) { $live = [ordered]@{ name = [string]$s.name; level = [int]$s.level; start = 0; end = 0; hash = '' } }
             if ([string]$live.hash -cne [string]$s.hash) { $changed = $true }
             $secs += , $live
+            $pairs += , (@{ File = [string]$f.file; Name = [string]$s.name; Plan = $s; Live = $live })
         }
         $h = ''; $g = [string]$f.grade
         $ev = @()
         if ($null -ne $c) { $h = $c.Hash; $ctxs[[string]$f.file] = $c; foreach ($e in @($c.Facts.evidence)) { $ev += [int]$e.n } }
         $files += , ([ordered]@{ domain = [string]$f.domain; file = [string]$f.file; path = [string]$f.path; role = [string]$f.role; hash = $h; grade = $g; evidence = @($ev); sections = @($secs) })
     }
-    $fp = Get-PsSpFingerprint -UnitId ([string]$u.unitId) -Part ([string]$Eu.Part) -Files $files -Items $Eu.Items
-    return @{ Files = @($files); Fingerprint = $fp; Changed = $changed; Ctxs = $ctxs }
+    $items = @()
+    $itemLines = @{}
+    foreach ($i in @($Eu.Items)) {
+        $fn = [string]$i.file; $pl = [int]$i.line; $ln = 0
+        foreach ($pr in $pairs) {
+            if ($pr.File -cne $fn -or $pr.Name -eq 'Evidence附錄') { continue }
+            $ps = [int]$pr.Plan.start; $pe = [int]$pr.Plan.end
+            if ($pl -lt $ps -or $pl -gt $pe) { continue }
+            if ([int]$pr.Live.start -lt 1 -or [string]$pr.Live.hash -cne [string]$pr.Plan.hash) { break }
+            $cand = $pl + ([int]$pr.Live.start - $ps)
+            $key = $fn + '|' + $pr.Name
+            if (-not $itemLines.ContainsKey($key)) {
+                $set = @{}
+                foreach ($x in (Get-PsSpSectionItems -Ctx $ctxs[$fn] -Sec $pr.Live -SectionName $pr.Name)) { $set[[int]$x.line] = $true }
+                $itemLines[$key] = $set
+            }
+            if ($itemLines[$key].ContainsKey($cand)) { $ln = $cand }
+            break
+        }
+        if ($ln -lt 1) { $changed = $true }
+        $items += , ([ordered]@{ n = [int]$i.n; file = $fn; line = $ln; kind = [string]$i.kind })
+    }
+    $fp = Get-PsSpFingerprint -UnitId ([string]$u.unitId) -Part ([string]$Eu.Part) -Files $files -Items $Eu.Items -FactKind ([string]$u.factKind)
+    return @{ Files = @($files); Fingerprint = $fp; Changed = $changed; Ctxs = $ctxs; Items = @($items) }
 }
-function Get-PsSpPlanFingerprint { param($Eu) return (Get-PsSpFingerprint -UnitId ([string]$Eu.Unit.unitId) -Part ([string]$Eu.Part) -Files @($Eu.Unit.readSet) -Items $Eu.Items) }
+function Get-PsSpPlanFingerprint { param($Eu) return (Get-PsSpFingerprint -UnitId ([string]$Eu.Unit.unitId) -Part ([string]$Eu.Part) -Files @($Eu.Unit.readSet) -Items $Eu.Items -FactKind ([string]$Eu.Unit.factKind)) }
 
 # 單位狀態（不信任 job.json）：@( @{ Eu; Fingerprint; Receipt; Attempts; State; Live } )
 #   State ∈ HAS_RECEIPT／PENDING／SOURCE_CHANGED／BLOCKED／BLOCKED_CAPACITY／WAITING_KNOWLEDGE／WAITING_AUDIT／BLOCKED_KNOWLEDGE／ROUTING_REQUIRED
@@ -1339,8 +1447,8 @@ function Get-PsSpUnitStatus {
         $live = Get-PsSpLiveInput -Root $Root -Eu $eu -Index $Index -Cache $Cache
         $planFp = Get-PsSpPlanFingerprint -Eu $eu
         $st = @{ Eu = $eu; Fingerprint = $live.Fingerprint; PlanFingerprint = $planFp; Receipt = $null; Attempts = 0; State = 'PENDING'; Live = $live }
-        foreach ($rc in $receipts) { if ([string]$rc.unitId -ceq [string]$u.unitId -and [string]$rc.part -ceq [string]$eu.Part -and [string]$rc.inputFingerprint -ceq $live.Fingerprint) { $st.Receipt = $rc } }
-        foreach ($v in $verdicts) { if ([string]$v.unitId -ceq [string]$u.unitId -and [string]$v.part -ceq [string]$eu.Part -and [string]$v.inputFingerprint -ceq $live.Fingerprint -and [bool]$v.counted) { $st.Attempts++ } }
+        foreach ($rc in $receipts) { if ([string]$rc.unitId -ceq [string]$u.unitId -and [string]$rc.part -ceq [string]$eu.Part -and [string]$rc.factKind -ceq [string]$u.factKind -and [string]$rc.inputFingerprint -ceq $live.Fingerprint) { $st.Receipt = $rc } }
+        foreach ($v in $verdicts) { if ([string]$v.unitId -ceq [string]$u.unitId -and [string]$v.part -ceq [string]$eu.Part -and [string]$v.factKind -ceq [string]$u.factKind -and [string]$v.inputFingerprint -ceq $live.Fingerprint -and [bool]$v.counted) { $st.Attempts++ } }
         $us = [string]$u.state
         if ($null -ne $st.Receipt) { $st.State = 'HAS_RECEIPT' }
         elseif ($us -ne 'DISPATCHABLE') { $st.State = $us }
@@ -1361,11 +1469,11 @@ function Get-PsSpRelPath {
     return ($Path -replace '\\', '/')
 }
 
-# 切片：回 @( @{ File; Lines=@(); Sections=@(名) } )；Capacity＝任一檔 >150 或總 >400
+# 切片：回 @( @{ File; Lines=@(); Sections=@(名) } )；Capacity＝任一檔 >150 或總 >400。條目行號取 Live.Items（現況文字重算），不用 plan 行號。
 function Get-PsSpContextSlices {
     param($Eu, $Live)
     $itemByKey = @{}
-    foreach ($i in @($Eu.Items)) { $itemByKey[([string]$i.file + '#' + [int]$i.line)] = [int]$i.n }
+    foreach ($i in @($Live.Items)) { if ([int]$i.line -ge 1) { $itemByKey[([string]$i.file + '#' + [int]$i.line)] = [int]$i.n } }
     $out = @()
     $total = 0
     foreach ($f in @($Live.Files)) {
@@ -1385,7 +1493,7 @@ function Get-PsSpContextSlices {
             $lo = $sStart; $hi = $sEnd
             if (-not $isEv -and [string]$Eu.Part -ne 'p0') {
                 $first = 0; $last = 0
-                foreach ($i in @($Eu.Items)) { if ([string]$i.file -ceq [string]$f.file -and [int]$i.line -ge $sStart -and [int]$i.line -le $sEnd) { if ($first -eq 0 -or [int]$i.line -lt $first) { $first = [int]$i.line }; if ([int]$i.line -gt $last) { $last = [int]$i.line } } }
+                foreach ($i in @($Live.Items)) { if ([string]$i.file -ceq [string]$f.file -and [int]$i.line -ge $sStart -and [int]$i.line -le $sEnd) { if ($first -eq 0 -or [int]$i.line -lt $first) { $first = [int]$i.line }; if ([int]$i.line -gt $last) { $last = [int]$i.line } } }
                 if ($first -eq 0) { continue }
                 $lo = $first; $hi = $last
             }
@@ -1413,20 +1521,28 @@ function Get-PsSpContextSlices {
 function Get-PsSpFragmentHeader { param($Cap) return ('| ' + (@($Cap.table | ForEach-Object { [string]$_ }) -join ' | ') + ' |') }
 function Get-PsSpTableSep { param([int]$Cols) return ('|' + ('---|' * $Cols)) }
 
-# 建 attempt 目錄（input.json create-only、context/*.md、manifest.md）。回 @{ AttemptId; Dir; ManifestPath; FragmentPath; InputPath; InputText; Capacity }
+# 建 attempt 目錄（input.json create-only、context/*.md、manifest.md）。回 @{ AttemptId; Dir; ManifestPath; FragmentPath; InputPath; InputText; Items; Capacity; Reason; Deferred }
+#   Capacity＝派工前就知道裝不下（Reason ITEMS_OVER：條目數＋固定 7 行 >150，片段每條至少一列；CONTEXT_OVER：切片超限）→ 外環直接拆分，不浪費 session。
+#   Items＝實際派出的條目（現況行號；工單條目表、input.json、驗收都用它）。Deferred＝input.json 寫不進（WRITE_DEFERRED）。
 function New-PsSpAttempt {
     param([string]$Root, $Dirs, $Plan, $Eu, $Live, $Cap, [string]$JobId)
+    $r = @{ AttemptId = ''; Dir = ''; ManifestPath = ''; FragmentPath = ''; InputPath = ''; InputText = ''; Items = @(); Capacity = $false; Reason = ''; Total = 0; Deferred = $false }
+    $nItems = @($Eu.Items).Count
+    if ($nItems + $script:PsSpFragmentOverheadLines -gt $script:PsSpMaxFragmentLines) { $r.Capacity = $true; $r.Reason = 'ITEMS_OVER'; $r.Total = $nItems; return $r }
     $slices = Get-PsSpContextSlices -Eu $Eu -Live $Live
-    $r = @{ AttemptId = ''; Dir = ''; ManifestPath = ''; FragmentPath = ''; InputPath = ''; InputText = ''; Capacity = $slices.Capacity; Total = $slices.Total }
-    if ($slices.Capacity) { return $r }
+    $r.Total = $slices.Total
+    if ($slices.Capacity) { $r.Capacity = $true; $r.Reason = 'CONTEXT_OVER'; return $r }
     $u = $Eu.Unit
+    $items = @($Live.Items)
     $aid = Get-PsSpNextAttemptId -Dirs $Dirs
     $dir = Join-Path $Dirs.Attempts $aid
-    [void][System.IO.Directory]::CreateDirectory((Join-Path $dir 'context'))
-    $input = [ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; jobId = $JobId; planRef = (Get-PsSpPlanRef -Plan $Plan); attemptId = $aid; unitId = [string]$u.unitId; part = [string]$Eu.Part; requirementId = [string]$u.requirementId; factKind = [string]$u.factKind; files = @($Live.Files); items = @($Eu.Items); fingerprint = $Live.Fingerprint }
+    $input = [ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; jobId = $JobId; planRef = (Get-PsSpPlanRef -Plan $Plan); attemptId = $aid; unitId = [string]$u.unitId; part = [string]$Eu.Part; requirementId = [string]$u.requirementId; factKind = [string]$u.factKind; files = @($Live.Files); items = @($items); fingerprint = $Live.Fingerprint }
     $inputText = (ConvertTo-PsKnJson -Value $input) + "`n"
     $ip = Join-Path $dir 'input.json'
-    if (-not (Write-PsKnCreateOnlyText -LiteralPath $ip -Text $inputText)) { throw ('input.json 已存在：' + $aid) }
+    $w = Write-PsKnCreateOnlyText -LiteralPath $ip -Text $inputText
+    if ($null -eq $w) { $r.Deferred = $true; $r.AttemptId = $aid; return $r }
+    if (-not $w) { throw ('input.json 已存在：' + $aid) }
+    [void][System.IO.Directory]::CreateDirectory((Join-Path $dir 'context'))
     $ctxRel = @()
     foreach ($s in $slices.Slices) {
         $cp = Join-Path (Join-Path $dir 'context') ([string]$s.File)
@@ -1441,14 +1557,14 @@ function New-PsSpAttempt {
     $nl = "`n"
     [void]$sb.Append('# Spec 工單（job ' + $JobId + '／attempt ' + $aid + '）').Append($nl).Append($nl)
     [void]$sb.Append('需求：' + [string]$u.requirementId + '　事實類別：' + [string]$u.factKind + '（COMPOSE）　單位：' + [string]$u.unitId + '　part：' + [string]$Eu.Part).Append($nl)
-    [void]$sb.Append('只讀「## 讀取範圍」列的片段檔；只寫「## 輸出」指定的一個檔。片段檔每行開頭 L<n>＝來源檔行號，#<k>＝條目號，E<n>＝Evidence 附錄列號。').Append($nl).Append($nl)
+    [void]$sb.Append('只讀「## 讀取範圍」列的片段檔；只寫「## 輸出」指定的一個檔。片段檔每行開頭 L<n>＝來源檔行號（不用抄），#<k>＝條目號（來源條目欄只寫數字 k），E<n>＝Evidence 附錄列號（證據欄寫「來源檔#n」）。').Append($nl).Append($nl)
     [void]$sb.Append('## 讀取範圍').Append($nl).Append($nl)
     [void]$sb.Append('| 片段檔 | 來源檔 | 節 |').Append($nl).Append('|---|---|---|').Append($nl)
     foreach ($c in $ctxRel) { [void]$sb.Append('| ' + $c.Rel + ' | ' + $c.File + ' | ' + (($c.Sections | ForEach-Object { $_ -replace 'Evidence附錄', 'Evidence 附錄' }) -join '；') + ' |').Append($nl) }
     [void]$sb.Append($nl).Append('## 條目').Append($nl).Append($nl)
     [void]$sb.Append('每一條都要處置：寫進事實表的「來源條目」欄，或列入「## 未採用」表。').Append($nl).Append($nl)
     [void]$sb.Append('| 條目 | 來源檔 | 列 | 種類 |').Append($nl).Append('|---|---|---|---|').Append($nl)
-    foreach ($i in @($Eu.Items)) { [void]$sb.Append('| ' + [int]$i.n + ' | ' + [string]$i.file + ' | ' + [int]$i.line + ' | ' + [string]$i.kind + ' |').Append($nl) }
+    foreach ($i in $items) { [void]$sb.Append('| ' + [int]$i.n + ' | ' + [string]$i.file + ' | ' + [int]$i.line + ' | ' + [string]$i.kind + ' |').Append($nl) }
     [void]$sb.Append($nl).Append('## 輸出').Append($nl).Append($nl)
     [void]$sb.Append('唯一可寫：' + (Get-PsSpRelPath -Root $Root -Path $fp)).Append($nl)
     [void]$sb.Append('章節：先「## 事實」再「## 未採用」，各恰一張表；章節名與表頭逐字；≤150 行；不得有三反引號圍欄、雙方括號連結、slot 標記、JSON。').Append($nl)
@@ -1456,16 +1572,41 @@ function New-PsSpAttempt {
     [void]$sb.Append('事實分隔列：' + (Get-PsSpTableSep -Cols $cols)).Append($nl)
     [void]$sb.Append('未採用表頭（逐字）：| 來源條目 | 原因 |').Append($nl)
     [void]$sb.Append('未採用分隔列：|---|---|').Append($nl)
-    [void]$sb.Append('來源條目＝條目號（多個以 ; 分隔）；證據＝「來源檔#附錄列號」（附錄列號取片段檔 Evidence 附錄各行開頭的 E 數字；多個以 ; 分隔）或 UNRESOLVED；').Append($nl)
-    [void]$sb.Append('每格不得空白（無值寫 NOT_APPLICABLE）；原因 ∈ ' + ($script:PsSpRejectReasons -join '／') + '。').Append($nl)
-    if ($null -ne $Cap.enums) { foreach ($ep in $Cap.enums.PSObject.Properties) { [void]$sb.Append('欄「' + $ep.Name + '」值域：' + (@($ep.Value | ForEach-Object { [string]$_ }) -join '／')).Append($nl) } }
+    [void]$sb.Append('來源條目＝條目號的數字（多個以 ; 分隔，例 1;2）；證據＝「來源檔#附錄列號」（附錄列號＝片段檔 Evidence 附錄各行開頭 E 後面的數字；多個以 ; 分隔）或 UNRESOLVED（片段裡沒有可引的附錄列）；').Append($nl)
+    [void]$sb.Append('每格不得空白（沒有值的欄寫 NOT_APPLICABLE）；原因 ∈ ' + ($script:PsSpRejectReasons -join '／') + '。').Append($nl)
+    $enumMap = @{}
+    if ($null -ne $Cap.enums) { foreach ($ep in $Cap.enums.PSObject.Properties) { $vals = @($ep.Value | ForEach-Object { [string]$_ }); $enumMap[$ep.Name] = $vals; [void]$sb.Append('欄「' + $ep.Name + '」值域：' + ($vals -join '／')).Append($nl) } }
+    # 逐字範例列（用實際的來源檔名與附錄列號；<欄值> 代表自由文字）
+    $exFile = ''; $exRow = 1
+    foreach ($lf in @($Live.Files)) { if ($exFile -eq '') { $exFile = [string]$lf.file; $evs = @($lf.evidence); if ($evs.Count -gt 0) { $exRow = [int]$evs[0] } } }
+    $exCells = @()
+    foreach ($h in @($Cap.table | ForEach-Object { [string]$_ })) {
+        if ($h -eq '來源條目') { $exCells += '1;2' }
+        elseif ($h -eq '證據') { $exCells += ($exFile + '#' + $exRow + ';UNRESOLVED') }
+        elseif ($enumMap.ContainsKey($h)) { $exCells += [string]@($enumMap[$h])[0] }
+        else { $exCells += '<欄值>' }
+    }
+    [void]$sb.Append('事實列範例（形狀示意）：| ' + ($exCells -join ' | ') + ' |').Append($nl)
+    [void]$sb.Append('未採用列範例（形狀示意）：| 5 | NOT_RELEVANT |').Append($nl)
+    [void]$sb.Append('條目太多寫不下：先把能處置的條目完整寫完；剩下的不要硬塞、也不要列入未採用——外環只採用已處置的條目，其餘拆成新單位重派。').Append($nl)
     [void](Write-PsKnAtomicText -LiteralPath $mp -Text $sb.ToString() -Bom $false)
-    $r.AttemptId = $aid; $r.Dir = $dir; $r.ManifestPath = $mp; $r.FragmentPath = $fp; $r.InputPath = $ip; $r.InputText = $inputText
+    $r.AttemptId = $aid; $r.Dir = $dir; $r.ManifestPath = $mp; $r.FragmentPath = $fp; $r.InputPath = $ip; $r.InputText = $inputText; $r.Items = $items
     return $r
 }
 
 # ── 片段驗收（骨架取自 ps-contract-lib.ps1 Read-CtFragment：表頭逐字、enum、證據參照、≤150 行、圍欄、洩漏標記）─
 # 回 @{ Ok; Errors; Reasons; Capacity; Lines; Hash; Rows; Rejected; Covered; Closure; Unresolved; Present }
+# 寬鬆處（工單詞彙表寫得出來的形狀都收，每次拒收都燒一次 attempt）：來源條目「#1」＝1、多個以 ; 分隔（兩張表都收）；
+#   證據「檔#E3」＝「檔#3」、檔名可帶片段檔路徑前綴（取最後一段）、NOT_APPLICABLE＝UNRESOLVED。兩張表都沒處置任何條目＝NO_COVERAGE（不合格）。
+function Get-PsSpItemToken {
+    param([string]$Tok)
+    $x = $Tok.Trim()
+    $m = [regex]::Match($x, '^#\s*(\d+)$')
+    if ($m.Success) { $x = $m.Groups[1].Value }
+    $n = 0
+    if ([int]::TryParse($x, [ref]$n)) { return $n }
+    return -1
+}
 function Test-PsSpFragment {
     param([string]$LiteralPath, $Items, $Files, $Cap, [string[]]$TemplateLines = @())
     $r = @{ Ok = $false; Errors = @(); Reasons = @(); Capacity = $false; Lines = 0; Hash = ''; Rows = @(); Rejected = @(); Covered = @(); Closure = 'NONE'; Unresolved = 0; Present = 'UNKNOWN' }
@@ -1501,10 +1642,12 @@ function Test-PsSpFragment {
                 foreach ($tok in ($Cell -split ';')) {
                     $x = $tok.Trim()
                     if ($x -eq '') { continue }
-                    if ($x -eq 'UNRESOLVED') { $unres++; continue }
-                    $m = [regex]::Match($x, '^(.+?)#(\d+)$')
+                    if ($x -eq 'UNRESOLVED' -or $x -eq 'NOT_APPLICABLE') { $unres++; continue }
+                    $m = [regex]::Match($x, '^(.+?)#E?(\d+)$')
                     if (-not $m.Success) { $bad += $x; continue }
-                    $fn = $m.Groups[1].Value; $rowN = [int]$m.Groups[2].Value
+                    $fn = $m.Groups[1].Value.Trim(); $rowN = [int]$m.Groups[2].Value
+                    $cut = $fn.LastIndexOfAny(@([char]'/', [char]'\'))
+                    if ($cut -ge 0) { $fn = $fn.Substring($cut + 1) }
                     $okL = $false
                     if ($evOf.ContainsKey($fn) -and @($evOf[$fn]) -contains $rowN) { $okL = $true }
                     if (-not $okL) { $bad += $x }
@@ -1513,7 +1656,7 @@ function Test-PsSpFragment {
             }
             $secs = Get-PsSpSections -Text $text
             $hdr = @($Cap.table | ForEach-Object { [string]$_ })
-            $evCol = -1
+            $evCol = -1; $srcCol = 0
             for ($i = 0; $i -lt $hdr.Count; $i++) { if ($hdr[$i] -eq '證據') { $evCol = $i }; if ($hdr[$i] -eq '來源條目') { $srcCol = $i } }
             $enumCols = @{}
             if ($null -ne $Cap.enums) { foreach ($ep in $Cap.enums.PSObject.Properties) { for ($i = 0; $i -lt $hdr.Count; $i++) { if ($hdr[$i] -eq $ep.Name) { $enumCols[$i] = @($ep.Value | ForEach-Object { [string]$_ }) } } } }
@@ -1534,8 +1677,8 @@ function Test-PsSpFragment {
                         foreach ($tok in ($row[$srcCol] -split ';')) {
                             $x = $tok.Trim()
                             if ($x -eq '') { continue }
-                            $n = 0
-                            if (-not [int]::TryParse($x, [ref]$n) -or -not $itemSet.ContainsKey($n)) { & $addErr 'ITEM_UNKNOWN' ('「## 事實」第 ' + $ri + ' 列來源條目「' + $x + '」不在工單列舉'); continue }
+                            $n = Get-PsSpItemToken -Tok $x
+                            if ($n -lt 0 -or -not $itemSet.ContainsKey($n)) { & $addErr 'ITEM_UNKNOWN' ('「## 事實」第 ' + $ri + ' 列來源條目「' + $x + '」不在工單列舉'); continue }
                             $rowItems += $n; $covered[$n] = $true
                         }
                         foreach ($ci in $enumCols.Keys) { $v = $row[[int]$ci]; if ($v -ne 'NOT_APPLICABLE' -and $v -ne 'UNRESOLVED' -and @($enumCols[$ci]) -notcontains $v) { & $addErr 'ENUM' ('「## 事實」第 ' + $ri + ' 列「' + $v + '」不在值域') } }
@@ -1559,17 +1702,22 @@ function Test-PsSpFragment {
                     foreach ($row in $tb.Rows) {
                         $ri++
                         if ($row.Count -ne 2) { & $addErr 'COLUMN_COUNT' ('「## 未採用」第 ' + $ri + ' 列欄數 ' + $row.Count + ' ≠ 2'); continue }
-                        $n = 0
-                        if (-not [int]::TryParse($row[0].Trim(), [ref]$n) -or -not $itemSet.ContainsKey($n)) { & $addErr 'ITEM_UNKNOWN' ('「## 未採用」第 ' + $ri + ' 列來源條目「' + $row[0] + '」不在工單列舉'); continue }
                         if ($script:PsSpRejectReasons -notcontains $row[1].Trim()) { & $addErr 'ENUM' ('「## 未採用」第 ' + $ri + ' 列原因「' + $row[1] + '」不在值域'); continue }
-                        $covered[$n] = $true
-                        $r.Rejected += , ([ordered]@{ n = $n; reason = $row[1].Trim() })
+                        foreach ($tok in ($row[0] -split ';')) {
+                            $x = $tok.Trim()
+                            if ($x -eq '') { continue }
+                            $n = Get-PsSpItemToken -Tok $x
+                            if ($n -lt 0 -or -not $itemSet.ContainsKey($n)) { & $addErr 'ITEM_UNKNOWN' ('「## 未採用」第 ' + $ri + ' 列來源條目「' + $x + '」不在工單列舉'); continue }
+                            $covered[$n] = $true
+                            $r.Rejected += , ([ordered]@{ n = $n; reason = $row[1].Trim() })
+                        }
                     }
                 }
             }
             $missing = 0
             foreach ($i in @($Items)) { if ($covered.ContainsKey([int]$i.n)) { $r.Covered += [int]$i.n } else { $missing++ } }
             if ($missing -eq 0) { $r.Closure = 'COMPLETE' } else { $r.Closure = 'PARTIAL' }
+            if (@($Items).Count -gt 0 -and $r.Covered.Count -eq 0) { & $addErr 'NO_COVERAGE' '兩張表都沒有處置任何條目' }
             if ($r.Rows.Count -gt 0) { $r.Present = 'TRUE' } elseif ($r.Closure -eq 'COMPLETE') { $r.Present = 'FALSE' }
         }
     }
@@ -1590,7 +1738,8 @@ function Write-PsSpReceipt {
     }
     $p = Join-Path $Dirs.Receipts (Get-PsSpReceiptName -UnitKey ([string]$u.unitKey) -Part ([string]$Eu.Part) -Fingerprint $Live.Fingerprint)
     $ok = Write-PsKnCreateOnlyText -LiteralPath $p -Text ((ConvertTo-PsKnJson -Value $rc) + "`n")
-    return @{ Ok = $ok; Path = $p; Existed = (-not $ok) }
+    if ($null -eq $ok) { return @{ Ok = $false; Path = $p; Existed = $false; Deferred = $true } }
+    return @{ Ok = [bool]$ok; Path = $p; Existed = (-not $ok); Deferred = $false }
 }
 function Write-PsSpVerdict {
     param($Dirs, [string]$AttemptId, $Verdict)
@@ -1626,11 +1775,16 @@ function Get-PsSpKnowledgeRefresh {
 }
 
 # ── 外環（-Run）：Dispatch scriptblock 收 @{ JobId; AttemptId; AttemptDir; ManifestPath; FragmentPath } 回 @{ TimedOut; ExitCode; FailureKind; SlotBusy }
-# 回 @{ Code; Exit; Phase; Sessions; Accepted; Invalid; Blocked; Splits; SourceChanged; Pending; Waiting; Summary }
+# 回 @{ Code; Exit; Phase; Sessions; Accepted; Invalid; Blocked; Splits; SourceChanged; Pending; Waiting; WriteDeferred; Summary }
+#   Phase 永遠是離開時的相位（起始＝plan 推得的相位；不會留在 RUNNING）。
+#   容量事件（切片超限／條目數裝不下／片段 >150 行／JSON 洩漏／session 回報 CONTEXT_OVERFLOW）＝拆分、不記 attempt；
+#   部分處置（合格但 closure PARTIAL）＝已處置條目寫收據、其餘拆成新 part 重派、不記 attempt；收據永遠 closure COMPLETE。
+#   任何 create-only／原子寫入回 WRITE_DEFERRED（splits／input.json／收據）＝停止本輪（3-07），絕不重派同一 part、不記 attempt。
 function Invoke-PsSpRun {
     param([string]$Root, $Dirs, $Plan, $PackV, $Capabilities, [string]$JobId, [int]$MaxSessions, [scriptblock]$Dispatch, [scriptblock]$Log = $null, $Index)
     function L([string]$m) { if ($null -ne $Log) { & $Log $m } }
-    $r = @{ Code = ''; Exit = 0; Phase = 'RUNNING'; Sessions = 0; Accepted = 0; Invalid = 0; Blocked = 0; Splits = 0; SourceChanged = 0; Pending = 0; Waiting = 0; Replan = 0; SessionFailed = 0; SlotBusy = $false; Summary = @() }
+    $prePhase = Get-PsSpPhaseFromPlan -Plan $Plan
+    $r = @{ Code = ''; Exit = 0; Phase = $prePhase; Sessions = 0; Accepted = 0; Invalid = 0; Blocked = 0; Splits = 0; SourceChanged = 0; Pending = 0; Waiting = 0; Replan = 0; SessionFailed = 0; SlotBusy = $false; WriteDeferred = 0; Summary = @() }
     $ref = Get-PsSpPlanRef -Plan $Plan
     $r.Replan = Get-PsSpKnowledgeRefresh -Root $Root -Plan $Plan -Index $Index
     $cache = @{}
@@ -1659,23 +1813,33 @@ function Invoke-PsSpRun {
         $u = $eu.Unit
         $cap = Get-PsSpFactKind -Capabilities $Capabilities -FactKind ([string]$u.factKind)
         $att = New-PsSpAttempt -Root $Root -Dirs $Dirs -Plan $Plan -Eu $eu -Live $next.Live -Cap $cap -JobId $JobId
+        if ($att.Deferred) {
+            $r.WriteDeferred++
+            L ('SPEC：attempt 檔寫入延遲（WRITE_DEFERRED）→ 不派工、停止本輪（' + [string]$u.requirementId + '）')
+            break
+        }
         if ($att.Capacity) {
             $sp = Write-PsSpSplit -Dirs $Dirs -Plan $Plan -Eu $eu
+            if (-not $sp.Ok) { $r.WriteDeferred++; L ('SPEC：splits 檔寫入延遲（WRITE_DEFERRED）→ 停止本輪（' + [string]$u.requirementId + '）'); break }
             $r.Splits++
-            if ($sp.Blocked) { L ('SPEC：capacity 不可拆 → BLOCKED_CAPACITY（' + [string]$u.requirementId + '）') } else { L ('SPEC：context ' + $att.Total + ' 行超限 → 拆分（' + [string]$u.requirementId + '）') }
+            if ($sp.Blocked) { L ('SPEC：capacity 不可拆 → BLOCKED_CAPACITY（' + [string]$u.requirementId + '）') } else { L ('SPEC：派工前容量 ' + $att.Reason + '（' + $att.Total + '）→ 拆分、不派 session（' + [string]$u.requirementId + '）') }
             continue
         }
-        L ('SPEC：派工 ' + $att.AttemptId + ' ' + [string]$u.requirementId + ' ' + [string]$u.factKind + ' part=' + [string]$eu.Part + ' items=' + @($eu.Items).Count)
+        L ('SPEC：派工 ' + $att.AttemptId + ' ' + [string]$u.requirementId + ' ' + [string]$u.factKind + ' part=' + [string]$eu.Part + ' items=' + @($att.Items).Count)
         $r.Sessions++
         $sess = & $Dispatch @{ JobId = $JobId; AttemptId = $att.AttemptId; AttemptDir = $att.Dir; ManifestPath = $att.ManifestPath; FragmentPath = $att.FragmentPath }
         $healthy = (-not [bool]$sess.TimedOut -and -not [bool]$sess.SlotBusy -and [int]$sess.ExitCode -eq 0 -and [string]$sess.FailureKind -ne 'PROMPT_UNSAFE')
+        # session 層容量事件：子代理溢出多半 exit 0，不算健康的驗收輸入，也不算一次 attempt
+        $overflow = ([string]$sess.FailureKind -eq 'CONTEXT_OVERFLOW')
         [void](Write-PsSpOutcome -Dirs $Dirs -AttemptId $att.AttemptId -Outcome @{ timedOut = [bool]$sess.TimedOut; exitCode = [int]$sess.ExitCode; failureKind = [string]$sess.FailureKind; slotBusy = [bool]$sess.SlotBusy; healthy = $healthy })
         if ([bool]$sess.SlotBusy) { $r.SlotBusy = $true }
-        # 驗收：來源快照重算
+        # 驗收：來源快照重算；片段只對照本 attempt 工單實際列出的條目（$att.Items）
         $live2 = Get-PsSpLiveInput -Root $Root -Eu $eu -Index $Index -Cache @{}
         $fpMatch = ($live2.Fingerprint -ceq $next.Live.Fingerprint)
-        $frag = Test-PsSpFragment -LiteralPath $att.FragmentPath -Items $eu.Items -Files $next.Live.Files -Cap $cap -TemplateLines $PackV.TemplateLines
-        $verdict = @{ unitId = [string]$u.unitId; part = [string]$eu.Part; requirementId = [string]$u.requirementId; factKind = [string]$u.factKind; inputFingerprint = $next.Live.Fingerprint; counted = $false; code = ''; reasons = @($frag.Reasons); lines = $frag.Lines; closure = $frag.Closure; sessionHealthy = $healthy; fingerprintMatch = $fpMatch; capacity = $frag.Capacity }
+        $frag = Test-PsSpFragment -LiteralPath $att.FragmentPath -Items $att.Items -Files $next.Live.Files -Cap $cap -TemplateLines $PackV.TemplateLines
+        $reasons = @($frag.Reasons)
+        if ($overflow) { $reasons += 'CONTEXT_OVERFLOW' }
+        $verdict = @{ unitId = [string]$u.unitId; part = [string]$eu.Part; requirementId = [string]$u.requirementId; factKind = [string]$u.factKind; inputFingerprint = $next.Live.Fingerprint; counted = $false; code = ''; reasons = @($reasons); lines = $frag.Lines; closure = $frag.Closure; sessionHealthy = $healthy; fingerprintMatch = $fpMatch; capacity = ($frag.Capacity -or $overflow) }
         if (-not $fpMatch) {
             $verdict.code = '4-04'; $r.SourceChanged++
             L ('SPEC：來源已變（' + [string]$u.requirementId + '）→ 拒收、不記 attempt、需 -Plan 重規劃')
@@ -1688,18 +1852,59 @@ function Invoke-PsSpRun {
             L ('SPEC：session 未健康結束（' + [string]$sess.FailureKind + '）→ 不記 attempt、停止本輪')
             break
         }
-        if ($frag.Capacity) {
+        if ($frag.Capacity -or $overflow) {
             $verdict.code = '4-05'
             $sp = Write-PsSpSplit -Dirs $Dirs -Plan $Plan -Eu $eu
+            if (-not $sp.Ok) {
+                $verdict.code = '3-07'; $r.WriteDeferred++
+                [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
+                L ('SPEC：splits 檔寫入延遲（WRITE_DEFERRED）→ 停止本輪（' + [string]$u.requirementId + '）')
+                break
+            }
             $r.Splits++
             if ($sp.Blocked) { $verdict.code = '4-06' }
             [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
-            L ('SPEC：容量事件（' + ($frag.Reasons -join ',') + '）→ 不記 attempt、拆分 ' + [string]$u.requirementId)
+            L ('SPEC：容量事件（' + ($reasons -join ',') + '）→ 不記 attempt、拆分 ' + [string]$u.requirementId)
+            continue
+        }
+        if ($frag.Ok -and $frag.Closure -ne 'COMPLETE') {
+            # 部分處置：已處置條目成 part A 並以本片段寫收據（closure COMPLETE），其餘條目成 part B 重派；不記 attempt
+            $ps = Write-PsSpPartialSplit -Dirs $Dirs -Plan $Plan -Eu $eu -Covered $frag.Covered
+            if (-not $ps.Ok) {
+                $verdict.code = '3-07'; $r.WriteDeferred++
+                [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
+                L ('SPEC：splits 檔寫入延遲（WRITE_DEFERRED）→ 停止本輪（' + [string]$u.requirementId + '）')
+                break
+            }
+            $r.Splits++
+            $euA = @{ Unit = $u; Part = $ps.PartA; Items = @($ps.ItemsA); BlockedCapacity = $false }
+            $liveA = @{ Files = @($next.Live.Files); Fingerprint = (Get-PsSpFingerprint -UnitId ([string]$u.unitId) -Part $ps.PartA -Files $next.Live.Files -Items $ps.ItemsA -FactKind ([string]$u.factKind)) }
+            $fragA = @{}
+            foreach ($k in @($frag.Keys)) { $fragA[$k] = $frag[$k] }
+            $fragA.Closure = 'COMPLETE'
+            if (@($frag.Rows).Count -gt 0) { $fragA.Present = 'TRUE' } else { $fragA.Present = 'FALSE' }
+            $rc = Write-PsSpReceipt -Dirs $Dirs -Eu $euA -Live $liveA -Frag $fragA -AttemptId $att.AttemptId -PlanRef $ref -JobId $JobId -InputText $att.InputText
+            if ($rc.Deferred) {
+                $verdict.code = '3-07'; $r.WriteDeferred++
+                [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
+                L ('SPEC：收據寫入延遲（WRITE_DEFERRED）→ 停止本輪（' + [string]$u.requirementId + '）')
+                break
+            }
+            $verdict.code = '4-07'; $verdict.acceptedPart = $ps.PartA; $verdict.pendingPart = $ps.PartB
+            [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
+            $r.Accepted++
+            L ('SPEC：部分處置 ' + $att.AttemptId + ' covered=' + @($frag.Covered).Count + '/' + @($att.Items).Count + ' → 收據 ' + $ps.PartA + '、其餘重派 ' + $ps.PartB + '（不記 attempt）')
             continue
         }
         if ($frag.Ok) {
-            $verdict.counted = $true; $verdict.code = '4-01'
             $rc = Write-PsSpReceipt -Dirs $Dirs -Eu $eu -Live $next.Live -Frag $frag -AttemptId $att.AttemptId -PlanRef $ref -JobId $JobId -InputText $att.InputText
+            if ($rc.Deferred) {
+                $verdict.code = '3-07'; $r.WriteDeferred++
+                [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
+                L ('SPEC：收據寫入延遲（WRITE_DEFERRED）→ 不記 attempt、停止本輪（' + [string]$u.requirementId + '）')
+                break
+            }
+            $verdict.counted = $true; $verdict.code = '4-01'
             [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
             $r.Accepted++
             L ('SPEC：驗收通過 ' + $att.AttemptId + ' closure=' + $frag.Closure + ' rows=' + @($frag.Rows).Count)
@@ -1708,15 +1913,16 @@ function Invoke-PsSpRun {
         $verdict.counted = $true; $verdict.code = '4-02'
         [void](Write-PsSpVerdict -Dirs $Dirs -AttemptId $att.AttemptId -Verdict $verdict)
         $r.Invalid++
-        L ('SPEC：驗收不合格 ' + $att.AttemptId + '（' + ($frag.Reasons -join ',') + '）')
+        L ('SPEC：驗收不合格 ' + $att.AttemptId + '（' + ($reasons -join ',') + '）')
     }
-    # 結論
+    # 結論（3-02／3-03／3-04／3-07 不改相位：離開時相位＝進入時相位）
     if ($r.SourceChanged -gt 0) { $r.Code = 'SPEC1-4-04-' + $r.SourceChanged; $r.Exit = 1; $r.Phase = 'PLANNED' }
     elseif ($r.Replan -gt 0) { $r.Code = 'SPEC1-5-06-' + $r.Replan; $r.Exit = 1; $r.Phase = 'PLANNED' }
-    elseif ($r.SlotBusy) { $r.Code = 'SPEC1-3-03'; $r.Exit = 1 }
-    elseif ($r.SessionFailed -gt 0) { $r.Code = 'SPEC1-3-04-' + $r.SessionFailed; $r.Exit = 1 }
+    elseif ($r.WriteDeferred -gt 0) { $r.Code = 'SPEC1-3-07-' + $r.WriteDeferred; $r.Exit = 1; $r.Phase = $prePhase }
+    elseif ($r.SlotBusy) { $r.Code = 'SPEC1-3-03'; $r.Exit = 1; $r.Phase = $prePhase }
+    elseif ($r.SessionFailed -gt 0) { $r.Code = 'SPEC1-3-04-' + $r.SessionFailed; $r.Exit = 1; $r.Phase = $prePhase }
     elseif ($r.Blocked -gt 0 -and $r.Pending -eq 0) { $r.Code = 'SPEC1-4-03-' + $r.Blocked; $r.Exit = 1; $r.Phase = 'BLOCKED' }
-    elseif ($r.Pending -gt 0) { $r.Code = 'SPEC1-3-02-' + $r.Pending; $r.Exit = 0 }
+    elseif ($r.Pending -gt 0) { $r.Code = 'SPEC1-3-02-' + $r.Pending; $r.Exit = 0; $r.Phase = $prePhase }
     elseif ($counts.BLOCKED_KNOWLEDGE -gt 0) { $r.Code = 'SPEC1-5-05-' + $counts.BLOCKED_KNOWLEDGE; $r.Exit = 1; $r.Phase = 'BLOCKED' }
     elseif ($r.Waiting -gt 0) {
         $ph = Get-PsSpPhaseFromPlan -Plan $Plan
@@ -1735,44 +1941,65 @@ function Invoke-PsSpRun {
 
 # ── 評估（render 與 gate 共用）────────────────────────────────────
 
-# 來源重驗：facts 的 sourceRefs（節 hash／檔 hash）＋各單位收據指紋。回 @{ Mismatch; Status; Facts }
+# 來源重驗：facts 的 sourceRefs（節 hash／檔 hash）＋現行 plan 各單位的收據指紋（只看現行單位綁定的收據；PENDING／BLOCKED 單位不算來源已變）。
+# 回 @{ Mismatch; Status; Facts; LiveGrades }；LiveGrades＝factId／unitId → 依現況知識索引重算的來源最低等級（gate 用來抓規劃後的等級下降）
 function Test-PsSpSources {
     param([string]$Root, $Dirs, $Plan, $Index)
     $cache = @{}
     $mis = 0
     $factOk = @{}
+    $liveGrades = @{}
+    $wikiByFile = @{}
+    if ($null -ne $Index) { foreach ($w in @($Index.wiki)) { $wikiByFile[[string]$w.file] = $w } }
     foreach ($f in @($Plan.facts)) {
         $ok = $true
+        $grades = @()
         foreach ($sr in @($f.sourceRefs)) {
             $role = [string]$sr.role
             if ($role -eq 'WIKI' -or $role -eq 'OVERVIEW') {
                 $p = Join-Path $Root ([string]$sr.path)
                 if ((Get-PsKnFileHash -LiteralPath $p) -cne [string]$sr.hash) { $ok = $false }
+                if ($role -eq 'WIKI') { $w = $null; if ($wikiByFile.ContainsKey([string]$sr.file)) { $w = $wikiByFile[[string]$sr.file] }; $grades += (Get-PsSpWikiGrade -Wiki $w) }
                 continue
             }
             $c = Get-PsSpNnCtx -Root $Root -Index $Index -Domain ([string]$sr.domain) -File ([string]$sr.file) -Cache $cache
-            if ($null -eq $c) { $ok = $false; continue }
+            if ($null -eq $c) { $ok = $false; $grades += 'MISSING'; continue }
+            $grades += [string]$c.Grade
             if ([string]$sr.section -eq '') { if ($c.Hash -cne [string]$sr.hash) { $ok = $false }; continue }
             $live = Get-PsSpSection -Ctx $c -Name ([string]$sr.section) -Level ([int]$sr.level)
             if ($null -eq $live -or [string]$live.hash -cne [string]$sr.sectionHash) { $ok = $false }
         }
         $factOk[[string]$f.factId] = $ok
+        $liveGrades[[string]$f.factId] = Get-PsSpMinGrade -Grades $grades
         if (-not $ok) { $mis++ }
     }
     $status = Get-PsSpUnitStatus -Root $Root -Dirs $Dirs -Plan $Plan -Index $Index -Cache $cache
-    $receipts = Get-PsSpReceipts -Dirs $Dirs
     foreach ($s in $status) {
-        if ([string]$s.State -eq 'SOURCE_CHANGED') { $mis++; continue }
-        if ($null -ne $s.Receipt) { continue }
-        # 有舊收據但指紋不符＝來源已變
-        foreach ($rc in $receipts) { if ([string]$rc.unitId -ceq [string]$s.Eu.Unit.unitId -and [string]$rc.part -ceq [string]$s.Eu.Part) { $mis++; break } }
+        if ([string]$s.State -eq 'SOURCE_CHANGED') { $mis++ }
+        $ug = @()
+        foreach ($rf in @($s.Eu.Unit.readSet)) {
+            $c = Get-PsSpNnCtx -Root $Root -Index $Index -Domain ([string]$rf.domain) -File ([string]$rf.file) -Cache $cache
+            if ($null -eq $c) { $ug += 'MISSING' } else { $ug += [string]$c.Grade }
+        }
+        $liveGrades[[string]$s.Eu.Unit.unitId] = Get-PsSpMinGrade -Grades $ug
     }
-    return @{ Mismatch = $mis; Status = @($status); Facts = $factOk }
+    return @{ Mismatch = $mis; Status = @($status); Facts = $factOk; LiveGrades = $liveGrades }
+}
+
+# LiveGrades 中各鍵的最低等級；沒有任何鍵＝''（不判）
+function Get-PsSpLiveMinGrade {
+    param($LiveGrades, [string[]]$Keys)
+    if ($null -eq $LiveGrades) { return '' }
+    $gs = @()
+    foreach ($k in @($Keys)) { if ($LiveGrades.ContainsKey($k)) { $gs += [string]$LiveGrades[$k] } }
+    if ($gs.Count -eq 0) { return '' }
+    return (Get-PsSpMinGrade -Grades $gs)
 }
 
 # 每 requirement 一筆評估：@{ Req; Applicable; State; Facts; Units=@(@{Eu;Receipt;State}); Findings=@(@{code;…}); Closure; Rows; Fatal }
+# LiveGrades（Test-PsSpSources）＝現況等級：規劃時符合 evidencePolicy 但現況已低於政策 → 7-22 GRADE_DROPPED（規劃時就不符＝7-13）
 function Get-PsSpEvaluation {
-    param($Plan, $PackV, $Status, $Capabilities)
+    param($Plan, $PackV, $Status, $Capabilities, $LiveGrades = $null)
     $factById = @{}
     foreach ($f in @($Plan.facts)) { $factById[[string]$f.factId] = $f }
     $fv = Get-PsSpFactValues -Facts @($Plan.facts)
@@ -1784,7 +2011,9 @@ function Get-PsSpEvaluation {
         $fk = [string]$q.factKind
         $vals = @()
         $all = $true
-        foreach ($s in @($unitsByReq[[string]$q.id])) { if ($null -eq $s.Receipt) { $all = $false; continue }; $vals += [string]$s.Receipt.present }
+        $qUnits = @()
+        if ($unitsByReq.ContainsKey([string]$q.id)) { $qUnits = @($unitsByReq[[string]$q.id]) }
+        foreach ($s in $qUnits) { if ($null -eq $s.Receipt) { $all = $false; continue }; $vals += [string]$s.Receipt.present }
         $pv = 'UNKNOWN'
         if ($all -and $vals.Count -gt 0) { if ($vals -contains 'TRUE') { $pv = 'TRUE' } elseif ($vals -notcontains 'UNKNOWN') { $pv = 'FALSE' } }
         elseif ($vals -contains 'TRUE') { $pv = 'TRUE' }
@@ -1813,6 +2042,10 @@ function Get-PsSpEvaluation {
             else {
                 $minG = Get-PsSpMinGrade -Grades @($e.Facts | ForEach-Object { [string]$_.grade })
                 if (-not (Test-PsSpGradeMeetsPolicy -Grade $minG -Policy ([string]$q.evidencePolicy))) { & $add '7-13' @{ a = $a; c = $minG } }
+                else {
+                    $lg = Get-PsSpLiveMinGrade -LiveGrades $LiveGrades -Keys @($e.Facts | ForEach-Object { [string]$_.factId })
+                    if ($lg -ne '' -and -not (Test-PsSpGradeMeetsPolicy -Grade $lg -Policy ([string]$q.evidencePolicy))) { & $add '7-22' @{ a = $a; c = $lg } }
+                }
                 $unres = 0
                 foreach ($f in $e.Facts) { foreach ($ev in @($f.evidenceRefs)) { if (-not [bool]$ev.resolved) { $unres++ } } }
                 if ($unres -gt 0) { & $add '7-14' @{ a = $unres; c = 'UNRESOLVED' } }
@@ -1829,7 +2062,9 @@ function Get-PsSpEvaluation {
             }
         }
         else {
-            $units = @($unitsByReq[$rid])
+            # 無單位的 COMPOSE（need-only）：鍵不存在時不得寫 @($null)（Count 會是 1、7-11 永遠走不到）
+            $units = @()
+            if ($unitsByReq.ContainsKey($rid)) { $units = @($unitsByReq[$rid]) }
             $e.Units = $units
             if ($units.Count -eq 0 -and -not $waiting) { & $add '7-11' @{ a = 0; c = 'NONE' }; if ([bool]$q.required) { $e.Fatal = $true } }
             $rows = 0; $allComplete = $true; $anyReceipt = $false; $unres = 0
@@ -1840,7 +2075,13 @@ function Get-PsSpEvaluation {
                 elseif ($st -eq 'PENDING' -or $st -eq 'SOURCE_CHANGED') { $allComplete = $false; & $add '7-11' @{ a = 0; c = $st }; if ([bool]$q.required) { $e.Fatal = $true } }
                 elseif ($st -eq 'BLOCKED_KNOWLEDGE') { $allComplete = $false }
                 else { $allComplete = $false; if (-not $waiting) { & $add '7-19' @{ a = 0; c = $st } } }
-                if (-not (Test-PsSpGradeMeetsPolicy -Grade ([string]$s.Eu.Unit.grade) -Policy ([string]$q.evidencePolicy)) -and $st -eq 'HAS_RECEIPT') { & $add '7-13' @{ a = 1; c = [string]$s.Eu.Unit.grade } }
+                if ($st -eq 'HAS_RECEIPT') {
+                    if (-not (Test-PsSpGradeMeetsPolicy -Grade ([string]$s.Eu.Unit.grade) -Policy ([string]$q.evidencePolicy))) { & $add '7-13' @{ a = 1; c = [string]$s.Eu.Unit.grade } }
+                    else {
+                        $lg = Get-PsSpLiveMinGrade -LiveGrades $LiveGrades -Keys @([string]$s.Eu.Unit.unitId)
+                        if ($lg -ne '' -and -not (Test-PsSpGradeMeetsPolicy -Grade $lg -Policy ([string]$q.evidencePolicy))) { & $add '7-22' @{ a = 1; c = $lg } }
+                    }
+                }
             }
             if ($unres -gt 0) { & $add '7-14' @{ a = $unres; c = 'UNRESOLVED' } }
             $e.Rows = $rows
@@ -1988,8 +2229,11 @@ function ConvertTo-PsSpTrace {
             foreach ($ev in @($f.evidenceRefs)) { $o += ('  - 證據 ' + [string]$ev.file + '#' + [string]$ev.row + ' resolved=' + [string]$ev.resolved) }
         }
         foreach ($s in @($e.Units)) {
-            $line = ('- unit ' + [string]$s.Eu.Unit.unitId + ' part ' + [string]$s.Eu.Part + ' state ' + [string]$s.State + ' fp ' + ([string]$s.Fingerprint).Substring(0, 16))
-            if ($null -ne $s.Receipt) { $line += ('　receipt ' + [string]$s.Receipt.attemptId + ' fragment ' + ([string]$s.Receipt.fragmentHash).Substring(0, 16) + ' closure ' + [string]$s.Receipt.closure) }
+            if ($null -eq $s) { continue }
+            $fp16 = [string]$s.Fingerprint
+            if ($fp16.Length -gt 16) { $fp16 = $fp16.Substring(0, 16) }
+            $line = ('- unit ' + [string]$s.Eu.Unit.unitId + ' part ' + [string]$s.Eu.Part + ' state ' + [string]$s.State + ' fp ' + $fp16)
+            if ($null -ne $s.Receipt) { $fh16 = [string]$s.Receipt.fragmentHash; if ($fh16.Length -gt 16) { $fh16 = $fh16.Substring(0, 16) }; $line += ('　receipt ' + [string]$s.Receipt.attemptId + ' fragment ' + $fh16 + ' closure ' + [string]$s.Receipt.closure) }
             $o += $line
             foreach ($f in @($s.Eu.Unit.readSet)) { $o += ('  - 讀取 ' + [string]$f.path + '（' + [string]$f.role + '，' + [string]$f.grade + '）：' + (@($f.sections | ForEach-Object { [string]$_.name + ' L' + $_.start + '-' + $_.end }) -join '；')) }
             if ($null -ne $s.Receipt) { foreach ($rj in @($s.Receipt.rejected)) { $o += ('  - 未採用 條目 ' + [string]$rj.n + '：' + [string]$rj.reason) } }
@@ -2008,9 +2252,10 @@ function Invoke-PsSpRender {
     $chk = Test-PsSpSources -Root $Root -Dirs $Dirs -Plan $Plan -Index $Index
     $r.Mismatch = $chk.Mismatch
     if ($chk.Mismatch -gt 0) { $r.Code = 'SPEC1-6-02-' + $chk.Mismatch; $r.Exit = 1; return $r }
-    $evals = Get-PsSpEvaluation -Plan $Plan -PackV $PackV -Status $chk.Status -Capabilities $Capabilities
+    $evals = Get-PsSpEvaluation -Plan $Plan -PackV $PackV -Status $chk.Status -Capabilities $Capabilities -LiveGrades $chk.LiveGrades
     $genParts = @([string]$Plan.planHash, $PackV.BindingHash, $PackV.ContentHash)
     foreach ($s in $chk.Status) { if ($null -ne $s.Receipt) { $genParts += ([string]$s.Receipt.inputFingerprint + ':' + [string]$s.Receipt.fragmentHash) } else { $genParts += ([string]$s.Fingerprint + ':' + [string]$s.State) } }
+    foreach ($k in (Sort-PsKnOrdinal -Items @($chk.LiveGrades.Keys | ForEach-Object { [string]$_ }))) { $genParts += ('grade ' + $k + '=' + [string]$chk.LiveGrades[$k]) }
     $gen = Get-PsKnTextHash -Text (($genParts -join "`n") + "`n")
     $r.Generation = $gen
     $gate = Get-PsSpGate -Plan $Plan -PackV $PackV -Evals $evals -Generation $gen
@@ -2019,6 +2264,7 @@ function Invoke-PsSpRender {
     $outDir = Join-Path $Dirs.Outputs ($gen.Substring(0, 16).ToLowerInvariant())
     $r.OutDir = $outDir
     $gateText = (ConvertTo-PsKnJson -Value $gate) + "`n"
+    $gateHash = Get-PsKnTextHash -Text $gateText
     if (-not (Write-PsKnAtomicText -LiteralPath (Join-Path $outDir 'gate.json') -Text $gateText -Bom $false)) { $r.Code = 'SPEC1-6-07'; $r.Exit = 1; return $r }
     if (-not $GateOnly) {
         $spec = ConvertTo-PsSpSpec -PackV $PackV -Evals $evals -Capabilities $Capabilities
@@ -2026,11 +2272,18 @@ function Invoke-PsSpRender {
         $ok1 = Write-PsKnAtomicText -LiteralPath (Join-Path $outDir 'spec.md') -Text $spec -Bom $false
         $ok2 = Write-PsKnAtomicText -LiteralPath (Join-Path $outDir 'trace.md') -Text $trace -Bom $false
         if (-not ($ok1 -and $ok2)) { $r.Code = 'SPEC1-6-07'; $r.Exit = 1; return $r }
-        $cur = [ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; generation = $gen; planRef = (Get-PsSpPlanRef -Plan $Plan); packVersion = $PackV.PackVersion; contentHash = $PackV.ContentHash; bindingHash = $PackV.BindingHash; verdict = [string]$gate.verdict; specHash = (Get-PsKnTextHash -Text $spec); traceHash = (Get-PsKnTextHash -Text $trace); gateHash = (Get-PsKnTextHash -Text $gateText) }
+        $cur = [ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; generation = $gen; planRef = (Get-PsSpPlanRef -Plan $Plan); packVersion = $PackV.PackVersion; contentHash = $PackV.ContentHash; bindingHash = $PackV.BindingHash; verdict = [string]$gate.verdict; specHash = (Get-PsKnTextHash -Text $spec); traceHash = (Get-PsKnTextHash -Text $trace); gateHash = $gateHash; gateGeneration = $gen; gateVerdict = [string]$gate.verdict }
         if (-not (Write-PsKnAtomicText -LiteralPath $Dirs.CurrentFile -Text ((ConvertTo-PsKnJson -Value $cur) + "`n") -Bom $false)) { $r.Code = 'SPEC1-6-07'; $r.Exit = 1; return $r }
         $r.Code = 'SPEC1-6-01'; $r.Exit = 0
         return $r
     }
+    # -Gate：只換 current.json 的 gate 指標（gateGeneration／gateVerdict／gateHash），render 指標（generation／specHash／traceHash）不動；-Doctor 依 gate 指標讀最新的 gate.json
+    $curOld = Read-PsSpJsonFile -LiteralPath $Dirs.CurrentFile
+    $cur = [ordered]@{}
+    if ($null -ne $curOld) { foreach ($k in (Get-PsSpPropNames $curOld)) { $cur[[string]$k] = (Get-PsSpProp $curOld $k) } }
+    else { $cur = [ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; generation = ''; planRef = (Get-PsSpPlanRef -Plan $Plan); packVersion = $PackV.PackVersion; contentHash = $PackV.ContentHash; bindingHash = $PackV.BindingHash; verdict = ''; specHash = ''; traceHash = ''; gateHash = '' } }
+    $cur['gateGeneration'] = $gen; $cur['gateVerdict'] = [string]$gate.verdict; $cur['gateHash'] = $gateHash
+    if (-not (Write-PsKnAtomicText -LiteralPath $Dirs.CurrentFile -Text ((ConvertTo-PsKnJson -Value $cur) + "`n") -Bom $false)) { $r.Code = 'SPEC1-6-07'; $r.Exit = 1; return $r }
     $v = [string]$gate.verdict
     if ($v -eq 'BLOCKED') { $r.Code = 'SPEC1-7-03-' + $gate.findingCount; $r.Exit = 1 }
     elseif ($v -eq 'SPEC_PARTIAL') { $r.Code = 'SPEC1-7-02-' + $gate.findingCount; $r.Exit = 1 }

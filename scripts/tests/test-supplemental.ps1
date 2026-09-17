@@ -212,7 +212,7 @@ $facts1 = Get-PsKnNnFacts -LiteralPath (Join-Path $domA '01-TW_DEMO_A.md') -Doma
 $bh = Get-PsKnSectionRange -Sections $facts1.sections -Name '行為邏輯'
 Assert ($mf.Created -and (Test-Path -LiteralPath $mf.CurrentPath) -and ((Read-PsKnText -LiteralPath $mf.CurrentPath) -ceq $mfText)) "工單檔＋current.manifest.md 內容相同"
 Assert ($mfText -match ('\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 行為邏輯 \| ' + $bh.start + ' \| ' + ([int]$bh.end - [int]$bh.start + 1) + ' \|')) "工單：目標 NN 的節 offset／limit 與解析一致"
-Assert ($mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 資料流 \|' -and $mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 執行方式 \|' -and $mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| Evidence \|') "工單：DATA.FILE_INPUT 的三節＋Evidence 附錄都列"
+Assert ($mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 資料流 \|' -and $mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 執行方式 \|' -and $mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| Evidence 附錄 \|' -and $mfText -notmatch '\| Evidence附錄 \|') "工單：DATA.FILE_INPUT 的三節＋Evidence 附錄都列（節名用實際標題名，worker 才對得上）"
 Assert ($mfText -match '02-TWSQR_DEMO\.md \| 執行方式（callee SQR，角色 排程執行） \|' -and $mf.CalleeFiles.Count -eq 1) "工單：follow 一跳 callee（角色排程、索引型別 SQR）的執行方式／資料流節"
 Assert ($mfText -notmatch '\[\[' -and $mfText -notmatch 'consumer' -and $mfText -notmatch 'requirementRef' -and $mfText -notmatch 'jobId' -and $mfText -match 'operation=IMPORT' -and $mfText -match '要補的屬性：layout、present') "工單：不含 [[／consumer／requirementRef／jobId；含情境與屬性"
 Assert ($mfText -match ('唯一可寫：docs/ps-research/職缺測試/supplemental-parts/' + [regex]::Escape($rid1) + '\.a1\.md')) "工單：唯一可寫的收據路徑"
@@ -441,6 +441,44 @@ Assert (-not (Test-CodeShape '結論代號：SUPP1-1-01-TW_X' 'SUPP') -and -not 
 $allOut = @()
 foreach ($a in @(@('-Status'), @('-Result', '-RequestId', $rid1))) { $allOut += (Invoke-Cli $a).Lines }
 Assert (@($allOut | Where-Object { $_ -match '^結論代號：' }).Count -eq 2) "每個動詞恰一行結論代號"
+
+# ── 情境 9：intake 拒收／callee 反向角色／wiki 內文 status 不動／領域目錄消失 ─────
+Write-Host "情境 9：intake 驗證拒收（ID_MISMATCH／WORKKEY）、callee 角色開頭比對、wiki 只改 frontmatter、領域目錄消失 → DOMAIN_MISSING"
+$dirs = Get-PsSuppDirs -Root $root
+$badId = 'S-' + ('a' * 24) + '-g1'
+Write-Utf8 (Join-Path $dirs.Requests ($badId + '.json')) @('{"schemaVersion":"1","requestId":"S-' + ('b' * 24) + '-g1","workKey":"x","generation":1,"domain":"職缺測試","need":{}}') $false
+$raw1 = Read-PsKnText -LiteralPath (Join-Path $dirs.Requests ($rid1 + '.json'))
+$fakeId = 'S-' + ('c' * 24) + '-g1'
+Write-Utf8 (Join-Path $dirs.Requests ($fakeId + '.json')) @(($raw1 -replace [regex]::Escape($rid1), $fakeId)) $false
+$acceptedRaw = Get-PsSuppRequests -Root $root -Capabilities $cap
+$accepted = @($acceptedRaw)
+$ids = @($accepted | ForEach-Object { $_.RequestId })
+$rejTxt = ($PsSuppIntakeRejected -join ';')
+Assert (($ids -contains $rid1) -and ($ids -notcontains $badId) -and ($ids -notcontains $fakeId) -and $rejTxt -match ([regex]::Escape($badId) + '\.json：ID_MISMATCH') -and $rejTxt -match ([regex]::Escape($fakeId) + '\.json：WORKKEY')) "intake：requestId 與檔名不符 → ID_MISMATCH；requestId 與 workKey 對不上 → WORKKEY；兩者都不進清單、合法的照常"
+Remove-Item -LiteralPath (Join-Path $dirs.Requests ($badId + '.json')) -Force
+Remove-Item -LiteralPath (Join-Path $dirs.Requests ($fakeId + '.json')) -Force
+$factsRev = @{ relatedObjects = @(@{ name = 'TWSQR_DEMO'; role = '被呼叫（由排程執行的反向關係）' }) }
+$cRevRaw = Get-PsSuppCallees -TargetFacts $factsRev -DomainDir $domA -Domain '職缺測試' -Index $index -Capabilities $cap
+$cRev = @($cRevRaw)
+$factsFwd = @{ relatedObjects = @(@{ name = 'TWSQR_DEMO'; role = '排程執行' }) }
+$cFwdRaw = Get-PsSuppCallees -TargetFacts $factsFwd -DomainDir $domA -Domain '職缺測試' -Index $index -Capabilities $cap
+$cFwd = @($cFwdRaw)
+Assert ($cRev.Count -eq 0 -and $cFwd.Count -eq 1 -and $cFwd[0].Name -eq 'TWSQR_DEMO') "callee：角色以開頭比對——「被呼叫」不是 callee、「排程執行」是"
+Write-Utf8 (Join-Path $wiki 'TW_DEMO_B.md') @('---', 'name: TW_DEMO_B', 'type: COMPONENT', 'status: verified', 'sources:', '  - 職缺測試/01-TW_DEMO_A.md', '---', '', '# TW_DEMO_B', '', 'status: verified（內文說明文字，不是 frontmatter）', '', '| 欄位 | 值 |', '|---|---|', '| status | verified |', '') $false
+$wsB = Set-PsSuppWikiStale -Root $root -TargetName 'TW_DEMO_B' -LinkedNames @() -RequestId $rid1 -SourceLabel 'x'
+$wikiB = Read-PsKnText -LiteralPath (Join-Path $wiki 'TW_DEMO_B.md')
+Assert ($wsB.Stale -eq 1 -and $wikiB -match '(?m)^status: stale$' -and $wikiB -match '(?m)^status: verified（內文' -and $wikiB -match '\| status \| verified \|' -and ([regex]::Matches($wikiB, '(?m)^status: stale')).Count -eq 1) "wiki：只改 frontmatter 的第一個 status:；內文的 status: 字樣一個都不動"
+$domGone = Join-Path $research 'zz-gone'
+Write-Utf8 (Join-Path $domGone '00-overview.md') @('# zz-gone 總覽', '') $false
+$sGone = Submit-PsSupplementalRequest -Root $root -Need (ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_DEMO_C' -FactKind 'UI.NAVIGATION' -Properties 'entries') -DomainHint 'zz-gone'
+Remove-Item -LiteralPath $domGone -Recurse -Force
+$stGoneRaw = Get-PsSuppStatus -Root $root -Domain 'zz-gone' -Capabilities $cap
+$stGone = @($stGoneRaw)
+Assert ($sGone.state -eq 'CREATED' -and $stGone.Count -eq 1 -and $stGone[0].State -eq 'DOMAIN_MISSING') "status：領域目錄不見（改名／刪除）→ DOMAIN_MISSING（不是 WAITING_RESEARCH）"
+$emptyRcpt = Join-Path $root 'empty-receipt.md'
+Write-Utf8 $emptyRcpt @('## 處置', '| 處置 | 查法收據 |', '|---|---|', '| NO_EVIDENCE | ps-peoplecode-flow 搜 TW_DEMO_A 全部事件 2 頁無 File 物件 |', '', '## 追加事實', '| 節 | 信心 | 敘述 | 證據# |', '|---|---|---|---|', '', '## 追加證據', '| 位置 | 說明 | 機器參照 |', '|---|---|---|', '') $false
+$vEmpty = Test-PsSuppReceipt -LiteralPath $emptyRcpt -Capabilities $cap
+Assert ($vEmpty.Ok -and $vEmpty.Disposition -eq 'NO_EVIDENCE' -and $vEmpty.Facts.Count -eq 0 -and $vEmpty.Evidence.Count -eq 0) "收據：查無時兩張空表（只有表頭與分隔列）合格（契約的空表規則）"
 
 Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ""

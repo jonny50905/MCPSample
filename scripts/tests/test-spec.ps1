@@ -178,9 +178,11 @@ Write-Utf8 $fake @(
     '$rows = @()',
     'foreach ($it in $items) { $c = @([string]$it[0]); for ($i = 1; $i -lt $cols - 1; $i++) { if ($hdr -match "用途" -and $i -eq 2) { $c += "WRITE" } else { $c += ("示範值" + $i) } }; $c += ($it[1] + "#1"); $rows += ("| " + ($c -join " | ") + " |") }',
     'if ($mode -eq "missing") { exit 0 }',
+    'if ($mode -eq "overflow") { Write-Output "FAILURE_KIND=CONTEXT_OVERFLOW"; exit 0 }',
+    'if ($mode -eq "crash") { exit 1 }',
     'if ($mode -eq "mutate") { $nn = $env:PS_SPEC_FAKE_NN; $t = [System.IO.File]::ReadAllText($nn); $t = $t.Replace("- **INFERRED**：匯入檔", "- **CONFIRMED**：新增條目`n- **INFERRED**：匯入檔"); [System.IO.File]::WriteAllText($nn, $t, (New-Object System.Text.UTF8Encoding($false))) }',
     '$out = @("## 事實", $hdr, $sep)',
-    'if ($mode -eq "invalid") { $out += ("| 99 | x | x | x | nofile#1 |") } elseif ($mode -eq "partial") { $out += $rows[0] } else { $out += $rows }',
+    'if ($mode -eq "invalid") { $out += ("| 99 | x | x | x | nofile#1 |") } elseif ($mode -eq "partial") { $out += $rows[0] } elseif ($mode -eq "empty") { } else { $out += $rows }',
     '$out += @("", "## 未採用", "| 來源條目 | 原因 |", "|---|---|")',
     'if ($mode -eq "template") { $out += "本模板為合成範例：公司機複製本目錄為 .ps-private/spec/<packId>/ 後，只改標記位置與文字，不改 generic 檔。" }',
     'if ($mode -eq "long") { for ($i = 0; $i -lt 200; $i++) { $out += "" } }',
@@ -276,6 +278,8 @@ Assert (@($u17.readSet).Count -eq 2 -and (@($u17.readSet | Where-Object { $_.rol
 Assert ((@($u17.readSet[0].sections | Where-Object { $_.name -eq 'Evidence附錄' })).Count -eq 1 -and [string]$u17.readSet[0].sections[0].hash -match '^[0-9A-F]{64}$') "讀取集合：每檔含 Evidence 附錄；每節內容 hash"
 $c = Invoke-Cli @{ Plan = $true; JobId = 'job-a'; Component = 'TW_DEMO_A'; Pack = 'pack-a' }
 Assert ($c -match '^SPEC1-2-02-\d+$') "同輸入再 -Plan → planHash 相同 → SPEC1-2-02（重用）"
+$jobTxt = Read-PsKnText -LiteralPath $dirsA.JobFile
+Assert ($jobTxt -match '"createdAt": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"' -and $jobTxt -match '"updatedAt": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"') "job.json 重寫後時間戳仍是 UTC ISO（PS7 的 [datetime] 不得寫成文化格式）"
 $c = Invoke-Cli @{ Plan = $true; JobId = 'job-x'; Component = 'TW_NOPE'; Pack = 'pack-a' }
 Assert ($c -eq 'SPEC1-2-03' -and $script:lastExit -eq 1) "Component 無 NN 且無 DomainHint → SPEC1-2-03"
 
@@ -284,6 +288,7 @@ Write-Host "情境 3：外環派工與驗收（假 worker）"
 $env:PS_SPEC_FAKE_MODE = 'valid'
 $c = Invoke-Cli @{ Run = $true; JobId = 'job-a'; MaxSessions = '1'; FakeWorker = $fake }
 Assert ($c -match '^SPEC1-3-02-\d+$' -and $script:lastExit -eq 0) "-Run MaxSessions=1 → 一個 session、仍有 pending → SPEC1-3-02-<n>"
+Assert ([string](Read-PsSpJob -Dirs $dirsA).phase -eq 'PLANNED') "3-02 離開後 job.phase 回到 PLANNED（不留 RUNNING）"
 $a1 = Join-Path $dirsA.Attempts 'a0001'
 Assert ([System.IO.File]::Exists((Join-Path $a1 'input.json')) -and [System.IO.File]::Exists((Join-Path $a1 'manifest.md')) -and [System.IO.File]::Exists((Join-Path $a1 'fragment.md')) -and [System.IO.File]::Exists((Join-Path $a1 'verdict.json')) -and [System.IO.File]::Exists((Join-Path $a1 'outcome.json'))) "attempt a0001：input.json／manifest.md／context／fragment.md／verdict／outcome"
 $man = Read-PsKnText -LiteralPath (Join-Path $a1 'manifest.md')
@@ -416,6 +421,9 @@ $before = @(Get-ChildItem -LiteralPath $dirsA.Attempts -Directory).Count
 $c = Invoke-Cli @{ Plan = $true; JobId = 'job-a'; Component = 'TW_DEMO_A'; Pack = 'pack-a' }
 $jobA2 = Read-PsSpJob -Dirs $dirsA
 Assert ($c -match '^SPEC1-2-01-5$' -and [string]$jobA2.currentPlanRef -ne [string]$jobA.currentPlanRef) "re-plan → 新 planHash、單位 5（多一個 Record）"
+$cG = Invoke-Cli @{ Gate = $true; JobId = 'job-a' }
+$cD6 = Invoke-Cli @{ Doctor = $true; JobId = 'job-a'; Drill = '6-02' }
+Assert ($cG -match '^SPEC1-7-02-\d+$' -and $cD6 -eq 'SPEC1-0-05-0') "re-plan 後、-Run 前 -Gate：PENDING 單位＝7-11 finding，不是 6-02（歷史收據不算來源已變）；drill 6-02 零筆"
 $c = Invoke-Cli @{ Run = $true; JobId = 'job-a'; MaxSessions = 9; FakeWorker = $fake }
 $after = @(Get-ChildItem -LiteralPath $dirsA.Attempts -Directory).Count
 Assert ($c -eq 'SPEC1-3-01-5' -and ($after - $before) -eq 4) "re-plan 後只派受影響單位（行為邏輯單位不變→收據重用；資料流相關 4 單位重派）"
@@ -511,6 +519,10 @@ $c = Invoke-Cli @{ Doctor = $true; JobId = 'job-p'; Drill = '7-16' }
 Assert ($c -match '^SPEC1-0-05-\d+$' -and $script:lastOut -match '(?m)^D7-16 C0\d CHECKLIST ANY a=0 c=UNCOVERED$') "drill 7-16：checklist 覆蓋缺口 tuple"
 $env:PS_SPEC_FAKE_MODE = 'valid'
 $c = Invoke-Cli @{ Run = $true; JobId = 'job-p'; MaxSessions = 9; FakeWorker = $fake }
+$cGp = Invoke-Cli @{ Gate = $true; JobId = 'job-p' }
+$cDp = Invoke-Cli @{ Doctor = $true; JobId = 'job-p'; Drill = '7-11' }
+$curPg = Read-PsSpJsonFile -LiteralPath $dirsP.CurrentFile
+Assert ($cGp -match '^SPEC1-7-02-' -and $cDp -eq 'SPEC1-0-05-0' -and $script:lastOut -notmatch 'D7-11 R09' -and [string]$curPg.gateGeneration -ne [string]$curPg.generation -and $script:lastOut -match 'verdict=SPEC_PARTIAL') "-Run 後 -Gate（未 -Render）：current.json 的 gate 指標更新，-Doctor drill 讀最新 gate（R09 的 7-11 已消失）"
 $c = Invoke-Cli @{ Render = $true; JobId = 'job-p' }
 $c2 = Invoke-Cli @{ Gate = $true; JobId = 'job-p' }
 $curP = Read-PsSpJsonFile -LiteralPath $dirsP.CurrentFile
@@ -572,17 +584,288 @@ $seen = @{}
 Assert ((Get-PsSpUniqueId -Base 'X.A' -Seen $seen) -eq 'X.A' -and (Get-PsSpUniqueId -Base 'X.A' -Seen $seen) -eq 'X.A.2' -and (Get-PsSpId -Prefix 'CTL' -Parts @('tw x', 'f-1')) -eq 'CTL.TW_X.F_1') "Get-PsSpId／Get-PsSpUniqueId（取自 #17 通用函式）"
 $env:PS_SPEC_FAKE_MODE = 'partial'
 $c = Invoke-Cli @{ Plan = $true; JobId = 'job-q'; Component = 'TW_DEMO_A'; Pack = 'pack-a' }
-$c = Invoke-Cli @{ Run = $true; JobId = 'job-q'; MaxSessions = 9; FakeWorker = $fake }
 $dirsQ = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-a' -JobId 'job-q'
-$rcQ = @(Get-PsSpReceipts -Dirs $dirsQ)
+$planQ = Read-PsSpPlan -Dirs $dirsQ -PlanRef ([string](Read-PsSpJob -Dirs $dirsQ).currentPlanRef)
+$nItemsQ = 0
+foreach ($uq in @($planQ.units)) { $nItemsQ += @($uq.items).Count }
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-q'; MaxSessions = 1; FakeWorker = $fake }
+$vQ1 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsQ.Attempts 'a0001') 'verdict.json')
+$rcQraw = Get-PsSpReceipts -Dirs $dirsQ
+$rcQ = @($rcQraw)
+$spQ = Read-PsSpJsonFile -LiteralPath (Get-PsSpSplitPath -Dirs $dirsQ -PlanRef (Get-PsSpPlanRef -Plan $planQ) -UnitKey ([string]$vQ1.unitId))
+Assert ([string]$vQ1.code -eq '4-07' -and -not [bool]$vQ1.counted -and [string]$vQ1.closure -eq 'PARTIAL' -and [string]$vQ1.acceptedPart -eq 'p1' -and [string]$vQ1.pendingPart -eq 'p2' -and $rcQ.Count -eq 1 -and [string]$rcQ[0].part -eq 'p1' -and [string]$rcQ[0].closure -eq 'COMPLETE' -and @($rcQ[0].covered).Count -eq 1 -and $null -ne $spQ -and @($spQ.parts).Count -eq 2) "片段只處置部分條目 → 4-07 PARTIAL_SPLIT（不記 attempt）：已處置條目成 p1 並寫收據（closure COMPLETE）、其餘成 p2 重派"
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-q'; MaxSessions = 30; FakeWorker = $fake }
+$rcQraw = Get-PsSpReceipts -Dirs $dirsQ
+$rcQ = @($rcQraw)
+$vQall = Get-PsSpVerdicts -Dirs $dirsQ
+Assert ($c -eq ('SPEC1-3-01-' + $nItemsQ) -and $rcQ.Count -eq $nItemsQ -and (@($rcQ | Where-Object { $_.closure -ne 'COMPLETE' })).Count -eq 0 -and (@($vQall | Where-Object { $_.code -eq '4-07' -and -not $_.counted })).Count -ge 3 -and (@($vQall | Where-Object { $_.counted })).Count -eq (@($vQall | Where-Object { $_.code -eq '4-01' })).Count) "每次只處置一條的 worker：全部條目最後都有收據（每條目一個 part）、收據永遠 COMPLETE、4-07 都不計 attempt"
 $c = Invoke-Cli @{ Render = $true; JobId = 'job-q' }
 $c2 = Invoke-Cli @{ Gate = $true; JobId = 'job-q' }
-$curQ = Read-PsSpJsonFile -LiteralPath $dirsQ.CurrentFile
-$gQ = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsQ.Outputs (([string]$curQ.generation).Substring(0, 16).ToLowerInvariant())) 'gate.json')
-Assert ((@($rcQ | Where-Object { $_.closure -eq 'PARTIAL' })).Count -ge 1 -and $c2 -match '^SPEC1-7-02-' -and (@($gQ.findings | Where-Object { $_.code -eq '7-21' -and $_.c -eq 'PARTIAL' })).Count -ge 1 -and (@($gQ.findings | Where-Object { $_.code -eq '7-12' -and $_.requirementId -eq 'R20' })).Count -eq 1) "片段只覆蓋部分條目 → 收據 closure PARTIAL（外環算）；ALL_DISCOVERED 需求 → 7-12；coverage tuple 7-21 c=PARTIAL"
+Assert ($c -eq 'SPEC1-6-01' -and $c2 -eq 'SPEC1-7-01') "部分處置拆分後 render／gate：無 PARTIAL 收據 → SPEC_COMPLETE"
 $c = Invoke-Cli @{ Doctor = $true; JobId = 'job-q'; Drill = '7-21' }
-Assert ($script:lastOut -match '(?m)^D7-21 R20 BEHAVIOR\.VALIDATIONS COMPOSE a=1 c=PARTIAL$') "drill 7-21 tuple 形狀：D7-21 R20 BEHAVIOR.VALIDATIONS COMPOSE a=1 c=PARTIAL"
+Assert ($c -eq 'SPEC1-0-05-0') "drill 7-21：零筆（收據不再有 PARTIAL closure）"
+$c = Invoke-Cli @{ Doctor = $true; JobId = 'job-q'; Drill = '4-07' }
+Assert ($c -match '^SPEC1-0-05-[1-9]\d*$' -and $script:lastOut -match '(?m)^D4-07 R\d+ [A-Z_.]+ COMPOSE a\d{4} n=\d+ c=PARTIAL r=NONE$') "drill 4-07 tuple 形狀"
 $env:PS_SPEC_FAKE_MODE = 'valid'
+
+# ── 情境 11：派工時行號重定位（讀取節之外的改動使行號漂移、指紋不變）────
+Write-Host "情境 11：行號漂移——讀取節之外插入列後派工，#k 標記與工單條目表用現況行號、片段照常驗收"
+$origD = [System.IO.File]::ReadAllBytes($nnA)
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-d'; Component = 'TW_DEMO_A'; Pack = 'pack-a' }
+$dirsD = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-a' -JobId 'job-d'
+$planD = Read-PsSpPlan -Dirs $dirsD -PlanRef ([string](Read-PsSpJob -Dirs $dirsD).currentPlanRef)
+$u17d = @($planD.units | Where-Object { $_.unitId -eq 'R17.TW_DEMO_A' })[0]
+$planLinesD = @{}
+foreach ($i in @($u17d.items)) { $planLinesD[[int]$i.n] = @([string]$i.file, [int]$i.line) }
+$n03 = @($u17d.items | Where-Object { $_.file -eq '03-TW_DEMO_A.md' }).Count
+$t = [System.IO.File]::ReadAllText($nnA)
+[System.IO.File]::WriteAllText($nnA, $t.Replace('| [[PS_JOB]] | 讀取來源 |', '| [[PS_JOB]] | 讀取來源 |' + "`n" + '| [[PS_DEMO_AUX]] | 讀取來源 |' + "`n" + '| [[PS_DEMO_LOG]] | 寫入目標 |'), (New-Object System.Text.UTF8Encoding($false)))
+Write-AuditDone
+$env:PS_SPEC_FAKE_MODE = 'valid'
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-d'; MaxSessions = 1; FakeWorker = $fake }
+$aD = Join-Path $dirsD.Attempts 'a0001'
+$vD = Read-PsSpJsonFile -LiteralPath (Join-Path $aD 'verdict.json')
+$inD = Read-PsSpJsonFile -LiteralPath (Join-Path $aD 'input.json')
+$manD = Read-PsKnText -LiteralPath (Join-Path $aD 'manifest.md')
+$ctxD = Read-PsKnText -LiteralPath (Join-Path (Join-Path $aD 'context') '03-TW_DEMO_A.md')
+Assert ($c -match '^SPEC1-3-02-' -and [string]$vD.code -eq '4-01' -and [bool]$vD.fingerprintMatch -and [string]$vD.closure -eq 'COMPLETE' -and [string]$inD.unitId -eq 'R17.TW_DEMO_A') "相關物件多兩列（不在任何 COMPOSE 讀取集合）→ 指紋不變、照常派工、驗收通過"
+$shiftOk = (@($inD.items).Count -eq @($u17d.items).Count)
+foreach ($i in @($inD.items)) { $pl = $planLinesD[[int]$i.n]; $want = [int]$pl[1]; if ([string]$i.file -eq '03-TW_DEMO_A.md') { $want += 2 }; if ([string]$i.file -ne [string]$pl[0] -or [int]$i.line -ne $want) { $shiftOk = $false } }
+Assert $shiftOk "input.json 條目行號＝現況行號（03 的條目全部 +2、callee 檔不變）"
+$manOk = $true
+foreach ($i in @($inD.items)) { if ($manD -notmatch ('(?m)^\| ' + [int]$i.n + ' \| ' + [regex]::Escape([string]$i.file) + ' \| ' + [int]$i.line + ' \| ')) { $manOk = $false } }
+$markOk = $true; $marks = 0
+foreach ($m in [regex]::Matches($ctxD, '(?m)^L(\d+) #(\d+) \| (.*)$')) { $marks++; $txt = $m.Groups[3].Value.Trim(); if ($txt -eq '' -or $txt -match '^#{1,6}\s' -or $txt -match '^\|[\s:|-]+\|$' -or $txt -match '^\| 表 \| 操作') { $markOk = $false } }
+Assert ($manOk -and $markOk -and $marks -eq $n03 -and $manD -match '事實列範例' -and $manD -match '未採用列範例') "工單條目表列號＝現況行號；片段檔每個 #k 都落在真正的條目行（不落在標題、空行、表頭）；工單含逐字範例列"
+$rcDraw = Get-PsSpReceipts -Dirs $dirsD
+$rcD = @($rcDraw)
+Assert ($rcD.Count -eq 1 -and @($rcD[0].covered).Count -eq @($u17d.items).Count -and ([string]$rcD[0].input) -match ('"line": ' + ([int]$planLinesD[1][1] + 2))) "收據 covered＝全部條目；收據內 input.json 保存實際派出的（現況）行號"
+[System.IO.File]::WriteAllBytes($nnA, $origD)
+Write-AuditDone
+
+# ── 情境 12：Component 尚無 NN ＋ -DomainHint：need-only plan、-Run 等待／result 訊號、無單位需求不炸 ──
+Write-Host "情境 12：身分 need-only plan（-DomainHint）：-Run 5-01 等待、result 到達 5-06、render／gate 對零單位 COMPOSE 不炸"
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-h'; Component = 'TW_NOWHERE'; Pack = 'pack-a'; DomainHint = '測試領域' }
+$dirsH = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-a' -JobId 'job-h'
+$jobH = Read-PsSpJob -Dirs $dirsH
+$planH = Read-PsSpPlan -Dirs $dirsH -PlanRef ([string]$jobH.currentPlanRef)
+$r01h = @($planH.requirements | Where-Object { $_.id -eq 'R01' })[0]
+$r20h = @($planH.requirements | Where-Object { $_.id -eq 'R20' })[0]
+Assert ($c -eq 'SPEC1-5-01-1' -and $script:lastExit -eq 0 -and [string]$jobH.phase -eq 'WAITING_KNOWLEDGE' -and $null -ne $planH -and @($planH.units).Count -eq 0 -and @($planH.facts).Count -eq 0 -and [string]$r01h.state -eq 'WAITING_KNOWLEDGE' -and [string]$r20h.state -eq 'WAITING_KNOWLEDGE' -and @($r01h.needs).Count -eq 1 -and [string]$r01h.needs[0].requestId -match '^S-[0-9a-f]{24}-g1$' -and [string]$r01h.needs[0].factKind -eq 'UI.COMPONENT_IDENTITY') "IDENTITY_NOT_FOUND＋DomainHint → 提交身分 need 並寫 need-only plan（每個 requirement 都 WAITING_KNOWLEDGE、need 掛在 R01）"
+$reqH = Read-PsSpJsonFile -LiteralPath (Join-Path $reqDir ([string]$r01h.needs[0].requestId + '.json'))
+Assert ([string]$reqH.consumer.requirementRef -eq 'R01' -and [string]$reqH.consumer.jobId -eq 'job-h') "request consumer 指向真正等待的 requirement"
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-h'; FakeWorker = $fake }
+Assert ($c -eq 'SPEC1-5-01-1' -and $script:lastExit -eq 0) "-Run 對 need-only plan → SPEC1-5-01-1 exit 0（不是 3-06 NO_PLAN）"
+$c = Invoke-Cli @{ Render = $true; JobId = 'job-h' }
+$c2 = Invoke-Cli @{ Gate = $true; JobId = 'job-h' }
+$curH = Read-PsSpJsonFile -LiteralPath $dirsH.CurrentFile
+$outH = Join-Path $dirsH.Outputs (([string]$curH.gateGeneration).Substring(0, 16).ToLowerInvariant())
+$gH = Read-PsSpJsonFile -LiteralPath (Join-Path $outH 'gate.json')
+$specH = Read-PsKnText -LiteralPath (Join-Path (Join-Path $dirsH.Outputs (([string]$curH.generation).Substring(0, 16).ToLowerInvariant())) 'spec.md')
+Assert ($c -eq 'SPEC1-6-01' -and $c2 -match '^SPEC1-7-02-\d+$' -and (@($gH.findings | Where-Object { $_.code -eq '7-19' })).Count -ge 1 -and (@($gH.findings | Where-Object { $_.code -eq '7-11' })).Count -eq 0 -and $specH -match '（WAITING_KNOWLEDGE）' -and $specH -notmatch '\{\{slot:') "零單位的 COMPOSE 需求：-Render 6-01（不炸）、spec.md 標 WAITING_KNOWLEDGE、gate 7-19 而非 7-11"
+$ridH = [string]$r01h.needs[0].requestId
+$resH = [ordered]@{ schemaVersion = 1; requestId = $ridH; workKey = [string]$reqH.workKey; domain = '測試領域'; outcome = 'RESOLVED'; dispositionCode = 'RESEARCHED'; auditRoundAtCompletion = 4; affected = @([ordered]@{ file = '05-TW_DEMO_B.md'; hashBefore = 'X'; hashAfter = 'DEADBEEF'; sections = @('功能定位'); evidenceRows = @() }); attempts = 1; completedAt = '2099-01-01T00:00:00Z' }
+[System.IO.File]::WriteAllText((Join-Path $resDir ($ridH + '.json')), (ConvertTo-PsKnJson -Value $resH), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-h'; FakeWorker = $fake }
+Assert ($c -eq 'SPEC1-5-06-1' -and $script:lastExit -eq 1) "result 到達 → -Run 回報 REPLAN_REQUIRED（SPEC1-5-06-1）"
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-h'; Component = 'TW_NOWHERE'; Pack = 'pack-a'; DomainHint = '測試領域' }
+$jobH2 = Read-PsSpJob -Dirs $dirsH
+$planH2 = Read-PsSpPlan -Dirs $dirsH -PlanRef ([string]$jobH2.currentPlanRef)
+$r01h2 = @($planH2.requirements | Where-Object { $_.id -eq 'R01' })[0]
+Assert ($c -eq 'SPEC1-5-01-1' -and [string]$jobH2.currentPlanRef -ne [string]$jobH.currentPlanRef -and [string]$r01h2.needs[0].requestId -match '-g2$') "下一次 -Plan 吃到 result（affected 檔已變 → 重送 g2）：planHash 改變"
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-i'; Component = 'TW_NOWHERE2'; Pack = 'pack-a'; DomainHint = '測試領域' }
+$dirsI = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-a' -JobId 'job-i'
+$planI = Read-PsSpPlan -Dirs $dirsI -PlanRef ([string](Read-PsSpJob -Dirs $dirsI).currentPlanRef)
+$ridI = [string](@($planI.requirements | Where-Object { $_.id -eq 'R01' })[0].needs[0].requestId)
+$reqI = Read-PsSpJsonFile -LiteralPath (Join-Path $reqDir ($ridI + '.json'))
+$resI = [ordered]@{ schemaVersion = 1; requestId = $ridI; workKey = [string]$reqI.workKey; domain = '測試領域'; outcome = 'RESOLVED'; dispositionCode = 'RESEARCHED'; auditRoundAtCompletion = 4; affected = @(); attempts = 1; completedAt = '2099-01-01T00:00:00Z' }
+[System.IO.File]::WriteAllText((Join-Path $resDir ($ridI + '.json')), (ConvertTo-PsKnJson -Value $resI), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-i'; Component = 'TW_NOWHERE2'; Pack = 'pack-a'; DomainHint = '測試領域' }
+$jobI = Read-PsSpJob -Dirs $dirsI
+$c2 = Invoke-Cli @{ Run = $true; JobId = 'job-i'; FakeWorker = $fake }
+$c3 = Invoke-Cli @{ Gate = $true; JobId = 'job-i' }
+Assert ($c -eq 'SPEC1-5-05-1' -and [string]$jobI.phase -eq 'BLOCKED' -and $c2 -match '^SPEC1-5-05-' -and $c3 -match '^SPEC1-7-03-') "RESOLVED 但 affected 為空（研究抽不出身分）→ BLOCKED_KNOWLEDGE：-Plan 5-05-1、-Run 5-05、-Gate 7-03"
+
+# ── 情境 13：零單位 COMPOSE 的 7-11 分支（lib 層）───────────────
+Write-Host "情境 13：零單位 COMPOSE（need 狀態 READY／INVALID）→ 7-11 c=NONE、required 即 Fatal；trace 不炸"
+$planZ = [ordered]@{ planHash = ('B' * 64); component = 'TW_X'; domain = '測試領域'; requirements = @([ordered]@{ id = 'R20'; slot = 'S03'; checklistRefs = @('C03'); factKind = 'BEHAVIOR.VALIDATIONS'; mode = 'COMPOSE'; required = $true; cardinality = 'ANY'; evidencePolicy = 'ANY'; applicability = [ordered]@{ op = 'ALWAYS' }; properties = @(); context = [ordered]@{}; applicable = 'TRUE'; state = 'READY'; facts = @(); units = @(); needs = @() }); facts = @(); units = @() }
+$evZ = Get-PsSpEvaluation -Plan $planZ -PackV $va -Status @() -Capabilities $caps
+$evZa = @($evZ)
+$f11 = @($evZa[0].Findings | Where-Object { $_.code -eq '7-11' })
+$traceOk = $true
+try { $trZ = ConvertTo-PsSpTrace -Plan $planZ -PackV $va -Evals $evZa -Generation ('A' * 64); if ($trZ -notmatch 'finding 7-11') { $traceOk = $false } } catch { $traceOk = $false }
+Assert ($evZa.Count -eq 1 -and @($evZa[0].Units).Count -eq 0 -and $f11.Count -eq 1 -and [string]$f11[0].c -eq 'NONE' -and $evZa[0].Fatal -and $traceOk) "Units 為空（不是 @(\$null)）→ 7-11 c=NONE、Fatal；ConvertTo-PsSpTrace 對零單位不炸"
+
+# ── 情境 14：gate 用現況等級（規劃後稽核標紅 → 7-22）─────────────
+Write-Host "情境 14：規劃後來源等級下降（稽核標紅）→ -Gate 7-22 GRADE_DROPPED、不發 SPEC_COMPLETE；還原後 7-01"
+$c = Invoke-Cli @{ Gate = $true; JobId = 'job-a' }
+Assert ($c -eq 'SPEC1-7-01') "前提：job-a 目前 SPEC_COMPLETE"
+$auditP = Join-Path $domA '90-audit.md'
+$auditOrig = [System.IO.File]::ReadAllBytes($auditP)
+$ta = [System.IO.File]::ReadAllText($auditP)
+[System.IO.File]::WriteAllText($auditP, $ta.Replace('| 03-TW_DEMO_A.md | 3 | 0 | 0 | 2 | 0 | 🟢 |', '| 03-TW_DEMO_A.md | 3 | 1 | 0 | 2 | 0 | 🔴 |'), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Gate = $true; JobId = 'job-a' }
+$curA3 = Read-PsSpJsonFile -LiteralPath $dirsA.CurrentFile
+$gA3 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsA.Outputs (([string]$curA3.gateGeneration).Substring(0, 16).ToLowerInvariant())) 'gate.json')
+$f22 = @($gA3.findings | Where-Object { $_.code -eq '7-22' })
+Assert ($c -match '^SPEC1-7-02-\d+$' -and $script:lastExit -eq 1 -and [string]$gA3.verdict -ne 'SPEC_COMPLETE' -and $f22.Count -ge 1 -and (@($f22 | Where-Object { $_.requirementId -eq 'R01' -and $_.c -eq 'AUDITED_ISSUES' })).Count -eq 1 -and [string]$curA3.gateGeneration -ne [string]$curA3.generation) "NN bytes 不變、90-audit 標 FAIL → 索引重建、R01（AUDITED）7-22 c=AUDITED_ISSUES → SPEC1-7-02、gate 世代與 render 世代不同"
+$c = Invoke-Cli @{ Doctor = $true; JobId = 'job-a'; Drill = '7-22' }
+Assert ($c -eq 'SPEC1-0-05-1' -and $script:lastOut -match '(?m)^D7-22 R01 UI\.COMPONENT_IDENTITY EXTRACT a=1 c=AUDITED_ISSUES$') "drill 7-22 tuple（-Doctor 讀最後一次 -Gate 的世代）"
+$c = Invoke-Cli @{ Render = $true; JobId = 'job-a' }
+Assert ($c -eq 'SPEC1-6-01') "等級下降不是來源改變：-Render 仍 6-01（finding 進 gate.json／trace）"
+[System.IO.File]::WriteAllBytes($auditP, $auditOrig)
+$c = Invoke-Cli @{ Gate = $true; JobId = 'job-a' }
+$c2 = Invoke-Cli @{ Render = $true; JobId = 'job-a' }
+Assert ($c -eq 'SPEC1-7-01' -and $c2 -eq 'SPEC1-6-01') "稽核還原 → -Gate 7-01"
+
+# ── 情境 15：RECORD need 的 result 比對 affected 檔自己的 hash ────
+Write-Host "情境 15：RECORD（ENTITY.DETAIL）need：result 的 affected 檔未變＝BLOCKED、不重送；變了才 -Resubmit"
+$planP2 = Read-PsSpPlan -Dirs $dirsP -PlanRef ([string](Read-PsSpJob -Dirs $dirsP).currentPlanRef)
+$needJ = @((@($planP2.requirements | Where-Object { $_.id -eq 'R07' })[0]).needs | Where-Object { $_.target.type -eq 'RECORD' -and $_.target.name -eq 'JOB' })[0]
+$ridJ = [string]$needJ.requestId
+$reqJ = Read-PsSpJsonFile -LiteralPath (Join-Path $reqDir ($ridJ + '.json'))
+$hashB2 = Get-PsKnFileHash -LiteralPath (Join-Path $domA '05-TW_DEMO_B.md')
+$resJ = [ordered]@{ schemaVersion = 1; requestId = $ridJ; workKey = [string]$reqJ.workKey; domain = '測試領域'; outcome = 'RESOLVED'; dispositionCode = 'RESEARCHED'; auditRoundAtCompletion = 4; affected = @([ordered]@{ file = '05-TW_DEMO_B.md'; hashBefore = $hashB2; hashAfter = $hashB2; sections = @('資料流'); evidenceRows = @() }); attempts = 1; completedAt = '2099-01-01T00:00:00Z' }
+[System.IO.File]::WriteAllText((Join-Path $resDir ($ridJ + '.json')), (ConvertTo-PsKnJson -Value $resJ), (New-Object System.Text.UTF8Encoding($false)))
+$nReqJ = @(Get-ChildItem -LiteralPath $reqDir -File).Count
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-p'; Component = 'TW_DEMO_A'; Pack = 'pack-b' }
+$planP3 = Read-PsSpPlan -Dirs $dirsP -PlanRef ([string](Read-PsSpJob -Dirs $dirsP).currentPlanRef)
+$needJ2 = @((@($planP3.requirements | Where-Object { $_.id -eq 'R07' })[0]).needs | Where-Object { $_.target.name -eq 'JOB' })[0]
+$c2 = Invoke-Cli @{ Plan = $true; JobId = 'job-p'; Component = 'TW_DEMO_A'; Pack = 'pack-b' }
+Assert ($ridJ -match '-g1$' -and [string]$needJ2.state -eq 'BLOCKED_KNOWLEDGE' -and [string]$needJ2.requestId -eq $ridJ -and @(Get-ChildItem -LiteralPath $reqDir -File).Count -eq $nReqJ -and $c2 -match '^SPEC1-2-02-') "RESOLVED 且 affected（Record 自己的檔）hashAfter＝現況 → BLOCKED_KNOWLEDGE、不建 g2；再 -Plan 仍不重送（plan 重用）"
+$resJ.affected[0].hashAfter = 'DEADBEEF'
+[System.IO.File]::WriteAllText((Join-Path $resDir ($ridJ + '.json')), (ConvertTo-PsKnJson -Value $resJ), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-p'; Component = 'TW_DEMO_A'; Pack = 'pack-b' }
+$planP4 = Read-PsSpPlan -Dirs $dirsP -PlanRef ([string](Read-PsSpJob -Dirs $dirsP).currentPlanRef)
+$needJ3 = @((@($planP4.requirements | Where-Object { $_.id -eq 'R07' })[0]).needs | Where-Object { $_.target.name -eq 'JOB' })[0]
+Assert ([string]$needJ3.requestId -match '-g2$' -and [string]$needJ3.state -eq 'WAITING_KNOWLEDGE' -and @(Get-ChildItem -LiteralPath $reqDir -File).Count -eq ($nReqJ + 1)) "affected 檔在 result 之後變過 → -Resubmit g2（只此一次）"
+
+# ── 情境 16：callee 角色以開頭比對（被呼叫／由 X 啟動 不是 callee）──
+Write-Host "情境 16：Get-PsSpCallees 角色錨定開頭（「被呼叫端」不進讀取集合）"
+$nnDd = Join-Path $domA '06-TW_DEMO_D.md'
+Write-Utf8 $nnDd @('# 06 示範丁（[[TW_DEMO_D]]）', '', '> 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE', '> Origin：CUSTOM_PREFIX　搜尋政策：CUSTOM_FIRST　Delivered fallback：未使用', '', '## 相關物件', '', '| 物件 | 角色 |', '|---|---|', '| [[TW_DEMO_D]] | 主 Component |', '| [[TW_DEMO_IMP]] | 被呼叫端（本頁由該 AE 回呼） |', '| [[TW_DEMO_B]] | 由 TW_DEMO_B 啟動 |', '', '## 功能定位', '', '示範。', '', '## Evidence 附錄', '', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|')
+$idxNow = Read-PsKnowledgeIndex -Root $root
+$ctxDd = Get-PsSpNnCtx -Root $root -Index $idxNow -Domain '測試領域' -File '06-TW_DEMO_D.md' -Cache @{}
+$calDd = Get-PsSpCallees -Ctx $ctxDd -Index $idxNow -Capabilities $caps
+$ctxAa = Get-PsSpNnCtx -Root $root -Index $idxNow -Domain '測試領域' -File '03-TW_DEMO_A.md' -Cache @{}
+$calAa = Get-PsSpCallees -Ctx $ctxAa -Index $idxNow -Capabilities $caps
+Remove-Item -LiteralPath $nnDd -Force
+Assert (@($calDd).Count -eq 0 -and @($calAa).Count -eq 1 -and [string]@($calAa)[0].Name -eq 'TW_DEMO_IMP') "「被呼叫端」「由 X 啟動」不算 callee；「呼叫（匯入 AE）」仍算"
+Assert ([string]$ctxAa.Facts.hash -ceq [string]$ctxAa.Hash -and [int]$ctxAa.Facts.lineCount -eq @($ctxAa.Lines).Count) "Get-PsSpNnCtx 只讀一次：Facts.hash／行數與 ctx 的 Hash／Lines 同一份文字"
+
+# ── 情境 17：空清單屬性＝FALSE、空 args、Get-PsSpProp 保留陣列 ──
+Write-Host "情境 17：Get-PsSpProp 不拆陣列——空清單屬性＝FALSE（記憶體與 JSON 往返都一樣）、單元素清單＝TRUE、空 args"
+$fEmpty = [ordered]@{ factId = 'DATA.FLOW@TW_X'; factKind = 'DATA.FLOW'; requirementIds = @('R06'); subject = 'TW_X'; value = [ordered]@{ tables = @([ordered]@{ table = 'PS_DEMO_TBL' }); reads = @([ordered]@{ table = 'PS_DEMO_TBL' }); writes = @() }; sourceRefs = @(); evidenceRefs = @(); grade = 'UNAUDITED'; closure = 'ROWS' }
+$fvE = Get-PsSpFactValues -Facts @($fEmpty)
+$rtE = (ConvertTo-PsKnJson -Value @($fEmpty)) | ConvertFrom-Json
+$fvR = Get-PsSpFactValues -Facts @($rtE)
+Assert ($fvE['DATA.FLOW.writes'] -eq 'FALSE' -and $fvE['DATA.FLOW.reads'] -eq 'TRUE' -and $fvR['DATA.FLOW.writes'] -eq 'FALSE' -and $fvR['DATA.FLOW.tables'] -eq 'TRUE' -and (Test-PsSpApplicability -App @{ op = 'FACT_FALSE'; fact = 'DATA.FLOW.writes' } -FactValues $fvR) -eq 'TRUE') "DATA.FLOW.writes 空清單 → FALSE；FACT_FALSE → TRUE（不是 UNKNOWN）"
+$oneConf = [ordered]@{ factId = 'BEHAVIOR.RULES@TW_X'; factKind = 'BEHAVIOR.RULES'; value = [ordered]@{ rules = @([ordered]@{ text = 'x' }); confidence = @('UNKNOWN') }; closure = 'ITEMS' }
+$fvO = Get-PsSpFactValues -Facts @($oneConf)
+$fvS = @{ 'A.x' = 'TRUE' }
+$synErr = Test-PsSpApplicabilitySyntax -App @{ op = 'ALL'; args = @() } -Where 'R' -FactKindProps @{}
+Assert ($fvO['BEHAVIOR.RULES.confidence'] -eq 'TRUE' -and (Test-PsSpApplicability -App @{ op = 'ALL'; args = @() } -FactValues $fvS) -eq 'TRUE' -and (Test-PsSpApplicability -App @{ op = 'ANY'; args = @() } -FactValues $fvS) -eq 'FALSE' -and (@($synErr) -join ';') -match 'BAD_OP' -and @($synErr).Count -eq 1) "單元素清單＝TRUE；空 args：ALL＝TRUE／ANY＝FALSE（不再對空陣列迭代一次）、語法檢查 BAD_OP 恰一筆"
+$pe = Get-PsSpProp ([ordered]@{ a = @() }) 'a'
+$pn = Get-PsSpProp ([ordered]@{ a = @() }) 'b'
+$ps1 = Get-PsSpProp ([pscustomobject]@{ a = @(1, 2) }) 'a'
+Assert (($pe -is [array]) -and @($pe).Count -eq 0 -and $null -eq $pn -and @($ps1).Count -eq 2 -and (Get-PsSpProp ([ordered]@{ a = 'x' }) 'a') -eq 'x') "Get-PsSpProp：空陣列原樣、缺鍵 \$null、雙元素陣列、純量"
+
+# ── 情境 18：session 層 CONTEXT_OVERFLOW＝容量事件；3-04／3-02 不留 RUNNING；NO_COVERAGE ──
+Write-Host "情境 18：CONTEXT_OVERFLOW（exit 0）＝拆分不記 attempt；session 失敗與未派完後 job.phase 不是 RUNNING；空表＝NO_COVERAGE"
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-o'; Component = 'TW_DEMO_A'; Pack = 'pack-a' }
+$dirsO = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-a' -JobId 'job-o'
+$env:PS_SPEC_FAKE_MODE = 'overflow'
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-o'; MaxSessions = 1; FakeWorker = $fake }
+$vO1 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsO.Attempts 'a0001') 'verdict.json')
+$outO1 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsO.Attempts 'a0001') 'outcome.json')
+$splitO = @(Get-ChildItem -LiteralPath (Join-Path (Join-Path $dirsO.Plans ([string](Read-PsSpJob -Dirs $dirsO).currentPlanRef)) 'splits') -File -ErrorAction SilentlyContinue)
+$idxO = Read-PsKnowledgeIndex -Root $root
+$planO = Read-PsSpPlan -Dirs $dirsO -PlanRef ([string](Read-PsSpJob -Dirs $dirsO).currentPlanRef)
+$stO = Get-PsSpUnitStatus -Root $root -Dirs $dirsO -Plan $planO -Index $idxO
+Assert ($c -match '^SPEC1-3-02-' -and [string]$vO1.code -eq '4-05' -and -not [bool]$vO1.counted -and (@($vO1.reasons) -contains 'CONTEXT_OVERFLOW') -and [bool]$vO1.capacity -and [string]$outO1.failureKind -eq 'CONTEXT_OVERFLOW' -and [bool]$outO1.healthy -and $splitO.Count -eq 1 -and (@($stO | Where-Object { $_.Attempts -gt 0 })).Count -eq 0 -and [string](Read-PsSpJob -Dirs $dirsO).phase -eq 'PLANNED') "worker exit 0 但 session 回報 CONTEXT_OVERFLOW → 4-05 容量事件：拆分、attempt 不計、phase PLANNED"
+$env:PS_SPEC_FAKE_MODE = 'crash'
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-o'; MaxSessions = 1; FakeWorker = $fake }
+$vO2 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsO.Attempts 'a0002') 'verdict.json')
+Assert ($c -eq 'SPEC1-3-04-1' -and $script:lastExit -eq 1 -and [string]$vO2.code -eq '3-04' -and -not [bool]$vO2.counted -and [string](Read-PsSpJob -Dirs $dirsO).phase -eq 'PLANNED') "worker exit 1 → SESSION_FAILED 3-04-1、不記 attempt、phase 回 PLANNED（不留 RUNNING）"
+$env:PS_SPEC_FAKE_MODE = 'empty'
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-o'; MaxSessions = 1; FakeWorker = $fake }
+$vO3 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsO.Attempts 'a0003') 'verdict.json')
+Assert ([string]$vO3.code -eq '4-02' -and [bool]$vO3.counted -and (@($vO3.reasons) -contains 'NO_COVERAGE')) "兩張表都空 → NO_COVERAGE 不合格、計入 attempt（不是拆分）"
+$env:PS_SPEC_FAKE_MODE = 'valid'
+
+# ── 情境 19：指紋含 factKind；-RuntimeRoot 守衛 ───────────────────
+Write-Host "情境 19：同 requirement 換成同文法的 COMPOSE 類別 → 舊收據不重用；派真 worker 時 -RuntimeRoot 非預設 → 9-07"
+$packF = Join-Path $priv 'pack-f'
+Copy-Item -LiteralPath (Join-Path $priv 'pack-a') -Destination $packF -Recurse
+$pfT = [System.IO.File]::ReadAllText((Join-Path $packF 'pack.json'))
+[System.IO.File]::WriteAllText((Join-Path $packF 'pack.json'), $pfT.Replace('"packId": "pack-a"', '"packId": "pack-f"'), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-f'; Component = 'TW_DEMO_A'; Pack = 'pack-f' }
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-f'; MaxSessions = 9; FakeWorker = $fake }
+$dirsF = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-f' -JobId 'job-f'
+$nAttF = @(Get-ChildItem -LiteralPath $dirsF.Attempts -Directory).Count
+Assert ($c -match '^SPEC1-3-01-\d+$') "pack-f（pack-a 的副本）派完"
+$pfT = [System.IO.File]::ReadAllText((Join-Path $packF 'pack.json'))
+[System.IO.File]::WriteAllText((Join-Path $packF 'pack.json'), $pfT.Replace('"factKind": "DATA.FILE_INPUT"', '"factKind": "DATA.FILE_OUTPUT"').Replace('"fact": "DATA.FILE_INPUT.present"', '"fact": "DATA.FILE_OUTPUT.present"'), (New-Object System.Text.UTF8Encoding($false)))
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-f'; Component = 'TW_DEMO_A'; Pack = 'pack-f' }
+$c2 = Invoke-Cli @{ Run = $true; JobId = 'job-f'; MaxSessions = 9; FakeWorker = $fake }
+$nAttF2 = @(Get-ChildItem -LiteralPath $dirsF.Attempts -Directory).Count
+$rcFraw = Get-PsSpReceipts -Dirs $dirsF
+$rcF17 = @($rcFraw | Where-Object { $_.unitId -eq 'R17.TW_DEMO_A' })
+Assert ($c -match '^SPEC1-2-01-' -and $c2 -match '^SPEC1-3-01-' -and ($nAttF2 - $nAttF) -eq 1 -and (@($rcF17 | Where-Object { $_.factKind -eq 'DATA.FILE_OUTPUT' })).Count -eq 1 -and (@($rcF17 | Where-Object { $_.factKind -eq 'DATA.FILE_INPUT' })).Count -eq 1 -and ([string]$rcF17[0].inputFingerprint -cne [string]$rcF17[1].inputFingerprint)) "R17 改為 DATA.FILE_OUTPUT → 指紋不同 → 重派一次、新收據 factKind=FILE_OUTPUT（舊 FILE_INPUT 收據不重用）"
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-a' }
+Assert ($c -eq 'SPEC1-9-07' -and $script:lastExit -eq 2) "-Run 不帶 -FakeWorker 且 -RuntimeRoot 不是 <Root>/.ps-runtime/spec → SPEC1-9-07 exit 2（不啟動 session）"
+
+# ── 情境 20：WRITE_DEFERRED 不空轉；派工前條目數超限直接拆分；驗收寬鬆形狀 ──
+Write-Host "情境 20：WRITE_DEFERRED（3-07）不空轉不重派；條目數＋7 >150 派工前拆分不派 session；工單詞彙表的每種形狀驗收都收"
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-w'; Component = 'TW_DEMO_A'; Pack = 'pack-a' }
+$dirsW = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-a' -JobId 'job-w'
+$planW = Read-PsSpPlan -Dirs $dirsW -PlanRef ([string](Read-PsSpJob -Dirs $dirsW).currentPlanRef)
+$idxW = Read-PsKnowledgeIndex -Root $root
+$origCreate = ${function:Write-PsKnCreateOnlyText}
+$origAtomic = ${function:Write-PsKnAtomicText}
+${function:Write-PsKnCreateOnlyText} = { param([string]$LiteralPath, [string]$Text, [int]$Retries = 5) return $null }
+$wpD = Write-PsSpPlan -Dirs $dirsW -Plan ([ordered]@{ planHash = ('C' * 64); x = 1 })
+$euW = Get-PsSpEffectiveUnits -Dirs $dirsW -Plan $planW
+$eu0 = @($euW)[0]
+$live0 = Get-PsSpLiveInput -Root $root -Eu $eu0 -Index $idxW -Cache @{}
+$cap0 = Get-PsSpFactKind -Capabilities $caps -FactKind ([string]$eu0.Unit.factKind)
+$attD = New-PsSpAttempt -Root $root -Dirs $dirsW -Plan $planW -Eu $eu0 -Live $live0 -Cap $cap0 -JobId 'job-w'
+$rcDef = Write-PsSpReceipt -Dirs $dirsW -Eu $eu0 -Live $live0 -Frag @{ Hash = 'H'; Lines = 1; Closure = 'COMPLETE'; Present = 'FALSE'; Rows = @(); Rejected = @(); Covered = @(); Unresolved = 0 } -AttemptId 'a0001' -PlanRef 'x' -JobId 'job-w' -InputText ''
+${function:Write-PsKnCreateOnlyText} = $origCreate
+Assert ($wpD.Deferred -and -not $wpD.Created -and $attD.Deferred -and -not $attD.Capacity -and $attD.AttemptId -ne '' -and $rcDef.Deferred -and -not $rcDef.Ok -and -not $rcDef.Existed) "create-only 回 \$null → Write-PsSpPlan／New-PsSpAttempt／Write-PsSpReceipt 都回 Deferred（不是「已存在」）"
+${function:Write-PsKnAtomicText} = { param([string]$LiteralPath, [string]$Text, [bool]$Bom = $false, [int]$Retries = 5) if ($LiteralPath -match 'splits') { return $false }; return (& $origAtomic -LiteralPath $LiteralPath -Text $Text -Bom $Bom -Retries $Retries) }
+$dispatchLong = { param($a) $ls = @('## 事實'); for ($i = 0; $i -lt 200; $i++) { $ls += '' }; [System.IO.File]::WriteAllText($a.FragmentPath, ($ls -join "`n"), (New-Object System.Text.UTF8Encoding($false))); return @{ TimedOut = $false; ExitCode = 0; FailureKind = 'FAKE'; SlotBusy = $false } }
+$rrW = Invoke-PsSpRun -Root $root -Dirs $dirsW -Plan $planW -PackV $va -Capabilities $caps -JobId 'job-w' -MaxSessions 5 -Dispatch $dispatchLong -Index $idxW
+${function:Write-PsKnAtomicText} = $origAtomic
+$vW = Get-PsSpVerdicts -Dirs $dirsW
+Assert ($rrW.Code -eq 'SPEC1-3-07-1' -and $rrW.Exit -eq 1 -and $rrW.Sessions -eq 1 -and $rrW.Splits -eq 0 -and $rrW.Phase -eq 'PLANNED' -and (@($vW | Where-Object { $_.code -eq '3-07' })).Count -eq 1 -and (@($vW | Where-Object { $_.counted })).Count -eq 0) "容量事件但 splits 檔寫不進 → 一次 session 後停止（3-07-1）、不重派同一 part、不記 attempt、phase PLANNED"
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-w2'; Component = 'TW_DEMO_A'; Pack = 'pack-a' }
+$dirsW2 = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-a' -JobId 'job-w2'
+$planW2 = Read-PsSpPlan -Dirs $dirsW2 -PlanRef ([string](Read-PsSpJob -Dirs $dirsW2).currentPlanRef)
+$script:sessCount = 0
+$dispatchCount = { param($a) $script:sessCount++; return @{ TimedOut = $false; ExitCode = 0; FailureKind = 'FAKE'; SlotBusy = $false } }
+$script:PsSpMaxFragmentLines = 12
+$rrC = Invoke-PsSpRun -Root $root -Dirs $dirsW2 -Plan $planW2 -PackV $va -Capabilities $caps -JobId 'job-w2' -MaxSessions 1 -Dispatch $dispatchCount -Index $idxW
+$script:PsSpMaxFragmentLines = 150
+$inC = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsW2.Attempts 'a0001') 'input.json')
+$nItemsR17 = @((@($planW2.units | Where-Object { $_.unitId -eq 'R17.TW_DEMO_A' })[0]).items).Count
+Assert ($nItemsR17 + 7 -gt 12 -and $rrC.Splits -eq 1 -and $rrC.Sessions -eq 1 -and $script:sessCount -eq 1 -and [string]$inC.unitId -eq 'R17.TW_DEMO_A' -and [string]$inC.part -eq 'p1' -and @($inC.items).Count -le 5) "條目數＋7 > 片段上限 → 派工前就拆分（不派 session），第一個 session 已是拆分後的 p1"
+$capRU = Get-PsSpFactKind -Capabilities $caps -FactKind 'DATA.RECORD_USAGE'
+$itemsF = @(@{ n = 1 }, @{ n = 2 }, @{ n = 3 }, @{ n = 4 }, @{ n = 5 })
+$filesF = @(@{ file = '03-TW_DEMO_A.md'; evidence = @(1, 2, 3) })
+$fragP = Join-Path $root 'frag-forms.md'
+$hdrRU = '| 來源條目 | 欄位 | 用途 | 證據 |'
+Write-Utf8 $fragP @('## 事實', $hdrRU, '|---|---|---|---|', '| #1 | F1 | READ | 03-TW_DEMO_A.md#E1 |', '| 2 | F2 | WRITE | NOT_APPLICABLE |', '| 3;#4 | F3 | LOOKUP | .ps-runtime/spec/j/attempts/a0001/context/03-TW_DEMO_A.md#2;UNRESOLVED |', '', '## 未採用', '| 來源條目 | 原因 |', '|---|---|', '| #5 | NOT_RELEVANT |')
+$tf1 = Test-PsSpFragment -LiteralPath $fragP -Items $itemsF -Files $filesF -Cap $capRU
+Write-Utf8 $fragP @('## 事實', $hdrRU, '|---|---|---|---|', '', '## 未採用', '| 來源條目 | 原因 |', '|---|---|', '| 1;2;3;4;5 | OUT_OF_SCOPE |')
+$tf2 = Test-PsSpFragment -LiteralPath $fragP -Items $itemsF -Files $filesF -Cap $capRU
+Write-Utf8 $fragP @('## 事實', $hdrRU, '|---|---|---|---|', '', '## 未採用', '| 來源條目 | 原因 |', '|---|---|')
+$tf3 = Test-PsSpFragment -LiteralPath $fragP -Items $itemsF -Files $filesF -Cap $capRU
+Write-Utf8 $fragP @('## 事實', $hdrRU, '|---|---|---|---|', '| 9 | F | READ | 03-TW_DEMO_A.md#9 |', '| 1 | F | NOPE | 04-TW_DEMO_IMP.md#1 |', '', '## 未採用', '| 來源條目 | 原因 |', '|---|---|', '| 2 | MAYBE |')
+$tf4 = Test-PsSpFragment -LiteralPath $fragP -Items $itemsF -Files $filesF -Cap $capRU
+Assert ($tf1.Ok -and $tf1.Closure -eq 'COMPLETE' -and @($tf1.Covered).Count -eq 5 -and $tf1.Unresolved -eq 2 -and @($tf1.Rows).Count -eq 3 -and @($tf1.Rejected).Count -eq 1 -and $tf1.Present -eq 'TRUE') "驗收收：來源條目 #1、3;#4；證據 檔#E1、NOT_APPLICABLE（＝UNRESOLVED）、片段檔路徑前綴；未採用 #5"
+Assert ($tf2.Ok -and $tf2.Closure -eq 'COMPLETE' -and @($tf2.Rejected).Count -eq 5 -and $tf2.Present -eq 'FALSE') "未採用來源條目以 ; 列多個（1;2;3;4;5）→ 五筆 rejected、closure COMPLETE、present FALSE"
+Assert ((-not $tf3.Ok) -and (@($tf3.Reasons) -contains 'NO_COVERAGE') -and (-not $tf4.Ok) -and (@($tf4.Reasons) -contains 'ITEM_UNKNOWN') -and (@($tf4.Reasons) -contains 'EVIDENCE_UNKNOWN') -and (@($tf4.Reasons) -contains 'ENUM')) "仍拒收：兩表皆空（NO_COVERAGE）、條目不在列舉、證據不在讀取集合、值域外"
 
 Remove-Item -Recurse -Force $root
 Write-Host ""

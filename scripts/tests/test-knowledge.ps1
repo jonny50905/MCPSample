@@ -203,9 +203,9 @@ $jsonPath = Join-Path $research 'knowledge/index.json'
 $md = Read-PsKnText -LiteralPath $mdPath
 Assert ((Test-Path -LiteralPath $mdPath) -and (Test-Path -LiteralPath $jsonPath) -and $pub.nn -eq 7) "Publish 寫出 index.md 與 index.json（NN 7）"
 Assert ($md -notmatch '\[\[') "index.md 不含 [[（不進 lint 的 wikilink 掃描）"
-Assert ($md -match '(?m)^\| 職缺測試 \| 01-TW_A\.md \| TW_A \| AUDITED_CLEAN \| COMPLETE \| 第4輪🟢 \| 相關物件@6/8;功能定位@14/12;畫面與欄位@26/7;行為邏輯@33/6;資料流@39/7;執行方式@46/4;權限@50/4;未解事項@54/5;Evidence@59/8;導覽入口@18/4;TechnicalMenu@22/4 \| 4 \| 2 \| 0 \| [0-9A-F]{8} \|') "index.md NN 列：等級／稽核／節@offset/limit 一列一筆可 grep"
-Assert ($md -match '(?m)^\| 職缺測試 \| 03-TW_C\.md \| TW_C \| BLOCKED \| BLOCKED \| 無 \| [^|]*權限@缺[^|]* \|') "index.md NN 列：缺節寫 @缺；沒有記分卡列＝稽核「無」"
-Assert ($md -match '(?m)^\| 職缺測試 \| 01-TW_A-2\.md \| TW_A（續篇） \|') "index.md NN 列：續篇標示"
+Assert ($md -match '(?m)^\| 職缺測試 \| 01-TW_A\.md \| TW_A \| 否 \| AUDITED_CLEAN \| COMPLETE \| 第4輪🟢 \| 相關物件@6/8;功能定位@14/12;畫面與欄位@26/7;行為邏輯@33/6;資料流@39/7;執行方式@46/4;權限@50/4;未解事項@54/5;Evidence 附錄@59/8;導覽入口@18/4;TechnicalMenu@22/4 \| 4 \| 2 \| 0 \| [0-9A-F]{8} \|') "index.md NN 列：等級／稽核／節@offset/limit（Evidence 附錄用實際標題名）一列一筆可 grep"
+Assert ($md -match '(?m)^\| 職缺測試 \| 03-TW_C\.md \| TW_C \| 否 \| BLOCKED \| BLOCKED \| 無 \| [^|]*權限@缺[^|]* \|') "index.md NN 列：缺節寫 @缺；沒有記分卡列＝稽核「無」"
+Assert ($md -match '(?m)^\| 職缺測試 \| 01-TW_A-2\.md \| TW_A \| 是 \|' -and $md -notmatch 'TW_A（續篇）') "index.md NN 列：主物件欄保持純物件名（cell 錨定可命中）、續篇另欄標「是」"
 $omd = Read-PsKnText -LiteralPath (Join-Path $research 'knowledge/objects.md')
 Assert ($omd -match '(?m)^\| PS_JOB \| RECORD \|  \| 7 \| zz-b/07-TW_G\.md（讀取來源）、職缺測試/01-TW_A-2\.md（讀取來源）、職缺測試/01-TW_A\.md（讀取來源）') "objects.md 物件列：一物件一列彙總、引用數與角色"
 Assert ($omd -match '(?m)^\| TW_A \| COMPONENT \| 職缺測試/01-TW_A-2\.md、職缺測試/01-TW_A\.md \| 0 \|' -and $omd -notmatch '\[\[') "objects.md 物件列：主物件於（本篇＋續篇）；不含 [["
@@ -323,6 +323,14 @@ $co = Join-Path $root 'co/req.json'
 Assert ((Write-PsKnCreateOnlyText -LiteralPath $co -Text '{"a":1}') -eq $true) "create-only：第一次寫成功"
 Assert ((Write-PsKnCreateOnlyText -LiteralPath $co -Text '{"a":2}') -eq $false -and (Read-PsKnText -LiteralPath $co) -eq '{"a":1}') "create-only：第二次不覆寫、回 false、內容不變"
 Assert (@(Get-ChildItem -LiteralPath (Join-Path $root 'co') -File -Force | Where-Object { $_.Name -match '\.tmp-' }).Count -eq 0) "create-only：失敗時 tmp 已清"
+$dtJson = ConvertTo-PsKnJson -Value ([ordered]@{ t = [datetime]::new(2026, 9, 16, 8, 0, 0, [System.DateTimeKind]::Utc) })
+Assert ($dtJson -match '"t": "2026-09-16T08:00:00Z"') "canonical JSON：DateTime（PS 7 ConvertFrom-Json 會把 ISO 字串轉成 DateTime）回寫成 UTC ISO 字串"
+$adjPath = Join-Path $root 'adjacent.md'
+Write-Utf8 $adjPath @('# 09 x（[[TW_H]]）', '', '## 執行方式', '## 權限', '## 未解事項（gaps）', '', '- b') $false
+$adj = Get-PsKnNnFacts -LiteralPath $adjPath -Domain 'x'
+Assert ($adj.executionHollow -and $adj.permissionHollow -and $adj.gaps -eq 1) "標題緊接下一標題（無內文）＝空洞；不會把下一標題當內文"
+$viaText = Get-PsKnNnFacts -LiteralPath $adjPath -Domain 'x' -Text (Read-PsKnText -LiteralPath $adjPath)
+Assert ($viaText.hash -ceq $adj.hash -and $viaText.sections.Count -eq $adj.sections.Count) "Get-PsKnNnFacts -Text：以已讀入的內容解析，結果與讀檔相同"
 
 Remove-Item -Recurse -Force $root
 Write-Host ""

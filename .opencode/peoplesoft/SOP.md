@@ -834,7 +834,11 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
    Invalidated 追加一行請人工覆核。合併後收據無效＝下一輪稽核重驗、畢業重驗（ps-auto-all 會自動 RUN）。
 5. **排錯**：`auto-loop-logs\<領域>\supplemental-done\<requestId>.a<n>.outcome.json`（timedOut／exitCode／failureKind／
    receiptValid／receiptErrors／merged／lintRegression／destructionRestored／integrityFail）；未發布的 parts 在
-   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占（SLOT_BUSY）＝另一個 headless session 在跑，錯開即可。
+   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占＝另一個 headless session（ps-spec -Run／另一個迷你圈／
+   auto-loop）在跑：外環會等最多一天（每 5 分鐘印一行心跳），等滿才回 SLOT_BUSY 停機且不計 attempts——看 log 是誰占著、錯開即可。
+   迷你圈遇未預期例外 → `SUPP1-3-03`（exit 2）：已合併的不回退、未發布的留在 parts 下次續跑；request 檔寫不進（`SUPP1-1-06`）
+   稍後重送同一 need 即可。auto-loop 只認通過 intake 驗證的 request（id／workKey／need 對不上的列在 log 的「intake 拒收」，
+   不會被派工）；迷你圈期間模型寫進 `supplemental/requests|results/`、`wiki/` 的檔案一律還原、記 fenceViolations 並作廢該次。
 6. **回報維護端**只給 `SUPP1-<stage>-<code>[-<count>]` 與 enum。
 
 ## SOP-24 Spec 引擎——私有需求包接入與 job 執行（issue #34／#35）
@@ -852,8 +856,11 @@ generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worke
    共用 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
    的迷你圈與下一輪稽核後重跑 `-Run`）→ `-Render` → `-Gate`（verdict SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED）。
    產出 `.ps-runtime\spec\<jobId>\outputs\<generation>\{spec.md,trace.md,gate.json}`；重 render 位元組相同；來源 NN 改了就
-   `SOURCE_CHANGED`，要重 plan。
+   `SOURCE_CHANGED`，要重 plan。`.ps-runtime\spec` 固定在 repo 根（worker 的 command 與 permission 以此路徑為準；`-RuntimeRoot`
+   只給 `-FakeWorker` 測試用，派真 worker 時帶別的路徑＝`SPEC1-9-07`）。規劃後來源被稽核標紅或改過＝gate `7-22`（重跑稽核或修 NN 後
+   `-Plan`）；片段只處置了部分條目＝`4-07` 自動拆分重派、不計 attempt；session 回報 CONTEXT_OVERFLOW 一樣算容量事件拆分。
 3. **排錯**：`-Doctor -JobId <id> [-Drill <stage>-<code>]` 只印 opaque tuple；責任分工見 `troubleshooting-matrix.md`
-   （1／8 私有映射、2／3／4／6／7 引擎、5 Research、0 搬運完整性）。
+   （1／8 私有映射、2／3／4／6／7 引擎、5 Research、0 搬運完整性）。attempt／splits／收據檔寫不進＝`3-07`（關掉開著
+   `.ps-runtime\spec` 檔案的程式——編輯器、防毒——再重跑 `-Run`；已驗收但收據沒寫成的單位會重派）。
 4. **回報維護端**只給 `SPEC1-<stage>-<code>[-<count>]` 與 drill tuple；template／checklist 原文與 `.ps-private` 內容不出公司。
 5. 改 `ps-spec*.ps1`／`spec\**` 後必跑 `test-spec.ps1`、`test-ps51-static.ps1`（5.1 語法紀律與 BOM）、`test-auto-loop.ps1`（情境 34）。

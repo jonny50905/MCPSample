@@ -9,7 +9,7 @@
 # 不呼叫模型、不查 DB、不寫 NN／wiki／checklist、不寫 result（result 只由 auto-loop 迷你圈寫）。
 # exit：0＝完成／1＝（保留）／2＝參數、驗證、路由錯誤
 # 結論碼（唯一可回報給維護端的一行；其餘只在本機看）：SUPP1-<stage>-<code>[-<count>]
-#   stage 1 submit：01 CREATED／02 PENDING（既有、未終局）／03 TERMINAL-<1 RESOLVED|2 PARTIAL|3 UNRESOLVED|4 OUT_OF_SCOPE|5 SUPERSEDED>／04 INVALID-<錯誤數>／05 ROUTING_REQUIRED
+#   stage 1 submit：01 CREATED／02 PENDING（既有、未終局）／03 TERMINAL-<1 RESOLVED|2 PARTIAL|3 UNRESOLVED|4 OUT_OF_SCOPE|5 SUPERSEDED>／04 INVALID-<錯誤數>／05 ROUTING_REQUIRED／06 WRITE_FAILED
 #   stage 2 status：01 OK-<筆數>；stage 4 result：01 FOUND-<完成層 1 RESEARCHED|2 AUDITED|3 GRADUATED|4 PROJECTED>／02 NONE／03 NOT_RESEARCHED
 #   stage 3 run（auto-loop 迷你圈印）：01 DONE-<results>／02 NOTHING；stage 9 usage：01 BAD_ARGS
 param(
@@ -71,6 +71,7 @@ function Write-SubmitOutcome {
         'PENDING' { Write-Host "→ 同 need 的 request 已存在且尚未終局；等迷你圈處理（-Status 看進度）"; Write-Host "結論代號：SUPP1-1-02"; exit 0 }
         'INVALID' { Write-Host ("結論代號：SUPP1-1-04-" + @($R.errors).Count); exit 2 }
         'ROUTING_REQUIRED' { Write-Host "→ 加 -DomainHint <領域>（該領域必須已有 00-overview.md）"; Write-Host "結論代號：SUPP1-1-05"; exit 2 }
+        'WRITE_FAILED' { Write-Host "→ request 檔寫不進去（目標被別的行程開著？）；沒有任何 request 在等，稍後重新提交"; Write-Host "結論代號：SUPP1-1-06"; exit 2 }
         default {
             $idx = @('RESOLVED', 'PARTIAL', 'UNRESOLVED', 'OUT_OF_SCOPE', 'SUPERSEDED').IndexOf([string]$R.state) + 1
             if ($idx -le 0) { $idx = 0 }
@@ -106,7 +107,8 @@ if ($Status) {
     foreach ($s in $rows) {
         Write-Host ("  " + $s.RequestId + "｜" + $s.Domain + "｜g" + $s.Generation + "｜" + $s.State + "｜attempts=" + $s.Attempts + "｜" + $s.FactKind + "｜" + $s.Target)
     }
-    Write-Host "狀態語意：PENDING＝等迷你圈；WAITING_RESEARCH＝目標尚無 NN（checklist 已有 D 列，等研究相位建檔）；EXHAUSTED＝兩次嘗試未果（下次迷你圈發 UNRESOLVED）；SUPERSEDED_PENDING＝已被新世代取代"
+    Write-Host "狀態語意：PENDING＝等迷你圈；WAITING_RESEARCH＝目標尚無 NN（迷你圈會在 checklist 寫 D 列，等研究相位建檔）；EXHAUSTED＝兩次嘗試未果（下次迷你圈發 UNRESOLVED）；SUPERSEDED_PENDING＝已被新世代取代；DOMAIN_MISSING＝request 的領域目錄已不存在（改名？）——只能重新提交"
+    foreach ($rj in @($PsSuppIntakeRejected)) { Write-Host ("  intake 拒收（不列入）：" + $rj) }
     Write-Host ("結論代號：SUPP1-2-01-" + $rows.Count)
     exit 0
 }

@@ -3380,3 +3380,54 @@
   utf8NoBOM／三段 Join-Path／-LeafBase／Test-Json／Move 三參數／GetRelativePath／BOM）；test-auto-loop 情境 34。
 - 教訓：「做完」的判定要對輸入指紋，不對輸出簽名；私有映射與 generic 引擎分層，機密只在私有層、驗證只回結論碼；
   能力目錄是封閉的——不在目錄的需求是 UNSUPPORTED＋申請單，不是讓模型自由組表。
+
+### L122 外環的「沒發生」要能證明——寫入延後、slot 被占、模型越界寫檔都不能冒充成功或失敗（issue #33／#36 對抗審查修正，2026-09-17）
+
+- 症狀：兩個獨立的對抗審查（find → 兩名 refuter 各自反駁）對知識索引／補研究／auto-loop 挑出 32 項，確認為真的有：
+  create-only 寫檔把暫時的 sharing violation 當「輸掉競賽」靜靜丟掉 request／result；中斷後重跑把已合併的 attempt 再派一次
+  （雙重合併、UNRESOLVED 蓋掉已合併的 NN）；模型改了目標 NN 但沒觸發破壞防衛就被靜靜合併；模型自己寫進
+  `supplemental/requests|results/`、`wiki/` 的檔案被當權威入庫；request 內容未驗證就進工單與檔名；prompt 安全閘門把含
+  `A > B > C` 的手術提示全擋（每圈 lint 修復停擺）；session slot 被占被當逾時燒 attempts、停機原因說謊；迷你圈崩潰 exit 1
+  被 auto-all 記 NEEDS_ATTENTION 後繼續跑；`[regex]::Replace(s,p,r,1)` 的 1 是 RegexOptions.IgnoreCase 不是 count（wiki 全檔
+  `status:` 都被改）；builtAt 依目前文化；`@(函式)` 包住 `return , 空陣列` 數成 1；契約要模型 `limit+1` 又檢查「最後一行」
+  → 系統性誤判「索引過時」；`\|` pattern 經 JSON 參數常掉反斜線；wiki 有效性 EXPIRED／STALE_BY_SOURCE／UNKNOWN 沒標籤；
+  續篇 NN 主物件欄被改寫成「X（續篇）」cell 錨定永遠找不到；合成識別字守衛放行了一個非合成名。
+- 根因：外環把「沒發生」（沒跑 session、沒寫成功、沒有真的合併）和「失敗」混成一類；模型可寫的範圍靠契約文字約束而不是
+  圍欄快照；契約寫的是設計稿的算術，不是模型會照字面做的動作。
+- 落點：`ps-knowledge-lib`（create-only 三態 `$true`／`$false`／`$null`＋五次重試、JSON escaper 改 regex＋List、`[datetime]`
+  → ISO、hollow 切片、索引「節」欄用實際標題名、續篇另欄、builtAt InvariantCulture）；`ps-session-lib`（閘門只擋
+  CR／LF／雙引號／%、slot 等待每 5 分鐘心跳）；`ps-supplemental-lib`（intake 驗證 id／schema／domain／generation／need／workKey、
+  `WRITE_FAILED`、發布 FOREIGN_RESULT、還原改原子、wiki 只改 frontmatter 第一個 `status:`、callee 角色開頭比對、
+  `DOMAIN_MISSING`）；`ps-auto-loop`（能力目錄缺檔守衛、迷你圈 try／catch → `SUPP1-3-03`、暫存檔清掃、已合併未發布的 attempt
+  從 outcome 復原、工單指標寫不進就撤回、目標 NN 位元組比對還原、圍欄快照／還原、SLOT_BUSY 不計 attempts 且停機原因寫明、
+  `@(函式)` 三處改先指派）；`ps-auto-all`（迷你圈 exit 1 進連續失敗保險絲、不重複計數）；契約與 orchestrator（`[|] 物件 [|]`
+  pattern、limit 直接用、只檢查首行且用前綴比對、wiki 檔路徑、有效性 → 標籤、空表與格內直線規則、第 0 步先於 read 工單）；
+  `test-ps51-static` 兩條新規則（`@(函式)` 包 `return ,` 函式＝BLOCK；`ToString('日期格式')` 無文化＝警告）；
+  `test-supplemental` 情境 9；test-auto-loop 情境 34 補強（.gitignore 缺檔跳過、三個提示常值過閘門、worker 工具與圍欄、slot）。
+- 驗證：test-knowledge／test-supplemental／test-spec／test-ps51-static／test-auto-loop 全綠（pwsh 7.6）；修正後再跑一輪 Opus 驗證。
+- 教訓：每個「寫入」都要三態——成功／輸了競賽／延後，延後不能假裝成任何一種；模型可寫的目錄要快照＋還原，不是靠契約文字；
+  「沒跑」（slot、缺料）不進任何 attempts 或熔絲，停機原因寫真話；PowerShell：`return , $arr` 的函式不能被 `@(函式)` 包、
+  靜態 `[regex]::Replace` 沒有 count 參數；給模型的數字要「直接用」，不要要求模型做算術或跨行自檢。
+
+### L123 指紋忽略了行號，切片與驗收就不能依賴行號；worker 的圍欄要縮到它真正需要的那一層目錄（issue #34／#35 對抗審查修正，2026-09-17）
+
+- 症狀：Spec 引擎的對抗審查 28 項，確認為真的：派工用規劃時的絕對行號切片與標條目，而指紋刻意不含行號——讀取集合外插一行就讓
+  條目標錯、片段照樣驗收入帳、收據還會被重用；零單位的 COMPOSE requirement 讓 -Render 崩潰；gate 用規劃時等級（來源稽核標紅後仍發
+  SPEC_COMPLETE）；RECORD need 每次 -Plan 都重送新世代（hashAfter 對錯檔）；callee 角色子字串比對把反向關係拉進讀取集合；身分 need
+  無 plan → -Run 直接報錯、result 到了沒人知道；`Get-PsSpProp` 管線展開讓空清單變 UNKNOWN；session 層 CONTEXT_OVERFLOW 當一般無效
+  attempt；PS7 把 job.json 時間戳寫成文化格式；-Gate 不更新 current.json；指紋不含 factKind；歷史收據全被當 SOURCE_CHANGED（BLOCKED
+  單位永遠 gate 不了）；phase 卡在 RUNNING；NN 讀兩次成撕裂快照；拆分寫檔的回傳沒人看；PARTIAL 片段被當終局收據；工單詞彙表寫得出
+  來的形狀驗收全拒；worker 圍欄 `.ps-runtime/spec/*` 涵蓋 receipts／plans／outputs／其他 attempt；-RuntimeRoot 在 repo 外 worker 全被
+  deny；websearch／skill／todowrite／lsp 沒關（片段內容可外流）。
+- 根因：規劃、派工、驗收三個時點各看各的快照；worker 的可寫範圍寫在文字裡而不是 permission pattern 裡；「延後」沒有自己的結論碼。
+- 落點：`scripts/ps-spec-lib.ps1`（派工時依現況文字重定位條目行、同節 hash 不同即 SOURCE_CHANGED 不派；`ContainsKey`；gate／render 先重建
+  索引、live grade 低於政策 → `7-22`；affected hashAfter 對正確檔；角色開頭比對；need-only plan → `5-01`／`5-06`；`return , $value`；
+  CONTEXT_OVERFLOW＝容量事件；`[datetime]` → ISO；current.json gate 指標；factKind 進指紋；只看現行單位的收據；phase try／finally；單次讀；
+  create-only 三態每個呼叫點都看 `$null` → `3-07`；PARTIAL_SPLIT `4-07`；parser 收詞彙表寫得出來的每種形狀；派工前容量檢查）；
+  `scripts/ps-spec.ps1`（-RuntimeRoot 驗證 `9-07`）；`ps-spec-worker`（tools 補關 list／patch／websearch／skill／todowrite／lsp；permission
+  以 `*` 開頭縮到 `attempts/*`、只有該 attempt 的 fragment.md 可寫）；`/ps-spec-batch`；support-codes／troubleshooting-matrix 同步；
+  generic.manifest.json 重生。
+- 驗證：`test-spec.ps1` 情境 11～20（行號漂移、need-only plan、零單位、等級下降、RECORD affected hash、callee、空清單、overflow、
+  factKind／9-07、WRITE_DEFERRED／容量／parser 形狀）；test-auto-loop 情境 34 的 worker 三條；`-Doctor` SPEC1-0-03。
+- 教訓：指紋忽略什麼，切片與驗收就不能依賴什麼——同一份現況文字算指紋、切片、標條目、驗收；每個「延後」都要有自己的結論碼；
+  permission pattern 以 `*` 開頭才不受 worktree 相對路徑前綴影響；收據永遠是完整的（部分處置＝拆分，不是收據）。

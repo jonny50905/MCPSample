@@ -116,7 +116,7 @@ auto-loop-logs/<領域>/             既有（gitignore）；supplemental-done/ 
 **輸出**（gitignore 的本機快取）：
 
 - `index.json`（腳本讀；`sections` 為陣列 `[{level,name,start,end}]`；不含 builtAt 以外的時間；`generation`＝所有輸入「相對路徑＋hash」Ordinal 排序後 SHA256）。
-- `index.md`（模型讀）：檔頭（用法兩行）＋ `## 領域`、`## Wiki`、`## NN` 三表——**每筆一列、不含 `[[`**；NN 列的節欄＝`節名@offset/limit`（`@缺`＝該節不存在；`重複標題×n`）；續篇檔的主物件欄標「（續篇）」。
+- `index.md`（模型讀）：檔頭（用法兩行）＋ `## 領域`、`## Wiki`、`## NN` 三表——**每筆一列、不含 `[[`**；NN 列的節欄＝`節名@offset/limit`（`@缺`＝該節不存在；`重複標題×n`）；主物件欄永遠是純物件名（cell 錨定才找得到），續篇檔另以「續篇」欄標「是」。
 - `objects.md`（模型讀）：`## 物件` 一物件一列彙總（類型／主物件於／引用 NN 數／引用於≤10）——與 index.md 分檔，hub 物件不會吃掉 grep 的 100 筆上限。
 - 動詞：`-Rebuild`（原子替換三檔；`PUBLISH_DEFERRED` 時 exit 1）、`-Check`（`CURRENT`／`STALE`／`MISSING`；exit 0／1／2；結論碼只帶變動檔數）、`-Find <詞>`、`-Slice <NN> -Section <節>`。
 - **觸發**：ps-auto-loop safe point（啟動歸檔 commit 後、每圈末 git 快照前、收據＋distill 後；`try/catch` 不中斷）；`-SupplementalOnly` 結尾；`ps-spec -Plan` 開頭（STALE 即重建）；SOP：pull 後、`/ps-correct` 後手跑；`ps-auto-all` preflight 跑 `-Check`，STALE 即重建。
@@ -124,12 +124,12 @@ auto-loop-logs/<領域>/             既有（gitignore）；supplemental-done/ 
 ### 4.2 讀取契約（`.opencode/peoplesoft/knowledge-retrieval-contract.md`，模型讀；取代 ps-orchestrator 第 3 步）
 
 1. **定位**（≤4 次 grep；只用下列呼叫形狀）：
-   - `grep(pattern="\| <物件名> \|", path="docs/ps-research/knowledge", include="index.md")`（cell 錨定；先 NN／Wiki 表）；
+   - `grep(pattern="[|] <物件名> [|]", path="docs/ps-research/knowledge", include="index.md")`（cell 錨定；直線放字元類別，不靠反斜線——經 JSON 參數傳遞反斜線常掉；先 NN／Wiki 表）；
    - 沒中 → `grep(pattern="<業務詞或 alias>", path="docs/ps-research/knowledge", include="index.md")`（aliases 欄）；
-   - 沒中 → `grep(pattern="\| <物件名> \|", path="docs/ps-research/knowledge", include="objects.md")`；
+   - 沒中 → `grep(pattern="[|] <物件名> [|]", path="docs/ps-research/knowledge", include="objects.md")`；
    - 仍沒中或索引不存在 → `grep(pattern="<物件名>", path="docs/ps-research", include="[0-9][0-9]-*.md")` 一次；命中的 NN 一律視為 `UNAUDITED`、來源標「索引過時」；索引檔不存在則答覆註明「知識索引未建（管理者跑 ps-knowledge -Rebuild）」。
 2. **挑選**：wiki 列 ≤3（整檔 read）、NN ≤3（等級 AUDITED_CLEAN ＞ AUDITED_ISSUES ＞ UNAUDITED ＞ PARTIAL ＞ BLOCKED；同級取稽核輪次新者）；同主物件的續篇算同一個 NN 名額。
-3. **片段讀取**：依問題型別只讀對應節（選項／欄位→畫面與欄位；行為／條件→行為邏輯＋資料流；批次／排程→執行方式；授權→權限；入口→功能定位；證據→Evidence）；`read(filePath, offset=<offset>, limit=<limit>+1)`；**第一行必須是該節 `## ` 標題、最後一行必須是下一個 `## ` 標題或檔尾**，否則（或 read 回 `Offset … out of range`）以 `grep(pattern="^## <節名>", path="docs/ps-research/<領域>", include="<NN 檔名>")` 重新定位一次（取第一筆），並把該檔等級視為 UNAUDITED、標「索引過時」。預算：每個 NN ≤2 節、每節一次 read、每個 NN ≤1 次重定位；總 ≤400 行、≤6 次 read（wiki 不計）；超過就換下一等級的 NN 或標「片段未讀完」。
+3. **片段讀取**：依問題型別只讀對應節（選項／欄位→畫面與欄位；行為／條件→行為邏輯＋資料流；批次／排程→執行方式；授權→權限；入口→功能定位；證據→Evidence）；`read(filePath, offset=<offset>, limit=<limit>)`（offset／limit 直接用，不加減）；**只檢查第一行：必須以 `## ` 開頭且標題名（去括號註記）以該節名開頭**，否則（或 read 回 `Offset … out of range`）以 `grep(pattern="^## <節名>", path="docs/ps-research/<領域>", include="<NN 檔名>")` 重新定位一次（取第一筆），並把該檔等級視為 UNAUDITED、標「索引過時」。預算：每個 NN ≤2 節、每節一次 read、每個 NN ≤1 次重定位；總 ≤400 行、≤6 次 read（wiki 不計）；超過就換下一等級的 NN 或標「片段未讀完」。
 4. **足夠 vs 現查**（子問句覆蓋）：每個子問句要有一條帶證據參照的主張才算覆蓋。**必須現查**：無覆蓋；問**現況**（值分布、筆數、還在不在用、誰現在能進）；關鍵主張只有 INFERRED／DYNAMIC_RUNTIME；來源等級非 AUDITED_CLEAN 且無 wiki verified 可佐；**wiki 與 NN 對同一事實矛盾（並陳＋必現查＋以現查為準；`reviewed: true` 或 `human:<日期>` 較新只影響並陳順序）**；索引過時。其餘：「知識（wiki＋NN）沒有或不足才現查」。
 5. **來源標註**：`wiki（已驗證）`／`wiki（人工審定）`／`NN：<領域>/<檔>（AUDITED_CLEAN，第 N 輪）`／`NN：…（UNAUDITED／AUDITED_ISSUES／PARTIAL，未經現查）`／`NN：…（索引過時）`／`本次現查`；證據參照逐字複製 NN 附錄的 ChunkId／SQL。
 6. **答覆結尾固定 `## 來源表`**：`| 子問句 | 來源 | 等級 | 證據參照 | 現查 |`（封閉值；test-scenarios I2 以 regex 驗：每列來源與證據參照非空；等級∉{AUDITED_CLEAN, wiki verified} ⇒ 現查=是）。
@@ -370,7 +370,60 @@ Generic engine（本 repo）                 Private adapter（公司機）     
 | 小模型 | grep 不能指定單檔（grep.ts:60-68）；物件表吃掉 100 筆上限；行號算術；矛盾規則重複；worker 改寫 NN 是已知失敗路徑；agent-doc-lint 會擋日期例 | 全採：呼叫形狀寫進契約、表序 Wiki→NN、objects.md 分檔、`名@offset/limit`、雙端自檢、來源表、worker 只寫 delta 收據由外環合併、佔位符 |
 | PS 5.1／Windows | 只有語法紀律沒有機械守衛；canonical JSON 未定序；標題作 JSON 鍵；jobId 未驗；Invoke-Opencode 不可重用；Replace sharing violation；民國曆；相對路徑 | 全採：test-ps51-static、`-SortKeys`、sections 陣列、身分文法、ps-session-lib、Replace 重試、InvariantCulture、絕對路徑 |
 | 並行／crash | result 在 rollback 窗內發布；隨機 requestId 讓去重成競態；receipt 以 unitId 為鍵；指紋在驗收時算；attempt 未定義；補研究相位污染熔絲；auto-all 把補研究算失敗；路由丟單；快照不 stage supplemental；兩個 loop 搶同一模型 | 全採：mini-run 末端發布、workKey 檔名、receipt 含指紋、input.json 先寫、attempt＝manifest 數、獨立 mini-run（不加相位）、exit 4、Submit 時路由、快照路徑、session-slot 鎖 |
-| 機密 | 只有 Spec 有結論碼；.gitignore 未加；能力申請會洩漏 checklist；worker 讀取未機械限制；jobId 自由文字；記憶體例子 TW_JO_OPEN；examples 不在搬運集合 | 全採：三家族結論碼、.gitignore＋守衛、CAP-REQ 表單、permission.read 逐路徑、身分文法、合成識別字守衛、examples 移入 .opencode |
+| 機密 | 只有 Spec 有結論碼；.gitignore 未加；能力申請會洩漏 checklist；worker 讀取未機械限制；jobId 自由文字；記憶體例子用了非合成物件名；examples 不在搬運集合 | 全採：三家族結論碼、.gitignore＋守衛、CAP-REQ 表單、permission.read 逐路徑、身分文法、合成識別字守衛、examples 移入 .opencode |
 | pipeline 不變量 | 新 NN 無 checklist 列＝MANUAL_ONLY 停機；相位熔絲；快照路徑；供 parts 的 `[[` 進 WIKI_MISSING；索引含單機輸入不可 commit | 全採：外環寫 D 列、mini-run、快照路徑、收據禁 `[[`＋發布後搬走、索引改本機快取＋audit-done.json 進 git |
 | 範疇契合 | 未研究 Component 走不通；RESOLVED 永遠到不了 AUDITED；一跳 callee；#17 通用函式應逐字取用；drill-down 缺；ALREADY_COVERED 死鎖 | 全採：D 列、WAITING_AUDIT＋auditRound 定義、`follow` 一跳、逐字取用、`-Drill`、ALREADY_COVERED 定義 |
 | 作者 48 問 | 38 具體、10 模糊／缺（見上列） | 缺項全部在本版補上（§4.2 衝突鍵、§6.3 domainGate、DATA.RECORD_USAGE、subjectKey 文法、doctor stage 0、QA request 由人跑 CLI、WAITING 重跑 no-op、wiki stale 標記） |
+
+## 11. 對抗審查修正（實作後第二輪：find 六鏡頭 → 每項兩名獨立 refuter，refuter 以 Opus 跑）
+
+### 11.1 知識索引／補研究／auto-loop（32 項提出、13 項兩名 refuter 都確認；被駁回但順手修掉的另列）
+
+| # | 確認的發現 | 修法（落點） |
+|---|---|---|
+| 8 | create-only 把任何 IOException 當「輸掉競賽」：request／result 靜靜消失、CLI 回 PENDING exit 0 | `Write-PsKnCreateOnlyText` 三態 `$true`／`$false`（目標已存在）／`$null`（重試 5 次仍寫不進＝WRITE_DEFERRED）；Submit 回 `WRITE_FAILED`（`SUPP1-1-06` exit 2）；Publish 回 Reason；manifest `CreateDeferred` 撤回 |
+| 9 | builtAt 依目前文化（民國曆 115） | InvariantCulture |
+| 11 | Test-PsKnHollow 對「標題緊接下一標題」的節切片錯 | `$Start -ge $End` 即空洞 |
+| 1 | 中斷後重跑把已合併的 attempt 再派一次（雙重合併、UNRESOLVED 蓋掉已合併 NN） | outcome 記 `merged／terminal／code／targetFile／hashAfter／affected`；迷你圈啟動先掃「已合併未發布」的 attempt 直接發布，不重派 |
+| 4 | current.manifest.md 寫不進被忽略：session 讀到舊指標、燒掉 attempt | `New-PsSuppManifest` 回 `CurrentWritten`；寫不進就撤回工單檔、本 run 提前結束 |
+| 16 | prompt 安全閘門把含 `A > B > C` 的手術提示全擋（每圈 lint 修復停擺） | `Test-PsOcPromptSafe` 只擋 CR／LF／雙引號／%（cmd 特殊字元由 shim 檔承接）；test-auto-loop 對三個提示常值做閘門驗證 |
+| 17 | SLOT_BUSY 被當逾時：稽核 attempts 被燒、「未查成」入檔、停機原因說謊 | `-SlotWaitMin 1440`（每 5 分鐘心跳）；等滿才回 SLOT_BUSY；稽核批次不計 attempts 直接回傳、手術／提煉／升級中止、主迴圈停機原因寫 slot |
+| 18 | 迷你圈 exit 1（永遠是崩潰）被 auto-all 記 NEEDS_ATTENTION 後繼續 | 迷你圈 try／catch → `SUPP1-3-03` exit 2；auto-all 的 exit 1 進連續失敗保險絲、不重複計數 |
+| 26 | wiki 有效性 EXPIRED／STALE_BY_SOURCE／UNKNOWN 無規則無標籤；draft／stale wiki 與 BLOCKED NN 沒有 §5 標籤 | 契約：有效性 → 標籤對照表、來源表一律 `wiki stale`；新增「wiki（草稿，未經現查）」「wiki（已過期／來源失效，未經現查）」「NN：…（BLOCKED，未經現查）」；orchestrator／explain skill 同步 |
+| 31 | 契約叫模型整檔 read wiki 卻沒寫檔路徑規則 | `docs/ps-research/wiki/<物件名>.md`（物件名取自 Wiki 列第一欄） |
+| 21 | 模型寫進 `supplemental/requests|results/`、`wiki/` 的檔被當權威入庫 | 迷你圈圍欄快照／還原（新增檔刪除、變更檔還原、記 fenceViolations、該次作廢） |
+| 22 | request 內容未驗證就進工單與檔名 | `Get-PsSuppRequests` intake 驗證（id＝檔名、schemaVersion、domain 文法、generation、need 值域、workKey 重算）；拒收列在 log |
+| 24 | 情境 34 讀 .gitignore（不在搬運集合） | 檔不存在＝跳過並印 SKIP |
+
+被駁回但順手修掉（成本低、不改行為）：`[regex]::Replace` 改實例 Replace(count)；暫存檔清掃擴到領域／wiki／supplemental；JSON escaper 改 regex＋List；
+Get-Date 規則改寫＋`ToString('日期格式')` 警告；目標 NN 位元組比對還原；`Restore-PsSuppBytes` 原子；`DOMAIN_MISSING`；auto-all 不重複計數；
+Invoke-GitSnapshot 只 commit 有暫存檔的路徑；`limit` 直接用＋只檢查首行前綴；`/ps-supplement` 第 0 步先於 read 工單；空表與格內直線規則；
+`[|] 物件 [|]` pattern；索引「節」欄用實際標題名；續篇另欄；合成識別字守衛去掉非合成名。
+
+另外在寫測試時抓到一類新陷阱：`return , $arr` 的函式被 `@(函式 …)` 直接包住時，空陣列會數成 1（`@(f)` 得到 `@(@())`）——
+auto-all／auto-loop 三處改「先指派再 @()」，test-ps51-static 新增 BLOCK 規則。
+
+### 11.2 Spec 引擎（28 項提出；全部依原發現修正，等第二輪 refuter 裁決另記）
+
+| # | 發現 | 修法（落點） |
+|---|---|---|
+| 1／7／13 | 派工用規劃時行號切片與標條目，指紋卻不含行號：讀取集合外插一行＝條目標錯、片段照樣驗收、收據被重用 | `Get-PsSpLiveInput` 依現況文字重定位每個條目（同節 hash 必須相同、行仍在該節條目集合內），切片／工單／input.json／驗收全用重定位後的清單；對不上＝SOURCE_CHANGED 不派 |
+| 2／11 | 零單位 COMPOSE requirement 讓 -Render 崩潰（`@($null)`） | `ContainsKey`；7-11 c=NONE 可達 |
+| 3 | gate 用規劃時等級 | -Run／-Render／-Gate 先重建 STALE 索引；`Test-PsSpSources` 回 LiveGrades；低於政策 → `7-22 GRADE_DROPPED`（SPEC_PARTIAL） |
+| 4 | RECORD need 每次 -Plan 重送新世代 | `Resolve-PsSpNeed` 比對 `result.affected[].hashAfter` 與該檔現況；未變＝BLOCKED_KNOWLEDGE 不重送 |
+| 5 | callee 角色子字串比對 | 開頭比對（同 `Get-PsSuppCallees`） |
+| 6 | 身分 need 無 plan | `New-PsSpNeedOnlyPlan`：提交 need 並寫 WAITING_KNOWLEDGE plan；-Run 5-01／5-06；result 到達後 -Plan 換 planHash |
+| 8 | `Get-PsSpProp` 管線展開 | `return , $value`；空清單＝FALSE；所有 `@(Get-PsSpProp …)` 改先指派 |
+| 9 | CONTEXT_OVERFLOW 當一般無效 attempt | 容量事件：拆分、不計 attempt |
+| 10 | PS7 job.json 時間戳文化格式 | `Write-PsSpJob` 以 `Get-PsKnUtcStamp` 序列化 `[datetime]` |
+| 12 | -Gate 不更新 current.json | gateGeneration／gateVerdict／gateHash 指標 |
+| 14 | 指紋不含 factKind | `Get-PsSpFingerprint -FactKind`；收據匹配也比 factKind |
+| 15 | 歷史收據全被當 SOURCE_CHANGED | 只看現行 plan 各單位綁定的收據；PENDING／BLOCKED 不算 |
+| 16 | phase 卡 RUNNING | 每條離開路徑寫回相位；CLI try／finally |
+| 17 | NN 讀兩次 | `Get-PsKnNnFacts -Text` 單次讀 |
+| 18 | 拆分寫檔回傳沒看；create-only `$null` | 所有寫入點分辨 `$null`（延後）與 `$false`；延後 → `3-07-n` 停止不重派、plan 延後 → 2-07 |
+| 19 | PARTIAL 片段當終局收據 | `4-07 PARTIAL_SPLIT`：已處置條目成 part＋收據（COMPLETE），其餘拆新 part 重派；兩表皆空＝`NO_COVERAGE`（計 attempt） |
+| 20 | 詞彙表形狀驗收拒收 | parser 收 `#k`、`a;b`、`檔#E3`、路徑前綴檔名、`NOT_APPLICABLE`；工單印字面範例列 |
+| 21／27／23／28／24／26 | worker 圍欄涵蓋整個 job 樹、worktree 相對前綴、websearch 等未關 | tools 補關 list／patch／websearch／skill／todowrite／lsp（1.18.29 沒有 codesearch／todoread）；read `*.ps-runtime/spec/*/attempts/*`、edit `*.ps-runtime/spec/*/attempts/*/fragment.md`，寬 pattern 移除 |
+| 22 | -RuntimeRoot 在 repo 外 worker 全 deny | 派真 worker 時 RuntimeRoot 必須＝`<Root>/.ps-runtime/spec`，否則 `9-07` |
+| 25 | 派工前不檢查容量 | 條目數＋7 > 150 直接拆分、不派 session |

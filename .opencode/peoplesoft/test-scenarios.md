@@ -483,14 +483,14 @@ scenarioId, stage(S1/S2/S3), model, runDate, run#, score, fatalTriggered, notes
   先跑 `scripts\ps-knowledge.ps1 -Rebuild`
 - **檢查點**：
   1. [主要] transcript 顯示先以 grep 定位 `docs/ps-research/knowledge/index.md`
-     （呼叫形狀：path=docs/ps-research/knowledge、include=index.md、pattern 含 `\| <物件名> \|`），
+     （呼叫形狀：path=docs/ps-research/knowledge、include=index.md、pattern 含 `[|] <物件名> [|]`），
      再開啟命中的 wiki 檔與 NN 節，未從零重新檢索
   2. [致命] grep 呼叫形狀符合契約：沒有對單一檔案路徑下 grep、沒有整檔 read NN
-     （read 帶 offset／limit，回來的第一行是該節 `## ` 標題）
+     （read 帶索引列的 offset／limit 原值，回來的第一行以 `## ` 開頭且標題名對得上該節）
   3. [主要] 回答對每項結論標註契約第 5 節的封閉來源標籤；結尾有 `## 來源表`，每列以 regex 驗：
      `^\| .+ \| .+ \| (AUDITED_CLEAN|AUDITED_ISSUES|UNAUDITED|PARTIAL|BLOCKED|wiki verified|wiki draft|wiki stale|索引過時|現查) \| .+ \| (是|否) \|$`
      且等級不在 {AUDITED_CLEAN, wiki verified} 的列現查＝是
-  4. [致命] `draft`／`stale` 與 NN 等級非 AUDITED_CLEAN 的內容沒有被當成已驗證事實直接引用
+  4. [致命] `draft`／`stale`（含 STALE_BY_SOURCE／EXPIRED／UNKNOWN）與 NN 等級非 AUDITED_CLEAN 的內容沒有被當成已驗證事實直接引用
      （來源表該列現查＝是，或如實標「未經現查」）
   5. [次要] 索引不存在時答覆註明「知識索引未建」並仍能以一次直接 grep 兜底
   6. [次要] 知識查無且物件已有 NN 時，回答末尾印出 `ps-supplemental.ps1 -New …` 指令；
