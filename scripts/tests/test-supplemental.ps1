@@ -10,7 +10,6 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $repoRoot 'scripts/ps-knowledge-lib.ps1')
 . (Join-Path $repoRoot 'scripts/ps-supplemental-lib.ps1')
 $cli = Join-Path $repoRoot 'scripts/ps-supplemental.ps1'
-$psExe = (Get-Process -Id $PID).Path
 
 $failCount = 0
 function Assert([bool]$Cond, [string]$Name) {
@@ -23,8 +22,24 @@ function Write-Utf8([string]$Path, [string[]]$Lines, [bool]$Bom, [string]$Eol = 
     [System.IO.File]::WriteAllText($Path, ($Lines -join $Eol), (New-Object System.Text.UTF8Encoding($Bom)))
 }
 function Invoke-Cli([string[]]$CliArgs) {
-    $out = & $psExe -NoProfile -File $cli @CliArgs -Root $root 2>&1 | ForEach-Object { [string]$_ }
-    return @{ Exit = $LASTEXITCODE; Lines = @($out); Last = [string]$out[-1] }
+    # 同行程呼叫（& script）：exit 碼進 $LASTEXITCODE、Write-Host 走 information stream 以 [string] 取字；
+    # 不開子行程＝不受公司機執行原則（ExecutionPolicy）與主控台編碼影響，也不會被 Out-String 折行
+    # 陣列 splat 對 script 一律走位置繫結、不辨識 '-Name'（與外部程序命令列剖析不同）；
+    # 先轉成雜湊表再 splat，讓 -New 等 switch／具名參數正確繫結到 CLI 的 param()
+    $h = @{}
+    $i = 0
+    while ($i -lt $CliArgs.Count) {
+        $name = $CliArgs[$i] -replace '^-', ''
+        if (($i + 1) -lt $CliArgs.Count -and $CliArgs[$i + 1] -notmatch '^-') {
+            $h[$name] = $CliArgs[$i + 1]; $i += 2
+        } else {
+            $h[$name] = $true; $i += 1
+        }
+    }
+    $out = @(& $cli @h -Root $root *>&1 | ForEach-Object { [string]$_ })
+    $last = ''
+    if ($out.Count -gt 0) { $last = [string]$out[$out.Count - 1] }
+    return @{ Exit = $LASTEXITCODE; Lines = @($out); Last = $last }
 }
 function Test-CodeShape([string]$Line, [string]$Family) {
     $code = $Line -replace '^結論代號：', ''

@@ -269,17 +269,17 @@ Assert ($dObj.receiptTier -eq 1 -and $dObj.receiptExists) "領域列：tier（�
 
 # ── 情境 6：CLI（exit code、-Find、-Slice）、片段讀回標題 ─────────────
 Write-Host "情境 6：CLI exit code／-Find／-Slice；片段第一行＝節標題"
-$o = (& $cli -Root $root -Check *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root -Check *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 1 -and $o -match 'KNOWLEDGE_CHECK：STALE' -and $o -match '(?m)^結論代號：KNOW1-2-02-\d+\s*$' -and $o -notmatch '(?m)^結論代號：.*(\.md|/)') "CLI -Check STALE → exit 1；結論碼只帶變動檔數（檔名不出）"
-$o = (& $cli -Root $root -Rebuild *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root -Rebuild *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 0 -and $o -match 'KNOWLEDGE：generation=[0-9A-F]{16} domains=2 nn=7' -and $o -match '(?m)^結論代號：KNOW1-1-01\s*$') "CLI -Rebuild → exit 0、KNOWLEDGE 行、結論碼"
-$o = (& $cli -Root $root -Check *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root -Check *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 0 -and $o -match 'CURRENT' -and $o -match '(?m)^結論代號：KNOW1-2-01\s*$') "CLI -Check CURRENT → exit 0、結論碼"
-$o = (& $cli -Root $root -Find '甲畫面' *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root -Find '甲畫面' *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 0 -and $o -match 'wiki：docs/ps-research/wiki/TW_A\.md' -and $o -match 'FIND：甲畫面｜nn=0 objects=0 wiki=1') "CLI -Find 以 alias 命中 wiki"
-$o = (& $cli -Root $root -Find 'TW_A' *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root -Find 'TW_A' *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 0 -and $o -match 'NN：docs/ps-research/職缺測試/01-TW_A\.md｜AUDITED_CLEAN' -and $o -match '資料流@39/7') "CLI -Find 命中 NN 並印節行號"
-$o = (& $cli -Root $root -Slice 'docs/ps-research/職缺測試/01-TW_A.md' -Section '資料流' *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root -Slice 'docs/ps-research/職缺測試/01-TW_A.md' -Section '資料流' *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 0 -and $o -match 'SLICE：.*｜資料流｜39-45' -and $o -match '(?m)^## 資料流') "CLI -Slice 印出節（第一行＝## 資料流）"
 $sl = Get-PsKnowledgeSlice -LiteralPath (Join-Path $domA '01-TW_A.md') -Section 'Evidence 附錄'
 Assert ($null -ne $sl -and $sl.Lines[0] -match '^## Evidence 附錄' -and $sl.End -eq 66) "片段讀回：Evidence 附錄以模板標題寫法查得到、迄行＝檔尾"
@@ -296,15 +296,15 @@ Assert ($null -ne $idxH -and $null -ne $rowH -and (@($rowH.sections)).Count -ge 
 $mdH = Read-PsKnText -LiteralPath $mdPath
 Assert ($mdH -match '(?m)^\| 職缺測試 \| 08-TW_H\.md \|[^\r\n]*重複標題×2') "index.md 節欄標示 重複標題×2"
 Remove-Item -LiteralPath (Join-Path $domA '08-TW_H.md') -Force
-$o = (& $cli -Root $root -Slice 'docs/ps-research/職缺測試/01-TW_A.md' -Section '不存在的節' *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root -Slice 'docs/ps-research/職缺測試/01-TW_A.md' -Section '不存在的節' *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 2) "CLI -Slice 找不到節 → exit 2"
-$o = (& $cli -Root $root *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $root *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 2 -and $o -match '用法') "CLI 無模式 → exit 2 印用法"
 $emptyRoot = Join-Path $root 'empty'
 New-Item -ItemType Directory -Path (Join-Path $emptyRoot 'docs/ps-research') -Force | Out-Null
-$o = (& $cli -Root $emptyRoot -Check *>&1 | Out-String); $ec = $LASTEXITCODE
+$o = ((& $cli -Root $emptyRoot -Check *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $ec = $LASTEXITCODE
 Assert ($ec -eq 2 -and $o -match 'MISSING' -and $o -match '(?m)^結論代號：KNOW1-2-03\s*$') "CLI -Check 無索引 → MISSING exit 2、結論碼"
-$allCodes = [regex]::Matches($o, '(?m)^結論代號：(.+)$')
+$allCodes = [regex]::Matches($o, '(?m)^結論代號：(\S+)\s*$')
 Assert ($allCodes.Count -eq 1 -and $allCodes[0].Groups[1].Value -match '^(KNOW|SUPP|SPEC)1-\d-\d\d(-\d+)?$') "每次 CLI 只印一行結論碼、形狀固定"
 
 # ── 情境 7：canonical JSON、create-only 發布 ─────────────────────

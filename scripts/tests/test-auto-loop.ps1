@@ -519,7 +519,7 @@ $auditFx = @(
     '| 48-TW_BAD.md | 證據 | 舊引用 | 換 id 3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d → 99999999-8888-4777-8666-555544443333 |'
 ) -join "`r`n"
 [System.IO.File]::WriteAllText((Join-Path $fxDir "90-audit.md"), $auditFx, (New-Object System.Text.UTF8Encoding($true)))
-$lintOut = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom *>&1 | Out-String)
+$lintOut = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom *>&1 | ForEach-Object { [string]$_ }) -join "`n")
 Assert ($lintOut -match '\[附錄\] 48-TW_BAD\.md') "壞檔出 [附錄] 工單"
 Assert ($lintOut -notmatch '47-TW_GOOD\.md：Evidence 附錄非模板表格') "好檔（正典表格）不觸發"
 Assert ($lintOut -match '【附錄】型') "修法說明段有印"
@@ -528,12 +528,12 @@ Assert ($lintOut -notmatch '疑似捏造') "UUID 緊貼註記括號（兩種寬�
 Assert ($lintOut -match '陳舊工單壓下：47-TW_GOOD\.md') "[回灌] 舊 id 不在檔＝陳舊，壓下並點名（L103）"
 Assert ($lintOut -notmatch '\[回灌\] 47-TW_GOOD') "陳舊 [回灌] 不進工單"
 Assert ($lintOut -match '\[回灌\] 48-TW_BAD\.md') "舊 id 還在檔＝正常開單（對照組）"
-$lintStats = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom -EvidenceStats *>&1 | Out-String)
+$lintStats = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom -EvidenceStats *>&1 | ForEach-Object { [string]$_ }) -join "`n")
 Assert ($lintStats -match 'EVIDENCE_ROWS：47-TW_GOOD\.md=1' -and $lintStats -match 'EVIDENCE_ROWS：48-TW_BAD\.md=0') "-EvidenceStats 逐檔列數正確（表格 1 列／裸傾倒 0 列）"
 Assert ($lintStats -match 'EVIDENCE_ROWS_SUMMARY：檔數=2 最大=1') "-EvidenceStats 摘要行"
 $auditUa = @('# 稽核報告','','> 稽核輪次：1','','## 總覽記分卡','| 檔案 | 證據 PASS | FAIL | UNVERIFIABLE | Claim VERIFIED | DISPUTED | 燈號 |','|---|---|---|---|---|---|---|','| 47-TW_GOOD.md | 1 | 0 | 0 | 0 | 0 | 🟢 |','| 48-TW_BAD.md | 未稽核（BLOCKED：合計不符） | - | - | - | - | ⛔ |','## FAIL / DISPUTED / UNVERIFIABLE 明細','| 檔案 | 類型 | 內容 | 原因 | 處置 |','|---|---|---|---|---|','## 上輪回灌項覆核','- 無上輪','## 完整性（換角度 diff）','- 任務 C 覆蓋：完成 1／共 1 批','## 已回灌 checklist 的行動項','- 無','## 系統性錯誤觀察','- 無') -join "`r`n"
 [System.IO.File]::WriteAllText((Join-Path $fxDir "90-audit.md"), $auditUa, (New-Object System.Text.UTF8Encoding($true)))
-$lintUa = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom -StrictAudit *>&1 | Out-String)
+$lintUa = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom -StrictAudit *>&1 | ForEach-Object { [string]$_ }) -join "`n")
 Assert ($lintUa -match '90-audit\.md 記分卡有 1 檔標「未稽核」' -and $lintUa -match 'FAIL：') "lint -StrictAudit：記分卡「未稽核」列＝違規（L107）"
 Remove-Item -Recurse -Force $fxDir
 
@@ -573,7 +573,7 @@ foreach ($pair in @(@('44-TW_NAV_SPACE.md', $nvSpace), @('45-TW_NAV_FLOW.md', $n
     [System.IO.File]::WriteAllText((Join-Path $nvDir $pair[0]), ($pair[1] -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
 }
 [System.IO.File]::WriteAllText((Join-Path $nvDir "00-overview.md"), "# 總覽`r`n測試 fixture", (New-Object System.Text.UTF8Encoding($true)))
-$nvOut = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom *>&1 | Out-String)
+$nvOut = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom *>&1 | ForEach-Object { [string]$_ }) -join "`n")
 Assert ($nvOut -match '41-TW_NAV_BAD\.md：功能定位宣稱導覽路徑') "Case 1：技術選單串成路徑＋無 Portal 證據 → 違規"
 Assert ($nvOut -match '\[導覽\] 41-TW_NAV_BAD\.md：TECHNICAL_MENU_AS_NAVIGATION') "Case 1：出 [導覽] 工單"
 Assert ($nvOut -notmatch '42-TW_NAV_OVER\.md：功能定位宣稱導覽路徑') "Case 1 對照組：有 PSPRSMDEFN 證據的路徑主張不誤報"
@@ -584,7 +584,7 @@ Assert ($nvOut -match '44-TW_NAV_SPACE\.md：功能定位宣稱導覽路徑') "�
 Assert ($nvOut -notmatch '45-TW_NAV_FLOW\.md：功能定位') "審查補強：箭頭型流程敘述不是導覽主張 → 不誤報"
 Assert ($nvOut -match '46-TW_NAV_AUTH\.md：功能定位出現 AUTHORIZED_FOR_CONTEXT' -and $nvOut -match '\[導覽\] 46-TW_NAV_AUTH\.md：[^\r\n]*USER_VISIBILITY_OVERCLAIM') "審查補強：加註 AUTHORIZED_FOR_CONTEXT 不能消音（Case 3）"
 Assert ($nvOut -notmatch '47-TW_NAV_ONLY\.md：功能定位') "profile surfaces=CLASSIC_ONLY：有入口列但無 surface gap 行 → 不再要求（Fluid 為 NOT_APPLICABLE）"
-$nvOutF = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -NavigationSurfaces CLASSIC_AND_FLUID *>&1 | Out-String)
+$nvOutF = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -NavigationSurfaces CLASSIC_AND_FLUID *>&1 | ForEach-Object { [string]$_ }) -join "`n")
 Assert ($nvOutF -match '47-TW_NAV_ONLY\.md：功能定位 ### 導覽入口 有 1 列但未解事項無' -and $nvOutF -match '\[導覽\] 47-TW_NAV_ONLY\.md：SINGLE_PATH_COLLAPSE') "surfaces=CLASSIC_AND_FLUID：有入口列但無 surface gap 行 → SINGLE_PATH_COLLAPSE"
 Assert ($nvOutF -notmatch '48-TW_NAV_GAP\.md：功能定位') "surfaces=CLASSIC_AND_FLUID：有 gap 行 → 零違規"
 Assert ($nvOut -notmatch '51-TW_NAV_CANON\.md：功能定位宣稱導覽路徑') "canonical query 逐字貼在 Evidence（CTE 內 SELECT→FROM 相距 >200 字）→ 認得是 Portal 證據"
@@ -593,7 +593,7 @@ Assert ($nvOut -notmatch '48-TW_NAV_GAP\.md：功能定位') "審查補強：有
 Assert ($nvOut -notmatch '49-TW_NAV_PEND\.md：功能定位宣稱導覽路徑') "審查補強：反序「待人工SQL（PSPRSMDEFN…）」是合法出口 → 不誤報"
 Assert ($nvOut -notmatch '50-TW_NAV_TM\.md：功能定位') "審查補強：### Technical Menu 段用 > 串（誠實分段）→ 不誤報"
 Assert ((Get-OrderFingerprint '3. [導覽] 41-TW_NAV_BAD.md：TECHNICAL_MENU_AS_NAVIGATION＋USER_VISIBILITY_OVERCLAIM') -eq '[導覽] 41-TW_NAV_BAD.md') "審查補強：[導覽] 工單指紋剝 Kinds（狀態不是身分）"
-$nvCov = (& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -CoverageOnly *>&1 | Out-String)
+$nvCov = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -CoverageOnly *>&1 | ForEach-Object { [string]$_ }) -join "`n")
 Assert ($nvCov -match '\[美工／不擋覆蓋畢業\].*功能定位宣稱導覽路徑') "tier 1：導覽類降為警告（不重演 L94 全存量違規）"
 Assert ($nvCov -notmatch '\[導覽\] 41-TW_NAV_BAD') "tier 1：導覽工單受 emitPolish 抑制"
 Remove-Item -Recurse -Force $nvDir
@@ -710,13 +710,13 @@ New-Item -ItemType Directory -Path (Join-Path $adRoot '.opencode/peoplesoft') -F
 $adLint = Join-Path $repoRoot 'scripts/ps-agent-doc-lint.ps1'
 [System.IO.File]::WriteAllText((Join-Path $adRoot '.opencode/agent/bad.md'), "規則一（issue #24）`r`n舊版寫法已廢止（2026-09-04）`r`n見 L109", (New-Object System.Text.UTF8Encoding($true)))
 [System.IO.File]::WriteAllText((Join-Path $adRoot '.opencode/peoplesoft/SOP.md'), "SOP 可以寫 issue #24 與 2026-09-04", (New-Object System.Text.UTF8Encoding($true)))
-$adOut = (& $adLint -Root $adRoot *>&1 | Out-String); $adExit = $LASTEXITCODE
+$adOut = ((& $adLint -Root $adRoot *>&1 | ForEach-Object { [string]$_ }) -join "`n"); $adExit = $LASTEXITCODE
 Assert ($adExit -eq 1 -and $adOut -match 'bad\.md:1 \[issue 編號\]' -and $adOut -match '\[變更敘述\]' -and $adOut -match '\[日期\]') "壞檔：issue 編號／變更敘述／日期 → 阻擋、exit 1"
 Assert ($adOut -notmatch 'SOP\.md:\d') "SOP.md 不在範圍（給人看的檔可以有歷史）"
 Assert ($adOut -match '教訓編號 L<nn>：1 處') "L 編號只計數不擋"
 [System.IO.File]::WriteAllText((Join-Path $adRoot '.opencode/agent/bad.md'), "規則一`r`n規則二", (New-Object System.Text.UTF8Encoding($true)))
-$null = (& $adLint -Root $adRoot *>&1 | Out-String); Assert ($LASTEXITCODE -eq 0) "乾淨檔 → exit 0"
-$adReal = (& $adLint -Root $repoRoot *>&1 | Out-String); Assert ($LASTEXITCODE -eq 0) "本 repo 的模型檔目前乾淨（exit 0）：$(($adReal -split "`n" | Where-Object { $_ -match '\[' } | Select-Object -First 3) -join ' / ')"
+$null = ((& $adLint -Root $adRoot *>&1 | ForEach-Object { [string]$_ }) -join "`n"); Assert ($LASTEXITCODE -eq 0) "乾淨檔 → exit 0"
+$adReal = ((& $adLint -Root $repoRoot *>&1 | ForEach-Object { [string]$_ }) -join "`n"); Assert ($LASTEXITCODE -eq 0) "本 repo 的模型檔目前乾淨（exit 0）：$(($adReal -split "`n" | Where-Object { $_ -match '\[' } | Select-Object -First 3) -join ' / ')"
 
 Write-Host "情境 32：執行期 guard plugin——檔案形狀／零相依／單一匯出／無派工狀態機／connect 目標比對／skill 名擋／掛載診斷與受控重掛安全邊界／npmrc offline／AGENTS.md／analyzer 判定項（issue #30／#31／#32）"
 $gp = Join-Path $repoRoot '.opencode/plugin/ps-runtime-guard.js'

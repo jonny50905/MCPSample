@@ -31,7 +31,7 @@ function Invoke-Cli {
     $h = @{}
     foreach ($k in $script:commonH.Keys) { $h[$k] = $script:commonH[$k] }
     foreach ($k in $Named.Keys) { $h[$k] = $Named[$k] }
-    $o = (& $cli @h *>&1 | Out-String)
+    $o = ((& $cli @h *>&1 | ForEach-Object { [string]$_ }) -join "`n")
     $script:lastOut = $o
     if ($env:PS_SPEC_TEST_DEBUG -eq '1') { Write-Host $o }
     $script:lastExit = $LASTEXITCODE
