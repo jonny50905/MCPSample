@@ -1,5 +1,5 @@
 ﻿# ps-spec-lib.ps1 — Spec 引擎共用邏輯：Component＋私有需求包（pack）→ EXTRACT facts／COMPOSE 單位 → 外環派工與驗收
-#                   → 確定性 render（slot 置換模板副本）→ gate；結論碼 SPEC1-<stage>-<code>[-<count>]。
+#                   → 確定性 render（模板副本：markers 置換 {{slot:Sxx}}／headings 綁章節標題與原生佔位符）→ gate；結論碼 SPEC1-<stage>-<code>[-<count>]。
 # 由 ps-spec.ps1（CLI）與 scripts/tests/test-spec.ps1 dot-source。
 # 前置：先 dot-source scripts/ps-knowledge-lib.ps1（讀檔／hash／canonical JSON／原子寫入／NN 解析／索引）
 #       與 scripts/ps-supplemental-lib.ps1（KnowledgeNeed → 補研究 request／result／完成邊界）。
@@ -17,6 +17,8 @@ $script:PsSpIdRx = '^[a-z0-9][a-z0-9-]{0,31}$'
 $script:PsSpReqIdRx = '^R[0-9]{2,4}$'
 $script:PsSpSlotIdRx = '^S[0-9]{2,4}$'
 $script:PsSpChecklistIdRx = '^C[0-9]{2,4}$'
+$script:PsSpBindingModes = @('markers', 'headings')
+$script:PsSpTokenRx = '\{\{[^{}\r\n]*\}\}'
 $script:PsSpAttemptRx = '^a[0-9]{4}$'
 $script:PsSpApplyOps = @('ALWAYS', 'FACT_TRUE', 'FACT_FALSE', 'ALL', 'ANY', 'NOT')
 $script:PsSpCardinalities = @('ONE', 'ANY', 'ALL_DISCOVERED')
@@ -230,10 +232,53 @@ function Test-PsSpApplicabilitySyntax {
     return , $errs
 }
 
-# 回 @{ Ok; Errors; Pack; Template; TemplateLines; Markers; ContentHash; BindingHash; Signed; PackId; PackVersion; ReviewedVersion; Requirements }
+# ── 模板綁定（bindingMode）：markers＝模板插 {{slot:Sxx}}；headings＝綁公司 Template 既有章節標題與原生佔位符 ──
+
+# 標題比對鍵：trim＋內部空白壓成單一空白（模板副本原樣，不改字）
+function Get-PsSpHeadingKey { param([string]$Text) return ([regex]::Replace(([string]$Text).Trim(), '\s+', ' ')) }
+# {{slot:Sxx}} 標記與模板原生佔位符分流
+function Test-PsSpSlotMarker { param([string]$Token) return ($Token -match '^\{\{slot:') }
+
+# 模板 ATX 標題（跳過 ``` ／ ~~~ 圍欄）：回 @(@{ Index; Level; Text }）；Index 為 0 起算行號
+function Get-PsSpTemplateHeadings {
+    param($Lines)
+    $out = @()
+    $ls = @($Lines)
+    $fence = $false
+    for ($i = 0; $i -lt $ls.Count; $i++) {
+        $ln = [string]$ls[$i]
+        if ($ln -match '^\s{0,3}(```|~~~)') { $fence = -not $fence; continue }
+        if ($fence) { continue }
+        $m = [regex]::Match($ln, '^(#{1,6})\s+(.+?)\s*$')
+        if (-not $m.Success) { continue }
+        $out += , ([ordered]@{ Index = $i; Level = $m.Groups[1].Value.Length; Text = (Get-PsSpHeadingKey -Text $m.Groups[2].Value) })
+    }
+    return , $out
+}
+
+# 章節範圍：標題行起，到下一個同級或更高級標題前（或檔尾）。回 @{ Start; End }（End 為排除端）
+function Get-PsSpHeadingRange {
+    param($Headings, [int]$Ix, [int]$LineCount)
+    $hs = @($Headings)
+    $end = $LineCount
+    for ($j = $Ix + 1; $j -lt $hs.Count; $j++) { if ([int]$hs[$j].Level -le [int]$hs[$Ix].Level) { $end = [int]$hs[$j].Index; break } }
+    return @{ Start = [int]$hs[$Ix].Index; End = $end }
+}
+
+# 標題文字 → 命中的標題索引清單（0 起算；恰好一筆才是合法綁定）
+function Get-PsSpHeadingHits {
+    param($Headings, [string]$Key)
+    $hits = @()
+    $hs = @($Headings)
+    for ($j = 0; $j -lt $hs.Count; $j++) { if ([string]$hs[$j].Text -ceq $Key) { $hits += $j } }
+    return , $hits
+}
+
+# 回 @{ Ok; Errors; Pack; Template; TemplateLines; Markers; ContentHash; BindingHash; Signed; PackId; PackVersion; ReviewedVersion; Requirements;
+#      BindingMode; Slots=@(@{ id; heading; placeholder }); Placeholders=@(@{ text; fact }) }
 function Test-PsSpPack {
     param([string]$PackDir, $Capabilities)
-    $r = @{ Ok = $false; Errors = @(); Pack = $null; Template = $null; TemplateLines = @(); Markers = @(); ContentHash = ''; BindingHash = ''; Signed = $false; PackId = ''; PackVersion = 0; ReviewedVersion = 0; Requirements = @() }
+    $r = @{ Ok = $false; Errors = @(); Pack = $null; Template = $null; TemplateLines = @(); Markers = @(); ContentHash = ''; BindingHash = ''; Signed = $false; PackId = ''; PackVersion = 0; ReviewedVersion = 0; Requirements = @(); BindingMode = 'markers'; Slots = @(); Placeholders = @() }
     $pp = Join-Path $PackDir 'pack.json'
     $t = Read-PsKnText -LiteralPath $pp
     if ($null -eq $t) { $r.Errors += 'PACK_NOT_FOUND：pack.json'; return $r }
@@ -241,7 +286,8 @@ function Test-PsSpPack {
     try { $p = $t | ConvertFrom-Json -ErrorAction Stop } catch { $r.Errors += 'PACK_JSON：無法解析'; return $r }
     $r.Pack = $p
     $top = @('schemaVersion', 'packId', 'packVersion', 'reviewedVersion', 'template', 'slots', 'checklist', 'requirements')
-    foreach ($n in (Get-PsSpPropNames $p)) { if ($top -notcontains $n) { $r.Errors += ('UNKNOWN_FIELD：' + $n) } }
+    $topOpt = @('bindingMode', 'placeholders')
+    foreach ($n in (Get-PsSpPropNames $p)) { if ($top -notcontains $n -and $topOpt -notcontains $n) { $r.Errors += ('UNKNOWN_FIELD：' + $n) } }
     foreach ($n in $top) { if ($null -eq (Get-PsSpProp $p $n)) { $r.Errors += ('MISSING_FIELD：' + $n) } }
     if ($r.Errors.Count -gt 0) { return $r }
     if (-not (Test-PsSpInt $p.schemaVersion) -or [int]$p.schemaVersion -ne $script:PsSpecSchemaVersion) { $r.Errors += ('VERSION：schemaVersion ' + $p.schemaVersion) }
@@ -259,14 +305,63 @@ function Test-PsSpPack {
             foreach ($m in [regex]::Matches($tt, '\{\{slot:([^}]*)\}\}')) { if ($r.Markers -notcontains $m.Groups[1].Value) { $r.Markers += $m.Groups[1].Value } }
         }
     }
-    $slots = @($p.slots | ForEach-Object { [string]$_ })
-    $seenS = @{}
-    foreach ($s in $slots) {
-        if ($s -notmatch $script:PsSpSlotIdRx) { $r.Errors += ('BAD_ID：slot ' + $s) }
-        if ($seenS.ContainsKey($s)) { $r.Errors += ('DUP_ID：slot ' + $s) } else { $seenS[$s] = $true }
-        if ($null -ne $r.Template -and $r.Markers -notcontains $s) { $r.Errors += ('SLOT_NOT_IN_TEMPLATE：' + $s) }
+    # bindingMode：預設 markers（模板插 {{slot:Sxx}}）；headings＝slot 綁章節標題＋（可選）該章節既有的 {{…}} 佔位符
+    $bm = 'markers'
+    $bmRaw = Get-PsSpProp $p 'bindingMode'
+    if ($null -ne $bmRaw) {
+        $bm = ([string]$bmRaw).Trim()
+        if ($script:PsSpBindingModes -notcontains $bm) { $r.Errors += ('BINDING_MODE_UNKNOWN：' + $bm); $bm = 'markers' }
     }
-    foreach ($m in $r.Markers) { if ($slots -notcontains $m) { $r.Errors += ('MARKER_NOT_IN_SLOTS：' + $m) } }
+    $r.BindingMode = $bm
+    $tplLines = @($r.TemplateLines)
+    $heads = @()
+    if ($null -ne $r.Template) { $hh = Get-PsSpTemplateHeadings -Lines $tplLines; $heads = @($hh) }
+    $slots = @()
+    $slotDefs = @()
+    $seenS = @{}
+    $si = 0
+    foreach ($sx in @($p.slots)) {
+        $si++
+        $sw = 'slots[' + $si + ']'
+        $sid = ''; $shd = ''; $stk = ''
+        if ($bm -eq 'headings') {
+            if ($null -eq $sx -or $sx -is [string] -or (Test-PsSpInt $sx)) { $r.Errors += ('SLOT_SHAPE：' + $sw + ' headings 模式的 slot 須為物件'); continue }
+            foreach ($n in (Get-PsSpPropNames $sx)) { if (@('id', 'heading', 'placeholder') -notcontains $n) { $r.Errors += ('UNKNOWN_FIELD：' + $sw + '.' + $n) } }
+            $sid = [string](Get-PsSpProp $sx 'id')
+            $shd = Get-PsSpHeadingKey -Text ([string](Get-PsSpProp $sx 'heading'))
+            $stk = ([string](Get-PsSpProp $sx 'placeholder')).Trim()
+        }
+        else {
+            if (-not ($sx -is [string])) { $r.Errors += ('SLOT_SHAPE：' + $sw + ' markers 模式的 slot 須為字串 id'); continue }
+            $sid = [string]$sx
+        }
+        if ($sid -notmatch $script:PsSpSlotIdRx) { $r.Errors += ('BAD_ID：slot ' + $sid) }
+        if ($seenS.ContainsKey($sid)) { $r.Errors += ('DUP_ID：slot ' + $sid) } else { $seenS[$sid] = $true }
+        $slots += $sid
+        if ($null -ne $r.Template) {
+            if ($bm -eq 'markers') { if ($r.Markers -notcontains $sid) { $r.Errors += ('SLOT_NOT_IN_TEMPLATE：' + $sid) } }
+            else {
+                $hitsRaw = Get-PsSpHeadingHits -Headings $heads -Key $shd
+                $hits = @($hitsRaw)
+                if ($shd -eq '' -or $hits.Count -eq 0) { $r.Errors += ('SLOT_HEADING_MISSING：' + $sid) }
+                elseif ($hits.Count -gt 1) { $r.Errors += ('SLOT_HEADING_AMBIGUOUS：' + $sid + ' n=' + $hits.Count) }
+                elseif ($stk -ne '') {
+                    if ($stk -notmatch ('^' + $script:PsSpTokenRx + '$')) { $r.Errors += ('SLOT_PLACEHOLDER_MISSING：' + $sid) }
+                    else {
+                        $rg = Get-PsSpHeadingRange -Headings $heads -Ix $hits[0] -LineCount $tplLines.Count
+                        $hitN = 0
+                        for ($j = [int]$rg.Start; $j -lt [int]$rg.End; $j++) { $hitN += @([regex]::Matches([string]$tplLines[$j], [regex]::Escape($stk))).Count }
+                        if ($hitN -eq 0) { $r.Errors += ('SLOT_PLACEHOLDER_MISSING：' + $sid) }
+                        elseif ($hitN -gt 1) { $r.Errors += ('SLOT_PLACEHOLDER_AMBIGUOUS：' + $sid + ' n=' + $hitN) }
+                    }
+                }
+            }
+        }
+        $slotDefs += , ([ordered]@{ id = $sid; heading = $shd; placeholder = $stk })
+    }
+    $r.Slots = @($slotDefs)
+    if ($bm -eq 'markers') { foreach ($m in $r.Markers) { if ($slots -notcontains $m) { $r.Errors += ('MARKER_NOT_IN_SLOTS：' + $m) } } }
+    else { foreach ($m in $r.Markers) { $r.Errors += ('BINDING_MODE_MIXED：' + $m) } }
     $cks = @($p.checklist | ForEach-Object { [string]$_ })
     $seenC = @{}
     foreach ($c in $cks) {
@@ -334,6 +429,32 @@ function Test-PsSpPack {
         $norm += , ([ordered]@{ id = $id; slot = $slot; checklistRefs = @($crefs); factKind = $fk; mode = $mode; required = [bool]$req; applicability = $app; cardinality = $card; evidencePolicy = $pol; properties = @($props); context = $ctx })
     }
     foreach ($c in $cks) { if (-not $refC.ContainsKey($c)) { $r.Errors += ('CHECKLIST_UNREFERENCED：' + $c) } }
+    # placeholders（兩種模式都可用）：模板既有的文件參數 {{…}} → 本 pack 某個 requirement 產出的事實屬性（render 時有值才置換）
+    $phDefs = @()
+    $phRaw = Get-PsSpProp $p 'placeholders'
+    if ($null -ne $phRaw) {
+        $pi = 0
+        foreach ($ph in @($phRaw)) {
+            $pi++
+            $pw = 'placeholders[' + $pi + ']'
+            foreach ($n in (Get-PsSpPropNames $ph)) { if (@('text', 'fact') -notcontains $n) { $r.Errors += ('UNKNOWN_FIELD：' + $pw + '.' + $n) } }
+            $ptx = ([string](Get-PsSpProp $ph 'text')).Trim()
+            $pft = ([string](Get-PsSpProp $ph 'fact')).Trim()
+            if ($ptx -notmatch ('^' + $script:PsSpTokenRx + '$')) { $r.Errors += ('PLACEHOLDER_TEXT_MISSING：' + $pw) }
+            elseif ($null -ne $r.Template -and -not ($r.Template.Contains($ptx))) { $r.Errors += ('PLACEHOLDER_TEXT_MISSING：' + $pw) }
+            $pix = $pft.LastIndexOf('.')
+            if ($pix -le 0 -or $pix -ge $pft.Length - 1) { $r.Errors += ('PLACEHOLDER_FACT_UNKNOWN：' + $pw) }
+            else {
+                $pfk = $pft.Substring(0, $pix)
+                $pprop = $pft.Substring($pix + 1)
+                if (-not $fkProps.ContainsKey($pfk)) { $r.Errors += ('PLACEHOLDER_FACT_UNKNOWN：' + $pw + ' factKind 不在目錄：' + $pfk) }
+                elseif (@($fkProps[$pfk]) -notcontains $pprop) { $r.Errors += ('PLACEHOLDER_FACT_UNKNOWN：' + $pw + ' property 不在目錄：' + $pft) }
+                elseif (-not $byFk.ContainsKey($pfk)) { $r.Errors += ('PLACEHOLDER_FACT_UNKNOWN：' + $pw + ' ' + $pfk + ' 沒有任何 requirement 產出') }
+            }
+            $phDefs += , ([ordered]@{ text = $ptx; fact = $pft })
+        }
+    }
+    $r.Placeholders = @($phDefs)
     # 依賴無環（R → 產出其 applicability 所引 factKind 的 requirement；自我引用允許＝驗收後再判）
     $edges = @{}
     foreach ($q in $norm) {
@@ -374,9 +495,62 @@ function Test-PsSpPack {
     foreach ($q in $norm) { $bind += , ([ordered]@{ id = $q.id; slot = $q.slot }) }
     $th = ''
     if ($null -ne $r.Template) { $th = Get-PsKnTextHash -Text $r.Template }
-    $r.BindingHash = Get-PsKnTextHash -Text (ConvertTo-PsKnJson -Value ([ordered]@{ slots = @($slots); binding = @($bind); templateHash = $th }) -SortKeys)
+    $r.BindingHash = Get-PsKnTextHash -Text (ConvertTo-PsKnJson -Value ([ordered]@{ bindingMode = $bm; slots = @($slotDefs); placeholders = @($phDefs); binding = @($bind); templateHash = $th }) -SortKeys)
     $r.Ok = ($r.Errors.Count -eq 0)
     return $r
+}
+
+# 章節「自己的內文」（不含子章節）：標題行起，到下一個 ATX 標題（任意層級）前，或檔尾。
+# 只給 New-PsSpPackSkeleton 判斷自動綁定用；Get-PsSpHeadingRange（含子章節，供驗證／render 找章節範圍）維持不動。
+function Get-PsSpHeadingDirectRange {
+    param($Headings, [int]$Ix, [int]$LineCount)
+    $hs = @($Headings)
+    $end = $LineCount
+    if ($Ix + 1 -lt $hs.Count) { $end = [int]$hs[$Ix + 1].Index }
+    return @{ Start = [int]$hs[$Ix].Index; End = $end }
+}
+
+# -InitPack 骨架：模板副本每個章節標題一個 slot（文件標題 H1 不算——模板存在 H2 以上章節時跳過；
+# 該章節自己的內文——不含子章節——恰有一個原生 {{…}} 佔位符就一併綁上）；
+# 其餘 {{…}}（含被跳過之 H1 內文、以及 0／≥2 個原生佔位符的章節）進 placeholders（fact 待填或整筆刪掉）；
+# checklist／requirements 留空——填完前本來就過不了 -ValidatePack。
+function New-PsSpPackSkeleton {
+    param([string]$PackId, [string]$TemplateText, [string]$BindingMode = 'headings', [string]$TemplateName = 'template-bound.md')
+    $lnRaw = Get-PsKnLines -Text $TemplateText
+    $ls = @($lnRaw)
+    $slots = @()
+    $bound = @{}
+    if ($BindingMode -eq 'headings') {
+        $hh = Get-PsSpTemplateHeadings -Lines $ls
+        $heads = @($hh)
+        $hasSubHeading = $false
+        foreach ($h in $heads) { if ([int]$h.Level -ge 2) { $hasSubHeading = $true; break } }
+        for ($i = 0; $i -lt $heads.Count; $i++) {
+            if ([int]$heads[$i].Level -eq 1 -and $hasSubHeading) { continue }
+            $sid = 'S' + ($slots.Count + 1).ToString('00', [System.Globalization.CultureInfo]::InvariantCulture)
+            $drg = Get-PsSpHeadingDirectRange -Headings $heads -Ix $i -LineCount $ls.Count
+            $toks = @()
+            for ($j = [int]$drg.Start + 1; $j -lt [int]$drg.End; $j++) {
+                foreach ($m in [regex]::Matches([string]$ls[$j], $script:PsSpTokenRx)) { if (-not (Test-PsSpSlotMarker -Token $m.Value)) { $toks += $m.Value } }
+            }
+            $sl = [ordered]@{ id = $sid; heading = [string]$heads[$i].Text }
+            if ($toks.Count -eq 1) { $sl['placeholder'] = [string]$toks[0]; $bound[[string]$toks[0]] = $true }
+            $slots += , $sl
+        }
+    }
+    else {
+        foreach ($m in [regex]::Matches($TemplateText, '\{\{slot:([^}]*)\}\}')) { $v = $m.Groups[1].Value; if ($slots -notcontains $v) { $slots += $v } }
+    }
+    $phs = @()
+    $seen = @{}
+    foreach ($m in [regex]::Matches($TemplateText, $script:PsSpTokenRx)) {
+        $t = $m.Value
+        if (Test-PsSpSlotMarker -Token $t) { continue }
+        if ($bound.ContainsKey($t) -or $seen.ContainsKey($t)) { continue }
+        $seen[$t] = $true
+        $phs += , ([ordered]@{ text = $t; fact = '' })
+    }
+    return ([ordered]@{ schemaVersion = $script:PsSpecSchemaVersion; packId = $PackId; packVersion = 1; reviewedVersion = 0; template = $TemplateName; bindingMode = $BindingMode; slots = @($slots); placeholders = @($phs); checklist = @(); requirements = @() })
 }
 
 # ── 三值 applicability ────────────────────────────────────────────
@@ -2138,7 +2312,7 @@ function Get-PsSpGate {
 function ConvertTo-PsSpCell { param([string]$V) if ($null -eq $V) { return '' }; return (($V -replace '\|', '／') -replace "[`r`n]+", ' ').Trim() }
 function ConvertTo-PsSpTable {
     param([string[]]$Header, $Rows)
-    $o = @('| ' + ($Header -join ' | ') + ' |', (Get-PsSpTableSep -Cols $Header.Count))
+    $o = @(('| ' + ($Header -join ' | ') + ' |'), (Get-PsSpTableSep -Cols $Header.Count))
     foreach ($r in @($Rows)) { $o += ('| ' + (@($r | ForEach-Object { ConvertTo-PsSpCell ([string]$_) }) -join ' | ') + ' |') }
     return , $o
 }
@@ -2199,6 +2373,118 @@ function ConvertTo-PsSpBlock {
     return , $o
 }
 
+# 佔位符的值：純量原樣、清單以 、 串接（一律單行；物件與空值＝無值）
+function ConvertTo-PsSpPlaceholderParts {
+    param($V)
+    $out = @()
+    if ($null -eq $V) { return , $out }
+    if ($V -is [string] -or $V -is [bool] -or (Test-PsSpInt $V)) {
+        $s = ((([string]$V) -replace "[`r`n]+", ' ')).Trim()
+        if ($s -ne '') { $out += $s }
+        return , $out
+    }
+    if ($V -is [System.Collections.IDictionary]) { return , $out }
+    if ($V -is [System.Collections.IEnumerable]) {
+        foreach ($x in @($V)) {
+            if ($x -is [string] -or $x -is [bool] -or (Test-PsSpInt $x)) {
+                $s = ((([string]$x) -replace "[`r`n]+", ' ')).Trim()
+                if ($s -ne '' -and $out -notcontains $s) { $out += $s }
+            }
+        }
+        return , $out
+    }
+    return , $out
+}
+
+# pack.placeholders → @(@{ text; fact; value; has }）：值取自本次 render 的事實（無值就不置換，trace 記 待人工）
+function Get-PsSpPlaceholderMap {
+    param($PackV, $Evals)
+    $out = @()
+    $phs = @($PackV.Placeholders)
+    if ($phs.Count -eq 0) { return , $out }
+    $acc = @{}
+    foreach ($e in @($Evals)) {
+        if ([string]$e.Applicable -eq 'FALSE') { continue }
+        foreach ($f in @($e.Facts)) {
+            $fk = [string]$f.factKind
+            foreach ($pn in (Get-PsSpPropNames $f.value)) {
+                $raw = Get-PsSpProp $f.value $pn
+                $partsRaw = ConvertTo-PsSpPlaceholderParts -V $raw
+                $parts = @($partsRaw)
+                if ($parts.Count -eq 0) { continue }
+                $key = $fk + '.' + $pn
+                if (-not $acc.ContainsKey($key)) { $acc[$key] = @() }
+                foreach ($one in $parts) { if ($acc[$key] -notcontains $one) { $acc[$key] += $one } }
+            }
+        }
+    }
+    foreach ($ph in $phs) {
+        $fact = [string]$ph.fact
+        $val = ''
+        if ($acc.ContainsKey($fact)) { $val = (@($acc[$fact]) -join '、') }
+        $out += , ([ordered]@{ text = [string]$ph.text; fact = $fact; value = $val; has = ($val -ne '') })
+    }
+    return , $out
+}
+
+# headings 綁定：slot 區塊放進對應章節——有原生佔位符就置換該佔位符（獨佔一行＝整行換掉，行內＝原地換字），
+# 沒有就補在該章節最後一個非空行之後（前空一行；下一個標題前保留一個空行）。模板其餘 {{…}} 原樣不動。
+function ConvertTo-PsSpHeadingBound {
+    param([string]$Text, $PackV, $BySlot)
+    $lines = @($Text -split "`n")
+    $hh = Get-PsSpTemplateHeadings -Lines $lines
+    $heads = @($hh)
+    $edits = @()
+    foreach ($sl in @($PackV.Slots)) {
+        $sid = [string]$sl.id
+        if (-not $BySlot.ContainsKey($sid)) { continue }
+        $content = (($BySlot[$sid] -join "`n").TrimEnd())
+        if ($content -eq '') { continue }
+        $block = @($content -split "`n")
+        $hitsRaw = Get-PsSpHeadingHits -Headings $heads -Key ([string]$sl.heading)
+        $hits = @($hitsRaw)
+        if ($hits.Count -ne 1) { continue }
+        $rg = Get-PsSpHeadingRange -Headings $heads -Ix $hits[0] -LineCount $lines.Count
+        $tok = [string]$sl.placeholder
+        if ($tok -ne '') {
+            $li = -1
+            for ($j = [int]$rg.Start; $j -lt [int]$rg.End; $j++) { if (([string]$lines[$j]).Contains($tok)) { $li = $j; break } }
+            if ($li -lt 0) { continue }
+            $ln = [string]$lines[$li]
+            if ($ln.Trim() -ceq $tok) { $edits += , @{ Start = $li; Count = 1; Lines = @($block) } }
+            else { $edits += , @{ Start = $li; Count = 1; Lines = @(($ln.Replace($tok, ($block -join "`n"))) -split "`n") } }
+            continue
+        }
+        $k = [int]$rg.Start
+        for ($j = [int]$rg.End - 1; $j -gt [int]$rg.Start; $j--) { if (([string]$lines[$j]).Trim() -ne '') { $k = $j; break } }
+        $tail = @('') + $block
+        if ([int]$rg.End -lt $lines.Count) { $tail += '' }
+        $edits += , @{ Start = ($k + 1); Count = ([int]$rg.End - $k - 1); Lines = $tail }
+    }
+    # 依起始行穩定排序（同位置照 slot 順序），再一次走完：重疊的後者跳過，確保 render 可重現
+    $ordered = @()
+    foreach ($ed in $edits) {
+        $pos = 0
+        while ($pos -lt $ordered.Count -and [int]$ordered[$pos].Start -le [int]$ed.Start) { $pos++ }
+        $tmp = @()
+        for ($j = 0; $j -lt $pos; $j++) { $tmp += , $ordered[$j] }
+        $tmp += , $ed
+        for ($j = $pos; $j -lt $ordered.Count; $j++) { $tmp += , $ordered[$j] }
+        $ordered = @($tmp)
+    }
+    $out = @()
+    $i = 0
+    foreach ($ed in $ordered) {
+        $st = [int]$ed.Start
+        if ($st -lt $i) { continue }
+        while ($i -lt $st) { $out += [string]$lines[$i]; $i++ }
+        foreach ($bl in @($ed.Lines)) { $out += [string]$bl }
+        $i = $st + [int]$ed.Count
+    }
+    while ($i -lt $lines.Count) { $out += [string]$lines[$i]; $i++ }
+    return ($out -join "`n")
+}
+
 function ConvertTo-PsSpSpec {
     param($PackV, $Evals, $Capabilities)
     $bySlot = @{}
@@ -2209,11 +2495,17 @@ function ConvertTo-PsSpSpec {
         $bySlot[$slot] += ''
     }
     $text = $PackV.Template -replace "`r", ''
-    foreach ($s in @($PackV.Pack.slots | ForEach-Object { [string]$_ })) {
-        $content = ''
-        if ($bySlot.ContainsKey($s)) { $content = (($bySlot[$s] -join "`n").TrimEnd()) }
-        $text = $text.Replace('{{slot:' + $s + '}}', $content)
+    if ([string]$PackV.BindingMode -eq 'headings') { $text = ConvertTo-PsSpHeadingBound -Text $text -PackV $PackV -BySlot $bySlot }
+    else {
+        foreach ($sl in @($PackV.Slots)) {
+            $s = [string]$sl.id
+            $content = ''
+            if ($bySlot.ContainsKey($s)) { $content = (($bySlot[$s] -join "`n").TrimEnd()) }
+            $text = $text.Replace('{{slot:' + $s + '}}', $content)
+        }
     }
+    $phRaw = Get-PsSpPlaceholderMap -PackV $PackV -Evals $Evals
+    foreach ($ph in @($phRaw)) { if ([bool]$ph.has) { $text = $text.Replace([string]$ph.text, [string]$ph.value) } }
     if (-not $text.EndsWith("`n")) { $text += "`n" }
     return $text
 }
@@ -2221,6 +2513,17 @@ function ConvertTo-PsSpSpec {
 function ConvertTo-PsSpTrace {
     param($Plan, $PackV, $Evals, [string]$Generation)
     $o = @('# Spec trace（機械產生）', '', ('generation：' + $Generation.Substring(0, 16) + '　plan：' + (Get-PsSpPlanRef -Plan $Plan) + '　pack：' + $PackV.PackId + ' v' + $PackV.PackVersion + '（reviewed ' + $PackV.ReviewedVersion + '）　content：' + $PackV.ContentHash.Substring(0, 16) + '　binding：' + $PackV.BindingHash.Substring(0, 16)), ('component：' + [string]$Plan.component + '　domain：' + [string]$Plan.domain), '')
+    $phRaw = Get-PsSpPlaceholderMap -PackV $PackV -Evals $Evals
+    $phs = @($phRaw)
+    if ($phs.Count -gt 0) {
+        $o += @('## 佔位符', '', '| 佔位符 | 事實 | 狀態 |', '|---|---|---|')
+        foreach ($ph in $phs) {
+            $st = '待人工（無值）'
+            if ([bool]$ph.has) { $st = '已置換' }
+            $o += ('| ' + (ConvertTo-PsSpCell ([string]$ph.text)) + ' | ' + (ConvertTo-PsSpCell ([string]$ph.fact)) + ' | ' + $st + ' |')
+        }
+        $o += ''
+    }
     foreach ($e in $Evals) {
         $q = $e.Req
         $o += ('## ' + [string]$q.id + ' ' + [string]$q.factKind + '（' + [string]$q.mode + '）')

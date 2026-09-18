@@ -53,8 +53,10 @@ stage：0 integrity／1 pack／2 plan／3 dispatch／4 accept／5 knowledge／6 
 | 0 | 05-`<n>` | DRILL：印了 n 行 tuple（-Drill） | 0 |
 | 1 | 01 | VALID（結構合法且 reviewedVersion＝packVersion） | 0 |
 | 1 | 02 | NOT_FOUND：pack 目錄或 pack.json 不存在 | 2 |
-| 1 | 03-`<n>` | INVALID：n 個驗證錯誤（未知欄位／ID 重複／checklist 未引用／slot 與模板標記不對應／factKind、property、context 不在目錄／依賴成環／required 非 bool） | 1 |
-| 1 | 04 | TEMPLATE_MISSING | 1 |
+| 1 | 03-`<n>` | INVALID：n 個驗證錯誤（未知欄位／ID 重複／checklist 未引用／slot 與模板標記不對應／factKind、property、context 不在目錄／依賴成環／required 非 bool／綁定類：`BINDING_MODE_UNKNOWN`、`BINDING_MODE_MIXED`、`SLOT_SHAPE`、`SLOT_HEADING_MISSING`、`SLOT_HEADING_AMBIGUOUS`、`SLOT_PLACEHOLDER_MISSING`、`SLOT_PLACEHOLDER_AMBIGUOUS`、`PLACEHOLDER_TEXT_MISSING`、`PLACEHOLDER_FACT_UNKNOWN`；原因碼只印 slot／placeholders 的序號與 id，不印章節標題與佔位符原文） | 1 |
+| 1 | 04 | TEMPLATE_MISSING（含 -InitPack 讀不到 -Template 指定的檔） | 1 |
+| 1 | 05 | INIT_WRITTEN：-InitPack 已建 `.ps-private/spec/<packId>/`（模板副本原樣複製＋pack.json 骨架；骨架填完前 -ValidatePack 本來就回 1-03） | 0 |
+| 1 | 06 | INIT_EXISTS：-InitPack 的 pack 目錄已存在——不覆寫（換 packId，或自行備份後移走再建） | 2 |
 | 2 | 01-`<n>` | PLANNED：新 plan 已寫（plans/&lt;planHash&gt;/plan.json），n＝COMPOSE 單位數 | 0 |
 | 2 | 02-`<n>` | PLAN_REUSED：planHash 未變（同輸入） | 0 |
 | 2 | 03 | IDENTITY_NOT_FOUND：索引中沒有以該 Component 為主物件的 NN（給 -DomainHint 可改為提交 KnowledgeNeed → 5-01） | 1 |
@@ -111,6 +113,24 @@ stage：0 integrity／1 pack／2 plan／3 dispatch／4 accept／5 knowledge／6 
 | 9 | 05 | BAD_ID：jobId／packId 不符 `^[a-z0-9][a-z0-9-]{0,31}$`，或 Component 不符物件名文法 | 2 |
 | 9 | 06 | LIB_VERSION：dot-source 的 lib 版本不符 | 2 |
 | 9 | 07 | RUNTIME_ROOT：-Run 派真 worker 時 -RuntimeRoot 不是 <Root>/.ps-runtime/spec（worker 的 command 與 permission 把工單固定在該路徑；-RuntimeRoot 只供 -FakeWorker 測試） | 2 |
+
+### 1-03 綁定類原因碼（`-ValidatePack` 印在本機的 PACK 行）
+
+`bindingMode` 預設 `markers`（模板插 `{{slot:Sxx}}`，行為與過去相同）；`headings` 是把 slot 綁到公司 Template 既有的章節標題與該章節內的原生佔位符，模板副本一個字都不改。
+
+| 原因碼 | 意義 |
+|---|---|
+| `BINDING_MODE_UNKNOWN` | `bindingMode` 不是 `markers`／`headings` |
+| `BINDING_MODE_MIXED` | `headings` 模式的模板裡還有 `{{slot:Sxx}}` 標記 |
+| `SLOT_SHAPE` | slot 形狀不對（`headings` 要物件、`markers` 要字串 id） |
+| `SLOT_HEADING_MISSING` | slot 的 `heading` 在模板找不到對應標題 |
+| `SLOT_HEADING_AMBIGUOUS` | slot 的 `heading` 命中多個標題 |
+| `SLOT_PLACEHOLDER_MISSING` | slot 的 `placeholder` 不是 `{{…}}`，或不在該章節內 |
+| `SLOT_PLACEHOLDER_AMBIGUOUS` | slot 的 `placeholder` 在該章節出現多次 |
+| `PLACEHOLDER_TEXT_MISSING` | `placeholders` 的 `text` 不是 `{{…}}`，或模板裡沒有 |
+| `PLACEHOLDER_FACT_UNKNOWN` | `placeholders` 的 `fact` 不是 `<factKind>.<property>`、property 不在能力目錄，或該 factKind 沒有任何 requirement 產出 |
+
+render 時：有 `placeholder` 的 slot 置換該佔位符（獨佔一行＝整行換掉，行內＝原地換字），沒有的補在該章節最後一個非空行之後；`placeholders` 的事實有值才置換（多值以、串接、保持單行），沒值就原樣留著並在 trace 記「待人工」；沒登錄的 `{{…}}`（例如要人補的圖）永遠不動。
 
 ### 4-02 INVALID 的原因碼（verdict.reasons；drill 4-02 的 r=）
 

@@ -441,3 +441,11 @@ auto-all／auto-loop 三處改「先指派再 @()」，test-ps51-static 新增 B
 | G | 掃除非合成名時把它原文寫進 HANDOFF | 改寫敘述；合成識別字守衛擴到 HANDOFF／docs/design／auto-loop 腳本與測試 |
 
 駁回 5 項不採（復原只讀最後一個 attempt 的 outcome、Evidence 附錄前綴規則、`/ps-supplement` 的 `｜` 禁令、worker 跨 attempt 圍欄 ×2）；其中 `/ps-supplement` 的分格例外順手補上。
+
+## 12. Template 綁定改為標題綁定（headings）
+
+原設計要人在 Template 插 `{{slot:Sxx}}`；管理者指出 Template 已有自帶意義的 `{{…}}` 參數與引導式佔位符、章節也已定好，要填的是章節底下的內容。
+裁決：`bindingMode: headings`——slot＝章節標題（必須唯一）＋（可選）章節內恰一次出現的原生佔位符；有佔位符就取代、沒有就補在章節末；
+文件參數 `placeholders: [{text, fact}]` 有值就代入、無值保留並在 trace 列 待人工；其他 `{{…}}` 不動；headings 模式禁止 `{{slot:`。
+綁定 hash 含 bindingMode／標題／佔位符，綁定一改就等同模板改版。`-InitPack` 從 Template 掃標題與佔位符產骨架（一節恰一個佔位符才自動綁，
+兩個以上留給人決定）。`{{slot:Sxx}}`（markers）保留給合成範例與相容。結論碼與 drill 永不印標題或佔位符文字。

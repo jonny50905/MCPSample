@@ -4,7 +4,8 @@
 #       pack 驗證負例、兩套 pack 對同一合成 NN 產不同 spec、EXTRACT facts、COMPOSE manifest／context／條目列舉、
 #       假 worker（合格／不合格／超長／含模板行／來源改變）、input.json 快照與來源改變拒收（不記 attempt）、receipt 鍵含指紋、
 #       re-plan 重用收據、WAITING_KNOWLEDGE／WAITING_AUDIT 不重送、render parity、render 前來源重驗、gate 覆蓋與 UNKNOWN debt、
-#       drill tuple 形狀、doctor stage 0、jobId 文法、結論碼形狀、一條需求引用多個 checklist、ENTITY.DETAIL 的現況等級只看 wiki。
+#       drill tuple 形狀、doctor stage 0、jobId 文法、結論碼形狀、一條需求引用多個 checklist、ENTITY.DETAIL 的現況等級只看 wiki、
+#       headings 綁定（slot 綁章節標題與模板原生佔位符、文件參數置換、新驗證原因碼、render parity）、-InitPack 骨架。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
 . (Join-Path $repoRoot 'scripts/ps-knowledge-lib.ps1')
@@ -908,6 +909,114 @@ $gG3 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsG.Outputs (([st
 $f22G = @($gG3.findings | Where-Object { $_.code -eq '7-22' -and $_.requirementId -eq 'R07' })
 Assert ($c -match '^SPEC1-7-02-\d+$' -and $script:lastExit -eq 1 -and $f22G.Count -eq 1 -and [string]$f22G[0].factKind -eq 'ENTITY.DETAIL' -and [string]$f22G[0].c -eq 'PARTIAL') "wiki 的 ChunkId 被稽核標 FAIL（effective STALE_BY_SOURCE）→ ENTITY.DETAIL 的 7-22 照常出（c=PARTIAL）"
 [System.IO.File]::WriteAllBytes($auditP, $auditG)
+
+# ── 情境 22：headings 綁定（pack-c）——章節標題＋模板原生佔位符，模板副本原樣 ──
+Write-Host "情境 22：headings 綁定——slot 綁章節標題與章節內原生佔位符（無佔位符就補在章節末）、文件參數 placeholders 置換、新驗證原因碼、render parity"
+$c = Invoke-Cli @{ ValidatePack = $true; Pack = 'pack-c'; PrivateRoot = $examples }
+Assert ($c -eq 'SPEC1-1-01' -and $script:lastExit -eq 0) "CLI -ValidatePack 直接驗 examples/pack-c（headings 範例包原樣）→ SPEC1-1-01"
+# 私有目錄名＝packId：複製成 pack-hc（情境 7 已占用 pack-c 這個私有包名）
+Copy-Item -LiteralPath (Join-Path $examples 'pack-c') -Destination (Join-Path $priv 'pack-hc') -Recurse
+$phcT = [System.IO.File]::ReadAllText((Join-Path $priv 'pack-hc/pack.json'))
+[System.IO.File]::WriteAllText((Join-Path $priv 'pack-hc/pack.json'), $phcT.Replace('"packId": "pack-c"', '"packId": "pack-hc"'), (New-Object System.Text.UTF8Encoding($false)))
+$vc = Test-PsSpPack -PackDir (Join-Path $priv 'pack-hc') -Capabilities $caps
+$vcSlots = @($vc.Slots)
+Assert ($vc.Ok -and $vc.Signed -and [string]$vc.BindingMode -eq 'headings' -and $vcSlots.Count -eq 4 -and @($vc.Placeholders).Count -eq 2 -and [string]$vcSlots[0].placeholder -ne '' -and [string]$vcSlots[3].placeholder -eq '' -and @($vc.Markers).Count -eq 0) "pack-hc（examples/pack-c 的副本）合法：headings 模式、4 個 slot（末一個無原生佔位符）、2 筆 placeholders、模板沒有任何 {{slot:}} 標記"
+$c = Invoke-Cli @{ ValidatePack = $true; Pack = 'pack-hc' }
+Assert ($c -eq 'SPEC1-1-01' -and $script:lastExit -eq 0) "CLI -ValidatePack pack-hc（headings）→ SPEC1-1-01"
+function New-BadPackC([string]$Name, [scriptblock]$Mutate, [string]$Template = '') {
+    $d = Join-Path $priv $Name
+    New-Item -ItemType Directory -Path $d -Force | Out-Null
+    $p = (Read-PsKnText -LiteralPath (Join-Path $priv 'pack-hc/pack.json')) | ConvertFrom-Json
+    $p.packId = $Name
+    & $Mutate $p
+    [System.IO.File]::WriteAllText((Join-Path $d 'pack.json'), (ConvertTo-PsKnJson -Value $p), (New-Object System.Text.UTF8Encoding($false)))
+    if ($Template -eq '') { $Template = Read-PsKnText -LiteralPath (Join-Path $priv 'pack-hc/template-bound.md') }
+    [System.IO.File]::WriteAllText((Join-Path $d 'template-bound.md'), $Template, (New-Object System.Text.UTF8Encoding($false)))
+    return (Test-PsSpPack -PackDir $d -Capabilities $caps)
+}
+$tplC = Read-PsKnText -LiteralPath (Join-Path $priv 'pack-hc/template-bound.md')
+$r = New-BadPackC 'bad-bm' { param($p) $p.bindingMode = 'both' }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'BINDING_MODE_UNKNOWN') "負例：bindingMode 不在值域"
+$r = New-BadPackC 'bad-mixed' { param($p) } ($tplC + "`n{{slot:S09}}`n")
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'BINDING_MODE_MIXED') "負例：headings 模式的模板混用 {{slot:Sxx}} 標記"
+$r = New-BadPackC 'bad-shape' { param($p) $p.slots[0] = 'S01' }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'SLOT_SHAPE') "負例：headings 模式的 slot 不是物件"
+$r = New-BadPack 'bad-shape2' { param($p) $p.slots[0] = ([pscustomobject]@{ id = 'S01'; heading = '一' }) }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'SLOT_SHAPE') "負例：markers 模式的 slot 不是字串 id"
+$r = New-BadPackC 'bad-head' { param($p) $p.slots[0].heading = '沒有這個章節' }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'SLOT_HEADING_MISSING：S01') "負例：slot 的章節標題不在模板"
+$r = New-BadPackC 'bad-head2' { param($p) } ($tplC + "`n## 一、功能概述`n`n（重複章節）`n")
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'SLOT_HEADING_AMBIGUOUS：S01') "負例：slot 的章節標題在模板出現兩次"
+$r = New-BadPackC 'bad-ph' { param($p) $p.slots[0].placeholder = '{{沒有這個佔位符}}' }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'SLOT_PLACEHOLDER_MISSING：S01') "負例：slot 的原生佔位符不在該章節"
+$r = New-BadPackC 'bad-ph2' { param($p) } ($tplC.Replace('{{寫入功能概述}}', ('{{寫入功能概述}}' + "`n`n" + '{{寫入功能概述}}')))
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'SLOT_PLACEHOLDER_AMBIGUOUS：S01') "負例：slot 的原生佔位符在該章節出現兩次"
+$r = New-BadPackC 'bad-pt' { param($p) $p.placeholders[0].text = '{{NO_SUCH_PARAM}}' }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'PLACEHOLDER_TEXT_MISSING') "負例：placeholders 的 text 不在模板"
+$r = New-BadPackC 'bad-pf' { param($p) $p.placeholders[0].fact = 'UI.COMPONENT_IDENTITY.nope' }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'PLACEHOLDER_FACT_UNKNOWN') "負例：placeholders 的 fact 的 property 不在能力目錄"
+$r = New-BadPackC 'bad-pf2' { param($p) $p.placeholders[0].fact = 'GAPS.items' }
+Assert ((-not $r.Ok) -and ($r.Errors -join ';') -match 'PLACEHOLDER_FACT_UNKNOWN') "負例：placeholders 的 fact 的 factKind 沒有任何 requirement 產出"
+$r = New-BadPackC 'bind-hash' { param($p) $p.slots[3].heading = '五、附註' }
+Assert ($r.Ok -and $r.ContentHash -ceq $vc.ContentHash -and $r.BindingHash -cne $vc.BindingHash) "只改綁定（換一個章節標題）：contentHash 不變、bindingHash 變（綁定改動與模板改動同級）"
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-hc'; Component = 'TW_DEMO_A'; Pack = 'pack-hc' }
+Assert ($c -match '^SPEC1-2-01-\d+$' -and $script:lastExit -eq 0) "-Plan pack-hc（headings 綁定）→ SPEC1-2-01-<units>"
+$env:PS_SPEC_FAKE_MODE = 'valid'
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-hc'; MaxSessions = 9; FakeWorker = $fake }
+Assert ($c -match '^SPEC1-3-01-\d+$' -and $script:lastExit -eq 0) "-Run pack-hc：假 worker 收齊收據"
+$c = Invoke-Cli @{ Render = $true; JobId = 'job-hc' }
+$dirsHc = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'pack-hc' -JobId 'job-hc'
+$curC = Read-PsSpJsonFile -LiteralPath $dirsHc.CurrentFile
+$outC = Join-Path $dirsHc.Outputs (([string]$curC.generation).Substring(0, 16).ToLowerInvariant())
+$specC1 = [System.IO.File]::ReadAllBytes((Join-Path $outC 'spec.md'))
+$traceC1 = [System.IO.File]::ReadAllBytes((Join-Path $outC 'trace.md'))
+$specC = [System.Text.Encoding]::UTF8.GetString($specC1)
+$traceC = [System.Text.Encoding]::UTF8.GetString($traceC1)
+Assert ($c -eq 'SPEC1-6-01' -and $specC -notmatch '\{\{寫入功能概述\}\}' -and $specC -match "## 一、功能概述`n`n<!-- R01 UI\.COMPONENT_IDENTITY -->" -and $specC -match '\| 物件 \| TW_DEMO_A \|') "render headings：章節內的原生佔位符整行換成該 slot 區塊"
+Assert ($specC -match "（本章沒有原生佔位符：引擎把內容補在章節末。）`n`n<!-- R10 DATA\.FLOW -->" -and $specC -match "`n`n## 五、附註" -and $specC -notmatch "`n`n`n## 五、附註") "render headings：沒有佔位符的 slot 補在章節最後一個非空行之後（前空一行、下一個標題前保留一個空行）"
+Assert ($specC -match '# 示範功能 功能規格書' -and $specC -notmatch 'PRODUCT_NAME') "render headings：文件參數 {{PRODUCT_NAME}} 換成身分事實的值"
+Assert ($specC -match '\{\{DOC_ID\}\}' -and $specC -match '\{\{DOC_VERSION\}\}' -and $specC -match '\{\{插入流程圖與說明\}\}') "render headings：沒有值的 placeholders 與未登錄的 {{…}}（含圖這種引擎產不出的內容）原樣留著"
+Assert ($traceC -match '(?m)^\| \{\{DOC_ID\}\} \| DATA\.FILE_INPUT\.layout \| 待人工（無值） \|$' -and $traceC -match '(?m)^\| \{\{PRODUCT_NAME\}\} \| UI\.COMPONENT_IDENTITY\.functionName \| 已置換 \|$') "trace：佔位符表逐列記狀態（無值＝待人工）"
+$c = Invoke-Cli @{ Render = $true; JobId = 'job-hc' }
+$specC2 = [System.IO.File]::ReadAllBytes((Join-Path $outC 'spec.md'))
+$traceC2 = [System.IO.File]::ReadAllBytes((Join-Path $outC 'trace.md'))
+Assert ($c -eq 'SPEC1-6-01' -and [System.Linq.Enumerable]::SequenceEqual($specC1, $specC2) -and [System.Linq.Enumerable]::SequenceEqual($traceC1, $traceC2)) "render parity（headings 模式）：重 render spec.md／trace.md byte 相同"
+$c = Invoke-Cli @{ Render = $true; JobId = 'job-a' }
+Assert ($c -eq 'SPEC1-6-01') "markers 模式不受影響：pack-a 照常 render"
+
+# ── 情境 23：-InitPack 骨架 ──────────────────────────────────────
+Write-Host "情境 23：-InitPack 產 pack 骨架（模板副本原樣、slot 由章節標題產生——文件標題 H1 不算、該章節自己的直接內文恰一個原生佔位符就一併綁上、其餘 {{…}} 進 placeholders）；重跑＝1-06；骨架本來就過不了 -ValidatePack"
+$priv2 = Join-Path $root 'private2'
+$tplSrc = Join-Path (Join-Path $examples 'pack-c') 'template-bound.md'
+$c = Invoke-Cli @{ InitPack = $true; Pack = 'initdemo'; PrivateRoot = $priv2; Template = $tplSrc }
+$initDir = Join-Path $priv2 'initdemo'
+$skel = Read-PsSpJsonFile -LiteralPath (Join-Path $initDir 'pack.json')
+$skelSlots = @($skel.slots)
+$skelPhs = @($skel.placeholders | ForEach-Object { [string]$_.text })
+$withPh = @($skelSlots | Where-Object { $null -ne $_.placeholder })
+Assert ($c -eq 'SPEC1-1-05' -and $script:lastExit -eq 0 -and [string]$skel.bindingMode -eq 'headings' -and [int]$skel.packVersion -eq 1 -and [int]$skel.reviewedVersion -eq 0 -and $skelSlots.Count -eq 6 -and $withPh.Count -eq 4 -and @($skel.checklist).Count -eq 0 -and @($skel.requirements).Count -eq 0) "-InitPack → SPEC1-1-05 exit 0：每個章節標題一個 slot（文件標題 H1 不算；該章節自己的直接內文恰一個原生佔位符就一併綁上）、checklist／requirements 留空"
+Assert ($skelSlots[0].heading -eq '一、功能概述' -and $skelSlots[1].heading -eq '二、作業流程' -and $skelSlots[2].heading -eq '2.1 流程圖' -and $skelSlots[3].heading -eq '三、畫面與欄位' -and $skelSlots[4].heading -eq '四、資料與檔案' -and $skelSlots[5].heading -eq '五、附註' -and (@($skelSlots | Where-Object { $_.heading -match 'PRODUCT_NAME' })).Count -eq 0) "-InitPack：文件標題（H1，含 {{PRODUCT_NAME}}）在模板存在 H2 以上章節時不產生 slot，S01 從第一個章節標題開始編號"
+Assert ([string]$skelSlots[1].placeholder -eq '{{寫入流程說明}}' -and [string]$skelSlots[2].placeholder -eq '{{插入流程圖與說明}}' -and ($skelPhs -notcontains '{{寫入流程說明}}')) "-InitPack：子章節（2.1 流程圖）自己的佔位符不算進父章節（二、作業流程）的直接內文，父章節照樣綁到自己那一個、不會落入 placeholders"
+Assert (($skelPhs -contains '{{PRODUCT_NAME}}') -and ($skelPhs -contains '{{DOC_ID}}') -and ($skelPhs -contains '{{DOC_VERSION}}') -and ($skelPhs -notcontains '{{列出畫面欄位}}') -and (@($skelPhs)).Count -eq 3 -and ([string]$skel.placeholders[0].fact) -eq '') "-InitPack：沒被 slot 綁走的 {{…}}（含被跳過的文件標題內文）都進 placeholders，fact 留空待填或刪"
+Assert ((Get-PsKnFileHash -LiteralPath (Join-Path $initDir 'template-bound.md')) -ceq (Get-PsKnFileHash -LiteralPath $tplSrc) -and $script:lastOut -match '\.gitignore') "-InitPack：模板副本原樣複製（內容 hash 相同）；沒有 .ps-private/ 那行時印警告"
+$c = Invoke-Cli @{ InitPack = $true; Pack = 'initdemo'; PrivateRoot = $priv2; Template = $tplSrc }
+Assert ($c -eq 'SPEC1-1-06' -and $script:lastExit -eq 2) "-InitPack 對已存在的 pack 目錄 → SPEC1-1-06 exit 2（不覆寫）"
+$c = Invoke-Cli @{ ValidatePack = $true; Pack = 'initdemo'; PrivateRoot = $priv2 }
+Assert ($c -match '^SPEC1-1-03-\d+$' -and $script:lastExit -eq 1) "骨架未填完 → -ValidatePack SPEC1-1-03-<n>（requirements 為空、placeholders 的 fact 待填）"
+$tplA = Join-Path (Join-Path $examples 'pack-a') 'template-bound.md'
+$c = Invoke-Cli @{ InitPack = $true; Pack = 'initmark'; PrivateRoot = $priv2; BindingMode = 'markers'; Template = $tplA }
+$skelM = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $priv2 'initmark') 'pack.json')
+$skelMSlots = @($skelM.slots)
+Assert ($c -eq 'SPEC1-1-05' -and [string]$skelM.bindingMode -eq 'markers' -and $skelMSlots.Count -eq 7 -and ([string]$skelMSlots[0]) -eq 'S01' -and @($skelM.placeholders).Count -eq 0) "-InitPack -BindingMode markers：slots 收模板既有的 {{slot:Sxx}} 標記、仍是字串 id"
+$c = Invoke-Cli @{ InitPack = $true; Pack = 'initnotpl'; PrivateRoot = $priv2; Template = (Join-Path $root 'no-such-template.md') }
+Assert ($c -eq 'SPEC1-1-04' -and $script:lastExit -eq 1) "-InitPack 讀不到 -Template 指定的檔 → SPEC1-1-04"
+$c = Invoke-Cli @{ InitPack = $true; Pack = 'initbad'; PrivateRoot = $priv2; BindingMode = 'nope' }
+Assert ($c -eq 'SPEC1-9-01' -and $script:lastExit -eq 2) "-InitPack -BindingMode 值域外 → SPEC1-9-01"
+
+# ── 情境 24：render 表格形狀 ──
+Write-Host "情境 24：render 的表格是合法 Markdown 表（表頭列與分隔列各自一行）"
+$tblLines = ConvertTo-PsSpTable -Header @('項目', '值') -Rows @(, @('a', 'b'))
+Assert (@($tblLines).Count -eq 3 -and @($tblLines)[0] -eq '| 項目 | 值 |' -and @($tblLines)[1] -match '^\|---' -and @($tblLines)[2] -eq '| a | b |') "ConvertTo-PsSpTable：表頭、分隔列、資料列各自一行（分隔列不再被併進表頭）"
 
 Remove-Item -Recurse -Force $root
 Write-Host ""

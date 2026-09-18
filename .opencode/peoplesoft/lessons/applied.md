@@ -3464,3 +3464,23 @@
 - 落點：profile 前綴註解改回管理者的定義（客製物件全域前綴，不含地區、語系或國別意義）；守衛的前綴改讀 customPrefixes（缺檔退回預設）。
 - 教訓：模型讀的設定檔只寫管理者給的定義，任何「這個縮寫大概是什麼意思」都不寫；審查者標出的名字一律當「session 自己造的」處理——
   刪掉換合成名，永遠不加白名單；前綴這種單一真相只能在 profile 定義一次，守衛與測試都從它讀。
+
+### L126 綁定要用 Template 自己的結構，不要叫人改 Template（2026-09-18）
+
+- 症狀：Spec 需求包原本要人在公司 Template 裡插 `{{slot:Sxx}}` 標記，但 Template 本來就有自己的 `{{PRODUCT_NAME}}`、
+  `{{Insert business process flow diagram + narrative}}` 這類參數與引導式佔位符，章節也早就定好；標記語法撞車、章節結構重複，
+  Template 副本無法原樣使用。
+- 根因：設計時把「內容落在哪」當成需要人工標記的事，沒有先看 Template 已經表達了什麼。
+- 落點：`bindingMode: headings`——slot 綁章節標題（唯一）＋章節內的原生佔位符（有就取代、沒有就補在章節末）；文件參數
+  用 `placeholders` 表對到事實；其他 `{{…}}` 一律不動；`-InitPack` 從 Template 掃標題與佔位符產骨架；`{{slot:Sxx}}` 只留給合成範例。
+  同時修掉 render 表格分隔列被併進表頭（`,` 比 `+` 先繫結）的 bug。
+- 教訓：綁定層要讀使用者既有的結構，不要要求使用者遷就工具的語法；引擎產不出的內容（圖）留給人補並在 gate 誠實列 debt。
+
+### L127 公司機首跑：測試框架本身也要照 5.1 的規矩（2026-09-18）
+
+- 症狀：沙箱全綠的測試組在公司機 PS 5.1 跑出 14 個 FAIL，全是框架問題：`*>&1 | Out-String` 走格式器會依主控台寬度折行、行尾 CRLF；
+  子行程 `powershell.exe -NoProfile -File` 沒帶 -ExecutionPolicy Bypass 被公司執行原則擋下（測試本身的 Bypass 不會傳給子行程）。
+- 根因：測試在沙箱（Linux pwsh、寬主控台、無執行原則）長出來，沒有在目標環境的限制下設計。
+- 落點：四套測試改同行程 `& script`，輸出以 `ForEach-Object { [string]$_ }` 逐筆取字再 join；不再開子行程。順帶：陣列 splat
+  對 script 只走位置繫結、不認 `-Name`，要 switch 正確繫結得先轉雜湊表再 splat（對外部程序則是由子行程自己剖析命令列）。
+- 教訓：抓輸出用 `[string]` 不用 `Out-String`；不在測試裡開子 PowerShell；沙箱綠不等於目標機綠，首跑回報的 FAIL 名稱就是最好的線索。

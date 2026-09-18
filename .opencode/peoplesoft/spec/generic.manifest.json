@@ -38,29 +38,39 @@
       "lines": 20
     },
     {
+      "path": ".opencode/peoplesoft/spec/examples/pack-c/pack.json",
+      "sha256": "DCD712C256ECC6C8F4159409223ECDA01A684583CBD78D3673E06A54124B26A2",
+      "lines": 34
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-c/template-bound.md",
+      "sha256": "AF81A07C807C9FCB4BCA26AB977C2541C57E778157ED41FA2F17CF680C520C25",
+      "lines": 29
+    },
+    {
       "path": ".opencode/peoplesoft/spec/pack.schema.json",
-      "sha256": "914B443E4E65EDF81E8F39D41C7D5E353DA06CC1C76AA9EEEC5581C8C65612D1",
-      "lines": 53
+      "sha256": "C57A56FD89C3A1CFFC48FD40D612E0E9739218A81789A747A15111D3E054862A",
+      "lines": 86
     },
     {
       "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "sha256": "2ABE27B5CE0C6B05C5DE209EE7163E855EE89F79D27AD892695276B28213E71B",
-      "lines": 149
+      "sha256": "A3303E26EB65A4058354E2217C88962AD41608A973983FFF2A87C1EB26B95E65",
+      "lines": 169
     },
     {
       "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
-      "sha256": "7E883BE96BA5D582BA3683614E94249AFE6AE9EB2D570821916631AE966C05AA",
-      "lines": 32
+      "sha256": "9B5AE710CFB61EB17DFAE83103FEA2409837260D50AA2A4C99501CFC144F16B0",
+      "lines": 34
     },
     {
       "path": "scripts/ps-spec-lib.ps1",
-      "sha256": "F2AE69BB4C0D8F65DBC05144FF1BC15A10789793BAC2F8DF268BCE22241E584D",
-      "lines": 2379
+      "sha256": "456E1383CE31790DF4261CAC45663E7608B88C80E9FFD8AC35634E18390FAF0E",
+      "lines": 2682
     },
     {
       "path": "scripts/ps-spec.ps1",
-      "sha256": "ECEB0203702F272BE475CD4D76A7C167D7796C3D7AF6616B1F536E862028485F",
-      "lines": 274
+      "sha256": "ABCB003D9A97EA945FFA3BEC27667460E3E9EA13105ED1EB3C559409AB4CFBD4",
+      "lines": 307
     }
   ]
 }

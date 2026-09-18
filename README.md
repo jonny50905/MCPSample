@@ -446,6 +446,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-knowledge.ps1 -
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-knowledge.ps1 -Check            # CURRENT／STALE／MISSING
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-supplemental.ps1 -New -Target COMPONENT:<物件> -FactKind <碼> -Properties <a,b> [-DomainHint <領域>]
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]   # 迷你圈，exit 4
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-spec.ps1 -InitPack -Pack <packId> [-Template <md>]   # 產 pack 骨架（首次接入）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ps-spec.ps1 -ValidatePack -Pack <packId>   # 之後 -Plan／-Run／-Render／-Gate／-Doctor
 ```
 

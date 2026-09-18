@@ -1,5 +1,6 @@
 ﻿# ps-spec.ps1 — Spec 引擎 CLI：私有需求包驗證／規劃／外環派工／render／gate／doctor
-# 用法（公司機）：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -ValidatePack -Pack <packId>
+# 用法（公司機）：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -InitPack -Pack <packId> [-Template <模板.md>] [-BindingMode headings|markers]
+#                powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -ValidatePack -Pack <packId>
 #                powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -Plan -JobId <jobId> -Component TW_X -Pack <packId> [-DomainHint <領域>]
 #                powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -Run -JobId <jobId> [-MaxSessions 4] [-Model m] [-TimeoutMin 30]
 #                powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-spec.ps1 -Render -JobId <jobId>
@@ -14,6 +15,7 @@
 # -Render／-Gate 只印結論碼。exit：0＝完成／1＝未達（BLOCKED、gate 未過、映射未簽核、來源已變…）／2＝環境或參數錯／3＝job 互斥鎖被占用。
 # -FakeWorker <ps1>：測試專用——以該腳本取代 opencode session（收 -AttemptDir -ManifestPath -FragmentPath），公司機不用。
 param(
+    [switch]$InitPack,
     [switch]$ValidatePack,
     [switch]$Plan,
     [switch]$Run,
@@ -32,6 +34,8 @@ param(
     [int]$TimeoutMin = 30,
     [int]$MaxSessions = 4,
     [string]$Drill = '',
+    [string]$Template = '',
+    [string]$BindingMode = '',
     [switch]$WriteGenericManifest,
     [string]$FakeWorker = ''
 )
@@ -51,13 +55,14 @@ function Say([string]$m) { if (-not ($Render -or $Gate)) { Write-Host $m } }
 
 if ($PsKnowledgeLibVersion -ne 1 -or $PsSupplementalLibVersion -ne 1 -or $PsSessionLibVersion -ne 1 -or $PsSpecLibVersion -ne 1) { Say 'SYSTEM ERROR：lib 版本不符'; Finish 'SPEC1-9-06' 2 }
 $modes = 0
-foreach ($m in @($ValidatePack, $Plan, $Run, $Render, $Gate, $Doctor)) { if ($m) { $modes++ } }
-if ($modes -ne 1) { Say '用法：-ValidatePack -Pack <packId> | -Plan -JobId <jobId> -Component <物件> -Pack <packId> [-DomainHint <領域>] | -Run -JobId <jobId> [-MaxSessions n] | -Render -JobId <jobId> | -Gate -JobId <jobId> | -Doctor [-JobId <jobId>] [-Drill <stage>-<code>] [-WriteGenericManifest]（擇一）'; Finish 'SPEC1-9-01' 2 }
+foreach ($m in @($InitPack, $ValidatePack, $Plan, $Run, $Render, $Gate, $Doctor)) { if ($m) { $modes++ } }
+if ($modes -ne 1) { Say '用法：-InitPack -Pack <packId> [-Template <模板.md>] [-BindingMode headings|markers] | -ValidatePack -Pack <packId> | -Plan -JobId <jobId> -Component <物件> -Pack <packId> [-DomainHint <領域>] | -Run -JobId <jobId> [-MaxSessions n] | -Render -JobId <jobId> | -Gate -JobId <jobId> | -Doctor [-JobId <jobId>] [-Drill <stage>-<code>] [-WriteGenericManifest]（擇一）'; Finish 'SPEC1-9-01' 2 }
 if ($JobId -ne '' -and -not (Test-PsSpId -Id $JobId)) { Say ('jobId 不符文法 ' + $script:PsSpIdRx + '（小寫英數與連字號，≤32）'); Finish 'SPEC1-9-05' 2 }
 if ($Pack -ne '' -and -not (Test-PsSpId -Id $Pack)) { Say ('packId 不符文法 ' + $script:PsSpIdRx); Finish 'SPEC1-9-05' 2 }
 if (($Plan -or $Run -or $Render -or $Gate) -and $JobId -eq '') { Say '缺 -JobId'; Finish 'SPEC1-9-01' 2 }
 if ($Plan -and ($Pack -eq '' -or $Component -eq '')) { Say '-Plan 需要 -Component 與 -Pack'; Finish 'SPEC1-9-01' 2 }
 if ($ValidatePack -and $Pack -eq '') { Say '-ValidatePack 需要 -Pack'; Finish 'SPEC1-9-01' 2 }
+if ($InitPack -and $Pack -eq '') { Say '-InitPack 需要 -Pack'; Finish 'SPEC1-9-01' 2 }
 if ($Component -ne '' -and $Component.Trim().ToUpperInvariant() -notmatch '^[A-Z0-9_][A-Z0-9_.$#-]{0,59}$') { Say 'Component 不符物件名文法'; Finish 'SPEC1-9-05' 2 }
 
 $dirs = Get-PsSpDirs -Root $Root -PrivateRoot $PrivateRoot -RuntimeRoot $RuntimeRoot -PackId $Pack -JobId $JobId
@@ -107,6 +112,34 @@ if ($Doctor) {
     if ($g.ManifestMissing) { Finish 'SPEC1-0-02' 1 }
     if (-not $g.Ok) { Finish ('SPEC1-0-01-' + $g.Count) 1 }
     Finish 'SPEC1-0-03' 0
+}
+
+# ── -InitPack：建 pack 骨架（模板副本原樣複製；slot 綁章節標題與章節內既有佔位符）──
+if ($InitPack) {
+    $bmode = 'headings'
+    if ($BindingMode -ne '') { $bmode = $BindingMode.Trim().ToLowerInvariant() }
+    if ($script:PsSpBindingModes -notcontains $bmode) { Say '-BindingMode 只能是 headings 或 markers'; Finish 'SPEC1-9-01' 2 }
+    if ([System.IO.Directory]::Exists($dirs.PackDir)) { Say 'SPEC：pack 目錄已存在（換一個 packId，或自行備份後移走再建）'; Finish 'SPEC1-1-06' 2 }
+    $tplPath = ''
+    if ($Template -eq '') { $tplPath = Join-Path (Join-Path $dirs.SpecGeneric 'examples') (Join-Path 'pack-a' 'template-bound.md') }
+    else { $tplPath = [System.IO.Path]::GetFullPath($Template) }
+    $tplText = Read-PsKnText -LiteralPath $tplPath
+    if ($null -eq $tplText) { Say 'SPEC：讀不到模板檔（-Template 指到公司 Template 的副本）'; Finish 'SPEC1-1-04' 1 }
+    $skel = New-PsSpPackSkeleton -PackId $Pack -TemplateText $tplText -BindingMode $bmode
+    $okT = Write-PsKnAtomicText -LiteralPath (Join-Path $dirs.PackDir 'template-bound.md') -Text $tplText -Bom $false
+    $okP = Write-PsKnAtomicText -LiteralPath (Join-Path $dirs.PackDir 'pack.json') -Text ((ConvertTo-PsKnJson -Value $skel) + "`n") -Bom $false
+    if (-not ($okT -and $okP)) { Say 'SPEC：pack 骨架寫入失敗（目錄或檔案被別的行程開著）'; Finish 'SPEC1-2-07' 1 }
+    Say ('SPEC：pack=' + $Pack + ' bindingMode=' + $bmode + ' slots=' + @($skel.slots).Count + ' placeholders=' + @($skel.placeholders).Count)
+    Say '下一步（骨架填完前 -ValidatePack 本來就不會過）：'
+    Say '  1. 模板副本保持原樣：章節與原文都不動，也不插標記。'
+    Say '  2. 依公司 Checklist 逐項填 checklist 的 C<nn>。'
+    Say '  3. 每個 C<nn> 至少對到一條 requirement；factKind 從 capabilities.json 挑，挑不到填 UNSUPPORTED 並用 support-codes.md 的 CAP-REQ 申請。'
+    Say '  4. placeholders 逐筆把 fact 填成 <factKind>.<property>，或整筆刪掉；圖與引擎產不出的內容留給人補。'
+    Say '  5. 跑 -ValidatePack -Pack <packId>，再對一個已研究的 Component 跑 -Plan／-Run／-Render／-Gate。'
+    Say '  6. 內部覆核後把 reviewedVersion 填成 packVersion。'
+    $giText = Read-PsKnText -LiteralPath (Join-Path $Root '.gitignore')
+    if ($null -eq $giText -or $giText -notmatch '(?m)^\.ps-private/\s*$') { Say '注意：.gitignore 少了 .ps-private/ 這行——pack 目錄永不入庫，請先補上再繼續。' }
+    Finish 'SPEC1-1-05' 0
 }
 
 # ── -ValidatePack ─────────────────────────────────────────────────

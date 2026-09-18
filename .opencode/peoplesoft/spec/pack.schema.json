@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Spec Definition Pack（私有需求包 pack.json）",
-  "description": "文件級 schema：描述 .ps-private/spec/<packId>/pack.json 的形狀。實際驗證由 scripts/ps-spec-lib.ps1 的 Test-PsSpPack（PowerShell 5.1 手寫 validator）執行；本檔只供閱讀與編輯器提示。pack 只含 opaque ID、capability 代碼、slot id、條件、基數與證據政策——公司 Template／Checklist 原文只在模板副本（template-bound.md）與內部人員手上，不進本 repo。validator 另外保證：ID 唯一、每個 checklist id 至少被一個 requirement 引用、每個 slot 在模板出現且模板每個 {{slot:Sxx}} 標記都在 slots、factKind／properties／context 在 capabilities.json 目錄內、applicability 依賴無環（自我引用允許＝驗收後再判）、reviewedVersion≠packVersion 時 gate 標 8-01。",
+  "description": "文件級 schema：描述 .ps-private/spec/<packId>/pack.json 的形狀。實際驗證由 scripts/ps-spec-lib.ps1 的 Test-PsSpPack（PowerShell 5.1 手寫 validator）執行；本檔只供閱讀與編輯器提示。pack 只含 opaque ID、capability 代碼、slot 綁定、條件、基數與證據政策——公司 Template／Checklist 原文只在模板副本（template-bound.md）與內部人員手上，不進本 repo。骨架用 ps-spec.ps1 -InitPack 產。validator 另外保證：ID 唯一、每個 checklist id 至少被一個 requirement 引用、markers 模式每個 slot 在模板出現且模板每個 {{slot:Sxx}} 標記都在 slots、headings 模式每個 slot 的 heading 在模板恰好命中一個標題（placeholder 若給則在該章節恰好出現一次、模板不得再有 {{slot:}} 標記）、placeholders 的 text 在模板出現且 fact 的 factKind 由本 pack 某個 requirement 產出、factKind／properties／context 在 capabilities.json 目錄內、applicability 依賴無環（自我引用允許＝驗收後再判）、reviewedVersion≠packVersion 時 gate 標 8-01。",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "packId", "packVersion", "reviewedVersion", "template", "slots", "checklist", "requirements"],
@@ -10,8 +10,41 @@
     "packId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$", "description": "與目錄名相同；小寫英數與連字號" },
     "packVersion": { "type": "integer", "minimum": 1, "description": "每次改 requirements／slots／模板都遞增" },
     "reviewedVersion": { "type": "integer", "minimum": 0, "description": "內部人員核可的 packVersion；不等於 packVersion → SPEC1-8-01 MAPPING_UNSIGNED" },
-    "template": { "type": "string", "description": "pack 目錄內的模板副本檔名（只插 {{slot:Sxx}} 標記）；不得含路徑分隔符" },
-    "slots": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^S[0-9]{2,4}$" } },
+    "template": { "type": "string", "description": "pack 目錄內的模板副本檔名；headings 模式是公司 Template 的原樣副本（不改一個字），markers 模式才插 {{slot:Sxx}} 標記。不得含路徑分隔符" },
+    "bindingMode": { "type": "string", "enum": ["markers", "headings"], "description": "可選，預設 markers。markers＝模板插 {{slot:Sxx}} 標記；headings＝slot 綁模板既有的章節標題與（可選）該章節內的原生佔位符，模板副本原樣不動" },
+    "slots": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "markers 模式：slot id 字串陣列。headings 模式：物件陣列（同一個 id 不得重複）",
+      "items": {
+        "oneOf": [
+          { "type": "string", "pattern": "^S[0-9]{2,4}$" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "heading"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^S[0-9]{2,4}$" },
+              "heading": { "type": "string", "description": "模板裡的章節標題原文（不含 # 記號）；比對前 trim 並把內部連續空白壓成一個空白；須恰好命中一個標題（任何層級）" },
+              "placeholder": { "type": "string", "description": "可選；該章節內的原生佔位符（{{…}}），須在該章節（標題行到下一個同級或更高級標題前）恰好出現一次。有＝置換該佔位符（獨佔一行就整行換掉，行內就原地換字）；沒有＝把內容補在該章節最後一個非空行之後" }
+            }
+          }
+        ]
+      }
+    },
+    "placeholders": {
+      "type": "array",
+      "description": "可選（兩種模式都可用）：模板既有的文件參數 {{…}} → 事實屬性。render 時該事實有值就把每一處都換掉（多值以、串接、保持單行），沒有值就原樣留著並在 trace 記『待人工』。沒列進來的 {{…}}（例如要人補的圖）永遠不動",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "fact"],
+        "properties": {
+          "text": { "type": "string", "description": "模板裡的佔位符原文，形如 {{…}}；至少出現一次" },
+          "fact": { "type": "string", "pattern": "^[A-Z][A-Z_.]*\\.[A-Za-z]+$", "description": "<factKind>.<property>；factKind 須由本 pack 某個 requirement 產出、property 須在 capabilities.json 內" }
+        }
+      }
+    },
     "checklist": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" }, "description": "公司 Checklist 逐項的 opaque id；每項須被 ≥1 requirement 的 checklistRefs 引用" },
     "requirements": {
       "type": "array",
@@ -22,7 +55,7 @@
         "required": ["id", "slot", "checklistRefs", "factKind", "required", "applicability", "cardinality", "evidencePolicy"],
         "properties": {
           "id": { "type": "string", "pattern": "^R[0-9]{2,4}$" },
-          "slot": { "type": "string", "pattern": "^S[0-9]{2,4}$", "description": "必須在 slots 內；同 slot 的 requirements 依 pack 順序串接成該 slot 的內容" },
+          "slot": { "type": "string", "pattern": "^S[0-9]{2,4}$", "description": "必須在 slots 內（兩種 bindingMode 都是引用 slot id）；同 slot 的 requirements 依 pack 順序串接成該 slot 的內容" },
           "checklistRefs": { "type": "array", "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" } },
           "factKind": { "type": "string", "description": "capabilities.json factKinds 的鍵，或字面值 UNSUPPORTED（目錄挑不到；gate 列 7-17）" },
           "required": { "type": "boolean" },

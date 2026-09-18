@@ -852,11 +852,16 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
 `.ps-private\spec\<packId>\`（gitignore、fs-doctor 不列管、不進任何 git）；job 狀態在 `.ps-runtime\spec\<jobId>\`。
 generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worker agent／command）禁改，`-Doctor` stage 0 機械驗。
 
-1. **接入（一次）**：複製 `.opencode\peoplesoft\spec\examples\pack-a\` 為 `.ps-private\spec\<packId>\`；對照公司 Template
-   逐章節在 `template-bound.md` 插 `{{slot:Sxx}}` 並登錄 `slots`；對照 Checklist 逐項登錄 `C<nn>`，每項映射到 ≥1 個
-   requirement（factKind 從 capabilities.json 挑；挑不到填 `UNSUPPORTED`，並用 support-codes.md 的 CAP-REQ 表單向維護端申請，
-   不附原文）；`ps-spec.ps1 -ValidatePack -Pack <packId>`；`scripts\tests\test-spec.ps1` 全綠；對一個已研究的 Component 跑
-   `-Plan／-Run／-Render／-Gate`；內部覆核後填 `reviewedVersion`（≠ `packVersion` 時 `SPEC1-8-01`，不出貨）。
+1. **接入（一次）**：`ps-spec.ps1 -InitPack -Pack <packId> -Template <公司 Template 的副本.md>`（結論碼 `SPEC1-1-05`；目錄已存在＝
+   `SPEC1-1-06`，不覆寫）。它把那份 Template **原樣**複製成 `.ps-private\spec\<packId>\template-bound.md`（章節與原文一個字都不改，
+   也不插標記），並產出 pack.json 骨架：`bindingMode: headings`、每個章節標題一個 slot（文件標題 H1 不算；該章節自己的內文——不含子章節——恰有一個原生 `{{…}}` 佔位符時一併綁上）、
+   其餘 `{{…}}` 進 `placeholders`（fact 待填或整筆刪掉）。接著逐項填：Checklist 每項一個 `C<nn>`，每項映射到 ≥1 個 requirement
+   （factKind 從 capabilities.json 挑；挑不到填 `UNSUPPORTED`，並用 support-codes.md 的 CAP-REQ 表單向維護端申請，不附原文）；
+   `placeholders` 的文件參數（產品名、文件編號這類）填成 `<factKind>.<property>`。slot 有佔位符就置換該佔位符、沒有就補在章節末；
+   引擎產不出的內容（流程圖之類）**不要**綁 slot，留著原生佔位符由人補——gate 只看 requirement 是否滿足，不會因為文件看起來滿了就假裝完成。
+   `{{slot:Sxx}}` 標記（`bindingMode: markers`）只留給 `examples\pack-a`／`pack-b` 這種合成範例與既有映射。
+   然後 `ps-spec.ps1 -ValidatePack -Pack <packId>`（骨架填完前本來就回 `SPEC1-1-03`）；`scripts\tests\test-spec.ps1` 全綠；
+   對一個已研究的 Component 跑 `-Plan／-Run／-Render／-Gate`；內部覆核後填 `reviewedVersion`（≠ `packVersion` 時 `SPEC1-8-01`，不出貨）。
 2. **跑 job**：`-Plan -JobId <小寫id> -Component <名> -Pack <packId> [-DomainHint]` → `-Run`（每個 unit 一個 worker session，
    共用 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
    的迷你圈與下一輪稽核後重跑 `-Run`）→ `-Render` → `-Gate`（verdict SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED）。

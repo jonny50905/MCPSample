@@ -723,7 +723,7 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | S4 | 目標無 NN | `-New -Target COMPONENT:<領域內尚未研究的物件> … -DomainHint <領域>` 後跑迷你圈 | 不派 session；checklist 多一列 `D<輪次>-<序> 新發現 …：補研究 <id>（稽核）`；`-Status` 該列 WAITING_RESEARCH；D 項治理不刪它 |
 | S5 | 收據不合格 | 故意在收據寫 `[[X]]`（沙箱已驗；公司機看 outcome） | outcome.json receiptValid=false、receiptErrors 列出原因；attempts+1；兩次後 `-Result` → UNRESOLVED／WORKER_FAILED |
 | S6 | slot 互斥 | 迷你圈與另一個 ps-spec -Run 同時啟動 | 後到者 log「session slot 被占用」並在等待上限後撤回工單、不消耗 attempts |
-| P1 | 需求包驗證 | 複製 examples/pack-a 為 `.ps-private\spec\demo\`，`ps-spec.ps1 -ValidatePack -Pack demo` | SPEC1-1-01；改壞一個 checklist id 未被引用 → SPEC1-1-xx（≠01）；`git status` 看不到 `.ps-private` |
+| P1 | 需求包骨架與驗證 | `ps-spec.ps1 -InitPack -Pack demo -Template <Template 副本.md>`（或複製 examples/pack-c 為 `.ps-private\spec\demo\`），填完後 `ps-spec.ps1 -ValidatePack -Pack demo` | -InitPack → SPEC1-1-05（模板副本原樣、slot 由章節標題產生；再跑一次同 packId → SPEC1-1-06）；填完 → SPEC1-1-01；改壞一個 checklist id 未被引用 → SPEC1-1-xx（≠01）；`git status` 看不到 `.ps-private` |
 | P2 | 規劃 | `-Plan -JobId demo1 -Component <已研究 Component> -Pack demo` | SPEC1-2-01；`.ps-runtime\spec\demo1\plans\<hash>\plan.json` 存在；缺事實時 `supplemental\requests\` 多出 consumer=SPEC 的 request |
 | P3 | 執行與驗收 | `-Run` | 每個 unit 一個 SESSION(spec-…)；不合格 fragment 不計 receipt；來源 NN 中途被改 → 該 unit 拒收且 attempts 不增；WAITING_* 時 exit 0 |
 | P4 | 產出 | `-Render` 兩次、`-Gate` | 兩次 spec.md 位元組相同；gate verdict ∈ SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED；改 NN 後 `-Render` → SOURCE_CHANGED 類碼、current.json 不變 |

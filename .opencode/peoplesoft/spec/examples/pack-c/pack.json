@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "packId": "pack-c",
+  "packVersion": 1,
+  "reviewedVersion": 1,
+  "template": "template-bound.md",
+  "bindingMode": "headings",
+  "slots": [
+    { "id": "S01", "heading": "一、功能概述", "placeholder": "{{寫入功能概述}}" },
+    { "id": "S02", "heading": "二、作業流程", "placeholder": "{{寫入流程說明}}" },
+    { "id": "S03", "heading": "三、畫面與欄位", "placeholder": "{{列出畫面欄位}}" },
+    { "id": "S04", "heading": "四、資料與檔案" }
+  ],
+  "placeholders": [
+    { "text": "{{PRODUCT_NAME}}", "fact": "UI.COMPONENT_IDENTITY.functionName" },
+    { "text": "{{DOC_ID}}", "fact": "DATA.FILE_INPUT.layout" }
+  ],
+  "checklist": ["C01", "C02", "C03", "C04"],
+  "requirements": [
+    { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "STATIC" },
+    { "id": "R02", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.NAVIGATION", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R12", "slot": "S02", "checklistRefs": ["C02"], "factKind": "PROCESS.EXECUTION", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R05", "slot": "S03", "checklistRefs": ["C03"], "factKind": "UI.FIELD_INVENTORY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R10", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FLOW", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R17", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FILE_INPUT", "required": true,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FILE_INPUT.present" }, "cardinality": "ANY", "evidencePolicy": "STATIC" }
+  ]
+}
