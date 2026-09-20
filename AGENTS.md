@@ -12,6 +12,11 @@
 
 ## PeopleSoft 問題的處理方式
 
+要以一個或多個確切 Component 產生「供獨立 LLM 重建核心功能」的規格，走
+`/ps-spec <Component...>`（ps-spec-author），或在 ps-spec-author 對話直接輸入清單。
+此路徑不走整個領域研究、不要求手填私有 pack；範圍與深度依 `spec/clone-contract.md`。
+`docs/ps-spec/**` 同為公司機密、禁止外部 remote；REVIEW_READY 不等於企業 E2E 通過。
+
 收到 PeopleSoft 業務問題（例：兵役資料在哪維護、某選項選了會執行什麼）時：
 
 1. 問答走 `ps-orchestrator` agent（Tab 切換）；要**產完整業務文件**用
@@ -85,7 +90,7 @@
 - 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
   （.ps-runtime/**）是公司機密：研究產出只進**內部** git，後兩者連內部 git 都不進（已 gitignore，
   知識索引 docs/ps-research/knowledge/ 同為本機快取），嚴禁外部 remote 或公開貼出；
-  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
+  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
   不回報路徑、物件名、hash、requestId。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。

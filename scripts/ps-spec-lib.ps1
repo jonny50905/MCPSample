@@ -319,6 +319,7 @@ function Test-PsSpPack {
     $slots = @()
     $slotDefs = @()
     $seenS = @{}
+    $seenBindings = @()
     $si = 0
     foreach ($sx in @($p.slots)) {
         $si++
@@ -348,11 +349,14 @@ function Test-PsSpPack {
                 elseif ($stk -ne '') {
                     if ($stk -notmatch ('^' + $script:PsSpTokenRx + '$')) { $r.Errors += ('SLOT_PLACEHOLDER_MISSING：' + $sid) }
                     else {
-                        $rg = Get-PsSpHeadingRange -Headings $heads -Ix $hits[0] -LineCount $tplLines.Count
+                        $rg = Get-PsSpHeadingDirectRange -Headings $heads -Ix $hits[0] -LineCount $tplLines.Count
                         $hitN = 0
-                        for ($j = [int]$rg.Start; $j -lt [int]$rg.End; $j++) { $hitN += @([regex]::Matches([string]$tplLines[$j], [regex]::Escape($stk))).Count }
+                        for ($j = [int]$rg.Start + 1; $j -lt [int]$rg.End; $j++) { $hitN += @([regex]::Matches([string]$tplLines[$j], [regex]::Escape($stk))).Count }
                         if ($hitN -eq 0) { $r.Errors += ('SLOT_PLACEHOLDER_MISSING：' + $sid) }
                         elseif ($hitN -gt 1) { $r.Errors += ('SLOT_PLACEHOLDER_AMBIGUOUS：' + $sid + ' n=' + $hitN) }
+                        $bk = [string]$hits[0] + ':' + $stk
+                        if ($seenBindings -ccontains $bk) { $r.Errors += ('SLOT_PLACEHOLDER_AMBIGUOUS：' + $sid + ' 同一佔位符已被其他 slot 綁定') }
+                        else { $seenBindings += $bk }
                     }
                 }
             }
@@ -501,7 +505,7 @@ function Test-PsSpPack {
 }
 
 # 章節「自己的內文」（不含子章節）：標題行起，到下一個 ATX 標題（任意層級）前，或檔尾。
-# 只給 New-PsSpPackSkeleton 判斷自動綁定用；Get-PsSpHeadingRange（含子章節，供驗證／render 找章節範圍）維持不動。
+# 骨架、驗證、render 共用；父章節的內容不可寫進子章節，也不可消耗子章節的佔位符。
 function Get-PsSpHeadingDirectRange {
     param($Headings, [int]$Ix, [int]$LineCount)
     $hs = @($Headings)
@@ -1154,7 +1158,9 @@ function New-PsSpComposeUnits {
                 if ($items.Count -eq 0) { continue }
                 $any = $true
                 $rs = Add-PsSpReadFile -ReadSet @() -Ctx $t -Role 'TARGET' -SectionNames @('行為邏輯')
-                $r.Units += , (New-PsSpUnit -Req $Req -SubjectKey ($Component + '@行為邏輯:L' + $s.start + '-' + $s.end) -ReadSet $rs -Items $items -Grade $t.Grade)
+                # 續篇常有相同節行號；以來源的穩定相對路徑區分，不把易漂移的行號當身分。
+                $sourceId = (Get-PsKnTextHash -Text (([string]$t.Rel).Replace('\', '/').ToLowerInvariant())).Substring(0, 16).ToLowerInvariant()
+                $r.Units += , (New-PsSpUnit -Req $Req -SubjectKey ($Component + '@行為邏輯:' + $sourceId) -ReadSet $rs -Items $items -Grade $t.Grade)
             }
             if (-not $any) { $r.Needs += , (@{ Reason = 'MISSING'; Target = @{ type = 'COMPONENT'; name = $Component }; Grade = $main.Grade; Ctx = $main }) }
         }
@@ -1622,7 +1628,11 @@ function Get-PsSpUnitStatus {
         $live = Get-PsSpLiveInput -Root $Root -Eu $eu -Index $Index -Cache $Cache
         $planFp = Get-PsSpPlanFingerprint -Eu $eu
         $st = @{ Eu = $eu; Fingerprint = $live.Fingerprint; PlanFingerprint = $planFp; Receipt = $null; Attempts = 0; State = 'PENDING'; Live = $live }
-        foreach ($rc in $receipts) { if ([string]$rc.unitId -ceq [string]$u.unitId -and [string]$rc.part -ceq [string]$eu.Part -and [string]$rc.factKind -ceq [string]$u.factKind -and [string]$rc.inputFingerprint -ceq $live.Fingerprint) { $st.Receipt = $rc } }
+        foreach ($rc in $receipts) {
+            # 舊版可能把 NO_EVIDENCE 當成已完成的排除；這類收據不能繼續重用。
+            $noEvidence = @($rc.rejected | Where-Object { [string]$_.reason -eq 'NO_EVIDENCE' }).Count -gt 0
+            if (-not $noEvidence -and [string]$rc.unitId -ceq [string]$u.unitId -and [string]$rc.part -ceq [string]$eu.Part -and [string]$rc.factKind -ceq [string]$u.factKind -and [string]$rc.inputFingerprint -ceq $live.Fingerprint) { $st.Receipt = $rc }
+        }
         foreach ($v in $verdicts) { if ([string]$v.unitId -ceq [string]$u.unitId -and [string]$v.part -ceq [string]$eu.Part -and [string]$v.factKind -ceq [string]$u.factKind -and [string]$v.inputFingerprint -ceq $live.Fingerprint -and [bool]$v.counted) { $st.Attempts++ } }
         $us = [string]$u.state
         if ($null -ne $st.Receipt) { $st.State = 'HAS_RECEIPT' }
@@ -1630,6 +1640,8 @@ function Get-PsSpUnitStatus {
         elseif ($live.Changed -or $live.Fingerprint -cne $planFp) { $st.State = 'SOURCE_CHANGED' }
         elseif ($eu.BlockedCapacity) { $st.State = 'BLOCKED_CAPACITY' }
         elseif ($st.Attempts -ge $script:PsSpMaxAttempts) { $st.State = 'BLOCKED' }
+        # 舊 plan 的行號式身分可能已吃掉續篇；必須重規劃，不能沿用舊收據假裝分母完整。
+        if ([string]$u.factKind -eq 'BEHAVIOR.VALIDATIONS' -and [string]$u.unitId -match '@行為邏輯:L\d+-\d+$') { $st.Receipt = $null; $st.State = 'SOURCE_CHANGED' }
         $out += , $st
     }
     return , $out
@@ -1836,6 +1848,7 @@ function Test-PsSpFragment {
             $enumCols = @{}
             if ($null -ne $Cap.enums) { foreach ($ep in $Cap.enums.PSObject.Properties) { for ($i = 0; $i -lt $hdr.Count; $i++) { if ($hdr[$i] -eq $ep.Name) { $enumCols[$i] = @($ep.Value | ForEach-Object { [string]$_ }) } } } }
             $covered = @{}
+            $noEvidenceItems = @{}
             if (-not $secs.Contains($script:PsSpFragmentSection)) { & $addErr 'SECTION_MISSING' '缺章節「## 事實」' }
             else {
                 $tb = Get-PsSpTableRows -SectionText ([string]$secs[$script:PsSpFragmentSection])
@@ -1883,13 +1896,19 @@ function Test-PsSpFragment {
                             if ($x -eq '') { continue }
                             $n = Get-PsSpItemToken -Tok $x
                             if ($n -lt 0 -or -not $itemSet.ContainsKey($n)) { & $addErr 'ITEM_UNKNOWN' ('「## 未採用」第 ' + $ri + ' 列來源條目「' + $x + '」不在工單列舉'); continue }
-                            $covered[$n] = $true
+                            if ($row[1].Trim() -eq 'NO_EVIDENCE') {
+                                $noEvidenceItems[$n] = $true
+                                $r.Unresolved++
+                                & $addErr 'EVIDENCE_UNKNOWN' ('「## 未採用」條目 ' + $n + ' 缺證據，不能視為已完成或不適用')
+                            }
+                            else { $covered[$n] = $true }
                             $r.Rejected += , ([ordered]@{ n = $n; reason = $row[1].Trim() })
                         }
                     }
                 }
             }
             $missing = 0
+            foreach ($n in @($noEvidenceItems.Keys)) { $covered.Remove($n) }
             foreach ($i in @($Items)) { if ($covered.ContainsKey([int]$i.n)) { $r.Covered += [int]$i.n } else { $missing++ } }
             if ($missing -eq 0) { $r.Closure = 'COMPLETE' } else { $r.Closure = 'PARTIAL' }
             if (@($Items).Count -gt 0 -and $r.Covered.Count -eq 0) { & $addErr 'NO_COVERAGE' '兩張表都沒有處置任何條目' }
@@ -1912,6 +1931,11 @@ function Write-PsSpReceipt {
         readSetGrade = [string]$u.grade; input = $InputText; acceptedAt = (Get-PsKnUtcStamp)
     }
     $p = Join-Path $Dirs.Receipts (Get-PsSpReceiptName -UnitKey ([string]$u.unitKey) -Part ([string]$Eu.Part) -Fingerprint $Live.Fingerprint)
+    $oldReceipt = Read-PsSpJsonFile -LiteralPath $p
+    if ($null -ne $oldReceipt -and @($oldReceipt.rejected | Where-Object { [string]$_.reason -eq 'NO_EVIDENCE' }).Count -gt 0) {
+        # 保留舊 immutable 收據作稽核；修正後的驗收另存，不讓 create-only 的 Existed 吃掉新結果。
+        $p = [System.IO.Path]::ChangeExtension($p, 'evidence-v2.json')
+    }
     $ok = Write-PsKnCreateOnlyText -LiteralPath $p -Text ((ConvertTo-PsKnJson -Value $rc) + "`n")
     if ($null -eq $ok) { return @{ Ok = $false; Path = $p; Existed = $false; Deferred = $true } }
     return @{ Ok = [bool]$ok; Path = $p; Existed = (-not $ok); Deferred = $false }
@@ -2435,6 +2459,8 @@ function ConvertTo-PsSpHeadingBound {
     $hh = Get-PsSpTemplateHeadings -Lines $lines
     $heads = @($hh)
     $edits = @()
+    $lineEdits = @{}
+    $appendEdits = @{}
     foreach ($sl in @($PackV.Slots)) {
         $sid = [string]$sl.id
         if (-not $BySlot.ContainsKey($sid)) { continue }
@@ -2444,24 +2470,41 @@ function ConvertTo-PsSpHeadingBound {
         $hitsRaw = Get-PsSpHeadingHits -Headings $heads -Key ([string]$sl.heading)
         $hits = @($hitsRaw)
         if ($hits.Count -ne 1) { continue }
-        $rg = Get-PsSpHeadingRange -Headings $heads -Ix $hits[0] -LineCount $lines.Count
+        $rg = Get-PsSpHeadingDirectRange -Headings $heads -Ix $hits[0] -LineCount $lines.Count
         $tok = [string]$sl.placeholder
         if ($tok -ne '') {
             $li = -1
-            for ($j = [int]$rg.Start; $j -lt [int]$rg.End; $j++) { if (([string]$lines[$j]).Contains($tok)) { $li = $j; break } }
+            for ($j = [int]$rg.Start + 1; $j -lt [int]$rg.End; $j++) { if (([string]$lines[$j]).Contains($tok)) { $li = $j; break } }
             if ($li -lt 0) { continue }
             $ln = [string]$lines[$li]
-            if ($ln.Trim() -ceq $tok) { $edits += , @{ Start = $li; Count = 1; Lines = @($block) } }
-            else { $edits += , @{ Start = $li; Count = 1; Lines = @(($ln.Replace($tok, ($block -join "`n"))) -split "`n") } }
+            # 一行可以有多個不同的原生 token；依原行的字元位置一次合成，不能各自覆寫整行。
+            if (-not $lineEdits.ContainsKey($li)) { $lineEdits[$li] = @() }
+            $offset = $ln.IndexOf($tok, [System.StringComparison]::Ordinal)
+            $length = $tok.Length
+            if ($ln.Trim() -ceq $tok) { $offset = 0; $length = $ln.Length }
+            $lineEdits[$li] += , @{ Offset = $offset; Length = $length; Text = ($block -join "`n") }
             continue
         }
         $k = [int]$rg.Start
         for ($j = [int]$rg.End - 1; $j -gt [int]$rg.Start; $j--) { if (([string]$lines[$j]).Trim() -ne '') { $k = $j; break } }
         $tail = @('') + $block
         if ([int]$rg.End -lt $lines.Count) { $tail += '' }
-        $edits += , @{ Start = ($k + 1); Count = ([int]$rg.End - $k - 1); Lines = $tail }
+        $start = $k + 1
+        if ($appendEdits.ContainsKey($start)) { $appendEdits[$start].Lines += $tail }
+        else { $appendEdits[$start] = @{ Start = $start; Count = ([int]$rg.End - $k - 1); Lines = $tail } }
     }
-    # 依起始行穩定排序（同位置照 slot 順序），再一次走完：重疊的後者跳過，確保 render 可重現
+    foreach ($li in $lineEdits.Keys) {
+        $ln = [string]$lines[[int]$li]
+        $right = $ln.Length
+        foreach ($rp in @($lineEdits[$li] | Sort-Object -Property Offset -Descending)) {
+            if ([int]$rp.Offset + [int]$rp.Length -gt $right) { throw 'SLOT_BINDING_OVERLAP' }
+            $ln = $ln.Remove([int]$rp.Offset, [int]$rp.Length).Insert([int]$rp.Offset, [string]$rp.Text)
+            $right = [int]$rp.Offset
+        }
+        $edits += , @{ Start = [int]$li; Count = 1; Lines = @($ln -split "`n") }
+    }
+    foreach ($ed in $appendEdits.Values) { $edits += , $ed }
+    # 依起始行穩定排序後一次走完；意外衝突必須失敗，不能靜默丟掉整個 slot。
     $ordered = @()
     foreach ($ed in $edits) {
         $pos = 0
@@ -2476,7 +2519,7 @@ function ConvertTo-PsSpHeadingBound {
     $i = 0
     foreach ($ed in $ordered) {
         $st = [int]$ed.Start
-        if ($st -lt $i) { continue }
+        if ($st -lt $i) { throw 'SLOT_BINDING_OVERLAP' }
         while ($i -lt $st) { $out += [string]$lines[$i]; $i++ }
         foreach ($bl in @($ed.Lines)) { $out += [string]$bl }
         $i = $st + [int]$ed.Count
@@ -2488,8 +2531,11 @@ function ConvertTo-PsSpHeadingBound {
 function ConvertTo-PsSpSpec {
     param($PackV, $Evals, $Capabilities)
     $bySlot = @{}
+    $slotByReq = @{}
+    foreach ($q in @($PackV.Requirements)) { $slotByReq[[string]$q.id] = [string]$q.slot }
     foreach ($e in $Evals) {
         $slot = [string]$e.Req.slot
+        if ($slotByReq.ContainsKey([string]$e.Req.id)) { $slot = $slotByReq[[string]$e.Req.id] }
         if (-not $bySlot.ContainsKey($slot)) { $bySlot[$slot] = @() }
         $bySlot[$slot] += (ConvertTo-PsSpBlock -E $e -Capabilities $Capabilities)
         $bySlot[$slot] += ''
@@ -2615,7 +2661,7 @@ function Get-PsSpGenericFiles {
             $out += (Get-PsSpRelPath -Root $Root -Path $f.FullName)
         }
     }
-    foreach ($p in @('.opencode/agent/ps-spec-worker.md', '.opencode/command/ps-spec-batch.md')) { if ([System.IO.File]::Exists((Join-Path $Root $p))) { $out += $p } }
+    foreach ($p in @('.opencode/agent/ps-spec-worker.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-author.md', '.opencode/agent/ps-clone-worker.md', '.opencode/command/ps-spec.md', '.opencode/command/ps-clone-batch.md')) { if ([System.IO.File]::Exists((Join-Path $Root $p))) { $out += $p } }
     return , (Sort-PsKnOrdinal -Items $out)
 }
 function New-PsSpGenericManifest {

@@ -12,6 +12,8 @@ tools:
   edit: false
   bash: false
   webfetch: false
+  websearch: false
+  codesearch: false
   # 血緣的引用反查可先用現有兩個 MCP 半自動達成（搜 table/欄位名 → 取段）：
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true

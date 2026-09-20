@@ -3,9 +3,24 @@
   "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
   "files": [
     {
+      "path": ".opencode/agent/ps-clone-worker.md",
+      "sha256": "A1BE7DCE95ABC62E2E422AF3BCF0E267E8CA233027CE72A2B586A7290EF1065A",
+      "lines": 73
+    },
+    {
+      "path": ".opencode/agent/ps-spec-author.md",
+      "sha256": "66C7F13A7C65CCFA381EBB71446F20181FDC3BAA15AB278E2188964C3FBEB758",
+      "lines": 66
+    },
+    {
       "path": ".opencode/agent/ps-spec-worker.md",
       "sha256": "2C881C2D9D47EF7BFF7D15595A4940B0550D26BB791984A3DFAF2BC736D0DEB8",
       "lines": 79
+    },
+    {
+      "path": ".opencode/command/ps-clone-batch.md",
+      "sha256": "F4E805CB87978683DDBBF8813A4ACAA3007BEA529A45320F46D4CA7FCD0321A9",
+      "lines": 12
     },
     {
       "path": ".opencode/command/ps-spec-batch.md",
@@ -13,9 +28,24 @@
       "lines": 19
     },
     {
+      "path": ".opencode/command/ps-spec.md",
+      "sha256": "59C6B10AC55A2F35D7995335930821CD5F91D71EDC8A6FCA5891D7D9CF4F2F18",
+      "lines": 13
+    },
+    {
       "path": ".opencode/peoplesoft/spec/capabilities.json",
       "sha256": "67E7A913080F50A6E268F245744D730F147DB683AFF100BDBCA87ED7BFE01573",
       "lines": 38
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/clone-contract.md",
+      "sha256": "81EC09F8976130FC0DA7BA2049E18970AD79871B58A8293CF0AB19CCB1687FE9",
+      "lines": 65
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/clone-profile.json",
+      "sha256": "8BCE499090C736E0478994E59E8674BDCEF393DE6606423516FF2B26D96233C4",
+      "lines": 60
     },
     {
       "path": ".opencode/peoplesoft/spec/examples/pack-a/pack.json",
@@ -49,13 +79,13 @@
     },
     {
       "path": ".opencode/peoplesoft/spec/pack.schema.json",
-      "sha256": "C57A56FD89C3A1CFFC48FD40D612E0E9739218A81789A747A15111D3E054862A",
+      "sha256": "2624BDBF8A89747A712881B11E99E35F13340E1E9F90AFD7C09521878516A878",
       "lines": 86
     },
     {
       "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "sha256": "A3303E26EB65A4058354E2217C88962AD41608A973983FFF2A87C1EB26B95E65",
-      "lines": 169
+      "sha256": "204A63303AEB83D38232040CD3CE666263179F263FE42497AE9401AFCB8221A0",
+      "lines": 189
     },
     {
       "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
@@ -63,9 +93,19 @@
       "lines": 34
     },
     {
+      "path": "scripts/ps-spec-build.ps1",
+      "sha256": "3A71327BAE57B516DE5648620DD74C072719DB44FB86D5399CD9027E001B928B",
+      "lines": 451
+    },
+    {
+      "path": "scripts/ps-spec-clone-lib.ps1",
+      "sha256": "B014176951C8F992A937F38CD0E4E7476AEB380F5B8F5F4887C92B9D7454206F",
+      "lines": 283
+    },
+    {
       "path": "scripts/ps-spec-lib.ps1",
-      "sha256": "456E1383CE31790DF4261CAC45663E7608B88C80E9FFD8AC35634E18390FAF0E",
-      "lines": 2682
+      "sha256": "265578725D77A93E01FD43D05395E696BB2425EB954C722F00E5477473CFFD85",
+      "lines": 2728
     },
     {
       "path": "scripts/ps-spec.ps1",

@@ -966,6 +966,8 @@ if ($null -ne $gitCmd) {
     & git -C $gitRepo config user.email 'zz-test@example.invalid' 2>&1 | Out-Null
     & git -C $gitRepo config user.name 'zz test' 2>&1 | Out-Null
     & git -C $gitRepo config commit.gpgsign false 2>&1 | Out-Null
+    # 合成 fixture 的 LF 不受維護機全域 autocrlf 影響；PS 5.1 會把 stderr 換行警告當例外。
+    & git -C $gitRepo config core.autocrlf false 2>&1 | Out-Null
     $gitDomDir = Join-Path (Join-Path (Join-Path $gitRepo 'docs') 'ps-research') '職缺測試'
     New-Item -ItemType Directory -Path $gitDomDir -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $gitDomDir '03-TW_DEMO_G.md'), "# 03 功能甲（TW_DEMO_G）`n", (New-Object System.Text.UTF8Encoding($false)))

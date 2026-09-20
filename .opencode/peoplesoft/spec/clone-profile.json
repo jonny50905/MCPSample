@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "core-clone-v1",
+  "title": "核心功能重建規格",
+  "maxItemsPerPage": 40,
+  "note": "僅研究使用者指定 Component 的核心業務與有實際使用關係的依賴。固定欄位是深度檢查清單，不代表填滿就已證明語意完整。值必須具體；不適用的個別欄位需寫理由，未知寫 UNKNOWN 並將 coverage 設 PARTIAL。技術物件、欄位、值、訊息保留原名，說明使用繁體中文。",
+  "topics": [
+    {
+      "id": "scope", "title": "範圍與核心依賴", "allowNotApplicable": false,
+      "instructions": "先固定重建邊界。CORE 必含指定 Component 根；不以 delivered／custom 前綴決定核心。DEPENDENCY 須由核心追得實際使用鏈，提供逐跳證據；usedBy 寫呼叫者、方向與中間鏈，condition 寫何時使用，只描述最小契約。必需的 delivered 依賴同樣納入最小介面契約。EXCLUDED 保留簡短排除理由，不展開共用框架或其他業務。scope 項目 scopeRefs 為空；後續章節引用本 Component 已接受的 CORE／DEPENDENCY id。",
+      "fields": [{"key":"object","label":"物件"},{"key":"type","label":"型別"},{"key":"inclusion","label":"範圍分類"},{"key":"usedBy","label":"使用關係／方向"},{"key":"condition","label":"使用條件"},{"key":"reason","label":"納入／排除理由"}]
+    },
+    {
+      "id": "flows", "title": "業務流程與操作順序", "allowNotApplicable": true,
+      "instructions": "逐個核心使用情境拆出步驟、分支、前後條件與資料副作用；不要只有流程名。標明先後、失敗出口與可否重入。",
+      "fields": [{"key":"scenario","label":"情境"},{"key":"actor","label":"操作者"},{"key":"preconditions","label":"前置條件"},{"key":"sequence","label":"步驟順序"},{"key":"branches","label":"條件分支"},{"key":"postconditions","label":"後置條件"},{"key":"sideEffects","label":"資料／外部副作用"},{"key":"errors","label":"失敗與恢復"},{"key":"excludedPath","label":"排除路徑與邊界"}]
+    },
+    {
+      "id": "ui", "title": "畫面、欄位與條件呈現", "allowNotApplicable": false,
+      "instructions": "逐欄／操作控制描述：技術欄位與畫面位置、格式長度、值域、預設、空值、必填／唯讀／隱藏的觸發條件、連動與錯誤訊息。不能只抄欄位清單。",
+      "fields": [{"key":"page","label":"頁面／位置"},{"key":"field","label":"欄位／控制"},{"key":"label","label":"顯示文字"},{"key":"searchKeys","label":"Search keys／查詢條件"},{"key":"scrollLevel","label":"Scroll level／父子列"},{"key":"dataType","label":"型別／格式／長度"},{"key":"valueDomain","label":"值域與儲存值"},{"key":"valueSource","label":"值來源／Prompt／Translate"},{"key":"defaultValue","label":"預設值／時機"},{"key":"nullBehavior","label":"空字串／NULL 差異"},{"key":"required","label":"必填條件"},{"key":"visibility","label":"顯示／隱藏條件"},{"key":"editability","label":"可編輯／唯讀條件"},{"key":"dependencies","label":"欄位依賴與重算"},{"key":"events","label":"事件與欄位連動"},{"key":"validation","label":"檢核與訊息"}]
+    },
+    {
+      "id": "data", "title": "資料模型與逐欄讀寫", "allowNotApplicable": false,
+      "instructions": "逐資料欄位與使用情境描述來源、鍵、有效日／序號、讀寫條件、轉換、空值與副作用；只保留核心確實使用的資料面。",
+      "fields": [{"key":"record","label":"Record／表"},{"key":"field","label":"欄位"},{"key":"logicalKey","label":"業務邏輯鍵"},{"key":"physicalKey","label":"實體主鍵／有效日與序號"},{"key":"dataType","label":"型別"},{"key":"lengthPrecision","label":"長度／精度／尺度"},{"key":"relations","label":"關聯與參照條件"},{"key":"cardinality","label":"關聯基數／唯一性"},{"key":"sensitivity","label":"敏感分類／遮罩"},{"key":"valueDomain","label":"值域"},{"key":"nullBehavior","label":"空值／預設"},{"key":"readCondition","label":"讀取條件"},{"key":"writeCondition","label":"寫入條件"},{"key":"transformation","label":"來源與轉換"},{"key":"sideEffects","label":"連帶更新／影響"}]
+    },
+    {
+      "id": "rules", "title": "業務規則與逐條檢核", "allowNotApplicable": false,
+      "instructions": "每條規則給觸發事件、精確條件／運算、動作、先後優先序、拒絕結果與訊息，包含空值、邊界、不同權限與模式下的差異。",
+      "fields": [{"key":"trigger","label":"觸發事件"},{"key":"field","label":"作用欄位"},{"key":"condition","label":"精確條件"},{"key":"expression","label":"條件／計算式"},{"key":"storedValues","label":"儲存值與業務意義"},{"key":"action","label":"動作／計算"},{"key":"eventOrder","label":"事件順序／優先序"},{"key":"nullBoundary","label":"NULL／空字串／邊界"},{"key":"dateEffectiveSequence","label":"日期／有效日／序號條件"},{"key":"authorization","label":"權限／模式差異"},{"key":"errorMessage","label":"錯誤訊息／阻擋方式"},{"key":"sideEffects","label":"資料副作用"}]
+    },
+    {
+      "id": "states", "title": "狀態機與生命週期", "allowNotApplicable": true,
+      "instructions": "每個狀態轉移分列：起點、事件、守衛、終點、寫入／通知、禁止轉移與重入。沒有狀態機需有程式或已驗研究證據及理由，查不到不等於不適用。",
+      "fields": [{"key":"entity","label":"狀態實體"},{"key":"fromState","label":"原狀態"},{"key":"event","label":"事件"},{"key":"guard","label":"轉移條件"},{"key":"fieldExpression","label":"守衛欄位／條件式"},{"key":"toState","label":"目標狀態"},{"key":"actions","label":"轉移動作／副作用"},{"key":"disallowed","label":"禁止轉移"},{"key":"reentry","label":"重入／重複事件"}]
+    },
+    {
+      "id": "transactions", "title": "交易、提交與失敗恢復", "allowNotApplicable": true,
+      "instructions": "列出提交邊界、寫入順序、鎖定／併發、部分失敗、回復與重試；不能由函式名稱推定 atomicity。無法取得執行期行為時留明確缺口。",
+      "fields": [{"key":"operation","label":"操作"},{"key":"boundary","label":"交易邊界"},{"key":"writeOrder","label":"寫入順序"},{"key":"commit","label":"提交條件／時機"},{"key":"rollback","label":"失敗／回復範圍"},{"key":"locks","label":"鎖定範圍／時機"},{"key":"concurrency","label":"併發衝突"},{"key":"retry","label":"重試策略"},{"key":"idempotency","label":"冪等／重複提交"}]
+    },
+    {
+      "id": "interfaces", "title": "介面、檔案與批次契約", "allowNotApplicable": true,
+      "instructions": "逐個直接使用的介面／檔案欄位描述方向、觸發、格式、順序、值域、空值、錯誤回覆、重試和副作用，不擴展成整個共用平台文件。",
+      "fields": [{"key":"interface","label":"介面／檔案／程序"},{"key":"direction","label":"方向"},{"key":"trigger","label":"觸發／排程"},{"key":"field","label":"欄位／段落"},{"key":"format","label":"格式／欄位順序"},{"key":"valueDomain","label":"值域"},{"key":"nullBehavior","label":"空值／缺值"},{"key":"response","label":"回覆／錯誤契約"},{"key":"retry","label":"重試／重複處理"},{"key":"sideEffects","label":"副作用"}]
+    },
+    {
+      "id": "security", "title": "權限與操作限制", "allowNotApplicable": true,
+      "instructions": "分清登入可見性、進入權、操作權、資料範圍與拒絕效果；靜態Permission List 不等於某人目前可使用。無依據的Role／人員清單不可補造。",
+      "fields": [{"key":"principal","label":"角色／Permission List／主體"},{"key":"resource","label":"受控頁面／資料"},{"key":"operation","label":"操作"},{"key":"condition","label":"允許條件"},{"key":"dataScope","label":"資料範圍"},{"key":"denial","label":"拒絕行為"},{"key":"enforcement","label":"檢查位置／時機"}]
+    },
+    {
+      "id": "acceptance", "title": "正反例與邊界驗收情境", "allowNotApplicable": false,
+      "instructions": "把核心規則轉為可人工驗收的情境；scenarioType 使用 POSITIVE／NEGATIVE／BOUNDARY。每例具前置資料、動作順序、期望畫面／錯誤、期望資料副作用與可核對判準。這是待執行驗收設計，絕不標成已通過企業E2E。",
+      "fields": [{"key":"scenarioType","label":"正例／反例／邊界"},{"key":"ruleRefs","label":"對應規則 ID／來源"},{"key":"preconditions","label":"前置條件"},{"key":"inputs","label":"輸入值／資料"},{"key":"steps","label":"操作步驟"},{"key":"expectedResult","label":"預期結果／錯誤"},{"key":"expectedFields","label":"預期逐欄值／可見與唯讀"},{"key":"expectedData","label":"預期資料副作用"},{"key":"negativeBoundary","label":"反例／邊界差異"},{"key":"verification","label":"人工核對方式"}]
+    }
+  ]
+}

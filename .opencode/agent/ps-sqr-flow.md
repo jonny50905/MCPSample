@@ -12,6 +12,8 @@ tools:
   edit: false
   bash: false
   webfetch: false
+  websearch: false
+  codesearch: false
   # 實際環境兩個 MCP：ES 搜 chunk ids（候選）；Source 以 chunk id 取完整上下文（Evidence）
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true

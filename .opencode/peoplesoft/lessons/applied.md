@@ -3484,3 +3484,19 @@
 - 落點：四套測試改同行程 `& script`，輸出以 `ForEach-Object { [string]$_ }` 逐筆取字再 join；不再開子行程。順帶：陣列 splat
   對 script 只走位置繫結、不認 `-Name`，要 switch 正確繫結得先轉雜湊表再 splat（對外部程序則是由子行程自己剖析命令列）。
 - 教訓：抓輸出用 `[string]` 不用 `Out-String`；不在測試裡開子 PowerShell；沙箱綠不等於目標機綠，首跑回報的 FAIL 名稱就是最好的線索。
+
+### L128 以重建目的設計文件入口；填滿模板不是功能完整（2026-09-20）
+
+- 症狀：管理者只想輸入 Component，得到另一個獨立 LLM 能據以重建核心功能的 Spec；現有 pack 接入、映射與多個 CLI 階段太繁瑣，規格又可能把無關 PeopleSoft 原生功能一起帶入。
+- 根因：把模板槽位與已研究文件當成使用者必須理解的起點；缺少以重建行為為目標的深度契約、可用對話入口與範圍排除。
+- 落點：新增 ps-spec-author／ps-clone-worker、/ps-spec／/ps-clone-batch、ps-spec-build／ps-spec-clone-lib、clone-profile／clone-contract。
+  Component 清單直接建 stable job；先 scope，後 flows／ui／data／rules／states／transactions／interfaces／security／acceptance；每頁有界，研究與覆核分開 session。
+  CORE／DEPENDENCY／EXCLUDED 依可證使用鏈；逐欄條件、事件先後、狀態轉移、交易、副作用、反例與邊界都具固定欄位；技術原名保留、敘述繁中。
+  結構＋獨立覆核才接受；缺證據候選只當草稿、針對同頁重試；未解 UNKNOWN 不能藏在分頁後面宣稱完成；跨 Component 工單包含所有已接受章節供一致性覆核。
+  immutable revision／receipt／generated，加來源指紋、獨佔鎖、寫檔圍欄、人工產物衝突停機；Status 唯讀，Retry 不抹歷史，Refresh 不刪舊成果。
+  .gitignore 排除 docs/ps-spec；author、worker 與其可委派 flow／auditor 明確停用 websearch／codesearch，不能假設父 agent 權限會套到子 agent。
+- 同波修正固定模板引擎：headings 只綁直屬內文、多 token 同列合成、最新 pack slot 重綁、NO_EVIDENCE 不算覆蓋、續篇 VALIDATIONS 用來源路徑身分；舊有不可信收據不重用，原始檔保留。
+- 驗證：真 PS5.1 的合成 packet／review 單元、CLI＋fake worker（多 Component、多頁、resume、錯誤 hash／覆核、未知、來源變更、越界寫入、人工修改保留）；既有 Spec／auto-loop 回歸、PS5.1 靜態檢查。
+  真 OpenCode 1.18.29＋localhost 假模型 smoke 驗 command 路由、author bash Status、worker read／write／拒絕偽造收據；runtime-guard 原有 13 個假 MCP／假模型 E2E 全過。
+  Windows Node ESM 的 unit harness 改以 pathToFileURL import；測試資料全合成，沒有企業內容或外部資料上傳。
+- 教訓：機械驗證只保證結構和狀態，不證明模型語意正確；REVIEW_READY 不是等價驗證。公司 E2E 不可得就明列人工驗收與未知，不用格式或第二個模型的 PASS 假裝真實執行。

@@ -1,7 +1,7 @@
-# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1）
+# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1）
 
-三個 CLI 家族每個動詞的**最後一行**都是唯一的結論碼；上面的內容只在本機看。結論碼**不含**路徑、檔名、物件名、hash、requestId。
-形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC)1-\d-\d\d(-\d+)?$`。
+CLI 每個動詞的**最後一行**都是唯一的結論碼；上面的內容只在本機看。結論碼**不含**路徑、檔名、物件名、hash、requestId。
+形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC|CLONE)1-\d-\d\d(-\d+)?$`。
 公司機回報只回結論碼、drill tuple 與 PASS／FAIL；`.ps-private`、template／checklist 原文、NN 內容一律不出公司。
 
 ## KNOW1（scripts/ps-knowledge.ps1）
@@ -40,7 +40,27 @@
 
 exit：0＝完成；2＝參數、驗證、路由、寫入錯（1-04／1-05／1-06／9-01）與迷你圈中止（3-03）。
 
+## CLONE1（scripts/ps-spec-build.ps1）
+
+| stage | code | 意義 | exit |
+|---|---|---|---|
+| 0 | 02 | 尚未開始（Status 唯讀） | 0 |
+| 0 | 03 | 同一 job 已在執行 | 3 |
+| 3 | 02-`<n>` | RUNNABLE，n 個頁工作可續跑 | 0 |
+| 3 | 03 | SLOT_BUSY；未取得模型 session，稍後續跑 | 1 |
+| 3 | 04 | SESSION_FAILED；檢查環境後續跑，不消耗本頁無效次數 | 1 |
+| 3 | 07 | WRITE_DEFERRED；解除檔案占用後續跑，不假裝已發布 | 1 |
+| 4 | 03 | BLOCKED；保留草稿／缺口，處理原因後顯式 Retry，必要時 Refresh | 1 |
+| 4 | 04 | STALE；來源或契約已變，同清單重跑建立新研究版本 | 1 |
+| 7 | 01 | REVIEW_READY；結構＋獨立 LLM 覆核通過，仍需內部驗收 | 0 |
+| 9 | 01 | 參數不合法 | 2 |
+| 9 | 02 | 環境／收據完整性／產物衝突等錯誤；詳細內容只在本機看 | 2 |
+
+CLONE1 不使用 drill tuple。請勿將本機錯誤文字、generated 文件或 attempt 帶出公司。
+
 ## SPEC1（scripts/ps-spec.ps1）
+
+CLONE1 是直接以 Component 寫核心重建規格的入口；本節 SPEC1 則用於私有需求包映射。
 
 stage：0 integrity／1 pack／2 plan／3 dispatch／4 accept／5 knowledge／6 render／7 gate／8 mapping／9 usage。責任方見 troubleshooting-matrix.md。
 

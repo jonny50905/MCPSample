@@ -8,14 +8,14 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, "..", "..")
 const pluginPath = path.join(repoRoot, ".opencode", "plugin", "ps-runtime-guard.js")
 process.env.PS_GUARD_REMOUNT_VERIFY_MS = "1500"
 process.env.PS_GUARD_REMOUNT_POLL_MS = "200"
-const { PsRuntimeGuard } = await import(pluginPath)
+const { PsRuntimeGuard } = await import(pathToFileURL(pluginPath).href)
 
 // 假 client：只用 mcp.status／connect／disconnect 與 experimental.tool.ids；記下每次呼叫
 function fakeClient({ status = "connected", error, connectFails = false, connectTo = "connected", toolIds = ["read", "task"] } = {}) {

@@ -12,6 +12,8 @@ tools:
   edit: false
   bash: false
   webfetch: false
+  websearch: false
+  codesearch: false
   # PeopleTools metadata（translate values、label、Page/Component 對映、prompt）
   # 用 oracleMCP 查，一律照 oracle-query-cookbook.md 樣板，只准 SELECT：
   # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／sqlcl_run，

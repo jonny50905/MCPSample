@@ -183,12 +183,14 @@ Write-Utf8 $fake @(
     'if ($mode -eq "crash") { exit 1 }',
     'if ($mode -eq "mutate") { $nn = $env:PS_SPEC_FAKE_NN; $t = [System.IO.File]::ReadAllText($nn); $t = $t.Replace("- **INFERRED**：匯入檔", "- **CONFIRMED**：新增條目`n- **INFERRED**：匯入檔"); [System.IO.File]::WriteAllText($nn, $t, (New-Object System.Text.UTF8Encoding($false))) }',
     '$out = @("## 事實", $hdr, $sep)',
-    'if ($mode -eq "invalid") { $out += ("| 99 | x | x | x | nofile#1 |") } elseif ($mode -eq "partial") { $out += $rows[0] } elseif ($mode -eq "empty") { } else { $out += $rows }',
+    'if ($mode -eq "invalid") { $out += ("| 99 | x | x | x | nofile#1 |") } elseif ($mode -eq "partial") { $out += $rows[0] } elseif ($mode -eq "empty" -or $mode -eq "no-evidence" -or $mode -eq "not-relevant") { } else { $out += $rows }',
     '$out += @("", "## 未採用", "| 來源條目 | 原因 |", "|---|---|")',
+    'if ($mode -eq "no-evidence" -or $mode -eq "not-relevant") { $reason = "NO_EVIDENCE"; if ($mode -eq "not-relevant") { $reason = "NOT_RELEVANT" }; foreach ($it in $items) { $out += ("| " + $it[0] + " | " + $reason + " |") } }',
     'if ($mode -eq "template") { $out += "本模板為合成範例：公司機複製本目錄為 .ps-private/spec/<packId>/ 後，只改標記位置與文字，不改 generic 檔。" }',
     'if ($mode -eq "long") { for ($i = 0; $i -lt 200; $i++) { $out += "" } }',
     '[System.IO.File]::WriteAllText($FragmentPath, ($out -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))',
-    'exit 0')
+    'exit 0') -Bom $true
+Assert (([System.IO.File]::ReadAllBytes($fake)[0..2] -join ',') -eq '239,187,191') "含中文的 fake-worker.ps1 使用 UTF-8 BOM（真 PS 5.1）"
 $env:PS_SPEC_FAKE_MODE = 'valid'
 $env:PS_SPEC_FAKE_NN = (Join-Path $domA '03-TW_DEMO_A.md')
 $script:commonH = @{ Root = $root; PrivateRoot = $priv; RuntimeRoot = $rt; LogRoot = $logs }
@@ -277,7 +279,7 @@ foreach ($q in @($planA.requirements)) { $reqA[[string]$q.id] = $q }
 Assert ([string]$reqA['R20'].applicable -eq 'TRUE' -and [string]$reqA['R17'].applicable -eq 'UNKNOWN' -and [string]$reqA['R18'].applicable -eq 'TRUE') "applicability：FACT_TRUE 對 EXTRACT 事實＝TRUE；自我引用 COMPOSE 事實＝UNKNOWN（不變 N/A）"
 $unitsA = @($planA.units)
 $uk = @($unitsA | ForEach-Object { [string]$_.unitId })
-Assert ($unitsA.Count -eq 4 -and ($uk -contains 'R17.TW_DEMO_A') -and ($uk -contains 'R18.TW_DEMO_A@PS_DEMO_TBL') -and ($uk -contains 'R18.TW_DEMO_A@PS_JOB') -and (@($uk | Where-Object { $_ -match '^R20\.TW_DEMO_A@行為邏輯:L\d+-\d+$' })).Count -eq 1) "COMPOSE units：subjectKey 文法（<C>／<C>@<Record>／<C>@行為邏輯:L<a>-<b>）"
+Assert ($unitsA.Count -eq 4 -and ($uk -contains 'R17.TW_DEMO_A') -and ($uk -contains 'R18.TW_DEMO_A@PS_DEMO_TBL') -and ($uk -contains 'R18.TW_DEMO_A@PS_JOB') -and (@($uk | Where-Object { $_ -match '^R20\.TW_DEMO_A@行為邏輯:[0-9a-f]{16}$' })).Count -eq 1) "COMPOSE units：VALIDATIONS 以來源穩定身分區分續篇，不以行號當身分"
 $u17 = @($unitsA | Where-Object { $_.unitId -eq 'R17.TW_DEMO_A' })[0]
 Assert (@($u17.readSet).Count -eq 2 -and (@($u17.readSet | Where-Object { $_.role -eq 'CALLEE' })).Count -eq 1 -and @($u17.items).Count -eq 8) "DATA.FILE_INPUT unit：讀取集合含 callee 節；條目＝行為 3＋資料流 2＋執行 1＋callee 執行 1＋callee 資料流 1"
 Assert ((@($u17.readSet[0].sections | Where-Object { $_.name -eq 'Evidence附錄' })).Count -eq 1 -and [string]$u17.readSet[0].sections[0].hash -match '^[0-9A-F]{64}$') "讀取集合：每檔含 Evidence 附錄；每節內容 hash"
@@ -1017,6 +1019,112 @@ Assert ($c -eq 'SPEC1-9-01' -and $script:lastExit -eq 2) "-InitPack -BindingMode
 Write-Host "情境 24：render 的表格是合法 Markdown 表（表頭列與分隔列各自一行）"
 $tblLines = ConvertTo-PsSpTable -Header @('項目', '值') -Rows @(, @('a', 'b'))
 Assert (@($tblLines).Count -eq 3 -and @($tblLines)[0] -eq '| 項目 | 值 |' -and @($tblLines)[1] -match '^\|---' -and @($tblLines)[2] -eq '| a | b |') "ConvertTo-PsSpTable：表頭、分隔列、資料列各自一行（分隔列不再被併進表頭）"
+
+# ── 情境 25：headings 直接正文、同列 token 與 binding-only 重綁 ──
+Write-Host '情境 25：標題綁定不吞子章節／同列 token；binding-only 使用最新 pack'
+function New-HeadingRegressionPack {
+    param([string]$Id, [string]$Text, $Slots = $null, [string]$FactKind = 'UI.COMPONENT_IDENTITY', $Applicability = @{ op = 'ALWAYS' })
+    $p = New-PsSpPackSkeleton -PackId $Id -TemplateText $Text
+    if ($null -ne $Slots) { $p.slots = @($Slots) }
+    $p.placeholders = @(); $p.reviewedVersion = 1; $p.checklist = @('C01'); $p.requirements = @()
+    $n = 0
+    foreach ($s in @($p.slots)) {
+        $n++
+        $p.requirements += , ([ordered]@{ id = ('R' + $n.ToString('00')); slot = [string]$s.id; checklistRefs = @('C01'); factKind = $FactKind; required = $true; applicability = $Applicability; cardinality = 'ALL_DISCOVERED'; evidencePolicy = 'ANY' })
+    }
+    $dir = Join-Path $priv $Id
+    Write-Utf8 (Join-Path $dir 'template-bound.md') @($Text)
+    Write-Utf8 (Join-Path $dir 'pack.json') @((ConvertTo-PsKnJson -Value $p))
+    return (Test-PsSpPack -PackDir $dir -Capabilities $caps)
+}
+$nestedText = "# Demo`n`n## Parent`nParent introduction.`n`n### Child`nChild introduction.`n`n## Next`n"
+$vn = New-HeadingRegressionPack -Id 'nested' -Text $nestedText
+$bound = ConvertTo-PsSpHeadingBound -Text $vn.Template -PackV $vn -BySlot @{ S01 = @('PARENT_CONTENT'); S02 = @('CHILD_CONTENT') }
+Assert ($vn.Ok -and $bound.IndexOf('PARENT_CONTENT') -lt $bound.IndexOf('### Child') -and $bound.IndexOf('CHILD_CONTENT') -gt $bound.IndexOf('### Child') -and $bound.IndexOf('CHILD_CONTENT') -lt $bound.IndexOf('## Next')) 'InitPack 父／子章節不需手工加 marker：兩份內容都在各自直接正文'
+$repeatText = "# Demo`n`n## Parent`n{{Description}}`n`n### Child`n{{Description}}`n"
+$vr = New-HeadingRegressionPack -Id 'repeat-token' -Text $repeatText
+$bound = ConvertTo-PsSpHeadingBound -Text $vr.Template -PackV $vr -BySlot @{ S01 = @('PARENT_CONTENT'); S02 = @('CHILD_CONTENT') }
+Assert ($vr.Ok -and $bound.Contains('PARENT_CONTENT') -and $bound.Contains('CHILD_CONTENT') -and -not $bound.Contains('{{Description}}')) '父／子正文各有一個同名 token：骨架、validator、render 使用相同直接範圍'
+$inlineText = "# Demo`n`n## Summary`n{{FIRST}} / {{SECOND}}`n"
+$vi = New-HeadingRegressionPack -Id 'inline-tokens' -Text $inlineText -Slots @(@{ id = 'S01'; heading = 'Summary'; placeholder = '{{FIRST}}' }, @{ id = 'S02'; heading = 'Summary'; placeholder = '{{SECOND}}' })
+$bound = ConvertTo-PsSpHeadingBound -Text $vi.Template -PackV $vi -BySlot @{ S01 = @('FIRST_CONTENT'); S02 = @('SECOND_CONTENT') }
+Assert ($vi.Ok -and $bound.Contains('FIRST_CONTENT / SECOND_CONTENT') -and -not $bound.Contains('{{SECOND}}')) '同一行兩個不同 token：以原行字元位置合成，不丟第二份內容'
+$collision = New-HeadingRegressionPack -Id 'binding-collision' -Text $inlineText -Slots @(@{ id = 'S01'; heading = 'Summary'; placeholder = '{{FIRST}}' }, @{ id = 'S02'; heading = 'Summary'; placeholder = '{{FIRST}}' })
+Assert (-not $collision.Ok -and ($collision.Errors -join ';') -match 'SLOT_PLACEHOLDER_AMBIGUOUS') '兩個 slot 綁同一個 token：驗證即拒絕，不容許 render 靜默跳過'
+$vAppend = New-HeadingRegressionPack -Id 'same-append' -Text "# Demo`n## Summary`nText.`n`n## Next`n" -Slots @(@{ id = 'S01'; heading = 'Summary' }, @{ id = 'S02'; heading = 'Summary' })
+$bound = ConvertTo-PsSpHeadingBound -Text $vAppend.Template -PackV $vAppend -BySlot @{ S01 = @('FIRST_CONTENT'); S02 = @('SECOND_CONTENT') }
+Assert ($vAppend.Ok -and $bound.Contains('FIRST_CONTENT') -and $bound.Contains('SECOND_CONTENT')) '同一章節多個 append slot：有序合併，兩份內容都保留'
+$hcPath = Join-Path (Join-Path $priv 'pack-hc') 'pack.json'
+$hcBefore = Read-PsKnText -LiteralPath $hcPath
+$hcPack = $hcBefore | ConvertFrom-Json
+$hcPack.packVersion = 2; $hcPack.reviewedVersion = 2
+(@($hcPack.requirements | Where-Object { $_.id -eq 'R01' })[0]).slot = 'S03'
+Write-Utf8 $hcPath @((ConvertTo-PsKnJson -Value $hcPack))
+$vcRebound = Test-PsSpPack -PackDir (Join-Path $priv 'pack-hc') -Capabilities $caps
+$oldPlanRef = [string](Read-PsSpJob -Dirs $dirsHc).currentPlanRef
+$c = Invoke-Cli @{ Render = $true; JobId = 'job-hc' }
+$curRebound = Read-PsSpJsonFile -LiteralPath $dirsHc.CurrentFile
+$reboundSpec = Read-PsKnText -LiteralPath (Join-Path (Join-Path $dirsHc.Outputs ([string]$curRebound.generation).Substring(0, 16).ToLowerInvariant()) 'spec.md')
+Assert ($c -eq 'SPEC1-6-01' -and $vcRebound.ContentHash -ceq $vc.ContentHash -and $vcRebound.BindingHash -cne $vc.BindingHash -and [string](Read-PsSpJob -Dirs $dirsHc).currentPlanRef -ceq $oldPlanRef -and $reboundSpec.IndexOf('<!-- R01 ') -gt $reboundSpec.IndexOf('## 三、畫面與欄位') -and $reboundSpec.IndexOf('<!-- R01 ') -lt $reboundSpec.IndexOf('## 四、資料與檔案')) '合法升版只改 requirement.slot：不重 Plan／不取新證，Render 即把內容搬到新章節'
+Write-Utf8 $hcPath @($hcBefore)
+
+# ── 情境 26：NO_EVIDENCE 不等於否定事實；外環不得寫假完整收據 ──
+Write-Host '情境 26：缺證據維持未完成；NOT_RELEVANT 才能閉合為無適用事實'
+$ve = New-HeadingRegressionPack -Id 'no-evidence' -Text "# Demo`n## Validations`n{{CONTENT}}`n" -FactKind 'BEHAVIOR.VALIDATIONS' -Applicability @{ op = 'FACT_TRUE'; fact = 'BEHAVIOR.VALIDATIONS.condition' }
+Assert $ve.Ok 'NO_EVIDENCE fixture 是目錄內合法的 self-applicability requirement'
+$c = Invoke-Cli @{ Plan = $true; JobId = 'job-no-evidence'; Component = 'TW_DEMO_A'; Pack = 'no-evidence' }
+$dirsE = Get-PsSpDirs -Root $root -PrivateRoot $priv -RuntimeRoot $rt -PackId 'no-evidence' -JobId 'job-no-evidence'
+$env:PS_SPEC_FAKE_MODE = 'no-evidence'
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-no-evidence'; MaxSessions = 1; FakeWorker = $fake }
+$ev1 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsE.Attempts 'a0001') 'verdict.json')
+$ei1 = Read-PsSpJsonFile -LiteralPath (Join-Path (Join-Path $dirsE.Attempts 'a0001') 'input.json')
+$efPath = Join-Path (Join-Path $dirsE.Attempts 'a0001') 'fragment.md'
+$ef = Test-PsSpFragment -LiteralPath $efPath -Items $ei1.items -Files $ei1.files -Cap (Get-PsSpFactKind -Capabilities $caps -FactKind 'BEHAVIOR.VALIDATIONS')
+$eReceipts = Get-PsSpReceipts -Dirs $dirsE
+Assert (-not $ef.Ok -and $ef.Closure -eq 'PARTIAL' -and $ef.Present -eq 'UNKNOWN' -and $ef.Unresolved -gt 0 -and $ef.Covered.Count -eq 0 -and $ev1.code -eq '4-02' -and @($eReceipts).Count -eq 0) '全 NO_EVIDENCE：不出 COMPLETE／FALSE、不進 PartialSplit、不寫 receipt'
+$c = Invoke-Cli @{ Gate = $true; JobId = 'job-no-evidence' }
+Assert ($c -ne 'SPEC1-7-01') '自我 applicability 缺證據仍 UNKNOWN debt，不能變 NOT_APPLICABLE／SPEC_COMPLETE'
+$efText = Read-PsKnText -LiteralPath $efPath
+Write-Utf8 $efPath @($efText.Replace('NO_EVIDENCE', 'NOT_RELEVANT'))
+$efNotRelevant = Test-PsSpFragment -LiteralPath $efPath -Items $ei1.items -Files $ei1.files -Cap (Get-PsSpFactKind -Capabilities $caps -FactKind 'BEHAVIOR.VALIDATIONS')
+Assert ($efNotRelevant.Ok -and $efNotRelevant.Closure -eq 'COMPLETE' -and $efNotRelevant.Present -eq 'FALSE' -and $efNotRelevant.Unresolved -eq 0) '真正 NOT_RELEVANT 仍可完整排除，保持與缺證據不同'
+# 模擬舊版錯收，必須忽略且能另寫正確收據（不能被 immutable Existed 卡住）。
+$planE = Read-PsSpPlan -Dirs $dirsE -PlanRef ([string](Read-PsSpJob -Dirs $dirsE).currentPlanRef)
+$idxE = Read-PsKnowledgeIndex -Root $root
+$statusE = Get-PsSpUnitStatus -Root $root -Dirs $dirsE -Plan $planE -Index $idxE
+$euE = @($statusE)[0].Eu; $liveE = @($statusE)[0].Live
+$legacyFrag = @{}; foreach ($k in $ef.Keys) { $legacyFrag[$k] = $ef[$k] }
+$legacyFrag.Closure = 'COMPLETE'; $legacyFrag.Present = 'FALSE'; $legacyFrag.Unresolved = 0
+$legacyReceipt = Write-PsSpReceipt -Dirs $dirsE -Eu $euE -Live $liveE -Frag $legacyFrag -AttemptId 'a0001' -PlanRef (Get-PsSpPlanRef -Plan $planE) -JobId 'job-no-evidence' -InputText (ConvertTo-PsKnJson -Value $ei1)
+$statusE = Get-PsSpUnitStatus -Root $root -Dirs $dirsE -Plan $planE -Index $idxE
+Assert ($legacyReceipt.Ok -and [string]@($statusE)[0].State -ne 'HAS_RECEIPT') '舊 NO_EVIDENCE 假完整收據不可重用'
+$env:PS_SPEC_FAKE_MODE = 'not-relevant'
+$c = Invoke-Cli @{ Run = $true; JobId = 'job-no-evidence'; MaxSessions = 1; FakeWorker = $fake }
+$statusE = Get-PsSpUnitStatus -Root $root -Dirs $dirsE -Plan $planE -Index $idxE
+Assert ([string]@($statusE)[0].State -eq 'HAS_RECEIPT' -and [string]@($statusE)[0].Receipt.present -eq 'FALSE' -and [System.IO.File]::Exists($legacyReceipt.Path) -and [System.IO.File]::Exists([System.IO.Path]::ChangeExtension($legacyReceipt.Path, 'evidence-v2.json'))) '重新驗收 NOT_RELEVANT 可完成；舊收據保留，新收據另存不覆寫'
+$env:PS_SPEC_FAKE_MODE = 'valid'
+
+# ── 情境 27：續篇同節同列號仍是兩個穩定工作單位 ──
+Write-Host '情境 27：續篇工作單位身分含來源，行號漂移不改身分'
+$contPath = Join-Path $domA '03-TW_DEMO_A-2.md'
+$mainText = Read-PsKnText -LiteralPath (Join-Path $domA '03-TW_DEMO_A.md')
+Write-Utf8 $contPath @($mainText)
+[void](Publish-PsKnowledgeIndex -Root $root)
+$idxCont = Read-PsKnowledgeIndex -Root $root
+$planCont = New-PsSpPlan -Root $root -Dirs $dirsE -PackV $ve -JobId 'job-cont' -Component 'TW_DEMO_A' -DomainHint '測試領域' -Index $idxCont -Capabilities $caps
+$contIds = @($planCont.Plan.units | ForEach-Object { [string]$_.unitId })
+Assert (@($planCont.Plan.units).Count -eq 2 -and @($contIds | Select-Object -Unique).Count -eq 2 -and @($planCont.Plan.requirements[0].units).Count -eq 2) '主檔與續篇相同行號的行為節：Plan 留下兩個不同 unit，不再 last-wins 少掉來源'
+Write-Utf8 $contPath @($mainText.Replace('## 行為邏輯', "`n`n## 行為邏輯"))
+[void](Publish-PsKnowledgeIndex -Root $root)
+$idxCont = Read-PsKnowledgeIndex -Root $root
+$planShift = New-PsSpPlan -Root $root -Dirs $dirsE -PackV $ve -JobId 'job-cont' -Component 'TW_DEMO_A' -DomainHint '測試領域' -Index $idxCont -Capabilities $caps
+$shiftIds = @($planShift.Plan.units | ForEach-Object { [string]$_.unitId })
+Assert (($contIds -join ';') -ceq ($shiftIds -join ';')) '來源檔身分未變、節內容未變但行號漂移：unitId 穩定'
+$legacyPlan = (ConvertTo-PsKnJson -Value $planShift.Plan) | ConvertFrom-Json
+$legacyPlan.units[0].unitId = 'R01.TW_DEMO_A@行為邏輯:L35-38'
+$legacyPlan.units[0].unitKey = Get-PsSpUnitKey -UnitId ([string]$legacyPlan.units[0].unitId)
+$legacyStatus = Get-PsSpUnitStatus -Root $root -Dirs $dirsE -Plan $legacyPlan -Index $idxCont
+Assert ([string]@($legacyStatus)[0].State -eq 'SOURCE_CHANGED' -and $null -eq @($legacyStatus)[0].Receipt) '舊版行號式 unitId 的 plan 必須重 Plan，不能沿用可能漏續篇的分母'
 
 Remove-Item -Recurse -Force $root
 Write-Host ""

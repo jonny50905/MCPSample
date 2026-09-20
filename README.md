@@ -25,6 +25,22 @@ Record 定義與 Portal Registry 裡，客製（`TW_` 前綴等）又疊在原�
 框架的做法：**先用模型把領域探勘成結構化文件，再用機械稽核逼它拿出證據**，
 最後沉澱成可直接問答的 wiki。
 
+## 用 Component 直接產生重建規格
+
+在 OpenCode 對話輸入 `/ps-spec TW_DEMO_A TW_DEMO_B`，或切到 `ps-spec-author`
+後直接輸入一個或多個 Component。名稱只是合成範例，請在公司機換成確切名稱。
+不必先填 pack JSON、不必指定 Domain、不必先研究整個領域。
+
+流程會先確認核心範圍，再逐段研究畫面、資料、欄位條件、狀態機、交易、介面、權限與驗收情境，
+由另一個 session 覆核後組成繁體中文 Spec；技術識別字與原始值保留原文。
+只納入指定功能真正使用的 PeopleSoft 依賴，不展開無關原生功能。
+
+輸出位於 `docs/ps-spec/<job>/README.md`（最新文件入口）與同目錄的 `current.json`。
+中斷後重送相同清單即續跑；缺證據會留下草稿與缺口，不會宣稱已完成。
+`REVIEW_READY` 表示可供內部審閱，**不是企業 E2E 或重建等價保證**。
+詳見 [SOP-25](.opencode/peoplesoft/SOP.md#sop-25-component-直接產生核心功能重建-spec)。
+既有公司 Template／Checklist 精準映射仍可用 SOP-24 的私有 pack 路徑，但不是這個入口的前置步驟。
+
 ## 證據契約（整個框架的地基）
 
 只有兩種東西算證據：
@@ -75,12 +91,13 @@ skill    決定「怎麼做」   載入當下 context 的作業程序（查法�
 
 ### Command（`.opencode/command/`）
 
-使用者的四個入口。指令本身只是一段 prompt ＋ 指定執行的 agent。
+指令本身是一段 prompt ＋ 指定執行的 agent。
 
-四個指令的 frontmatter 都是 `agent: ps-deep-research`——因為只有它有寫檔權限。
+研究與修正指令交給 `ps-deep-research`；重建 Spec 交給 `ps-spec-author` 操作確定性外環。
 
 | 指令 | 做什麼 |
 |---|---|
+| `/ps-spec <Component...>` | 直接產核心功能重建規格；支援複數 Component、分段查證／獨立覆核與續跑 |
 | `/ps-research <領域>` | 產完整業務文件：總覽 ＋ 逐功能深查 → `docs/ps-research/<領域>/`。中斷後重跑即續跑 |
 | `/ps-audit <領域>` | 稽核：逐檔委派 `ps-auditor` 做證據解引用、claim 反駁抽驗、完整性 diff → 產 `90-audit.md`，問題回灌 checklist |
 | `/ps-lesson <描述>` | 模型答錯時登錄教訓：自動分類落點、套用最小修改、記進 `applied.md` |
@@ -97,6 +114,8 @@ OpenCode 內建 agent 重新上鎖。
 
 | Agent | 類型 | 職責 |
 |---|---|---|
+| `ps-spec-author` | all | 對話／委派入口：接收 Component，執行規格外環，回報文件與缺口 |
+| `ps-clone-worker` | primary | 外環專用：只研究或覆核一個 Component／topic／頁，不直接寫最終 Spec |
 | `ps-orchestrator` | primary | 業務問答主流程：解析領域與客製政策，把重檢索委派出去，彙整 JSON 報告後產出業務說明 |
 | `ps-deep-research` | primary | 文件生成：總覽 ＋ 調查 checklist ＋ 逐功能深查，可中斷續跑 |
 | `ps-auditor` | subagent | 稽核：證據解引用驗證（chunk／SQL 重查比對）、claim 反駁、換角度完整性盤點 |
@@ -251,6 +270,7 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-knowledge.ps1`（＋`ps-knowledge-lib.ps1`） | 知識索引：NN／wiki 的定位與等級（問答讀取契約用） | `docs/ps-research/knowledge/`（本機快取，gitignore） |
 | `ps-supplemental.ps1`（＋`ps-supplemental-lib.ps1`） | 補研究 request 提交／狀態／結果；執行在 `ps-auto-loop -SupplementalOnly` | `docs/ps-research/supplemental/requests/` |
 | `ps-spec.ps1`（＋`ps-spec-lib.ps1`） | Spec 引擎：私有需求包驗證、規劃、外環、render、gate、doctor | `.ps-runtime/spec/`（gitignore） |
+| `ps-spec-build.ps1`（＋`ps-spec-clone-lib.ps1`） | Component 直接產核心重建 Spec：範圍、分段研究、獨立覆核、自動組文／續跑 | `.ps-runtime/clone-spec/`、`docs/ps-spec/`（皆 gitignore） |
 | `ps-session-lib.ps1` | opencode headless session 啟動＋session slot 互斥鎖（函式庫） | log |
 | `tests/test-*.ps1` | 測試組：auto-loop、knowledge、supplemental、spec、ps51-static、oracle-runtime | 臨時目錄 |
 | `test-mcp-tools-list.ps1`<br>`test-elasticsearch-mcp-tools-list.ps1` | **遺留**，與本框架無關 | — |

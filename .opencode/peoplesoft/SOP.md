@@ -848,6 +848,9 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
 
 ## SOP-24 Spec 引擎——私有需求包接入與 job 執行（issue #34／#35）
 
+本節只用於有既定公司 Template／Checklist、需要精準綁定欄位的情境。
+只想以 Component 產生供獨立 LLM 重建的核心規格，直接走 SOP-25，不需先建 pack。
+
 分母＝**目標 Component＋公司私有需求包**（不是整個領域）；公司 Template／Checklist 原文與映射只放
 `.ps-private\spec\<packId>\`（gitignore、fs-doctor 不列管、不進任何 git）；job 狀態在 `.ps-runtime\spec\<jobId>\`。
 generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worker agent／command）禁改，`-Doctor` stage 0 機械驗。
@@ -874,3 +877,72 @@ generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worke
    `.ps-runtime\spec` 檔案的程式——編輯器、防毒——再重跑 `-Run`；已驗收但收據沒寫成的單位會重派）。
 4. **回報維護端**只給 `SPEC1-<stage>-<code>[-<count>]` 與 drill tuple；template／checklist 原文與 `.ps-private` 內容不出公司。
 5. 改 `ps-spec*.ps1`／`spec\**` 後必跑 `test-spec.ps1`、`test-ps51-static.ps1`（5.1 語法紀律與 BOM）、`test-auto-loop.ps1`（情境 34）。
+
+綁定補充：headings 的 slot 只處理該標題的直屬內文（到下一個任意層級標題前），不包含子章節；
+同位置不能綁兩個 slot。同列不同 placeholder 會一起保留。調整 requirement 的 slot 並簽核新 packVersion 後，
+Render 使用新綁定；內容事實有改仍須 Plan。NO_EVIDENCE 不是不存在的證明，不算已覆蓋。
+行號式 VALIDATIONS 舊 plan 必須重 Plan 一次；新 unit ID 以來源檔身分區分續篇。
+生成的 spec.md 是投影，不是可直接保留人工修改的工作稿，人工交付修訂請另存副本。
+
+## SOP-25 Component 直接產生核心功能重建 Spec
+
+### 日常操作
+
+1. OpenCode 對話輸入 `/ps-spec TW_DEMO_A TW_DEMO_B`；也可切至 `ps-spec-author` 後輸入
+   `TW_DEMO_A,TW_DEMO_B`。ps-orchestrator 遇到明確寫 Spec 要求或純 Component 清單也會轉交。
+   所有名稱均為合成範例，實際名稱只在公司機輸入。無須 Pack／Domain／自行挑內部階段。
+2. author 自動分輪呼叫 `scripts/ps-spec-build.ps1`，每輪預設 4 個 session，RUNNABLE 就續跑。
+   範圍先研究再獨立覆核；之後依 10 個 topic 分段查證及覆核。每頁最多 40 筆，每 topic 最多 20 頁。
+   兩次無效或覆核失敗後暫停該頁；可繼續的其他 Component／主題仍會處理，不無限重試。
+3. 回覆會顯示 `docs/ps-spec/<job>/README.md` 與最新文件位置。spec.md 是自足的核心行為契約，
+   trace.md 放來源定位，gate.json 放狀態／缺口；未驗收片段另以 candidate.md 保留，不混入已接受正文。
+4. 中斷後輸入相同 Component 清單即續跑（大小寫／排序／重複不影響 job 身分）。只查進度可以說
+   「狀態 TW_DEMO_A」；環境修復後說「重試被擋項 TW_DEMO_A」；實際來源更新後說「重新查證 TW_DEMO_A」。
+   系統不擅自清空舊資料，不自動替使用者增加重試預算。
+
+需要不用對話的入口時，在 repo 根目錄的 PowerShell 執行：
+
+```powershell
+powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_DEMO_B'
+```
+
+`-Status` 唯讀、不派模型；`-Retry` 開新重試預算、保留已接受頁；`-Refresh` 建新研究版本、保留歷史。
+三者不能混用。PowerShell 執行原則、OpenCode 模型／MCP 掛載必須由管理者依既有公司規範配置；
+此入口不會修改權限或下載依賴。
+
+### 寫什麼、排除什麼
+
+- 目標讀者是另一個獨立 LLM：繁體中文說明，Page／Record.Field／事件／SQL／schema／stored value／原始訊息維持原文。
+- 規格固定涵蓋範圍、流程、畫面、資料、規則、狀態、交易、介面、權限、正反例及邊界驗收。
+  畫面要逐欄條件，規則要精確判斷式與事件次序，狀態要守衛與非法轉移；不能只列摘要。
+- CORE／DEPENDENCY／EXCLUDED 依實際使用鏈與證據，不依 delivered／custom 猜測。
+  核心用到的 PeopleSoft 原生功能只寫最小替代契約；無關功能只留下簡短排除理由，不展開正文。
+- NN／wiki 只是定位起點，不存在也能定向查證；關鍵行為要追原始來源。不會自動改寫 NN、wiki 或研究 checklist。
+
+### 狀態、恢復與保證界線
+
+| 狀態 | 意義與動作 |
+|---|---|
+| RUNNABLE | 還有可處理的研究／覆核頁；同清單繼續 |
+| BLOCKED | 已留草稿／缺口；先處理原因，再 -Retry。已接受頁不用重做 |
+| STALE | 本機研究或執行契約已變；同清單重跑會建立新版本 |
+| REVIEW_READY | 結構與獨立 LLM 覆核通過，供內部人員審閱；不是企業 E2E 或重建等價驗證 |
+
+純分頁用 PARTIAL＋nextCursor、gaps 空；未知條件用 gaps 明列，不能用續頁結束把未知抹掉。
+缺口頁即使覆核認為如實描述，也不發完成收據；只補查該頁，重試額度用完才停。
+同一 job 有鎖；模型 session 沿用全域 session slot。slot 被占、檔案暫時鎖定時不假裝工作已完成。
+
+本機來源／agent 契約 fingerprint 改變會失效；目前採保守策略，其他領域 NN 改動也可能觸發新版本。
+Oracle／PeopleCode 遠端本體的改動不會被本機 hash 自動察覺，已知上游更新請明確重新查證。
+原生動態 UI、執行時資料與權限仍需公司內部核對；未能觀察就留缺口，不能憑框架常識補成事實。
+
+generated 每次產出為不可覆寫世代，current.json 指向成功發布版本；人工交付版另存，避免與續跑混用。
+`.ps-runtime/clone-spec/`、`.ps-runtime/clone-spec-logs/`、`docs/ps-spec/` 都是機敏本機產物，不進 git、不出公司。
+對外維護只回最後一行 `CLONE1-...` 與狀態，不回傳物件、路徑、hash、trace 或真實內容。
+
+### 維護驗證
+
+真 PS 5.1 跑 `test-spec-clone.ps1`、`test-spec-build.ps1`、`test-spec.ps1`、`test-auto-loop.ps1`；
+PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-guard 單元／假模型 E2E，
+以及 `node tests/runtime-guard/run-clone-smoke.mjs`（OPENCODE_BIN 可指定既有執行檔）。
+這些測試只驗機制及合成資料，不代替企業功能驗收。維護端重生 generic／transfer manifest 後再搬整檔；公司機不重生基準。

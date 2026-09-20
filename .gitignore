@@ -36,3 +36,6 @@ docs/ps-research/*/supplemental-parts/
 # Spec：私有需求包（公司 Template／Checklist 映射）與 job 執行狀態——永不入庫
 .ps-private/
 .ps-runtime/
+
+# 核心功能重建 Spec（機敏產物，只在公司本機，不可進外部 remote）
+docs/ps-spec/

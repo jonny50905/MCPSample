@@ -11,6 +11,8 @@ tools:
   edit: false
   bash: false
   webfetch: false
+  websearch: false
+  codesearch: false
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
   # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／sqlcl_run，
