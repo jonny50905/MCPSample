@@ -40,7 +40,7 @@ permission:
 對工單的每個需求鍵，讀 Spec 原文段落，再讀對應程式與測試：
 
 1. **條件式**：欄位、運算子、比較值、AND／OR 與優先序；NULL、空白、0、日期邊界的處理。
-2. **值與訊息**：stored value 大小寫與長度、訊息 set／number、訊息原文與替換符、Error 或 Warning。
+2. **值與訊息**：stored value 大小寫與長度、訊息代碼、訊息原文與替換符、Error 或 Warning。
 3. **時機**：規則掛在哪個事件、事件先後、只在特定模式或狀態成立的條件。
 4. **狀態**：轉移的起點、守衛、終點、副作用；禁止轉移是否真的被拒絕。
 5. **交易**：寫入順序、交易邊界、失敗時 rollback 範圍、取號與鎖、併發衝突處理。
@@ -50,9 +50,10 @@ permission:
 9. **測試**：每個驗收需求鍵有 `Trait("Spec", 鍵)` 的測試；斷言真的驗到預期結果、欄位狀態與資料變動，
    不是只驗 HTTP 200；正例、反例、邊界都有。
 10. **架構鐵律**：規則有沒有寫到前端、欄位狀態是不是前端自己算、存檔是否違反 Spec 或 ADR 的交易邊界、
-    有沒有 `NotImplementedException` 或假資料回傳、有沒有被 Skip 的測試。
+    有沒有 `NotImplementedException` 或假資料回傳、有沒有被 Skip 的測試、有沒有 dev 自己加的 `Known` Trait。
 
-在專案根目錄執行 `dotnet test`（有動前端再加 `npm.cmd --prefix web run build`）確認結果，數字照實填。
+在專案根目錄執行 `dotnet test --filter "Known!=Failing"`（有動前端再加 `npm.cmd --prefix web run build`）確認結果，數字照實填。
+第 4 階段另跑一次完整 `dotnet test`，核對失敗的只有 status.md 列為 Known Failing 的測試。
 發現 Spec 本身矛盾或不足時，不算實作錯誤，寫成 `SPEC_ISSUE` 讓 lead 登記假設。
 
 跨 Component 一致性覆核（第 4 階段）另外核對：共用的表與欄位定義、狀態值、stored value、訊息、

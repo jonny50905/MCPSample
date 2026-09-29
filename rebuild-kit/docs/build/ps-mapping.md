@@ -18,9 +18,9 @@
 | Field | 欄位，名稱原樣 |
 | Translate 值（XLAT） | 代碼值表（欄位名、值、有效日、狀態、長短名稱）＋種子；只放 Spec 用到的欄位與值 |
 | Prompt Table | lookup API，篩選條件照 Spec |
-| Message Catalog（set／number） | 訊息目錄表：set、number、嚴重度、原文（含 `%1` 這類替換符）；顯示時代入參數 |
-| `Error` | 阻擋：該次事件或存檔失敗，回傳訊息 |
-| `Warning` | 不阻擋但需使用者確認：回傳警告，前端確認後帶 `confirmWarnings=true` 重送 |
+| Message Catalog（set／number） | 訊息目錄表：set、number（Spec 有給時）、嚴重度、原文（含 `%1` 這類替換符）；顯示時代入參數。Spec 只有原文沒有編號時，由 lead 在 ADR 定內部代碼 |
+| `Error` | 阻擋：該次事件或存檔失敗，回傳訊息（細節見第 2 節的預設） |
+| `Warning` | 不阻擋但需使用者確認：回傳警告，前端確認後帶 `confirmWarnings=true` 重送（預設，需登記） |
 | SQLExec／Rowset／CreateRecord | handler 內的 EF Core 或參數化 SQL，與存檔同一交易 |
 | Auto numbering／序號表 | 計數表＋`SELECT … FOR UPDATE` 於存檔交易內取號；格式（前導零、長度）照 Spec |
 | Application Engine／SQR／Process Scheduler | 後端服務類別；本機用開發用 API（`POST /api/dev/run/<程序>`）或 CLI 參數觸發；Run Control 變成參數 DTO |
@@ -51,7 +51,7 @@ API 形狀（預設）：
 
 - `GET /api/<component>/new`：新增模式的初始資料＋欄位狀態。
 - `GET /api/<component>/open?<keys>&mode=`：開啟既有資料。
-- `POST /api/<component>/event`：`{ buffer, event: FieldChange|RowInsert|RowDelete…, path }` → 新 buffer＋欄位狀態＋訊息。
+- `POST /api/<component>/event`：`{ buffer, event: FieldChange|RowInsert|RowDelete…, path, confirmWarnings }` → 新 buffer＋欄位狀態＋訊息。
 - `POST /api/<component>/save`：`{ buffer, mode, confirmWarnings }` → 成功後的新 buffer，或錯誤／警告。
 
 回應統一包含：`buffer`（資料）、`fieldStates`（每個欄位路徑的 visible／editable／required／options）、
@@ -61,6 +61,8 @@ API 形狀（預設）：
 
 - 存檔＝ SaveEdit → SavePreChange → 寫入 → SavePostChange 全在同一個 DB 交易內，任何一步 Error 就整筆 rollback。
 - 同一事件中多個 Error：回第一個就停止。
+- FieldEdit 發生 Error：欄位退回變更前的值，不觸發 FieldChange。
+- Warning（事件或存檔）：先回警告不套用，使用者確認後帶 `confirmWarnings=true` 重送才繼續；取消則維持原狀。
 - 併發：開啟時帶版本（例如最後更新時間或版本欄），存檔時比對不符就拒絕並回訊息。
 
 ## 3. 型別對照
@@ -94,7 +96,7 @@ Spec 寫的型別、長度、精度是權威；下表只是換算方式。
 - **預設值來源不只一個**：Record 欄位預設、FieldDefault、程式指派的先後照 Spec；Spec 沒寫先後就登記 `A-###`。
 - **Translate 值失效**：既有資料上的失效代碼是否仍顯示、是否可再選，照 Spec；沒寫就登記。
 - **SetID／Business Unit 對應的 Prompt**：只實作 Spec 用到的那一種解析方式，不做整套 TableSet。
-- **訊息原文**：保留原文與替換符，不改寫、不翻譯；測試用 set／number 斷言。
+- **訊息原文**：保留原文與替換符，不改寫、不翻譯；測試用訊息代碼（set／number 或 ADR 定的內部代碼）斷言。
 - **畫面欄位條件**：「隱藏」與「唯讀」是不同狀態，必填也可能只在特定模式或狀態成立；逐欄照 Spec。
 
 ## 5. 前端做法
@@ -102,19 +104,23 @@ Spec 寫的型別、長度、精度是權威；下表只是換算方式。
 - 共用欄位元件（例如 `PsField`）：吃後端的欄位狀態決定顯示、唯讀、必填與選項；欄位 label 用 Spec 原文。
 - 欄位離開（blur）或選項改變時送 `event`，用回應整份取代畫面資料與狀態（對應 PeopleSoft 的伺服器往返）。
 - 子層資料用可編輯表格；新增列／刪除列走 `event`。
-- 訊息區顯示 Error；Warning 用確認對話框，確認後帶 `confirmWarnings=true` 重送。
+- 訊息區顯示 Error；`event` 或 `save` 回 Warning 時用確認對話框，確認後帶 `confirmWarnings=true` 重送同一請求。
 - 畫面頂端有開發用使用者下拉選單，選擇結果放 `X-Dev-User` header；後端據此套權限。
 - 前端不寫業務條件判斷。
 
 ## 6. 測試做法
 
 - 驗收測試結構：Arrange＝Spec 的前置條件（用合成資料建）；Act＝依步驟呼叫 `open`／`event`／`save`；
-  Assert＝預期結果或訊息（set／number）、預期欄位值與欄位狀態（可見、唯讀、必填）、預期資料庫資料。
+  Assert＝預期結果或訊息代碼、預期欄位值與欄位狀態（可見、唯讀、必填）、預期資料庫資料。
 - 只驗 HTTP 200 不算驗收；每個預期都要有明確斷言。
 - 正例、反例、邊界各自獨立測試；日期邊界用 `IClock` 固定日期。
 - 測試庫：連線只讀 `ConnectionStrings__Test`，fixture 套用 migrations 與種子；每個測試類別開始前清空交易類表並重灌種子。
   清表前先確認連線的資料庫名稱與 `ConnectionStrings__Main` 不同，相同就讓測試直接失敗，絕不清主庫。
+- 所有測試共用一個測試庫，因此關閉 xUnit 平行執行（`xunit.runner.json` 設 `parallelizeTestCollections: false`，
+  或全部整合測試放同一個 collection）。
+- `WebApplicationFactory` 必須在應用程式讀設定之前，把 `ConnectionStrings:Main` 覆寫成測試庫連線（例如 `UseSetting`），
+  否則啟動時的 migration runner 會對主庫套 migration 與種子。
 - 規則與狀態轉移另寫不需 DB 的單元測試。
-- `SpecCoverageTests`：讀 `docs/build/spec-index.md` 與 `traceability.md`，核對每個需求鍵都在追蹤表；
-  類別 ACCEPTANCE 且狀態 DONE 的鍵，測試組件中一定有相同 `Trait("Spec", 鍵)` 的測試。
-  找不到 `spec-input/` 或索引檔時明確失敗並說明原因，不 Skip。
+- `SpecCoverageTests`：只讀 `docs/build/spec-index.md` 與 `traceability.md`（不讀 `spec-input/`，
+  沒有 Spec 的 clone 也能跑），核對每個需求鍵都在追蹤表；類別 ACCEPTANCE 且狀態 DONE 或 ASSUMPTION 的鍵，
+  測試組件中一定有相同 `Trait("Spec", 鍵)` 的測試。找不到索引檔時明確失敗並說明原因，不 Skip。

@@ -16,12 +16,14 @@
 
 ## 套件檔案與放置位置
 
-把 `rebuild-kit/` 底下的檔案，照相同的相對路徑放到新專案根目錄（`HOW-TO-USE.md` 本身可以不放）：
+把 `rebuild-kit/` 底下的全部檔案（包括本檔，agent 會參照它），照相同的相對路徑放到新專案根目錄：
 
 | 套件內路徑 | 用途 |
 |---|---|
+| `HOW-TO-USE.md` | 本說明（agent 會引用其中的開工步驟） |
 | `AGENTS.md` | 所有 agent 自動載入的常駐規則 |
-| `.gitignore` | 排除 Spec、建置產物、node_modules |
+| `opencode.json` | 專案層 OpenCode 設定：關閉 session 分享與自動更新 |
+| `.gitignore` | 排除 Spec、建置產物、node_modules、本機設定 |
 | `.opencode/agent/rebuild-lead.md` | 主控 agent |
 | `.opencode/agent/rebuild-dev.md` | 實作 subagent |
 | `.opencode/agent/rebuild-reviewer.md` | 覆核 subagent |
@@ -39,10 +41,11 @@
 ## 開工步驟
 
 1. **建新資料夾**，不要放在 MCPSample 裡面（例：`D:\work\jo-clone`）。在裡面執行 `git init`，不要加任何 remote。
+   接著設定本專案的 commit 身分（代號即可，不必真名）：`git config user.name "<代號>"`、`git config user.email "<代號>@local"`。
 2. **放套件檔**：依上表，從 GitHub 開 Raw 複製整檔貼上，存成 UTF-8。
 3. **放 Spec**：把公司 Spec 的全部檔案放進 `spec-input\`，有 checklist 也一起放；子資料夾與檔名隨意，不要改內容。
-   agent 只能讀文字檔（`.md`、`.txt`、`.csv`、`.json`）。Word／Excel 請先轉成 Markdown（例如用公司機已有的
-   markitdown skill）再放進來；原檔可以一起留著當對照。這個資料夾在 `.gitignore` 裡。
+   agent 只能讀文字檔（`.md`、`.txt`、`.csv`、`.json`）。Word／Excel 請先轉成 Markdown 或 csv（例如用公司機已有的
+   markitdown skill；Excel 每個工作表一個 csv）再放進來；原檔可以一起留著當對照。這個資料夾在 `.gitignore` 裡。
 4. **建資料庫**：用 MariaDB 附的 HeidiSQL 或 `mariadb` 用戶端，以管理者帳號執行下面這段（密碼自訂、不要貼給 agent）：
 
    ```sql
@@ -71,7 +74,7 @@
 
 | 時機 | 你會看到 | 你要做的 |
 |---|---|---|
-| 第 0 階段結束 | 環境與 Spec 盤點結果、阻擋項 | 排除阻擋（例如請 IT 開套件來源），回覆「繼續」 |
+| 第 0 階段結束 | 環境與 Spec 盤點結果、阻擋項 | 排除阻擋（例如請 IT 開套件來源），回覆「繼續」（新 session 就輸入 `/rebuild 繼續`） |
 | 第 1 階段結束 | 需求鍵數、slice 數、待業務確認的假設 `A-###`、技術決定 | 看過後回覆「繼續」，或指出要調整的地方 |
 | 第 2～3 階段 | 每張 slice 一段 5 行內的簡報 | 通常不用做事；出現權限詢問就依內容允許或拒絕 |
 | 停下來問你 | 工具壞掉、Spec 矛盾需要業務判斷、同一問題修不好 | 依說明處理後回覆 |
@@ -84,7 +87,7 @@
 
 ## 你會拿到什麼
 
-- 可在本機執行的程式：啟動方式寫在新專案的 `README.md`（單一指令 `powershell -NoProfile -File scripts\run-local.ps1`）。
+- 可在本機執行的程式：啟動方式寫在新專案的 `README.md`（單一指令 `scripts\run-local.cmd`；用 `.cmd` 是因為公司執行原則會擋 `.ps1`）。
 - `docs/build/traceability.md`：每個需求鍵的實作狀態、程式位置與測試名。
 - `docs/build/assumptions.md`：Spec 的缺口與暫定做法。這些要找業務確認，或回 Spec 產製端補查。
 - `docs/build/mvp-report.md`：完成度統計、驗收測試結果、未解項目、刻意簡化的非業務項目。
@@ -95,7 +98,7 @@
 
 ## Spec 更新時
 
-1. 把 `spec-input\` 目前的內容移到 `spec-input\previous\`，放入新版檔案。
+1. 刪掉舊的 `spec-previous\`（如果有），把目前的 `spec-input\` 整個改名為 `spec-previous\`，再建新的 `spec-input\` 放入新版檔案。
 2. 執行 `/rebuild spec-update`：agent 比對差異、更新需求索引與追蹤表、開新的 slice，回報差異後等你回覆「繼續」。
 
 ## 機密
@@ -108,8 +111,10 @@
 
 ## 常見狀況
 
-- **第 0 階段說 `model:` 還是 REPLACE-ME**：回到開工步驟 6。
+- **切到 `rebuild-lead` 或執行 `/rebuild` 時出現 model not found**：`model:` 還是 REPLACE-ME 或 ID 打錯，回到開工步驟 6。
+- **第 0 階段說 `model:` 還是 REPLACE-ME**：同上，改 dev 或 reviewer 的檔。
 - **套件還原失敗**：多半是 npm registry 或 NuGet source 沒有指向公司內部來源，請 IT 設定。
 - **測試連不到資料庫**：檢查開工步驟 4、5，重開終端機與 OpenCode。
 - **OpenCode 啟動明顯變慢**：可以比照 MCPSample，在新專案放 `.opencode\.npmrc`，內容一行 `offline=true`。
-- **agent 在 shell 前景跑 `dotnet run` 而卡住**：已用權限擋下；真的發生時中斷該步，提醒它依 AGENTS.md 只跑 build 與 test。
+- **agent 在 shell 前景跑長駐程式而卡住**：常見寫法已用權限擋下；真的發生時中斷該步，提醒它依 AGENTS.md 只跑 build 與 test。
+- **commit 失敗說沒有身分**：回到開工步驟 1 設定 `git config user.name`／`user.email`。

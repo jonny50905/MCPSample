@@ -19,6 +19,9 @@
 管理者明示：公司 Spec template／checklist 維護端看不到 → 套件**不得假設 Spec 格式**，由 lead 在第 1 階段自寫
 `spec-map.md`／`spec-index.md` 定義需求鍵，追蹤與 SpecCoverageTests 都以此為準。套件位於 manifest 範圍
 （scripts／.opencode）外，fs-doctor 與 agent-doc-lint 不列管；未在公司機實跑，model ID 需管理者以 `opencode models` 填入。
+同波獨立審查 24 項全數修入：啟動腳本改 `.cmd`（L127 執行原則擋 `.ps1` 子行程）、Known Failing 為唯一暫存失敗方式、
+status.md 記關卡與進行中步驟（工單存檔可續跑）、需求鍵限 ASCII 且更新不改鍵、測試關平行並覆寫主庫連線、
+bash 權限對「最後相符」與「最長相符」兩種語意都驗過（長駐程式、全域安裝、改套件來源、push 皆擋）、`opencode.json` 關分享。
 
 大領域（67 個 NN 檔）的稽核在單一 session 內撞 context 上限（auditor 子代理、單檔 37 列即爆），
 已改成**分批稽核**（L107）：外環 manifest → 每 session K 檔 → part 檔不變量發收據 → 收據齊備由外環

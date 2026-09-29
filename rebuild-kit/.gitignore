@@ -1,5 +1,6 @@
 # 公司 Spec：機敏，不進任何 git
 spec-input/
+spec-previous/
 
 # .NET
 bin/
@@ -7,11 +8,14 @@ obj/
 *.user
 .vs/
 TestResults/
+appsettings.*.local.json
 
 # 前端
 node_modules/
 web/dist/
+*.tsbuildinfo
 
 # 本機工具
 .vscode/
 *.log
+.env*
