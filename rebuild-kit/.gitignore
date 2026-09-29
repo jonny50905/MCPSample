@@ -1,0 +1,17 @@
+# 公司 Spec：機敏，不進任何 git
+spec-input/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# 前端
+node_modules/
+web/dist/
+
+# 本機工具
+.vscode/
+*.log

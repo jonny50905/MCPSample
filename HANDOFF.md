@@ -12,6 +12,14 @@
 公司內容只在本機，沒有真實企業 E2E。驗證與整檔搬運清單見 `docs/design/clone-spec-handover.md`。
 下方是歷次交接紀錄，不應把舊入口當新流程的前置作業；此波未改 .NET，版本與發布紀錄以 git 為準。
 
+**重建套件（2026-09-29）**：管理者要讓 AI 依 Spec 從零重建 JO（.NET＋React＋MariaDB、本機可跑的 MVP、
+業務功能完整、非業務需求不完善；模型限 Opus 4.8＋Sonnet 5）。新增 `rebuild-kit/`：新專案的 AGENTS.md、
+三個 agent（`rebuild-lead`／`rebuild-reviewer`＝Opus、`rebuild-dev`＝Sonnet）、`/rebuild` 指令、
+`docs/build/KICKOFF.md`（第 0～4 階段、兩個人工關卡、slice 迴圈）與 `ps-mapping.md`（PeopleSoft 對照與陷阱）。
+管理者明示：公司 Spec template／checklist 維護端看不到 → 套件**不得假設 Spec 格式**，由 lead 在第 1 階段自寫
+`spec-map.md`／`spec-index.md` 定義需求鍵，追蹤與 SpecCoverageTests 都以此為準。套件位於 manifest 範圍
+（scripts／.opencode）外，fs-doctor 與 agent-doc-lint 不列管；未在公司機實跑，model ID 需管理者以 `opencode models` 填入。
+
 大領域（67 個 NN 檔）的稽核在單一 session 內撞 context 上限（auditor 子代理、單檔 37 列即爆），
 已改成**分批稽核**（L107）：外環 manifest → 每 session K 檔 → part 檔不變量發收據 → 收據齊備由外環
 合併 90-audit.md。第一次實跑失敗在「模型 exit 0 卻不寫任何檔」（b0/b1/b2 零產出），已把批次指令

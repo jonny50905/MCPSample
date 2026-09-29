@@ -8,6 +8,9 @@
   環境設定與協定（peoplesoft/）。架構總覽：`.opencode/peoplesoft/README.md`。
 - `scripts/`：確定性外環（lint／auto-loop／auto-all／收據／fs-doctor／知識索引 ps-knowledge／
   補研究 ps-supplemental／Spec 引擎 ps-spec；共用 lib：ps-knowledge-lib／ps-session-lib／ps-supplemental-lib／ps-spec-lib）。
+- `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
+  lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
+  說明見 `rebuild-kit/HOW-TO-USE.md`。
 - `src/`：與本框架無關的舊有 .NET 範例，不維護、不在文件範圍。
 
 ## PeopleSoft 問題的處理方式

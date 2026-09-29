@@ -77,6 +77,7 @@ Record 定義與 Portal Registry 裡，客製（`TW_` 前綴等）又疊在原�
 scripts/                           確定性外環（PowerShell 5.1）
 docs/ps-research/<領域>/           研究產出（機密，見下方資安邊界）
 docs/ps-research/wiki/             已歸戶的已驗證知識——問答一律先查這裡
+rebuild-kit/                       用 Spec 在新專案重建 JO 的 prompt 套件（複製到新專案用，見 HOW-TO-USE.md）
 ```
 
 ## 三層構件：command / agent / skill
