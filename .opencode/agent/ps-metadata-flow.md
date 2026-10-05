@@ -63,7 +63,7 @@ SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被
    回傳**只作定位線索**，不得直接寫成 evidence。
 3. 排程 / 授權 / origin / Record 結構：**Read
    `.opencode/peoplesoft/oracle-query-cookbook.md`，照樣板用 oracleMCP 查**
-   （§3 Process、§4 Security、§1 Origin、§6 Record），不要自己發明 SQL。
+   （§3 Process、§4 Security、§1 Origin、§6 Record、§7 欄位使用剖析），不要自己發明 SQL。
    連線已由主 agent 建好：第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
 4. 血緣邊需要原始碼佐證時，以 table / 欄位名搜 PeoplecodeElasticSearch
    取 chunk ids，再用 PeoplecodeSource 取段確認（遵守

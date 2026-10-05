@@ -3500,3 +3500,36 @@
   真 OpenCode 1.18.29＋localhost 假模型 smoke 驗 command 路由、author bash Status、worker read／write／拒絕偽造收據；runtime-guard 原有 13 個假 MCP／假模型 E2E 全過。
   Windows Node ESM 的 unit harness 改以 pathToFileURL import；測試資料全合成，沒有企業內容或外部資料上傳。
 - 教訓：機械驗證只保證結構和狀態，不證明模型語意正確；REVIEW_READY 不是等價驗證。公司 E2E 不可得就明列人工驗收與未知，不用格式或第二個模型的 PASS 假裝真實執行。
+
+### L129 欄位在 Record 或畫面上存在，不等於業務在用——全表無值且核心程式沒指名引用才判無用（2026-10-05）
+
+- 症狀：管理者回報 Spec 把 PeopleSoft 原生、業務實際沒用到的欄位寫得像在用，外部重建端照著建出不需要的欄位。
+- 根因：scope 的 CORE／DEPENDENCY／EXCLUDED 只判到物件（Component／Page／Record）；Page 或 Record 一旦是 CORE，
+  上面所有原生欄位就自動在範圍內。「實際使用」沒有可操作的證據定義；ui「逐欄描述」與覆核「是否漏列」只罰少寫、不罰多寫。
+  PeopleSoft 字元欄空值存單一空白、數值存 0、Record 預設常數每筆自動帶值，用 IS NOT NULL 看填寫率會誤判成在用。
+- 落點：
+  - clone-contract 新增「原生欄位無用判定」：同時符合（1）PROD 實體表全表非預設值 0 筆、（2）核心路徑程式沒有指名引用
+    （查法 a PeopleCode 交叉參照、b SQL 文字類程式、c 已記錄的引用，三種都做完）才判無用，在 scope 以 EXCLUDED、type FIELD、
+    每個 Record 一項記錄；其他一律保留。判不了（沒有實體表、空表、LOB、非 PROD、逾時、查法沒做完）就保留，
+    保留不是缺口、不影響 coverage。覆核：排除項證據不足報 EVIDENCE_MISMATCH，後續 topic 寫了無用欄位報 SCOPE_NOISE。
+  - clone-profile 的 scope／ui／data 指示各補一句；外環程式碼未改。
+  - cookbook §7：7-0 表欄驗證、7a 預設常數、7b 型別與統計資訊（只能判有在用）、7c 全表非預設彙總、
+    7d PSPCMNAME 交叉參照與判讀、7e 名稱類型確認。ps-metadata-flow 的樣板清單加 §7。
+  - loop 端：deep-research 把欄位剖析寫進 NN「畫面與欄位」生命狀態格（模板範例同步），Spec 在 90 天內可沿用；
+    知識檢索契約註明問答問到還在不在用仍現查。
+  - rebuild-kit：Spec 排除或判定無用的欄位不建資料欄、不上畫面、不寫規則；spec-map 要寫明欄位層級排除的位置。
+- 設計取捨：
+  - 管理者要求全自動、不要業務逐欄確認（loop 會因等人而中斷），所以採「完全沒用到才判無用」的保守規則，
+    捨棄先前提出的五級分類、「證據矛盾預設不建」與業務確認迴路。
+  - 稽核會重跑 SQL；筆數每天變，寫實際筆數會被判 STALE_DATA、讓 loop 反覆手術。NN 與 Spec 只記不隨日期變動的斷言
+    （有值／非預設 0 筆／TOTAL_ROWS > 0）。
+  - 空表一律保留：暫存／中介表處理後會清空，0 筆不代表欄位無用。抽樣不能證明沒有值，逾時就保留，不改抽樣。
+  - PSPCMNAME 的 OBJECTID 代碼意義沒在公司環境觀察過，不寫進 cookbook（L125：未驗證的語意註記會被後續 session 當事實）；
+    判讀改用 OBJECTVALUE 比對 scope 物件名、事件名 FieldFormula 與 7e 名稱類型確認，判斷不出一律算引用。
+    7-0 驗證欄位存在；表或欄位不在就整步停止、全部保留。
+  - 範圍邊界：只看本 Component 核心路徑的程式；別的功能真的在用時資料會有值，第 1 項就會保留。
+- 驗證：沙箱沒有 PowerShell，未跑 PS 測試；以 Python 重現 ps-agent-doc-lint 規則（0 阻擋）與 generic／transfer manifest
+  的正規化雜湊（未改動的檔全數相符）後重生兩份 manifest。Spec 工作的來源指紋含這些檔，搬檔後既有 job 會顯示 STALE，
+  同清單重跑建新版本。公司機尚未試跑；第 2 階段（外環確定性擋關）等試跑數字再做。
+- 教訓：「存在」不是「使用」。判無用的決定性證據要是查得到的正面事實（全表非預設值 0 筆），程式面只當安全網，
+  判不了一律保留，才能全自動又不誤刪。寫進會被稽核重跑的文件的數值，要選不會自然漂移的斷言。

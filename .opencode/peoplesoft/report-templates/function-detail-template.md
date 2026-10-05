@@ -51,9 +51,12 @@
 
 | 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |
 |---|---|---|---|---|
-| MIL_STATUS | 兵役狀態 | Translate | 免役=E / 服役中=S / … | E：使用中（資料 N 筆） |
+| MIL_STATUS | 兵役狀態 | Translate | 免役=E / 服役中=S / … | 欄位：有值（全表，查詢日 YYYY-MM-DD）；E：使用中（資料 N 筆） |
 
 <動態 label / 動態選項標 DYNAMIC_RUNTIME 並附 evidence。>
+
+<!-- 生命狀態格的欄位剖析（「欄位：…」）照 oracle-query-cookbook §7c 的記法，只寫有值或非預設 0 筆，
+     不寫實際筆數；沒剖析就只寫選項生命狀態。 -->
 
 <!-- 物件無畫面（Function Library 等）：標題保留，內文寫
      「（無——Function Library，無使用者畫面）」——不適用要申報，

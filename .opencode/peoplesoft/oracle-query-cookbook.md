@@ -639,3 +639,115 @@ FETCH FIRST 200 ROWS ONLY;
 SELECT RECNAME FROM PSRECFIELDDB WHERE FIELDNAME = :fieldName
 FETCH FIRST 100 ROWS ONLY;
 ```
+
+---
+
+## 7. 欄位使用剖析（原生欄位無用判定）
+
+用途：clone-contract「原生欄位無用判定」的資料面（7a～7c）與 PeopleCode 交叉參照（7d～7e），
+研究時寫 NN「畫面與欄位」生命狀態欄的資料剖析也用 7a～7c。委派給 @ps-metadata-flow（oracleMCP 類）。
+只回彙總，不撈明細。任何一步查不到表或欄位、逾時或失敗 → 該步停止、記 gaps，
+呼叫端依「判不了就保留」處理；不換表名或欄位名再猜、不改用抽樣、不重試迴圈。
+
+**7-0. 前置驗證（每個環境第一次使用必跑）**
+
+```sql
+SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE
+  FROM ALL_TAB_COLUMNS
+ WHERE TABLE_NAME IN ('PSRECFIELDDB', 'PSPCMNAME')
+   AND COLUMN_NAME IN ('RECNAME', 'FIELDNAME', 'FIELDNUM', 'DEFRECNAME', 'DEFFIELDNAME', 'REFNAME',
+                       'OBJECTVALUE1', 'OBJECTVALUE2', 'OBJECTVALUE3')
+ ORDER BY TABLE_NAME, COLUMN_NAME
+FETCH FIRST 50 ROWS ONLY;
+```
+
+- PSRECFIELDDB 缺 DEFRECNAME 或 DEFFIELDNAME → 7c 不比對預設常數（有預設常數的欄位一律保留）。
+- PSPCMNAME 缺 RECNAME、REFNAME 或 OBJECTVALUE1～3 任一 → 7d 做不了，查法 a 未完成。
+
+**7a. Record 欄位與預設常數**
+
+```sql
+SELECT FIELDNAME, FIELDNUM, DEFRECNAME, DEFFIELDNAME
+  FROM PSRECFIELDDB
+ WHERE RECNAME = :recName
+ ORDER BY FIELDNUM
+FETCH FIRST 200 ROWS ONLY;
+```
+
+- 預設常數＝DEFRECNAME 空白、DEFFIELDNAME 非空白且不以 `%` 開頭時的 DEFFIELDNAME 值；其他情況視為沒有預設常數。
+- 第一次使用先拿一個已知有預設常數的欄位核對；對不上 → 7c 不比對預設常數。
+- 超過 200 欄 → 加 `AND FIELDNUM > :lastFieldNum` 續查。
+
+**7b. 實體欄位型別與統計資訊**
+
+實體表名照 §6（SQLTABLENAME 空白 → `PS_<RECNAME>`）。
+
+```sql
+SELECT OWNER, COLUMN_NAME, DATA_TYPE, NUM_DISTINCT, NUM_NULLS, LAST_ANALYZED
+  FROM ALL_TAB_COLUMNS
+ WHERE TABLE_NAME = :physicalTable
+ ORDER BY OWNER, COLUMN_ID
+FETCH FIRST 200 ROWS ONLY;
+```
+
+- 回 0 列 → 沒有實體表（View、Derived／Work），整個 Record 判不了、全部保留。
+- 多個 OWNER → 只採 customization-profile `oracle.currentSchema` 那組；判斷不了就整個 Record 判不了、全部保留。
+- DATA_TYPE 是 LONG、LONG RAW、RAW、CLOB、BLOB、NCLOB → 該欄判不了、保留，不進 7c。
+- 統計資訊只能用來判「有使用跡象」：日期型 NUM_DISTINCT ≥ 1、其他型 NUM_DISTINCT ≥ 3 → 保留，不必進 7c。
+  其餘欄位（含沒有統計資訊）是候選，進 7c。統計資訊不能用來判無用。
+
+**7c. 非預設值彙總（候選欄位，一次 ≤ 40 欄，全表）**
+
+```sql
+SELECT COUNT(*) AS TOTAL_ROWS,
+       SUM(CASE WHEN <CHAR_FIELD> <> ' ' THEN 1 ELSE 0 END) AS <CHAR_FIELD>,
+       SUM(CASE WHEN <CHAR_FIELD_D> NOT IN (' ', '<預設常數>') THEN 1 ELSE 0 END) AS <CHAR_FIELD_D>,
+       SUM(CASE WHEN <NUM_FIELD> NOT IN (0, <預設常數>) THEN 1 ELSE 0 END) AS <NUM_FIELD>,
+       SUM(CASE WHEN <DATE_FIELD> IS NOT NULL THEN 1 ELSE 0 END) AS <DATE_FIELD>
+  FROM <physicalTable>
+FETCH FIRST 1 ROWS ONLY;
+```
+
+- 字元欄：不是單一空白、也不是預設常數才算有值（NULL 算沒值）；數值欄：不是 0、也不是預設常數才算有值；
+  日期欄：非 NULL 就算有值。沒有預設常數的欄位只寫前半段條件。
+- TOTAL_ROWS ＝ 0 → 空表（暫存／中介表常在處理後清空），整個 Record 判不了、全部保留。
+- 結果 0 ＝ 該欄非預設值 0 筆；> 0 → 保留。逾時 → 這一批判不了、全部保留；不加 WHERE、不抽樣。
+- 寫成證據時 SQL 原樣保留（含 FROM 實體表）。excerpt／keyRows 只寫不隨日期變動的斷言：
+  `TOTAL_ROWS > 0`、為 0 的欄位、有值的欄位；不寫實際筆數（線上筆數每天變，重跑必不同）。
+- NN 生命狀態欄的記法：`欄位：非預設 0 筆（全表非空，查詢日 YYYY-MM-DD）` 或
+  `欄位：有值（全表，查詢日 YYYY-MM-DD）`，SQL 進 Evidence 附錄；選項生命狀態照原寫法接在同一格。
+
+**7d. PeopleCode 交叉參照（只查 7c 結果為 0 的欄位）**
+
+```sql
+SELECT OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME, COUNT(*) AS CNT
+  FROM PSPCMNAME
+ WHERE REFNAME IN (<7c 為 0 的欄位>)
+ GROUP BY OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME
+ ORDER BY OBJECTVALUE1
+FETCH FIRST 200 ROWS ONLY;
+```
+
+逐列判讀，算「核心路徑引用」的欄位一律保留：
+
+1. RECNAME 是本 Record 以外、經 7e 確認的 Record → 那是別的 Record 的同名欄位，這列不算。
+   RECNAME 是本 Record，或 7e 確認不是 Record 名（定義型參照）→ 繼續判下面各條。
+2. OBJECTVALUE1 是 scope 中 CORE／DEPENDENCY 物件名，或本 Component 任一 Page 上出現的 Record（§2d）→ 算。
+3. OBJECTVALUE1～3 任一是 `FieldFormula`（函式庫）→ 算。
+4. OBJECTVALUE1 經 7e 確認是 scope 外的 Component 或 Record → 不算。
+5. 其餘（Application Package、Page、AE 或判斷不出物件類型）→ 算。
+
+回滿 200 列 → 依 REFNAME 分批重查到不滿 200 列為止；做不完 → 查法 a 未完成。
+
+**7e. 名稱類型確認（7d 用）**
+
+```sql
+SELECT * FROM (
+  SELECT 'COMPONENT' AS KIND, PNLGRPNAME AS NAME FROM PSPNLGRPDEFN WHERE PNLGRPNAME IN (<名稱清單>)
+  UNION ALL
+  SELECT 'RECORD' AS KIND, RECNAME AS NAME FROM PSRECDEFN WHERE RECNAME IN (<名稱清單>)
+) FETCH FIRST 200 ROWS ONLY;
+```
+
+- 名稱清單＝7d 結果中的 OBJECTVALUE1 與本 Record 以外的 RECNAME。
+- 同一名稱同時是 Component 與 Record → 判斷不出類型，依 7d 第 5 條算核心路徑引用。

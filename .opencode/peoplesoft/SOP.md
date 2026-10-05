@@ -918,6 +918,12 @@ powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_
 - CORE／DEPENDENCY／EXCLUDED 依實際使用鏈與證據，不依 delivered／custom 猜測。
   核心用到的 PeopleSoft 原生功能只寫最小替代契約；無關功能只留下簡短排除理由，不展開正文。
 - NN／wiki 只是定位起點，不存在也能定向查證；關鍵行為要追原始來源。不會自動改寫 NN、wiki 或研究 checklist。
+- 原生欄位：只有「PROD 實體表全表非預設值 0 筆」且「核心路徑程式沒有指名引用」才判無用，記在範圍表
+  （EXCLUDED、類型 FIELD、每個 Record 一列），正文不寫；其他一律保留。判不了（沒有實體表、空表、LOB、
+  非 PROD、逾時、查法沒做完）就保留，不算缺口、不停下來等人。查法見 cookbook §7，規則見 clone-contract
+  「原生欄位無用判定」。誤判（其實有用）時後續章節會列缺口，修正後「重新查證」。
+- 試跑回報給維護端只用計數：範圍表中 FIELD 排除項列數、被排除的欄位數、畫面章節欄位數、耗時、委派次數；
+  不回物件名或欄位名。
 
 ### 狀態、恢復與保證界線
 
@@ -933,6 +939,7 @@ powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_
 同一 job 有鎖；模型 session 沿用全域 session slot。slot 被占、檔案暫時鎖定時不假裝工作已完成。
 
 本機來源／agent 契約 fingerprint 改變會失效；目前採保守策略，其他領域 NN 改動也可能觸發新版本。
+搬入新版契約或 cookbook 後，既有 job 會顯示 STALE；同清單重跑即建新版本，舊成果保留。
 Oracle／PeopleCode 遠端本體的改動不會被本機 hash 自動察覺，已知上游更新請明確重新查證。
 原生動態 UI、執行時資料與權限仍需公司內部核對；未能觀察就留缺口，不能憑框架常識補成事實。
 

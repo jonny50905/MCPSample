@@ -14,7 +14,7 @@
 
 每個 topic 的固定欄位以 clone-profile.json 為準。欄位值可以多行，但單筆不得把多個不同條件壓成模糊摘要。
 
-- scope：根身分、核心操作、使用鏈、相依介面、明確排除與未知邊界。
+- scope：根身分、核心操作、使用鏈、相依介面、明確排除與未知邊界，以及核心 Record 的原生欄位無用判定。
 - flows：角色、入口與模式、前置條件、順序、分支判斷、成功結果、失敗路徑；每個判斷用原始 Record.Field／參數與值表示。
 - ui：搜尋與新增／修改模式、Page／Subpage／Scroll level、控制項、原始 Record.Field、顯示 label、型別／長度、預設值來源、必填／可見／可編輯的精確條件、選項 label↔stored value、Prompt／Translate 來源、觸發事件與畫面刷新。
 - data：logical／physical key、型別／長度／精度／nullable、預設、關聯與基數、讀寫欄位、有效日期／序號、來源與用途。共用 Record 只保留被核心實際使用的欄位及必要 key，不複製整個共用 schema。
@@ -26,6 +26,31 @@
 - acceptance：按主要流程、規則分支、狀態轉移及資料副作用逐項列正向／反向／邊界測例；給具體輸入欄位與值、前置資料、動作、預期畫面／資料變動／原始錯誤，讓重建者可實作測試；合成測資明標，不冒充公司真實資料。
 
 實作所需內容不能只寫「見 NN」「依 PeopleSoft 標準」「同另一頁」；trace 可指來源，Spec 本文必須自足。
+
+## 原生欄位無用判定
+
+PeopleSoft 原生 Record／Page 帶有大量業務從未使用的欄位；欄位存在於 Record 或畫面上，不代表要重建。scope 對每個 CORE／DEPENDENCY Record 的欄位做判定，結果供所有後續 topic 使用。
+
+只有同時符合以下兩項才判定無用，其餘一律保留、照本契約深度描述：
+
+1. 資料沒有值：依 oracle-query-cookbook §7 對實體表全表彙總，非預設值筆數為 0。非預設值＝字元不是單一空白也不是 Record 預設常數、數值不是 0 也不是預設常數、日期不是 NULL。連線環境須是 customization-profile 的 `environment: PROD`。
+2. 核心路徑程式沒有指名引用：本 Component 核心路徑（scope 中 CORE／DEPENDENCY 物件掛的 PeopleCode，以及其呼叫的 AE／SQR／SQC／SQL 物件／View）沒有以名稱讀、寫、判斷或輸出該欄位。整列複製、%SelectAll、%InsertSelect 等不指名欄位的操作不算引用；核心路徑以外的程式不算。
+
+第 2 項要以下三種查法都做完才成立：
+
+- a. PeopleCode：cookbook §7 交叉參照。掛在核心物件、FieldFormula 函式庫、Application Package，或判斷不出掛在哪裡的引用，都算核心路徑引用。
+- b. SQL 文字：核心路徑上會讀寫該 Record 的 AE、SQR、SQC、SQL 物件、View，逐支確認它指名的欄位（委派對應 flow，或已稽核 NN 已列出）；核心 PeopleCode 內的 SQL 字串，以該表名依 progressive-source-retrieval 搜到預算上限，命中段落取回確認。
+- c. NN／wiki 或本 job 其他頁已記錄的指名引用，直接算引用。
+
+find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（找到就保留），不能用來證明沒有使用。
+
+判不了就保留：沒有實體表（View、Derived／Work）、空表、LONG／LOB 欄位、環境不是 PROD、查詢逾時或失敗、第 2 項任一查法沒做完。逾時不改用抽樣，抽樣不能證明沒有值。保留不是缺口：不寫進 gaps，不影響 coverage。
+
+資料剖析可沿用 NN「畫面與欄位」生命狀態欄已記錄、附 SQL 證據、全表、查詢日在 90 天內的結果；不符任一條件就重查。
+
+記錄方式：判定無用的欄位在 scope 以 EXCLUDED 項記錄，一個 Record 一項。values：object＝`<RECORD>：<FIELD>、<FIELD>…`；type＝`FIELD`；inclusion＝`EXCLUDED`；usedBy＝`a：<結果>；b：<結果>；c：<結果>`；condition＝`非預設 0 筆（全表非空，查詢日 YYYY-MM-DD）`；reason＝「原生欄位無用：資料無值且核心路徑無指名引用」。evidenceIds 至少含資料彙總 SQL 與交叉參照 SQL。保留的欄位不在 scope 逐欄列出。
+
+後續 topic 不描述 scope 判定無用的欄位：ui 欄位、data 欄位、規則條件、介面欄位、驗收輸入都不寫。發現其實有核心路徑指名引用時，在 gaps 寫明誤判的 scope 項目、引用位置與證據，本頁 PARTIAL，不自行補寫該欄位。
 
 ## 研究與證據
 
@@ -54,6 +79,8 @@
 先讀本次 packet、inputHash、核定 scope 與已有各段路徑；不要沿用寫作者的自評。工單 components 是本次完整清單，acceptedPacketPaths 含所有 Component 已接受內容，scopeItems 只屬於當前 Component。用定向 subagent 重取關鍵原始來源，逐筆核對可追溯性、未使用功能污染、欄位條件、例外、狀態／資料／畫面一致性，以及是否漏列。
 
 特別檢查：UI／規則／狀態是否只出現少量範例卻宣稱 COMPLETE；所有被使用的 Page／Scroll／欄位／事件是否有處置；接受條件是否覆蓋條件分支與拒絕路徑；多頁是否重複、跳號、遺失例外；其他已完成 topic 的識別字與 stored values 是否矛盾。來源不夠判斷完整性就 BLOCKED，不能只看 JSON 能解析就 PASS。
+
+原生欄位：scope 判定無用的欄位算已處置，不因它沒出現在 ui／data 而報漏列。scope 的 FIELD 排除項要核對資料彙總是全表、非預設值有比對預設常數、環境是 PROD、查法 a／b／c 都有結果，不符報 `EVIDENCE_MISMATCH`；後續 topic 描述了 scope 判定無用的欄位報 `SCOPE_NOISE`。
 
 多 Component 的 acceptance 覆核還須查所有已接受的相關技術章節，核對共享 Record.Field、狀態值、交易與介面契約。差異須有具體模式／條件解釋；無法解釋就報 TOPIC／CONTRADICTION，不能因每份各自格式正確就 PASS。已接受章節有錯且本頁不能修復時明列受影響章節，請求重新查證，不在本頁藏一個不同答案。
 

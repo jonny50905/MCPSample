@@ -39,12 +39,12 @@
     },
     {
       "path": ".opencode/peoplesoft/spec/clone-contract.md",
-      "sha256": "81EC09F8976130FC0DA7BA2049E18970AD79871B58A8293CF0AB19CCB1687FE9",
-      "lines": 65
+      "sha256": "592B8E275521DFCCD296728EDCF1A26CBE170B8DE5F2E7E59197521FE32D9B4E",
+      "lines": 92
     },
     {
       "path": ".opencode/peoplesoft/spec/clone-profile.json",
-      "sha256": "8BCE499090C736E0478994E59E8674BDCEF393DE6606423516FF2B26D96233C4",
+      "sha256": "5880C93ADBF6970654D0FFD31CAEF356DB197AA849DA4CBD6A4B131A946AEFBD",
       "lines": 60
     },
     {

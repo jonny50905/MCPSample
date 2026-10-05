@@ -1,6 +1,6 @@
 {
     "note":  "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-    "commit":  "1a6b3f2",
+    "commit":  "9523125",
     "files":  [
                   {
                       "path":  ".opencode/.npmrc",
@@ -46,14 +46,14 @@
                   },
                   {
                       "path":  ".opencode/agent/ps-deep-research.md",
-                      "lines":  528,
-                      "sha256":  "9f604d81a514071514bbe637a43d74616ada4852cebac44342f8070913fd7c2c",
+                      "lines":  531,
+                      "sha256":  "4529a198ceb2d30cf91f2cede15e2456b0595cc4c45e5e49a5cf27dea094136e",
                       "bom":  false
                   },
                   {
                       "path":  ".opencode/agent/ps-metadata-flow.md",
                       "lines":  118,
-                      "sha256":  "e705a3ec6ae4e0db7815b172f8aecc6c18edca4221dbfd869b2086c255c4c48f",
+                      "sha256":  "eb28fb794e98a8330276248db49be161e66b1f3137185074dc78de541ff05bd9",
                       "bom":  false
                   },
                   {
@@ -172,14 +172,14 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/knowledge-retrieval-contract.md",
-                      "lines":  124,
-                      "sha256":  "418c7f196ded5a0da0d8f8459aeeffda6bba17a13bcac56bd56a916036f3f447",
+                      "lines":  127,
+                      "sha256":  "c4c7329b663e5d2f6cd2644644ef49be07afa4ae6f5ef3e3fd74883408dc6af0",
                       "bom":  false
                   },
                   {
                       "path":  ".opencode/peoplesoft/lessons/applied.md",
-                      "lines":  3502,
-                      "sha256":  "21534eacbbfd9e15771673680384a6d3ad75933767f52161bddf55e9a037de68",
+                      "lines":  3535,
+                      "sha256":  "f908c52f8978fc926a4bda5270889c2bb593b835b7100bd73a5cf77b51541570",
                       "bom":  false
                   },
                   {
@@ -196,8 +196,8 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/oracle-query-cookbook.md",
-                      "lines":  641,
-                      "sha256":  "89c4194ce00c31f0d5fcb8120892c312e16fe4a5bb3aaa78b26c0458470e96db",
+                      "lines":  753,
+                      "sha256":  "9be32c3ae3a32273f2217c53f168bcd8b61ef593fd841df560fbc0fc04a27618",
                       "bom":  false
                   },
                   {
@@ -232,8 +232,8 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/report-templates/function-detail-template.md",
-                      "lines":  111,
-                      "sha256":  "3c2580a37c2ef35451e9b49fb335986610fb33fb9f2a21cbc3f434dfa79103e2",
+                      "lines":  114,
+                      "sha256":  "9010b8f16ca9ab2ae35ffdd38029c2fb3bc6001235a5df1533e0e92522f8c674",
                       "bom":  false
                   },
                   {
@@ -250,8 +250,8 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/SOP.md",
-                      "lines":  948,
-                      "sha256":  "c3bd4b77b321315faf190b24a3dcc8798f74927ac075dca045db3fef1881bb35",
+                      "lines":  955,
+                      "sha256":  "a62db0e286b65af23cbff8871a87cc8d82de5b9f0237e9b4a2f11e7d3b1e65e6",
                       "bom":  false
                   },
                   {
@@ -262,14 +262,14 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/spec/clone-contract.md",
-                      "lines":  64,
-                      "sha256":  "81ec09f8976130fc0da7ba2049e18970ad79871b58a8293cf0ab19ccb1687fe9",
+                      "lines":  91,
+                      "sha256":  "592b8e275521dfccd296728edcf1a26cbe170b8de5f2e7e59197521fe32d9b4e",
                       "bom":  false
                   },
                   {
                       "path":  ".opencode/peoplesoft/spec/clone-profile.json",
                       "lines":  59,
-                      "sha256":  "8bce499090c736e0478994e59e8674bdcef393de6606423516ff2b26d96233c4",
+                      "sha256":  "5880c93adbf6970654d0ffd31caef356db197aa849da4cbd6a4b131a946aefbd",
                       "bom":  false
                   },
                   {
@@ -311,7 +311,7 @@
                   {
                       "path":  ".opencode/peoplesoft/spec/generic.manifest.json",
                       "lines":  116,
-                      "sha256":  "7bcabf12c910c1172500e37534ee5300601587f420926111253471b509eeef0c",
+                      "sha256":  "4fe45143f7f34bcccca5b82ebc615abd5990f647648ddbbda86bc3627b425ba7",
                       "bom":  false
                   },
                   {
