@@ -6,7 +6,7 @@ $testBase = Join-Path ([System.IO.Path]::GetTempPath()) ('ps-clone-build-' + [gu
 # 凍結這次待測 production bytes，避免並行維護同一 checkout 被誤判成 fixture 的來源改變。
 $testTools = Join-Path $testBase 'framework'
 [void][System.IO.Directory]::CreateDirectory($testTools)
-foreach($name in @('ps-spec-build.ps1','ps-spec-clone-lib.ps1','ps-knowledge-lib.ps1','ps-session-lib.ps1')){Copy-Item -LiteralPath (Join-Path (Join-Path $testRepo 'scripts') $name) -Destination (Join-Path $testTools $name)}
+foreach($name in @('ps-spec-build.ps1','ps-spec-clone-lib.ps1','ps-knowledge-lib.ps1','ps-session-lib.ps1','ps-cli-lib.ps1')){Copy-Item -LiteralPath (Join-Path (Join-Path $testRepo 'scripts') $name) -Destination (Join-Path $testTools $name)}
 $testCli = Join-Path $testTools 'ps-spec-build.ps1'
 $script:testPass = 0; $script:testFail = 0
 function Assert-Build([bool]$Condition, [string]$Name) {

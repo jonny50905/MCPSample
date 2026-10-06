@@ -13,6 +13,8 @@
 
 $script:PsKnowledgeLibVersion = 1
 $script:PsKnowledgeSchemaVersion = 1
+# 前端版本描述（OpenCode／Claude Code）：索引用法行的工具呼叫形狀與契約路徑依版本而異
+. (Join-Path $PSScriptRoot 'ps-cli-lib.ps1')
 
 # ── 基礎：讀檔、hash、排序 ───────────────────────────────────────
 
@@ -913,13 +915,20 @@ function Get-PsKnLightText {
 }
 
 function ConvertTo-PsKnowledgeIndexMd {
-    param($Index)
+    param($Index, [string]$Root = '')
     $sb = New-Object System.Text.StringBuilder
     $nl = "`n"
+    $isClaude = ((Get-PsCliVariant -Root $Root).Name -eq 'claude')
     [void]$sb.Append('# 知識索引（機械產生，勿手改）').Append($nl).Append($nl)
     [void]$sb.Append('generation：' + $Index.generation.Substring(0, 16) + '　建置：' + $Index.builtAt + '　領域 ' + $Index.domains.Count + '　NN ' + $Index.nn.Count + '　wiki ' + $Index.wiki.Count + '　schema ' + $Index.schemaVersion).Append($nl).Append($nl)
-    [void]$sb.Append('用法（讀取契約：.opencode/peoplesoft/knowledge-retrieval-contract.md）：grep（pattern=物件名或 alias，path=docs/ps-research/knowledge，include=index.md）取列；').Append($nl)
-    [void]$sb.Append('NN 列的「節」欄＝節名@offset/limit（read 該 NN 檔時 offset 與 limit 原樣用；@缺＝該節不存在）；片段第一行必須是該節標題（以節名為前綴比對），否則以 grep 重新定位一次；續篇欄「是」＝同主物件的續篇檔。').Append($nl)
+    if ($isClaude) {
+        [void]$sb.Append('用法（讀取契約：.claude/peoplesoft/knowledge-retrieval-contract.md）：Grep（pattern=物件名或 alias，path=docs/ps-research/knowledge/index.md，output_mode=content）取列；').Append($nl)
+        [void]$sb.Append('NN 列的「節」欄＝節名@offset/limit（Read 該 NN 檔時 offset 與 limit 原樣用；@缺＝該節不存在）；片段第一行必須是該節標題（以節名為前綴比對），否則以 Grep 重新定位一次；續篇欄「是」＝同主物件的續篇檔。').Append($nl)
+    }
+    else {
+        [void]$sb.Append('用法（讀取契約：.opencode/peoplesoft/knowledge-retrieval-contract.md）：grep（pattern=物件名或 alias，path=docs/ps-research/knowledge，include=index.md）取列；').Append($nl)
+        [void]$sb.Append('NN 列的「節」欄＝節名@offset/limit（read 該 NN 檔時 offset 與 limit 原樣用；@缺＝該節不存在）；片段第一行必須是該節標題（以節名為前綴比對），否則以 grep 重新定位一次；續篇欄「是」＝同主物件的續篇檔。').Append($nl)
+    }
     [void]$sb.Append('等級：AUDITED_CLEAN（可直接引用）／AUDITED_ISSUES／UNAUDITED／PARTIAL／BLOCKED（只當線索，關鍵結論要現查）。物件彙總表在同目錄 objects.md。重建：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-knowledge.ps1 -Rebuild').Append($nl).Append($nl)
     [void]$sb.Append('## 領域').Append($nl).Append($nl)
     [void]$sb.Append('| 領域 | NN 數 | 稽核輪次 | 待補 | 未建 NN | tier（本機） |').Append($nl)
@@ -969,11 +978,13 @@ function ConvertTo-PsKnowledgeIndexMd {
 
 # objects.md（模型讀）：物件彙總表，一物件一列——與 index.md 分檔，hub 物件不會吃掉 grep 的 100 筆上限
 function ConvertTo-PsKnowledgeObjectsMd {
-    param($Index)
+    param($Index, [string]$Root = '')
     $sb = New-Object System.Text.StringBuilder
     $nl = "`n"
     [void]$sb.Append('# 物件索引（機械產生，勿手改）').Append($nl).Append($nl)
-    [void]$sb.Append('generation：' + $Index.generation.Substring(0, 16) + '　物件 ' + $Index.objects.Count + '　用法：grep（pattern=[|] <物件名> [|]，path=docs/ps-research/knowledge，include=objects.md）；找到檔名後回 index.md 的 NN 列取節 offset/limit').Append($nl).Append($nl)
+    $use = '用法：grep（pattern=[|] <物件名> [|]，path=docs/ps-research/knowledge，include=objects.md）；找到檔名後回 index.md 的 NN 列取節 offset/limit'
+    if ((Get-PsCliVariant -Root $Root).Name -eq 'claude') { $use = '用法：Grep（pattern=[|] <物件名> [|]，path=docs/ps-research/knowledge/objects.md，output_mode=content）；找到檔名後回 index.md 的 NN 列取節 offset/limit' }
+    [void]$sb.Append('generation：' + $Index.generation.Substring(0, 16) + '　物件 ' + $Index.objects.Count + '　' + $use).Append($nl).Append($nl)
     [void]$sb.Append('## 物件').Append($nl).Append($nl)
     [void]$sb.Append('| 物件 | 類型 | 主物件於 | 引用NN數 | 引用於（角色；最多 10） |').Append($nl)
     [void]$sb.Append('|---|---|---|---|---|').Append($nl)
@@ -1009,8 +1020,8 @@ function Publish-PsKnowledgeIndex {
     $dir = Get-PsKnowledgeDir -Root $Root
     [void](Remove-PsKnTempFiles -Directory $dir)
     $json = ConvertTo-PsKnJson -Value $idx
-    $md = ConvertTo-PsKnowledgeIndexMd -Index $idx
-    $om = ConvertTo-PsKnowledgeObjectsMd -Index $idx
+    $md = ConvertTo-PsKnowledgeIndexMd -Index $idx -Root $Root
+    $om = ConvertTo-PsKnowledgeObjectsMd -Index $idx -Root $Root
     $ok1 = Write-PsKnAtomicText -LiteralPath (Join-Path $dir 'index.json') -Text ($json + "`n") -Bom $false
     $ok2 = Write-PsKnAtomicText -LiteralPath (Join-Path $dir 'index.md') -Text $md -Bom $false
     $ok3 = Write-PsKnAtomicText -LiteralPath (Join-Path $dir 'objects.md') -Text $om -Bom $false

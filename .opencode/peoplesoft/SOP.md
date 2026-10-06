@@ -1,7 +1,7 @@
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
-一般使用者只需要 OpenCode 對話（問答、`/ps-research`、`/ps-audit`、`/ps-lesson`），
+一般使用者只需要 OpenCode（或 Claude Code 版，見 SOP-26）對話（問答、`/ps-research`、`/ps-audit`、`/ps-lesson`），
 不需要本文件。
 
 ---
@@ -961,3 +961,21 @@ generated 每次產出為不可覆寫世代，current.json 指向成功發布版
 PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-guard 單元／假模型 E2E，
 以及 `node tests/runtime-guard/run-clone-smoke.mjs`（OPENCODE_BIN 可指定既有執行檔）。
 這些測試只驗機制及合成資料，不代替企業功能驗收。維護端重生 generic／transfer manifest 後再搬整檔；公司機不重生基準。
+
+## SOP-26 Claude Code 版（另一個前端；只搬一版）
+
+同一套框架另有 Claude Code CLI＋Sonnet 的前端，原始檔在 repo 的 `claude-code/`。公司機**只裝一版、只搬那一版**；
+安裝步驟、日常使用與兩版對照（主代理、委派、hook、MCP 工具全名、headless 權限）見 `claude-code/README.md`（給人看，不搬）。
+
+□ 1. 搬運：`scripts/**` 原樣＋`claude-code/CLAUDE.md`、`claude-code/.claude/**` 去掉 `claude-code/` 前綴；
+     清單＝`scripts/ps-transfer-manifest.claude.json`（`path`＝本機路徑、`repo`＝GitHub 位置）。`.ps1` 存 UTF-8 with BOM。
+□ 2. profile：`.claude/peoplesoft/customization-profile.yaml` 的鍵值與 OpenCode 版逐行相同，把本機已回填的值抄過去。
+□ 3. MCP：`claude mcp add --scope user` 註冊 oracleMCP／PeoplecodeElasticSearch／PeoplecodeSource／PeoplecodeMetadata（名字逐字相同）。
+□ 4. 在專案資料夾執行一次 `claude` 接受信任詢問（否則專案權限允許清單被忽略，headless 工具全部被拒）。
+□ 5. `ps-fs-doctor` 應顯示「Claude Code 版」且結論 G；再跑 `scripts\ps-claude-doctor.ps1 -Live`（hook 自測、MCP 註冊、
+     真 session 第 0 步開線）結論 G。外環照舊跑；它們依 `.claude/peoplesoft` 是否存在改開 `claude -p --agent …`；
+     同一資料夾要跑 OpenCode 版外環先設 `$env:PS_CLI='opencode'`。
+
+SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context 由 Claude Code 管理）；SOP-17 改看 `.claude/settings.json`
+允許清單與信任（臨時換權限模式用 `$env:PS_CLAUDE_PERMISSION_MODE`）；SOP-21 的恢復是該 session `/mcp` 選 oracleMCP 重新連線，
+沒有自動重掛，hook 紀錄在 `auto-loop-logs\ps-runtime-guard\hook-<日期>.jsonl`。

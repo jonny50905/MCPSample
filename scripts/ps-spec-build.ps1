@@ -57,14 +57,15 @@ function Get-CbSource {
         if ($rel -match '^(knowledge|supplemental)/') { continue }
         if ($f.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase) -or [System.IO.Path]::GetFileName($f) -eq 'audit-done.json') { $paths += $f }
     }
-    foreach ($p in @('.opencode/peoplesoft/spec/clone-profile.json', '.opencode/peoplesoft/spec/clone-contract.md', '.opencode/peoplesoft/customization-profile.yaml', '.opencode/peoplesoft/business-domain-map.yaml', '.opencode/agent/ps-clone-worker.md', '.opencode/command/ps-clone-batch.md')) { $paths += (Join-Path $Root $p) }
+    $cliV = Get-PsCliVariant -Root $Root
+    foreach ($p in @(($cliV.PsDir + '/spec/clone-profile.json'), ($cliV.PsDir + '/spec/clone-contract.md'), ($cliV.PsDir + '/customization-profile.yaml'), ($cliV.PsDir + '/business-domain-map.yaml'), ($cliV.AgentDir + '/ps-clone-worker.md'), ($cliV.CommandDir + '/ps-clone-batch.md'))) { $paths += (Join-Path $Root $p) }
     # 委派 flow／auditor／orchestrator 的模型契約也是來源版本；保守納入全部 ps-* agent。
-    $agentFiles = Get-CbFiles (Join-Path $Root '.opencode/agent')
+    $agentFiles = Get-CbFiles (Join-Path $Root $cliV.AgentDir)
     foreach ($p in $agentFiles) { if ([System.IO.Path]::GetFileName($p) -match '^ps-.*\.md$') { $paths += $p } }
-    foreach ($p in @('.opencode/peoplesoft/subagent-report-contract.md', '.opencode/peoplesoft/knowledge-retrieval-contract.md')) { $paths += (Join-Path $Root $p) }
-    $skillFiles = Get-CbFiles (Join-Path $Root '.opencode/skills')
+    foreach ($p in @(($cliV.PsDir + '/subagent-report-contract.md'), ($cliV.PsDir + '/knowledge-retrieval-contract.md'))) { $paths += (Join-Path $Root $p) }
+    $skillFiles = Get-CbFiles (Join-Path $Root $cliV.SkillDir)
     foreach ($p in $skillFiles) { $paths += $p; [void]$rawHashPaths.Add($p) }
-    $modelContracts = Join-Path $Root '.opencode/peoplesoft'
+    $modelContracts = Join-Path $Root $cliV.PsDir
     if ([System.IO.Directory]::Exists($modelContracts)) {
         foreach ($f in @(Get-ChildItem -LiteralPath $modelContracts -File -Filter '*.md')) {
             if (@('SOP.md', 'README.md', 'test-scenarios.md') -notcontains $f.Name) { $paths += $f.FullName }
@@ -246,7 +247,7 @@ function Invoke-CbOne($Work, $State) {
     $inp = [ordered]@{ schemaVersion = 1; jobId = $jobId; attemptId = $aid; revision = $revision.id; budget = $budget; components = @($names); component = $Work.Component; topic = $Work.Topic; kind = $kind; page = $Work.Page; pageKey = $Work.Key; cursor = $Work.Cursor; sourceHash = $revision.sourceHash; scopeItems = @($scopeItems); acceptedPacketPaths = @($packetPaths); previousFindings = @($Work.Findings); candidateId = $candidateId; candidateHash = $candidateHash; packet = $packet; outputPath = $outPath; inputHash = '' }
     $inp.inputHash = Get-PsKnTextHash -Text (ConvertTo-PsKnJson -Value $inp -SortKeys)
     Write-CbJson (Join-Path $ad 'input.json') $inp -Create
-    $manifest = @('# 有界功能規格工單', '', ('Component: ' + $Work.Component), ('Topic: ' + $Work.Topic), ('Kind: ' + $kind), ('OutputPath: ' + $outPath), ('InputPath: ' + (Join-Path $ad 'input.json')), ('InputHash: ' + $inp.inputHash), ('ProfilePath: ' + (Join-Path $Root '.opencode/peoplesoft/spec/clone-profile.json')), ('PacketSchemaPath: ' + (Join-Path $Root '.opencode/peoplesoft/spec/clone-contract.md')), ('ReviewSchemaPath: ' + (Join-Path $Root '.opencode/peoplesoft/spec/clone-contract.md')), ('KnowledgeIndex: ' + (Join-Path $Root 'docs/ps-research/knowledge/index.md')), ('ResearchRoot: ' + (Join-Path $Root 'docs/ps-research')), '', '先讀 clone-contract.md 與 input.json。只准寫 OutputPath，不改任何 NN、收據、工單或既有文件。', 'input.components 是全工作功能清單；scopeItems 只屬於本功能；acceptedPacketPaths 包含全工作已接受內容（檔案內 packet 欄位），須檢查跨主題與跨 Component 共用欄位、狀態、交易及介面的一致性。', '先定位知識索引與相關節；沒有 NN 並非失敗，可定向委派既有 PeopleSoft subagent 查證。', '每頁至多 40 items；有明確未完成範圍才用 PARTIAL＋nextCursor；證據不足請明列 gaps，不把未知寫成不適用。', 'RESEARCH 回 packet.json；AUDIT 是獨立覆核 session，讀 input.packet 與來源後回 review.json，inputHash 原樣帶回。') -join "`n"
+    $manifest = @('# 有界功能規格工單', '', ('Component: ' + $Work.Component), ('Topic: ' + $Work.Topic), ('Kind: ' + $kind), ('OutputPath: ' + $outPath), ('InputPath: ' + (Join-Path $ad 'input.json')), ('InputHash: ' + $inp.inputHash), ('ProfilePath: ' + (Get-PsCliPsPath -Root $Root -Rel 'spec/clone-profile.json')), ('PacketSchemaPath: ' + (Get-PsCliPsPath -Root $Root -Rel 'spec/clone-contract.md')), ('ReviewSchemaPath: ' + (Get-PsCliPsPath -Root $Root -Rel 'spec/clone-contract.md')), ('KnowledgeIndex: ' + (Join-Path $Root 'docs/ps-research/knowledge/index.md')), ('ResearchRoot: ' + (Join-Path $Root 'docs/ps-research')), '', '先讀 clone-contract.md 與 input.json。只准寫 OutputPath，不改任何 NN、收據、工單或既有文件。', 'input.components 是全工作功能清單；scopeItems 只屬於本功能；acceptedPacketPaths 包含全工作已接受內容（檔案內 packet 欄位），須檢查跨主題與跨 Component 共用欄位、狀態、交易及介面的一致性。', '先定位知識索引與相關節；沒有 NN 並非失敗，可定向委派既有 PeopleSoft subagent 查證。', '每頁至多 40 items；有明確未完成範圍才用 PARTIAL＋nextCursor；證據不足請明列 gaps，不把未知寫成不適用。', 'RESEARCH 回 packet.json；AUDIT 是獨立覆核 session，讀 input.packet 與來源後回 review.json，inputHash 原樣帶回。') -join "`n"
     Write-CbText (Join-Path $ad 'manifest.md') ($manifest + "`n")
     $fence = Get-CbFence
     Write-Host ('研究／覆核：' + $Work.Component + ' / ' + $Work.Topic + ' / 第 ' + $Work.Page + ' 頁 / ' + $kind)
@@ -399,7 +400,7 @@ try {
             $state = Get-CbState
             $stopReason = ''; $sessions = 0
             if (-not $Status) {
-                if ($FakeWorker -eq '') { $oc = Get-PsOcPath; $ocPath = [string]$oc.Path; if ($ocPath -eq '' -and $state.Work.Count -gt 0) { throw ('無法啟動 OpenCode：' + $oc.Error) } }
+                if ($FakeWorker -eq '') { $oc = Get-PsOcPath -Root $Root; $ocPath = [string]$oc.Path; if ($ocPath -eq '' -and $state.Work.Count -gt 0) { throw ('無法啟動 ' + $oc.Exe + '：' + $oc.Error) } }
                 elseif (-not [System.IO.File]::Exists($FakeWorker)) { throw 'FakeWorker 不存在。' }
                 $componentCursor = 0
                 $sessionFailedComponents = @{}

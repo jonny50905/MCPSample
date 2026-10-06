@@ -8,6 +8,9 @@
   環境設定與協定（peoplesoft/）。架構總覽：`.opencode/peoplesoft/README.md`。
 - `scripts/`：確定性外環（lint／auto-loop／auto-all／收據／fs-doctor／知識索引 ps-knowledge／
   補研究 ps-supplemental／Spec 引擎 ps-spec；共用 lib：ps-knowledge-lib／ps-session-lib／ps-supplemental-lib／ps-spec-lib）。
+- `claude-code/`：同一框架的 **Claude Code 版**（`CLAUDE.md`＋`.claude/`：agents／commands／skills／hooks／peoplesoft），
+  部署到公司機時去掉 `claude-code/` 前綴；`scripts/` 兩版共用（`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 是否存在認版本）。
+  說明與對照表見 `claude-code/README.md`。
 - `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
   lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
   說明見 `rebuild-kit/HOW-TO-USE.md`。
@@ -82,6 +85,10 @@
 - 公司網路封鎖 git 下載 → **人工搬運**：你改完檔案只列「改動檔案
   路徑清單」，使用者自己開 GitHub 網頁 Raw 複製整檔貼回本機——
   **禁止在對話中貼整檔內容**（浪費 token，使用者開得了 GitHub）。
+- **兩個前端、只搬一版**：公司機只裝 OpenCode 版或 Claude Code 版其中之一，搬運清單只列該版
+  （OpenCode＝`scripts/**`＋`.opencode/**`，manifest `scripts/ps-transfer-manifest.json`；Claude Code＝`scripts/**`＋
+  `claude-code/` 去前綴的 `CLAUDE.md`／`.claude/**`，manifest `scripts/ps-transfer-manifest.claude.json`，每列 `repo` 欄＝GitHub 位置）。
+  改模型讀的規則時兩版對應檔都要改（Claude Code 版只換機制用語）；`scripts/tests/test-claude-variant.ps1` 驗兩版檔案一一對應。
 - 搬運清單必附**核對欄**（2026-08 管理者要求）：每檔一列——路徑／
   新增或修改／行數（供編輯器總行數核對，允許 ±1 行尾差異）；
   `.ps1` 標註「存 UTF-8 with BOM」。搬完整波跑一次

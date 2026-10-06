@@ -3583,3 +3583,39 @@
 - 驗證（PowerShell 7.4／Linux）：test-spec-clone 148 PASS（＋20）、test-spec-build 37 PASS（＋2：CHECK_INCOMPLETE 照樣 READY
   但統計顯示判不了 1、缺結論 scope 不驗收）、test-spec／test-knowledge／test-supplemental 全過、5.1 靜態守衛 0 阻擋。
 - 教訓：允許「判不了就放行」的規則，必須同時要求把「判不了」寫成可計數的結論，否則放行和沒做無法區分，效果無從量測。
+
+### L132 換前端不能變成「兩版都要搬」——CLI 機制一層、規則與外環共用（2026-10-06）
+
+- 起因：管理者取得 Claude Code CLI，要一版能用 Claude Code＋Sonnet 跑的框架；OpenCode 版保留；公司機搬運時**只搬其中一版**。
+- 設計：
+  - Claude Code 版放在 repo 的 `claude-code/` 子樹（`CLAUDE.md`＋`.claude/`），部署時去掉前綴。不放在 repo 根：維護端的
+    Claude Code session 會把根目錄的 CLAUDE.md、`.claude/agents`、hooks 當成自己的設定載入。
+  - `scripts/` 兩版共用：新增 `ps-cli-lib.ps1`（`.claude/peoplesoft` 存在＝Claude Code；`PS_CLI` 環境變數優先），所有寫死
+    `.opencode/peoplesoft` 的外環改走版本描述；`ps-session-lib` 的命令列抽成 `New-PsOcCommandLine`：Claude Code 為
+    `claude -p --agent <主代理> --permission-mode dontAsk --output-format stream-json --verbose "/<指令> <參數>"`
+    （Claude Code 的指令不切換主代理，外環依對照表帶 `--agent`），事件流落 `.stream.jsonl`、最終回覆抽進 `.out.txt`
+    （稽核的 stdout 回收語意不變），啟動時拿掉繼承的 `CLAUDECODE`。
+  - `ps-doc-lint.ps1` 不改：它的 hash 綁畢業收據，改了會讓所有已畢業領域重跑；Claude Code 版由 auto-loop 把 `.claude` profile 的
+    `navigation.surfaces` 以 `-NavigationSurfaces` 帶進每次 lint 呼叫。
+  - 搬運 manifest 一版一份（`ps-transfer-manifest.json`／`ps-transfer-manifest.claude.json`；後者 `path`＝部署路徑、`repo`＝原始位置），
+    `ps-fs-doctor` 依版本選 manifest 與搬運集合，`-WriteManifest` 兩份一起重生（之後採 PowerShell 7 的 JSON 版面）。
+    Spec 的 generic manifest 也一版一份（Claude Code 版以部署模擬目錄重生）。
+  - 執行期 guard 從 OpenCode plugin 改成 Claude Code hook（`.claude/hooks/ps-runtime-guard.ps1`，PS 5.1）：connect 目標＝profile、
+    Agent 委派只准 ps-* 子代理（skill 名、主代理名、內建 general-purpose 等一律 `PS_TASK_TARGET_INVALID`——Claude Code 的主代理定義
+    也在 agents 目錄，能被當子代理叫）、suggestedNext 註記（PostToolUse additionalContext）、spec／clone worker 與 spec-author 的
+    讀寫路徑與 Bash 命令白名單（agent frontmatter hooks，以 `--agent` 當主對話時同樣生效）。沒有自動重掛（Claude Code 無對應 API）。
+  - 權限：agent `tools:` 是白名單；headless 用 `dontAsk`，只執行 `.claude/settings.json` 允許清單（MCP 查詢工具、寫研究與 Spec 執行目錄、
+    ps-spec-build 命令）；`ENABLE_TOOL_SEARCH=false` 讓 MCP 工具不被延遲載入（「工具清單沒有 connect＝掛載故障」的判讀才成立）。
+  - 模型讀的檔一對一移植，只換機制用語（Agent 工具、Read／Grep 呼叫形狀：Grep 可給單檔 path、要 `output_mode="content"`、Read 行號前綴是
+    「行號＋tab」、MCP 全名 `mcp__<註冊名>__<工具>`）；PeopleSoft 規則一字不改。本機教訓帳本改用 C 編號，不與本帳本的 L 編號混用。
+- 實測（Claude Code 2.1.290，Linux）：專案未信任時 `permissions.allow` 會被忽略（headless 全部被拒）——安裝步驟要先互動開一次 `claude`；
+  agent `tools:` 列了不存在的工具名會被略過（`Agent, Task`、`TodoWrite, TaskCreate…` 新舊名並列無害）；server 層級
+  `mcp__PeoplecodeMetadata` 在 tools 與 permissions 都有效；hook 的 stdin 有 `agent_type`；Read 的 offset 語意與 OpenCode 相同（1 起算）。
+- 公司機安裝健檢：`scripts/ps-claude-doctor.ps1`（版本判定、claude 版本、powershell 在 PATH、hook 自測、profile 回填、
+  `claude mcp list` 四個名字；`-Live` 另開真 headless session 只做第 0 步開線，看 permission_denials 判斷資料夾是否信任）。
+- 驗證：`scripts/tests/test-claude-variant.ps1`（兩版一一對應、資料檔逐字相同、frontmatter 形狀、hook 各分支、命令列、stream 抽取、
+  部署模擬目錄的 fs-doctor 與 Spec generic manifest）；既有六套測試全過、5.1 靜態守衛 0 阻擋；
+  `tests/claude-code/run-e2e.mjs` 以真 CLI＋假 MCP 跑 haiku 與 sonnet 各一次（問答 connect→委派→取證、錯主代理的指令只回提示、
+  spec worker 只寫 fragment）全過。真 Windows／PowerShell 5.1 下的 Claude Code（hook 經 Git Bash 或 PowerShell 執行）未在本沙箱驗證。
+- 教訓：多一個前端時，把「CLI 機制」收斂成一層（版本描述＋命令列＋guard），規則與外環只留一份；搬運清單跟著版本走，
+  不讓使用者為了一個前端搬另一個前端的檔。

@@ -1,13 +1,15 @@
-﻿# ps-session-lib.ps1 — opencode headless session 啟動共用邏輯
-# 由 ps-auto-loop.ps1（薄包裝 Invoke-Opencode）、ps-spec.ps1（-Run）、ps-supplemental 迷你圈 dot-source。
-# 責任：挑 .cmd/.exe/.bat 型 shim；以 cmd.exe 啟動 `opencode run`（rc 檔取真實結束碼、.Handle 快取、
+﻿# ps-session-lib.ps1 — headless session 啟動共用邏輯（OpenCode：`opencode run`；Claude Code：`claude -p --agent`）
+# 由 ps-auto-loop.ps1（薄包裝 Invoke-Opencode）、ps-spec.ps1（-Run）、ps-spec-build.ps1、ps-supplemental 迷你圈 dot-source。
+# 責任：挑 .cmd/.exe/.bat 型 shim；以 cmd.exe 啟動 CLI（rc 檔取真實結束碼、.Handle 快取、
 #       逾時整樹強殺、心跳與沉默判讀、容量事件標籤）；session slot 互斥鎖 Global\MCPSample-OpencodeSession
 #       ——同一台機器同一時間只跑一個 headless session（各外環各持自己的鎖：research 全域鎖／spec 逐 job 鎖，
-#       但都用同一個模型服務與 oracleMCP 單通道）。
+#       但都用同一個模型服務與 oracleMCP 單通道）。前端版本由 ps-cli-lib.ps1 判定（.claude/peoplesoft 存在＝Claude Code）。
 # 純函式庫：dot-source 無副作用。PowerShell 5.1 紀律：無三元／??／&&；Join-Path 兩參數；-LiteralPath。
 # prompt 走 cmd.exe 命令列、放在半形雙引號裡：真正會壞的是半形雙引號（結束引號）、% （即使在引號內 cmd 也展開 %VAR%）與換行；
 # > < & | ^ 在雙引號內是普通字元（不當重導向、不當中繼字元），照舊可用；中文引號「」不受限。
 
+. (Join-Path $PSScriptRoot 'ps-cli-lib.ps1')
+$script:PsSessionLibRoot = Split-Path $PSScriptRoot -Parent
 $script:PsSessionLibVersion = 1
 $script:PsOcSessionSlotName = 'Global\MCPSample-OpencodeSession'
 
@@ -23,22 +25,25 @@ function Select-PsOcShim {
     return $null
 }
 
-# 回 @{ Path; Error; Count }：Path 空＝找不到可用 shim（Error 說明）
+# 回 @{ Path; Error; Count; Exe }：Path 空＝找不到可用 shim（Error 說明）。Exe＝opencode｜claude（依前端版本）
 function Get-PsOcPath {
-    $all = @(Get-Command opencode -All -ErrorAction SilentlyContinue)
-    if ($all.Count -eq 0) { return @{ Path = ''; Error = 'PATH 找不到 opencode'; Count = 0 } }
+    param([string]$Root = '')
+    if ($Root -eq '') { $Root = $script:PsSessionLibRoot }
+    $exe = (Get-PsCliVariant -Root $Root).Exe
+    $all = @(Get-Command $exe -All -ErrorAction SilentlyContinue)
+    if ($all.Count -eq 0) { return @{ Path = ''; Error = ('PATH 找不到 ' + $exe); Count = 0; Exe = $exe } }
     $p = Select-PsOcShim -Candidates $all
     if (-not $p) {
-        return @{ Path = ''; Error = ('PATH 上的 opencode 是 ' + $all[0].Source + '（非 .cmd/.exe/.bat）——cmd.exe 會用檔案關聯開啟它而不是執行它；請確認 npm 的 opencode.cmd 在 PATH 上'); Count = $all.Count }
+        return @{ Path = ''; Error = ('PATH 上的 ' + $exe + ' 是 ' + $all[0].Source + '（非 .cmd/.exe/.bat）——cmd.exe 會用檔案關聯開啟它而不是執行它；請確認 ' + $exe + '.cmd 或 ' + $exe + '.exe 在 PATH 上'); Count = $all.Count; Exe = $exe }
     }
-    return @{ Path = $p; Error = ''; Count = $all.Count }
+    return @{ Path = $p; Error = ''; Count = $all.Count; Exe = $exe }
 }
 
 # 容量事件標籤：子代理 context 溢出通常以 exit 0 收場（task 錯誤回給 parent 當工具結果），只看 exit code 看不到；
 # 不論 exit 都掃 out＋err 全文。這是標籤不是判定：無此字樣≠無溢出。
 function Get-PsOcFailureKind {
     param([string]$OutFile, [string]$ErrFile)
-    $pat = '(?i)context.?length|maximum context|context window|context_length_exceeded|truncating input|input (?:is )?too long'
+    $pat = '(?i)context.?length|maximum context|context window|context_length_exceeded|truncating input|input (?:is )?too long|prompt is too long'
     foreach ($f in @($OutFile, $ErrFile)) {
         if ($f -and (Test-Path -LiteralPath $f)) {
             $t = Get-Content -LiteralPath $f -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
@@ -99,8 +104,73 @@ function Exit-PsOcSessionSlot {
     $Slot.Mutex = $null
 }
 
-# 開一個新鮮 opencode session（逾時整樹強殺）。回傳 @{ TimedOut; ExitCode; ErrFile; OutFile; FailureKind; SlotBusy; SlotWaitedSec }
-#   -ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'
+# Claude Code 的 stream-json 輸出 → 最後一個 result 事件的最終回覆寫進 OutFile（與 OpenCode 的 stdout 同語意：外環的
+# 「stdout 回收」與尾行摘錄只看最終回覆）。回 @{ Found; IsError; Subtype; Turns }。
+function Convert-PsOcClaudeStream {
+    param([string]$StreamFile, [string]$OutFile)
+    $r = @{ Found = $false; IsError = $false; Subtype = ''; Turns = 0 }
+    if (-not $StreamFile -or -not (Test-Path -LiteralPath $StreamFile)) { return $r }
+    $last = $null
+    foreach ($ln in [System.IO.File]::ReadLines($StreamFile, (New-Object System.Text.UTF8Encoding($false)))) {
+        $k = $ln.IndexOf('"type":"result"')
+        if ($k -ge 0 -and $k -lt 40) { $last = $ln }
+    }
+    if ($null -eq $last) { return $r }
+    $o = $null
+    try { $o = $last | ConvertFrom-Json } catch { return $r }
+    $r.Found = $true
+    $r.IsError = [bool]$o.is_error
+    $r.Subtype = [string]$o.subtype
+    if ($null -ne $o.num_turns) { $r.Turns = [int]$o.num_turns }
+    $txt = [string]$o.result
+    try { [System.IO.File]::WriteAllText($OutFile, $txt, (New-Object System.Text.UTF8Encoding($false))) } catch { }
+    return $r
+}
+
+# Claude Code 的權限模式（headless 預設 dontAsk：只執行 .claude/settings.json 允許清單內的工具，其餘自動拒絕、不會卡在詢問）
+function Get-PsOcClaudePermissionMode {
+    $pm = ([string]$env:PS_CLAUDE_PERMISSION_MODE).Trim()
+    foreach ($ok in @('dontAsk', 'acceptEdits', 'default', 'auto', 'bypassPermissions')) { if ($pm -ceq $ok) { return $pm } }
+    return 'dontAsk'
+}
+
+# cmd.exe 的內層命令列（不含 rc 檔那段）。回 @{ Inner; LogArgs; Agent; Prompt }。
+#   OpenCode：opencode run [--model] <ExtraArgs> --title "auto-<Tag>" "<prompt>" 1> out 2> err
+#   Claude Code：claude -p --agent <主代理> [--model] --permission-mode <dontAsk> --output-format stream-json --verbose "<prompt>" < NUL 1> stream 2> err
+#     --command X → prompt「/X <PromptText>」、主代理取 ps-cli-lib 的指令對照（Claude Code 的指令不切換主代理）；--agent Y 原樣
+function New-PsOcCommandLine {
+    param([string]$Variant, [string]$OcPath, [string]$Model = '', [string]$ExtraArgs = '', [string]$PromptText,
+        [string]$Tag, [string]$OutFile, [string]$ErrFile, [string]$StreamFile = '')
+    if ($Variant -eq 'claude') {
+        $agent = ''
+        $cmdName = ''
+        $mA = [regex]::Match($ExtraArgs, '--agent\s+([A-Za-z0-9_-]+)')
+        if ($mA.Success) { $agent = $mA.Groups[1].Value }
+        $mC = [regex]::Match($ExtraArgs, '--command\s+([A-Za-z0-9_-]+)')
+        if ($mC.Success) { $cmdName = $mC.Groups[1].Value }
+        $promptOut = $PromptText
+        if ($cmdName -ne '') {
+            $promptOut = '/' + $cmdName + ' ' + $PromptText
+            if ($agent -eq '') { $agent = Get-PsCliCommandAgent -Command $cmdName }
+        }
+        $inner = '"' + $OcPath + '" -p '
+        if ($agent -ne '') { $inner += '--agent ' + $agent + ' ' }
+        if ($Model -ne '') { $inner += '--model "' + $Model + '" ' }
+        $inner += '--permission-mode ' + (Get-PsOcClaudePermissionMode) + ' --output-format stream-json --verbose '
+        $inner += '"' + $promptOut + '" < NUL 1> "' + $StreamFile + '" 2> "' + $ErrFile + '"'
+        return @{ Inner = $inner; LogArgs = ('--agent ' + $agent + ' ｜ ' + $promptOut); Agent = $agent; Prompt = $promptOut }
+    }
+    $inner = '"' + $OcPath + '" run '
+    if ($Model -ne '') { $inner += '--model "' + $Model + '" ' }
+    if ($ExtraArgs -ne '') { $inner += $ExtraArgs + ' ' }
+    $inner += '--title "auto-' + $Tag + '" '
+    $inner += '"' + $PromptText + '" 1> "' + $OutFile + '" 2> "' + $ErrFile + '"'
+    return @{ Inner = $inner; LogArgs = ($ExtraArgs + ' ｜ ' + $PromptText); Agent = ''; Prompt = $PromptText }
+}
+
+# 開一個新鮮 headless session（逾時整樹強殺）。回傳 @{ TimedOut; ExitCode; ErrFile; OutFile; FailureKind; SlotBusy; SlotWaitedSec }
+#   -ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'（OpenCode 原樣傳；Claude Code 轉成
+#     --agent <該指令的主代理>＋prompt「/ps-research <PromptText>」，輸出 stream-json 落 .stream.jsonl、最終回覆抽進 OutFile）
 #   -SlotWaitMin：取不到 session slot 最多等幾分（0＝不等）；等不到＝不啟動，回 SlotBusy=$true、TimedOut=$true、FailureKind=SLOT_BUSY
 #   -Log：一行一則的記錄函式（外環傳 ${function:Write-Log}）；未給＝Write-Host
 #   逾時從取得 slot 起算（等待 slot 的時間不吃 session 的 TimeoutMin）
@@ -128,21 +198,33 @@ function Invoke-PsOcSession {
         # 結束碼落檔：不相信 Process 物件的 .ExitCode（-PassThru 物件在只用 WaitForExit(ms) 等待時常為 $null，
         # 而 $null -eq 0 為 false＝每個正常 session 都被判成錯誤）。改讓 cmd 把 ERRORLEVEL 寫進檔案——要可觀測的事實。
         $rcFile = Join-Path $LogRoot ('{0}-{1}.rc.txt' -f $stamp, $Tag)
-        $inner = '"' + $OcPath + '" run '
-        if ($Model -ne '') { $inner += '--model "' + $Model + '" ' }
-        if ($ExtraArgs -ne '') { $inner += $ExtraArgs + ' ' }
-        $inner += '--title "auto-' + $Tag + '" '
-        $inner += '"' + $PromptText + '" 1> "' + $outFile + '" 2> "' + $errFile + '"'
-        # %^ERRORLEVEL% ＋ call：延後展開，取得的才是 opencode 的真實結束碼
+        $variant = Get-PsCliVariant -Root $Root
+        $streamFile = ''
+        if ($variant.Name -eq 'claude') { $streamFile = Join-Path $LogRoot ('{0}-{1}.stream.jsonl' -f $stamp, $Tag) }
+        $watch = @($outFile, $errFile)
+        if ($streamFile -ne '') { $watch += $streamFile }
+        $cl = New-PsOcCommandLine -Variant $variant.Name -OcPath $OcPath -Model $Model -ExtraArgs $ExtraArgs -PromptText $PromptText `
+            -Tag $Tag -OutFile $outFile -ErrFile $errFile -StreamFile $streamFile
+        $inner = $cl.Inner
+        $logArgs = $cl.LogArgs
+        # %^ERRORLEVEL% ＋ call：延後展開，取得的才是 CLI 的真實結束碼
         $inner += ' & call echo %^ERRORLEVEL% > "' + $rcFile + '"'
-        L "SESSION($Tag) 啟動：$ExtraArgs ｜ $PromptText"
-        $p = Start-Process -FilePath 'cmd.exe' -ArgumentList ('/d /s /c "' + $inner + '"') `
-            -WorkingDirectory $Root -NoNewWindow -PassThru
+        L "SESSION($Tag) 啟動：$logArgs"
+        # Claude Code 在自己的 session 內會設 CLAUDECODE；子行程繼承它會被當成巢狀 session——啟動當下拿掉、啟動後還原
+        $ccSaved = $null
+        if ($variant.Name -eq 'claude' -and $null -ne $env:CLAUDECODE) { $ccSaved = $env:CLAUDECODE; Remove-Item -Path Env:\CLAUDECODE -ErrorAction SilentlyContinue }
+        try {
+            $p = Start-Process -FilePath 'cmd.exe' -ArgumentList ('/d /s /c "' + $inner + '"') `
+                -WorkingDirectory $Root -NoNewWindow -PassThru
+        }
+        finally {
+            if ($null -ne $ccSaved) { $env:CLAUDECODE = $ccSaved }
+        }
         # 必須先取用 .Handle 把行程 handle 快取住，否則 -PassThru 物件在只用 WaitForExit(ms) 等待時 .ExitCode 會是 $null
         try { $null = $p.Handle } catch { }
         $tpn = $TimeoutParamName
         if ($tpn -eq '') { if ($Tag -like 'audit*') { $tpn = 'AuditTimeoutMin' } else { $tpn = 'ResearchTimeoutMin' } }
-        # 心跳：session 期間 opencode 輸出全被重導到檔案，console 會完全安靜——每 5 分鐘印一行「還活著＋已耗時」
+        # 心跳：session 期間 CLI 輸出全被重導到檔案，console 會完全安靜——每 5 分鐘印一行「還活著＋已耗時」
         $sessStart = Get-Date
         $lastBeat = $sessStart
         $done = $false
@@ -152,7 +234,7 @@ function Invoke-PsOcSession {
                 $mins = [int]((Get-Date) - $sessStart).TotalMinutes
                 # 沉默停滯偵測（確定性、只警告不強殺）：輸出檔多久沒長大
                 $lastOut = $sessStart
-                foreach ($lf in @($outFile, $errFile)) {
+                foreach ($lf in $watch) {
                     if (Test-Path -LiteralPath $lf) {
                         $wt = (Get-Item -LiteralPath $lf).LastWriteTime
                         if ($wt -gt $lastOut) { $lastOut = $wt }
@@ -174,7 +256,7 @@ function Invoke-PsOcSession {
             & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
             # 強殺當下就下判讀：「卡死 vs 跑得久」的處置完全相反（一個查通道、一個調上限）
             $lastOutK = $sessStart
-            foreach ($lf in @($outFile, $errFile)) {
+            foreach ($lf in $watch) {
                 if (Test-Path -LiteralPath $lf) {
                     $wt = (Get-Item -LiteralPath $lf).LastWriteTime
                     if ($wt -gt $lastOutK) { $lastOutK = $wt }
@@ -182,6 +264,7 @@ function Invoke-PsOcSession {
             }
             $killSilent = [int]((Get-Date) - $lastOutK).TotalMinutes
             L "SESSION($Tag) 逾時 $TimeoutMin 分，已整樹強制結束（狀態在檔案，無損）"
+            if ($streamFile -ne '') { $null = Convert-PsOcClaudeStream -StreamFile $streamFile -OutFile $outFile }
             if ($killSilent -le 5) {
                 L "SESSION($Tag) 判讀：強殺當下輸出仍在增加（靜止僅 $killSilent 分）＝**上限太短，不是卡死**——把 -$tpn 調高後重跑，不要去查 MCP 通道"
             }
@@ -212,6 +295,11 @@ function Invoke-PsOcSession {
             # 仍讀不到＝環境層面拿不到結束碼；視為 0（正常）並大聲記錄——反向（視為錯誤）已實證會把健康的 run 誤停
             L "SESSION($Tag) 警告：ExitCode 讀不到，視為 0（正常結束）——若後續行為異常請回報此行"
             $code = 0
+        }
+        if ($streamFile -ne '') {
+            $cr = Convert-PsOcClaudeStream -StreamFile $streamFile -OutFile $outFile
+            if (-not $cr.Found) { L "SESSION($Tag) stream 沒有 result 事件（session 可能在啟動階段就死——看 err 檔與 $streamFile）" }
+            elseif ($cr.IsError) { L "SESSION($Tag) Claude Code 回報錯誤收場：subtype=$($cr.Subtype) turns=$($cr.Turns)" }
         }
         L "SESSION($Tag) 結束 exit=$code 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
         $fk = Get-PsOcFailureKind -OutFile $outFile -ErrFile $errFile

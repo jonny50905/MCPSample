@@ -1,5 +1,5 @@
 ﻿# ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
-# 設計：確定性外環（本腳本）＋模型內步（opencode run 新鮮 session）＋確定性驗收（lint／checklist 解析）
+# 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
 # 用法：.\scripts\ps-auto-loop.ps1 -Domain 轉職
 #       .\scripts\ps-auto-loop.ps1 -Domain 轉職 -MaxCycles 12 -Model "provider/model-id"
 #       .\scripts\ps-auto-loop.ps1 -Domain 轉職 -SupplementalOnly       # 只處理補研究 request（迷你圈；exit 4）
@@ -109,29 +109,6 @@ $logRoot = Join-Path $root (Join-Path "auto-loop-logs" $Domain)
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 $logFile = Join-Path $logRoot "auto-loop.log"
 
-# opencode 可執行檔（L46）：**必須挑 .cmd/.exe/.bat 型 shim**。
-# npm 同時裝 opencode / opencode.cmd / opencode.ps1；PowerShell 的 Get-Command
-# 會優先回 **.ps1**（它把 .ps1 當一等公民）——把 .ps1 丟給 cmd.exe 不會執行，
-# Windows 會用「檔案關聯」開啟它＝**跳出記事本並阻塞**，關掉後 cmd 回 exit 0，
-# 外環誤判 session 正常結束 → 整圈空轉、完全沒有 session 真的跑過。
-function Select-OpencodeShim {
-    param($Candidates)
-    foreach ($ext in @('.cmd', '.exe', '.bat')) {
-        foreach ($c in $Candidates) {
-            if ($c.Source -and $c.Source.ToLowerInvariant().EndsWith($ext)) { return $c.Source }
-        }
-    }
-    return $null
-}
-$ocAll = @(Get-Command opencode -All -ErrorAction SilentlyContinue)
-if ($ocAll.Count -eq 0) { Write-Error "PATH 找不到 opencode"; exit 2 }
-$ocPath = Select-OpencodeShim -Candidates $ocAll
-if (-not $ocPath) {
-    Write-Error ("PATH 上的 opencode 是 " + $ocAll[0].Source + "（非 .cmd/.exe/.bat）——" +
-        "cmd.exe 會用檔案關聯開啟它（記事本）而不是執行它。請確認 npm 的 opencode.cmd 在 PATH 上")
-    exit 2
-}
-
 # ── 畢業收據共用邏輯（issue #3）——缺檔／版本不符要在取鎖前快炸，
 #    不能拖到數小時後畢業瞬間才發現人工搬運不完整
 $gradLibPath = Join-Path $PSScriptRoot "ps-graduation.ps1"
@@ -152,9 +129,27 @@ foreach ($libName in @('ps-knowledge-lib.ps1', 'ps-session-lib.ps1', 'ps-supplem
 if ($PsKnowledgeLibVersion -ne 1 -or $PsSessionLibVersion -ne 1 -or $PsSupplementalLibVersion -ne 1) {
     Write-Error "共用 lib 版本不符（knowledge=$PsKnowledgeLibVersion session=$PsSessionLibVersion supplemental=$PsSupplementalLibVersion）——人工搬運不完整？"; exit 2
 }
-$capabilitiesPath = Join-Path $root (Join-Path '.opencode' (Join-Path 'peoplesoft' (Join-Path 'spec' 'capabilities.json')))
+# CLI 可執行檔（L46）：**必須挑 .cmd/.exe/.bat 型 shim**（Get-PsOcPath，在 ps-session-lib.ps1）。
+# npm 同時裝 <cli> / <cli>.cmd / <cli>.ps1；PowerShell 的 Get-Command 會優先回 **.ps1**——把 .ps1 丟給 cmd.exe
+# 不會執行，Windows 會用「檔案關聯」開啟它＝**跳出記事本並阻塞**，關掉後 cmd 回 exit 0，外環誤判 session 正常結束。
+# 前端版本（OpenCode／Claude Code）由 ps-cli-lib.ps1 判定：.claude/peoplesoft 存在＝Claude Code（claude -p --agent）。
+$cliVariant = Get-PsCliVariant -Root $root
+$ocInfo = Get-PsOcPath -Root $root
+if ($ocInfo.Path -eq '') { Write-Error $ocInfo.Error; exit 2 }
+$ocPath = $ocInfo.Path
+# ps-doc-lint 只從 .opencode 的 profile 讀 navigation.surfaces（lint 腳本的 hash 綁畢業收據，不為版本改它）：
+# Claude Code 版由外環把 .claude 的 profile 值以 -NavigationSurfaces 帶進每一次 lint 呼叫
+$lintNav = @{}
+if ($cliVariant.Name -eq 'claude') {
+    $navProf = Get-PsCliPsPath -Root $root -Rel 'customization-profile.yaml'
+    if (Test-Path -LiteralPath $navProf) {
+        $navTxt = [System.IO.File]::ReadAllText($navProf)
+        if ($navTxt -match '(?m)^\s*surfaces:\s*([A-Z_]+)') { $lintNav = @{ NavigationSurfaces = $Matches[1] } }
+    }
+}
+$capabilitiesPath = Get-PsCliPsPath -Root $root -Rel 'spec/capabilities.json'
 if (-not (Test-Path -LiteralPath $capabilitiesPath)) {
-    Write-Error "缺 .opencode/peoplesoft/spec/capabilities.json（能力目錄；人工搬運不完整？）"; exit 2
+    Write-Error ("缺 " + $cliVariant.PsDir + "/spec/capabilities.json（能力目錄；人工搬運不完整？）"); exit 2
 }
 
 function Write-Log([string]$msg) {
@@ -772,7 +767,7 @@ function Test-FsConsistency {
         # lint 以「僅回報」身分跑一次驗證它自己能執行——exit 0/1 都算可執行
         # （FAIL 內容交給正常迴圈處理）；這裡絕不接手術路徑
         if (Test-Path (Join-Path $dir "00-overview.md")) {
-            & $lintPath -Domain $Domain *> $null
+            & $lintPath -Domain $Domain @lintNav *> $null
             if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1) {
                 $problems += "lint 無法正常執行（exit=$LASTEXITCODE）"
             }
@@ -873,7 +868,7 @@ function Invoke-NnDestructionGuard {
 # 靜默截斷不報錯），完整性仍由 lint／StrictAudit 守。
 function Get-SessionFailureKind {
     param([string]$OutFile, [string]$ErrFile)
-    $pat = '(?i)context.?length|maximum context|context window|context_length_exceeded|truncating input|input (?:is )?too long'
+    $pat = '(?i)context.?length|maximum context|context window|context_length_exceeded|truncating input|input (?:is )?too long|prompt is too long'
     foreach ($f in @($OutFile, $ErrFile)) {
         if ($f -and (Test-Path -LiteralPath $f)) {
             $t = Get-Content -LiteralPath $f -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
@@ -938,9 +933,9 @@ function Invoke-Lint {
     # L44：必須 *>&1（全流合併）——lint 用 Write-Host 輸出（information stream），
     # 2>&1 抓不到 → $raw 空 → 下方 PASS 防呆把每次成功誤判成 exit 3
     # （VALIDATION_OK 永遠假＝永遠畢不了業），工單擷取也永遠落空
-    if ($Strict) { $raw = & $lintPath -Domain $Domain -StrictAudit *>&1 | Out-String }
-    elseif ($Coverage) { $raw = & $lintPath -Domain $Domain -CoverageOnly *>&1 | Out-String }
-    else { $raw = & $lintPath -Domain $Domain *>&1 | Out-String }
+    if ($Strict) { $raw = & $lintPath -Domain $Domain @lintNav -StrictAudit *>&1 | Out-String }
+    elseif ($Coverage) { $raw = & $lintPath -Domain $Domain @lintNav -CoverageOnly *>&1 | Out-String }
+    else { $raw = & $lintPath -Domain $Domain @lintNav *>&1 | Out-String }
     $code = $LASTEXITCODE
     # 防呆：lint 若中途死亡未跑到 exit，$LASTEXITCODE 是上一個原生命令的殘值
     # ——exit 0 但輸出無 PASS 標記＝不得當通過
@@ -961,7 +956,7 @@ function Invoke-Lint {
 if ($Preflight) {
     Write-Host "=== auto-loop 啟動前檢查（唯讀）===" -ForegroundColor Cyan
     Write-Host "領域目錄  ：$dir"
-    Write-Host "opencode  ：$ocPath$(if ($ocAll.Count -gt 1) { "（PATH 上共 $($ocAll.Count) 個候選，已選 .cmd/.exe/.bat 型）" })"
+    Write-Host "CLI       ：$($cliVariant.Display)（$($cliVariant.FwDir)）$ocPath$(if ($ocInfo.Count -gt 1) { "（PATH 上共 $($ocInfo.Count) 個候選，已選 .cmd/.exe/.bat 型）" })"
     Write-Host "收據邏輯  ：$gradLibPath（schema=$GraduationSchemaVersion gate=$GraduationGateVersion）"
     $st = Get-ChecklistState
     if (-not $st.Exists) {
@@ -1137,7 +1132,7 @@ function Save-AuditLedger {
 
 # 每檔 Evidence 資料列數：只有 lint 的一份實作（-EvidenceStats），外環只解析
 function Get-EvidenceRowCounts {
-    $raw = & $lintPath -Domain $Domain -EvidenceStats *>&1 | Out-String
+    $raw = & $lintPath -Domain $Domain @lintNav -EvidenceStats *>&1 | Out-String
     $h = @{}
     foreach ($m in [regex]::Matches($raw, '(?m)^EVIDENCE_ROWS：(?<f>[^=\r\n]+)=(?<n>\d+)')) {
         $h[$m.Groups['f'].Value.Trim()] = [int]$m.Groups['n'].Value
@@ -2122,7 +2117,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
                 # **agent 做不到**（它的 write 沒有 append，重寫大檔會撐爆），
                 # 但那是模型工具層的限制，PowerShell 沒有。本分支一圈只走一次。
                 Write-Log "剩 $cvManualOnly 項需人工 → 先試 lint -FixArchive 自動處置"
-                $fx = & $lintPath -Domain $Domain -FixArchive *>&1 | Out-String
+                $fx = & $lintPath -Domain $Domain @lintNav -FixArchive *>&1 | Out-String
                 Add-Content -Path (Join-Path $logRoot ("fixarchive-cycle{0}.txt" -f $cycle)) `
                     -Value $fx -Encoding UTF8
                 $coverBefore = Invoke-Lint -Coverage
@@ -2229,7 +2224,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
             $tail = @(Get-Content -LiteralPath $r.ErrFile -Tail 5 -Encoding UTF8 -ErrorAction SilentlyContinue |
                     Where-Object { $_.Trim() -ne '' })
             foreach ($tl in $tail) { Write-Log "  err> $tl" }
-            if ($tail.Count -eq 0) { Write-Log "  err> （err 檔為空——session 可能在啟動階段就死，檢查 opencode 與模型服務）" }
+            if ($tail.Count -eq 0) { Write-Log "  err> （err 檔為空——session 可能在啟動階段就死，檢查 $($cliVariant.Exe) 與模型服務）" }
         }
         if ($errorStreak -ge 2) { $stopReason = "連續 2 次 session 錯誤（需人工看 err log）"; break }
         # session 自行異常結束也可能留半寫檔（crash mid-write）——同樣驗一致性
@@ -2296,7 +2291,7 @@ for ($cycle = 1; $cycle -le $MaxCycles; $cycle++) {
     # 標題正規化（L101／issue #10）：LLM 寫錯結構語法 → 確定性層修，
     # 不再回頭叫 LLM 修語法。冪等、無變體時零寫入；在 lint 評估前跑，
     # 「假缺章節」到不了工單。
-    $fhRaw = & $lintPath -Domain $Domain -FixHeadings *>&1 | Out-String
+    $fhRaw = & $lintPath -Domain $Domain @lintNav -FixHeadings *>&1 | Out-String
     $fhN = @([regex]::Matches($fhRaw, '\[標題正規化\]')).Count
     if ($fhN -gt 0) { Write-Log "標題正規化：確定性修正 $fhN 個變體標題" }
 

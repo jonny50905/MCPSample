@@ -1,0 +1,128 @@
+# =============================================================================
+# PeopleSoft Business Domain Map（業務領域對照表）
+# =============================================================================
+# 定義「全客製 / 客製優先」的業務領域，供 ps-business-discovery 在選定
+# 根物件（Root Object）之前解析業務領域與搜尋政策。
+#
+# 每個領域可設定：
+#   displayName            領域顯示名稱
+#   aliases                業務同義詞（使用者問題會先比對這裡）
+#   rootObjectPolicy       CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED / DELIVERED_ALLOWED
+#   preferredPrefixes      此領域偏好的客製 Prefix
+#   allowDeliveredDependencies  原生物件可否作為相依物件
+#   deliveredFallback      找不到客製證據時，可否 fallback 到原生物件
+#
+# 由 customization-profile.yaml 的 businessDomainMap 指向本檔。
+#
+# 維護重點：
+# - aliases 必須涵蓋使用者「實際會打的字」——中文、英文、口語簡稱都要放
+#   （使用者用英文問 probation 時，只有中文 alias 是比不到的）。
+# - 未命中任何 domain ≠ 不能查：Skill 會改用 customization-profile.yaml 的
+#   searchPolicy.defaultMode 繼續搜尋；在此定義領域只是讓排序與政策更準。
+# - 新業務領域上線時，照下方格式加一段即可，Skill 邏輯不用改。
+# =============================================================================
+
+mapVersion: 1
+
+businessDomains:
+  military_service:
+    displayName: 兵役
+    aliases:
+      - 兵役
+      - 役別
+      - 役男
+      - 服役
+      - 退伍
+      - 免役
+      - 替代役
+      - 軍種
+      - 兵役狀態
+
+    # 兵役為全客製功能：只有客製物件可作為業務根物件，
+    # 原生物件僅能列為 DEPENDENCY，且預設不做 delivered fallback。
+    rootObjectPolicy: CUSTOM_ONLY_ROOTS
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: false
+
+  job_opening:
+    displayName: 職缺（Job Opening）
+    aliases:
+      - 職缺
+      - 開缺
+      - 職缺開立
+      - 徵才
+      - 求才
+      - 招募職缺
+      - Job Opening
+      - 缺額
+      - JO
+
+    # 管理者確認（2026-09）：原生 Recruiting 流程為主（約 8 成）＋少量
+    # 客製（約 2 成）→ CUSTOM_FIRST：客製與 MODIFIED_DELIVERED 優先成為
+    # root／NN 檔（知識庫的價值在客製與掛接點）；未改動的原生骨幹寫進
+    # 總覽功能地圖與 DEPENDENCY，不逐檔建 NN（原生標準行為 PeopleBooks
+    # 有，逐檔深究＝燒 session 抄官方文件＋原生 Recruiting 物件量會撐爆
+    # 領域範圍）。真需要深究某原生節點時人工加 D 項——人的判定優先於政策。
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true
+
+  employee_name:
+    displayName: 員工姓名
+    aliases:
+      - 員工姓名
+      - 姓名同步
+      - 中英文姓名
+
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true
+
+  job_transfer:
+    displayName: 轉職
+    aliases:
+      - 轉職
+      - 調職
+      - 職務異動
+      - 調動
+      - 派任
+      - 異動作業
+      - transfer
+      - job transfer
+
+    # 30 年老系統、客製範圍未知 → 先 CUSTOM_FIRST（fallback 必回報）；
+    # 深查後確認為全客製時，再改 CUSTOM_ONLY_ROOTS
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true
+
+  probation:
+    displayName: 試用期
+    aliases:
+      - 試用期
+      - 試用
+      - 試用期滿
+      - 試用考核
+      - 留用
+      - probation
+      - probationary
+
+    # 依實際環境調整：若試用期功能為全客製，改 CUSTOM_ONLY_ROOTS 並關 fallback
+    rootObjectPolicy: CUSTOM_FIRST
+    preferredPrefixes:
+      - TW_
+
+    allowDeliveredDependencies: true
+    deliveredFallback: true

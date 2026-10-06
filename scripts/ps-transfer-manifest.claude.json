@@ -1,0 +1,611 @@
+{
+  "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
+  "commit": "53a9805",
+  "files": [
+    {
+      "path": ".claude/agents/ps-ae-flow.md",
+      "lines": 68,
+      "sha256": "57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-ae-flow.md"
+    },
+    {
+      "path": ".claude/agents/ps-auditor.md",
+      "lines": 244,
+      "sha256": "b91b56a7b6690e1880841100d4b81f60abc16437a01338676b9b49ec269d2b06",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-auditor.md"
+    },
+    {
+      "path": ".claude/agents/ps-clone-worker.md",
+      "lines": 34,
+      "sha256": "ee0c2c94c9faa2e4c543bc26de10f641862169c0116421ac688dadf58bd77cb5",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-clone-worker.md"
+    },
+    {
+      "path": ".claude/agents/ps-deep-research.md",
+      "lines": 512,
+      "sha256": "6ef77459dd729bf6f35e410e66f3377a8ab27ff453081c2490ad9db63aa16efc",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-deep-research.md"
+    },
+    {
+      "path": ".claude/agents/ps-metadata-flow.md",
+      "lines": 87,
+      "sha256": "4890d45d0a32bf1b29c8dfc82cfd36c7ea5bb035afb0d81b35e9f262774e0440",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-metadata-flow.md"
+    },
+    {
+      "path": ".claude/agents/ps-orchestrator.md",
+      "lines": 211,
+      "sha256": "3e4e7c887110a88c02cf8d94973ee330acf26500de7ca0c45fb13cf2e13b8814",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-orchestrator.md"
+    },
+    {
+      "path": ".claude/agents/ps-peoplecode-flow.md",
+      "lines": 68,
+      "sha256": "31dd376bb7a16f4da902498d76d3627387f39d9c7fb2208a151fe9cd0bf2d941",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-peoplecode-flow.md"
+    },
+    {
+      "path": ".claude/agents/ps-spec-author.md",
+      "lines": 39,
+      "sha256": "8090f176353e94bec74bf0a45d9f1687667b5e09879282e55aa31274e34d98c8",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-spec-author.md"
+    },
+    {
+      "path": ".claude/agents/ps-spec-worker.md",
+      "lines": 55,
+      "sha256": "b00b1f6ddfa4d149e49efb84554dc62a2ae271e4fecd0dbe80583a402db32f50",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-spec-worker.md"
+    },
+    {
+      "path": ".claude/agents/ps-sql-flow.md",
+      "lines": 51,
+      "sha256": "f0644959b57b776a4c8242b91ce98bb35ab7c525371b4665da0e11b3e914b12a",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-sql-flow.md"
+    },
+    {
+      "path": ".claude/agents/ps-sqr-flow.md",
+      "lines": 59,
+      "sha256": "1c36177e6126cd4ce45f986cfa636c41ce25b90993474db60f0f1ffc4ef713f9",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-sqr-flow.md"
+    },
+    {
+      "path": ".claude/agents/ps-ui-flow.md",
+      "lines": 115,
+      "sha256": "8d66e384f9556a32a9a296f4d9e6dcbc4b8172e6b4501652898913256460c8d8",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-ui-flow.md"
+    },
+    {
+      "path": ".claude/commands/ps-audit-batch.md",
+      "lines": 115,
+      "sha256": "53b6fd9064b934e232d16c933765c80babb89ce887600a7e7eaa206380a7e879",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-audit-batch.md"
+    },
+    {
+      "path": ".claude/commands/ps-audit.md",
+      "lines": 78,
+      "sha256": "b5ca4e22eab7f76c997529316e76b6b5741f19e6a25aa1f359072788f76661cc",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-audit.md"
+    },
+    {
+      "path": ".claude/commands/ps-clone-batch.md",
+      "lines": 16,
+      "sha256": "b92e057447840947031970d3ee32e7ab48faf7b4cf22b9524ca9cc0964e3a0aa",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-clone-batch.md"
+    },
+    {
+      "path": ".claude/commands/ps-correct.md",
+      "lines": 32,
+      "sha256": "ce27034f011e25045b811e3e7388f561b77aa8279778ccbbe4aae6bcfe162554",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-correct.md"
+    },
+    {
+      "path": ".claude/commands/ps-lesson.md",
+      "lines": 31,
+      "sha256": "c0d18d9f9d567e68897dd8ed3861719918812237284e4921b79d184682fc8f02",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-lesson.md"
+    },
+    {
+      "path": ".claude/commands/ps-research.md",
+      "lines": 29,
+      "sha256": "c23709d73d80f17bcfb78e09b08a0fd3f4d0b39b40274de0d0f963dc8b7d5411",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-research.md"
+    },
+    {
+      "path": ".claude/commands/ps-spec-batch.md",
+      "lines": 23,
+      "sha256": "57e0c5dd83ae0b7ebb4364d7c83067c327079dbfcff0fe7b721502d738c4cad2",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-spec-batch.md"
+    },
+    {
+      "path": ".claude/commands/ps-spec.md",
+      "lines": 16,
+      "sha256": "cba0eeed472a73fb35659e9232109bfab37480753384280b954d053f1dd38d88",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-spec.md"
+    },
+    {
+      "path": ".claude/commands/ps-supplement.md",
+      "lines": 32,
+      "sha256": "6b7e1b0cec46346a97abdce1c8253d47033c57dc88ff73199333ac60928e3b4f",
+      "bom": false,
+      "repo": "claude-code/.claude/commands/ps-supplement.md"
+    },
+    {
+      "path": ".claude/hooks/ps-runtime-guard.ps1",
+      "lines": 384,
+      "sha256": "0d6f0941e2d26cd037896af2cfe8511b2a2f3e08c92de045332baaad3860e277",
+      "bom": true,
+      "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
+    },
+    {
+      "path": ".claude/peoplesoft/business-domain-map.yaml",
+      "lines": 128,
+      "sha256": "881f35185296dc9da7f760b20e9522c95cc8dab3ac1e36740833bcda5d4f94b8",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/business-domain-map.yaml"
+    },
+    {
+      "path": ".claude/peoplesoft/customization-profile.yaml",
+      "lines": 110,
+      "sha256": "cdf452f53dc2c2751dfe69db1e3939f6c187013d8aa4bc4bde500e6c97685755",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/customization-profile.yaml"
+    },
+    {
+      "path": ".claude/peoplesoft/knowledge-retrieval-contract.md",
+      "lines": 128,
+      "sha256": "842f54a9ddd128c967fc266c698494a4533ae678ca8c8adfc1f44add485c0e9f",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/knowledge-retrieval-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/lessons/applied.md",
+      "lines": 19,
+      "sha256": "72fb4712277f7fee186bae78954039ebc4de39116149523c0803ea57db3938f3",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/lessons/applied.md"
+    },
+    {
+      "path": ".claude/peoplesoft/lessons/pending.md",
+      "lines": 25,
+      "sha256": "2848e5f793b387519c37854ed2bbe8d8e9cf093c4e26caf93a930a6e9fe58ded",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/lessons/pending.md"
+    },
+    {
+      "path": ".claude/peoplesoft/mcp-tool-contracts.md",
+      "lines": 129,
+      "sha256": "2cf7273c9f090db99bf0770e5e60623eeb9f1d0bea8f6e6b3de9fc439ce888ba",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/mcp-tool-contracts.md"
+    },
+    {
+      "path": ".claude/peoplesoft/oracle-query-cookbook.md",
+      "lines": 753,
+      "sha256": "536cf2e7562374592efd23c55e1547ca9da945a1c47e4892e2ed6791166d5e1c",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/oracle-query-cookbook.md"
+    },
+    {
+      "path": ".claude/peoplesoft/progressive-source-retrieval.md",
+      "lines": 428,
+      "sha256": "59f5047c4d728678ce84c12a88aab476aecc85e1e705af2147e8e89b3f3cdfc6",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/progressive-source-retrieval.md"
+    },
+    {
+      "path": ".claude/peoplesoft/report-templates/audit-template.md",
+      "lines": 87,
+      "sha256": "db6a2a3a5ea31209cb739b01b6fbac0244d83c4de3bef760efc287a4c32bd741",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/report-templates/audit-template.md"
+    },
+    {
+      "path": ".claude/peoplesoft/report-templates/checklist-template.md",
+      "lines": 25,
+      "sha256": "366e97a7097a3e6165789d4a8ba5afa918e1a43f35a0d227db9050045a800f92",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/report-templates/checklist-template.md"
+    },
+    {
+      "path": ".claude/peoplesoft/report-templates/entity-template.md",
+      "lines": 34,
+      "sha256": "de2a989eba864ef30cf837956e9b09ac774822fd85522cbb2869c4fd0fdcf34a",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/report-templates/entity-template.md"
+    },
+    {
+      "path": ".claude/peoplesoft/report-templates/function-detail-template.md",
+      "lines": 114,
+      "sha256": "9010b8f16ca9ab2ae35ffdd38029c2fb3bc6001235a5df1533e0e92522f8c674",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/report-templates/function-detail-template.md"
+    },
+    {
+      "path": ".claude/peoplesoft/report-templates/overview-template.md",
+      "lines": 49,
+      "sha256": "e2ccd269668daf8d0f7a059b3d1c8b3b00ca8f69e666439905339a69204a1e74",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/report-templates/overview-template.md"
+    },
+    {
+      "path": ".claude/peoplesoft/research-domains.txt",
+      "lines": 28,
+      "sha256": "6be65b50cee4d82d152301f4ed68cdf1a6d88d9e6d2fac4896cf109d8a393da8",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/research-domains.txt"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/capabilities.json",
+      "lines": 37,
+      "sha256": "67e7a913080f50a6e268f245744d730f147db683aff100bdbca87ed7bfe01573",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/capabilities.json"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/clone-contract.md",
+      "lines": 97,
+      "sha256": "7206c4672c8348aec36b97dbc84872c7f1343d415fcd8f453887890b7c2f7594",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/clone-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/clone-profile.json",
+      "lines": 59,
+      "sha256": "93ff3d0fb58660c4aaad238f6fae89dab85952cf78647e5ae167ab262ad6fa08",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/clone-profile.json"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-a/pack.json",
+      "lines": 33,
+      "sha256": "a54bda5d2278a1cb1471c42c1ca5077703dd57af0dac5d3dd4915b5c7ea1d8e1",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/examples/pack-a/pack.json"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-a/template-bound.md",
+      "lines": 31,
+      "sha256": "475b5714806f963a2e5a3a67b2a529994bea606f7d779fe2863f2a1872ecd518",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/examples/pack-a/template-bound.md"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-b/pack.json",
+      "lines": 30,
+      "sha256": "0ad1597d1c7d7c3ac4bf5049b4b0391d7fd035c5b022b228a13e4137b8f6eb2e",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/examples/pack-b/pack.json"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-b/template-bound.md",
+      "lines": 19,
+      "sha256": "5fd342f4b44049c596094c1dd80c8cae7f108f8204b5de89ba8c3efd8a863715",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/examples/pack-b/template-bound.md"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-c/pack.json",
+      "lines": 33,
+      "sha256": "dcd712c256ecc6c8f4159409223ecda01a684583cbd78d3673e06a54124b26a2",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/examples/pack-c/pack.json"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-c/template-bound.md",
+      "lines": 28,
+      "sha256": "af81a07c807c9fcb4bca26ab977c2541c57e778157ed41fa2f17cf680c520c25",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/examples/pack-c/template-bound.md"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/generic.manifest.json",
+      "lines": 116,
+      "sha256": "a2758c6acd5f9a90e1742b87a7a4bbb991152fdb5e3f5846af9ba787b3b94d9c",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/pack.schema.json",
+      "lines": 85,
+      "sha256": "2624bdbf8a89747a712881b11e99e35f13340e1e9f90afd7c09521878516a878",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/pack.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/support-codes.md",
+      "lines": 188,
+      "sha256": "ed605fdc62534f7b8bbae202f864c93597f742867f064112b8b3c8954e9d52c6",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/support-codes.md"
+    },
+    {
+      "path": ".claude/peoplesoft/spec/troubleshooting-matrix.md",
+      "lines": 33,
+      "sha256": "ac683aff932748d6e752915e29e5041e637bd59bb05df3ebcf551c72f34ba5fb",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/spec/troubleshooting-matrix.md"
+    },
+    {
+      "path": ".claude/peoplesoft/subagent-report-contract.md",
+      "lines": 175,
+      "sha256": "cf685ff5de45824f3fd34fd75915f5d1ea3b313afe2392189a40846a70bc2d42",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/subagent-report-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/supplemental-contract.md",
+      "lines": 100,
+      "sha256": "0ff995cfb48eae1e9ecfaf20fbf26a9cdbe1836b267c4c2948164eb58760a715",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/supplemental-contract.md"
+    },
+    {
+      "path": ".claude/settings.json",
+      "lines": 55,
+      "sha256": "589c82b6af2b793f048b2bf14a1790c99fc9b85829aaef831bfd8cbdb9b9dcc8",
+      "bom": false,
+      "repo": "claude-code/.claude/settings.json"
+    },
+    {
+      "path": ".claude/skills/ps-ae-flow/SKILL.md",
+      "lines": 64,
+      "sha256": "b20a690bd7a63fe9a6902212e035f045c230334286ffbfec22443e416786d8d8",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-ae-flow/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-business-discovery/SKILL.md",
+      "lines": 187,
+      "sha256": "96da3cf1931fadee647602b269f5d449a6e96fe3330aef8034d3dcf0bbf5fbfc",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-business-discovery/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-business-explain/SKILL.md",
+      "lines": 116,
+      "sha256": "14b9c17b829f875b0216410ee42b7e758b934f65a889bcf07d1eea103cf02ba4",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-business-explain/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-data-lineage/SKILL.md",
+      "lines": 59,
+      "sha256": "d64d36debdde5fd566a8a71c0dec2957a1c41a15f99aa8a3e3b5b4ea21395346",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-data-lineage/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-impact-analysis/SKILL.md",
+      "lines": 61,
+      "sha256": "8a255c16d143d4ec6ef28e4b431179ceb38f460b15121dbe83b914445e5824d6",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-impact-analysis/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-peoplecode-flow/SKILL.md",
+      "lines": 103,
+      "sha256": "086bea16c9026c61e2db064de0334e0073f9032a2727957fcafdebe9183d7289",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-peoplecode-flow/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-process-flow/SKILL.md",
+      "lines": 56,
+      "sha256": "506f601c2e8a7a0a6a4b86ef0ccf4a527273873761495bbae00dcfb31dc85890",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-process-flow/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-security-flow/SKILL.md",
+      "lines": 84,
+      "sha256": "4c71eabe0832f4e8f2d0e9417bc56f1e2f287b65c436b2da98c54613eb803a09",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-security-flow/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-sql-flow/SKILL.md",
+      "lines": 97,
+      "sha256": "56e56cb59d1e8485da9fb9e337df154841c19286ad17fd92051e4b24d915c21d",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-sql-flow/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-sqr-flow/SKILL.md",
+      "lines": 116,
+      "sha256": "c885ac8b6bd179964bbbd65b7eb7c77b5250d0c1c9b4ce0b74c17928d66f1ef8",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-sqr-flow/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ps-ui-flow/SKILL.md",
+      "lines": 192,
+      "sha256": "4c23fcf8bba25d6550a3174b021f8df483605704cfe6e0c5810495ee69df554f",
+      "bom": false,
+      "repo": "claude-code/.claude/skills/ps-ui-flow/SKILL.md"
+    },
+    {
+      "path": "CLAUDE.md",
+      "lines": 71,
+      "sha256": "76e02999c4fc944eda015ff50fb2cd821674212d62a4f27d1b45f2d4193c232b",
+      "bom": false,
+      "repo": "claude-code/CLAUDE.md"
+    },
+    {
+      "path": "scripts/ps-agent-doc-lint.ps1",
+      "lines": 57,
+      "sha256": "89836217ad2acbe83b1ca52cc4689ddffd5cb4ea6e35ecf6aec5e714faf04c0a",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-auto-all.ps1",
+      "lines": 275,
+      "sha256": "bb9c1c3b5d41783980a97eaf78f02c3a83dd051c7f22c5ed7acaa5c90c0258cd",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-auto-loop.ps1",
+      "lines": 2645,
+      "sha256": "e32c9c7d8323cb9a0b203df981cb716f81949dd44d13d78cd082e0ede1321f0a",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-claude-doctor.ps1",
+      "lines": 160,
+      "sha256": "8ab86d52a8ccbdc5557283fbd0422ef63c6b4fd2714dd46c854cbd2525083ff7",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-cli-lib.ps1",
+      "lines": 59,
+      "sha256": "03efed3b250ee8e825206e0a11ec3fecb44ae037e6148fa685882632952606d7",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-doc-lint.ps1",
+      "lines": 1612,
+      "sha256": "5af2d5a422693ed0e09a443f6476c7ce1c6f6dd169f8236149d9a22f6d6b6a3b",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-fs-doctor.ps1",
+      "lines": 385,
+      "sha256": "7e9094e5833280305eab59ce38de3bd3f1cb0b8d7154ef30b9496d510a576c7d",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-graduation.ps1",
+      "lines": 191,
+      "sha256": "6317c159db889ff70629236aaf0c4badb7d86d0d2f7995c91801570269a34fa4",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-knowledge-lib.ps1",
+      "lines": 1094,
+      "sha256": "f840c27ebf96bd9901f860728f9cc3f2371235a39012a491f118dc4044ddec91",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-knowledge.ps1",
+      "lines": 92,
+      "sha256": "03188a292d89b89db413ba2135465ff8f662860992ab54ce63528f1f4255fe3c",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-session-lib.ps1",
+      "lines": 312,
+      "sha256": "f614cba595c0a0c21a164302f42a7e3b964cec83b23969871da6f2bdb3b701dd",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-spec-build.ps1",
+      "lines": 455,
+      "sha256": "40a57f84050ae399e03871d9eb799f908defb3999eedabc4c2ba4dea5b6d7b2c",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-spec-clone-lib.ps1",
+      "lines": 544,
+      "sha256": "beeb5c7e07779f5eb7f9b7c71a045f37dad61c9d196bd3087401747366f092b9",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-spec-lib.ps1",
+      "lines": 2729,
+      "sha256": "d8460ec0599c9b21cbff47a32e295f91d3710b431384912aee8bcc905c47ad67",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-spec.ps1",
+      "lines": 307,
+      "sha256": "de5f42b04d56d3de59673c2b67c12ba6fed92e7b07725173eb6dd31644b061b0",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-supplemental-lib.ps1",
+      "lines": 1193,
+      "sha256": "e593d2cf6aaf9cd0e5dbd530beff91f89ce9abf054607e36c6045b03da75c857",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-supplemental.ps1",
+      "lines": 131,
+      "sha256": "751f35d4df5ae2d797cfc90db865ec93be1ac3eb1b4e5c9203d6a9b01f51532c",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-auto-loop.ps1",
+      "lines": 1024,
+      "sha256": "eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-claude-variant.ps1",
+      "lines": 372,
+      "sha256": "53e19149fe7e826f3551d7d23e17c900ee917be1f77d7237dcc88dfe17d373eb",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-knowledge.ps1",
+      "lines": 338,
+      "sha256": "dc18bdc60f9607362f1b474ceb11c3b35974bd142221ac361b132e056f3cee76",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-oracle-runtime.ps1",
+      "lines": 470,
+      "sha256": "6adfc52fc82001ac8165f6fefb23fec99bfaf4abc964ea61919a8cf73b2a775a",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-ps51-static.ps1",
+      "lines": 125,
+      "sha256": "3825f4898a6fd35514b75e4a4923cfeda1ba5fedce2fdcbb9619a9218cf48681",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-spec-build.ps1",
+      "lines": 299,
+      "sha256": "e85d28fa30a5b57a992d783ed7d3284d1230536165b18c8d66e51580f0faaa2b",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-spec-clone.ps1",
+      "lines": 288,
+      "sha256": "89f020def4f34ec653703a7c8115824d3c6898e52a79d77bf0e69a04f004bd6b",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-spec.ps1",
+      "lines": 1132,
+      "sha256": "ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-supplemental.ps1",
+      "lines": 524,
+      "sha256": "02cf5b26122222697986c2bac5796c1cc5d830c0482f603f2e4e93c3a6cafa35",
+      "bom": true
+    }
+  ],
+  "removed": []
+}

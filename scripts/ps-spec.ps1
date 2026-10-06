@@ -9,8 +9,9 @@
 # 路徑：pack＝<PrivateRoot>/<packId>/（預設 .ps-private/spec/）；job＝<RuntimeRoot>/<jobId>/（預設 .ps-runtime/spec/）；兩者皆 gitignore。
 #       -RuntimeRoot 只供測試（-FakeWorker）：worker 的 command 與 permission 把工單路徑固定在 <Root>/.ps-runtime/spec/，派真 worker 時不是預設值＝SPEC1-9-07。
 # 只讀 docs/ps-research/**、docs/ps-research/knowledge/index.json（每個動詞都先 check，STALE 即重建：等級要看現況）、.ps-private；只寫 .ps-runtime/spec/<jobId>/、
-# docs/ps-research/supplemental/requests/（KnowledgeNeed）、docs/ps-research/knowledge/（重建）、.opencode/peoplesoft/spec/generic.manifest.json（-WriteGenericManifest）。
-# 永不寫 NN／wiki／checklist。worker session：opencode run --command ps-spec-batch "<jobId>-<attemptId>"（agent ps-spec-worker 只寫 fragment.md）。
+# docs/ps-research/supplemental/requests/（KnowledgeNeed）、docs/ps-research/knowledge/（重建）、<框架>/peoplesoft/spec/generic.manifest.json（-WriteGenericManifest；.opencode 或 .claude，依 ps-cli-lib 判定）。
+# 永不寫 NN／wiki／checklist。worker session：opencode run --command ps-spec-batch "<jobId>-<attemptId>"；Claude Code 版為
+# claude -p --agent ps-spec-worker "/ps-spec-batch <jobId>-<attemptId>"（ps-session-lib 依前端版本轉換；ps-spec-worker 只寫 fragment.md）。
 # 最後一行永遠是唯一結論碼 SPEC1-<stage>-<code>[-<count>]（碼表 .opencode/peoplesoft/spec/support-codes.md；不含路徑／物件名／hash）；
 # -Render／-Gate 只印結論碼。exit：0＝完成／1＝未達（BLOCKED、gate 未過、映射未簽核、來源已變…）／2＝環境或參數錯／3＝job 互斥鎖被占用。
 # -FakeWorker <ps1>：測試專用——以該腳本取代 opencode session（收 -AttemptDir -ManifestPath -FragmentPath），公司機不用。
@@ -261,7 +262,7 @@ try {
             $rtExpected = [System.IO.Path]::GetFullPath((Join-Path $Root (Join-Path '.ps-runtime' 'spec'))).TrimEnd('\', '/')
             $rtActual = [System.IO.Path]::GetFullPath($dirs.RuntimeRoot).TrimEnd('\', '/')
             if (-not [string]::Equals($rtActual, $rtExpected, [System.StringComparison]::OrdinalIgnoreCase)) { Say 'SPEC：-RuntimeRoot 只供測試（-FakeWorker）；派 worker session 時 job 目錄必須是 <Root>/.ps-runtime/spec/'; $code = 'SPEC1-9-07'; $exitCode = 2; throw 'DONE' }
-            $oc = Get-PsOcPath
+            $oc = Get-PsOcPath -Root $Root
             if ($oc.Path -eq '') { Say ('SYSTEM ERROR：' + $oc.Error); $code = 'SPEC1-3-05'; $exitCode = 2; throw 'DONE' }
             $ocPath = $oc.Path
             $dispatch = {

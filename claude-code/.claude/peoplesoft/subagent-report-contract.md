@@ -1,0 +1,175 @@
+# Subagent Report Contract（回報契約）
+
+所有 ps-* subagent 的**最終輸出只能是一份符合本契約的 JSON**，
+前後不加說明文字。目的：raw chunks 留在 subagent context，
+orchestrator 主 context 只累積小而結構化的報告。
+
+## 硬規則（違反即報告不合格）
+
+```text
+1. 報告內不得出現大段原始碼：
+   - 單一 quote ≤ 5 行
+   - 全報告引用總量 ≤ 20 行
+   - 引用永遠可省略；evidence ID（chunkId + 行號 + sourceHash）才是必要項
+2. findings 內每個 claim 必附 ≥ 1 個 evidence ID；
+   沒有 evidence 的內容寫入 gaps，不寫入 findings。
+3. confidence 只能是 CONFIRMED / INFERRED / DYNAMIC_RUNTIME。
+3a. **可見性是另一條軸，不是 confidence 值**：導覽入口的
+   REGISTRY_DEFINED / AUTHORIZED_FOR_CONTEXT / UNKNOWN_VISIBILITY 只能寫在
+   `navigationEntries[].visibility`，**不得**寫進 `confidence` 欄；同一筆導覽入口
+   仍要照第 3 條標它自己的 confidence。沒有 user／security context 時
+   **只准** CLASSIC_NAV_VISIBLE（cookbook §2k-C 的 `CLASSIC_VISIBLE = 1`）、REGISTRY_DEFINED（只有 registry 證據）
+   或 UNKNOWN_VISIBILITY，不得升格為 AUTHORIZED_FOR_CONTEXT。
+   `labels[].fallbackLanguageCode`：有覆寫而未回退＝`NOT_APPLICABLE`，回退＝實際採用的 base language
+   （cookbook §2k-0 (2b)），查不到＝`UNRESOLVED`——**不得留空字串、不得預設 ENG**。
+4. 查無 / 不確定 / 超出 budget：用 status=PARTIAL 或 BLOCKED + gaps 說明，並填 `blockedReason`
+   （封閉值，見欄位表）；未連線一律 NOT_CONNECTED，不得寫成逾時或查無。不得編造物件名稱或執行期結果。
+5. 報告目標長度 ≤ 600 tokens（軟性）；findings 依相關性排序，最多 8 筆。
+6. delivered 物件一律進 dependencies，不進 findings 的主要實作敘述
+   （CUSTOM_ONLY_ROOTS 模式下尤其如此）。
+7. evidence 分兩種（`kind`），欄位不得混用、不得補假值：
+   - `CHUNK`（來自 ES / Source）：欄位**逐字取自** `get_chunks_details` 回傳——
+     `id` ← `ChunkId`（Elasticsearch chunk UUID；**非 UUID 格式＝捏造**）、
+     `filePath` ← `FilePath`、`lines` ← `StartLine`-`EndLine`、
+     `quote` ← `ChunkText` 節錄（≤ 5 行）；選填 `objectName` ← `ObjectName`、
+     `event` ← `EventName`、`fieldName` ← `FieldName`。
+     給人看的引用寫「filePath:行號」，id 供機器重取。
+   - `SQL`（來自 oracleMCP）：附 `sql` 與 `keyRows`（關鍵列摘要），
+     **沒有 id、也不准自創 id**——`SQL-XLAT-1` 這種自編字串＝報告不合格。
+     **僅限本次實際執行過的 SELECT 與其結果**——程式碼裡的 SQL 語句
+     （AE_SQL Action、SQR 段、PeopleCode 內嵌 SQL）屬**原始碼**，
+     一律用 `CHUNK` 證據引用，不得標成 `SQL`。
+   - **只有這兩種**。`PeoplecodeMetadata` 的回傳＝定位線索（地位同 ES
+     搜尋結果），不得寫成 evidence 條目；只有定位、未經 CHUNK／SQL 查證
+     的 finding 最高標 INFERRED。
+   - **證據格式三鐵律**（缺一該筆不得列入 findings，改放 gaps）：
+     (1) CHUNK 型必附**完整 36 字元** ChunkId；(2) 行號必須對應
+     **當前**取回內容（引用時同步更新）；(3) **任何欄位禁止縮寫**
+     （id、路徑、quote 皆逐字取自工具回傳）。
+8. **禁止捏造識別碼**：id / filePath / lines 只能來自工具回傳；
+   工具沒提供的欄位一律省略，不得補一個「看起來像」的值。
+9. 長文本分析必附 `coverage`：本次分析的程式單位、其**結構行號範圍**、
+   已取回並分析的行號區間；單位內未覆蓋的行號區間**必須**同時出現在
+   `gaps`，不可默默省略。`quote` 節錄要挑**支撐 claim 的關鍵行**
+   （判斷條件、寫入語句），不是 chunk 開頭幾行。
+10. `suggestedNext[].agent` 只能是 `.claude/agents/` 裡存在且允許委派的 agent 名
+   （ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-peoplecode-flow／ps-sql-flow／ps-sqr-flow／ps-auditor）。
+   skill 名（ps-security-flow／ps-data-lineage／ps-process-flow…）**不是**合法目標、不得直接轉成 Agent 工具的 subagent_type：
+   授權類建議寫 `{ "agent": "ps-metadata-flow", "task": "讀取 .claude/skills/ps-security-flow/SKILL.md …" }`。
+   orchestrator 轉發前先核對；執行期 guard 會在 Agent 工具回傳之後附註無效目標（`[ps-runtime-guard]`）、並在 Agent 工具執行前擋下 skill 名——
+   這是路由錯誤，不得歸因為 Oracle 掛載或 DB 連線故障、不觸發重掛或重連。
+```
+
+## JSON 結構
+
+```json
+{
+  "agent": "ps-sqr-flow",
+  "task": "一句話重述被委派的問題",
+  "status": "COMPLETE | PARTIAL | BLOCKED",
+  "blockedReason": "NOT_APPLICABLE",
+  "searchScope": {
+    "mode": "CUSTOM_ONLY_ROOTS",
+    "customPrefixes": ["TW_"],
+    "deliveredFallbackUsed": false
+  },
+  "coverage": [
+    {
+      "unit": "UPDATE-MIL-STATUS",
+      "structureLines": "61-120",
+      "analyzedLines": "61-120"
+    }
+  ],
+  "findings": [
+    {
+      "claim": "UPDATE-MIL-STATUS 將 DISCHARGE_DT 已到期者的 MIL_STATUS 更新為 'D'",
+      "confidence": "CONFIRMED",
+      "objects": [
+        { "type": "SQR", "name": "TW_MIL001", "origin": "CUSTOM_PREFIX" }
+      ],
+      "operations": [
+        { "table": "PS_TW_MILITARY", "field": "MIL_STATUS", "op": "UPDATE" }
+      ],
+      "evidence": [
+        {
+          "kind": "CHUNK",
+          "id": "9b2f5c1e-4a3d-4f0a-8f21-7e5d0c9a1b2c",
+          "filePath": "sqr/TWMIL001.sqr",
+          "lines": "61-120",
+          "objectName": "TW_MIL001",
+          "quote": "UPDATE PS_TW_MILITARY SET MIL_STATUS = 'D' ..."
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    { "type": "FUNCLIB", "name": "HR_COMMON_UTIL", "origin": "DELIVERED", "role": "DEPENDENCY" }
+  ],
+  "technicalMenuLocations": [
+    { "menuName": "RECRUITING", "barName": "USE", "itemName": "MANAGE_APPLICANTS" }
+  ],
+  "navigationEntries": [
+    {
+      "portalName": "EMPLOYEE",
+      "entryType": "PORTAL_REGISTRY",
+      "crefObjectName": "HC_HRS_MANAGE_APPLICANTS",
+      "labels": [
+        { "displayText": "招募", "languageCode": "ZHT", "displayTextSource": "LANG", "fallbackLanguageCode": "NOT_APPLICABLE" },
+        { "displayText": "Applicant Management", "languageCode": "ENG", "displayTextSource": "BASE", "fallbackLanguageCode": "ENG" }
+      ],
+      "visibility": "CLASSIC_NAV_VISIBLE",
+      "confidence": "CONFIRMED",
+      "evidence": [ { "kind": "SQL", "sql": "SELECT … FROM PSPRSMDEFN …", "keyRows": ["…"] } ]
+    },
+    {
+      "portalName": "EMPLOYEE",
+      "entryType": "CREF_LINK",
+      "crefObjectName": "HC_HRS_MANAGE_APPLICANTS_LNK",
+      "labels": [ { "displayText": "Manager Self Service", "languageCode": "ENG", "displayTextSource": "BASE", "fallbackLanguageCode": "UNRESOLVED" } ],
+      "visibility": "CLASSIC_NAV_VISIBLE",
+      "confidence": "INFERRED",
+      "evidence": [ { "kind": "SQL", "sql": "SELECT … FROM PSPRSMDEFN … PORTAL_CREF_USGT = 'LINK' …", "keyRows": ["…"] } ]
+    }
+  ],
+  "_sqlEvidenceExample": {
+    "kind": "SQL",
+    "sql": "SELECT FIELDVALUE, XLATLONGNAME FROM PSXLATITEM WHERE FIELDNAME = 'MIL_STATUS' ...",
+    "keyRows": ["E=免役 (ACTIVE)", "A=替代役 (ACTIVE)"]
+  },
+  "dynamicRuntimeWarnings": [
+    "LOAD-HISTORY 讀取的 table 由 [$hist_table] 執行期組成（CHK-SQR-003）"
+  ],
+  "gaps": [
+    "PRINT-REPORT 未展開（與本題無關）",
+    "Registry 另有 1 筆入口因 hide-from-nav 不顯示（HC_HRS_MANAGE_APPLICANTS_OLD），未列為入口"
+  ],
+  "suggestedNext": [
+    { "agent": "ps-metadata-flow", "task": "TW_MIL001 的排程與 Run Control" }
+  ]
+}
+```
+
+## 欄位說明
+
+| 欄位 | 必填 | 說明 |
+|---|---|---|
+| `agent` | ✔ | 回報的 subagent 名稱 |
+| `task` | ✔ | 一句話重述任務（供 orchestrator 對帳） |
+| `status` | ✔ | COMPLETE：已回答；PARTIAL：部分回答（見 gaps）；BLOCKED：無法進行（工具失敗 / 查無） |
+| `blockedReason` | status≠COMPLETE 時必填 | 封閉值：NOT_CONNECTED（SQL 工具回未連線；由主 agent 重連後重派一次）／ORACLE_MCP_DOWN（工具清單無 mcp__oracleMCP__：掛載故障，不猜名、不重試，由管理者重掛後重新驗證；不是 NOT_CONNECTED）／QUERY_TIMEOUT（>30 秒無回應）／SCHEMA_UNRESOLVED（view/table not found 且 profile currentSchema=FILL_ME）／TOOL_ERROR／NO_EVIDENCE（查無）／BUDGET_EXCEEDED；COMPLETE 時 NOT_APPLICABLE |
+| `searchScope` | ✔ | 實際使用的搜尋模式；用了 delivered fallback 必須在此如實回報 |
+| `coverage[]` | 長文本必填 | 程式單位、結構行號範圍、已分析行號區間；未覆蓋區間必同時列於 gaps |
+| `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
+| `dependencies[]` | ✔（可為空陣列） | 原生 / 相依物件，只能出現在這裡 |
+| `technicalMenuLocations[]` | 選填 | PSMENUITEM 的 MENUNAME／BARNAME／ITEMNAME——**technical metadata，不是導覽路徑** |
+| `navigationEntries[]` | 選填（導覽類委派必填，可為空陣列） | Portal Registry 入口，**複數**；每筆帶 entryType／labels／visibility（值域見 `mcp-tool-contracts.md` §3）。空陣列＋gaps＝查無；未支援的 surface 記 gaps，不得省略 |
+| `dynamicRuntimeWarnings[]` | ✔（可為空陣列） | 所有 DYNAMIC_RUNTIME 事項集中列出 |
+| `gaps[]` | ✔（可為空陣列） | 未涵蓋範圍與原因（budget 到頂 / 與題無關 / 查無） |
+| `suggestedNext[]` | 選填 | 建議 orchestrator 的後續委派；`agent` 必須是存在且允許委派的 agent 名（硬規則 10），skill 名不是合法目標 |
+
+## Orchestrator 端的使用規則
+
+- 報告是**彙整素材**，不是給使用者的最終答案；最終說明由
+  ps-business-explain 規則產出。
+- 引用報告時帶 evidence IDs；需要原文時按 ID 定向補取，不重跑檢索。
+- 多份報告衝突時：以 confidence 高者為準；同級衝突如實並陳並標 INFERRED。

@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
+  "files": [
+    {
+      "path": ".claude/agents/ps-clone-worker.md",
+      "sha256": "EE0C2C94C9FAA2E4C543BC26DE10F641862169C0116421AC688DADF58BD77CB5",
+      "lines": 35
+    },
+    {
+      "path": ".claude/agents/ps-spec-author.md",
+      "sha256": "8090F176353E94BEC74BF0A45D9F1687667B5E09879282E55AA31274E34D98C8",
+      "lines": 40
+    },
+    {
+      "path": ".claude/agents/ps-spec-worker.md",
+      "sha256": "B00B1F6DDFA4D149E49EFB84554DC62A2AE271E4FECD0DBE80583A402DB32F50",
+      "lines": 56
+    },
+    {
+      "path": ".claude/commands/ps-clone-batch.md",
+      "sha256": "B92E057447840947031970D3EE32E7AB48FAF7B4CF22B9524CA9CC0964E3A0AA",
+      "lines": 17
+    },
+    {
+      "path": ".claude/commands/ps-spec-batch.md",
+      "sha256": "57E0C5DD83AE0B7EBB4364D7C83067C327079DBFCFF0FE7B721502D738C4CAD2",
+      "lines": 24
+    },
+    {
+      "path": ".claude/commands/ps-spec.md",
+      "sha256": "CBA0EEED472A73FB35659E9232109BFAB37480753384280B954D053F1DD38D88",
+      "lines": 17
+    },
+    {
+      "path": ".claude/peoplesoft/spec/capabilities.json",
+      "sha256": "67E7A913080F50A6E268F245744D730F147DB683AFF100BDBCA87ED7BFE01573",
+      "lines": 38
+    },
+    {
+      "path": ".claude/peoplesoft/spec/clone-contract.md",
+      "sha256": "7206C4672C8348AEC36B97DBC84872C7F1343D415FCD8F453887890B7C2F7594",
+      "lines": 98
+    },
+    {
+      "path": ".claude/peoplesoft/spec/clone-profile.json",
+      "sha256": "93FF3D0FB58660C4AAAD238F6FAE89DAB85952CF78647E5AE167AB262AD6FA08",
+      "lines": 60
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-a/pack.json",
+      "sha256": "A54BDA5D2278A1CB1471C42C1CA5077703DD57AF0DAC5D3DD4915B5C7EA1D8E1",
+      "lines": 34
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-a/template-bound.md",
+      "sha256": "475B5714806F963A2E5A3A67B2A529994BEA606F7D779FE2863F2A1872ECD518",
+      "lines": 32
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-b/pack.json",
+      "sha256": "0AD1597D1C7D7C3AC4BF5049B4B0391D7FD035C5B022B228A13E4137B8F6EB2E",
+      "lines": 31
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-b/template-bound.md",
+      "sha256": "5FD342F4B44049C596094C1DD80C8CAE7F108F8204B5DE89BA8C3EFD8A863715",
+      "lines": 20
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-c/pack.json",
+      "sha256": "DCD712C256ECC6C8F4159409223ECDA01A684583CBD78D3673E06A54124B26A2",
+      "lines": 34
+    },
+    {
+      "path": ".claude/peoplesoft/spec/examples/pack-c/template-bound.md",
+      "sha256": "AF81A07C807C9FCB4BCA26AB977C2541C57E778157ED41FA2F17CF680C520C25",
+      "lines": 29
+    },
+    {
+      "path": ".claude/peoplesoft/spec/pack.schema.json",
+      "sha256": "2624BDBF8A89747A712881B11E99E35F13340E1E9F90AFD7C09521878516A878",
+      "lines": 86
+    },
+    {
+      "path": ".claude/peoplesoft/spec/support-codes.md",
+      "sha256": "ED605FDC62534F7B8BBAE202F864C93597F742867F064112B8B3C8954E9D52C6",
+      "lines": 189
+    },
+    {
+      "path": ".claude/peoplesoft/spec/troubleshooting-matrix.md",
+      "sha256": "AC683AFF932748D6E752915E29E5041E637BD59BB05DF3EBCF551C72F34BA5FB",
+      "lines": 34
+    },
+    {
+      "path": "scripts/ps-spec-build.ps1",
+      "sha256": "40A57F84050AE399E03871D9EB799F908DEFB3999EEDABC4C2BA4DEA5B6D7B2C",
+      "lines": 456
+    },
+    {
+      "path": "scripts/ps-spec-clone-lib.ps1",
+      "sha256": "BEEB5C7E07779F5EB7F9B7C71A045F37DAD61C9D196BD3087401747366F092B9",
+      "lines": 545
+    },
+    {
+      "path": "scripts/ps-spec-lib.ps1",
+      "sha256": "D8460EC0599C9B21CBFF47A32E295F91D3710B431384912AEE8BCC905C47AD67",
+      "lines": 2730
+    },
+    {
+      "path": "scripts/ps-spec.ps1",
+      "sha256": "DE5F42B04D56D3DE59673C2B67C12BA6FED92E7B07725173EB6DD31644B061B0",
+      "lines": 308
+    }
+  ]
+}

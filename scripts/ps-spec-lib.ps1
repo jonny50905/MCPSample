@@ -156,7 +156,7 @@ function Get-PsSpDirs {
     $d = @{
         Root = $Root; PrivateRoot = $PrivateRoot; RuntimeRoot = $RuntimeRoot
         Research = (Join-Path $Root (Join-Path 'docs' 'ps-research'))
-        SpecGeneric = (Join-Path $Root (Join-Path '.opencode' (Join-Path 'peoplesoft' 'spec')))
+        SpecGeneric = (Get-PsCliPsPath -Root $Root -Rel 'spec')
         PackDir = ''; JobDir = ''; Plans = ''; Attempts = ''; Receipts = ''; Outputs = ''; JobFile = ''; CurrentFile = ''
     }
     $d.Capabilities = Join-Path $d.SpecGeneric 'capabilities.json'
@@ -2647,13 +2647,15 @@ function Invoke-PsSpRender {
 
 # ── Doctor：stage 0 完整性、drill tuple ───────────────────────────
 
-# generic 集合（相對 Root）：scripts/ps-spec*.ps1、.opencode/peoplesoft/spec/**（manifest 自身除外）、worker agent／command
+# generic 集合（相對 Root）：scripts/ps-spec*.ps1、<框架>/peoplesoft/spec/**（manifest 自身除外）、worker agent／command
+# （<框架>＝.opencode 或 .claude，依 ps-cli-lib 判定；agent／command 目錄名也依版本）
 function Get-PsSpGenericFiles {
     param([string]$Root)
     $out = @()
     $sd = Join-Path $Root 'scripts'
     if ([System.IO.Directory]::Exists($sd)) { foreach ($f in @(Get-ChildItem -LiteralPath $sd -File -Filter 'ps-spec*.ps1' -ErrorAction SilentlyContinue)) { $out += ('scripts/' + $f.Name) } }
-    $gd = Join-Path $Root (Join-Path '.opencode' (Join-Path 'peoplesoft' 'spec'))
+    $cv = Get-PsCliVariant -Root $Root
+    $gd = Get-PsCliPsPath -Root $Root -Rel 'spec'
     if ([System.IO.Directory]::Exists($gd)) {
         foreach ($f in @(Get-ChildItem -LiteralPath $gd -File -Recurse -ErrorAction SilentlyContinue)) {
             if ($f.Name -eq 'generic.manifest.json') { continue }
@@ -2661,7 +2663,7 @@ function Get-PsSpGenericFiles {
             $out += (Get-PsSpRelPath -Root $Root -Path $f.FullName)
         }
     }
-    foreach ($p in @('.opencode/agent/ps-spec-worker.md', '.opencode/command/ps-spec-batch.md', '.opencode/agent/ps-spec-author.md', '.opencode/agent/ps-clone-worker.md', '.opencode/command/ps-spec.md', '.opencode/command/ps-clone-batch.md')) { if ([System.IO.File]::Exists((Join-Path $Root $p))) { $out += $p } }
+    foreach ($p in @(($cv.AgentDir + '/ps-spec-worker.md'), ($cv.CommandDir + '/ps-spec-batch.md'), ($cv.AgentDir + '/ps-spec-author.md'), ($cv.AgentDir + '/ps-clone-worker.md'), ($cv.CommandDir + '/ps-spec.md'), ($cv.CommandDir + '/ps-clone-batch.md'))) { if ([System.IO.File]::Exists((Join-Path $Root $p))) { $out += $p } }
     return , (Sort-PsKnOrdinal -Items $out)
 }
 function New-PsSpGenericManifest {

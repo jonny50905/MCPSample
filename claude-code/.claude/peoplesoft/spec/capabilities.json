@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "note": "能力目錄（公開、機械讀）：補研究 need.factKind／properties／context 與 Spec 需求包 requirements.factKind 的封閉值域。sections 用知識索引的節鍵；EXTRACT＝外環從 NN 節確定性抽取，COMPOSE＝worker 依 manifest 切片組表、外環算覆蓋率。follow＝可沿相關物件表的呼叫／啟動／排程／執行角色一跳讀 callee NN 同節。目錄外＝UNSUPPORTED。新增能力走 CAP-REQ 表單（support-codes.md）。",
+  "targetTypes": ["COMPONENT", "RECORD", "FIELD", "PAGE", "AE", "SQR", "SQC", "SQL", "PROCESS", "MENU"],
+  "objectNamePattern": "^[A-Z0-9_][A-Z0-9_.$#-]{0,59}$",
+  "contextKeys": {
+    "operation": ["IMPORT", "EXPORT", "SAVE", "SEARCH", "APPROVE", "BATCH", "ANY"],
+    "mode": ["ADD", "UPDATE", "CORRECT", "DISPLAY", "ANY"],
+    "page": "OBJECT_NAME",
+    "record": "OBJECT_NAME",
+    "field": "OBJECT_NAME",
+    "process": "OBJECT_NAME"
+  },
+  "evidencePolicies": ["AUDITED", "STATIC", "ANY"],
+  "freshness": ["CURRENT", "AS_OF"],
+  "confidence": ["CONFIRMED", "INFERRED", "DYNAMIC_RUNTIME"],
+  "nnSections": ["相關物件", "功能定位", "畫面與欄位", "行為邏輯", "資料流", "執行方式", "權限", "未解事項"],
+  "followRoles": ["呼叫", "啟動", "排程", "執行"],
+  "followTypes": ["AE", "SQR", "SQC", "PROCESS"],
+  "factKinds": {
+    "UI.COMPONENT_IDENTITY": { "mode": "EXTRACT", "sections": [], "head": true, "properties": ["primaryObject", "origin", "status", "functionName"], "closure": "SINGLE" },
+    "UI.NAVIGATION": { "mode": "EXTRACT", "sections": ["功能定位"], "subsections": ["導覽入口", "Technical Menu"], "properties": ["entries", "technicalMenu"], "closure": "ROWS" },
+    "UI.FIELD_INVENTORY": { "mode": "EXTRACT", "sections": ["畫面與欄位"], "properties": ["fields", "choices", "lifecycle"], "closure": "ROWS" },
+    "BEHAVIOR.RULES": { "mode": "EXTRACT", "sections": ["行為邏輯"], "properties": ["rules", "confidence"], "closure": "ITEMS" },
+    "DATA.FLOW": { "mode": "EXTRACT", "sections": ["資料流"], "properties": ["reads", "writes", "tables"], "closure": "ROWS" },
+    "PROCESS.EXECUTION": { "mode": "EXTRACT", "follow": true, "sections": ["執行方式"], "properties": ["online", "batch", "schedule"], "closure": "PRESENT" },
+    "SECURITY.ACCESS": { "mode": "EXTRACT", "sections": ["權限"], "properties": ["permissionLists", "roles"], "closure": "PRESENT" },
+    "RELATED.OBJECTS": { "mode": "EXTRACT", "sections": ["相關物件"], "properties": ["objects", "roles", "classification"], "closure": "ROWS" },
+    "GAPS": { "mode": "EXTRACT", "sections": ["未解事項"], "properties": ["items"], "closure": "ITEMS" },
+    "EVIDENCE.APPENDIX": { "mode": "EXTRACT", "sections": ["Evidence附錄"], "properties": ["rows", "kinds"], "closure": "ROWS" },
+    "ENTITY.DETAIL": { "mode": "EXTRACT", "hop": "wiki", "sections": ["資料流"], "properties": ["observations", "relations"], "closure": "PER_RECORD" },
+    "BEHAVIOR.VALIDATIONS": { "mode": "COMPOSE", "sections": ["行為邏輯", "Evidence附錄"], "properties": ["trigger", "condition", "message"], "table": ["來源條目", "觸發", "條件", "訊息", "證據"], "closure": "COVERAGE" },
+    "DATA.FILE_INPUT": { "mode": "COMPOSE", "follow": true, "sections": ["行為邏輯", "資料流", "執行方式"], "properties": ["present", "layout", "fields"], "table": ["來源條目", "欄位", "格式", "說明", "證據"], "closure": "COVERAGE" },
+    "DATA.FILE_OUTPUT": { "mode": "COMPOSE", "follow": true, "sections": ["行為邏輯", "資料流", "執行方式"], "properties": ["present", "layout", "fields"], "table": ["來源條目", "欄位", "格式", "說明", "證據"], "closure": "COVERAGE" },
+    "DATA.RECORD_USAGE": { "mode": "COMPOSE", "sections": ["資料流", "行為邏輯"], "properties": ["fields", "usage"], "table": ["來源條目", "欄位", "用途", "證據"], "enums": { "用途": ["READ", "LOOKUP", "WRITE"] }, "closure": "COVERAGE" }
+  }
+}

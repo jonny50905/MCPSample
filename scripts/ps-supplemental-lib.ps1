@@ -39,7 +39,7 @@ function Get-PsSuppDirs {
         Supplemental = $supp
         Requests     = (Join-Path $supp 'requests')
         Results      = (Join-Path $supp 'results')
-        Capabilities = (Join-Path $Root (Join-Path '.opencode' (Join-Path 'peoplesoft' (Join-Path 'spec' 'capabilities.json'))))
+        Capabilities = (Get-PsCliPsPath -Root $Root -Rel 'spec/capabilities.json')
     }
 }
 
@@ -553,7 +553,7 @@ function New-PsSuppManifest {
     }
     [void]$sb.Append($nl)
     [void]$sb.Append('## 委派鏈').Append($nl).Append($nl)
-    [void]$sb.Append('依 .opencode/peoplesoft/supplemental-contract.md 的「事實類別 → 委派鏈」表；本工單類別：' + $fk + '。').Append($nl)
+    [void]$sb.Append('依 ' + (Get-PsCliVariant -Root $Root).PsDir + '/supplemental-contract.md 的「事實類別 → 委派鏈」表；本工單類別：' + $fk + '。').Append($nl)
     [void]$sb.Append('只補「要補的屬性」列出的事實；工單沒列的不查。缺證據走既有出口（SQL 型→待人工SQL；CHUNK 型→處置 NO_EVIDENCE＋查法收據）。').Append($nl).Append($nl)
     [void]$sb.Append('## 輸出').Append($nl).Append($nl)
     [void]$sb.Append('唯一可寫：' + $receiptRel).Append($nl)

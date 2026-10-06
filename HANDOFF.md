@@ -23,6 +23,16 @@
 status.md 記關卡與進行中步驟（工單存檔可續跑）、需求鍵限 ASCII 且更新不改鍵、測試關平行並覆寫主庫連線、
 bash 權限對「最後相符」與「最長相符」兩種語意都驗過（長駐程式、全域安裝、改套件來源、push 皆擋）、`opencode.json` 關分享。
 
+**Claude Code 版（2026-10-06，L132）**：管理者取得 Claude Code CLI，要一版用 Claude Code＋Sonnet 跑、OpenCode 版保留、
+公司機**只搬一版**。新增 `claude-code/`（`CLAUDE.md`＋`.claude/`：agents 12、commands 9、skills 11、hook、settings、peoplesoft 契約），
+部署時去前綴；`scripts/` 兩版共用，`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 認版本，外環改開
+`claude -p --agent <主代理> --permission-mode dontAsk --output-format stream-json --verbose "/<指令> <參數>"`。搬運 manifest 一版一份
+（`scripts/ps-transfer-manifest.claude.json`）；`ps-doc-lint.ps1` 刻意不改（hash 綁畢業收據）。維護端改完依序：
+`ps-spec.ps1 -Doctor -WriteGenericManifest` → `scripts/tests/test-claude-variant.ps1 -WriteGenericManifest` → `ps-fs-doctor.ps1 -WriteManifest`；
+兩版模型檔的規則要同步改（只換機制用語）。公司機安裝健檢 `scripts/ps-claude-doctor.ps1 [-Live]`（結論代號 V／C／P／H／F／N／T／L／G）。真 CLI 端到端 `node tests/claude-code/run-e2e.mjs`（haiku／sonnet 已各跑一次全過）。
+待公司機驗：Windows 上 hook 經 Git Bash／PowerShell 執行、`claude mcp add` 註冊既有四個 MCP、信任資料夾後 headless 權限、外環真跑一圈。
+安裝與對照見 `claude-code/README.md`、SOP-26。
+
 **原生欄位無用判定（2026-10-05，L129，第 1 階段）**：管理者回報 Spec 把業務沒用到的原生欄位寫得像在用，
 重建端照建。管理者定案：全自動、不要人逐欄確認（loop 會中斷），「完全沒用到才判無用」。規則在 clone-contract
 「原生欄位無用判定」：PROD 實體表全表非預設值 0 筆＋核心路徑程式無指名引用（cookbook §7 查法 a／b／c）才排除，

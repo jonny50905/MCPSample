@@ -2,7 +2,7 @@
 # 責任只有：讀佇列 → preflight → 驗收據 → 逐一以子行程呼叫 ps-auto-loop → 記錄。
 # 不理解 PeopleSoft、不呼叫模型、不寫 checklist、不做 audit、**永不寫收據**。
 #
-# 佇列：.opencode/peoplesoft/research-domains.txt（人工維護：一行一領域、# 註解）
+# 佇列：<框架>/peoplesoft/research-domains.txt（.opencode 或 .claude，依 ps-cli-lib 判定；人工維護：一行一領域、# 註解）
 # 收據：docs/ps-research/<領域>/graduation.json（只由 ps-auto-loop 畢業時寫入；
 #       驗證＝純 hash 比對，不跑 lint——新領域無目錄＝無收據＝RUN，不會誤判錯誤）
 # V1 嚴格 sequential：領域間共享 Entity Wiki／oracleMCP／working tree，禁止並行。
@@ -35,7 +35,10 @@ param(
 )
 
 $root = Split-Path $PSScriptRoot -Parent
-$queuePath = Join-Path $root (Join-Path ".opencode/peoplesoft" "research-domains.txt")
+$cliLibPath = Join-Path $PSScriptRoot "ps-cli-lib.ps1"
+if (-not (Test-Path -LiteralPath $cliLibPath)) { Write-Error "缺 scripts/ps-cli-lib.ps1（人工搬運不完整？）"; exit 2 }
+. $cliLibPath
+$queuePath = Get-PsCliPsPath -Root $root -Rel "research-domains.txt"
 $autoLoopPath = Join-Path $PSScriptRoot "ps-auto-loop.ps1"
 $lintPath = Join-Path $PSScriptRoot "ps-doc-lint.ps1"
 $gradLibPath = Join-Path $PSScriptRoot "ps-graduation.ps1"

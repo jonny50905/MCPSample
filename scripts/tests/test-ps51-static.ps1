@@ -1,4 +1,4 @@
-﻿# scripts/tests/test-ps51-static.ps1 — PowerShell 5.1 語法紀律的靜態守衛（AST 走訪 scripts/**/*.ps1）
+﻿# scripts/tests/test-ps51-static.ps1 — PowerShell 5.1 語法紀律的靜態守衛（AST 走訪 scripts/**/*.ps1＋claude-code/.claude/hooks/*.ps1）
 # 用法：pwsh -NoProfile -File scripts/tests/test-ps51-static.ps1   （在 PowerShell 7 跑：5.1 連解析都會炸的語法在 7 才看得到）
 # 阻擋（exit 1）：三元 ?:、??、??=、?.、&&／|| 管線鏈、ForEach-Object -Parallel、ConvertFrom-Json -AsHashtable／-Depth、
 #   -Encoding utf8NoBOM／utf8BOM／ansi、三段以上 Join-Path（含 -AdditionalChildPath）、Split-Path -LeafBase、Test-Json、
@@ -10,6 +10,9 @@
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
 $files = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Filter '*.ps1' -Recurse -File | Sort-Object FullName)
+# Claude Code 版的 hook 也在公司機 PowerShell 5.1 執行：同一套紀律
+$hookDir = Join-Path $repoRoot (Join-Path 'claude-code' (Join-Path '.claude' 'hooks'))
+if (Test-Path -LiteralPath $hookDir) { $files += @(Get-ChildItem -LiteralPath $hookDir -Filter '*.ps1' -File | Sort-Object FullName) }
 $problems = @()
 $warnings = @()
 $pathParams = @('Path', 'ChildPath', 'AdditionalChildPath')

@@ -239,7 +239,7 @@ function Get-PsCloneFieldStats {
 }
 function Get-PsCloneProfile {
     param([string]$Root)
-    $path = Join-Path $Root '.opencode/peoplesoft/spec/clone-profile.json'
+    $path = Get-PsCliPsPath -Root $Root -Rel 'spec/clone-profile.json'
     $text = Read-PsKnText -LiteralPath $path
     if ($null -eq $text) { throw 'CLONE_PROFILE_MISSING' }
     $p = $text | ConvertFrom-Json -ErrorAction Stop

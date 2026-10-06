@@ -1,0 +1,110 @@
+# =============================================================================
+# PeopleSoft Customization Profile（環境客製化設定檔）
+# =============================================================================
+# 此檔描述「這一個 PeopleSoft 環境」的客製命名規則、客製物件登錄來源與搜尋政策。
+# 所有 ps-* Skill 在搜尋 PeopleSoft 物件前，必須先載入本檔（或透過 MCP tool
+# `ps_get_customization_profile` 取得等價內容），不可把 TW_ 等規則硬寫在 SKILL.md。
+#
+# 注意：
+# - `TW_` 是強烈的客製訊號，但不是唯一判斷條件（見 objectOrigins 分類）。
+# - 不同環境可複製本檔並修改，Skill 邏輯不需要跟著改。
+# - 業務領域（Business Domain）定義已依 Plan Addendum §28 拆到
+#   business-domain-map.yaml，本檔只保留指標。
+# =============================================================================
+
+profileVersion: 1
+environment: PROD
+defaultLanguage: ZHT
+
+customization:
+  # 客製物件命名 Prefix（可多個；未來新增 Prefix 只改這裡）
+  customPrefixes:
+    - TW_
+
+  # 客製物件登錄表：名稱不符合 Prefix、但實際為客製的物件由此判斷。
+  # 來源可為：手動 Object Registry、Project Migration 清單、Compare Report、
+  # 客製套件清單、版控匯出、PeopleTools Project Definition、自訂 Oracle Table。
+  # 查法：oracleMCP 照 oracle-query-cookbook.md §1 樣板（PSPROJECTITEM / 登錄表）。
+  customObjectRegistry:
+    enabled: true
+    source: oracleMCP
+
+  # 物件來源分類（Object Origin）——不可只靠 Prefix 判斷：
+  #   CUSTOM_PREFIX      名稱符合客製 Prefix（高可信度客製）
+  #   CUSTOM_REGISTRY    名稱不符 Prefix，但在客製登錄表中
+  #   MODIFIED_DELIVERED 原生名稱、內容已被修改（不可當純原生）
+  #   DELIVERED          確認原生且未被修改
+  #   UNKNOWN            無法確認來源
+  objectOrigins:
+    - CUSTOM_PREFIX
+    - CUSTOM_REGISTRY
+    - MODIFIED_DELIVERED
+    - DELIVERED
+    - UNKNOWN
+
+searchPolicy:
+  # 全域預設搜尋模式（個別 Business Domain 可覆寫）：
+  #   CUSTOM_ONLY_ROOTS  只允許客製物件作為業務根物件；原生僅能是 dependency
+  #   CUSTOM_FIRST       先找客製，證據不足才查原生
+  #   MIXED              客製與原生同等重要
+  #   DELIVERED_ALLOWED  無特定客製限制
+  defaultMode: CUSTOM_FIRST
+  allowDeliveredFallback: true
+  allowDeliveredDependencies: true
+
+# 代碼語意對照（本環境專屬）。
+# 表中**已列**的值是確定事實，**不得改寫或另作解釋**（AZ 就是亞利桑那州，
+# 不准再讀成澳洲）。表中**沒有**的可以推測——不要卡住——但要標記，
+# 管理者才找得到來糾正、回填。
+namingSemantics:
+  # 物件名前綴（與上方 customPrefixes 對應；此處記語意）
+  prefixes:
+    TW_: 客製物件全域前綴（與 customPrefixes 同義）——強烈的客製訊號；不含地區、語系或國別意義（判定仍以 objectOrigins 為準）
+
+  # 代碼／縮寫（可能出現在物件名、欄位值、Translate 值、資料內容）
+  codes:
+    AZ: 美國亞利桑那州（Arizona，US state）——**不是澳洲**；澳洲是 AU／AUS
+
+  # 未列在本表的代碼：**照最合理的解讀寫下去，不要卡住**，但要留下痕跡——
+  #  1) 該處標「(推測)」，例如「AZ（推測：亞利桑那州）」；
+  #  2) 該檔 gaps 記一行「代碼 <X> 語意為推測，未經對照表確認」；
+  #  3) 手邊剛好有對照表（XLATTABLE／州別／國別）就順手查，查到直接寫確定值；
+  #  4) 管理者糾正後回填本表 codes——之後它就是確定值，不再是推測。
+  # 標記的用途：讓「猜錯了再糾正」這條路可以用 grep 找，不必整份重讀。
+  unlistedCodePolicy: GUESS_BUT_MARK
+
+oracle:
+  # PeopleTools 表的擁有者 schema——登入帳號非擁有者時，裸表名會
+  # view/table not found。連線生命週期第 3 步執行：
+  # ALTER SESSION SET CURRENT_SCHEMA=<此值>（唯一准許的非 SELECT）。
+  # 值為 FILL_ME 則跳過該步。
+  currentSchema: FILL_ME
+  # 主 agent 開場直接 connect 這個名字（不 list、不從清單挑；必須與 SQLcl 已儲存連線名完全一致——大小寫、空白都算）。
+  # FILL_ME／未填 → 主 agent 不 connect，回報「Oracle 連線未設定」——請回填。
+  # 執行期 guard（.claude/hooks/ps-runtime-guard.ps1，PreToolUse hook）在 connect 執行前比對：未填 → ORACLE_CONNECTION_NOT_CONFIGURED；
+  # 不一致 → ORACLE_CONNECTION_MISMATCH（connect 不執行）。這是參數限制，不是派工前置閘門。
+  connectionName: FILL_ME
+  # connect 目標 guard 的模式：enforce（預設）＝上面的比對不過就擋；observe＝只記錄不擋（診斷時才用，不要長期停在 observe）。
+  # 環境變數 PS_ORACLE_CONNECT_GUARD 可臨時覆寫本值。沒有派工前置閘門、沒有 todo 閘門：順序是 agent 規則，
+  # subagent 回 NOT_CONNECTED 由主 agent 重連、重派一次。
+  connectGuard: enforce
+  # oracleMCP 掛載故障（工具消失／transport 關閉；不是 DB 未連線）：Claude Code 版不使用此鍵（沒有自動重掛；
+  # 掛載故障由管理者在該 session `/mcp` 重新連線，SOP-21）。
+  mcpAutoRecover: off
+
+# 業務領域定義（Domain alias、rootObjectPolicy、fallback 政策）
+# 見同目錄 business-domain-map.yaml
+businessDomainMap: business-domain-map.yaml
+
+# 導覽（Classic PIA）環境事實——cookbook §2k-C canonical query 的 bind 與判定全部從這裡取；
+# 一次驗證回填（SOP-20），之後 ps-ui-flow 直接跑 canonical，不再每題重新研究 schema。
+navigation:
+  surfaces: CLASSIC_ONLY          # CLASSIC_ONLY | CLASSIC_AND_FLUID；CLASSIC_ONLY 下 Fluid Tile／NavBar／Navigation Collection 一律 NOT_APPLICABLE
+  identity: MENU_COMPONENT        # MENU_COMPONENT | MENU_COMPONENT_MARKET；本環境不以 MARKET 區分導覽（PORTAL_URI_SEG3 不參與識別）
+  portal: EMPLOYEE                # 使用者登入的 portal（Classic HR 預設；以 PSPRDMDEFN 列舉確認）——canonical 的 :portalName
+  labelLanguage: ENG              # 使用者看到的選單語系＝base；PSPRSMDEFNLANG 另有 JPN／JPP／ZHS／ZHT 翻譯但 UI 不用——canonical 的 :languageCd
+  hideFromNavValues: [TRUE, Y, 1] # PSPRSMSYSATTRVL.PORTAL_HIDE_FROM_NAV 觀察值 TRUE（Y／1 保留）
+  attrValType: CLOB               # PORTAL_ATTR_VAL 型別——CLOB 必須經 DBMS_LOB.SUBSTR 才能比對
+  rootObject: PORTAL_ROOT_OBJECT
+  linkRowsCarrySeg2: true         # LINK 列絕大多數帶 PORTAL_URI_SEG2（1039/1045）→ canonical 的 seed 直接含 LINK，不需第二跳
+  verified: true                  # 已驗：PSPRSMDEFN.PORTAL_EXPIRE_DT 存在、CONNECT_BY_ISCYCLE 可用、EMPLOYEE 在 PSPRDMDEFN、canonical 對已知 Component 回 1 可見／4 不可見；false＝先跑 cookbook §2k-0 再回填本區塊

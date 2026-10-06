@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "sonnet",
+  "agent": "ps-orchestrator",
+  "env": {
+    "BASH_MAX_TIMEOUT_MS": "7200000",
+    "ENABLE_TOOL_SEARCH": "false"
+  },
+  "permissions": {
+    "allow": [
+      "mcp__PeoplecodeElasticSearch",
+      "mcp__PeoplecodeSource",
+      "mcp__PeoplecodeMetadata",
+      "mcp__oracleMCP__list_connections",
+      "mcp__oracleMCP__connect",
+      "mcp__oracleMCP__sql_run",
+      "Edit(./docs/ps-research/**)",
+      "Edit(./.ps-runtime/spec/**)",
+      "Edit(./.ps-runtime/clone-spec/**)",
+      "Bash(powershell -NoProfile -File scripts/ps-spec-build.ps1 *)",
+      "PowerShell(powershell -NoProfile -File scripts/ps-spec-build.ps1 *)"
+    ],
+    "deny": [
+      "mcp__oracleMCP__sqlcl_run",
+      "WebFetch",
+      "WebSearch"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__oracleMCP__connect|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1 -Mode pre",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1 -Mode post",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

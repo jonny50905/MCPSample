@@ -39,8 +39,19 @@ function Test-HasInvisible([string]$s) {
 # ── 搬運 manifest（檢查 M）——維護 session 每批 push 前重生、公司機只讀。
 # 雜湊對「正規化內容」計算：剝 BOM、換行統一 LF、檔尾空白裁掉——
 # GitHub Raw 複製到 Windows 另存造成的行尾／BOM 差異不誤報，
-# 內容差一個字就會報。範圍＝scripts＋.opencode 全樹（框架的全部）。
-$manifestPath = Join-Path $root (Join-Path "scripts" "ps-transfer-manifest.json")
+# 內容差一個字就會報。範圍依前端版本（公司機只裝其中一版、只搬那一版）：
+#   OpenCode 版＝scripts＋.opencode 全樹，manifest＝scripts/ps-transfer-manifest.json
+#   Claude Code 版＝scripts＋.claude 全樹（settings.local.json 除外）＋CLAUDE.md，manifest＝scripts/ps-transfer-manifest.claude.json
+#   （repo 裡 Claude Code 版的原始檔在 claude-code/ 子樹，部署路徑＝去掉 claude-code/ 前綴；manifest 每列 repo 欄寫原始位置）
+# 版本判定與 ps-cli-lib.ps1 相同（env PS_CLI 優先；.claude/peoplesoft 存在＝Claude Code）——本檢查要在搬運不完整時也能跑，
+# 所以不 dot-source 任何 lib，這裡內嵌同一條規則。
+$cliName = 'opencode'
+$cliEnv = ([string]$env:PS_CLI).Trim().ToLowerInvariant()
+if ($cliEnv -eq 'claude' -or $cliEnv -eq 'opencode') { $cliName = $cliEnv }
+elseif ([System.IO.Directory]::Exists((Join-Path $root (Join-Path '.claude' 'peoplesoft')))) { $cliName = 'claude' }
+$manifestNames = @{ opencode = 'ps-transfer-manifest.json'; claude = 'ps-transfer-manifest.claude.json' }
+$cliDisplay = @{ opencode = 'OpenCode'; claude = 'Claude Code' }
+$manifestPath = Join-Path $root (Join-Path "scripts" $manifestNames[$cliName])
 
 function Get-NormalizedInfo([string]$Path) {
     $bytes = [System.IO.File]::ReadAllBytes($Path)
@@ -56,20 +67,37 @@ function Get-NormalizedInfo([string]$Path) {
     return @{ Lines = $lines; Sha = $hash; Bom = $hasBom }
 }
 
+# 傳回 @{ File; Path }：File＝實際檔（FileInfo）、Path＝部署相對路徑（/ 分隔）
+#   -Variant claude 且 -FromRepo：取維護端 repo 的 claude-code/ 子樹（部署路徑＝去掉前綴）；否則取 <root> 底下已部署的檔
 function Get-TransferFiles {
+    param([string]$Variant = $cliName, [switch]$FromRepo)
     $list = @()
     $sDir = Join-Path $root "scripts"
     if (Test-Path -LiteralPath $sDir) {
-        $list += @(Get-ChildItem -LiteralPath $sDir -File -Recurse |
-                Where-Object { $_.Name -ne 'ps-transfer-manifest.json' })
+        foreach ($f in @(Get-ChildItem -LiteralPath $sDir -File -Recurse |
+                Where-Object { @($manifestNames.Values) -notcontains $_.Name })) { $list += @{ File = $f; Path = (Get-RelPath $f.FullName) } }
+    }
+    if ($Variant -eq 'claude') {
+        $base = $root
+        if ($FromRepo) { $base = Join-Path $root 'claude-code' }
+        $cDir = Join-Path $base '.claude'
+        if (Test-Path -LiteralPath $cDir) {
+            foreach ($f in @(Get-ChildItem -LiteralPath $cDir -File -Recurse -Force |
+                    Where-Object { $_.Name -ne 'settings.local.json' })) {
+                $list += @{ File = $f; Path = (($f.FullName.Substring($base.Length).TrimStart('\', '/')) -replace '\\', '/') }
+            }
+        }
+        $cm = Join-Path $base 'CLAUDE.md'
+        if (Test-Path -LiteralPath $cm) { $list += @{ File = (Get-Item -LiteralPath $cm); Path = 'CLAUDE.md' } }
+        return $list
     }
     $ocDir = Join-Path $root ".opencode"
     if (Test-Path -LiteralPath $ocDir) {
         # -Force：.npmrc 這類點檔在 Linux 維護端被 PowerShell 當隱藏檔，不加會漏出 manifest（issue #29）；
         # OpenCode 自己在 .opencode 產生的安裝痕跡（node_modules／package.json／package-lock.json／bun.lock／.gitignore）不列管
-        $list += @(Get-ChildItem -LiteralPath $ocDir -File -Recurse -Force |
+        foreach ($f in @(Get-ChildItem -LiteralPath $ocDir -File -Recurse -Force |
                 Where-Object { $_.FullName -notmatch '[\\/]node_modules[\\/]' -and
-                    (@('.gitignore', 'package.json', 'package-lock.json', 'bun.lock') -notcontains $_.Name) })
+                    (@('.gitignore', 'package.json', 'package-lock.json', 'bun.lock') -notcontains $_.Name) })) { $list += @{ File = $f; Path = (Get-RelPath $f.FullName) } }
     }
     return $list
 }
@@ -83,55 +111,67 @@ if ($WriteManifest) {
     # 先驗模型讀的檔沒有夾雜出處／變更敘述（規則只留規則），不過就不重生基準
     & (Join-Path $PSScriptRoot 'ps-agent-doc-lint.ps1') -Root $root
     if ($LASTEXITCODE -ne 0) { Write-Host "agent 檔檢查未過，manifest 不寫" -ForegroundColor Red; exit 1 }
-    $entries = @()
-    foreach ($f in (Get-TransferFiles | Sort-Object FullName)) {
-        $n = Get-NormalizedInfo $f.FullName
-        $entries += [pscustomobject]@{
-            path   = (Get-RelPath $f.FullName)
-            lines  = $n.Lines
-            sha256 = $n.Sha
-            bom    = [bool]($f.Extension -eq '.ps1' -and $n.Bom)
-        }
-    }
     $commit = "unknown"
     try {
         $g = (& git -C $root rev-parse --short HEAD 2>$null | Out-String).Trim()
         if ($g) { $commit = $g }
     }
     catch { }
-    # removed＝上一版 manifest 有、這一版搬運集合裡沒有的檔（維護端已刪除／改名的舊檔；沿用舊的 removed 清單，重新出現就移出）
-    # ——公司機的檢查 M 會把這些檔當「必須刪除的殘留」點名（舊 plugin 殘留會被 OpenCode 一起載入，只貼新檔不夠）
-    $current = @{}
-    foreach ($e in $entries) { $current[[string]$e.path] = $true }
-    $removed = @()
-    $prev = $null
-    try { if (Test-Path -LiteralPath $manifestPath) { $prev = (Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { }
-    if ($null -ne $prev) {
-        $prevPaths = @()
-        if ($null -ne $prev.files) { $prevPaths += @($prev.files | ForEach-Object { [string]$_.path }) }
-        if ($null -ne $prev.removed) { $prevPaths += @($prev.removed | ForEach-Object { [string]$_.path }) }
-        foreach ($pp in ($prevPaths | Sort-Object -Unique)) {
-            if ($pp -ne '' -and -not $current.ContainsKey($pp)) { $removed += [pscustomobject]@{ path = $pp; note = '維護端已刪除／改名：公司機必須刪除此檔' } }
+    # 兩個版本各一份 manifest：OpenCode＝repo 根的 .opencode；Claude Code＝claude-code/ 子樹（部署路徑去前綴、repo 欄記原始位置）
+    foreach ($variant in @('opencode', 'claude')) {
+        if ($variant -eq 'claude' -and -not (Test-Path -LiteralPath (Join-Path $root 'claude-code'))) { continue }
+        $mPath = Join-Path $root (Join-Path "scripts" $manifestNames[$variant])
+        $entries = @()
+        foreach ($t in (Get-TransferFiles -Variant $variant -FromRepo | Sort-Object { [string]$_.Path })) {
+            $f = $t.File
+            $n = Get-NormalizedInfo $f.FullName
+            $e = [ordered]@{
+                path   = [string]$t.Path
+                lines  = $n.Lines
+                sha256 = $n.Sha
+                bom    = [bool]($f.Extension -eq '.ps1' -and $n.Bom)
+            }
+            $repoRel = Get-RelPath $f.FullName
+            if ($repoRel -ne [string]$t.Path) { $e['repo'] = $repoRel }
+            $entries += [pscustomobject]$e
         }
+        # removed＝上一版 manifest 有、這一版搬運集合裡沒有的檔（維護端已刪除／改名的舊檔；沿用舊的 removed 清單，重新出現就移出）
+        # ——公司機的檢查 M 會把這些檔當「必須刪除的殘留」點名（舊 plugin／agent 殘留會被 CLI 一起載入，只貼新檔不夠）
+        $current = @{}
+        foreach ($e in $entries) { $current[[string]$e.path] = $true }
+        $removed = @()
+        $prev = $null
+        try { if (Test-Path -LiteralPath $mPath) { $prev = (Get-Content -LiteralPath $mPath -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { }
+        if ($null -ne $prev) {
+            $prevPaths = @()
+            if ($null -ne $prev.files) { $prevPaths += @($prev.files | ForEach-Object { [string]$_.path }) }
+            if ($null -ne $prev.removed) { $prevPaths += @($prev.removed | ForEach-Object { [string]$_.path }) }
+            foreach ($pp in ($prevPaths | Sort-Object -Unique)) {
+                if ($pp -ne '' -and -not $current.ContainsKey($pp)) { $removed += [pscustomobject]@{ path = $pp; note = '維護端已刪除／改名：公司機必須刪除此檔' } }
+            }
+        }
+        $note = "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。"
+        if ($variant -eq 'claude') { $note = "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。" }
+        $doc = [pscustomobject]@{
+            note    = $note
+            commit  = $commit
+            files   = $entries
+            removed = $removed
+        }
+        [System.IO.File]::WriteAllText($mPath, (ConvertTo-Json $doc -Depth 4),
+            (New-Object System.Text.UTF8Encoding($false)))
+        Write-Host ("已寫入 manifest（" + $cliDisplay[$variant] + "）：" + $entries.Count + " 檔（commit " + $commit + "）；必刪舊檔 " + $removed.Count + " 個" + $(if ($removed.Count -gt 0) { "：" + (@($removed | ForEach-Object { $_.path }) -join ", ") } else { "" })) -ForegroundColor Green
     }
-    $doc = [pscustomobject]@{
-        note    = "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。"
-        commit  = $commit
-        files   = $entries
-        removed = $removed
-    }
-    [System.IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $doc -Depth 4),
-        (New-Object System.Text.UTF8Encoding($false)))
-    Write-Host ("已寫入 manifest：" + $entries.Count + " 檔（commit " + $commit + "）；必刪舊檔 " + $removed.Count + " 個" + $(if ($removed.Count -gt 0) { "：" + (@($removed | ForEach-Object { $_.path }) -join ", ") } else { "" })) -ForegroundColor Green
     exit 0
 }
 
 Write-Host "=== ps-fs-doctor：檔案系統健檢（唯讀） ===" -ForegroundColor Cyan
 
 # M) 搬運完整性——漏搬／版本不符／搬壞／BOM 缺，逐檔點名
-Write-Host "[檢查 M] 搬運完整性（scripts＋.opencode 全樹對照 manifest）"
+if ($cliName -eq 'claude') { Write-Host "[檢查 M] 搬運完整性（Claude Code 版：scripts＋.claude 全樹＋CLAUDE.md 對照 manifest）" }
+else { Write-Host "[檢查 M] 搬運完整性（OpenCode 版：scripts＋.opencode 全樹對照 manifest）" }
 if (-not (Test-Path -LiteralPath $manifestPath)) {
-    Write-Host "  !! 找不到 scripts\ps-transfer-manifest.json——manifest 本身也在搬運清單內，先搬它再重跑" -ForegroundColor Red
+    Write-Host ("  !! 找不到 scripts\" + $manifestNames[$cliName] + "——manifest 本身也在搬運清單內，先搬它再重跑") -ForegroundColor Red
     $findings += 'M'
 }
 else {
@@ -163,7 +203,7 @@ else {
                 $mBomBad++
             }
         }
-        # 必刪的舊檔還在＝殘留（舊 plugin 會被 OpenCode 一起載入；舊腳本會被誤跑）——一律點名
+        # 必刪的舊檔還在＝殘留（舊 plugin／agent 會被 CLI 一起載入；舊腳本會被誤跑）——一律點名
         $mStale = 0
         if ($null -ne $mf.removed) {
             foreach ($r in @($mf.removed)) {
@@ -178,8 +218,8 @@ else {
         # 多出檔只在 -ShowExtras 時列（預設沉默：公司機的非鏡像內部檔案是
         # 常態，逐檔列出會把「搬檔完整與否」的真訊號淹掉）
         if ($ShowExtras) {
-            foreach ($f in (Get-TransferFiles)) {
-                $rp = Get-RelPath $f.FullName
+            foreach ($t in (Get-TransferFiles)) {
+                $rp = [string]$t.Path
                 if (-not $known.ContainsKey($rp)) {
                     Write-Host ("  ?? 未列管的多出檔：" + $rp) -ForegroundColor Yellow
                     $mExtra++
@@ -278,6 +318,8 @@ else {
 Write-Host "[檢查 D] 內文 FEFF（雙 BOM 病）掃描"
 $scanFiles = @()
 $scanFiles += @(Get-ChildItem -LiteralPath (Join-Path $root "scripts") -Filter "*.ps1" -File)
+$hookDir = Join-Path $root (Join-Path '.claude' 'hooks')
+if ($cliName -eq 'claude' -and (Test-Path -LiteralPath $hookDir)) { $scanFiles += @(Get-ChildItem -LiteralPath $hookDir -Filter "*.ps1" -File) }
 if ($Domain -ne "" -and (Test-Path -LiteralPath $dir)) {
     $scanFiles += @(Get-ChildItem -LiteralPath $dir -Filter "*.md" -File)
 }
@@ -303,9 +345,11 @@ foreach ($f in $scanFiles) {
 if (-not $dFound) { Write-Host "  全部乾淨" -ForegroundColor Green }
 
 # S) 腳本語法與行數（搬運完整性）——貼上被截斷／中文字串壞掉會在這裡現形
-Write-Host "[檢查 S] scripts\*.ps1 語法解析與行數（搬運完整性）"
+Write-Host "[檢查 S] scripts\*.ps1 語法解析與行數（搬運完整性；Claude Code 版另含 .claude\hooks\*.ps1）"
 $sBad = $false
-foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $root "scripts") -Filter "*.ps1" -File)) {
+$sFiles = @(Get-ChildItem -LiteralPath (Join-Path $root "scripts") -Filter "*.ps1" -File)
+if ($cliName -eq 'claude' -and (Test-Path -LiteralPath $hookDir)) { $sFiles += @(Get-ChildItem -LiteralPath $hookDir -Filter "*.ps1" -File) }
+foreach ($f in $sFiles) {
     $lineCount = @([System.IO.File]::ReadAllLines($f.FullName)).Count
     $errs = $null
     $toks = $null
@@ -334,7 +378,7 @@ Write-Host "          B=檔名異常（變體/隱形字元，照上面列的檔�
 Write-Host "          D=內文 FEFF 污染（.ps1 可加 -FixBom 自動修）  E=真缺檔或路徑對不上（SOP-4）"
 Write-Host "          F=這次輸入的參數含隱形字元  S=腳本語法解析失敗（搬運不完整，重新複製整檔）"
 Write-Host "          M=搬運不完整（漏搬/版本不符/搬壞/BOM 缺——照檢查 M 列的檔逐一重搬）"
-Write-Host "          R=舊檔殘留（manifest removed 清單裡的檔還在本機——刪掉它，再重新載入 OpenCode）"
+Write-Host ("          R=舊檔殘留（manifest removed 清單裡的檔還在本機——刪掉它，再重新開 " + $cliDisplay[$cliName] + "）")
 Write-Host "          X=多出未列管檔（僅 -ShowExtras 時列出；預設不檢查）"
 Write-Host "          G=全部正常（另有原因，回報後續查）"
 Write-Host ("結論代號：" + ($codes -join '+')) -ForegroundColor Cyan
