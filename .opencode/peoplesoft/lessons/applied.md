@@ -3619,3 +3619,23 @@
   spec worker 只寫 fragment）全過。真 Windows／PowerShell 5.1 下的 Claude Code（hook 經 Git Bash 或 PowerShell 執行）未在本沙箱驗證。
 - 教訓：多一個前端時，把「CLI 機制」收斂成一層（版本描述＋命令列＋guard），規則與外環只留一份；搬運清單跟著版本走，
   不讓使用者為了一個前端搬另一個前端的檔。
+
+### L133 逐檔人工搬運太慢——整版收成一個文字檔，解開時驗整包、保留本機改過的檔（2026-10-06）
+
+- 症狀：每次交接要逐檔開 GitHub Raw 複製貼上（Claude Code 版首搬 81 檔），管理者反映搬運非常久。
+- 根因：搬運單位是「檔」，而 manifest 已經有完整的檔清單與正規化雜湊——缺的只是把它們包成一個可驗證的文字檔。
+- 落點：
+  - `scripts/ps-bundle.ps1`：`-Pack`（維護端；`ps-fs-doctor -WriteManifest` 在寫完每份 manifest 後呼叫）把 manifest 全部檔＋manifest 本身
+    （OpenCode 版另含 AGENTS.md）收成 `transfer/ps-bundle-<版本>.txt`：純文字、逐檔「標記行＋原文＋結尾標記」，雜湊與 fs-doctor 同一套正規化，
+    開頭有版本／檔數、結尾有總雜湊；內容有保留標記開頭的行就拒絕打包。
+  - `-Bundle <檔>`（公司機）：先在記憶體驗整包（缺開頭／結尾＝T、逐檔雜湊或行數不符＝H、路徑不合法或不屬於該版＝P），任一失敗一個檔都不寫；
+    再三方比對（本機現況／上次搬入的 manifest 記錄／搬運包）：沒改過才更新、本機改過而上游沒動就保留、兩邊都改另存 `.incoming`；
+    profile／domain map／研究佇列／教訓帳本沒有基準時當衝突；`scripts/**` 一律更新。覆寫與刪除前備份；manifest 最後寫（中斷可重跑）；
+    寫完逐檔回讀驗雜湊（W）。`-DryRun` 只列計畫。
+  - 兩版分開兩個檔；Claude Code 版的 scripts 基準在沒有自己的 manifest 時借 OpenCode 版 manifest 的 scripts 列（同一資料夾換版時不誤判衝突）。
+- 設計取捨：用純文字而不是 base64 壓縮檔——內容可在 GitHub 直接檢閱、git diff 看得出改了什麼、不像夾帶執行檔；代價是約 2MB，複製貼上仍可行。
+  scripts 不走保留本機：外環腳本只由維護端改，公司機舊版殘留反而該被蓋掉。
+- 驗證：`scripts/tests/test-bundle.ps1`（repo 的兩個搬運包與重新打包逐字相同；全新安裝 CRLF＋BOM 另存仍可解、fs-doctor G；重跑全相同；
+  保留本機／更新／衝突／設定檔無基準／scripts 一律更新／必刪舊檔與備份；截斷、內容被改、路徑跳出、他版路徑都整包拒絕；OpenCode 版含 AGENTS.md）。
+  真 Windows PowerShell 5.1 未在本沙箱執行（5.1 靜態守衛 0 阻擋）。
+- 教訓：人工搬運的痛點要從「搬運單位」解，不是從「清單寫得更好」解；一次搬一個可驗證的整包，比逐檔核對行數可靠也快。

@@ -161,6 +161,11 @@ if ($WriteManifest) {
         [System.IO.File]::WriteAllText($mPath, (ConvertTo-Json $doc -Depth 4),
             (New-Object System.Text.UTF8Encoding($false)))
         Write-Host ("已寫入 manifest（" + $cliDisplay[$variant] + "）：" + $entries.Count + " 檔（commit " + $commit + "）；必刪舊檔 " + $removed.Count + " 個" + $(if ($removed.Count -gt 0) { "：" + (@($removed | ForEach-Object { $_.path }) -join ", ") } else { "" })) -ForegroundColor Green
+        # 搬運包：同一版要搬的檔（manifest 全部＋manifest 本身；OpenCode 版另含 AGENTS.md）收成一個文字檔，公司機以 ps-bundle.ps1 解開
+        $bundleExtra = @()
+        if ($variant -eq 'opencode') { $bundleExtra = @('AGENTS.md') }
+        & (Join-Path $PSScriptRoot 'ps-bundle.ps1') -Pack -Manifest $mPath -Out (Join-Path $root (Join-Path 'transfer' ('ps-bundle-' + $variant + '.txt'))) -Root $root -Extra $bundleExtra
+        if ($LASTEXITCODE -ne 0) { Write-Host ("搬運包（" + $cliDisplay[$variant] + "）打包失敗") -ForegroundColor Red; exit 1 }
     }
     exit 0
 }

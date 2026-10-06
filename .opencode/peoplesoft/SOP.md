@@ -979,3 +979,17 @@ PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-gua
 SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context 由 Claude Code 管理）；SOP-17 改看 `.claude/settings.json`
 允許清單與信任（臨時換權限模式用 `$env:PS_CLAUDE_PERMISSION_MODE`）；SOP-21 的恢復是該 session `/mcp` 選 oracleMCP 重新連線，
 沒有自動重掛，hook 紀錄在 `auto-loop-logs\ps-runtime-guard\hook-<日期>.jsonl`。
+
+## SOP-27 搬運包（一版一個文字檔）
+
+公司機不能 git 下載時，每版要搬的檔收成一個文字檔：OpenCode 版 `transfer/ps-bundle-opencode.txt`、Claude Code 版
+`transfer/ps-bundle-claude.txt`（維護端 `ps-fs-doctor -WriteManifest` 自動重生；使用說明在 `transfer/README.md`）。
+
+□ 1. 第一次：手動搬 `scripts/ps-bundle.ps1`（UTF-8 with BOM）。之後每個搬運包都帶新版的它。
+□ 2. 開對應搬運包的 GitHub Raw → 全選複製 → 記事本另存 UTF-8（或 Download raw file）。
+□ 3. `powershell -NoProfile -File .\scripts\ps-bundle.ps1 -Bundle <檔> -DryRun` 看計畫；沒問題再去掉 `-DryRun` 執行。
+□ 4. 結論代號：G 完成；C 有衝突（本機改過、搬運包也改了）→ 比對 `<檔>.incoming` 合併後刪掉它；
+     T 不完整（重新複製整份）；H 雜湊不符（多半不是存成 UTF-8）；P 路徑不合法；W 寫入後驗證失敗。T／H／P 時一個檔都沒寫。
+□ 5. 接著跑 `ps-fs-doctor`（Claude Code 版另跑 `ps-claude-doctor`）。保留本機的檔（已回填的 profile 等）在檢查 M 會列為版本不符，屬正常。
+
+被覆寫或刪除的舊檔備份在 `auto-loop-logs\ps-bundle-backup\<時間>\`；要回到上一版就把備份複製回原位。

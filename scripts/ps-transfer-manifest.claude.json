@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "53a9805",
+  "commit": "eb638bd",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -469,6 +469,12 @@
       "bom": true
     },
     {
+      "path": "scripts/ps-bundle.ps1",
+      "lines": 289,
+      "sha256": "66d8653e4bf7856165e5b850be2b246b72e779f3c0465f70f1c7b8b7b0aed1e5",
+      "bom": true
+    },
+    {
       "path": "scripts/ps-claude-doctor.ps1",
       "lines": 160,
       "sha256": "8ab86d52a8ccbdc5557283fbd0422ef63c6b4fd2714dd46c854cbd2525083ff7",
@@ -488,8 +494,8 @@
     },
     {
       "path": "scripts/ps-fs-doctor.ps1",
-      "lines": 385,
-      "sha256": "7e9094e5833280305eab59ce38de3bd3f1cb0b8d7154ef30b9496d510a576c7d",
+      "lines": 390,
+      "sha256": "df20e78279201cd0e42fbf0b90122e2b18ecf4e5238f93a2679d37d63386601f",
       "bom": true
     },
     {
@@ -556,6 +562,12 @@
       "path": "scripts/tests/test-auto-loop.ps1",
       "lines": 1024,
       "sha256": "eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-bundle.ps1",
+      "lines": 172,
+      "sha256": "34655760d324aded318d3ac9b2e654caaeac1a3841a04fefbd2506fe5972fe96",
       "bom": true
     },
     {

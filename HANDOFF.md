@@ -23,6 +23,13 @@
 status.md 記關卡與進行中步驟（工單存檔可續跑）、需求鍵限 ASCII 且更新不改鍵、測試關平行並覆寫主庫連線、
 bash 權限對「最後相符」與「最長相符」兩種語意都驗過（長駐程式、全域安裝、改套件來源、push 皆擋）、`opencode.json` 關分享。
 
+**搬運包（2026-10-06，L133）**：管理者反映逐檔搬運太久，要「整版收成一個文字檔＋一支 PowerShell 解開」，
+兩版分開。`ps-fs-doctor -WriteManifest` 現在另產 `transfer/ps-bundle-opencode.txt`（含 AGENTS.md）與
+`transfer/ps-bundle-claude.txt`；公司機 `scripts/ps-bundle.ps1 -Bundle <檔> [-DryRun]` 解開：整包驗證（T／H／P 時不寫）、
+三方比對（本機／上次 manifest／搬運包：保留本機改過的檔、兩邊都改另存 `.incoming`、設定檔無基準不覆寫、scripts 一律更新）、
+備份到 `auto-loop-logs\ps-bundle-backup\`。交接清單只列搬運包（第一次另列 `scripts/ps-bundle.ps1`）。測試 `scripts/tests/test-bundle.ps1`
+（含「repo 的搬運包是最新」）。SOP-27、`transfer/README.md`。
+
 **Claude Code 版（2026-10-06，L132）**：管理者取得 Claude Code CLI，要一版用 Claude Code＋Sonnet 跑、OpenCode 版保留、
 公司機**只搬一版**。新增 `claude-code/`（`CLAUDE.md`＋`.claude/`：agents 12、commands 9、skills 11、hook、settings、peoplesoft 契約），
 部署時去前綴；`scripts/` 兩版共用，`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 認版本，外環改開

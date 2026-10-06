@@ -8,6 +8,11 @@ OpenCode 版（repo 根的 `.opencode/`＋`AGENTS.md`）保留不動、照常可
 
 ## 搬運：只搬這一版
 
+**最省事：搬運包**。`transfer/ps-bundle-claude.txt` 就是下表全部的檔收成的一個文字檔：複製 Raw、另存 UTF-8，
+在公司機執行 `powershell -NoProfile -File .\scripts\ps-bundle.ps1 -Bundle <檔>`（先加 `-DryRun` 看計畫）。
+第一次要先手動搬 `scripts/ps-bundle.ps1` 一個檔。本機改過的檔（例如已回填的 profile）會保留，兩邊都改過的另存 `.incoming`。
+詳見 `transfer/README.md`。逐檔搬的對照如下：
+
 | 來源（GitHub） | 公司機路徑 |
 |---|---|
 | `claude-code/CLAUDE.md` | `CLAUDE.md` |

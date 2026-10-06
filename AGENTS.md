@@ -89,6 +89,10 @@
   （OpenCode＝`scripts/**`＋`.opencode/**`，manifest `scripts/ps-transfer-manifest.json`；Claude Code＝`scripts/**`＋
   `claude-code/` 去前綴的 `CLAUDE.md`／`.claude/**`，manifest `scripts/ps-transfer-manifest.claude.json`，每列 `repo` 欄＝GitHub 位置）。
   改模型讀的規則時兩版對應檔都要改（Claude Code 版只換機制用語）；`scripts/tests/test-claude-variant.ps1` 驗兩版檔案一一對應。
+- **搬運包（優先）**：`ps-fs-doctor -WriteManifest` 會把每版要搬的檔收成一個文字檔
+  `transfer/ps-bundle-opencode.txt`／`transfer/ps-bundle-claude.txt`，公司機以 `scripts\ps-bundle.ps1 -Bundle <檔>` 解開
+  （整包驗證、三方比對保留本機改過的檔、衝突另存 `.incoming`）。交接時清單只列「搬運包一個檔」（第一次另列
+  `scripts/ps-bundle.ps1`），整包驗證取代逐檔核對；不用搬運包時才給下面的逐檔清單。
 - 搬運清單必附**核對欄**（2026-08 管理者要求）：每檔一列——路徑／
   新增或修改／行數（供編輯器總行數核對，允許 ±1 行尾差異）；
   `.ps1` 標註「存 UTF-8 with BOM」。搬完整波跑一次

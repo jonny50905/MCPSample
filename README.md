@@ -25,6 +25,8 @@ lint 格式稽核                     文件撰寫、稽核判定
 | OpenCode 版（本機部署模型） | repo 根的 `AGENTS.md`＋`.opencode/**` | `scripts/ps-transfer-manifest.json` |
 | Claude Code 版（Claude Code CLI＋Sonnet） | `claude-code/CLAUDE.md`＋`claude-code/.claude/**`，部署時去掉 `claude-code/` 前綴 | `scripts/ps-transfer-manifest.claude.json` |
 
+搬運可以只搬一個檔：`transfer/ps-bundle-opencode.txt`／`transfer/ps-bundle-claude.txt` 是該版全部檔案收成的文字檔，
+公司機以 `scripts\ps-bundle.ps1 -Bundle <檔>` 解開（說明見 [`transfer/README.md`](transfer/README.md)）。
 `scripts/` 是兩版共用的確定性外環，依專案根有沒有 `.claude/peoplesoft` 認版本（`$env:PS_CLI` 可強制），
 自動開對應 CLI 的 headless session。PeopleSoft 規則、契約與外環驗收兩版相同；差的只有 CLI 機制
 （主代理怎麼開、委派工具、執行期 guard 是 plugin 還是 hook、MCP 工具全名）。Claude Code 版的安裝、
@@ -290,7 +292,8 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-session-lib.ps1` | headless session 啟動（`opencode run`／`claude -p --agent`）＋session slot 互斥鎖（函式庫） | log |
 | `ps-cli-lib.ps1` | 前端版本描述：`.claude/peoplesoft` 存在＝Claude Code 版（`PS_CLI` 可強制），決定框架目錄、CLI 與搬運 manifest（函式庫） | — |
 | `ps-claude-doctor.ps1` | Claude Code 版安裝健檢（hook 自測、MCP 註冊、`-Live` 第 0 步開線） | 唯讀（`-Live` 寫 log） |
-| `tests/test-*.ps1` | 測試組：auto-loop、knowledge、supplemental、spec、ps51-static、oracle-runtime、claude-variant | 臨時目錄 |
+| `ps-bundle.ps1` | 搬運包：維護端 `-Pack`（由 `ps-fs-doctor -WriteManifest` 呼叫）、公司機 `-Bundle <檔>` 解開（整包驗證、三方比對、衝突另存 .incoming） | 解開時寫框架檔、備份 |
+| `tests/test-*.ps1` | 測試組：auto-loop、knowledge、supplemental、spec、ps51-static、oracle-runtime、claude-variant、bundle | 臨時目錄 |
 
 ---
 
