@@ -1,6 +1,6 @@
 {
     "note":  "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-    "commit":  "8014e82",
+    "commit":  "ffdb32e",
     "files":  [
                   {
                       "path":  ".opencode/.npmrc",
@@ -519,18 +519,6 @@
                       "bom":  true
                   },
                   {
-                      "path":  "scripts/test-elasticsearch-mcp-tools-list.ps1",
-                      "lines":  59,
-                      "sha256":  "d0789babdb17d07bb80385fb84ca31356b0f252f431083dea80f010025147d6a",
-                      "bom":  false
-                  },
-                  {
-                      "path":  "scripts/test-mcp-tools-list.ps1",
-                      "lines":  59,
-                      "sha256":  "43c074dfab7760ebca70c18580e201711231e4bb0c4c15d3daa871a6014b750d",
-                      "bom":  false
-                  },
-                  {
                       "path":  "scripts/tests/test-auto-loop.ps1",
                       "lines":  1024,
                       "sha256":  "eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e",
@@ -550,8 +538,8 @@
                   },
                   {
                       "path":  "scripts/tests/test-ps51-static.ps1",
-                      "lines":  124,
-                      "sha256":  "2d4c32f541385965525bb7d8df3ce163065423d053ec425687abcff1c1cba8da",
+                      "lines":  122,
+                      "sha256":  "b8bd86eae1bffa0f4436a3eb8502afe6515685a55a4481076b1adcf3356c8ccd",
                       "bom":  true
                   },
                   {
@@ -582,6 +570,14 @@
     "removed":  [
                     {
                         "path":  ".opencode/plugin/ps-oracle-preflight-gate.js",
+                        "note":  "維護端已刪除／改名：公司機必須刪除此檔"
+                    },
+                    {
+                        "path":  "scripts/test-elasticsearch-mcp-tools-list.ps1",
+                        "note":  "維護端已刪除／改名：公司機必須刪除此檔"
+                    },
+                    {
+                        "path":  "scripts/test-mcp-tools-list.ps1",
                         "note":  "維護端已刪除／改名：公司機必須刪除此檔"
                     },
                     {

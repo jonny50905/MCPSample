@@ -274,7 +274,6 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-spec-build.ps1`（＋`ps-spec-clone-lib.ps1`） | Component 直接產核心重建 Spec：範圍、分段研究、獨立覆核、自動組文／續跑 | `.ps-runtime/clone-spec/`、`docs/ps-spec/`（皆 gitignore） |
 | `ps-session-lib.ps1` | opencode headless session 啟動＋session slot 互斥鎖（函式庫） | log |
 | `tests/test-*.ps1` | 測試組：auto-loop、knowledge、supplemental、spec、ps51-static、oracle-runtime | 臨時目錄 |
-| `test-mcp-tools-list.ps1`<br>`test-elasticsearch-mcp-tools-list.ps1` | **遺留**，與本框架無關 | — |
 
 ---
 
@@ -505,12 +504,6 @@ G  全部正常
 
 ---
 
-### 遺留腳本
-
-`test-mcp-tools-list.ps1` 與 `test-elasticsearch-mcp-tools-list.ps1` 是前一個
-.NET 專案（`src\HanshinChat.Mcp.Server`）的 MCP smoke test，與本框架無關，
-也不會被任何流程呼叫。留著只是還沒清。
-
 ## 環境紀律
 
 這些不是建議，是踩過坑之後的硬規定（每一條在 `applied.md` 都有對應教訓）：
@@ -634,7 +627,3 @@ agent 用白名單各拿各的鑰匙。
 
 改動規則走**最小新增**（只加不刪）、當天記 `applied.md`、
 團隊生效靠內部 git PR。**規則一律從觀察到的行為推導，不從規格書想像。**
-
----
-
-註：`src/` 底下是與本框架無關的舊有 .NET 範例，不在本文件範圍。

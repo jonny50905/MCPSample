@@ -9,9 +9,7 @@
 #   DateTime.ToString('<日期格式>') 未給文化參數、Get-Content 未指定 -Encoding UTF8。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
-# 遺留腳本（前一個專案、與本框架無關，README「腳本」表標為遺留）不在守衛範圍
-$legacy = @('test-mcp-tools-list.ps1', 'test-elasticsearch-mcp-tools-list.ps1')
-$files = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Filter '*.ps1' -Recurse -File | Where-Object { $legacy -notcontains $_.Name } | Sort-Object FullName)
+$files = @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Filter '*.ps1' -Recurse -File | Sort-Object FullName)
 $problems = @()
 $warnings = @()
 $pathParams = @('Path', 'ChildPath', 'AdditionalChildPath')

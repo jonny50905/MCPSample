@@ -11,7 +11,6 @@
 - `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
   lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
   說明見 `rebuild-kit/HOW-TO-USE.md`。
-- `src/`：與本框架無關的舊有 .NET 範例，不維護、不在文件範圍。
 
 ## PeopleSoft 問題的處理方式
 
@@ -70,11 +69,10 @@
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：最新在 `claude/peoplesoft-framework-handover-0u6b5g`
-   （自 `claude/review-implement-requirement-svqhqt` 的 `67e9b36` 接續；
-   main 上沒有框架）。版線以維護 session 為節點串接——新的維護
-   session 從最新版線頭開自己的分支，交接時**回來更新本行**；
-   前後版線的 diff＝該任 session 的全部改動（review 邊界）。
+4. **維護版線**：`main` 是正式版線（由 `claude/peoplesoft-framework-handover-0u6b5g`
+   快轉而來；更早接續自 `claude/review-implement-requirement-svqhqt` 的 `67e9b36`）。
+   新的維護 session 從 `main` 頭開自己的分支，交接時併回 `main` 並**回來更新本行**；
+   前後 `main` 頭的 diff＝該任 session 的全部改動（review 邊界）。
 
 與管理者（使用者）協作的鐵律（只活在這裡，別的檔案沒有）：
 

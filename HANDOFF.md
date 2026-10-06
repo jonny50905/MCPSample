@@ -1,6 +1,6 @@
 # HANDOFF — PeopleSoft 知識庫分析框架（2026-09-02 交接）
 
-> 給下一個 session（或明天的自己）。開發分支 `claude/peoplesoft-framework-handover-0u6b5g`，
+> 給下一個 session（或明天的自己）。正式版線 `main`（由開發分支 `claude/peoplesoft-framework-handover-0u6b5g` 快轉），
 > HEAD 見 `git log -1`。本檔在 manifest 範圍外，不需搬到公司機。
 
 ## 0. 一句話現況
