@@ -1,6 +1,6 @@
 {
     "note":  "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-    "commit":  "bf84a5d",
+    "commit":  "8014e82",
     "files":  [
                   {
                       "path":  ".opencode/.npmrc",
@@ -178,8 +178,8 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/lessons/applied.md",
-                      "lines":  3565,
-                      "sha256":  "b004d74a26c1c3ce6c6ab0f81875eca4a8009dde66ed29d195f3599e7c6893f7",
+                      "lines":  3585,
+                      "sha256":  "4537a1ec6cc490fe3976bbf501757b8518a402c8d570fa735ea0a11ddd408f66",
                       "bom":  false
                   },
                   {
@@ -250,8 +250,8 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/SOP.md",
-                      "lines":  959,
-                      "sha256":  "f9a68b713ee01ea54bfbb3bf2d04da60139d7705d37d5cfd39db7547c8359c63",
+                      "lines":  963,
+                      "sha256":  "175c13f7b79f76a9faff42ecd845055e8bfcc0f011cf09dcc0ffc01a02c1ce90",
                       "bom":  false
                   },
                   {
@@ -262,14 +262,14 @@
                   },
                   {
                       "path":  ".opencode/peoplesoft/spec/clone-contract.md",
-                      "lines":  91,
-                      "sha256":  "592b8e275521dfccd296728edcf1a26cbe170b8de5f2e7e59197521fe32d9b4e",
+                      "lines":  97,
+                      "sha256":  "7206c4672c8348aec36b97dbc84872c7f1343d415fcd8f453887890b7c2f7594",
                       "bom":  false
                   },
                   {
                       "path":  ".opencode/peoplesoft/spec/clone-profile.json",
                       "lines":  59,
-                      "sha256":  "5880c93adbf6970654d0ffd31caef356db197aa849da4cbd6a4b131a946aefbd",
+                      "sha256":  "93ff3d0fb58660c4aaad238f6fae89dab85952cf78647e5ae167ab262ad6fa08",
                       "bom":  false
                   },
                   {
@@ -311,7 +311,7 @@
                   {
                       "path":  ".opencode/peoplesoft/spec/generic.manifest.json",
                       "lines":  116,
-                      "sha256":  "9d150ae2e451bd3d38e840cef72513540581b00321717ce645c540d4d503d2e4",
+                      "sha256":  "3381ee1e20f232e8256f05b0cd4c6a6e8922ad0bbe67ec7b12dedf9ceaf92c14",
                       "bom":  false
                   },
                   {
@@ -490,14 +490,14 @@
                   },
                   {
                       "path":  "scripts/ps-spec-build.ps1",
-                      "lines":  452,
-                      "sha256":  "467973b1906c57a9fc704a260267f2ac209c3fc80a7f78311e358a4940152b58",
+                      "lines":  454,
+                      "sha256":  "d882b17a67cca785066646448066a4385b6e7e0b841cb357fb60ed12474c925d",
                       "bom":  true
                   },
                   {
                       "path":  "scripts/ps-spec-clone-lib.ps1",
-                      "lines":  451,
-                      "sha256":  "4b93e134132e50d84f9c750c26bb80b89bcc550c550ccb8dc29522d9d1e890f5",
+                      "lines":  544,
+                      "sha256":  "9e771ee8286f54ab9199998ac15bcd2e604335cf4d55402e7b836fa78e4121fb",
                       "bom":  true
                   },
                   {
@@ -562,14 +562,14 @@
                   },
                   {
                       "path":  "scripts/tests/test-spec-build.ps1",
-                      "lines":  286,
-                      "sha256":  "c57ff2764b405346bb0ba878c43212dce2cb737a893a6c62c487c47c802f2fd0",
+                      "lines":  299,
+                      "sha256":  "571f74cb66ccdcd7adac937c770dd7bf1571a5704d2ff6aa3660e6a4fbcb63d5",
                       "bom":  true
                   },
                   {
                       "path":  "scripts/tests/test-spec-clone.ps1",
-                      "lines":  247,
-                      "sha256":  "072040aaad21a11c8e2db804863e4921579da11e84efae13f832a170a69e4158",
+                      "lines":  288,
+                      "sha256":  "89f020def4f34ec653703a7c8115824d3c6898e52a79d77bf0e69a04f004bd6b",
                       "bom":  true
                   },
                   {

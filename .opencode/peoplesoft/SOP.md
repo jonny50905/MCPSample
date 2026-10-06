@@ -926,8 +926,12 @@ powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_
   該頁不驗收（`FIELD_EXCLUDED_IN_BODY`）；排除項格式、資料剖析斷言、a／b／c 三種查法、資料彙總與交叉參照
   兩筆 SQL 證據缺一、type 大小寫不精確也不驗收（`FIELD_EXCLUSION_*`／`FIELD_TYPE_CASE`）。spec.md 另有「不建置的原生欄位」表與合計；
   被某 Component 判無用、但其他 Component 正文仍引用的欄位不列入不建置表，另列「整體重建須建置」。
-- 試跑回報給維護端只用計數：輸出（與 gate.json 的 fieldUsage）中的「欄位統計」行——不建置 Record／欄位數、
-  跨 Component 須建置數、畫面與資料項目數——加上耗時、委派次數；不回物件名或欄位名。
+- 每個範圍內 Record 都要寫「原生欄位判定」結論：排除 n 欄／無可排除／判不了：原因代碼（NO_TABLE、EMPTY_TABLE、
+  NOT_PROD、TIMEOUT、QUERY_FAILED、CHECK_INCOMPLETE）；缺結論 scope 不驗收（`FIELD_USAGE_REQUIRED`）。
+  沒做判定只能寫 CHECK_INCOMPLETE，所以「不建置欄位＝0」可以分辨是都在用、還是沒查。
+- 試跑回報給維護端只用計數：輸出（與 gate.json 的 fieldUsage）中的「欄位統計」行——範圍內 Record／已判定／
+  判不了（依代碼）、不建置 Record／欄位數、跨 Component 須建置數、畫面與資料項目數——加上耗時、委派次數；
+  不回物件名或欄位名。
 
 ### 狀態、恢復與保證界線
 

@@ -38,7 +38,7 @@ $p = Copy-CloneValue $scope; $p.items[0].values.object='TW_DEMO_OTHER'
 Assert-Clone (-not (Test-PsClonePacket -Packet $p -Component $component -Topic scope -Profile $profile).Ok) '禁止冒入另一 CORE Component'
 $p = Copy-CloneValue $scope; $p.items[0].values.inclusion='DEPENDENCY'; $p.items[0].values.usedBy='UNKNOWN'
 Assert-Clone (-not (Check-Clone $p).Ok) '依賴必有實際使用關係'
-$p = Copy-CloneValue $scope; $p.items[0].id='S02'; $p.items[0].values.inclusion='DEPENDENCY'; $p.items[0].values.type='RECORD'; $p.items[0].values.object='PS_DEMO_TBL'
+$p = Copy-CloneValue $scope; $p.items[0].id='S02'; $p.items[0].values.inclusion='DEPENDENCY'; $p.items[0].values.type='RECORD'; $p.items[0].values.object='PS_DEMO_TBL'; $p.items[0].values.fieldUsage='判不了：NOT_PROD'
 Assert-Clone (Check-Clone $p).Ok 'scope 續頁沿用前頁根'
 $p=New-ClonePacket 'ui'; $p.items[0].scopeRefs=@()
 Assert-Clone (-not (Check-Clone $p).Ok) '正文必有 scopeRefs'
@@ -167,8 +167,10 @@ function New-FieldScope {
     $p = New-ClonePacket
     $p.evidence += ,[ordered]@{id='E2';kind='SQL';locator="SELECT COUNT(*) AS TOTAL_ROWS, SUM(CASE WHEN DEMO_UNUSED <> ' ' THEN 1 ELSE 0 END) AS DEMO_UNUSED FROM PS_DEMO_TBL FETCH FIRST 1 ROWS ONLY";excerpt='TOTAL_ROWS > 0；DEMO_UNUSED、DEMO_UNUSED_B 為 0'}
     $p.evidence += ,[ordered]@{id='E3';kind='SQL';locator="SELECT OBJECTVALUE1, RECNAME, REFNAME, COUNT(*) AS CNT FROM PSPCMNAME WHERE REFNAME IN ('DEMO_UNUSED','DEMO_UNUSED_B') GROUP BY OBJECTVALUE1, RECNAME, REFNAME FETCH FIRST 200 ROWS ONLY";excerpt='0 列'}
-    $values = [ordered]@{object='DEMO_TBL：DEMO_UNUSED、DEMO_UNUSED_B';type='FIELD';inclusion='EXCLUDED';usedBy='a：交叉參照 0 列；b：核心路徑沒有讀寫此表的 SQL 文字類程式；c：無已記錄引用';condition='非預設 0 筆（全表非空，查詢日 2026-10-01）';reason='原生欄位無用：資料無值且核心路徑無指名引用'}
+    $values = [ordered]@{object='DEMO_TBL：DEMO_UNUSED、DEMO_UNUSED_B';type='FIELD';inclusion='EXCLUDED';usedBy='a：交叉參照 0 列；b：核心路徑沒有讀寫此表的 SQL 文字類程式；c：無已記錄引用';condition='非預設 0 筆（全表非空，查詢日 2026-10-01）';reason='原生欄位無用：資料無值且核心路徑無指名引用';fieldUsage='不適用'}
     $p.items += ,[ordered]@{id='F01';scopeRefs=@();values=$values;evidenceIds=@('E2','E3')}
+    $rec = [ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='DEPENDENCY';usedBy='TW_DEMO_A 存檔寫入';condition='每次存檔';reason='核心資料表';fieldUsage='排除 2 欄（F01）'}
+    $p.items += ,[ordered]@{id='R01';scopeRefs=@();values=$rec;evidenceIds=@('E1')}
     return $p
 }
 function Check-FieldScope($Packet) { return (Test-PsClonePacket -Packet $Packet -Component $component -Topic scope -Profile $profile -ScopeItems @()) }
@@ -224,12 +226,51 @@ Assert-Clone (Check-FieldBody $p).Ok '別的 Record 的同名欄位不受影響'
 $p = New-ClonePacket 'ui'; $p.items[0].scopeRefs = @('F01')
 Assert-Clone ((Check-FieldBody $p).Errors -contains 'SCOPE_REF_EXCLUDED:S01') '正文不得引用欄位排除項 ID'
 
+# 每個範圍內 Record 都要有原生欄位判定；沒做只能寫判不了＋代碼，統計看得到。
+$p = New-FieldScope; $p.items[2].values.fieldUsage = '已檢查'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_REQUIRED:R01') 'Record 缺原生欄位判定結論拒絕'
+foreach ($bad in @('判不了：LAZY', '判不了：timeout', '判不了', '無可排除', '無可排除（查詢日 2026-02-30）', '不適用')) {
+    $p = New-FieldScope; $p.items[2].values.fieldUsage = $bad
+    Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_REQUIRED:R01') ('判定結論格式拒絕 ' + $bad)
+}
+$p = New-ClonePacket; $p.items += ,[ordered]@{id='R02';scopeRefs=@();values=[ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='CORE';usedBy='主檔';condition='進入功能';reason='核心資料表';fieldUsage='判不了：TIMEOUT（全表彙總逾時）'};evidenceIds=@('E1')}
+Assert-Clone (Check-FieldScope $p).Ok '判不了加封閉代碼可通過'
+$p.items[1].values.fieldUsage = '無可排除（查詢日 2026-10-01）'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_EVIDENCE_REQUIRED:R02') '無可排除必須附資料剖析 SQL'
+$p.evidence += ,[ordered]@{id='E2';kind='SQL';locator='SELECT OWNER, COLUMN_NAME, DATA_TYPE, NUM_DISTINCT FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = ''PS_DEMO_TBL'' FETCH FIRST 200 ROWS ONLY';excerpt='每欄 NUM_DISTINCT ≥ 3'}
+$p.items[1].evidenceIds = @('E1','E2')
+Assert-Clone (Check-FieldScope $p).Ok '無可排除附統計資訊 SQL 可通過'
+$p = New-FieldScope; $p.items[2].values.fieldUsage = '排除 3 欄（F01）'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_REF_INVALID:R01') '排除欄數與 FIELD 項不符拒絕'
+$p = New-FieldScope; $p.items[2].values.fieldUsage = '排除 2 欄（F99）'
+$v = Check-FieldScope $p
+Assert-Clone ($v.Errors -contains 'FIELD_USAGE_REF_INVALID:R01' -and $v.Errors -contains 'FIELD_EXCLUSION_ORPHAN:F01') '指到不存在的 FIELD 項拒絕，FIELD 項成孤兒'
+$p = New-FieldScope; $p.items[2].values.object = 'PS_OTHER_TBL'
+$v = Check-FieldScope $p
+Assert-Clone ($v.Errors -contains 'FIELD_USAGE_REF_INVALID:R01' -and $v.Errors -contains 'FIELD_EXCLUSION_ORPHAN:F01') 'Record 與 FIELD 項不同表拒絕'
+$p = New-FieldScope; $p.items = @($p.items[0], $p.items[1])
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_ORPHAN:F01') 'FIELD 項必須有同頁 Record 項指到'
+$p = New-FieldScope; $p.items[2].values.type = 'Record'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'RECORD_TYPE_CASE:R01') 'Record type 大小寫不同不能繞過判定'
+$p = New-FieldScope; $p.items[2].values.object = 'DEMO_TBL'
+Assert-Clone (Check-FieldScope $p).Ok 'Record 寫不帶 PS_ 的名稱也對得上 FIELD 項'
+$p = New-ClonePacket; $p.items += ,[ordered]@{id='X01';scopeRefs=@();values=[ordered]@{object='PS_DEMO_OLD';type='RECORD';inclusion='EXCLUDED';usedBy='無';condition='無';reason='其他功能分支';fieldUsage='不適用'};evidenceIds=@('E1')}
+Assert-Clone (Check-FieldScope $p).Ok '排除的 Record 不需要原生欄位判定'
+$covScope = New-FieldScope
+foreach ($n in 2..3) { $covScope.items += ,[ordered]@{id=('R0' + $n);scopeRefs=@();values=[ordered]@{object=('PS_DEMO_T' + $n);type='RECORD';inclusion='DEPENDENCY';usedBy='讀取';condition='查值';reason='依賴';fieldUsage='判不了：TIMEOUT'};evidenceIds=@('E1')} }
+$covScope.items += ,[ordered]@{id='R04';scopeRefs=@();values=[ordered]@{object='PS_DEMO_T4';type='RECORD';inclusion='DEPENDENCY';usedBy='讀取';condition='查值';reason='依賴';fieldUsage='判不了：NO_TABLE（View）'};evidenceIds=@('E1')}
+Assert-Clone (Check-FieldScope $covScope).Ok '多 Record 混合結論可通過'
+$covStats = Get-PsCloneFieldStats -Components @('TW_DEMO_A') -Packets @($covScope)
+Assert-Clone ($covStats.scopeRecords -eq 4 -and $covStats.checkedRecords -eq 1 -and $covStats.undeterminedRecords -eq 3 -and $covStats.undeterminedByCode['TIMEOUT'] -eq 2 -and $covStats.undeterminedByCode['NO_TABLE'] -eq 1 -and (Format-PsCloneUndeterminedCodes $covStats.undeterminedByCode) -ceq 'NO_TABLE 1、TIMEOUT 2') '判定覆蓋統計依代碼計數且排序確定'
+$covSpec = ConvertTo-PsCloneSpec -Components @('TW_DEMO_A') -Packets @($covScope) -Profile $profile -Status DRAFT
+Assert-Clone ($covSpec.Contains('範圍內 Record 的原生欄位判定：已判定 1／4；判不了 3（NO_TABLE 1、TIMEOUT 2）') -and $covSpec.Contains('| 排除 2 欄（F01） |')) 'spec 顯示判定覆蓋與每個 Record 的結論'
+
 $fieldPackets = @($fs, (New-ClonePacket 'ui'), (New-ClonePacket 'data'))
 $fieldSpec = ConvertTo-PsCloneSpec -Components @('TW_DEMO_A') -Packets $fieldPackets -Profile $profile -Status DRAFT
 Assert-Clone ($fieldSpec.Contains('| TW_DEMO_A | F01 | DEMO_TBL | DEMO_UNUSED、DEMO_UNUSED_B |') -and $fieldSpec.Contains('合計：1 個 Record、2 個欄位。')) 'render 產出不建置欄位表與合計'
 Assert-Clone (-not $fieldSpec.Contains('| TW_DEMO_A | F01 | DEMO_TBL：')) '欄位排除項不重複列在一般範圍表'
 $fieldStats = Get-PsCloneFieldStats -Components @('TW_DEMO_A') -Packets $fieldPackets
-Assert-Clone ($fieldStats.excludedRecords -eq 1 -and $fieldStats.excludedFields -eq 2 -and $fieldStats.crossComponentKept -eq 0 -and $fieldStats.uiItems -eq 1 -and $fieldStats.dataItems -eq 1) '欄位統計只有計數'
+Assert-Clone ($fieldStats.scopeRecords -eq 1 -and $fieldStats.checkedRecords -eq 1 -and $fieldStats.undeterminedRecords -eq 0 -and $fieldStats.excludedRecords -eq 1 -and $fieldStats.excludedFields -eq 2 -and $fieldStats.crossComponentKept -eq 0 -and $fieldStats.uiItems -eq 1 -and $fieldStats.dataItems -eq 1) '欄位統計只有計數'
 $uB = New-ClonePacket 'ui' 'TW_DEMO_B'; $uB.items[0].values.field = 'PS_DEMO_TBL.DEMO_UNUSED'
 $crossPackets = @($fs, (New-ClonePacket 'scope' 'TW_DEMO_B'), $uB)
 $crossPlan = Get-PsCloneFieldExclusionPlan -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $crossPackets

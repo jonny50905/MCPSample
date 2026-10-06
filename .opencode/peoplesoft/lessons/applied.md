@@ -3563,3 +3563,23 @@
   欄位排除經覆核進不建置表、gate.json 欄位統計、CLI 計數行、正文寫到排除欄位不驗收）、test-spec、test-ps51-static 0 阻擋；
   真 Windows PowerShell 5.1 未在本沙箱執行，公司機搬完先跑兩套 Spec 測試。generic／transfer manifest 以真 PowerShell 腳本重生。
 - 教訓：契約規定「不得寫」的東西，要給它一個可機械比對的形狀，外環才擋得住；擋關訊息要指名是哪個欄位，重試才收斂。
+
+### L131 「不建置欄位＝0」分不出是都在用還是沒查——每個 Record 都要留封閉的判定結論（2026-10-06）
+
+- 症狀：L129／L130 之後，「判不了就保留」讓 scope worker 完全不做欄位判定也合法；試跑看到不建置欄位為 0 時，
+  無法分辨是欄位都有在用、查詢失敗，還是模型根本沒查。效果無從量測。
+- 根因：外環只檢查「有寫的排除項」與「正文不得寫排除欄位」，沒有要求每個範圍內 Record 都交代判定結果。
+- 落點：
+  - clone-profile 的 scope 加欄位 fieldUsage（原生欄位判定）。範圍內 Record（type RECORD、CORE／DEPENDENCY）只准三種結論：
+    `排除 n 欄（FIELD 項 ID）`、`無可排除（查詢日）`（evidenceIds 要有 ALL_TAB_COLUMNS 或 COUNT／SUM 的剖析 SQL）、
+    `判不了：代碼`（NO_TABLE／EMPTY_TABLE／NOT_PROD／TIMEOUT／QUERY_FAILED／CHECK_INCOMPLETE）；其他 scope 項寫「不適用」。
+  - 外環：缺或格式不符 FIELD_USAGE_REQUIRED；無可排除缺剖析 SQL FIELD_USAGE_EVIDENCE_REQUIRED；排除指到的 FIELD 項要在同一頁、
+    同一 Record（PS_ 前綴不計）、欄數相符，否則 FIELD_USAGE_REF_INVALID；同頁沒有 Record 指到的 FIELD 項 FIELD_EXCLUSION_ORPHAN；
+    type 大小寫 RECORD_TYPE_CASE。排除的 Record 不需要判定。
+  - 統計與 render：fieldUsage／CLI「欄位統計」開頭加範圍內 Record、已判定、判不了（依代碼計數、代碼排序）；spec.md 的範圍表多一欄
+    原生欄位判定，不建置段落開頭列判定覆蓋（判不了的 Record 欄位全部保留在正文，未經篩選）。
+- 設計取捨：判不了仍不擋驗收（全自動、不中斷 loop），但一定要寫出原因代碼；代碼是封閉值域，可直接回報維護端。
+  FIELD 項與 Record 項限同一頁，免得跨頁順序讓驗證結果依頁序而變。
+- 驗證（PowerShell 7.4／Linux）：test-spec-clone 148 PASS（＋20）、test-spec-build 37 PASS（＋2：CHECK_INCOMPLETE 照樣 READY
+  但統計顯示判不了 1、缺結論 scope 不驗收）、test-spec／test-knowledge／test-supplemental 全過、5.1 靜態守衛 0 阻擋。
+- 教訓：允許「判不了就放行」的規則，必須同時要求把「判不了」寫成可計數的結論，否則放行和沒做無法區分，效果無從量測。

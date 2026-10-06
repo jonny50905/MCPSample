@@ -50,6 +50,12 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 記錄方式：判定無用的欄位在 scope 以 EXCLUDED 項記錄，一個 Record 一項。values：object＝`<RECORD>：<FIELD>、<FIELD>…`；type＝`FIELD`；inclusion＝`EXCLUDED`；usedBy＝`a：<結果>；b：<結果>；c：<結果>`；condition＝`非預設 0 筆（全表非空，查詢日 YYYY-MM-DD）`；reason＝「原生欄位無用：資料無值且核心路徑無指名引用」。evidenceIds 至少含資料彙總 SQL 與交叉參照 SQL。保留的欄位不在 scope 逐欄列出。
 
+每個範圍內 Record（scope 中 type 寫 `RECORD`、CORE 或 DEPENDENCY）的 fieldUsage 必填下列結論之一；其他 scope 項的 fieldUsage 寫「不適用」：
+
+- `排除 <n> 欄（<FIELD 項 ID>）`：同一頁要有該 FIELD 項，Record 相同、欄數相符；每個 FIELD 項都要有 Record 項指到它。
+- `無可排除（查詢日 YYYY-MM-DD）`：剖析做完，每個欄位都有值或有核心路徑引用；evidenceIds 要含資料剖析 SQL（§7b 或 §7c）。
+- `判不了：<代碼>`：代碼只准 NO_TABLE（沒有實體表）、EMPTY_TABLE（空表）、NOT_PROD（環境不是 PROD）、TIMEOUT（查詢逾時）、QUERY_FAILED（查詢失敗或 §7-0 驗證未過）、CHECK_INCOMPLETE（程式面查法沒做完），後面可接一句說明。沒做判定就寫 CHECK_INCOMPLETE，不得留空或寫無可排除。
+
 後續 topic 不描述 scope 判定無用的欄位：ui 欄位、data 欄位、規則條件、介面欄位、驗收輸入都不寫。發現其實有核心路徑指名引用時，在 gaps 寫明誤判的 scope 項目、引用位置與證據，本頁 PARTIAL，不自行補寫該欄位。
 
 ## 研究與證據
@@ -80,7 +86,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 特別檢查：UI／規則／狀態是否只出現少量範例卻宣稱 COMPLETE；所有被使用的 Page／Scroll／欄位／事件是否有處置；接受條件是否覆蓋條件分支與拒絕路徑；多頁是否重複、跳號、遺失例外；其他已完成 topic 的識別字與 stored values 是否矛盾。來源不夠判斷完整性就 BLOCKED，不能只看 JSON 能解析就 PASS。
 
-原生欄位：scope 判定無用的欄位算已處置，不因它沒出現在 ui／data 而報漏列。scope 的 FIELD 排除項要核對資料彙總是全表、非預設值有比對預設常數、環境是 PROD、查法 a／b／c 都有結果，不符報 `EVIDENCE_MISMATCH`；後續 topic 描述了 scope 判定無用的欄位報 `SCOPE_NOISE`。
+原生欄位：scope 判定無用的欄位算已處置，不因它沒出現在 ui／data 而報漏列。scope 的 FIELD 排除項要核對資料彙總是全表、非預設值有比對預設常數、環境是 PROD、查法 a／b／c 都有結果，不符報 `EVIDENCE_MISMATCH`；後續 topic 描述了 scope 判定無用的欄位報 `SCOPE_NOISE`。Record 的 fieldUsage 要與證據一致：寫無可排除卻沒有剖析結果、有剖析結果卻寫判不了、代碼與實際原因不符，報 `EVIDENCE_MISMATCH`。
 
 多 Component 的 acceptance 覆核還須查所有已接受的相關技術章節，核對共享 Record.Field、狀態值、交易與介面契約。差異須有具體模式／條件解釋；無法解釋就報 TOPIC／CONTRADICTION，不能因每份各自格式正確就 PASS。已接受章節有錯且本頁不能修復時明列受影響章節，請求重新查證，不在本頁藏一個不同答案。
 

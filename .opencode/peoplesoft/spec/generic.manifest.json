@@ -39,12 +39,12 @@
     },
     {
       "path": ".opencode/peoplesoft/spec/clone-contract.md",
-      "sha256": "592B8E275521DFCCD296728EDCF1A26CBE170B8DE5F2E7E59197521FE32D9B4E",
-      "lines": 92
+      "sha256": "7206C4672C8348AEC36B97DBC84872C7F1343D415FCD8F453887890B7C2F7594",
+      "lines": 98
     },
     {
       "path": ".opencode/peoplesoft/spec/clone-profile.json",
-      "sha256": "5880C93ADBF6970654D0FFD31CAEF356DB197AA849DA4CBD6A4B131A946AEFBD",
+      "sha256": "93FF3D0FB58660C4AAAD238F6FAE89DAB85952CF78647E5AE167AB262AD6FA08",
       "lines": 60
     },
     {
@@ -94,13 +94,13 @@
     },
     {
       "path": "scripts/ps-spec-build.ps1",
-      "sha256": "467973B1906C57A9FC704A260267F2AC209C3FC80A7F78311E358A4940152B58",
-      "lines": 453
+      "sha256": "D882B17A67CCA785066646448066A4385B6E7E0B841CB357FB60ED12474C925D",
+      "lines": 455
     },
     {
       "path": "scripts/ps-spec-clone-lib.ps1",
-      "sha256": "4B93E134132E50D84F9C750C26BB80B89BCC550C550CCB8DC29522D9D1E890F5",
-      "lines": 452
+      "sha256": "9E771EE8286F54AB9199998AC15BCD2E604335CF4D55402E7B836FA78E4121FB",
+      "lines": 545
     },
     {
       "path": "scripts/ps-spec-lib.ps1",

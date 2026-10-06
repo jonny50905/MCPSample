@@ -73,6 +73,40 @@ function ConvertFrom-PsCloneFieldExclusion {
     $r.Ok = $true; $r.Record = $record; $r.Fields = $fields
     return $r
 }
+# Record 的「原生欄位判定」三種結論；判不了只准下列原因代碼。
+$script:PsCloneFieldUsageCodes = @('NO_TABLE', 'EMPTY_TABLE', 'NOT_PROD', 'TIMEOUT', 'QUERY_FAILED', 'CHECK_INCOMPLETE')
+function ConvertFrom-PsCloneFieldUsage {
+    # 排除 <n> 欄（<FIELD 項 ID>）／無可排除（查詢日 YYYY-MM-DD）／判不了：<代碼>。回傳 @{ Kind; Count; Ref; Code }，Kind 空字串＝格式不符。
+    param([string]$Text)
+    $r = @{ Kind = ''; Count = 0; Ref = ''; Code = '' }
+    $m = [regex]::Match([string]$Text, '^\s*排除\s*([0-9]{1,4})\s*欄\s*[（(]\s*([A-Za-z][A-Za-z0-9_.-]{0,79})\s*[）)]')
+    if ($m.Success) { $r.Kind = 'EXCLUDE'; $r.Count = [int]$m.Groups[1].Value; $r.Ref = $m.Groups[2].Value; return $r }
+    $m = [regex]::Match([string]$Text, '^\s*無可排除\s*[（(]\s*查詢日\s*[:：]?\s*([0-9]{4}-[0-9]{2}-[0-9]{2})\s*[）)]')
+    if ($m.Success) {
+        $d = [datetime]::MinValue
+        if ([datetime]::TryParseExact($m.Groups[1].Value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$d)) { $r.Kind = 'NONE' }
+        return $r
+    }
+    $m = [regex]::Match([string]$Text, '^\s*判不了\s*[：:]\s*([A-Z_]+)(?![A-Za-z0-9_])')
+    if ($m.Success -and $script:PsCloneFieldUsageCodes -ccontains $m.Groups[1].Value) { $r.Kind = 'UNDETERMINED'; $r.Code = $m.Groups[1].Value }
+    return $r
+}
+function Get-PsCloneRecordKey {
+    # Record 名比對鍵：開頭識別字、大寫、去掉 PS_ 實體表前綴。
+    param([string]$Name)
+    $m = [regex]::Match([string]$Name, '^\s*([A-Za-z0-9_$#-]+)')
+    if (-not $m.Success) { return '' }
+    $k = $m.Groups[1].Value.ToUpperInvariant()
+    if ($k.StartsWith('PS_')) { $k = $k.Substring(3) }
+    return $k
+}
+function Test-PsCloneRecordItem {
+    # 範圍內（CORE／DEPENDENCY）的 Record：每筆都要有原生欄位判定。
+    param($Item)
+    if (-not (Test-PsCloneObject $Item)) { return $false }
+    $v = Get-PsCloneProp $Item 'values'
+    return ([string](Get-PsCloneProp $v 'type') -ceq 'RECORD' -and @('CORE', 'DEPENDENCY') -ccontains [string](Get-PsCloneProp $v 'inclusion'))
+}
 function Test-PsCloneFieldExclusionItem {
     param($Item)
     if (-not (Test-PsCloneObject $Item)) { return $false }
@@ -165,17 +199,43 @@ function Get-PsCloneFieldExclusionPlan {
     }
     return @{ Rows = $rows.ToArray(); Conflicts = $conflicts.ToArray(); RecordCount = $recordKeys.Count; FieldCount = $fieldKeys.Count }
 }
+function Get-PsCloneRecordCoverage {
+    # 範圍內 Record 的原生欄位判定覆蓋：已判定（排除／無可排除）、判不了（依原因代碼）。
+    param($Packets)
+    $total = 0; $checked = 0; $undetermined = 0; $byCode = @{}
+    foreach ($p in @($Packets)) {
+        if ($null -eq $p -or $p.topic -cne 'scope') { continue }
+        foreach ($item in @($p.items)) {
+            if (-not (Test-PsCloneRecordItem $item)) { continue }
+            $total++
+            $u = ConvertFrom-PsCloneFieldUsage ([string](Get-PsCloneProp $item.values 'fieldUsage'))
+            if ($u.Kind -eq 'EXCLUDE' -or $u.Kind -eq 'NONE') { $checked++ }
+            elseif ($u.Kind -eq 'UNDETERMINED') { $undetermined++; if (-not $byCode.ContainsKey($u.Code)) { $byCode[$u.Code] = 0 }; $byCode[$u.Code]++ }
+        }
+    }
+    $ordered = [ordered]@{}
+    $codes = Sort-PsKnOrdinal -Items @($byCode.Keys)
+    foreach ($c in $codes) { $ordered[$c] = [int]$byCode[$c] }
+    return @{ Total = $total; Checked = $checked; Undetermined = $undetermined; ByCode = $ordered }
+}
+function Format-PsCloneUndeterminedCodes {
+    param($ByCode)
+    $parts = @()
+    foreach ($k in $ByCode.Keys) { $parts += ([string]$k + ' ' + [string]$ByCode[$k]) }
+    return ($parts -join '、')
+}
 function Get-PsCloneFieldStats {
-    # 只有計數，可對維護端回報；不含物件名。
+    # 只有計數與封閉代碼，可對維護端回報；不含物件名。
     param([string[]]$Components, $Packets)
     $plan = Get-PsCloneFieldExclusionPlan -Components $Components -Packets $Packets
+    $cov = Get-PsCloneRecordCoverage -Packets $Packets
     $ui = 0; $data = 0
     foreach ($p in @($Packets)) {
         if ($null -eq $p) { continue }
         if ($p.topic -ceq 'ui') { $ui += @($p.items).Count }
         elseif ($p.topic -ceq 'data') { $data += @($p.items).Count }
     }
-    return [ordered]@{ excludedRecords = [int]$plan.RecordCount; excludedFields = [int]$plan.FieldCount; crossComponentKept = [int]@($plan.Conflicts).Count; uiItems = [int]$ui; dataItems = [int]$data }
+    return [ordered]@{ scopeRecords = [int]$cov.Total; checkedRecords = [int]$cov.Checked; undeterminedRecords = [int]$cov.Undetermined; undeterminedByCode = $cov.ByCode; excludedRecords = [int]$plan.RecordCount; excludedFields = [int]$plan.FieldCount; crossComponentKept = [int]@($plan.Conflicts).Count; uiItems = [int]$ui; dataItems = [int]$data }
 }
 function Get-PsCloneProfile {
     param([string]$Root)
@@ -245,6 +305,7 @@ function Test-PsClonePacket {
     $fieldKeys = @($def.fields | ForEach-Object { [string]$_.key })
     $excludedKeys = $null
     if ($Topic -ne 'scope') { $excludedKeys = Get-PsCloneExcludedFieldKeys $ScopeItems }
+    $pageFieldItems = @{}; $pageExcludeRefs = @()
     foreach ($item in $items) {
         $e = Test-PsCloneShape $item @('id','scopeRefs','values','evidenceIds') 'item'; $r.Errors += $e
         if (-not (Test-PsCloneObject $item)) { continue }
@@ -268,10 +329,28 @@ function Test-PsClonePacket {
             if ([string]$v.inclusion -eq 'CORE' -and [string]$v.type -eq 'COMPONENT' -and [string]$v.object -cne $Component) { $r.Errors += ('FOREIGN_CORE_COMPONENT:' + $id) }
             if ([string]$v.inclusion -eq 'DEPENDENCY') { foreach ($k in @('usedBy','condition','reason')) { $value = Get-PsCloneProp $v $k; if (-not (Test-PsCloneText $value) -or (Test-PsCloneUnknown $value)) { $r.Errors += ('DEPENDENCY_RELATION_REQUIRED:' + $id + '.' + $k) } } }
             if ([string]$v.type -ieq 'FIELD' -and [string]$v.type -cne 'FIELD') { $r.Errors += ('FIELD_TYPE_CASE:' + $id) }
+            if ([string]$v.type -ieq 'RECORD' -and [string]$v.type -cne 'RECORD') { $r.Errors += ('RECORD_TYPE_CASE:' + $id) }
+            if (Test-PsCloneRecordItem $item) {
+                # 每個範圍內 Record 都要有判定結論；「沒查」只能寫成判不了＋原因代碼，統計看得到。
+                $u = ConvertFrom-PsCloneFieldUsage ([string](Get-PsCloneProp $v 'fieldUsage'))
+                if ($u.Kind -eq '') { $r.Errors += ('FIELD_USAGE_REQUIRED:' + $id) }
+                elseif ($u.Kind -eq 'EXCLUDE') { $pageExcludeRefs += , @{ Id = $id; Ref = $u.Ref; Count = $u.Count; Key = (Get-PsCloneRecordKey ([string]$v.object)) } }
+                elseif ($u.Kind -eq 'NONE') {
+                    $hasProfile = $false
+                    foreach ($eid in @($eRefs)) {
+                        if ($eid -isnot [string] -or -not $evMap.ContainsKey([string]$eid)) { continue }
+                        $ev = $evMap[[string]$eid]
+                        if ([string]$ev.kind -ceq 'SQL' -and [string]$ev.locator -match '(?i)\bALL_TAB_COLUMNS\b|\b(?:COUNT|SUM)\s*\(') { $hasProfile = $true }
+                    }
+                    if (-not $hasProfile) { $r.Errors += ('FIELD_USAGE_EVIDENCE_REQUIRED:' + $id) }
+                }
+            }
             if ([string]$v.type -ceq 'FIELD') {
                 # 原生欄位只記判定無用者；保留的欄位不逐欄列進 scope。
                 if ([string]$v.inclusion -cne 'EXCLUDED') { $r.Errors += ('FIELD_SCOPE_EXCLUDED_ONLY:' + $id) }
-                if (-not (ConvertFrom-PsCloneFieldExclusion ([string]$v.object)).Ok) { $r.Errors += ('FIELD_EXCLUSION_OBJECT_INVALID:' + $id) }
+                $fx = ConvertFrom-PsCloneFieldExclusion ([string]$v.object)
+                if (-not $fx.Ok) { $r.Errors += ('FIELD_EXCLUSION_OBJECT_INVALID:' + $id) }
+                elseif ([string]$v.inclusion -ceq 'EXCLUDED') { $pageFieldItems[$id] = @{ Key = (Get-PsCloneRecordKey $fx.Record); Count = @($fx.Fields).Count } }
                 $dm = [regex]::Match([string]$v.condition, '^\s*非預設\s*0\s*筆\s*[（(]\s*全表非空\s*[，,、]\s*查詢日\s*[:：]?\s*([0-9]{4}-[0-9]{2}-[0-9]{2})\s*[）)]')
                 $queryDate = [datetime]::MinValue
                 if (-not $dm.Success -or -not [datetime]::TryParseExact($dm.Groups[1].Value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$queryDate)) { $r.Errors += ('FIELD_EXCLUSION_CONDITION_INVALID:' + $id) }
@@ -304,6 +383,16 @@ function Test-PsClonePacket {
         $rootFound = $false
         foreach ($s in $scopeMap.Values) { if ([string]$s.values.inclusion -ceq 'CORE' -and [string]$s.values.type -ceq 'COMPONENT' -and [string]$s.values.object -ceq $Component) { $rootFound = $true } }
         if (-not $rootFound) { $r.Errors += 'CORE_COMPONENT_REQUIRED' }
+        # 「排除 n 欄（ID）」要指到同一頁、同一 Record、欄數相符的 FIELD 項；FIELD 項也必須有 Record 項指到它。
+        $referenced = @{}
+        foreach ($ref in $pageExcludeRefs) {
+            $target = $null
+            if ($pageFieldItems.ContainsKey($ref.Ref)) { $target = $pageFieldItems[$ref.Ref] }
+            if ($null -eq $target -or $target.Key -cne $ref.Key -or $target.Count -ne $ref.Count) { $r.Errors += ('FIELD_USAGE_REF_INVALID:' + $ref.Id) }
+            else { $referenced[$ref.Ref] = $true }
+        }
+        $fieldIds = Sort-PsKnOrdinal -Items @($pageFieldItems.Keys)
+        foreach ($fid in $fieldIds) { if (-not $referenced.ContainsKey($fid)) { $r.Errors += ('FIELD_EXCLUSION_ORPHAN:' + $fid) } }
     }
     $r.Ok = ($r.Errors.Count -eq 0)
     return $r
@@ -376,17 +465,21 @@ function ConvertTo-PsCloneSpec {
         foreach ($packet in @($Packets | Where-Object { $_.component -ceq $component -and $_.topic -ceq 'scope' })) { [void]$o.Add('- ' + (ConvertTo-PsCloneCell $component) + '：' + (ConvertTo-PsCloneCell $packet.summary)) }
     }
     [void]$o.Add('')
-    [void]$o.Add('| Component | 範圍 ID | 物件 | 型別 | 分類 | 使用關係／條件 | 理由 |')
-    [void]$o.Add('|---|---|---|---|---|---|---|')
+    [void]$o.Add('| Component | 範圍 ID | 物件 | 型別 | 分類 | 使用關係／條件 | 理由 | 原生欄位判定 |')
+    [void]$o.Add('|---|---|---|---|---|---|---|---|')
     foreach ($component in $Components) {
         foreach ($packet in @($Packets | Where-Object { $_.component -ceq $component -and $_.topic -ceq 'scope' })) {
             foreach ($item in $packet.items) {
                 if (Test-PsCloneFieldExclusionItem $item) { continue }
-                $v = $item.values; [void]$o.Add('| ' + ((@($component,$item.id,$v.object,$v.type,$v.inclusion,($v.usedBy + '；' + $v.condition),$v.reason) | ForEach-Object { ConvertTo-PsCloneCell $_ }) -join ' | ') + ' |')
+                $v = $item.values; [void]$o.Add('| ' + ((@($component,$item.id,$v.object,$v.type,$v.inclusion,($v.usedBy + '；' + $v.condition),$v.reason,(Get-PsCloneProp $v 'fieldUsage')) | ForEach-Object { ConvertTo-PsCloneCell $_ }) -join ' | ') + ' |')
             }
         }
     }
     [void]$o.Add(''); [void]$o.Add('## 不建置的原生欄位'); [void]$o.Add('')
+    $cov = Get-PsCloneRecordCoverage -Packets $Packets
+    $covLine = '範圍內 Record 的原生欄位判定：已判定 ' + $cov.Checked + '／' + $cov.Total + '；判不了 ' + $cov.Undetermined
+    if ($cov.Undetermined -gt 0) { $covLine += '（' + (Format-PsCloneUndeterminedCodes $cov.ByCode) + '）' }
+    [void]$o.Add($covLine + '。判不了的 Record 欄位全部保留在正文，未經篩選。'); [void]$o.Add('')
     $plan = Get-PsCloneFieldExclusionPlan -Components $Components -Packets $Packets
     if (@($plan.Rows).Count -eq 0) { [void]$o.Add('無判定無用的原生欄位；判不了的欄位一律保留在各章節正文。') }
     else {

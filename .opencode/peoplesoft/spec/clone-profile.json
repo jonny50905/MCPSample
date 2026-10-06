@@ -7,8 +7,8 @@
   "topics": [
     {
       "id": "scope", "title": "範圍與核心依賴", "allowNotApplicable": false,
-      "instructions": "先固定重建邊界。CORE 必含指定 Component 根；不以 delivered／custom 前綴決定核心。DEPENDENCY 須由核心追得實際使用鏈，提供逐跳證據；usedBy 寫呼叫者、方向與中間鏈，condition 寫何時使用，只描述最小契約。必需的 delivered 依賴同樣納入最小介面契約。EXCLUDED 保留簡短排除理由，不展開共用框架或其他業務。核心 Record 的原生欄位依 clone-contract「原生欄位無用判定」：判定無用者每個 Record 合成一筆 EXCLUDED（type FIELD），判不了或有使用跡象的欄位保留且不逐欄列。scope 項目 scopeRefs 為空；後續章節引用本 Component 已接受的 CORE／DEPENDENCY id。",
-      "fields": [{"key":"object","label":"物件"},{"key":"type","label":"型別"},{"key":"inclusion","label":"範圍分類"},{"key":"usedBy","label":"使用關係／方向"},{"key":"condition","label":"使用條件"},{"key":"reason","label":"納入／排除理由"}]
+      "instructions": "先固定重建邊界。CORE 必含指定 Component 根；不以 delivered／custom 前綴決定核心。DEPENDENCY 須由核心追得實際使用鏈，提供逐跳證據；usedBy 寫呼叫者、方向與中間鏈，condition 寫何時使用，只描述最小契約。必需的 delivered 依賴同樣納入最小介面契約。EXCLUDED 保留簡短排除理由，不展開共用框架或其他業務。核心 Record 的原生欄位依 clone-contract「原生欄位無用判定」：判定無用者每個 Record 合成一筆 EXCLUDED（type FIELD），判不了或有使用跡象的欄位保留且不逐欄列。fieldUsage：每個 type RECORD 的 CORE／DEPENDENCY 項必填三種結論之一（排除 n 欄（FIELD 項 ID）／無可排除（查詢日）／判不了：原因代碼，見 clone-contract），其他項寫「不適用」。scope 項目 scopeRefs 為空；後續章節引用本 Component 已接受的 CORE／DEPENDENCY id。",
+      "fields": [{"key":"object","label":"物件"},{"key":"type","label":"型別"},{"key":"inclusion","label":"範圍分類"},{"key":"usedBy","label":"使用關係／方向"},{"key":"condition","label":"使用條件"},{"key":"reason","label":"納入／排除理由"},{"key":"fieldUsage","label":"原生欄位判定"}]
     },
     {
       "id": "flows", "title": "業務流程與操作順序", "allowNotApplicable": true,

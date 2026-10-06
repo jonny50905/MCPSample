@@ -80,7 +80,12 @@ if($Kind -eq 'RESEARCH'){
     if(@('field-clean','field-noise') -contains $mode -and $inp.topic -eq 'scope'){
         $value.evidence+=,[ordered]@{id='E2';kind='SQL';locator="SELECT COUNT(*) AS TOTAL_ROWS, SUM(CASE WHEN DEMO_UNUSED <> ' ' THEN 1 ELSE 0 END) AS DEMO_UNUSED FROM PS_DEMO_TBL FETCH FIRST 1 ROWS ONLY";excerpt='TOTAL_ROWS > 0；DEMO_UNUSED、DEMO_UNUSED_B 為 0'}
         $value.evidence+=,[ordered]@{id='E3';kind='SQL';locator="SELECT OBJECTVALUE1, RECNAME, REFNAME, COUNT(*) AS CNT FROM PSPCMNAME WHERE REFNAME IN ('DEMO_UNUSED','DEMO_UNUSED_B') GROUP BY OBJECTVALUE1, RECNAME, REFNAME FETCH FIRST 200 ROWS ONLY";excerpt='0 列'}
-        $value.items+=,[ordered]@{id='F01';scopeRefs=@();values=[ordered]@{object='DEMO_TBL：DEMO_UNUSED、DEMO_UNUSED_B';type='FIELD';inclusion='EXCLUDED';usedBy='a：交叉參照 0 列；b：核心路徑沒有讀寫此表的 SQL 文字類程式；c：無已記錄引用';condition='非預設 0 筆（全表非空，查詢日 2026-10-01）';reason='原生欄位無用：資料無值且核心路徑無指名引用'};evidenceIds=@('E2','E3')}
+        $value.items+=,[ordered]@{id='F01';scopeRefs=@();values=[ordered]@{object='DEMO_TBL：DEMO_UNUSED、DEMO_UNUSED_B';type='FIELD';inclusion='EXCLUDED';usedBy='a：交叉參照 0 列；b：核心路徑沒有讀寫此表的 SQL 文字類程式；c：無已記錄引用';condition='非預設 0 筆（全表非空，查詢日 2026-10-01）';reason='原生欄位無用：資料無值且核心路徑無指名引用';fieldUsage='不適用'};evidenceIds=@('E2','E3')}
+        $value.items+=,[ordered]@{id='R01';scopeRefs=@();values=[ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='DEPENDENCY';usedBy='存檔寫入';condition='每次存檔';reason='核心資料表';fieldUsage='排除 2 欄（F01）'};evidenceIds=@('E1')}
+    }
+    if(@('field-skip','field-unchecked') -contains $mode -and $inp.topic -eq 'scope'){
+        $usage='判不了：CHECK_INCOMPLETE（本輪未做剖析）'; if($mode -eq 'field-unchecked'){$usage='已看過'}
+        $value.items+=,[ordered]@{id='R01';scopeRefs=@();values=[ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='DEPENDENCY';usedBy='存檔寫入';condition='每次存檔';reason='核心資料表';fieldUsage=$usage};evidenceIds=@('E1')}
     }
     if($mode -eq 'field-noise' -and $inp.topic -eq 'ui'){$value.items[0].values.field='PS_DEMO_TBL.DEMO_UNUSED'}
     if(@('paged','repeat-cursor','late-na') -contains $mode -and $inp.topic -eq 'flows'){
@@ -266,8 +271,8 @@ $j=Get-BuildJob $rFieldClean
 $ptr=Read-BuildJson (Join-Path (Join-Path (Join-Path $rFieldClean 'docs/ps-spec') ([System.IO.Path]::GetFileName($j))) 'current.json')
 $fieldSpecText=Read-PsKnText -LiteralPath $ptr.specPath;$fieldGate=Read-BuildJson $ptr.gatePath
 Assert-Build ($fieldClean.Code -eq 'CLONE1-7-01' -and $fieldSpecText.Contains('| TW_DEMO_A | F01 | DEMO_TBL | DEMO_UNUSED、DEMO_UNUSED_B |') -and $fieldSpecText.Contains('合計：1 個 Record、2 個欄位。')) '欄位排除項經覆核後進不建置表'
-Assert-Build ($fieldGate.fieldUsage.excludedRecords -eq 1 -and $fieldGate.fieldUsage.excludedFields -eq 2 -and $fieldGate.fieldUsage.uiItems -eq 1 -and $fieldGate.fieldUsage.dataItems -eq 1) 'gate.json 帶欄位統計'
-Assert-Build ($fieldClean.Output -match '欄位統計：不建置 Record=1；不建置欄位=2；跨 Component 須建置=0；畫面項目=1；資料項目=1') 'CLI 輸出只有計數的欄位統計'
+Assert-Build ($fieldGate.fieldUsage.scopeRecords -eq 1 -and $fieldGate.fieldUsage.checkedRecords -eq 1 -and $fieldGate.fieldUsage.excludedRecords -eq 1 -and $fieldGate.fieldUsage.excludedFields -eq 2 -and $fieldGate.fieldUsage.uiItems -eq 1 -and $fieldGate.fieldUsage.dataItems -eq 1) 'gate.json 帶欄位統計'
+Assert-Build ($fieldClean.Output -match '欄位統計：範圍內 Record=1；已判定=1；判不了=0；不建置 Record=1；不建置欄位=2；跨 Component 須建置=0；畫面項目=1；資料項目=1') 'CLI 輸出只有計數的欄位統計'
 $rFieldNoise=New-BuildRoot 'field-noise'
 $fieldNoise=Invoke-Build $rFieldNoise 'TW_DEMO_A' 12 field-noise
 $j=Get-BuildJob $rFieldNoise;$rc=Get-BuildRecords $j 'receipts'
@@ -280,6 +285,14 @@ foreach($mode in @('forge-receipt','mutate-input')){
     if($mode -eq 'forge-receipt'){$q=Join-Path $r '.ps-runtime/clone-spec/quarantine';Assert-Build ((Test-Path -LiteralPath $q) -and @(Get-ChildItem -LiteralPath $q -File).Count -gt 0) '偽造收據隔離保留現場'}
     else{$inputs=Get-BuildRecords $j 'attempts';Assert-Build ($inputs.Count -eq 2 -and $inputs[0].component -eq 'TW_DEMO_A') '被改工單從圍欄原樣還原'}
 }
+$rFieldSkip=New-BuildRoot 'field-skip'
+$fieldSkip=Invoke-Build $rFieldSkip 'TW_DEMO_A' 22 field-skip
+if($fieldSkip.Code -ne 'CLONE1-7-01'){Write-Host $fieldSkip.Output}
+Assert-Build ($fieldSkip.Code -eq 'CLONE1-7-01' -and $fieldSkip.Output -match '欄位統計：範圍內 Record=1；已判定=0；判不了=1（CHECK_INCOMPLETE 1）；不建置 Record=0') '沒做判定只能寫判不了，統計看得出來'
+$rFieldUnchecked=New-BuildRoot 'field-unchecked'
+$fieldUnchecked=Invoke-Build $rFieldUnchecked 'TW_DEMO_A' 4 field-unchecked
+$j=Get-BuildJob $rFieldUnchecked;$rc=Get-BuildRecords $j 'receipts'
+Assert-Build ($fieldUnchecked.Code -ne 'CLONE1-7-01' -and $fieldUnchecked.Output -match 'FIELD_USAGE_REQUIRED' -and $rc.Count -eq 0) 'Record 沒有判定結論，scope 不驗收'
 Write-Host ('build tests: PASS=' + $script:testPass + ' FAIL=' + $script:testFail)
 Write-Host ('合成測試現場保留（可供本機排查）：' + $testBase)
 if($script:testFail -gt 0){exit 1}

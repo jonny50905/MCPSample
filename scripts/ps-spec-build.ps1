@@ -426,7 +426,9 @@ try {
             }
             Write-Host ('狀態：' + $state.Phase + '；本輪 session=' + $sessions + '；已接受頁=' + $state.Accepted.Count + '；待處理=' + $state.Work.Count)
             $fieldStats = Get-PsCloneFieldStats -Components $names -Packets @($state.Accepted | ForEach-Object { $_.Receipt.packet })
-            Write-Host ('欄位統計：不建置 Record=' + $fieldStats.excludedRecords + '；不建置欄位=' + $fieldStats.excludedFields + '；跨 Component 須建置=' + $fieldStats.crossComponentKept + '；畫面項目=' + $fieldStats.uiItems + '；資料項目=' + $fieldStats.dataItems)
+            $undeterminedText = [string]$fieldStats.undeterminedRecords
+            if ($fieldStats.undeterminedRecords -gt 0) { $undeterminedText += '（' + (Format-PsCloneUndeterminedCodes $fieldStats.undeterminedByCode) + '）' }
+            Write-Host ('欄位統計：範圍內 Record=' + $fieldStats.scopeRecords + '；已判定=' + $fieldStats.checkedRecords + '；判不了=' + $undeterminedText + '；不建置 Record=' + $fieldStats.excludedRecords + '；不建置欄位=' + $fieldStats.excludedFields + '；跨 Component 須建置=' + $fieldStats.crossComponentKept + '；畫面項目=' + $fieldStats.uiItems + '；資料項目=' + $fieldStats.dataItems)
             Write-Host ('入口：' + (Join-Path $outputRoot 'README.md'))
             $pointer = Read-CbJson (Join-Path $outputRoot 'current.json')
             if ($null -ne $pointer) { $label = '文件：'; if ([string]$pointer.revision -cne $revision.id) { $label = '前一版本文件（不是目前已覆核版本）：' }; Write-Host ($label + $pointer.specPath) }

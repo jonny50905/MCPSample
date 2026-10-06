@@ -38,6 +38,10 @@ bash 權限對「最後相符」與「最長相符」兩種語意都驗過（長
 本沙箱改用 PowerShell 7.4（Linux）跑測試：clone 128、build 35、spec、5.1 靜態守衛全過；test-oracle-runtime 需 PATH 上的
 opencode，沙箱無法跑。真 5.1 未驗——公司機搬完先跑 `test-spec-clone.ps1`、`test-spec-build.ps1`。下一步等試跑計數再決定第 3 階段。
 
+**判定覆蓋（2026-10-06，L131）**：補上「沒查」與「查了都在用」分不出來的缺口——scope 每個範圍內 Record 必填
+fieldUsage（排除 n 欄（FIELD 項 ID）／無可排除（查詢日）／判不了：封閉代碼），FIELD 項與其 Record 同頁互相對上；
+欄位統計開頭改為「範圍內 Record／已判定／判不了（代碼）」。clone 148、build 37 PASS。
+
 大領域（67 個 NN 檔）的稽核在單一 session 內撞 context 上限（auditor 子代理、單檔 37 列即爆），
 已改成**分批稽核**（L107）：外環 manifest → 每 session K 檔 → part 檔不變量發收據 → 收據齊備由外環
 合併 90-audit.md。第一次實跑失敗在「模型 exit 0 卻不寫任何檔」（b0/b1/b2 零產出），已把批次指令
