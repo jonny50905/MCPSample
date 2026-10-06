@@ -3533,3 +3533,33 @@
   同清單重跑建新版本。公司機尚未試跑；第 2 階段（外環確定性擋關）等試跑數字再做。
 - 教訓：「存在」不是「使用」。判無用的決定性證據要是查得到的正面事實（全表非預設值 0 筆），程式面只當安全網，
   判不了一律保留，才能全自動又不誤刪。寫進會被稽核重跑的文件的數值，要選不會自然漂移的斷言。
+
+### L130 只靠契約，模型寫錯的欄位照樣進正文——排除欄位要由外環確定性擋下（2026-10-06）
+
+- 症狀：L129 第 1 階段只改契約與指示；scope 判定無用的欄位若被 ui／data／規則頁寫進正文，結構驗證不會發現，
+  只能指望獨立覆核報 SCOPE_NOISE。重建端拿到的 Spec 也沒有一張明確的「不建置」清單，判定結果散在範圍表裡。
+- 根因：SCOPE_REF_EXCLUDED 只擋 scopeRefs 引用排除項 ID，不看 values 文字；判定無用的欄位沒有可機械比對的格式，
+  外環無從得知哪些 Record.Field 不該出現。
+- 落點（ps-spec-clone-lib）：
+  - scope 的 type FIELD 項：type 大小寫要精確（FIELD_TYPE_CASE，否則小寫就繞過全部檢查）；只准 EXCLUDED（FIELD_SCOPE_EXCLUDED_ONLY）；object 照 `<RECORD>：<FIELD>、…` 解析，
+    原名大寫，半形冒號與逗號也收（FIELD_EXCLUSION_OBJECT_INVALID）；condition 必須是「非預設 0 筆（全表非空，查詢日
+    合法日期）」斷言，半形標點也收（FIELD_EXCLUSION_CONDITION_INVALID）；usedBy 要有 a／b／c 三種查法標記
+    （FIELD_EXCLUSION_CHECKS_REQUIRED）；evidenceIds 要有 COUNT／SUM 的資料彙總 SQL 與 PSPCMNAME 交叉參照 SQL
+    （FIELD_EXCLUSION_DATA_SQL_REQUIRED／XREF_SQL_REQUIRED）。
+  - 正文頁：任何 values 寫到排除的 Record.Field（大小寫不拘、含 PS_ 實體表前綴）、或 data 類 record＋field 欄指到排除欄位
+    → FIELD_EXCLUDED_IN_BODY:<item>:<RECORD.FIELD>（錯誤帶名稱，供重試的 worker 修正；只在公司機本地顯示）。
+    相近名稱（前後多字元、別的 Record 同名欄位）不誤判。
+  - render：一般範圍表不再列 FIELD 項，改列「不建置的原生欄位」表＋合計；沒有排除項時明寫「無」。
+    多 Component 時，被某 Component 判無用、但其他 Component 正文引用的欄位移出不建置表、另列「整體重建須建置」——
+    同一實體表在重建端只有一份。
+  - 計數：Get-PsCloneFieldStats 進 gate.json 的 fieldUsage，CLI 另印一行「欄位統計」；只有計數，ps-spec-author 原樣轉述，
+    可回報維護端。
+- 設計取捨：
+  - 查詢日 90 天的時效不放進驗證器：已接受收據每輪都會重驗，依今天日期判斷會讓同一份收據過幾個月後失效；時效留給契約與覆核。
+  - 沒有限定 Record 的欄位名（ui 只寫欄位名）無法確定屬於哪個 Record，不比對，避免誤擋；契約本來就要求 ui 寫 Record.Field。
+  - 證據 excerpt 不掃描：引用的程式段落本來就可能出現排除欄位。
+  - 改 lib 會改來源指紋，舊 job 進新 revision；舊收據只在原 revision 內重驗，不會被新規則誤擋。
+- 驗證：沙箱以 PowerShell 7.4（Linux）跑——test-spec-clone 128 PASS（原 88＋40）、test-spec-build 35 PASS（原 31＋4：
+  欄位排除經覆核進不建置表、gate.json 欄位統計、CLI 計數行、正文寫到排除欄位不驗收）、test-spec、test-ps51-static 0 阻擋；
+  真 Windows PowerShell 5.1 未在本沙箱執行，公司機搬完先跑兩套 Spec 測試。generic／transfer manifest 以真 PowerShell 腳本重生。
+- 教訓：契約規定「不得寫」的東西，要給它一個可機械比對的形狀，外環才擋得住；擋關訊息要指名是哪個欄位，重試才收斂。

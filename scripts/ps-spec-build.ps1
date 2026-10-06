@@ -327,7 +327,7 @@ function Publish-Cb($State) {
     }
     $spec = ConvertTo-PsCloneSpec -Components $names -Packets $packets -Profile $profile -Status $State.Phase -Gaps $gaps
     $trace = ConvertTo-PsCloneTrace -Components $names -Packets $packets -Profile $profile -Status $State.Phase -Gaps $gaps
-    $gate = [ordered]@{ schemaVersion = 1; jobId = $jobId; revision = $revision.id; sourceHash = $revision.sourceHash; status = $State.Phase; components = @($names); acceptedPages = $packets.Count; gaps = @($gaps); assurance = '結構驗證及不同 session 的 LLM 覆核；不是企業環境 E2E，也不是重建功能保證。'; receipts = @($State.Accepted | ForEach-Object { $_.Path }) }
+    $gate = [ordered]@{ schemaVersion = 1; jobId = $jobId; revision = $revision.id; sourceHash = $revision.sourceHash; status = $State.Phase; components = @($names); acceptedPages = $packets.Count; gaps = @($gaps); fieldUsage = (Get-PsCloneFieldStats -Components $names -Packets $packets); assurance = '結構驗證及不同 session 的 LLM 覆核；不是企業環境 E2E，也不是重建功能保證。'; receipts = @($State.Accepted | ForEach-Object { $_.Path }) }
     $generation = (Get-PsKnTextHash -Text ($spec + "`n" + $trace + "`n" + (ConvertTo-PsKnJson -Value $gate -SortKeys))).Substring(0, 24).ToLowerInvariant()
     $dir = Join-Path (Join-Path $outputRoot 'generated') $generation
     foreach ($item in @(@{ Name = 'spec.md'; Text = $spec }, @{ Name = 'trace.md'; Text = $trace }, @{ Name = 'gate.json'; Text = ((ConvertTo-PsKnJson -Value $gate -SortKeys) + "`n") })) {
@@ -425,6 +425,8 @@ try {
                 Write-CbJson (Join-Path $jobRoot 'job.json') ([ordered]@{ schemaVersion = 1; jobId = $jobId; components = @($names); revision = $revision.id; budget = $budget; status = $state.Phase; sourceHash = $revision.sourceHash; updatedAt = (Get-PsKnUtcStamp) })
             }
             Write-Host ('狀態：' + $state.Phase + '；本輪 session=' + $sessions + '；已接受頁=' + $state.Accepted.Count + '；待處理=' + $state.Work.Count)
+            $fieldStats = Get-PsCloneFieldStats -Components $names -Packets @($state.Accepted | ForEach-Object { $_.Receipt.packet })
+            Write-Host ('欄位統計：不建置 Record=' + $fieldStats.excludedRecords + '；不建置欄位=' + $fieldStats.excludedFields + '；跨 Component 須建置=' + $fieldStats.crossComponentKept + '；畫面項目=' + $fieldStats.uiItems + '；資料項目=' + $fieldStats.dataItems)
             Write-Host ('入口：' + (Join-Path $outputRoot 'README.md'))
             $pointer = Read-CbJson (Join-Path $outputRoot 'current.json')
             if ($null -ne $pointer) { $label = '文件：'; if ([string]$pointer.revision -cne $revision.id) { $label = '前一版本文件（不是目前已覆核版本）：' }; Write-Host ($label + $pointer.specPath) }

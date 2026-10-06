@@ -922,8 +922,12 @@ powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_
   （EXCLUDED、類型 FIELD、每個 Record 一列），正文不寫；其他一律保留。判不了（沒有實體表、空表、LOB、
   非 PROD、逾時、查法沒做完）就保留，不算缺口、不停下來等人。查法見 cookbook §7，規則見 clone-contract
   「原生欄位無用判定」。誤判（其實有用）時後續章節會列缺口，修正後「重新查證」。
-- 試跑回報給維護端只用計數：範圍表中 FIELD 排除項列數、被排除的欄位數、畫面章節欄位數、耗時、委派次數；
-  不回物件名或欄位名。
+- 外環確定性擋關：正文任何欄位寫到判定無用的 Record.Field（含 PS_ 實體表名、data 的 record＋field 欄），
+  該頁不驗收（`FIELD_EXCLUDED_IN_BODY`）；排除項格式、資料剖析斷言、a／b／c 三種查法、資料彙總與交叉參照
+  兩筆 SQL 證據缺一、type 大小寫不精確也不驗收（`FIELD_EXCLUSION_*`／`FIELD_TYPE_CASE`）。spec.md 另有「不建置的原生欄位」表與合計；
+  被某 Component 判無用、但其他 Component 正文仍引用的欄位不列入不建置表，另列「整體重建須建置」。
+- 試跑回報給維護端只用計數：輸出（與 gate.json 的 fieldUsage）中的「欄位統計」行——不建置 Record／欄位數、
+  跨 Component 須建置數、畫面與資料項目數——加上耗時、委派次數；不回物件名或欄位名。
 
 ### 狀態、恢復與保證界線
 

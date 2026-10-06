@@ -77,6 +77,12 @@ if($Kind -eq 'RESEARCH'){
     }
     $value=[ordered]@{schemaVersion=1;component=$inp.component;topic=$inp.topic;coverage='COMPLETE';summary='本合成主題的具體行為。';items=$items;evidence=@([ordered]@{id='E1';kind='CHUNK';locator='3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d';excerpt='If DEMO_STATUS = "A" Then'});gaps=@();nextCursor=''}
     if($mode -eq 'partial' -and $inp.topic -eq 'scope'){$value.coverage='PARTIAL';$value.gaps=@('仍缺核心欄位證據')}
+    if(@('field-clean','field-noise') -contains $mode -and $inp.topic -eq 'scope'){
+        $value.evidence+=,[ordered]@{id='E2';kind='SQL';locator="SELECT COUNT(*) AS TOTAL_ROWS, SUM(CASE WHEN DEMO_UNUSED <> ' ' THEN 1 ELSE 0 END) AS DEMO_UNUSED FROM PS_DEMO_TBL FETCH FIRST 1 ROWS ONLY";excerpt='TOTAL_ROWS > 0；DEMO_UNUSED、DEMO_UNUSED_B 為 0'}
+        $value.evidence+=,[ordered]@{id='E3';kind='SQL';locator="SELECT OBJECTVALUE1, RECNAME, REFNAME, COUNT(*) AS CNT FROM PSPCMNAME WHERE REFNAME IN ('DEMO_UNUSED','DEMO_UNUSED_B') GROUP BY OBJECTVALUE1, RECNAME, REFNAME FETCH FIRST 200 ROWS ONLY";excerpt='0 列'}
+        $value.items+=,[ordered]@{id='F01';scopeRefs=@();values=[ordered]@{object='DEMO_TBL：DEMO_UNUSED、DEMO_UNUSED_B';type='FIELD';inclusion='EXCLUDED';usedBy='a：交叉參照 0 列；b：核心路徑沒有讀寫此表的 SQL 文字類程式；c：無已記錄引用';condition='非預設 0 筆（全表非空，查詢日 2026-10-01）';reason='原生欄位無用：資料無值且核心路徑無指名引用'};evidenceIds=@('E2','E3')}
+    }
+    if($mode -eq 'field-noise' -and $inp.topic -eq 'ui'){$value.items[0].values.field='PS_DEMO_TBL.DEMO_UNUSED'}
     if(@('paged','repeat-cursor','late-na') -contains $mode -and $inp.topic -eq 'flows'){
         $value.items[0].id='flows-'+$inp.page
         $value.items[0].values.scenario='FLOW_PAGE_'+$inp.page
@@ -252,6 +258,20 @@ $rNoise=New-BuildRoot 'scope-noise'
 $noise=Invoke-Build $rNoise 'TW_DEMO_A' 4 scope-noise
 $j=Get-BuildJob $rNoise;$rc=Get-BuildRecords $j 'receipts'
 Assert-Build ($noise.Output -match 'SCOPE_REF_EXCLUDED' -and @($rc | Where-Object {$_.topic -eq 'flows'}).Count -eq 0) 'EXCLUDED 雜訊不得污染核心正文'
+# 原生欄位無用判定：判定無用的欄位只出現在不建置表；正文寫到就不驗收。
+$rFieldClean=New-BuildRoot 'field-clean'
+$fieldClean=Invoke-Build $rFieldClean 'TW_DEMO_A' 22 field-clean
+if($fieldClean.Code -ne 'CLONE1-7-01'){Write-Host $fieldClean.Output}
+$j=Get-BuildJob $rFieldClean
+$ptr=Read-BuildJson (Join-Path (Join-Path (Join-Path $rFieldClean 'docs/ps-spec') ([System.IO.Path]::GetFileName($j))) 'current.json')
+$fieldSpecText=Read-PsKnText -LiteralPath $ptr.specPath;$fieldGate=Read-BuildJson $ptr.gatePath
+Assert-Build ($fieldClean.Code -eq 'CLONE1-7-01' -and $fieldSpecText.Contains('| TW_DEMO_A | F01 | DEMO_TBL | DEMO_UNUSED、DEMO_UNUSED_B |') -and $fieldSpecText.Contains('合計：1 個 Record、2 個欄位。')) '欄位排除項經覆核後進不建置表'
+Assert-Build ($fieldGate.fieldUsage.excludedRecords -eq 1 -and $fieldGate.fieldUsage.excludedFields -eq 2 -and $fieldGate.fieldUsage.uiItems -eq 1 -and $fieldGate.fieldUsage.dataItems -eq 1) 'gate.json 帶欄位統計'
+Assert-Build ($fieldClean.Output -match '欄位統計：不建置 Record=1；不建置欄位=2；跨 Component 須建置=0；畫面項目=1；資料項目=1') 'CLI 輸出只有計數的欄位統計'
+$rFieldNoise=New-BuildRoot 'field-noise'
+$fieldNoise=Invoke-Build $rFieldNoise 'TW_DEMO_A' 12 field-noise
+$j=Get-BuildJob $rFieldNoise;$rc=Get-BuildRecords $j 'receipts'
+Assert-Build ($fieldNoise.Code -ne 'CLONE1-7-01' -and $fieldNoise.Output -match 'FIELD_EXCLUDED_IN_BODY' -and @($rc | Where-Object {$_.topic -eq 'ui'}).Count -eq 0 -and @($rc | Where-Object {$_.topic -eq 'scope'}).Count -eq 1) '正文寫到判定無用的欄位不得驗收'
 foreach($mode in @('forge-receipt','mutate-input')){
     $r=New-BuildRoot $mode
     $result=Invoke-Build $r 'TW_DEMO_A' 2 $mode

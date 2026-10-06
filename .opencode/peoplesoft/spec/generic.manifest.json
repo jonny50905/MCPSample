@@ -9,7 +9,7 @@
     },
     {
       "path": ".opencode/agent/ps-spec-author.md",
-      "sha256": "66C7F13A7C65CCFA381EBB71446F20181FDC3BAA15AB278E2188964C3FBEB758",
+      "sha256": "B2F0689A6DA46448DF69EA21F3BCF3F3076263710C580FD50247C0B1A0733F9B",
       "lines": 66
     },
     {
@@ -94,13 +94,13 @@
     },
     {
       "path": "scripts/ps-spec-build.ps1",
-      "sha256": "3A71327BAE57B516DE5648620DD74C072719DB44FB86D5399CD9027E001B928B",
-      "lines": 451
+      "sha256": "467973B1906C57A9FC704A260267F2AC209C3FC80A7F78311E358A4940152B58",
+      "lines": 453
     },
     {
       "path": "scripts/ps-spec-clone-lib.ps1",
-      "sha256": "B014176951C8F992A937F38CD0E4E7476AEB380F5B8F5F4887C92B9D7454206F",
-      "lines": 283
+      "sha256": "4B93E134132E50D84F9C750C26BB80B89BCC550C550CCB8DC29522D9D1E890F5",
+      "lines": 452
     },
     {
       "path": "scripts/ps-spec-lib.ps1",

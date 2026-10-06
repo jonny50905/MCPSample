@@ -32,6 +32,12 @@ bash 權限對「最後相符」與「最長相符」兩種語意都驗過（長
 後續階段：2 外環確定性擋關（ui／data 出現排除欄位即擋、Spec 產出不建置欄位表）→ 3 知識層回寫與補研究 →
 4 公司 template 路徑（SOP-24）同一判定。先等公司機試跑回報計數（SOP-25「寫什麼、排除什麼」末兩條）。
 
+**第 2 階段（2026-10-06，L130）已落地**：ps-spec-clone-lib 對 scope FIELD 排除項驗格式／斷言／a・b・c／兩筆 SQL，
+正文寫到排除的 Record.Field 即 FIELD_EXCLUDED_IN_BODY 不驗收；spec.md 新增「不建置的原生欄位」表（跨 Component
+仍被引用者另列須建置）；gate.json `fieldUsage` 與 CLI「欄位統計」行只有計數，ps-spec-author 轉述、可回報維護端。
+本沙箱改用 PowerShell 7.4（Linux）跑測試：clone 128、build 35、spec、5.1 靜態守衛全過；test-oracle-runtime 需 PATH 上的
+opencode，沙箱無法跑。真 5.1 未驗——公司機搬完先跑 `test-spec-clone.ps1`、`test-spec-build.ps1`。下一步等試跑計數再決定第 3 階段。
+
 大領域（67 個 NN 檔）的稽核在單一 session 內撞 context 上限（auditor 子代理、單檔 37 列即爆），
 已改成**分批稽核**（L107）：外環 manifest → 每 session K 檔 → part 檔不變量發收據 → 收據齊備由外環
 合併 90-audit.md。第一次實跑失敗在「模型 exit 0 卻不寫任何檔」（b0/b1/b2 零產出），已把批次指令
