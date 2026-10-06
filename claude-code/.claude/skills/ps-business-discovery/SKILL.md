@@ -174,7 +174,7 @@ a dependency of a TW_ custom object.
 
 ## Orchestrator 模式（小 context 部署）
 
-地端小 context 模型建議用 `.claude/agents/ps-orchestrator.md`（主代理；專案預設，直接 `claude` 即是）
+地端小 context 模型建議用 `.claude/agents/ps-orchestrator.md`（主代理；以 `claude --agent ps-orchestrator` 啟動）
 承載本 skill：本 skill 只做 domain 解析與根物件定位；長文本檢索一律依
 orchestrator 的委派表派給 ps-* subagents，主 context 只保留
 `subagent-report-contract.md` 格式的 JSON 報告，不累積 raw chunks。

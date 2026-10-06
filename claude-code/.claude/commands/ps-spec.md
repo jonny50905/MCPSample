@@ -4,9 +4,9 @@ argument-hint: <Component...>
 disable-model-invocation: true
 ---
 
-本指令的主代理是 ps-orchestrator 時，以 Agent 工具委派 ps-spec-author（`subagent_type`＝`ps-spec-author`，prompt 只傳下列清單與產文意圖）；
-主代理是 ps-spec-author（`claude --agent ps-spec-author`）時直接照流程做。其他主代理不要執行任何步驟，只回覆一行：
-請在預設主代理（直接 `claude`）下 `/ps-spec $ARGUMENTS`，或以 `claude --agent ps-spec-author` 開新 session 輸入清單。
+主代理是 ps-spec-author（`claude --agent ps-spec-author`）時直接照流程做；其他 session 以 Agent 工具委派 ps-spec-author
+（`subagent_type`＝`ps-spec-author`，prompt 只傳下列清單與產文意圖）。沒有 Agent 工具時不要執行任何步驟，只回覆一行：
+請以 `claude --agent ps-spec-author` 開新 session 輸入清單。
 
 為以下 Component 產製或續跑核心功能重建 Spec：
 

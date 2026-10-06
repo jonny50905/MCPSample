@@ -3639,3 +3639,19 @@
   保留本機／更新／衝突／設定檔無基準／scripts 一律更新／必刪舊檔與備份；截斷、內容被改、路徑跳出、他版路徑都整包拒絕；OpenCode 版含 AGENTS.md）。
   真 Windows PowerShell 5.1 未在本沙箱執行（5.1 靜態守衛 0 阻擋）。
 - 教訓：人工搬運的痛點要從「搬運單位」解，不是從「清單寫得更好」解；一次搬一個可驗證的整包，比逐檔核對行數可靠也快。
+
+### L134 預設主代理把整個專案鎖進問答白名單——出問題時連修都不能修（2026-10-06）
+
+- 症狀：管理者在公司機首搬 Claude Code 版實測：`.claude/settings.json` 設 `"agent": "ps-orchestrator"`，直接 `claude` 開出來就是
+  問答主代理（只有 Read／Grep／Glob／Agent／connect），而 hook 又擋掉非 ps-* 子代理——專案有問題時，在同一個資料夾找不到能改檔、
+  跑命令的 Claude。
+- 根因：照搬 OpenCode「建議 default_agent＝ps-orchestrator」的便利設定，沒考慮 Claude Code 版的管理者也用同一個資料夾做維護；
+  主代理白名單與 hook 的嚴格委派規則都是為「問答 session」設計，套到所有 session 就變成鎖死。
+- 落點：
+  - `settings.json` 拿掉 `agent`：直接 `claude`＝一般 session（維護、排錯）；問答 `claude --agent ps-orchestrator`。
+    CLAUDE.md、claude-code/README、SOP-26、ps-business-discovery、/ps-spec（任何有 Agent 工具的 session 都委派 ps-spec-author）同步。
+  - hook：Agent 委派的嚴格白名單只在呼叫者是 ps-* 主代理時套用（hook 輸入的 `agent_type`；一般 session 沒有這個欄位）；
+    skill 名與主代理專用名不論誰呼叫都擋（那是路由錯誤）。CLAUDE.md 新增「一般 session」節：業務問題仍照流程，改了框架檔要回報維護端。
+- 驗證：test-claude-variant 加一般 session 可派 Explore／省略 subagent_type、主代理專用名照擋、ps-* 主代理照舊嚴格；
+  run-e2e 加 plain 情境（真 CLI：一般 session 委派 Explore，hook 不擋），qa／cmd 改用 `--agent ps-orchestrator`。
+- 教訓：給「使用者 session」的限制要掛在那個角色上（agent 定義、`--agent`），不要掛成專案預設——管理者永遠需要一個沒被鎖的入口。

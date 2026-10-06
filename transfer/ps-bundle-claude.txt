@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit eb638bd）
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 6b303fe）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|claude|eb638bd|93
+@@@PSBUNDLE|1|claude|6b303fe|93
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44|0
 ---
 name: ps-ae-flow
@@ -1906,16 +1906,16 @@ attemptId 是最後一個連字號之後的 `a` 加四位數字（例 `a0003`）
 
 **最終回覆只准一行：「已寫 <路徑>」**。不得反問、不得婉拒。
 @@@PSBUNDLE-END|.claude/commands/ps-spec-batch.md
-@@@PSBUNDLE-FILE|.claude/commands/ps-spec.md|16|cba0eeed472a73fb35659e9232109bfab37480753384280b954d053f1dd38d88|0
+@@@PSBUNDLE-FILE|.claude/commands/ps-spec.md|16|fbb1afe81fc8228882d7cf1726f54b0be7f2d7b908b46938bab5358fec7e0c66|0
 ---
 description: 輸入一個或多個 Component，自動產生／續跑供獨立 LLM 重建核心功能的繁體中文 Spec
 argument-hint: <Component...>
 disable-model-invocation: true
 ---
 
-本指令的主代理是 ps-orchestrator 時，以 Agent 工具委派 ps-spec-author（`subagent_type`＝`ps-spec-author`，prompt 只傳下列清單與產文意圖）；
-主代理是 ps-spec-author（`claude --agent ps-spec-author`）時直接照流程做。其他主代理不要執行任何步驟，只回覆一行：
-請在預設主代理（直接 `claude`）下 `/ps-spec $ARGUMENTS`，或以 `claude --agent ps-spec-author` 開新 session 輸入清單。
+主代理是 ps-spec-author（`claude --agent ps-spec-author`）時直接照流程做；其他 session 以 Agent 工具委派 ps-spec-author
+（`subagent_type`＝`ps-spec-author`，prompt 只傳下列清單與產文意圖）。沒有 Agent 工具時不要執行任何步驟，只回覆一行：
+請以 `claude --agent ps-spec-author` 開新 session 輸入清單。
 
 為以下 Component 產製或續跑核心功能重建 Spec：
 
@@ -1958,16 +1958,17 @@ disable-model-invocation: true
 - 寫收據用整檔 Write，寫完 Read 回來確認三張表都在。**最終回覆只准一行：「已寫 <收據路徑>」**。
   不得反問、不得婉拒、不得先輸出計畫。
 @@@PSBUNDLE-END|.claude/commands/ps-supplement.md
-@@@PSBUNDLE-FILE|.claude/hooks/ps-runtime-guard.ps1|384|0d6f0941e2d26cd037896af2cfe8511b2a2f3e08c92de045332baaad3860e277|1
+@@@PSBUNDLE-FILE|.claude/hooks/ps-runtime-guard.ps1|388|b7e8035c70f665881d6b26e58605f24674d4d43b73786c7475c02efb982052cc|1
 # ps-runtime-guard.ps1 — Claude Code hook：無狀態 guard，沒有派工閘門、沒有 READY／todo 狀態機
 #
 # -Mode pre（.claude/settings.json 的 PreToolUse，matcher：mcp__oracleMCP__connect|Agent|Task）
 #   (1) Oracle connect 目標：本次 connection_name 必須等於 profile oracle.connectionName。
 #       未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；不一致或沒帶 → ORACLE_CONNECTION_MISMATCH；工具不執行、不改參數。
 #       env PS_ORACLE_CONNECT_GUARD=observe 或 profile oracle.connectGuard: observe → 只記錄不擋（enforce 為預設）。
-#   (2) Agent 委派目標：subagent_type 只准 .claude/agents 裡可當子代理的 ps-* agent。
-#       skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker）、內建或不存在的代理、
-#       沒帶 subagent_type（＝內建 general-purpose）→ PS_TASK_TARGET_INVALID（訊息指出該派誰）。
+#   (2) Agent 委派目標：skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker）一律擋；
+#       呼叫者是 ps-* 主代理（hook 輸入的 agent_type）時更嚴：只准 .claude/agents 裡可當子代理的 ps-* agent——內建或不存在的代理、
+#       沒帶 subagent_type（＝內建 general-purpose）也擋。一般 session（沒有 --agent，agent_type 空）可用內建代理做維護／排錯。
+#       擋＝PS_TASK_TARGET_INVALID（訊息指出該派誰）。
 # -Mode post（PostToolUse，matcher：Agent|Task）
 #   (3) 子代理報告的 suggestedNext[].agent 是 skill 名或不是可委派的 agent → 以 additionalContext 附一段
 #       「[ps-runtime-guard] …」註記（報告本文不動）。
@@ -2127,12 +2128,13 @@ function Get-PsGuardDelegatable {
 
 # 委派目標檢查：回 $null＝可執行；否則 @{ Code; Kind; Carrier; Message }
 function Get-PsGuardTargetProblem {
-    param([string]$Target)
+    param([string]$Target, [bool]$Strict = $true)
     $agents = Get-PsGuardAgentNames
     $skills = Get-PsGuardSkillNames
     $list = (Get-PsGuardDelegatable) -join '／'
     $tail = '這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要 connect、不要重新連線 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。'
     if ($Target -eq '') {
+        if (-not $Strict) { return $null }
         return @{ Code = $script:CodeTarget; Kind = 'missing'; Carrier = ''; Message = ($script:CodeTarget + '：本次 Agent 委派未執行——沒有指定 subagent_type（會落到內建 general-purpose，查不到 PeopleSoft）。可委派的 agent：' + $list + '。' + $tail) }
     }
     if ($agents.ContainsKey($Target)) {
@@ -2156,6 +2158,7 @@ function Get-PsGuardTargetProblem {
         }
         return @{ Code = $script:CodeTarget; Kind = 'skill'; Carrier = $carrier; Message = ($script:CodeTarget + '：本次 Agent 委派未執行——「' + $Target + '」是 skill（' + $where + '），不是可委派的 agent。' + $next + $tail) }
     }
+    if (-not $Strict) { return $null }
     return @{ Code = $script:CodeTarget; Kind = 'unknown'; Carrier = ''; Message = ($script:CodeTarget + '：本次 Agent 委派未執行——「' + $Target + '」不是本專案的 ps-* 子代理（內建代理與其他代理查不到 PeopleSoft）。可委派的 agent：' + $list + '。' + $tail) }
 }
 
@@ -2268,7 +2271,8 @@ function Invoke-PsGuardPre {
     }
     if ($tool -eq 'Agent' -or $tool -eq 'Task') {
         $target = ([string](Get-PsGuardProp $ti 'subagent_type')).Trim()
-        $prob = Get-PsGuardTargetProblem -Target $target
+        # ps-* 主代理（--agent 啟動，hook 輸入帶 agent_type）走嚴格白名單；一般 session 只擋 skill 名與主代理專用名
+        $prob = Get-PsGuardTargetProblem -Target $target -Strict ($agent.StartsWith('ps-'))
         if ($null -eq $prob) { Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'allow' -Code $target -Session $session; return }
         Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'deny' -Code ($prob.Code + ':' + $prob.Kind) -Session $session
         Write-PsGuardDeny -Reason $prob.Message
@@ -4814,7 +4818,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 （無）
 @@@PSBUNDLE-END|.claude/peoplesoft/spec/examples/pack-c/template-bound.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/spec/generic.manifest.json|116|a2758c6acd5f9a90e1742b87a7a4bbb991152fdb5e3f5846af9ba787b3b94d9c|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/spec/generic.manifest.json|116|490fa9242d18d0eeff32b106e9019065ef2b63c82acda887aea07d45d78fde34|0
 {
   "schemaVersion": 1,
   "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
@@ -4846,7 +4850,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".claude/commands/ps-spec.md",
-      "sha256": "CBA0EEED472A73FB35659E9232109BFAB37480753384280B954D053F1DD38D88",
+      "sha256": "FBB1AFE81FC8228882D7CF1726F54B0BE7F2D7B908B46938BAB5358FEC7E0C66",
       "lines": 17
     },
     {
@@ -5523,11 +5527,10 @@ BLOCKED(NOT_CONNECTED) 只重連重派一次。
 - 不得反問、不得婉拒、不得先輸出計畫；第 0 步（Oracle 連線）照你 system prompt 先做，接著就 Read 工單
   （兩者之間不做別的事）。
 @@@PSBUNDLE-END|.claude/peoplesoft/supplemental-contract.md
-@@@PSBUNDLE-FILE|.claude/settings.json|55|589c82b6af2b793f048b2bf14a1790c99fc9b85829aaef831bfd8cbdb9b9dcc8|0
+@@@PSBUNDLE-FILE|.claude/settings.json|54|6d70c3b88806eaa04cb19fd98559e7a5d28e8c8db48b22707a507769418b39f3|0
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "sonnet",
-  "agent": "ps-orchestrator",
   "env": {
     "BASH_MAX_TIMEOUT_MS": "7200000",
     "ENABLE_TOOL_SEARCH": "false"
@@ -5646,7 +5649,7 @@ Classify each conclusion as CONFIRMED, INFERRED, or DYNAMIC_RUNTIME.
 - `.claude/peoplesoft/progressive-source-retrieval.md`（AE_SQL 遵守共用協定）
 - `.claude/peoplesoft/customization-profile.yaml`
 @@@PSBUNDLE-END|.claude/skills/ps-ae-flow/SKILL.md
-@@@PSBUNDLE-FILE|.claude/skills/ps-business-discovery/SKILL.md|187|96da3cf1931fadee647602b269f5d449a6e96fe3330aef8034d3dcf0bbf5fbfc|0
+@@@PSBUNDLE-FILE|.claude/skills/ps-business-discovery/SKILL.md|187|2584f96952784c750253eaba6ab8b35947dc6fffbc307142850b303dc8027ed8|0
 ---
 name: ps-business-discovery
 description: PeopleSoft 業務問題入口（例：兵役資料在哪裡維護？）— 解析 business domain 與客製政策（CUSTOM_ONLY_ROOTS / CUSTOM_FIRST），定位業務根物件。
@@ -5823,7 +5826,7 @@ a dependency of a TW_ custom object.
 
 ## Orchestrator 模式（小 context 部署）
 
-地端小 context 模型建議用 `.claude/agents/ps-orchestrator.md`（主代理；專案預設，直接 `claude` 即是）
+地端小 context 模型建議用 `.claude/agents/ps-orchestrator.md`（主代理；以 `claude --agent ps-orchestrator` 啟動）
 承載本 skill：本 skill 只做 domain 解析與根物件定位；長文本檢索一律依
 orchestrator 的委派表派給 ps-* subagents，主 context 只保留
 `subagent-report-contract.md` 格式的 JSON 報告，不累積 raw chunks。
@@ -6737,7 +6740,7 @@ Choice Values：低基數最多回傳 100 個；
 - `.claude/peoplesoft/customization-profile.yaml`（origin / prefix 過濾）
 - `.claude/peoplesoft/mcp-tool-contracts.md`
 @@@PSBUNDLE-END|.claude/skills/ps-ui-flow/SKILL.md
-@@@PSBUNDLE-FILE|CLAUDE.md|71|76e02999c4fc944eda015ff50fb2cd821674212d62a4f27d1b45f2d4193c232b|0
+@@@PSBUNDLE-FILE|CLAUDE.md|79|72cb7c4014fd9635cfdcbc6506745dfd72db858b877aa0c1ea378230d91debc4|0
 # CLAUDE.md — Claude Code 專案指引（PeopleSoft 知識庫分析框架）
 
 ## 這個專案是什麼
@@ -6753,9 +6756,10 @@ Choice Values：低基數最多回傳 100 個；
 
 | 要做什麼 | 啟動方式 |
 |---|---|
-| 業務問答 | `claude`（專案預設主代理 ps-orchestrator）或 `claude --agent ps-orchestrator` |
+| 業務問答 | `claude --agent ps-orchestrator` |
 | 產完整業務文件、稽核、教訓、知識指正 | `claude --agent ps-deep-research`，再下 `/ps-research <領域>`、`/ps-audit <領域>`、`/ps-lesson <描述>`、`/ps-correct <正確知識>` |
-| 以 Component 產重建 Spec | `/ps-spec <Component...>`（ps-orchestrator 會委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
+| 以 Component 產重建 Spec | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
+| 框架維護、排錯、看 log | `claude`（一般 session：沒有主代理限制） |
 
 `ps-spec-worker`、`ps-clone-worker` 只由外環 headless 啟動；`/ps-audit-batch`、`/ps-supplement`、`/ps-spec-batch`、
 `/ps-clone-batch` 只供外環呼叫。
@@ -6800,6 +6804,13 @@ Choice Values：低基數最多回傳 100 個；
    - 不可一次載入整支 PeopleCode / SQL / SQR / SQC。
 4. 子代理回報一律依 `.claude/peoplesoft/subagent-report-contract.md`
    （單一 JSON、單段引用 ≤ 5 行、必附 evidence IDs）。
+
+## 一般 session（沒有 `--agent`）
+
+- 用途是框架維護與排錯（看 log、跑腳本、修設定）。PeopleSoft 業務問題仍照上方流程：建議改用 `claude --agent ps-orchestrator`；
+  在一般 session 回答時同樣先開線、查知識層、委派 ps-* 子代理，不自己直接檢索原始碼或查 DB。
+- 改了框架檔（`.claude/**`、`scripts/**`、`CLAUDE.md`）要告訴使用者改了哪個檔、為什麼，請使用者回報維護端：
+  下次搬運包會把 `scripts/**` 換回維護端版本；`.claude/**` 本機改過的檔會保留，但兩邊都改時另存 `.incoming` 待合併。
 
 ## 一般規則
 
@@ -20581,7 +20592,7 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-bundle.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|372|53e19149fe7e826f3551d7d23e17c900ee917be1f77d7237dcc88dfe17d373eb|1
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|377|1c7b7d85b5b28eabad2f4109407ca52a48352260984135ba67cb618fefcfd472|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
 #       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
@@ -20757,7 +20768,7 @@ if ($null -ne $settings) {
     $deny = @($settings.permissions.deny)
     $preCmd = [string]$settings.hooks.PreToolUse[0].hooks[0].command
     $postCmd = [string]$settings.hooks.PostToolUse[0].hooks[0].command
-    Assert ([string]$settings.model -eq 'sonnet' -and [string]$settings.agent -eq 'ps-orchestrator') "settings：模型 sonnet、預設主代理 ps-orchestrator"
+    Assert ([string]$settings.model -eq 'sonnet' -and $null -eq $settings.PSObject.Properties['agent']) "settings：模型 sonnet、不設預設主代理（直接 claude＝一般 session，可做維護排錯）"
     Assert ($allow -contains 'mcp__oracleMCP__connect' -and $allow -contains 'mcp__oracleMCP__sql_run' -and $allow -contains 'Edit(./docs/ps-research/**)' -and $deny -contains 'mcp__oracleMCP__sqlcl_run' -and $allow -notcontains 'mcp__oracleMCP__disconnect') "settings：headless 需要的工具在允許清單、sqlcl_run 拒絕、disconnect 不預先允許"
     Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'mcp__oracleMCP__connect' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 掛 connect 與 Agent"
     Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
@@ -20825,15 +20836,20 @@ try {
     Remove-Item -Path Env:\PS_ORACLE_CONNECT_GUARD -ErrorAction SilentlyContinue
     Assert ($o.Trim() -eq '') "connect：PS_ORACLE_CONNECT_GUARD=observe → 只記錄不擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-security-flow","prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow"
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow（一般 session 也擋）"
+    $o = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","prompt":"x"}}'
+    $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"}}'
+    Assert ($o.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：一般 session（沒有 agent_type）可用內建 Explore／general-purpose 做維護排錯"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"}}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：一般 session 委派主代理專用名 → 照樣擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-business-explain","prompt":"x"}}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*自己 Read*') "Agent：主代理自讀的 skill → 擋、說明不委派"
-    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"}}'
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"},"agent_type":"ps-orchestrator"}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：主代理專用名 → 擋"
-    $null = Invoke-Hook '{"tool_name":"Task","tool_input":{"subagent_type":"general-purpose","prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-ui-flow*') "Agent（舊名 Task）：內建 general-purpose → 擋、列出可委派清單"
-    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*subagent_type*') "Agent：沒帶 subagent_type → 擋"
+    $null = Invoke-Hook '{"tool_name":"Task","tool_input":{"subagent_type":"general-purpose","prompt":"x"},"agent_type":"ps-orchestrator"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-ui-flow*') "Agent（舊名 Task）：ps-* 主代理委派內建 general-purpose → 擋、列出可委派清單"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"},"agent_type":"ps-deep-research"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*subagent_type*') "Agent：ps-* 主代理沒帶 subagent_type → 擋"
     $o1 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-ui-flow","prompt":"x"}}'
     $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-author","prompt":"x"}}'
     Assert ($o1.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：ps-ui-flow／ps-spec-author → 放行"
@@ -24145,10 +24161,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|623|8e74df13cb0badbf3c88192610b95731302598ae8c76cf2ad64b705fff65184a|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|623|182cda62086545051afe46e3bf889a81aae38ce02083f80f19bb2b528a9017a2|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "eb638bd",
+  "commit": "6b303fe",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -24286,7 +24302,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/commands/ps-spec.md",
       "lines": 16,
-      "sha256": "cba0eeed472a73fb35659e9232109bfab37480753384280b954d053f1dd38d88",
+      "sha256": "fbb1afe81fc8228882d7cf1726f54b0be7f2d7b908b46938bab5358fec7e0c66",
       "bom": false,
       "repo": "claude-code/.claude/commands/ps-spec.md"
     },
@@ -24299,8 +24315,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/hooks/ps-runtime-guard.ps1",
-      "lines": 384,
-      "sha256": "0d6f0941e2d26cd037896af2cfe8511b2a2f3e08c92de045332baaad3860e277",
+      "lines": 388,
+      "sha256": "b7e8035c70f665881d6b26e58605f24674d4d43b73786c7475c02efb982052cc",
       "bom": true,
       "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
     },
@@ -24468,7 +24484,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "a2758c6acd5f9a90e1742b87a7a4bbb991152fdb5e3f5846af9ba787b3b94d9c",
+      "sha256": "490fa9242d18d0eeff32b106e9019065ef2b63c82acda887aea07d45d78fde34",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
     },
@@ -24509,8 +24525,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/settings.json",
-      "lines": 55,
-      "sha256": "589c82b6af2b793f048b2bf14a1790c99fc9b85829aaef831bfd8cbdb9b9dcc8",
+      "lines": 54,
+      "sha256": "6d70c3b88806eaa04cb19fd98559e7a5d28e8c8db48b22707a507769418b39f3",
       "bom": false,
       "repo": "claude-code/.claude/settings.json"
     },
@@ -24524,7 +24540,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/skills/ps-business-discovery/SKILL.md",
       "lines": 187,
-      "sha256": "96da3cf1931fadee647602b269f5d449a6e96fe3330aef8034d3dcf0bbf5fbfc",
+      "sha256": "2584f96952784c750253eaba6ab8b35947dc6fffbc307142850b303dc8027ed8",
       "bom": false,
       "repo": "claude-code/.claude/skills/ps-business-discovery/SKILL.md"
     },
@@ -24593,8 +24609,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "CLAUDE.md",
-      "lines": 71,
-      "sha256": "76e02999c4fc944eda015ff50fb2cd821674212d62a4f27d1b45f2d4193c232b",
+      "lines": 79,
+      "sha256": "72cb7c4014fd9635cfdcbc6506745dfd72db858b877aa0c1ea378230d91debc4",
       "bom": false,
       "repo": "claude-code/CLAUDE.md"
     },
@@ -24720,8 +24736,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 372,
-      "sha256": "53e19149fe7e826f3551d7d23e17c900ee917be1f77d7237dcc88dfe17d373eb",
+      "lines": 377,
+      "sha256": "1c7b7d85b5b28eabad2f4109407ca52a48352260984135ba67cb618fefcfd472",
       "bom": true
     },
     {
@@ -24770,4 +24786,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|93|3be18ef847e63500562718d1402b19ed4aa9c32ae624eba14b36009f8c6642ea
+@@@PSBUNDLE-EOF|93|8e31f257df6f7cdd2fbdf33e358daec74e2bdb21aaab80bb2fb7eca05b339a50

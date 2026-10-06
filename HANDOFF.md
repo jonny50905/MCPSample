@@ -23,6 +23,11 @@
 status.md 記關卡與進行中步驟（工單存檔可續跑）、需求鍵限 ASCII 且更新不改鍵、測試關平行並覆寫主庫連線、
 bash 權限對「最後相符」與「最長相符」兩種語意都驗過（長駐程式、全域安裝、改套件來源、push 皆擋）、`opencode.json` 關分享。
 
+**一般 session 給維護用（2026-10-06，L134）**：管理者首搬實測——`settings.json` 設了預設主代理 ps-orchestrator，直接 `claude`
+就被鎖在問答代理的工具白名單裡，專案出問題時無法在同一個資料夾叫 Claude 修。已拿掉預設主代理：直接 `claude`＝一般 session
+（維護、排錯），業務問答改 `claude --agent ps-orchestrator`；hook 的 Agent 委派嚴格白名單只套在 ps-* 主代理（依 hook 輸入的
+`agent_type`），一般 session 可用內建 Explore／general-purpose，skill 名與主代理專用名照擋。
+
 **搬運包（2026-10-06，L133）**：管理者反映逐檔搬運太久，要「整版收成一個文字檔＋一支 PowerShell 解開」，
 兩版分開。`ps-fs-doctor -WriteManifest` 現在另產 `transfer/ps-bundle-opencode.txt`（含 AGENTS.md）與
 `transfer/ps-bundle-claude.txt`；公司機 `scripts/ps-bundle.ps1 -Bundle <檔> [-DryRun]` 解開：整包驗證（T／H／P 時不寫）、

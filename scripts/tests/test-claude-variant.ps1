@@ -173,7 +173,7 @@ if ($null -ne $settings) {
     $deny = @($settings.permissions.deny)
     $preCmd = [string]$settings.hooks.PreToolUse[0].hooks[0].command
     $postCmd = [string]$settings.hooks.PostToolUse[0].hooks[0].command
-    Assert ([string]$settings.model -eq 'sonnet' -and [string]$settings.agent -eq 'ps-orchestrator') "settings：模型 sonnet、預設主代理 ps-orchestrator"
+    Assert ([string]$settings.model -eq 'sonnet' -and $null -eq $settings.PSObject.Properties['agent']) "settings：模型 sonnet、不設預設主代理（直接 claude＝一般 session，可做維護排錯）"
     Assert ($allow -contains 'mcp__oracleMCP__connect' -and $allow -contains 'mcp__oracleMCP__sql_run' -and $allow -contains 'Edit(./docs/ps-research/**)' -and $deny -contains 'mcp__oracleMCP__sqlcl_run' -and $allow -notcontains 'mcp__oracleMCP__disconnect') "settings：headless 需要的工具在允許清單、sqlcl_run 拒絕、disconnect 不預先允許"
     Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'mcp__oracleMCP__connect' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 掛 connect 與 Agent"
     Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
@@ -241,15 +241,20 @@ try {
     Remove-Item -Path Env:\PS_ORACLE_CONNECT_GUARD -ErrorAction SilentlyContinue
     Assert ($o.Trim() -eq '') "connect：PS_ORACLE_CONNECT_GUARD=observe → 只記錄不擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-security-flow","prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow"
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow（一般 session 也擋）"
+    $o = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","prompt":"x"}}'
+    $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"}}'
+    Assert ($o.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：一般 session（沒有 agent_type）可用內建 Explore／general-purpose 做維護排錯"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"}}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：一般 session 委派主代理專用名 → 照樣擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-business-explain","prompt":"x"}}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*自己 Read*') "Agent：主代理自讀的 skill → 擋、說明不委派"
-    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"}}'
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"},"agent_type":"ps-orchestrator"}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：主代理專用名 → 擋"
-    $null = Invoke-Hook '{"tool_name":"Task","tool_input":{"subagent_type":"general-purpose","prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-ui-flow*') "Agent（舊名 Task）：內建 general-purpose → 擋、列出可委派清單"
-    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*subagent_type*') "Agent：沒帶 subagent_type → 擋"
+    $null = Invoke-Hook '{"tool_name":"Task","tool_input":{"subagent_type":"general-purpose","prompt":"x"},"agent_type":"ps-orchestrator"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-ui-flow*') "Agent（舊名 Task）：ps-* 主代理委派內建 general-purpose → 擋、列出可委派清單"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"},"agent_type":"ps-deep-research"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*subagent_type*') "Agent：ps-* 主代理沒帶 subagent_type → 擋"
     $o1 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-ui-flow","prompt":"x"}}'
     $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-author","prompt":"x"}}'
     Assert ($o1.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：ps-ui-flow／ps-spec-author → 放行"

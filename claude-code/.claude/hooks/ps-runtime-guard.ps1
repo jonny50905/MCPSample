@@ -4,9 +4,10 @@
 #   (1) Oracle connect 目標：本次 connection_name 必須等於 profile oracle.connectionName。
 #       未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；不一致或沒帶 → ORACLE_CONNECTION_MISMATCH；工具不執行、不改參數。
 #       env PS_ORACLE_CONNECT_GUARD=observe 或 profile oracle.connectGuard: observe → 只記錄不擋（enforce 為預設）。
-#   (2) Agent 委派目標：subagent_type 只准 .claude/agents 裡可當子代理的 ps-* agent。
-#       skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker）、內建或不存在的代理、
-#       沒帶 subagent_type（＝內建 general-purpose）→ PS_TASK_TARGET_INVALID（訊息指出該派誰）。
+#   (2) Agent 委派目標：skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker）一律擋；
+#       呼叫者是 ps-* 主代理（hook 輸入的 agent_type）時更嚴：只准 .claude/agents 裡可當子代理的 ps-* agent——內建或不存在的代理、
+#       沒帶 subagent_type（＝內建 general-purpose）也擋。一般 session（沒有 --agent，agent_type 空）可用內建代理做維護／排錯。
+#       擋＝PS_TASK_TARGET_INVALID（訊息指出該派誰）。
 # -Mode post（PostToolUse，matcher：Agent|Task）
 #   (3) 子代理報告的 suggestedNext[].agent 是 skill 名或不是可委派的 agent → 以 additionalContext 附一段
 #       「[ps-runtime-guard] …」註記（報告本文不動）。
@@ -166,12 +167,13 @@ function Get-PsGuardDelegatable {
 
 # 委派目標檢查：回 $null＝可執行；否則 @{ Code; Kind; Carrier; Message }
 function Get-PsGuardTargetProblem {
-    param([string]$Target)
+    param([string]$Target, [bool]$Strict = $true)
     $agents = Get-PsGuardAgentNames
     $skills = Get-PsGuardSkillNames
     $list = (Get-PsGuardDelegatable) -join '／'
     $tail = '這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要 connect、不要重新連線 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。'
     if ($Target -eq '') {
+        if (-not $Strict) { return $null }
         return @{ Code = $script:CodeTarget; Kind = 'missing'; Carrier = ''; Message = ($script:CodeTarget + '：本次 Agent 委派未執行——沒有指定 subagent_type（會落到內建 general-purpose，查不到 PeopleSoft）。可委派的 agent：' + $list + '。' + $tail) }
     }
     if ($agents.ContainsKey($Target)) {
@@ -195,6 +197,7 @@ function Get-PsGuardTargetProblem {
         }
         return @{ Code = $script:CodeTarget; Kind = 'skill'; Carrier = $carrier; Message = ($script:CodeTarget + '：本次 Agent 委派未執行——「' + $Target + '」是 skill（' + $where + '），不是可委派的 agent。' + $next + $tail) }
     }
+    if (-not $Strict) { return $null }
     return @{ Code = $script:CodeTarget; Kind = 'unknown'; Carrier = ''; Message = ($script:CodeTarget + '：本次 Agent 委派未執行——「' + $Target + '」不是本專案的 ps-* 子代理（內建代理與其他代理查不到 PeopleSoft）。可委派的 agent：' + $list + '。' + $tail) }
 }
 
@@ -307,7 +310,8 @@ function Invoke-PsGuardPre {
     }
     if ($tool -eq 'Agent' -or $tool -eq 'Task') {
         $target = ([string](Get-PsGuardProp $ti 'subagent_type')).Trim()
-        $prob = Get-PsGuardTargetProblem -Target $target
+        # ps-* 主代理（--agent 啟動，hook 輸入帶 agent_type）走嚴格白名單；一般 session 只擋 skill 名與主代理專用名
+        $prob = Get-PsGuardTargetProblem -Target $target -Strict ($agent.StartsWith('ps-'))
         if ($null -eq $prob) { Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'allow' -Code $target -Session $session; return }
         Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'deny' -Code ($prob.Code + ':' + $prob.Kind) -Session $session
         Write-PsGuardDeny -Reason $prob.Message

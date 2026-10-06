@@ -13,9 +13,10 @@
 
 | 要做什麼 | 啟動方式 |
 |---|---|
-| 業務問答 | `claude`（專案預設主代理 ps-orchestrator）或 `claude --agent ps-orchestrator` |
+| 業務問答 | `claude --agent ps-orchestrator` |
 | 產完整業務文件、稽核、教訓、知識指正 | `claude --agent ps-deep-research`，再下 `/ps-research <領域>`、`/ps-audit <領域>`、`/ps-lesson <描述>`、`/ps-correct <正確知識>` |
-| 以 Component 產重建 Spec | `/ps-spec <Component...>`（ps-orchestrator 會委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
+| 以 Component 產重建 Spec | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
+| 框架維護、排錯、看 log | `claude`（一般 session：沒有主代理限制） |
 
 `ps-spec-worker`、`ps-clone-worker` 只由外環 headless 啟動；`/ps-audit-batch`、`/ps-supplement`、`/ps-spec-batch`、
 `/ps-clone-batch` 只供外環呼叫。
@@ -60,6 +61,13 @@
    - 不可一次載入整支 PeopleCode / SQL / SQR / SQC。
 4. 子代理回報一律依 `.claude/peoplesoft/subagent-report-contract.md`
    （單一 JSON、單段引用 ≤ 5 行、必附 evidence IDs）。
+
+## 一般 session（沒有 `--agent`）
+
+- 用途是框架維護與排錯（看 log、跑腳本、修設定）。PeopleSoft 業務問題仍照上方流程：建議改用 `claude --agent ps-orchestrator`；
+  在一般 session 回答時同樣先開線、查知識層、委派 ps-* 子代理，不自己直接檢索原始碼或查 DB。
+- 改了框架檔（`.claude/**`、`scripts/**`、`CLAUDE.md`）要告訴使用者改了哪個檔、為什麼，請使用者回報維護端：
+  下次搬運包會把 `scripts/**` 換回維護端版本；`.claude/**` 本機改過的檔會保留，但兩邊都改時另存 `.incoming` 待合併。
 
 ## 一般規則
 

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit eb638bd）
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6b303fe）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|opencode|eb638bd|101
+@@@PSBUNDLE|1|opencode|6b303fe|101
 @@@PSBUNDLE-REMOVED|.opencode/plugin/ps-oracle-preflight-gate.js
 @@@PSBUNDLE-REMOVED|scripts/test-elasticsearch-mcp-tools-list.ps1
 @@@PSBUNDLE-REMOVED|scripts/test-mcp-tools-list.ps1
@@ -2837,7 +2837,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
 能力目錄代號與屬性見 `.opencode/peoplesoft/spec/capabilities.json`（例：`DATA.FILE_INPUT` 的 `present,layout,fields`）。
 該領域尚無研究 → 建議 `/ps-research <領域>`；答錯的事實 → 建議 `/ps-correct <正確知識>`。
 @@@PSBUNDLE-END|.opencode/peoplesoft/knowledge-retrieval-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3641|4c584b0fd3b1c7f4f01ead2f402891257375a184af44e15702d3487dc215c660|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3657|42cae6621d4000eae648e7223e3c683bbd5b68e0c4aa2f3ffeb1f324d212a841|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -6479,6 +6479,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
   保留本機／更新／衝突／設定檔無基準／scripts 一律更新／必刪舊檔與備份；截斷、內容被改、路徑跳出、他版路徑都整包拒絕；OpenCode 版含 AGENTS.md）。
   真 Windows PowerShell 5.1 未在本沙箱執行（5.1 靜態守衛 0 阻擋）。
 - 教訓：人工搬運的痛點要從「搬運單位」解，不是從「清單寫得更好」解；一次搬一個可驗證的整包，比逐檔核對行數可靠也快。
+
+### L134 預設主代理把整個專案鎖進問答白名單——出問題時連修都不能修（2026-10-06）
+
+- 症狀：管理者在公司機首搬 Claude Code 版實測：`.claude/settings.json` 設 `"agent": "ps-orchestrator"`，直接 `claude` 開出來就是
+  問答主代理（只有 Read／Grep／Glob／Agent／connect），而 hook 又擋掉非 ps-* 子代理——專案有問題時，在同一個資料夾找不到能改檔、
+  跑命令的 Claude。
+- 根因：照搬 OpenCode「建議 default_agent＝ps-orchestrator」的便利設定，沒考慮 Claude Code 版的管理者也用同一個資料夾做維護；
+  主代理白名單與 hook 的嚴格委派規則都是為「問答 session」設計，套到所有 session 就變成鎖死。
+- 落點：
+  - `settings.json` 拿掉 `agent`：直接 `claude`＝一般 session（維護、排錯）；問答 `claude --agent ps-orchestrator`。
+    CLAUDE.md、claude-code/README、SOP-26、ps-business-discovery、/ps-spec（任何有 Agent 工具的 session 都委派 ps-spec-author）同步。
+  - hook：Agent 委派的嚴格白名單只在呼叫者是 ps-* 主代理時套用（hook 輸入的 `agent_type`；一般 session 沒有這個欄位）；
+    skill 名與主代理專用名不論誰呼叫都擋（那是路由錯誤）。CLAUDE.md 新增「一般 session」節：業務問題仍照流程，改了框架檔要回報維護端。
+- 驗證：test-claude-variant 加一般 session 可派 Explore／省略 subagent_type、主代理專用名照擋、ps-* 主代理照舊嚴格；
+  run-e2e 加 plain 情境（真 CLI：一般 session 委派 Explore，hook 不擋），qa／cmd 改用 `--agent ps-orchestrator`。
+- 教訓：給「使用者 session」的限制要掛在那個角色上（agent 定義、`--agent`），不要掛成專案預設——管理者永遠需要一個沒被鎖的入口。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -8504,7 +8520,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|995|5f20259dadf1e9d4884b0b0a9ccb327efaf6403ff3124ed4a03e169ce0d7724d|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|998|6b865a62f460bfa31ce37bfbfbc7b25773accf9cc24b1726131751ff89092031|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -9482,6 +9498,9 @@ PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-gua
 □ 5. `ps-fs-doctor` 應顯示「Claude Code 版」且結論 G；再跑 `scripts\ps-claude-doctor.ps1 -Live`（hook 自測、MCP 註冊、
      真 session 第 0 步開線）結論 G。外環照舊跑；它們依 `.claude/peoplesoft` 是否存在改開 `claude -p --agent …`；
      同一資料夾要跑 OpenCode 版外環先設 `$env:PS_CLI='opencode'`。
+
+啟動方式：業務問答 `claude --agent ps-orchestrator`；產文件／稽核／教訓 `claude --agent ps-deep-research`；直接 `claude` 是一般 session
+（沒有主代理的工具限制，給框架維護與排錯用——在裡面改了框架檔要回報維護端，下次搬運包會把 scripts 換回維護端版本）。
 
 SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context 由 Claude Code 管理）；SOP-17 改看 `.claude/settings.json`
 允許清單與信任（臨時換權限模式用 `$env:PS_CLAUDE_PERMISSION_MODE`）；SOP-21 的恢復是該 session `/mcp` 選 oracleMCP 重新連線，
@@ -27428,7 +27447,7 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-bundle.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|372|53e19149fe7e826f3551d7d23e17c900ee917be1f77d7237dcc88dfe17d373eb|1
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|377|1c7b7d85b5b28eabad2f4109407ca52a48352260984135ba67cb618fefcfd472|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
 #       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
@@ -27604,7 +27623,7 @@ if ($null -ne $settings) {
     $deny = @($settings.permissions.deny)
     $preCmd = [string]$settings.hooks.PreToolUse[0].hooks[0].command
     $postCmd = [string]$settings.hooks.PostToolUse[0].hooks[0].command
-    Assert ([string]$settings.model -eq 'sonnet' -and [string]$settings.agent -eq 'ps-orchestrator') "settings：模型 sonnet、預設主代理 ps-orchestrator"
+    Assert ([string]$settings.model -eq 'sonnet' -and $null -eq $settings.PSObject.Properties['agent']) "settings：模型 sonnet、不設預設主代理（直接 claude＝一般 session，可做維護排錯）"
     Assert ($allow -contains 'mcp__oracleMCP__connect' -and $allow -contains 'mcp__oracleMCP__sql_run' -and $allow -contains 'Edit(./docs/ps-research/**)' -and $deny -contains 'mcp__oracleMCP__sqlcl_run' -and $allow -notcontains 'mcp__oracleMCP__disconnect') "settings：headless 需要的工具在允許清單、sqlcl_run 拒絕、disconnect 不預先允許"
     Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'mcp__oracleMCP__connect' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 掛 connect 與 Agent"
     Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
@@ -27672,15 +27691,20 @@ try {
     Remove-Item -Path Env:\PS_ORACLE_CONNECT_GUARD -ErrorAction SilentlyContinue
     Assert ($o.Trim() -eq '') "connect：PS_ORACLE_CONNECT_GUARD=observe → 只記錄不擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-security-flow","prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow"
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow（一般 session 也擋）"
+    $o = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","prompt":"x"}}'
+    $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"}}'
+    Assert ($o.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：一般 session（沒有 agent_type）可用內建 Explore／general-purpose 做維護排錯"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"}}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：一般 session 委派主代理專用名 → 照樣擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-business-explain","prompt":"x"}}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*自己 Read*') "Agent：主代理自讀的 skill → 擋、說明不委派"
-    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"}}'
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"},"agent_type":"ps-orchestrator"}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：主代理專用名 → 擋"
-    $null = Invoke-Hook '{"tool_name":"Task","tool_input":{"subagent_type":"general-purpose","prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-ui-flow*') "Agent（舊名 Task）：內建 general-purpose → 擋、列出可委派清單"
-    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"}}'
-    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*subagent_type*') "Agent：沒帶 subagent_type → 擋"
+    $null = Invoke-Hook '{"tool_name":"Task","tool_input":{"subagent_type":"general-purpose","prompt":"x"},"agent_type":"ps-orchestrator"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-ui-flow*') "Agent（舊名 Task）：ps-* 主代理委派內建 general-purpose → 擋、列出可委派清單"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"},"agent_type":"ps-deep-research"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*subagent_type*') "Agent：ps-* 主代理沒帶 subagent_type → 擋"
     $o1 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-ui-flow","prompt":"x"}}'
     $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-author","prompt":"x"}}'
     Assert ($o1.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：ps-ui-flow／ps-spec-author → 放行"
@@ -30992,10 +31016,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|618|6d7e27c4d1f37bc00e53778808e44f17f1ed9b3869caba7c3b3b84e77449acaf|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|618|9d3b224f00238c25bece3fb29ae5826cd095f817fc4d750585d153c566eca7c2|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "eb638bd",
+  "commit": "6b303fe",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -31173,8 +31197,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3641,
-      "sha256": "4c584b0fd3b1c7f4f01ead2f402891257375a184af44e15702d3487dc215c660",
+      "lines": 3657,
+      "sha256": "42cae6621d4000eae648e7223e3c683bbd5b68e0c4aa2f3ffeb1f324d212a841",
       "bom": false
     },
     {
@@ -31245,8 +31269,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 995,
-      "sha256": "5f20259dadf1e9d4884b0b0a9ccb327efaf6403ff3124ed4a03e169ce0d7724d",
+      "lines": 998,
+      "sha256": "6b865a62f460bfa31ce37bfbfbc7b25773accf9cc24b1726131751ff89092031",
       "bom": false
     },
     {
@@ -31545,8 +31569,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 372,
-      "sha256": "53e19149fe7e826f3551d7d23e17c900ee917be1f77d7237dcc88dfe17d373eb",
+      "lines": 377,
+      "sha256": "1c7b7d85b5b28eabad2f4109407ca52a48352260984135ba67cb618fefcfd472",
       "bom": true
     },
     {
@@ -31737,4 +31761,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|101|97b9b2dca339129b1e70d5aad897dd67df134c827f6f94220b8e44406a3079a4
+@@@PSBUNDLE-EOF|101|60a438be971ad6e7ee0f20b7ef3878a91f3aa024571fd3d643703fb49204629a

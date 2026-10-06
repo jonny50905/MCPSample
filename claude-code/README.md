@@ -31,7 +31,7 @@ OpenCode 版（repo 根的 `.opencode/`＋`AGENTS.md`）保留不動、照常可
 <專案>/
 ├─ CLAUDE.md                     常駐指引（執行期規則）
 ├─ .claude/
-│  ├─ settings.json              模型 sonnet、預設主代理 ps-orchestrator、權限允許清單、hook
+│  ├─ settings.json              模型 sonnet、權限允許清單、hook（不設預設主代理：直接 `claude` 是一般 session）
 │  ├─ hooks/ps-runtime-guard.ps1 執行期 guard（PreToolUse／PostToolUse；PowerShell 5.1）
 │  ├─ agents/                    主代理 5＋子代理 7
 │  ├─ commands/                  /ps-research、/ps-audit、/ps-lesson、/ps-correct、/ps-spec＋外環專用 4 個
@@ -59,7 +59,7 @@ OpenCode 版（repo 根的 `.opencode/`＋`AGENTS.md`）保留不動、照常可
 5. **驗收**：`powershell -NoProfile -File .\scripts\ps-claude-doctor.ps1 -Live`——檢查版本判定、claude 版本、powershell、
    hook 自測、profile、四個 MCP 註冊，並開一個真 headless session 只做第 0 步開線；結論代號 `G` 才算裝好
    （代號：V 版本判定／C claude／P powershell／H hook／F profile／N MCP／T 工具被拒＝多半沒信任／L connect 沒成功）。
-   之後 `claude` 問一題業務問題，第一個動作應是 `mcp__oracleMCP__connect`（connection_name＝profile 值）。
+   之後 `claude --agent ps-orchestrator` 問一題業務問題，第一個動作應是 `mcp__oracleMCP__connect`（connection_name＝profile 值）。
 
 需求：Claude Code CLI 2.1 以上（用到 `--agent`、`--permission-mode dontAsk`、agent frontmatter 的 hooks）；
 hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`，`powershell` 要在 PATH 上（Git Bash 與 PowerShell 都能執行這行）。
@@ -69,10 +69,11 @@ hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`�
 
 | 要做什麼 | 怎麼開 |
 |---|---|
-| 業務問答 | `claude`（預設主代理 ps-orchestrator） |
+| 業務問答 | `claude --agent ps-orchestrator` |
 | 產完整業務文件 | `claude --agent ps-deep-research`，進去後 `/ps-research <領域>`（或一行：`claude --agent ps-deep-research "/ps-research <領域>"`） |
 | 稽核／教訓／知識指正 | 同上的主代理，`/ps-audit <領域>`、`/ps-lesson <描述>`、`/ps-correct <正確知識>` |
-| 以 Component 產重建 Spec | 預設主代理下 `/ps-spec <Component...>`，或 `claude --agent ps-spec-author` 直接輸入清單 |
+| 以 Component 產重建 Spec | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
+| 框架維護、排錯、看 log | `claude`（一般 session，沒有主代理的工具限制；改了框架檔記得回報維護端） |
 | 無人看管跑批 | 不變：`scripts\ps-auto-loop.ps1`、`ps-auto-all.ps1`、`ps-supplemental.ps1`、`ps-spec.ps1 -Run`——外環自動改開 `claude -p --agent …` |
 
 指令打錯主代理（例如在問答 session 打 `/ps-research`）時，模型只會回一行「請以 `claude --agent ps-deep-research` 開新 session」，不會動檔。
@@ -81,7 +82,7 @@ hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`�
 
 | 項目 | OpenCode 版 | Claude Code 版 |
 |---|---|---|
-| 主代理 | Tab 切換 | `claude --agent <名>`；預設主代理寫在 `.claude/settings.json` 的 `agent` |
+| 主代理 | Tab 切換 | `claude --agent <名>`；不設預設主代理（直接 `claude` 是一般 session，供維護與排錯） |
 | 委派 | task 工具 | Agent 工具（`subagent_type` 參數名不變）；子代理不能再委派 |
 | 工具權限 | tools 覆寫表（沒列＝開） | agent `tools:` 白名單（沒列＝沒有）＋`settings.json` 權限允許清單 |
 | MCP 工具名 | `oracleMCP_connect` | `mcp__oracleMCP__connect` |

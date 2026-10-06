@@ -4,11 +4,12 @@
 // 部署模擬：<tmp>/proj＝scripts＋claude-code/*（去前綴）；.mcp.json 掛假 oracleMCP／PeoplecodeElasticSearch／PeoplecodeSource；
 //   profile oracle.connectionName＝HR_DEV；在 ~/.claude.json 把該目錄標為已信任（未信任時專案 settings 的 permissions.allow 會被忽略）。
 // 情境：
-//   qa      預設主代理（ps-orchestrator）問業務問題 → 第 0 步 connect＝profile 值、之後才有 sql_run；主對話不直接用檢索 MCP；
+//   qa      claude --agent ps-orchestrator 問業務問題 → 第 0 步 connect＝profile 值、之後才有 sql_run；主對話不直接用檢索 MCP；
 //           Agent 委派目標都是 ps-* 子代理且至少一次；hook 無誤擋；有最終回覆
-//   cmd     預設主代理下 /ps-research → 前提段生效：只回「請以 claude --agent ps-deep-research …」、不寫檔
+//   cmd     ps-orchestrator 下 /ps-research → 前提段生效：只回「請以 claude --agent ps-deep-research …」、不寫檔
 //   worker  claude -p --agent ps-spec-worker "/ps-spec-batch <job>-<attempt>"（外環的實際命令形狀）→ 只讀工單、寫 fragment.md；
 //           讀 wiki（工單外）被路徑 hook 擋下
+//   plain   一般 session（沒有 --agent、沒有預設主代理）委派內建 Explore 不被 hook 擋（維護排錯用）
 import { spawnSync } from "node:child_process"
 import fs from "node:fs"
 import os from "node:os"
@@ -18,7 +19,7 @@ const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..",
 const args = process.argv.slice(2)
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d }
 const model = opt("--model", "haiku")
-const only = (opt("--only", "qa,cmd,worker") || "").split(",")
+const only = (opt("--only", "qa,cmd,worker,plain") || "").split(",")
 const keep = args.includes("--keep")
 const pwsh = process.env.PWSH || spawnSync("bash", ["-lc", "command -v pwsh"], { encoding: "utf8" }).stdout.trim()
 if (!pwsh) { console.error("找不到 pwsh（設 PWSH=<路徑>）"); process.exit(2) }
@@ -75,7 +76,7 @@ const SUB = new Set(["ps-ui-flow", "ps-peoplecode-flow", "ps-sql-flow", "ps-sqr-
 
 if (only.includes("qa")) {
   console.log(`qa（model=${model}）`)
-  const r = run("qa", [], "兵役資料的「免役」選項選了以後，系統會做什麼？請照流程查證後回答。")
+  const r = run("qa", ["--agent", "ps-orchestrator"], "兵役資料的「免役」選項選了以後，系統會做什麼？請照流程查證後回答。")
   const ora = readLines(logs.oracle).filter((x) => x.tool)
   const firstConnect = ora.findIndex((x) => x.tool === "connect")
   const firstSql = ora.findIndex((x) => x.tool === "sql_run")
@@ -92,9 +93,9 @@ if (only.includes("qa")) {
 
 if (only.includes("cmd")) {
   console.log(`cmd（model=${model}）`)
-  const r = run("cmd", [], "/ps-research 測試領域")
+  const r = run("cmd", ["--agent", "ps-orchestrator"], "/ps-research 測試領域")
   const txt = String(r.result?.result || "")
-  check(/claude --agent ps-deep-research/.test(txt), "預設主代理下 /ps-research → 回覆要求以 claude --agent ps-deep-research 開新 session")
+  check(/claude --agent ps-deep-research/.test(txt), "ps-orchestrator 下 /ps-research → 回覆要求以 claude --agent ps-deep-research 開新 session")
   check(!r.uses.some((u) => ["Write", "Edit"].includes(u.name)) && !fs.existsSync(path.join(proj, "docs", "ps-research", "測試領域")), "沒有寫任何檔、沒有建立領域目錄")
 }
 
@@ -124,6 +125,15 @@ if (only.includes("worker")) {
   const decoyRead = r.uses.some((u) => u.name === "Read" && String(u.input?.file_path || "").includes("DECOY"))
   check(otherWrites.length === 0, "沒有寫工單產物以外的檔")
   check(!decoyRead || pathDenied > 0, "工單外的讀取（DECOY）若嘗試則被路徑 hook 擋下" + (decoyRead ? "（有嘗試、已擋）" : "（未嘗試）"))
+}
+
+if (only.includes("plain")) {
+  console.log(`plain（model=${model}）`)
+  const before = hookLog().length
+  const r = run("plain", [], "這是維護排錯：用 Agent 工具（subagent_type 填 Explore）列出 .claude/agents 底下有哪些檔，然後只回覆檔案數量。")
+  const used = r.uses.filter((u) => !u.sub && (u.name === "Agent" || u.name === "Task")).map((u) => u.input?.subagent_type)
+  const denied = hookLog().slice(before).filter((x) => x.decision === "deny")
+  check(used.includes("Explore") && denied.length === 0, "一般 session（沒有 --agent）可委派內建 Explore 做維護排錯、hook 不擋：" + JSON.stringify(used))
 }
 
 console.log(fail ? `共 ${fail} 個 FAIL（現場：${work}）` : `全部情境 PASS${keep ? "（現場：" + work + "）" : ""}`)

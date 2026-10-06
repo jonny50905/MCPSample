@@ -976,6 +976,9 @@ PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-gua
      真 session 第 0 步開線）結論 G。外環照舊跑；它們依 `.claude/peoplesoft` 是否存在改開 `claude -p --agent …`；
      同一資料夾要跑 OpenCode 版外環先設 `$env:PS_CLI='opencode'`。
 
+啟動方式：業務問答 `claude --agent ps-orchestrator`；產文件／稽核／教訓 `claude --agent ps-deep-research`；直接 `claude` 是一般 session
+（沒有主代理的工具限制，給框架維護與排錯用——在裡面改了框架檔要回報維護端，下次搬運包會把 scripts 換回維護端版本）。
+
 SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context 由 Claude Code 管理）；SOP-17 改看 `.claude/settings.json`
 允許清單與信任（臨時換權限模式用 `$env:PS_CLAUDE_PERMISSION_MODE`）；SOP-21 的恢復是該 session `/mcp` 選 oracleMCP 重新連線，
 沒有自動重掛，hook 紀錄在 `auto-loop-logs\ps-runtime-guard\hook-<日期>.jsonl`。

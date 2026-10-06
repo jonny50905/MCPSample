@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "eb638bd",
+  "commit": "6b303fe",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -138,7 +138,7 @@
     {
       "path": ".claude/commands/ps-spec.md",
       "lines": 16,
-      "sha256": "cba0eeed472a73fb35659e9232109bfab37480753384280b954d053f1dd38d88",
+      "sha256": "fbb1afe81fc8228882d7cf1726f54b0be7f2d7b908b46938bab5358fec7e0c66",
       "bom": false,
       "repo": "claude-code/.claude/commands/ps-spec.md"
     },
@@ -151,8 +151,8 @@
     },
     {
       "path": ".claude/hooks/ps-runtime-guard.ps1",
-      "lines": 384,
-      "sha256": "0d6f0941e2d26cd037896af2cfe8511b2a2f3e08c92de045332baaad3860e277",
+      "lines": 388,
+      "sha256": "b7e8035c70f665881d6b26e58605f24674d4d43b73786c7475c02efb982052cc",
       "bom": true,
       "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
     },
@@ -320,7 +320,7 @@
     {
       "path": ".claude/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "a2758c6acd5f9a90e1742b87a7a4bbb991152fdb5e3f5846af9ba787b3b94d9c",
+      "sha256": "490fa9242d18d0eeff32b106e9019065ef2b63c82acda887aea07d45d78fde34",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
     },
@@ -361,8 +361,8 @@
     },
     {
       "path": ".claude/settings.json",
-      "lines": 55,
-      "sha256": "589c82b6af2b793f048b2bf14a1790c99fc9b85829aaef831bfd8cbdb9b9dcc8",
+      "lines": 54,
+      "sha256": "6d70c3b88806eaa04cb19fd98559e7a5d28e8c8db48b22707a507769418b39f3",
       "bom": false,
       "repo": "claude-code/.claude/settings.json"
     },
@@ -376,7 +376,7 @@
     {
       "path": ".claude/skills/ps-business-discovery/SKILL.md",
       "lines": 187,
-      "sha256": "96da3cf1931fadee647602b269f5d449a6e96fe3330aef8034d3dcf0bbf5fbfc",
+      "sha256": "2584f96952784c750253eaba6ab8b35947dc6fffbc307142850b303dc8027ed8",
       "bom": false,
       "repo": "claude-code/.claude/skills/ps-business-discovery/SKILL.md"
     },
@@ -445,8 +445,8 @@
     },
     {
       "path": "CLAUDE.md",
-      "lines": 71,
-      "sha256": "76e02999c4fc944eda015ff50fb2cd821674212d62a4f27d1b45f2d4193c232b",
+      "lines": 79,
+      "sha256": "72cb7c4014fd9635cfdcbc6506745dfd72db858b877aa0c1ea378230d91debc4",
       "bom": false,
       "repo": "claude-code/CLAUDE.md"
     },
@@ -572,8 +572,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 372,
-      "sha256": "53e19149fe7e826f3551d7d23e17c900ee917be1f77d7237dcc88dfe17d373eb",
+      "lines": 377,
+      "sha256": "1c7b7d85b5b28eabad2f4109407ca52a48352260984135ba67cb618fefcfd472",
       "bom": true
     },
     {
