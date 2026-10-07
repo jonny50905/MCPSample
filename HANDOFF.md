@@ -23,6 +23,10 @@
 status.md 記關卡與進行中步驟（工單存檔可續跑）、需求鍵限 ASCII 且更新不改鍵、測試關平行並覆寫主庫連線、
 bash 權限對「最後相符」與「最長相符」兩種語意都驗過（長駐程式、全域安裝、改套件來源、push 皆擋）、`opencode.json` 關分享。
 
+**一般 session 可叫內建子代理（2026-10-07，L135）**：L134 放寬了 hook，但 CLAUDE.md 仍寫「內建代理都擋」，模型照文字自我設限、
+一般 session 只肯叫 ps-* 子代理。CLAUDE.md 改為：skill 名與主代理專用名一律擋；ps-* 主代理下才只准 ps-* 子代理；一般 session 維護排錯可派
+general-purpose／Explore／Plan（業務檢索仍派 ps-*）。
+
 **一般 session 給維護用（2026-10-06，L134）**：管理者首搬實測——`settings.json` 設了預設主代理 ps-orchestrator，直接 `claude`
 就被鎖在問答代理的工具白名單裡，專案出問題時無法在同一個資料夾叫 Claude 修。已拿掉預設主代理：直接 `claude`＝一般 session
 （維護、排錯），業務問答改 `claude --agent ps-orchestrator`；hook 的 Agent 委派嚴格白名單只套在 ps-* 主代理（依 hook 輸入的

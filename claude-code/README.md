@@ -87,7 +87,7 @@ hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`�
 | 工具權限 | tools 覆寫表（沒列＝開） | agent `tools:` 白名單（沒列＝沒有）＋`settings.json` 權限允許清單 |
 | MCP 工具名 | `oracleMCP_connect` | `mcp__oracleMCP__connect` |
 | MCP 註冊 | 全域 opencode.json | `claude mcp add --scope user`（或專案 `.mcp.json`，含主機名時不建議） |
-| 執行期 guard | plugin（JS） | hook（PowerShell）：connect 目標＝profile、Agent 目標只准 ps-* 子代理（skill 名、主代理名、內建代理都擋）、suggestedNext 註記、worker 讀寫路徑白名單 |
+| 執行期 guard | plugin（JS） | hook（PowerShell）：connect 目標＝profile、Agent 目標不得是 skill 名或主代理名；ps-* 主代理下只准 ps-* 子代理（內建代理也擋），一般 session 可用內建代理維護排錯、suggestedNext 註記、worker 讀寫路徑白名單 |
 | oracleMCP 掛載故障 | `/mcps` 重掛；plugin 可受控自動重掛 | 該 session 打 `/mcp` 選 oracleMCP 重新連線；**沒有自動重掛**（profile 的 `mcpAutoRecover` 不使用） |
 | 外環 headless | `opencode run --command X "<參數>"` | `claude -p --agent <主代理> --permission-mode dontAsk --output-format stream-json --verbose "/X <參數>"` |
 | headless 權限 | 全域 opencode.json 的 permission | `.claude/settings.json`：允許 MCP 查詢工具、寫 `docs/ps-research/**`／`.ps-runtime/spec/**`／`.ps-runtime/clone-spec/**`、ps-spec-build 命令；拒絕 `sqlcl_run`、WebFetch、WebSearch；其餘在 headless 一律自動拒絕 |

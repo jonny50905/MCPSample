@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6b303fe）
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit f8fe8f1）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|opencode|6b303fe|101
+@@@PSBUNDLE|1|opencode|f8fe8f1|101
 @@@PSBUNDLE-REMOVED|.opencode/plugin/ps-oracle-preflight-gate.js
 @@@PSBUNDLE-REMOVED|scripts/test-elasticsearch-mcp-tools-list.ps1
 @@@PSBUNDLE-REMOVED|scripts/test-mcp-tools-list.ps1
@@ -2837,7 +2837,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
 能力目錄代號與屬性見 `.opencode/peoplesoft/spec/capabilities.json`（例：`DATA.FILE_INPUT` 的 `present,layout,fields`）。
 該領域尚無研究 → 建議 `/ps-research <領域>`；答錯的事實 → 建議 `/ps-correct <正確知識>`。
 @@@PSBUNDLE-END|.opencode/peoplesoft/knowledge-retrieval-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3657|42cae6621d4000eae648e7223e3c683bbd5b68e0c4aa2f3ffeb1f324d212a841|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3668|7c338e91b2cf24b4511d99c7dcbfb008ef6a9579b2fb04a652cf3b05c8ffef04|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -6495,6 +6495,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
 - 驗證：test-claude-variant 加一般 session 可派 Explore／省略 subagent_type、主代理專用名照擋、ps-* 主代理照舊嚴格；
   run-e2e 加 plain 情境（真 CLI：一般 session 委派 Explore，hook 不擋），qa／cmd 改用 `--agent ps-orchestrator`。
 - 教訓：給「使用者 session」的限制要掛在那個角色上（agent 定義、`--agent`），不要掛成專案預設——管理者永遠需要一個沒被鎖的入口。
+
+### L135 hook 放行了、CLAUDE.md 還說「內建代理都擋」——模型自己不敢叫一般子代理（2026-10-07）
+
+- 症狀：管理者在 Claude Code 版的一般 session（直接 `claude`）要叫一般子代理做維護排錯，只叫得出 ps-* 子代理。
+  沙盒重現：hook 對 general-purpose／Explore 都是 allow；但問模型「可以叫哪些子代理」，它答「ps-runtime-guard 會擋掉非 ps-* 子代理」。
+- 根因：L134 只改了 hook（嚴格白名單只套 ps-* 主代理），CLAUDE.md 第 1 節的執行期說明仍寫「Agent 的 subagent_type 必須是可委派的
+  ps-* 子代理（skill 名、主代理名、內建代理都擋）」。CLAUDE.md 是每個 session 都讀的常駐指引，模型照這句自我限制，hook 根本沒機會放行。
+- 落點：CLAUDE.md 改成「不得是 skill 名或主代理專用名；在 ps-* 主代理下還必須是 ps-* 子代理（內建代理也擋）」，「一般 session」節
+  加「維護排錯可委派內建子代理（general-purpose／Explore／Plan），hook 不擋；PeopleSoft 業務檢索仍只派 ps-* 子代理」。
+  claude-code/README 對照表同步。ps-orchestrator／ps-deep-research／ps-clone-worker 定義檔的「不可委派內建代理」不動（那是主代理下的規則）。
+- 教訓：放寬執行期機制時，要一起改「模型讀的對該機制的描述」——模型不會試探 guard，它照文字自我設限；描述比機制嚴，等於機制沒放寬。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -31016,10 +31027,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|618|9d3b224f00238c25bece3fb29ae5826cd095f817fc4d750585d153c566eca7c2|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|618|2c5c96d06d8625e363a76fe830f25c9116a12d6889141f1849e1e68d37640f99|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "6b303fe",
+  "commit": "f8fe8f1",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -31197,8 +31208,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3657,
-      "sha256": "42cae6621d4000eae648e7223e3c683bbd5b68e0c4aa2f3ffeb1f324d212a841",
+      "lines": 3668,
+      "sha256": "7c338e91b2cf24b4511d99c7dcbfb008ef6a9579b2fb04a652cf3b05c8ffef04",
       "bom": false
     },
     {
@@ -31761,4 +31772,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|101|60a438be971ad6e7ee0f20b7ef3878a91f3aa024571fd3d643703fb49204629a
+@@@PSBUNDLE-EOF|101|88d4cbd8fb4c526739c53306e80e376f0889e05f5fce4341fc843e192915fc0b

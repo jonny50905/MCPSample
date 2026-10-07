@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 6b303fe）
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit f8fe8f1）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|claude|6b303fe|93
+@@@PSBUNDLE|1|claude|f8fe8f1|93
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44|0
 ---
 name: ps-ae-flow
@@ -6740,7 +6740,7 @@ Choice Values：低基數最多回傳 100 個；
 - `.claude/peoplesoft/customization-profile.yaml`（origin / prefix 過濾）
 - `.claude/peoplesoft/mcp-tool-contracts.md`
 @@@PSBUNDLE-END|.claude/skills/ps-ui-flow/SKILL.md
-@@@PSBUNDLE-FILE|CLAUDE.md|79|72cb7c4014fd9635cfdcbc6506745dfd72db858b877aa0c1ea378230d91debc4|0
+@@@PSBUNDLE-FILE|CLAUDE.md|81|76511f0817f82b963b5ac1de24866a1d73197d98356c201068573e8dc0817407|0
 # CLAUDE.md — Claude Code 專案指引（PeopleSoft 知識庫分析框架）
 
 ## 這個專案是什麼
@@ -6784,8 +6784,8 @@ Choice Values：低基數最多回傳 100 個；
    不從清單挑名字；無條件，見 agent 定義），等 connect 回覆成功才派會查 DB 的子代理。
    執行期只有 `.claude/hooks/ps-runtime-guard.ps1` 的無狀態檢查：connect 的 connection_name
    必須等於 profile 值（否則 `ORACLE_CONNECTION_NOT_CONFIGURED`／`ORACLE_CONNECTION_MISMATCH`，
-   工具不執行）、Agent 工具的 subagent_type 必須是可委派的 ps-* 子代理（skill 名、主代理名、內建代理都擋：
-   `PS_TASK_TARGET_INVALID`）。**沒有派工前置閘門**——順序是你的責任：先派子代理而 DB 未連 → 它回
+   工具不執行）、Agent 工具的 subagent_type 不得是 skill 名或主代理專用名；在 ps-* 主代理下還必須是可委派的
+   ps-* 子代理（內建代理也擋）（`PS_TASK_TARGET_INVALID`）。**沒有派工前置閘門**——順序是你的責任：先派子代理而 DB 未連 → 它回
    `NOT_CONNECTED`，你再 connect 一次、重派一次，只一次、不迴圈。工具清單裡沒有 `mcp__oracleMCP__` 工具＝掛載故障
    → 不猜工具名、不重派、不多 connect，回報 ORACLE_MCP_DOWN，交管理者在該 session 以 `/mcp` 重新連線 oracleMCP（SOP-21）；
    重新連線後重新 connect，不沿用舊結論。
@@ -6809,6 +6809,8 @@ Choice Values：低基數最多回傳 100 個；
 
 - 用途是框架維護與排錯（看 log、跑腳本、修設定）。PeopleSoft 業務問題仍照上方流程：建議改用 `claude --agent ps-orchestrator`；
   在一般 session 回答時同樣先開線、查知識層、委派 ps-* 子代理，不自己直接檢索原始碼或查 DB。
+- 維護排錯（讀框架檔、看 log、查腳本）可委派內建子代理（general-purpose／Explore／Plan），hook 不擋；
+  PeopleSoft 業務檢索仍只派 ps-* 子代理。
 - 改了框架檔（`.claude/**`、`scripts/**`、`CLAUDE.md`）要告訴使用者改了哪個檔、為什麼，請使用者回報維護端：
   下次搬運包會把 `scripts/**` 換回維護端版本；`.claude/**` 本機改過的檔會保留，但兩邊都改時另存 `.incoming` 待合併。
 
@@ -24161,10 +24163,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|623|182cda62086545051afe46e3bf889a81aae38ce02083f80f19bb2b528a9017a2|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|623|3dc0a1a497c9e55b2272aedb67b4ad46fd71d63294ff2ca77200c71adb517fbc|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "6b303fe",
+  "commit": "f8fe8f1",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -24609,8 +24611,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "CLAUDE.md",
-      "lines": 79,
-      "sha256": "72cb7c4014fd9635cfdcbc6506745dfd72db858b877aa0c1ea378230d91debc4",
+      "lines": 81,
+      "sha256": "76511f0817f82b963b5ac1de24866a1d73197d98356c201068573e8dc0817407",
       "bom": false,
       "repo": "claude-code/CLAUDE.md"
     },
@@ -24786,4 +24788,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|93|8e31f257df6f7cdd2fbdf33e358daec74e2bdb21aaab80bb2fb7eca05b339a50
+@@@PSBUNDLE-EOF|93|c3eef4f1c6926ffced3298ae2b22c434f11b64da511afdabee5585406bd8fb9d

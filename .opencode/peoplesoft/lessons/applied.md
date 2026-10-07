@@ -3655,3 +3655,14 @@
 - 驗證：test-claude-variant 加一般 session 可派 Explore／省略 subagent_type、主代理專用名照擋、ps-* 主代理照舊嚴格；
   run-e2e 加 plain 情境（真 CLI：一般 session 委派 Explore，hook 不擋），qa／cmd 改用 `--agent ps-orchestrator`。
 - 教訓：給「使用者 session」的限制要掛在那個角色上（agent 定義、`--agent`），不要掛成專案預設——管理者永遠需要一個沒被鎖的入口。
+
+### L135 hook 放行了、CLAUDE.md 還說「內建代理都擋」——模型自己不敢叫一般子代理（2026-10-07）
+
+- 症狀：管理者在 Claude Code 版的一般 session（直接 `claude`）要叫一般子代理做維護排錯，只叫得出 ps-* 子代理。
+  沙盒重現：hook 對 general-purpose／Explore 都是 allow；但問模型「可以叫哪些子代理」，它答「ps-runtime-guard 會擋掉非 ps-* 子代理」。
+- 根因：L134 只改了 hook（嚴格白名單只套 ps-* 主代理），CLAUDE.md 第 1 節的執行期說明仍寫「Agent 的 subagent_type 必須是可委派的
+  ps-* 子代理（skill 名、主代理名、內建代理都擋）」。CLAUDE.md 是每個 session 都讀的常駐指引，模型照這句自我限制，hook 根本沒機會放行。
+- 落點：CLAUDE.md 改成「不得是 skill 名或主代理專用名；在 ps-* 主代理下還必須是 ps-* 子代理（內建代理也擋）」，「一般 session」節
+  加「維護排錯可委派內建子代理（general-purpose／Explore／Plan），hook 不擋；PeopleSoft 業務檢索仍只派 ps-* 子代理」。
+  claude-code/README 對照表同步。ps-orchestrator／ps-deep-research／ps-clone-worker 定義檔的「不可委派內建代理」不動（那是主代理下的規則）。
+- 教訓：放寬執行期機制時，要一起改「模型讀的對該機制的描述」——模型不會試探 guard，它照文字自我設限；描述比機制嚴，等於機制沒放寬。
