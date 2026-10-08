@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "3c15d84",
+  "commit": "6ebc14c",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -64,6 +64,20 @@
       "sha256": "80b8b2cfda967e37ac573c395878a65fd83ac0c92214362fc5cf92378077d846",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-spec-author.md"
+    },
+    {
+      "path": ".claude/agents/ps-spec-judge.md",
+      "lines": 22,
+      "sha256": "a17c64802b60c383ba148cbdc56b962d25e1438e2346639d3905f2163525b35d",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-spec-judge.md"
+    },
+    {
+      "path": ".claude/agents/ps-spec-reader.md",
+      "lines": 22,
+      "sha256": "eafd44798c8386756771ffd58fe8a76c0604a766fc4add9035b7ffcb139c8854",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-spec-reader.md"
     },
     {
       "path": ".claude/agents/ps-spec-worker.md",
@@ -165,8 +179,8 @@
     },
     {
       "path": ".claude/hooks/ps-runtime-guard.ps1",
-      "lines": 394,
-      "sha256": "15454949fa7780806f4b157de7394ffc788cccd5f0f79d9165e68803663e1249",
+      "lines": 400,
+      "sha256": "07e6b964c5608d30f2ff4e191973ff09d46d708adb45c44ca924eb9f0f832358",
       "bom": true,
       "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
     },
@@ -353,9 +367,23 @@
       "repo": "claude-code/.claude/peoplesoft/sdoc/examples/workflow.json"
     },
     {
+      "path": ".claude/peoplesoft/sdoc/judge-contract.md",
+      "lines": 18,
+      "sha256": "6907acbe710273f174b9d0bc5348be1150eb810fbe7ee95c2f1ef70927091acf",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/judge-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/reader-contract.md",
+      "lines": 35,
+      "sha256": "7f325c7e6211b1c4f606f64ee388625f9f06e62115776d2e0700b6844c18adac",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/reader-contract.md"
+    },
+    {
       "path": ".claude/peoplesoft/sdoc/research-contract.md",
-      "lines": 271,
-      "sha256": "2c5ba8b2f35cf04bf68beb869cb17758d2f92c1995fc2f6cf9f87c299f7bfff4",
+      "lines": 278,
+      "sha256": "3bb4d0e7f0ca5dcc42df7fc6f1408767f2746f6cf818b96cbebc48cfe9761465",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/research-contract.md"
     },
@@ -365,6 +393,20 @@
       "sha256": "57360b70c60885f3500b41faaaa80aa0d492acd4d022069800857ffff8c16c29",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/review-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas-runtime/l5-answers.schema.json",
+      "lines": 37,
+      "sha256": "e94f53cd34b39bf7e249fb690174d95155c1d3aa3e86499502c0060511a72043",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas-runtime/l5-answers.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas-runtime/l5-judge.schema.json",
+      "lines": 31,
+      "sha256": "b9746e20798d01d1a7572b99dd53de486e9ddc9047aeeb97d88b5fc020087014",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas-runtime/l5-judge.schema.json"
     },
     {
       "path": ".claude/peoplesoft/sdoc/schemas-runtime/research-packet.schema.json",
@@ -712,7 +754,7 @@
     {
       "path": "CLAUDE.md",
       "lines": 83,
-      "sha256": "651665bae63bb57cda249f3a2cb144b9e9f781ce79f8e8d89716a876baa5fa80",
+      "sha256": "1a6c25a3ec7323bbba68eec8ae98da4f300768b97df93d82896098603a67a890",
       "bom": false,
       "repo": "claude-code/CLAUDE.md"
     },
@@ -790,14 +832,20 @@
     },
     {
       "path": "scripts/ps-sdoc-lib.ps1",
-      "lines": 1410,
-      "sha256": "c37324823e87994cb5a40c1283d90c3fa153d32a210d6890a3293a3c32dc3ae6",
+      "lines": 1420,
+      "sha256": "a8fb7d1c2344448c9984495321f233174c11cf40bfdf7a88b3ea713d50f39456",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-sdoc-reader-lib.ps1",
+      "lines": 367,
+      "sha256": "91d931200dd645172e3626d5883a7e3eeadbce0672b30d11fdee7e0721464dd4",
       "bom": true
     },
     {
       "path": "scripts/ps-sdoc-render-lib.ps1",
-      "lines": 583,
-      "sha256": "ba9fb0066e7dd57bb827cb29bf0625681f815725aea28dd3199411e74c3020f4",
+      "lines": 589,
+      "sha256": "bf32d6c33ca01131cec06f378b393cabcaaaa0fa662f034d44aca35228cf23ba",
       "bom": true
     },
     {
@@ -814,8 +862,8 @@
     },
     {
       "path": "scripts/ps-sdoc.ps1",
-      "lines": 976,
-      "sha256": "da8953b004980830d86517c6ceb48cbfdee5951b0ba3ff83550b8b1c77903002",
+      "lines": 1302,
+      "sha256": "8a81a20f4ccfb026f865507982a6721391d1e90b8a0e53741db09b4fd9243cfa",
       "bom": true
     },
     {
@@ -880,8 +928,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 406,
-      "sha256": "a29816b69dfdf5a3aa12e76afc1dbf0dc25f101a459481492476821cef7c86f4",
+      "lines": 419,
+      "sha256": "f26aaae5dd8483d35e51f5e6b1a3612d9e07abdc0e7ac64dc3b1c7a263adc37b",
       "bom": true
     },
     {
@@ -904,14 +952,14 @@
     },
     {
       "path": "scripts/tests/test-sdoc-assemble.ps1",
-      "lines": 306,
-      "sha256": "a1c4a0703f530b82a28e84aea9af207265332f056699170b02edc58ab85cac37",
+      "lines": 343,
+      "sha256": "4338bc10a8846254fc54a5d9624881ca8fa2dae8705836ed5e1dd4beacff1435",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 411,
-      "sha256": "9fb26475ec92bbc4eaead7f1cef2ca43e52cb1800e574cf9b517068c80d4ca58",
+      "lines": 507,
+      "sha256": "f5a06604127993b6288bdf1a7071b4bdaad9f9bd4a3710a1453b8c4cc3b233e1",
       "bom": true
     },
     {

@@ -262,6 +262,43 @@ Assert-Sd $same2 '渲染：同樣的輸入產生逐位元相同的 Markdown'
 $fence = $true; foreach ($k in $md.Keys) { if ((([regex]::Matches($md[$k], '```')).Count % 2) -ne 0) { $fence = $false } }
 Assert-Sd $fence '渲染：每份的程式碼區塊都有成對的 ```'
 
+# ---------------- L5：出題、引用驗證、比對與多數決 ----------------
+. (Join-Path $repo 'scripts/ps-sdoc-reader-lib.ps1')
+$l5Docs = @('02-functional-requirements', '03-roles-permissions', '04-workflow', '05-ui', '06-architecture', '07-database', '08-api', '09-business-logic')
+$qs = Get-PsSdL5Questions $m $l5Docs
+$qmap = @{}; foreach ($q in $qs) { $qmap[[string]$q['id']] = $q }
+$q1 = $qmap['TRN-008/T1']; $q4 = $qmap['TRN-008/T4']; $q2 = $qmap['TRN-008/T2']
+$t1 = Sort-PsKnOrdinal -Items @($q1['ids']); $t4 = @($q4['ids'])
+Assert-Sd ($qs.Length -gt 50 -and $null -ne $q1 -and (@($t1) -join ',') -ceq 'DRV-002,ROLE-001') '出題：TRN-008 的 T1 標準答案是操作者條件裡的 ROLE-001、DRV-002' (@($t1) -join ',')
+Assert-Sd ($t4 -ccontains 'FLD-017' -and $t4 -ccontains 'FLD-011' -and $t4 -ccontains 'FLD-012' -and [string]$q2['kind'] -ceq 'USER_ACTION' -and @($q2['ids']) -ccontains 'OBJ-002') '出題：T4 是寫入的欄位、T2 是觸發種類與物件'
+$noIds = @(); foreach ($q in $qs) { if (@('T4', 'D1', 'B2', 'F1', 'W1', 'O1', 'A1') -ccontains [string]$q['q'] -and @($q['ids']).Count -eq 0) { $noIds += [string]$q['id'] } }
+Assert-Sd ($noIds.Count -eq 0) '出題：寫入、查找、條件、步驟類的題目標準答案都有 ID（不會是空集合）' (($noIds | Select-Object -First 5) -join '、')
+$txt = @(); foreach ($q in $qs) { if ([string]$q['mode'] -ceq 'TEXT' -and ([string]$q['text']).Trim() -eq '') { $txt += [string]$q['id'] } }
+Assert-Sd ($txt.Count -eq 0) '出題：文字題都有標準答案' ($txt -join '、')
+$qs2 = Get-PsSdL5Questions $m @('04-workflow')
+$other = @(); foreach ($q in $qs2) { if ([string]$q['doc'] -cne '04-workflow') { $other += [string]$q['id'] } }
+Assert-Sd ($other.Count -eq 0 -and $qs2.Length -gt 0) '出題：只出可出題文件的題目'
+$groups = Get-PsSdL5Groups $m $qs 20
+$cnt = 0; $big = 0; foreach ($g in $groups) { $cnt += @($g).Count; if (@($g).Count -gt 20) { $big++ } }
+Assert-Sd ($cnt -eq $qs.Length -and $big -eq 0) '分批：每題恰在一批、每批最多 20 題'
+$sec = Get-PsSdMdSections $md
+Assert-Sd ($sec.ContainsKey('04-workflow.md#TRN-008') -and $sec['04-workflow.md#TRN-008'].Contains('ROLE-001') -and -not $sec['04-workflow.md#TRN-008'].Contains('<a id="TRN-009">')) '段落：錨點到下一個錨點'
+$mkAns = { param($St, $Idl, $Kd, $Cit) $o = New-PsSdObject; $o['id'] = 'TRN-008/T1'; $o['status'] = $St; $o['ids'] = @($Idl); $o['kind'] = $Kd; $o['text'] = '合成'; $o['citations'] = @($Cit); return , $o }
+$a1 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('ROLE-001', 'DRV-002', 'TRN-008') '' @('04-workflow.md#TRN-008')) $q1 $sec
+$a2 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('ROLE-001') '' @('04-workflow.md#TRN-999')) $q1 $sec
+$a3 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('FLD-001') '' @('04-workflow.md#TRN-008')) $q1 $sec
+$a4 = Test-PsSdL5Answer (& $mkAns 'NOT_IN_SPEC' @() '' @()) $q1 $sec
+Assert-Sd ($a1.Class -ceq 'ANS' -and (@($a1.Ids) -join ',') -ceq 'ROLE-001,DRV-002' -and $a2.Class -ceq 'INV' -and $a3.Class -ceq 'INV' -and $a4.Class -ceq 'NIS') '引用驗證：有效、段落不存在、引用段落裡沒有該 ID、文件沒寫；自己的 ID 不算'
+Assert-Sd ((Get-PsSdL5Vote $q1 $a1 '') -ceq 'MATCH' -and (Get-PsSdL5Vote $q1 @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' } '') -ceq 'MISMATCH' -and (Get-PsSdL5Vote $q2 @{ Class = 'ANS'; Ids = @('OBJ-002'); Kind = 'BATCH'; Text = '' } '') -ceq 'MISMATCH') '比對：ID 集合；KIND 題代碼也要相同'
+$va = @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' }
+$vn = @{ Class = 'NIS'; Ids = @(); Kind = ''; Text = '' }
+$vi = @{ Class = 'INV'; Ids = @('DRV-009'); Kind = ''; Text = '' }
+$V = { param($A, $B, $C) return (Get-PsSdL5Verdict $q1 @(@{ Vote = $A[0]; Ans = $A[1] }, @{ Vote = $B[0]; Ans = $B[1] }, @{ Vote = $C[0]; Ans = $C[1] })) }
+$ok = ((& $V @('MATCH', $a1) @('MATCH', $a1) @('MISMATCH', $va)) -ceq 'CONSISTENT') -and ((& $V @('NIS', $vn) @('NIS', $vn) @('MATCH', $a1)) -ceq 'UNDERSPECIFIED') -and
+    ((& $V @('MISMATCH', $va) @('MISMATCH', $va) @('MATCH', $a1)) -ceq 'CONTRADICTS_SOURCE') -and ((& $V @('INV', $vi) @('INV', $vi) @('MATCH', $a1)) -ceq 'UNDERSPECIFIED') -and
+    ((& $V @('MATCH', $a1) @('NIS', $vn) @('MISMATCH', $va)) -ceq 'DIVERGENT')
+Assert-Sd $ok '多數決：CONSISTENT／UNDERSPECIFIED（2 票沒寫或 2 位腦補相同）／CONTRADICTS_SOURCE（2 票相同的錯答）／DIVERGENT'
+
 # ---------------- 研究包範例（部署給 worker 看格式；貫穿範例裁成每型別最多 4 項） ----------------
 function Get-SdEvRefs($Node, $Set) {
     if ($Node -is [string]) { if ([regex]::IsMatch($Node, '^E[1-9][0-9]*$')) { [void]$Set.Add($Node) }; return }

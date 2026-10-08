@@ -18,7 +18,7 @@
 | 以 Component 產 Spec 文件（00-index＋14 份＋90 問題清單） | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
 | 框架維護、排錯、看 log | `claude`（一般 session：沒有主代理限制） |
 
-`ps-spec-worker`、`ps-clone-worker`、`ps-status-reader`、`ps-sdoc-worker` 只由外環 headless 啟動；`/ps-audit-batch`、`/ps-supplement`、`/ps-spec-batch`、
+`ps-spec-worker`、`ps-clone-worker`、`ps-status-reader`、`ps-sdoc-worker`、`ps-spec-reader`、`ps-spec-judge` 只由外環 headless 啟動；`/ps-audit-batch`、`/ps-supplement`、`/ps-spec-batch`、
 `/ps-clone-batch` 只供外環呼叫。
 
 ## PeopleSoft 問題的處理方式

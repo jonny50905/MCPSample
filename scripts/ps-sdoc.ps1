@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 try {
     . (Join-Path $PSScriptRoot 'ps-knowledge-lib.ps1')
     . (Join-Path $PSScriptRoot 'ps-session-lib.ps1')
-    foreach ($lib in @('ps-sdoc-schema-lib', 'ps-sdoc-status-lib', 'ps-sdoc-lib', 'ps-sdoc-check-lib', 'ps-sdoc-render-lib')) { . (Join-Path $PSScriptRoot ($lib + '.ps1')) }
+    foreach ($lib in @('ps-sdoc-schema-lib', 'ps-sdoc-status-lib', 'ps-sdoc-lib', 'ps-sdoc-check-lib', 'ps-sdoc-render-lib', 'ps-sdoc-reader-lib')) { . (Join-Path $PSScriptRoot ($lib + '.ps1')) }
 }
 catch { Write-Host ('共用腳本載入失敗，請核對搬運清單與 UTF-8 BOM：' + $_.Exception.Message); Write-Host 'DOC1-9-02'; exit 2 }
 
@@ -122,13 +122,17 @@ function Get-SdKnowledgeFingerprint {
 
 # ---------------- 帳本與收據 ----------------
 function Get-SdLedger {
+    # attempt 寫完 outcome.json 就不再變：同一個行程內快取，不重讀
     $rows = New-Object System.Collections.Generic.List[object]
     if ([System.IO.Directory]::Exists($J.AttemptRoot)) {
         foreach ($d in @(Get-ChildItem -LiteralPath $J.AttemptRoot -Directory | Sort-Object Name)) {
             if ($d.Name -notmatch '^a[0-9]{4,8}$') { continue }
+            if ($J.LedgerCache.ContainsKey($d.Name)) { $c = $J.LedgerCache[$d.Name]; if ($null -ne $c) { $rows.Add($c) }; continue }
             $inp = Read-SdNode (Join-Path $d.FullName 'input.json')
-            if ($null -eq $inp -or [string]$inp['revision'] -cne $J.Revision['id']) { continue }
-            $rows.Add(@{ Id = $d.Name; Dir = $d.FullName; Input = $inp; Outcome = (Read-SdNode (Join-Path $d.FullName 'outcome.json')) })
+            if ($null -eq $inp -or [string]$inp['revision'] -cne $J.Revision['id']) { if ($null -ne $inp) { $J.LedgerCache[$d.Name] = $null }; continue }
+            $row = @{ Id = $d.Name; Dir = $d.FullName; Input = $inp; Outcome = (Read-SdNode (Join-Path $d.FullName 'outcome.json')) }
+            if ($null -ne $row.Outcome) { $J.LedgerCache[$d.Name] = $row }
+            $rows.Add($row)
         }
     }
     return , $rows.ToArray()
@@ -138,13 +142,17 @@ function Get-SdReceipts {
     $rows = New-Object System.Collections.Generic.List[object]
     foreach ($p in (Get-SdFiles $J.ReceiptRoot)) {
         if (-not $p.EndsWith('.json')) { continue }
-        $rc = Read-SdNode $p
+        # 收據建立後不再變：同一個行程內快取
+        if (-not $J.ReceiptCache.ContainsKey($p)) { $J.ReceiptCache[$p] = Read-SdNode $p }
+        $rc = $J.ReceiptCache[$p]
         if ($null -eq $rc -or [string]$rc['revision'] -cne $J.Revision['id']) { continue }
         if ((Get-SdHash $rc['packet']) -cne [string]$rc['packetHash'] -or [string]$rc['review']['verdict'] -cne 'PASS') { throw ('收據失去完整性：' + (Get-SdRel $p)) }
         if ([string]$rc['researchAttempt'] -ceq [string]$rc['reviewAttempt']) { throw ('收據沒有獨立的研究與覆核：' + (Get-SdRel $p)) }
         $ui = Get-PsSdUnitIndex ([string]$rc['unit'])
         $sk = $ui.ToString('D2', [System.Globalization.CultureInfo]::InvariantCulture) + [char]0 + [string]$rc['subject'] + [char]0 + ([int]$rc['page']).ToString('D4', [System.Globalization.CultureInfo]::InvariantCulture)
-        $rows.Add(@{ Path = $p; Receipt = $rc; Packet = $rc['packet']; Ref = ([string]$rc['unit'] + '/' + [string]$rc['subject'] + '/p' + [string]$rc['page']); Sort = $sk })
+        $aq = @(); foreach ($x in @($rc['amendQuestions'])) { if ($null -ne $x) { $aq += [string]$x } }
+        $rows.Add(@{ Path = $p; Receipt = $rc; Packet = $rc['packet']; Ref = ([string]$rc['unit'] + '/' + [string]$rc['subject'] + '/p' + [string]$rc['page']); Sort = $sk
+                Amend = ([string]$rc['cursor']).StartsWith('L5-AMEND'); AmendQuestions = $aq })
     }
     $keys = New-Object System.Collections.Generic.List[string]; $map = @{}
     foreach ($r in $rows) { $keys.Add($r.Sort); $map[$r.Sort] = $r }
@@ -315,25 +323,27 @@ function Get-SdPending([object[]]$Receipts) {
     }
     return $out
 }
-function Get-SdPageState($Unit, [string]$Subject, [object[]]$Receipts, [object[]]$Ledger, $Pending, $Stage0) {
+function Get-SdPageState($Unit, [string]$Subject, [object[]]$Receipts, [object[]]$Ledger, $Pending, $Stage0, $Amend) {
+    # $Amend：L5 要本主題改寫的項目（@{ ItemKeys; Questions; Findings; Cursor }），沒有就 $null。
     $mine = @(); foreach ($r in $Receipts) { if ([string]$r.Receipt['unit'] -ceq $Unit.Id -and [string]$r.Receipt['subject'] -ceq $Subject) { $mine += , $r } }
     $page = 1; $cursor = ''; $mainDone = $false
     $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
     foreach ($r in $mine) {
         $rc = $r.Receipt
         if ([int]$rc['page'] -ne $page) { throw ('頁次不連續：' + $r.Ref) }
-        if ($mainDone) { if ([string]$rc['cursor'] -cne 'REQUESTS') { throw ('頁次不連續：' + $r.Ref) }; $page++; continue }
+        if ($mainDone) { $cr = [string]$rc['cursor']; if ($cr -cne 'REQUESTS' -and -not $cr.StartsWith('L5-AMEND')) { throw ('頁次不連續：' + $r.Ref) }; $page++; continue }
         if ([string]$rc['cursor'] -cne $cursor) { throw ('頁次不連續：' + $r.Ref) }
         if ([string]$r.Packet['coverage'] -ceq 'COMPLETE') { $mainDone = $true; $page++; $cursor = 'REQUESTS'; continue }
         $next = [string]$r.Packet['nextCursor']
         if ($next -eq '' -or $seen.Contains($next) -or $page -ge 30) { return @{ State = 'BLOCKED'; Findings = @('續頁游標重複、空白或已達 30 頁；請縮小範圍後 -Refresh。') } }
         [void]$seen.Add($next); $cursor = $next; $page++
     }
-    $requested = @()
+    $requested = @(); $amendKeys = @(); $amendQs = @(); $l5Find = @()
     $slot = $Unit.Id + '|' + $Subject
     if ($mainDone) {
-        if (-not $Pending.ContainsKey($slot)) { return @{ State = 'DONE'; Findings = @() } }
-        $requested = @($Pending[$slot])
+        if ($Pending.ContainsKey($slot)) { $requested = @($Pending[$slot]); $cursor = 'REQUESTS' }
+        elseif ($null -ne $Amend) { $amendKeys = @($Amend.ItemKeys); $requested = $amendKeys; $amendQs = @($Amend.Questions); $l5Find = @($Amend.Findings); $cursor = [string]$Amend.Cursor }
+        else { return @{ State = 'DONE'; Findings = @() } }
     }
     # 分母以全部已驗收收據判斷：別的 Component 已寫的共用欄位不必重寫
     $required = Get-SdRequired $Unit $Subject $Stage0 $Receipts
@@ -341,12 +351,13 @@ function Get-SdPageState($Unit, [string]$Subject, [object[]]$Receipts, [object[]
     $remaining = @(); foreach ($k in $required) { if (-not (Test-SdCovered $k $cov $J.Registry)) { $remaining += $k } }
     $key = $Unit.Id + '/' + $Subject + '/' + $page
     $s = Get-SdSlotState (Get-SdRowsFor $Ledger $key)
-    $base = @{ Unit = $Unit.Id; Subject = $Subject; Page = $page; Cursor = $cursor; Key = $key; Findings = $s.Findings; Required = $remaining; Requested = $requested; Candidate = $s.Candidate }
+    $base = @{ Unit = $Unit.Id; Subject = $Subject; Page = $page; Cursor = $cursor; Key = $key; Findings = $s.Findings; Required = $remaining; Requested = $requested; Candidate = $s.Candidate
+        Amend = $amendKeys; AmendQuestions = $amendQs; L5Findings = $l5Find }
     if ($s.Invalid -ge 2) { $base.State = 'BLOCKED'; $base.Findings = @($s.Findings) + '本頁本次預算已兩次未通過；修正原因後加 -Retry（保留既有收據）。'; return $base }
     if ($null -ne $s.Candidate) {
         # 候選產生後，別的主題先驗收了同一個自然鍵：候選作廢重研究（不計次）
         $written = Get-SdWrittenKeys $Receipts
-        $dup = Get-SdDuplicateKeys (Read-SdNode (Join-Path $s.Candidate.Dir 'candidate.json')) $written
+        $dup = @(); foreach ($k in (Get-SdDuplicateKeys (Read-SdNode (Join-Path $s.Candidate.Dir 'candidate.json')) $written)) { if ($amendKeys -cnotcontains $k) { $dup += $k } }
         if ($dup.Count -eq 0) { $base.State = 'REVIEW'; $base.Kind = 'REVIEW'; return $base }
         $base.Candidate = $null
         $base.Findings = @('前一份研究包寫了別頁已驗收的項目：' + (@($dup | Select-Object -First 8) -join '、') + '；改為參照，不要重寫。') + @($s.Findings)
@@ -354,13 +365,29 @@ function Get-SdPageState($Unit, [string]$Subject, [object[]]$Receipts, [object[]
     $base.State = 'RESEARCH'; $base.Kind = 'RESEARCH'
     return $base
 }
+function Get-SdResearchWork($Receipts, [object[]]$Ledger, $Pending, $S0, $Amend) {
+    # 研究單元依序（前一單元全部完成才排下一單元）。回傳 @{ Work; Gaps; Done }。
+    $work = @(); $gaps = @(); $done = $true
+    foreach ($u in $script:PsSdUnits) {
+        $unitDone = $true
+        foreach ($subj in (Get-SdSubjects $u $S0)) {
+            $am = $null; $slot = $u.Id + '|' + $subj; if ($Amend.ContainsKey($slot)) { $am = $Amend[$slot] }
+            $ps = Get-SdPageState $u $subj $Receipts $Ledger $Pending $S0 $am
+            if ($ps.State -eq 'DONE') { continue }
+            $unitDone = $false
+            if ($ps.State -eq 'BLOCKED') { $gaps += ($u.Id + ' / ' + $subj + '：' + (@($ps.Findings | Select-Object -First 3) -join '；')); continue }
+            $work += , $ps
+        }
+        if (-not $unitDone) { $done = $false; break }
+    }
+    return @{ Work = $work; Gaps = $gaps; Done = $done }
+}
 function Get-SdState {
     $ledger = Get-SdLedger
     $receipts = @()
-    $work = @(); $gaps = @(); $phase = 'RUNNABLE'
+    $work = @(); $gaps = @(); $phase = 'RUNNABLE'; $l5 = $null
     $s0 = Get-SdStage0 $ledger
     $gaps += @($s0.Gaps)
-    $researchDone = $false
     if ($s0.State -eq 'READ' -or $s0.State -eq 'ROUND2') { $work += @($s0.Work) }
     elseif ($s0.State -eq 'BLOCKED') { $phase = 'BLOCKED' }
     elseif ($s0.State -eq 'WAIT') { $phase = 'WAIT_STATUS' }
@@ -368,25 +395,207 @@ function Get-SdState {
         $J.Skeleton = $s0.Skeleton; $J.Built = $s0.Built
         $receipts = Get-SdReceipts
         $pending = Get-SdPending $receipts
-        $researchDone = $true
-        foreach ($u in $script:PsSdUnits) {
-            $unitDone = $true
-            foreach ($subj in (Get-SdSubjects $u $s0)) {
-                $ps = Get-SdPageState $u $subj $receipts $ledger $pending $s0
-                if ($ps.State -eq 'DONE') { continue }
-                $unitDone = $false
-                if ($ps.State -eq 'BLOCKED') { $gaps += ($u.Id + ' / ' + $subj + '：' + (@($ps.Findings | Select-Object -First 3) -join '；')); continue }
-                $work += , $ps
+        $rw = Get-SdResearchWork $receipts $ledger $pending $s0 @{}
+        $work += @($rw.Work); $gaps += @($rw.Gaps)
+        if (-not $rw.Done) { if ($work.Count -eq 0) { $phase = 'BLOCKED' } }
+        else {
+            # 研究完成：L5 乾淨讀者（第 1 輪沒讀懂的項目先交原研究單元改寫，再由新讀者重問）
+            $l5 = Get-SdL5State $s0 $receipts $ledger
+            $blocked = (@($l5.Gaps).Count -gt 0)
+            $gaps += @($l5.Gaps)
+            if ($l5.Amend.Count -gt 0) {
+                $aw = Get-SdResearchWork $receipts $ledger $pending $s0 $l5.Amend
+                $work += @($aw.Work); $gaps += @($aw.Gaps); if (@($aw.Gaps).Count -gt 0) { $blocked = $true }
             }
-            if (-not $unitDone) { $researchDone = $false; break }
+            $work += @($l5.Work)
+            if ($work.Count -gt 0) { $phase = 'RUNNABLE' } elseif ($blocked) { $phase = 'BLOCKED' } else { $phase = 'RESEARCH_DONE' }
         }
-        if (-not $researchDone -and $work.Count -eq 0) { $phase = 'BLOCKED' }
-        if ($researchDone) { $phase = 'RESEARCH_DONE' }
     }
     $used = 0; foreach ($e in $ledger) { if ([int]$e.Input['budget'] -eq $J.Budget -and ($null -eq $e.Outcome -or [string]$e.Outcome['status'] -cne 'SLOT_BUSY')) { $used++ } }
     $limit = [Math]::Min(6000, 300 + 80 * $J.Names.Count * $script:PsSdUnits.Length)
     if ($used -ge $limit -and $work.Count -gt 0) { $gaps += '本次總派工預算已達上限；檢查缺口後加 -Retry 開新預算。'; $work = @(); $phase = 'BLOCKED' }
-    return @{ Ledger = $ledger; Receipts = $receipts; Stage0 = $s0; Work = $work; Gaps = $gaps; Phase = $phase; Used = $used; Limit = $limit }
+    return @{ Ledger = $ledger; Receipts = $receipts; Stage0 = $s0; Work = $work; Gaps = $gaps; Phase = $phase; Used = $used; Limit = $limit; L5 = $l5 }
+}
+
+# ---------------- L5 乾淨讀者 ----------------
+function ConvertTo-SdAns($A) {
+    $ids = @(); foreach ($x in @($A['ids'])) { if ($null -ne $x) { $ids += [string]$x } }
+    return @{ Class = [string]$A['class']; Ids = $ids; Kind = [string]$A['kind']; Text = [string]$A['text']; Reason = [string]$A['reason'] }
+}
+function Get-SdBatchId([int]$Round, [object[]]$Questions) {
+    $ids = @(); foreach ($q in $Questions) { $ids += [string]$q['id'] }
+    $sorted = Sort-PsKnOrdinal -Items $ids
+    return ('b' + (Get-PsSdTextHash ([string]$Round + "`n" + (@($sorted) -join "`n"))).Substring(0, 12))
+}
+function Get-SdReaderFinal($Batch, [string]$Reader, [object[]]$Ledger) {
+    # 一位讀者在一個批次的最後答案：@{ State（DONE／WORK／BLOCKED）; Answers（題目 ID → 歸類後的答案）; Work; Findings }
+    $base = 'l5/' + $Batch.Round + '/' + $Batch.Id + '/' + $Reader
+    $mk = { param($WorkKey, $AskList, [bool]$IsRetry, $Notes) return @{ Kind = 'READER'; Key = $WorkKey; Reader = $Reader; Round = $Batch.Round; Batch = $Batch.Id; Questions = @($AskList); Retry = $IsRetry; Findings = @($Notes); Unit = 'l5'; Subject = $Batch.Id; Page = $Batch.Round } }
+    $s1 = Get-SdSlotState (Get-SdRowsFor $Ledger $base)
+    if ($null -eq $s1.Accepted) {
+        if ($s1.Invalid -ge 2) { return @{ State = 'BLOCKED'; Findings = $s1.Findings } }
+        return @{ State = 'WORK'; Work = (& $mk $base $Batch.Questions $false $s1.Findings) }
+    }
+    $answers = @{}
+    foreach ($a in @($s1.Accepted.Outcome['answers'])) { if ($null -ne $a) { $answers[[string]$a['id']] = ConvertTo-SdAns $a } }
+    $inv = @(); foreach ($q in $Batch.Questions) { $id = [string]$q['id']; if ($answers.ContainsKey($id) -and $answers[$id].Class -ceq 'INV') { $inv += $id } }
+    if ($inv.Count -eq 0) { return @{ State = 'DONE'; Answers = $answers } }
+    $s2 = Get-SdSlotState (Get-SdRowsFor $Ledger ($base + '/retry'))
+    if ($null -ne $s2.Accepted) { foreach ($a in @($s2.Accepted.Outcome['answers'])) { if ($null -ne $a) { $answers[[string]$a['id']] = ConvertTo-SdAns $a } }; return @{ State = 'DONE'; Answers = $answers } }
+    if ($s2.Invalid -ge 2) { return @{ State = 'DONE'; Answers = $answers } }
+    # 答案沒有出處：同一輪重問該讀者一次
+    $qs = @(); foreach ($q in $Batch.Questions) { if ($inv -ccontains [string]$q['id']) { $qs += , $q } }
+    $fs = @(); foreach ($id in $inv) { $fs += ($id + '：' + $answers[$id].Reason) }
+    return @{ State = 'WORK'; Work = (& $mk ($base + '/retry') $qs $true (@($s2.Findings) + $fs)) }
+}
+function Get-SdL5Short([string]$Text, [int]$Max) {
+    $t = ($Text -replace '\s+', ' ').Trim()
+    if ($t.Length -gt $Max) { $t = $t.Substring(0, $Max) + '…' }
+    return $t
+}
+function Get-SdL5Summary($V) {
+    $sum = @()
+    foreach ($x in $V.Votes) {
+        $t = Get-SdL5Short $x.Ans.Text 120
+        if ($x.Vote -ceq 'NIS') { $t = '文件沒寫' }
+        elseif ($x.Vote -ceq 'INV') { $t = '答案沒有出處（' + $x.Ans.Reason + '）' }
+        elseif (@($x.Ans.Ids).Count -gt 0) { $t = $t + '〔' + (@($x.Ans.Ids) -join '、') + '〕' }
+        $sum += ($x.Reader + '：' + $t)
+    }
+    return ($sum -join '；')
+}
+function New-SdReaderQuestion($Q, $V) {
+    $cat = Get-PsSdL5Category $V.Verdict
+    $text = '乾淨讀者兩輪都沒有一致讀懂：' + [string]$Q['prompt'] + '（' + $V.Verdict + '）。讀者答案：' + (Get-SdL5Summary $V) + '。請把這個項目寫清楚，或在 decisions.md 裁決。'
+    return @{ Key = ($cat + ':' + [string]$Q['item'] + ':' + [string]$Q['q']); Category = $cat; Question = $text; Affects = @([string]$Q['item']); RaisedBy = 'READER'; Status = 'OPEN'; Evidence = @() }
+}
+function Get-SdL5State($S0, [object[]]$Receipts, [object[]]$Ledger) {
+    # 回傳 @{ Work; Gaps; Amend（'單元|主題' → @{ ItemKeys; Questions; Findings; Cursor }）; Docs（文件 → PASS／NOT_RUN）; Extra（READER 問題）; 計數 }
+    $res = @{ Work = @(); Gaps = @(); Amend = @{}; Docs = @{}; Extra = @(); Asked = 0; Passed = 0; Failed = 0; Eligible = @() }
+    foreach ($d in $script:PsSdDocOrder) { $res.Docs[$d] = 'NOT_RUN' }
+    # 出題的基礎（組裝、可出題的文件、題目）只隨收據與人工輸入改變：同一個行程內快取
+    $sig = New-Object System.Text.StringBuilder
+    foreach ($r in $Receipts) { [void]$sig.Append([string]$r.Receipt['packetHash']).Append('|') }
+    foreach ($n in @('project.md', 'decisions.md')) { [void]$sig.Append((Get-PsSdStatusFingerprint (Get-SdText (Join-Path $J.InputRoot $n)))).Append('|') }
+    $ck = Get-PsSdTextHash $sig.ToString()
+    if ($null -ne $J.L5Cache -and $J.L5Cache.Key -ceq $ck) { $model = $J.L5Cache.Model; $eligible = $J.L5Cache.Eligible; $questions = $J.L5Cache.Questions }
+    else {
+        [void](Update-PsSdRegistry $J.SchemaReg $J.Registry $J.Skeleton @($Receipts) @())
+        $st = @{ Receipts = @($Receipts); Stage0 = $S0 }
+        $model = Build-SdModel $st @()
+        $gates = (Get-SdDocGates $model $st $null $null).Gates
+        $eligible = @()
+        foreach ($d in $script:PsSdDocOrder) {
+            $g = $gates[$d]
+            if ([string]$g['L5'] -ceq 'NOT_APPLICABLE') { continue }
+            $ok = $true; foreach ($l in @('L1', 'L2', 'L3', 'L4')) { if (@('PASS', 'NOT_APPLICABLE') -cnotcontains [string]$g[$l]) { $ok = $false } }
+            if ($ok) { $eligible += $d }
+        }
+        $questions = Get-PsSdL5Questions $model $eligible
+        $J.L5Cache = @{ Key = $ck; Model = $model; Eligible = $eligible; Questions = $questions }
+    }
+    $res.Eligible = $eligible
+    $res.Asked = @($questions).Count
+    # 批次：由各批次第一個讀者工單定義題目與標準答案
+    $batches = New-Object System.Collections.Generic.List[object]; $seenB = @{}
+    foreach ($e in $Ledger) {
+        if ([string]$e.Input['kind'] -cne 'READER' -or $e.Input['retry'] -eq $true) { continue }
+        $bk = [string]$e.Input['round'] + '|' + [string]$e.Input['batch']
+        if ($seenB.ContainsKey($bk)) { continue }
+        $seenB[$bk] = $true
+        $batches.Add(@{ Round = [int]$e.Input['round']; Id = [string]$e.Input['batch']; Questions = @($e.Input['questions']) })
+    }
+    $verdicts = @{}; $open = @{}
+    foreach ($b in $batches) {
+        foreach ($q in $b.Questions) { $open[[string]$b.Round + '|' + [string]$q['id']] = $true }
+        $finals = @{}; $busy = $false
+        foreach ($r in @('R1', 'R2', 'R3')) {
+            $f = Get-SdReaderFinal $b $r $Ledger
+            if ($f.State -eq 'BLOCKED') { $res.Gaps += ('L5 讀者 ' + $r + '（第 ' + $b.Round + ' 輪 ' + $b.Id + '）本預算兩次不合格：' + (@($f.Findings | Select-Object -First 2) -join '；')); $busy = $true; continue }
+            if ($f.State -eq 'WORK') { $res.Work += , $f.Work; $busy = $true; continue }
+            $finals[$r] = $f.Answers
+        }
+        if ($busy) { continue }
+        # 文字題交判定 session
+        $judge = @{}; $needJudge = @()
+        foreach ($q in $b.Questions) {
+            if ([string]$q['mode'] -cne 'TEXT') { continue }
+            $any = $false; foreach ($r in @('R1', 'R2', 'R3')) { $a = $finals[$r][[string]$q['id']]; if ($null -ne $a -and $a.Class -ceq 'ANS') { $any = $true } }
+            if ($any) { $needJudge += , $q }
+        }
+        if ($needJudge.Count -gt 0) {
+            $jk = 'l5/' + $b.Round + '/' + $b.Id + '/judge'
+            $sj = Get-SdSlotState (Get-SdRowsFor $Ledger $jk)
+            if ($null -eq $sj.Accepted) {
+                if ($sj.Invalid -ge 2) { $res.Gaps += ('L5 判定（第 ' + $b.Round + ' 輪 ' + $b.Id + '）本預算兩次不合格：' + (@($sj.Findings | Select-Object -First 2) -join '；')); continue }
+                $items = @()
+                foreach ($q in $needJudge) {
+                    $o = New-PsSdObject; $o['id'] = [string]$q['id']; $o['question'] = [string]$q['prompt']; $o['standard'] = [string]$q['text']
+                    $ans = @(); foreach ($r in @('R1', 'R2', 'R3')) { $a = $finals[$r][[string]$q['id']]; if ($null -ne $a -and $a.Class -ceq 'ANS') { $x = New-PsSdObject; $x['reader'] = $r; $x['text'] = $a.Text; $ans += , $x } }
+                    $o['answers'] = $ans; $items += , $o
+                }
+                $res.Work += , @{ Kind = 'JUDGE'; Key = $jk; Round = $b.Round; Batch = $b.Id; Items = $items; Findings = @($sj.Findings); Unit = 'l5'; Subject = $b.Id; Page = $b.Round }
+                continue
+            }
+            foreach ($v in @($sj.Accepted.Outcome['verdicts'])) { if ($null -ne $v) { $judge[[string]$v['id'] + '|' + [string]$v['reader']] = [string]$v['verdict'] } }
+        }
+        foreach ($q in $b.Questions) {
+            $id = [string]$q['id']
+            $votes = @()
+            foreach ($r in @('R1', 'R2', 'R3')) {
+                $a = $finals[$r][$id]
+                if ($null -eq $a) { $a = @{ Class = 'INV'; Ids = @(); Kind = ''; Text = ''; Reason = '沒有回答' } }
+                $votes += , @{ Reader = $r; Vote = (Get-PsSdL5Vote $q $a ([string]$judge[$id + '|' + $r])); Ans = $a }
+            }
+            $verdicts[[string]$b.Round + '|' + $id] = @{ Verdict = (Get-PsSdL5Verdict $q $votes); Votes = $votes }
+            $open.Remove([string]$b.Round + '|' + $id)
+        }
+    }
+    # 每題：第 1 輪 → 原研究單元改寫 → 第 2 輪（仍不一致就開 READER 問題）
+    $amended = @{}; foreach ($r in $Receipts) { foreach ($x in @($r.AmendQuestions)) { $amended[[string]$x] = $true } }
+    $need1 = @(); $need2 = @(); $failed1 = @(); $final = @{}
+    foreach ($q in $questions) {
+        $id = [string]$q['id']
+        $v1 = $verdicts['1|' + $id]
+        if ($null -eq $v1) { if (-not $open.ContainsKey('1|' + $id)) { $need1 += , $q }; continue }
+        if ($v1.Verdict -ceq 'CONSISTENT') { $final[$id] = 'PASS'; continue }
+        if (-not $amended.ContainsKey($id)) { $failed1 += , @{ Q = $q; V = $v1 }; continue }
+        $v2 = $verdicts['2|' + $id]
+        if ($null -eq $v2) { if (-not $open.ContainsKey('2|' + $id)) { $need2 += , $q }; continue }
+        if ($v2.Verdict -ceq 'CONSISTENT') { $final[$id] = 'PASS' } else { $final[$id] = 'FAIL'; $res.Extra += , (New-SdReaderQuestion $q $v2) }
+    }
+    foreach ($pair in @(@(1, $need1), @(2, $need2))) {
+        if (@($pair[1]).Count -eq 0) { continue }
+        foreach ($g in (Get-PsSdL5Groups $model @($pair[1]))) {
+            $bid = Get-SdBatchId $pair[0] $g
+            $res.Work += , @{ Kind = 'READER'; Key = ('l5/' + $pair[0] + '/' + $bid + '/R1'); Reader = 'R1'; Round = $pair[0]; Batch = $bid; Questions = @($g); Retry = $false; Findings = @(); Unit = 'l5'; Subject = $bid; Page = $pair[0] }
+        }
+    }
+    # 第 1 輪全部問完才交改寫：同一主題的問題一次改完
+    $round1Busy = ($need1.Count -gt 0); foreach ($k in @($open.Keys)) { if (([string]$k).StartsWith('1|')) { $round1Busy = $true } }
+    if (-not $round1Busy -and $failed1.Count -gt 0) {
+        $idKeys = Get-PsSdIdKeyMap $J.Registry
+        foreach ($f in $failed1) {
+            $item = [string]$f.Q['item']
+            if (-not $model.ItemReceipt.ContainsKey($item) -or -not $idKeys.ContainsKey($item)) { continue }
+            $parts = ([string]$model.ItemReceipt[$item]).Split('/')
+            $slot = $parts[0] + '|' + $parts[1]
+            if (-not $res.Amend.ContainsKey($slot)) { $res.Amend[$slot] = @{ ItemKeys = (New-Object System.Collections.Generic.List[string]); Questions = (New-Object System.Collections.Generic.List[string]); Findings = (New-Object System.Collections.Generic.List[string]); Cursor = '' } }
+            $am = $res.Amend[$slot]
+            $tk = [string]$idKeys[$item].Prefix + '/' + [string]$idKeys[$item].Key
+            if (-not $am.ItemKeys.Contains($tk)) { $am.ItemKeys.Add($tk) }
+            $am.Questions.Add([string]$f.Q['id'])
+            $am.Findings.Add(([string]$f.Q['prompt'] + ' → ' + $f.V.Verdict + '。讀者答案：' + (Get-SdL5Summary $f.V)))
+        }
+        foreach ($slot in @($res.Amend.Keys)) {
+            $n = 1; foreach ($r in $Receipts) { if ($r.Amend -and ([string]$r.Receipt['unit'] + '|' + [string]$r.Receipt['subject']) -ceq $slot) { $n++ } }
+            $res.Amend[$slot].Cursor = 'L5-AMEND-' + $n
+        }
+    }
+    $pendingDocs = @{}
+    foreach ($q in $questions) { $id = [string]$q['id']; if (-not $final.ContainsKey($id)) { $pendingDocs[[string]$q['doc']] = $true } elseif ($final[$id] -eq 'PASS') { $res.Passed++ } else { $res.Failed++ } }
+    foreach ($d in $eligible) { if (-not $pendingDocs.ContainsKey($d)) { $res.Docs[$d] = 'PASS' } }
+    return $res
 }
 
 # ---------------- 工單附件：欄位說明（由 schema 產生） ----------------
@@ -510,15 +719,19 @@ function Test-SdResearchOutput($Out, $Work, $State, [string]$Aid, [string]$Input
     }
     if ([int]$Out['page'] -ne [int]$Work.Page) { $errs += ('page 應為 ' + $Work.Page) }
     $unit = Get-PsSdUnit $Work.Unit
-    foreach ($x in @('denominators', 'statusTexts', 'programDispositions', 'definitionOnlyCodes')) { if ($Out.Contains($x) -and $unit.Extras -notcontains $x) { $errs += ($Work.Unit + ' 單元不能寫 ' + $x) } }
-    if ($Work.Cursor -ceq 'REQUESTS' -and [string]$Out['coverage'] -cne 'COMPLETE') { $errs += '上游需求頁要一頁寫完（COMPLETE）' }
+    $extraPage = ([string]$Work.Cursor -ceq 'REQUESTS' -or ([string]$Work.Cursor).StartsWith('L5-AMEND'))
+    foreach ($x in @('denominators', 'statusTexts', 'programDispositions', 'definitionOnlyCodes')) {
+        if ($Out.Contains($x) -and $unit.Extras -notcontains $x) { $errs += ($Work.Unit + ' 單元不能寫 ' + $x) }
+        elseif ($Out.Contains($x) -and $extraPage) { $errs += ('上游需求頁與改寫頁不寫 ' + $x + '（第一輪已處置）') }
+    }
+    if ($extraPage -and [string]$Out['coverage'] -cne 'COMPLETE') { $errs += '上游需求頁與改寫頁要一頁寫完（COMPLETE）' }
     if ([string]$Out['nextCursor'] -ne '' -and [string]$Out['nextCursor'] -ceq [string]$Work.Cursor) { $errs += 'nextCursor 沒有前進' }
     $ctx = New-PsSdResolveContext $J.SchemaReg $J.Registry $J.Skeleton 'status.md' $J.Built 'Check'
     $res = Resolve-PsSdPacket $ctx $Out
     foreach ($e in $res.Errors) { $errs += $e }
     # 全 job 同一個自然鍵只寫一次（跨頁、跨主題）
     $written = Get-SdWrittenKeys $State.Receipts
-    foreach ($k in (Get-SdDuplicateKeys $Out $written)) { $errs += ($k + '：別頁已寫過（可引用清單上有），改為參照，不要重寫') }
+    foreach ($k in (Get-SdDuplicateKeys $Out $written)) { if (@($Work.Amend) -ccontains $k) { continue }; $errs += ($k + '：別頁已寫過（可引用清單上有），改為參照，不要重寫') }
     # COMPLETE：分母鍵、上游需求、前頁與本頁引用的同單元後寫項目都要處置
     if ([string]$Out['coverage'] -ceq 'COMPLETE') {
         $rcpt = @{ Receipt = (New-PsSdOrderedFrom @('unit', $Work.Unit, 'subject', $Work.Subject)); Packet = $Out }
@@ -557,13 +770,79 @@ function Test-SdReviewOutput($Out, $Work, $Packet, [string]$Aid, [string]$InputH
     return $res
 }
 
+function Test-SdReaderOutput($Out, $Work, [string]$Aid, [string]$InputHash, $Docs) {
+    # 讀者答案：結構與題目對齊有錯就整份退回（計次）；逐題驗引用，沒有出處的答案記為無效（同一輪重問一次）。
+    $res = @{ Errors = @(); Answers = @(); Invalid = @() }
+    if ($null -eq $Out) { $res.Errors = @('output.json 不存在或不是合法 JSON'); return $res }
+    $errs = @(); foreach ($e in (Test-PsSdSchema $J.SchemaReg 'urn:ps-sdoc:schema:l5-answers' $Out)) { $errs += $e }
+    if ($errs.Count -gt 0) { $res.Errors = @($errs | Select-Object -First 20); return $res }
+    foreach ($pair in @(@('jobId', $J.JobId), @('attemptId', $Aid), @('reader', $Work.Reader), @('batch', $Work.Batch), @('inputHash', $InputHash))) { if ([string]$Out[$pair[0]] -cne [string]$pair[1]) { $errs += ($pair[0] + ' 應為 ' + $pair[1]) } }
+    if ([int]$Out['round'] -ne [int]$Work.Round) { $errs += ('round 應為 ' + $Work.Round) }
+    $byId = @{}; foreach ($a in @($Out['answers'])) { if ($null -eq $a) { continue }; $id = [string]$a['id']; if ($byId.ContainsKey($id)) { $errs += ($id + ' 回答了兩次') } else { $byId[$id] = $a } }
+    $want = @(); foreach ($q in $Work.Questions) { $want += [string]$q['id'] }
+    foreach ($id in $want) { if (-not $byId.ContainsKey($id)) { $errs += ($id + ' 沒有回答') } }
+    foreach ($id in @($byId.Keys)) { if ($want -cnotcontains $id) { $errs += ($id + ' 不是本工單的題目') } }
+    if ($errs.Count -gt 0) { $res.Errors = @($errs | Select-Object -First 30); return $res }
+    $sections = Get-PsSdMdSections $Docs
+    $answers = @(); $inv = @()
+    foreach ($q in $Work.Questions) {
+        $id = [string]$q['id']
+        $c = Test-PsSdL5Answer $byId[$id] $q $sections
+        $o = New-PsSdObject; $o['id'] = $id; $o['class'] = $c.Class; $o['ids'] = @($c.Ids); $o['kind'] = $c.Kind; $o['text'] = $c.Text; $o['reason'] = $c.Reason
+        $answers += , $o
+        if ($c.Class -ceq 'INV') { $inv += $id }
+    }
+    $res.Answers = $answers; $res.Invalid = $inv
+    return $res
+}
+function Test-SdJudgeOutput($Out, $Work, [string]$Aid, [string]$InputHash) {
+    $res = @{ Errors = @(); Verdicts = @() }
+    if ($null -eq $Out) { $res.Errors = @('output.json 不存在或不是合法 JSON'); return $res }
+    $errs = @(); foreach ($e in (Test-PsSdSchema $J.SchemaReg 'urn:ps-sdoc:schema:l5-judge' $Out)) { $errs += $e }
+    if ($errs.Count -gt 0) { $res.Errors = @($errs | Select-Object -First 20); return $res }
+    foreach ($pair in @(@('jobId', $J.JobId), @('attemptId', $Aid), @('batch', $Work.Batch), @('inputHash', $InputHash))) { if ([string]$Out[$pair[0]] -cne [string]$pair[1]) { $errs += ($pair[0] + ' 應為 ' + $pair[1]) } }
+    if ([int]$Out['round'] -ne [int]$Work.Round) { $errs += ('round 應為 ' + $Work.Round) }
+    $want = @{}; foreach ($it in $Work.Items) { foreach ($a in @($it['answers'])) { $want[[string]$it['id'] + '|' + [string]$a['reader']] = $true } }
+    $got = @{}
+    foreach ($v in @($Out['verdicts'])) {
+        if ($null -eq $v) { continue }
+        $k = [string]$v['id'] + '|' + [string]$v['reader']
+        if (-not $want.ContainsKey($k)) { $errs += ($k + ' 不是本工單要判定的答案') } elseif ($got.ContainsKey($k)) { $errs += ($k + ' 判定了兩次') } else { $got[$k] = $true }
+    }
+    foreach ($k in @($want.Keys)) { if (-not $got.ContainsKey($k)) { $errs += ($k + ' 沒有判定') } }
+    $res.Errors = @($errs | Select-Object -First 30)
+    if ($errs.Count -eq 0) { $res.Verdicts = @($Out['verdicts']) }
+    return $res
+}
+
 # ---------------- 組裝、工作中文件、發布 ----------------
-function Build-SdModel($State) {
+function Build-SdModel($State, [object[]]$Extra) {
     $ai = Read-SdNode (Join-Path $J.SdocDir 'ai-instructions.json')
     if ($null -eq $ai) { throw '缺少 .claude/peoplesoft/sdoc/ai-instructions.json（搬運不完整）。' }
+    $xq = @(); foreach ($x in @($Extra)) { if ($null -ne $x) { $xq += , $x } }
     return (Build-PsSdModel @{ SchemaReg = $J.SchemaReg; Registry = $J.Registry; Skeleton = $J.Skeleton; Built = $J.Built; StageResult = $State.Stage0.Result
             StatusRef = 'status.md'; Receipts = @($State.Receipts); ProjectText = (Get-SdText (Join-Path $J.InputRoot 'project.md')); ProjectRef = 'project.md'
-            DecisionsText = (Get-SdText (Join-Path $J.InputRoot 'decisions.md')); DecisionsRef = 'decisions.md'; AiTemplate = @($ai['clauses']); ExtraQuestions = @() })
+            DecisionsText = (Get-SdText (Join-Path $J.InputRoot 'decisions.md')); DecisionsRef = 'decisions.md'; AiTemplate = @($ai['clauses']); ExtraQuestions = $xq })
+}
+function Get-SdDocGates($Model, $State, $UnitsDone, $L5Docs) {
+    # 每份文件的 L1～L5。$UnitsDone 為 $null＝研究單元都已完成；$L5Docs 為 $null＝L5 維持 NOT_RUN。
+    $l2 = Invoke-PsSdL2Checks $Model $J.Registry
+    $l3 = Invoke-PsSdL3Checks $Model $J.Built 'status.md' $State.Stage0.Summary
+    $viol = @{}; foreach ($x in @($l2) + @($l3)) { $viol[$x.Doc + '/' + $x.Layer] = $true }
+    $meta = Get-SdMeta $State
+    $gates = @{}; $l1Errors = @()
+    foreach ($d in $script:PsSdDocOrder) {
+        $g = New-PsSdGate $d
+        $e0 = New-PsSdEnvelope $Model $d $g $meta $null
+        $se = Test-PsSdSchema $J.SchemaReg ('urn:ps-spec:schema:' + $d) $e0
+        if (@($se).Count -gt 0) { $g['L1'] = 'FAIL'; foreach ($x in @($se | Select-Object -First 5)) { $l1Errors += @{ Doc = $d; Layer = 'L1'; Code = 'S01'; Message = $x } } } else { $g['L1'] = 'PASS' }
+        $g['L2'] = 'PASS'; if ($viol.ContainsKey($d + '/L2')) { $g['L2'] = 'FAIL' }
+        if ($g['L3'] -ne 'NOT_APPLICABLE') { $g['L3'] = 'PASS'; if ($viol.ContainsKey($d + '/L3')) { $g['L3'] = 'FAIL' } }
+        if ($g['L4'] -ne 'NOT_APPLICABLE') { if ($null -eq $UnitsDone -or $UnitsDone[$d]) { $g['L4'] = 'PASS' } else { $g['L4'] = 'NOT_RUN' } }
+        if ($g['L5'] -ne 'NOT_APPLICABLE' -and $null -ne $L5Docs -and $L5Docs.ContainsKey($d)) { $g['L5'] = [string]$L5Docs[$d] }
+        $gates[$d] = $g
+    }
+    return @{ Gates = $gates; L1Errors = $l1Errors; L2 = $l2; L3 = $l3; Meta = $meta }
 }
 function Save-SdRegistry { Write-SdJson $J.RegistryPath $J.Registry; $J.RegistryStamp = Get-SdHash $J.Registry }
 function Get-SdMeta($State) {
@@ -574,7 +853,7 @@ function Get-SdMeta($State) {
 function Update-SdWorkingSet($State) {
     # 工作中文件：已驗收內容的組裝與渲染＋可引用清單（工單指向這裡）。不跑檢核。
     [void](Update-PsSdRegistry $J.SchemaReg $J.Registry $J.Skeleton @($State.Receipts) @())
-    $model = Build-SdModel $State
+    $model = Build-SdModel $State @()
     Save-SdRegistry
     $meta = Get-SdMeta $State
     $envs = @{}
@@ -621,25 +900,18 @@ function Get-SdDocUnitsDone($State) {
     return $done
 }
 function Publish-Sd($State) {
-    $model = Build-SdModel $State
+    $extra = @(); $l5Docs = $null
+    if ($null -ne $State.L5) { $extra = @($State.L5.Extra); $l5Docs = $State.L5.Docs }
+    $model = Build-SdModel $State $extra
     Save-SdRegistry
-    $l2 = Invoke-PsSdL2Checks $model $J.Registry
-    $l3 = Invoke-PsSdL3Checks $model $J.Built 'status.md' $State.Stage0.Summary
+    $gg = Get-SdDocGates $model $State (Get-SdDocUnitsDone $State) $l5Docs
+    $l2 = $gg.L2; $l3 = $gg.L3; $l1Errors = $gg.L1Errors; $meta = $gg.Meta
     $warn = Get-PsSdSpeculationWarnings $model
-    $viol = @{}; foreach ($x in @($l2) + @($l3)) { $viol[$x.Doc + '/' + $x.Layer] = $true }
     $appr = ConvertFrom-PsSdApprovals (Get-SdText (Join-Path $J.InputRoot 'approvals.md')) 'approvals.md'
     $problems = @($model.Problems) + @($appr.Problems)
-    $meta = Get-SdMeta $State
-    $unitsDone = Get-SdDocUnitsDone $State
-    $envs = @{}; $hashes = @{}; $l1Errors = @()
+    $envs = @{}; $hashes = @{}
     foreach ($d in $script:PsSdDocOrder) {
-        $g = New-PsSdGate $d
-        $e0 = New-PsSdEnvelope $model $d $g $meta $null
-        $se = Test-PsSdSchema $J.SchemaReg ('urn:ps-spec:schema:' + $d) $e0
-        if (@($se).Count -gt 0) { $g['L1'] = 'FAIL'; foreach ($x in @($se | Select-Object -First 5)) { $l1Errors += @{ Doc = $d; Layer = 'L1'; Code = 'S01'; Message = $x } } } else { $g['L1'] = 'PASS' }
-        $g['L2'] = 'PASS'; if ($viol.ContainsKey($d + '/L2')) { $g['L2'] = 'FAIL' }
-        if ($g['L3'] -ne 'NOT_APPLICABLE') { $g['L3'] = 'PASS'; if ($viol.ContainsKey($d + '/L3')) { $g['L3'] = 'FAIL' } }
-        if ($g['L4'] -ne 'NOT_APPLICABLE') { if ($unitsDone[$d]) { $g['L4'] = 'PASS' } else { $g['L4'] = 'NOT_RUN' } }
+        $g = $gg.Gates[$d]
         $env = New-PsSdEnvelope $model $d $g $meta $null
         $h = Get-PsSdDocHash $env
         $approval = $null
@@ -656,7 +928,8 @@ function Publish-Sd($State) {
         if ($phase -ne 'APPROVED') { foreach ($d in $script:PsSdDocOrder) { if (@('in_review', 'approved') -cnotcontains [string]$envs[$d]['status']) { $phase = 'DRAFT' } } }
     }
     $allViol = @($l1Errors) + @($l2) + @($l3)
-    $set = ConvertTo-PsSdMarkdownSet $model $envs @{ JobId = $J.JobId; Revision = $J.Revision['id']; Phase = $phase; Components = @($J.Names); Violations = $allViol; Warnings = @($warn); Problems = $problems; DocHashes = $hashes; SchemaReg = $J.SchemaReg }
+    $l5Info = $null; if ($null -ne $State.L5) { $l5Info = @{ Eligible = @($State.L5.Eligible); Asked = $State.L5.Asked; Passed = $State.L5.Passed; Failed = $State.L5.Failed } }
+    $set = ConvertTo-PsSdMarkdownSet $model $envs @{ JobId = $J.JobId; Revision = $J.Revision['id']; Phase = $phase; Components = @($J.Names); Violations = $allViol; Warnings = @($warn); Problems = $problems; DocHashes = $hashes; SchemaReg = $J.SchemaReg; L5 = $l5Info }
     $files = [ordered]@{}
     foreach ($name in $set.Keys) { $files[$name] = $set[$name] }
     foreach ($d in $script:PsSdDocOrder) { $files['canonical/' + $d + '.json'] = ConvertTo-PsSdJsonText $envs[$d] }
@@ -710,8 +983,10 @@ function Invoke-SdAttempt($Work, $State) {
     $ad = Join-Path $J.AttemptRoot $aid
     [void][System.IO.Directory]::CreateDirectory($ad)
     $kind = $Work.Kind
-    $isolated = @('STATUS_READ', 'STATUS_ROUND2') -contains $kind
-    $agent = 'ps-sdoc-worker'; if ($isolated) { $agent = 'ps-status-reader' }
+    # 讀者與判定都在 inbox 隔離：看不到其他讀者、研究包或標準答案
+    $isolated = @('STATUS_READ', 'STATUS_ROUND2', 'READER', 'JUDGE') -contains $kind
+    $agent = 'ps-sdoc-worker'
+    if ($kind -like 'STATUS_*') { $agent = 'ps-status-reader' } elseif ($kind -eq 'READER') { $agent = 'ps-spec-reader' } elseif ($kind -eq 'JUDGE') { $agent = 'ps-spec-judge' }
     $box = $ad
     if ($isolated) {
         $box = $J.InboxDir
@@ -729,7 +1004,18 @@ function Invoke-SdAttempt($Work, $State) {
     $inp = New-PsSdObject
     foreach ($kv in @(@('schemaVersion', 1), @('jobId', $J.JobId), @('attemptId', $aid), @('revision', $J.Revision['id']), @('budget', $J.Budget), @('workKey', $Work.Key), @('kind', $kind),
             @('unit', $Work.Unit), @('subject', $Work.Subject), @('page', [int]$Work.Page), @('components', @($J.Names)), @('statusPath', (Get-SdRel (Join-Path $J.InputRoot 'status.md'))))) { $inp[$kv[0]] = $kv[1] }
-    if ($isolated) {
+    $docs = $null
+    if ($kind -eq 'READER') {
+        $inp['reader'] = $Work.Reader; $inp['round'] = [int]$Work.Round; $inp['batch'] = $Work.Batch; $inp['retry'] = [bool]$Work.Retry
+        $inp['perspective'] = $script:PsSdL5Perspectives[$Work.Reader]
+        $inp['questions'] = @($Work.Questions)
+        $inp['docsDir'] = Get-SdRel (Join-Path $box 'docs')
+        # 文件快照：讀者只看這一份，引用也以這一份驗
+        $docs = New-PsSdMap
+        foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $J.WorkDir 'md') -Filter '*.md' -File)) { $docs[$f.Name] = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8) }
+    }
+    elseif ($kind -eq 'JUDGE') { $inp['round'] = [int]$Work.Round; $inp['batch'] = $Work.Batch; $inp['items'] = @($Work.Items) }
+    elseif ($isolated) {
         $inp['reader'] = $Work.Reader
         $inp['statusRef'] = 'status.md'
         $inp['statusFingerprint'] = $State.Stage0.Fingerprint
@@ -743,6 +1029,7 @@ function Invoke-SdAttempt($Work, $State) {
         $inp['fieldGuidePath'] = Get-SdRel (Join-Path $ad 'fields.md')
         if ($Work.Unit -eq 'workflow') { $inp['skeletonPath'] = Get-SdRel (Join-Path $ad 'skeleton.json') }
         if ($kind -eq 'REVIEW') { $inp['candidateId'] = $candidateId; $inp['candidateHash'] = $candidateHash; $inp['packet'] = $packet }
+        if (@($Work.Amend).Count -gt 0) { $inp['amendKeys'] = @($Work.Amend); $inp['amendQuestions'] = @($Work.AmendQuestions); $inp['readerFindings'] = @($Work.L5Findings) }
     }
     $inp['previousFindings'] = @($Work.Findings)
     $inp['outputPath'] = Get-SdRel $outPath
@@ -750,11 +1037,23 @@ function Invoke-SdAttempt($Work, $State) {
     $inp['inputHash'] = Get-SdHash $inp
     Write-SdJson (Join-Path $ad 'input.json') $inp -Create
     $unitTitle = '第 0 階段：狀態圖解讀'
-    if (-not $isolated) { $unitTitle = $Work.Unit + '（' + (Get-PsSdUnit $Work.Unit).Title + '）' }
+    if ($kind -eq 'READER' -or $kind -eq 'JUDGE') { $unitTitle = 'L5 乾淨讀者（第 ' + $Work.Round + ' 輪）' }
+    elseif (-not $isolated) { $unitTitle = $Work.Unit + '（' + (Get-PsSdUnit $Work.Unit).Title + '）' }
     $m = New-Object System.Collections.Generic.List[string]
     $m.Add('# Spec 文件工單'); $m.Add('')
     foreach ($l in @(('- Job：' + $J.JobId), ('- Attempt：' + $aid), ('- 種類：' + $kind), ('- 研究單元：' + $unitTitle + '；主題：' + $Work.Subject + '；第 ' + $Work.Page + ' 頁'), ('- 工單：' + (Get-SdRel (Join-Path $box 'input.json')) + '（inputHash ' + $inp['inputHash'] + '）'), ('- 輸出：' + (Get-SdRel $outPath) + '（只准寫這一個檔）'), ('- STATUS 檔：' + $inp['statusPath']))) { $m.Add($l) }
-    if ($isolated) {
+    if ($kind -eq 'READER') {
+        $m.Add('- 規則：.claude/peoplesoft/sdoc/reader-contract.md')
+        $m.Add('- 你的視角：' + $inp['perspective'])
+        $m.Add('- 文件：' + $inp['docsDir'] + '/（只看這些 Markdown；從 00-index.md 開始）')
+        $m.Add('- 題目：input.json 的 questions，共 ' + @($Work.Questions).Count + ' 題；每題都要回答')
+        if ($Work.Retry) { $m.Add('- 重問：這些題目上次的答案沒有出處（引用不存在，或引用的段落裡找不到答案的 ID），重新作答') }
+    }
+    elseif ($kind -eq 'JUDGE') {
+        $m.Add('- 規則：.claude/peoplesoft/sdoc/judge-contract.md')
+        $m.Add('- 題目、標準答案與讀者答案：input.json 的 items，共 ' + @($Work.Items).Count + ' 題')
+    }
+    elseif ($isolated) {
         $m.Add('- 規則：.claude/peoplesoft/sdoc/status-reading-contract.md')
         if ($kind -eq 'STATUS_ROUND2') { $m.Add('- 第 2 輪：逐題回答工單 questions 的每一項（YES／NO／UNSURE）') }
     } else {
@@ -767,12 +1066,27 @@ function Invoke-SdAttempt($Work, $State) {
         $hReq = '## 必須處置的分母鍵（COMPLETE 前要全部寫成項目，或開同鍵的 EVIDENCE_GAP 問題）'; $hAsk = '## 上游需求（本頁要產出這些項目，或開同鍵的 EVIDENCE_GAP 問題）'
         if ($kind -eq 'REVIEW') { $hReq = '## 本頁研究前尚未處置的分母鍵（研究包若標 COMPLETE，外環已確認每個鍵都有項目或 EVIDENCE_GAP；覆核看處置是否有證據）'; $hAsk = '## 本頁要處理的上游需求' }
         if (@($Work.Required).Count -gt 0) { $m.Add(''); $m.Add($hReq); $m.Add(''); foreach ($k in $Work.Required) { $m.Add('- `' + $k + '`') } }
+        if (@($Work.Amend).Count -gt 0) {
+            $hAsk = '## 要改寫的項目（同一個自然鍵寫完整的新版本，取代先前的內容）'
+            if ($kind -eq 'REVIEW') { $hAsk = '## 本頁改寫的項目（取代先前的內容；覆核改寫後是否讀得懂、證據是否支持）' }
+        }
         if (@($Work.Requested).Count -gt 0) { $m.Add(''); $m.Add($hAsk); $m.Add(''); foreach ($k in $Work.Requested) { $m.Add('- `' + $k + '`') } }
+        if (@($Work.L5Findings).Count -gt 0) { $m.Add(''); $m.Add('## 乾淨讀者沒有一致讀懂的地方（只看渲染後文件作答；改寫要讓這些題目答得出來，不要只換說法）'); $m.Add(''); foreach ($f in @($Work.L5Findings)) { $m.Add('- ' + $f) } }
     }
     if (@($Work.Findings).Count -gt 0) { $m.Add(''); $m.Add('## 前次未通過的原因（先修正這些）'); $m.Add(''); foreach ($f in @($Work.Findings | Select-Object -First 30)) { $m.Add('- ' + $f) } }
     $manifest = ($m.ToArray() -join "`n") + "`n"
     Write-SdText (Join-Path $ad 'manifest.md') $manifest
-    if ($isolated) { Write-SdText (Join-Path $box 'manifest.md') $manifest; Write-SdText (Join-Path $box 'input.json') (ConvertTo-PsSdJsonText $inp) }
+    if ($isolated) {
+        $boxInp = $inp
+        if ($kind -eq 'READER') {
+            # 讀者的工單不含標準答案
+            $boxInp = New-PsSdObject; foreach ($k in @($inp.get_Keys())) { $boxInp[[string]$k] = $inp[$k] }
+            $qs = @(); foreach ($q in $Work.Questions) { $o = New-PsSdObject; foreach ($k in @('id', 'item', 'q', 'prompt', 'mode', 'ask')) { $o[$k] = $q[$k] }; $qs += , $o }
+            $boxInp['questions'] = $qs
+            foreach ($name in @($docs.get_Keys())) { Write-SdText (Join-Path (Join-Path $box 'docs') $name) $docs[$name] }
+        }
+        Write-SdText (Join-Path $box 'manifest.md') $manifest; Write-SdText (Join-Path $box 'input.json') (ConvertTo-PsSdJsonText $boxInp)
+    }
     else {
         Write-SdText (Join-Path $ad 'fields.md') (Get-SdFieldGuide (Get-PsSdUnit $Work.Unit).Types)
         if ($Work.Unit -eq 'workflow') { Write-SdText (Join-Path $ad 'skeleton.json') (ConvertTo-PsSdJsonText (Get-SdSkeletonForEntity $Work.Subject)) }
@@ -813,6 +1127,16 @@ function Invoke-SdAttempt($Work, $State) {
             $e = Test-SdRound2Output $out $Work.Reader $State.Stage0.Fingerprint $Work.Questions
             if ($e.Count -gt 0) { $outcome['status'] = 'INVALID'; $outcome['counted'] = $true; $outcome['findings'] = @($e | Select-Object -First 30) } else { $outcome['status'] = 'ACCEPTED' }
         }
+        elseif ($kind -eq 'READER') {
+            $v = Test-SdReaderOutput $out $Work $aid ([string]$inp['inputHash']) $docs
+            if (@($v.Errors).Count -gt 0) { $outcome['status'] = 'INVALID'; $outcome['counted'] = $true; $outcome['findings'] = @($v.Errors) }
+            else { $outcome['status'] = 'ACCEPTED'; $outcome['answers'] = @($v.Answers); $outcome['invalidIds'] = @($v.Invalid); $outcome['findings'] = @() }
+        }
+        elseif ($kind -eq 'JUDGE') {
+            $v = Test-SdJudgeOutput $out $Work $aid ([string]$inp['inputHash'])
+            if (@($v.Errors).Count -gt 0) { $outcome['status'] = 'INVALID'; $outcome['counted'] = $true; $outcome['findings'] = @($v.Errors) }
+            else { $outcome['status'] = 'ACCEPTED'; $outcome['verdicts'] = @($v.Verdicts) }
+        }
         elseif ($kind -eq 'RESEARCH') {
             $e = Test-SdResearchOutput $out $Work $State $aid ([string]$inp['inputHash'])
             if ($e.Count -gt 0) { $outcome['status'] = 'INVALID'; $outcome['counted'] = $true; $outcome['findings'] = @($e) }
@@ -824,6 +1148,7 @@ function Invoke-SdAttempt($Work, $State) {
             elseif (-not $v.Passed) { $outcome['status'] = 'REVIEW_FAIL'; if ($v.Verdict -ceq 'BLOCKED') { $outcome['status'] = 'REVIEW_BLOCKED' }; $outcome['counted'] = $true; $outcome['findings'] = @($v.Findings) }
             else {
                 $rc = New-PsSdOrderedFrom @('schemaVersion', 1, 'revision', $J.Revision['id'], 'unit', $Work.Unit, 'subject', $Work.Subject, 'page', [int]$Work.Page, 'cursor', [string]$Work.Cursor, 'packet', $packet, 'packetHash', $candidateHash, 'review', $out, 'researchAttempt', $candidateId, 'reviewAttempt', $aid, 'acceptedAt', (Get-PsKnUtcStamp))
+                if (@($Work.AmendQuestions).Count -gt 0) { $rc['amendQuestions'] = @($Work.AmendQuestions) }
                 $rk = (Get-PsSdTextHash $Work.Key).Substring(0, 24)
                 Write-SdJson (Join-Path $J.ReceiptRoot ($rk + '.json')) $rc -Create
                 $outcome['status'] = 'ACCEPTED'; $accepted = $true
@@ -838,7 +1163,7 @@ function Invoke-SdAttempt($Work, $State) {
 
 # ---------------- 主程式 ----------------
 $exitCode = 0; $code = 'DOC1-9-02'; $mutex = $null; $held = $false
-$J = @{ ResolveCache = @{}; RegistryStamp = '' }
+$J = @{ ResolveCache = @{}; RegistryStamp = ''; LedgerCache = @{}; ReceiptCache = @{}; L5Cache = $null }
 try {
     if ($Root -eq '') { $Root = Split-Path $PSScriptRoot -Parent }
     $Root = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
@@ -946,6 +1271,7 @@ try {
                 $receiptCount = @($state.Receipts).Count
                 Write-Host ('狀態：' + $phase + '；本輪 session=' + $sessions + '；已驗收頁=' + $receiptCount + '；待處理=' + $state.Work.Count + '；本預算已用 ' + $state.Used + '／' + $state.Limit)
                 if ($null -ne $published) { Write-Host (Get-PsSdFieldStatsLine $published.Model) }
+                if ($null -ne $state.L5) { Write-Host ('乾淨讀者（L5）：題目 ' + $state.L5.Asked + '；通過 ' + $state.L5.Passed + '；兩輪仍沒讀懂 ' + $state.L5.Failed) }
                 Write-Host ('入口：' + (Join-Path $J.OutputRoot 'README.md'))
                 if ($null -ne $J.Revision -and $J.Revision.Contains('knowledge') -and [string]$J.Revision['knowledge'] -cne (Get-SdKnowledgeFingerprint)) { Write-Host '提醒：本版本開始後 docs/ps-research 有更新；要以新知識重查請加 -Refresh。' }
                 foreach ($g in $state.Gaps) { Write-Host ('缺口：' + $g) }

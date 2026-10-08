@@ -3699,3 +3699,31 @@
   裁決、核准、STALE、鎖、BLOCKED／-Retry、session 失敗、圍欄、覆核不通過、分頁前向引用、跨 Component 重寫、第 2 輪多數決與仍無多數）、
   test-claude-variant、ps-agent-doc-lint、PS 5.1 靜態守衛。真 Windows PowerShell 5.1 與真 claude CLI 未在沙箱執行。
 - 教訓：讓模型只寫它查到的內容，ID、參照、覆蓋、渲染交給確定性外環，檢核才有固定分母；模型的自由留在狀態圖的畫法與敘述措辭，不留在結構。
+
+### L137 文件「讀得懂」才算數——乾淨讀者（L5）出題、驗引用、多數決，沒讀懂就退回原研究單元改寫（issue #37，2026-10-08）
+
+- 症狀：L1～L4 只證明結構、參照、覆蓋與證據；「需要長官審核」這類寫法在結構上合法（引用了一筆 DRV），但 DRV 若只寫「從人事資料找主管」，
+  重建端照樣不知道怎麼實作。
+- 根因：沒有人以重建端的處境讀過交付的 Markdown。
+- 落點（Claude Code 版 Spec 文件流程）：
+  - `scripts/ps-sdoc-reader-lib.ps1`：由組裝結果確定性出題（TRN T1～T8、DRV D1～D3、BR B1～B4、FR F1～F2、FLOW W1、OP O1～O2、
+    有條件的 UI U1、有資料範圍的 PERM P1、IF I1、ACT A1），只出 L1～L4 都通過的文件；依功能切片分批（每批最多 20 題）。
+  - 讀者 ps-spec-reader（三位：後端、畫面、測試視角）只讀 inbox 附的渲染後文件，工單不含標準答案；答案要引用「檔名#項目 ID」段落，
+    答案的每個 ID 都要出現在引用的段落裡，否則該題無效、同一輪重問該讀者一次。ID 類題目由外環比對 ID 集合（KIND 題另比代碼、W1 比順序），
+    文字題交 ps-spec-judge 判 MATCH／MISMATCH。多數決：CONSISTENT／UNDERSPECIFIED／CONTRADICTS_SOURCE／DIVERGENT。
+  - 第 1 輪全部問完後，沒讀懂的題目依項目所屬的研究頁交原單元改寫（游標 L5-AMEND-n；同一自然鍵寫完整新版本、覆核通過才收，組裝時取代舊版）；
+    改寫後由三位新讀者重問；仍沒讀懂就開 90 的 READER_UNDERSPECIFIED／READER_DIVERGENT／READER_CONTRADICTION（BLOCKING）。
+  - 文件 L5：可出題且每題都有最終結果（通過或已開 READER 問題）＝PASS；READER 問題未裁決時由 C09 讓 L3 FAIL、文件維持 draft。
+  - 契約 `sdoc/reader-contract.md`、`judge-contract.md`；研究契約加改寫頁一節；schema `l5-answers`、`l5-judge`；hook 路徑設定 spec-reader
+    （只讀 inbox）、spec-judge；兩個 agent 進 MainOnly；00-index 加 L5 摘要。
+- 設計取捨（與設計文件不同或補充）：
+  - 答案格式攤平成 `id／status／ids／kind／text／citations`，不用巢狀 `answer`；結構題只比 ID 集合（與代碼），不比運算子與常數——
+    讀者寫法差異太大時誤判風險高，運算子與值的正確性由 L1～L4 負責。
+  - 可出題的文件以「不含 READER 問題」的組裝結果判 L1～L4，避免 READER 問題回頭讓文件失去出題資格。
+  - 只在第 1 輪全部問完後才交改寫：同一研究頁的問題一次改完。
+- 實作中抓到的坑：出題用的 scriptblock 參數 `$Ids` 與函式內的 `$ids` 是同一個變數（PowerShell 不分大小寫），標準答案的 ID 全被清空；
+  合成讀者照標準答案作答所以端到端照樣通過。test-sdoc 的「同一函式內沒有只差大小寫的變數」檢查抓到；單元測試另驗 T1／T4 等標準答案的實際 ID。
+- 效能：attempt 與收據寫完就不變，同一個行程內快取；出題基礎（組裝、可出題文件、題目）只在收據或人工輸入變了才重算。
+- 驗證：test-sdoc-assemble 加出題、引用、比對、多數決 10 項（66 項全過）；test-sdoc-run 加 L5（49 項）：貫穿範例走到 REVIEW_READY、
+  全部核准走到 APPROVED；第 1 輪「文件沒寫」→ 改寫頁 → 第 2 輪通過；兩輪都沒寫 → READER_UNDERSPECIFIED、07 維持 draft；引用無效重問一次。
+- 教訓：自動比對的題目要有「標準答案確實非空」的獨立測試——合成作答者照標準答案寫，任何讓標準答案變空的錯都會被它掩蓋。

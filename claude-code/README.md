@@ -33,7 +33,7 @@ OpenCode 版（repo 根的 `.opencode/`＋`AGENTS.md`）保留不動、照常可
 ├─ .claude/
 │  ├─ settings.json              模型 sonnet、權限允許清單、hook（不設預設主代理：直接 `claude` 是一般 session）
 │  ├─ hooks/ps-runtime-guard.ps1 執行期 guard（PreToolUse／PostToolUse；PowerShell 5.1）
-│  ├─ agents/                    主代理 5＋子代理 7＋Spec 文件的讀者與 worker 2
+│  ├─ agents/                    主代理 5＋子代理 7＋Spec 文件的讀者、worker、判定 4
 │  ├─ commands/                  /ps-research、/ps-audit、/ps-lesson、/ps-correct、/ps-spec＋外環專用 4 個
 │  ├─ skills/                    ps-* 11 個
 │  └─ peoplesoft/                契約、cookbook、profile、domain map、報告模板、spec、sdoc（Spec 文件的契約、schema、範例）、本機教訓帳本
@@ -112,6 +112,7 @@ SOP 編號照用；有差異的只有：
    - `decisions.md`：之後裁決 90 的問題用。
    - `approvals.md`：之後核准文件用（填 00-index 上的 docHash 前 12 碼）。
 2. 再下同一個 `/ps-spec`：三位讀者各自解讀狀態圖（不一致的逐項再問一次、多數決），之後依序研究範圍、資料、權限、說明區域、流程、介面、功能、畫面、規則、操作、測試；每頁研究與獨立覆核是兩個 session。
+   研究完成後，三位只看渲染後文件的乾淨讀者回答外環出的題目（L5）；第 1 輪沒讀懂的項目交原研究單元改寫，再由新讀者重問一次。
    一次跑 `-MaxSessions` 個 session，結論碼 `DOC1-3-02-<n>` 時 ps-spec-author 會自動續跑。
 3. 產出在 `docs\ps-spec\<jobId>\README.md`（入口）與 `generated\<代號>\`；結論碼與下一步見 `.claude\peoplesoft\spec\support-codes.md` 的 DOC1。
 4. 執行狀態在 `.ps-runtime\sdoc\<jobId>\`（attempt、收據、ID 對照、工作中文件），log 在 `.ps-runtime\sdoc-logs\`。

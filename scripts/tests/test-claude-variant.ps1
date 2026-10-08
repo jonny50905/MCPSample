@@ -75,7 +75,7 @@ Assert ($leak.Count -eq 0) ("claude-code/ 的部署檔不含另一版字樣（op
 
 $excludedAgents = @('explore', 'general', 'scout', 'ps-audit-orchestrator')
 # Spec 文件流程（scripts/ps-sdoc.ps1）只有 Claude Code 版：它的 worker／讀者 agent 沒有 OpenCode 對應檔
-$claudeOnlyAgents = @('ps-status-reader', 'ps-sdoc-worker')
+$claudeOnlyAgents = @('ps-status-reader', 'ps-sdoc-worker', 'ps-spec-reader', 'ps-spec-judge')
 $ocAgents = Get-NameSet (Join-Path $oc 'agent') '*.md'
 $ccAgents = Get-NameSet (Join-Path $cc '.claude/agents') '*.md'
 $missA = @($ocAgents.Keys | Where-Object { $excludedAgents -notcontains $_ -and -not $ccAgents.ContainsKey($_) })
@@ -129,7 +129,7 @@ Assert ((Get-YamlKeyLines (Join-Path $oc 'peoplesoft/customization-profile.yaml'
 
 $subagents = @('ps-ui-flow', 'ps-peoplecode-flow', 'ps-sql-flow', 'ps-sqr-flow', 'ps-ae-flow', 'ps-metadata-flow', 'ps-auditor')
 $dbMain = @('ps-orchestrator', 'ps-deep-research', 'ps-clone-worker', 'ps-sdoc-worker')
-$pathProfiles = @{ 'ps-spec-worker' = 'spec-worker'; 'ps-clone-worker' = 'clone-worker'; 'ps-spec-author' = 'spec-author'; 'ps-status-reader' = 'status-reader'; 'ps-sdoc-worker' = 'sdoc-worker' }
+$pathProfiles = @{ 'ps-spec-worker' = 'spec-worker'; 'ps-clone-worker' = 'clone-worker'; 'ps-spec-author' = 'spec-author'; 'ps-status-reader' = 'status-reader'; 'ps-sdoc-worker' = 'sdoc-worker'; 'ps-spec-reader' = 'spec-reader'; 'ps-spec-judge' = 'spec-judge' }
 $fmBad = @()
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/agents') -File -Filter '*.md')) {
     $fm = Get-Frontmatter $f.FullName
@@ -266,7 +266,11 @@ try {
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-sdoc-worker","prompt":"x"}}'
     $d1 = Get-Deny
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-status-reader","prompt":"x"},"agent_type":"ps-orchestrator"}'
-    Assert ($d1 -like 'PS_TASK_TARGET_INVALID*主代理*' -and (Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：Spec 文件的 worker／讀者只由外環 headless 啟動，不能委派"
+    $d2 = Get-Deny
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-reader","prompt":"x"}}'
+    $d3 = Get-Deny
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-judge","prompt":"x"}}'
+    Assert ($d1 -like 'PS_TASK_TARGET_INVALID*主代理*' -and $d2 -like 'PS_TASK_TARGET_INVALID*主代理*' -and $d3 -like 'PS_TASK_TARGET_INVALID*主代理*' -and (Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：Spec 文件的 worker、讀者、判定只由外環 headless 啟動，不能委派"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_response":{"content":[{"type":"text","text":"{\"status\":\"COMPLETE\",\"suggestedNext\":[{\"agent\":\"ps-data-lineage\",\"task\":\"x\"},{\"agent\":\"ps-sqr-flow\"},{\"agent\":\"nobody\"}]}"}]}}' @('-Mode', 'post')
     $note = ''
     if ($null -ne $script:hookObj) { $note = [string]$script:hookObj.hookSpecificOutput.additionalContext }
@@ -318,6 +322,15 @@ try {
     Assert (-not (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'receipts/r0001/x.json'))) "path sdoc-worker：寫收據 → 擋"
     Assert (-not (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'attempts/a0004/candidate.json'))) "path sdoc-worker：寫候選快照 → 擋"
     Assert (-not (Test-PathHook 'sdoc-worker' 'Bash' 'command' 'dir')) "path sdoc-worker：Bash → 擋"
+    Assert (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $sj 'inbox/docs/04-workflow.md')) "path spec-reader：讀工單附的文件 → 放行"
+    Assert (Test-PathHook 'spec-reader' 'Grep' 'path' (Join-Path $sj 'inbox/docs')) "path spec-reader：Grep 工單附的文件 → 放行"
+    Assert (-not (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $sj 'attempts/a0090/input.json'))) "path spec-reader：讀 attempt 工單（含標準答案）→ 擋"
+    Assert (-not (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $sj 'receipts/r0001/x.json'))) "path spec-reader：讀研究包收據 → 擋"
+    Assert (-not (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/wiki/X.md'))) "path spec-reader：讀研究知識 → 擋"
+    Assert (Test-PathHook 'spec-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output.json')) "path spec-reader：寫 inbox/output.json → 放行"
+    Assert (Test-PathHook 'spec-judge' 'Read' 'file_path' (Join-Path $sj 'inbox/input.json')) "path spec-judge：讀判定工單 → 放行"
+    Assert (-not (Test-PathHook 'spec-judge' 'Read' 'file_path' (Join-Path $sj 'work/r0001/md/04-workflow.md'))) "path spec-judge：讀工作中文件 → 擋"
+    Assert (-not (Test-PathHook 'spec-judge' 'Write' 'file_path' (Join-Path $sj 'attempts/a0090/output.json'))) "path spec-judge：寫 attempt 目錄 → 擋"
     Assert (-not (Test-PathHook 'no-such' 'Read' 'file_path' (Join-Path $att 'manifest.md'))) "path：未知設定 → 擋（hook 設定錯不放行）"
 
     Write-Host "C：外環版本層（部署模擬目錄）"

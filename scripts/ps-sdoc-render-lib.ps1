@@ -525,6 +525,12 @@ function ConvertTo-PsSdIndexMarkdown {
     if ($groups.Count -eq 0) { $out.Add('- 無') } else { foreach ($k in $groups.Keys) { $out.Add('- ' + $k + '：' + ($groups[$k] -join '；')) } }
     if (@($Info.Warnings).Count -gt 0) { $out.Add(''); $out.Add('## 警告（不擋，交覆核）'); $out.Add(''); foreach ($w in $Info.Warnings) { $out.Add('- ' + $w.Code + ' ' + $w.Message) } }
     if (@($Info.Problems).Count -gt 0) { $out.Add(''); $out.Add('## 輸入檔與收據的問題'); $out.Add(''); foreach ($p in $Info.Problems) { $out.Add('- ' + $p) } }
+    if ($null -ne $Info.L5) {
+        $out.Add(''); $out.Add('## 乾淨讀者（L5）'); $out.Add('')
+        $out.Add('- 三位只看本組文件的讀者回答外環由規格出的題目，多數決比對標準答案；第 1 輪沒讀懂的項目交原研究單元改寫後由新讀者重問一次。')
+        $out.Add('- 可出題的文件：' + ((@($Info.L5.Eligible) | ForEach-Object { $script:PsSdDocTitles[[string]$_] }) -join '、'))
+        $out.Add('- 題目 ' + $Info.L5.Asked + '；通過 ' + $Info.L5.Passed + '；兩輪仍沒讀懂 ' + $Info.L5.Failed + '（90 的 READER_* 問題）')
+    }
     $out.Add(''); $out.Add('## ID 前綴對照'); $out.Add(''); $out.Add('| 前綴 | 項目 | 定義所在 |'); $out.Add('|---|---|---|')
     foreach ($p in $script:PsSdPrefixInfo.Keys) { $pi = $script:PsSdPrefixInfo[$p]; $out.Add('| `' + $p + '` | ' + $pi.Name + ' | [' + $script:PsSdDocTitles[$pi.Doc] + '](' + $pi.Doc + '.md) |') }
     $out.Add(''); $out.Add('## 追溯矩陣（以功能為列，外環反查產生）'); $out.Add('')
@@ -574,7 +580,7 @@ function ConvertTo-PsSdMarkdownSet {
     param($Model, $Envelopes, $Info)
     $sreg = $null; if ($Info.ContainsKey('SchemaReg')) { $sreg = $Info.SchemaReg }
     $rc = New-PsSdRenderContext $Model $Envelopes $sreg
-    $ii = @{ JobId = $Info.JobId; Revision = $Info.Revision; Phase = $Info.Phase; Components = $Info.Components; Violations = $Info.Violations; Warnings = $Info.Warnings; Problems = $Info.Problems; DocHashes = $Info.DocHashes }
+    $ii = @{ JobId = $Info.JobId; Revision = $Info.Revision; Phase = $Info.Phase; Components = $Info.Components; Violations = $Info.Violations; Warnings = $Info.Warnings; Problems = $Info.Problems; DocHashes = $Info.DocHashes; L5 = $Info.L5 }
     if ($null -eq $ii.Components) { $ii.Components = @($Envelopes['01-overview']['components']) }
     $set = [ordered]@{}
     $set['00-index.md'] = ConvertTo-PsSdIndexMarkdown $rc $ii

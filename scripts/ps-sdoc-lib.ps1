@@ -719,7 +719,7 @@ function Resolve-PsSdPacket {
 
 # ---------------- 派號：骨架與收據 ----------------
 function Update-PsSdRegistry {
-    # 為第 0 階段骨架與目前全部收據（依單元順序）中尚未派號的自然鍵派號。$Receipts：@{ Packet } 陣列（已排序）。
+    # 為第 0 階段骨架與目前全部收據（依單元順序）中尚未派號的自然鍵派號。$Receipts：@{ Packet } 陣列（已排序；改寫頁帶 Amend＝$true）。
     param($SchemaReg, $Registry, $Skeleton, [object[]]$Receipts, [object[]]$ExtraKeys)
     $want = New-PsSdMap
     $add = {
@@ -773,7 +773,17 @@ function Build-PsSdResearchModel {
         $res = Resolve-PsSdPacket $ctx $r.Packet
         foreach ($e in $res.Errors) { $errors.Add([string]$r.Ref + '：' + $e) }
         foreach ($it in $res.Items) {
-            if ($byId.ContainsKey($it.Id)) { $errors.Add([string]$r.Ref + '：' + $it.Prefix + '/' + $it.Key + ' 已在其他收據出現，略過'); continue }
+            if ($byId.ContainsKey($it.Id)) {
+                # 改寫頁（L5 讀者沒讀懂後由原研究單元改寫）：同一個 ID 以後來的版本取代
+                if ($r.Amend -eq $true) {
+                    $lst = $items[$it.Prefix]
+                    for ($i = 0; $i -lt $lst.Count; $i++) { if ([string]$lst[$i]['id'] -ceq $it.Id) { $lst[$i] = $it.Item; break } }
+                    $byId[$it.Id] = $it.Item
+                    $itemReceipt[$it.Id] = $r.Ref
+                    continue
+                }
+                $errors.Add([string]$r.Ref + '：' + $it.Prefix + '/' + $it.Key + ' 已在其他收據出現，略過'); continue
+            }
             $items[$it.Prefix].Add($it.Item)
             $byId[$it.Id] = $it.Item
             $itemReceipt[$it.Id] = $r.Ref
