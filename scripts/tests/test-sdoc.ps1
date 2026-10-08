@@ -13,8 +13,11 @@ function Test-SdHasError($Errors, [string]$Needle) {
     foreach ($e in @($Errors)) { if (([string]$e).Contains($Needle)) { return $true } }
     return $false
 }
-$design = Join-Path $repo 'docs/design/spec-schema-framework'
-$runtimeSchemas = Join-Path $repo 'claude-code/.claude/peoplesoft/sdoc/schemas'
+. (Join-Path $PSScriptRoot 'sdoc-test-fixtures.ps1')
+$paths = Get-SdTestPaths $repo
+if (-not $paths.HasDesign) { Write-Host 'SKIP 本測試以設計範例為預期結果（docs/design/spec-schema-framework），範例只在維護端 repo、不在搬運包'; exit 0 }
+$design = $paths.Design
+$runtimeSchemas = Join-Path $paths.SdocDir 'schemas'
 
 # ---------------- schema 驗證器 ----------------
 $reg = Read-PsSdSchemaDir $runtimeSchemas
@@ -23,7 +26,8 @@ $same = $true
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $design 'schemas') -Filter '*.json' -File)) {
     $rt = Join-Path $runtimeSchemas $f.Name
     if (-not (Test-Path -LiteralPath $rt)) { $same = $false; continue }
-    if ([System.IO.File]::ReadAllText($f.FullName) -cne [System.IO.File]::ReadAllText($rt)) { $same = $false }
+    # 搬運包解開的檔是 CRLF：比內容不比換行
+    if ([System.IO.File]::ReadAllText($f.FullName).Replace("`r", '') -cne [System.IO.File]::ReadAllText($rt).Replace("`r", '')) { $same = $false }
 }
 Assert-Sd $same 'schema：部署副本與設計文件的 schemas 相同'
 

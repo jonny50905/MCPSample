@@ -3727,3 +3727,28 @@
 - 驗證：test-sdoc-assemble 加出題、引用、比對、多數決 10 項（66 項全過）；test-sdoc-run 加 L5（49 項）：貫穿範例走到 REVIEW_READY、
   全部核准走到 APPROVED；第 1 輪「文件沒寫」→ 改寫頁 → 第 2 輪通過；兩輪都沒寫 → READER_UNDERSPECIFIED、07 維持 draft；引用無效重問一次。
 - 教訓：自動比對的題目要有「標準答案確實非空」的獨立測試——合成作答者照標準答案寫，任何讓標準答案變空的錯都會被它掩蓋。
+
+### L138 「5.1 相容」要分兩層驗，測試要在部署版面跑過（issue #37，2026-10-08）
+
+- 症狀：管理者問「7 和 5.1 語法有落差，能用 5.1 測一輪嗎」。維護端沙箱只有 Linux＋PowerShell 7。檢查時發現 sdoc 三支測試寫死
+  `claude-code/` 路徑與 `docs/design` 範例，在公司機的部署版面（`.claude/` 在根目錄、搬運包解開的檔一律 CRLF）跑不起來。
+- 根因：(1) 測試只在維護端 repo 版面跑過；(2) `ps-bundle.ps1` 解開時換行寫成 CRLF，測試逐字比對檔案內容；
+  (3) 圍欄判斷「本工單允許的輸出檔」以字串比對 Get-ChildItem 的 FullName 與 Join-Path 組出的路徑，Windows 上分隔符號與大小寫可能不同，
+  Linux 沙箱看不出來。
+- 落點：
+  - `scripts/tests/sdoc-test-fixtures.ps1` 加 Get-SdTestPaths：sdoc 目錄先找 `claude-code/.claude/...`、沒有就找根目錄 `.claude/...`；
+    設計範例只在維護端，沒有就整支測試印 SKIP、exit 0。test-sdoc 的 schema 副本比對、test-sdoc-assemble 的研究包範例比對改成不比換行。
+  - `scripts/ps-sdoc.ps1` 圍欄改用 Test-SdSamePath（GetFullPath 正規化；Windows 不分大小寫）。
+  - SOP-28「維護驗證」補部署版面演練與公司機搬完後的確認方式。
+- 5.1 靜態檢查：官方 PSScriptAnalyzer 1.23.0 的 PSUseCompatibleSyntax／Commands／Types，配模組內附的三份 Windows PowerShell 5.1 設定檔
+  （Windows 10 1809、Server 2019、Server 2016），掃 scripts/** 與 hook 共 39 支：語法 0、型別 0；命令 420 筆全是誤報（ps-auto-loop.ps1
+  自訂的 Write-Log 417 筆、test-auto-loop.ps1 呼叫 node 3 筆）。先以金絲雀檔確認它抓得到 ??、三元、&&、-AsHashtable、-AsByteStream、
+  Test-Json、Join-String、GetRelativePath、ToHexString、SHA256.HashData。它抓不到的語意差異逐項盤點：預設編碼（sdoc 讀寫一律 [IO.File]＋UTF-8）、
+  ConvertFrom-Json 的頂層陣列列舉／數字型別／ISO 時間戳（函式回傳時已正規化；canonical 序列化會把 DateTime 化回字串）、原生命令 stderr 遇
+  ErrorActionPreference=Stop（sdoc 只經 ps-session-lib 以 cmd.exe 檔案重導）、排序文化（sdoc 用 Ordinal；Sort-Object 只排數字與固定格式名稱）、
+  多字元 Split、-replace scriptblock、`u{}、$IsWindows（都沒有用到）。
+- 驗證：PS 7 上 repo 版面 test-sdoc 41、test-sdoc-assemble 67、test-sdoc-run 49 全過；把 Claude Code 搬運包以 ps-bundle.ps1 解到空目錄
+  （結論 G）、補設計範例後三支同樣全過；部署版面第一次執行 ps-sdoc.ps1（沒有輸入檔）停在 DOC1-0-01 並建出四個骨架檔。
+  真 Windows PowerShell 5.1 未執行：沙箱沒有；GitHub Actions 的 Windows runner 可以跑，但要在 repo 加工作流程，待管理者決定。
+- 教訓：「5.1 相容」分兩層——語法與 API 用有官方 5.1 設定檔的相容性分析器；編碼、JSON、原生命令、排序文化、路徑這類語意差異只能盤點或真跑。
+  測試要在部署版面（搬運包解開後的位置與換行）跑過，才算公司機能用。

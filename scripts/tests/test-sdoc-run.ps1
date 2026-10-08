@@ -10,7 +10,9 @@ function Assert-Sd([bool]$Condition, [string]$Name, [string]$Detail = '') {
     if ($Condition) { $script:passed++; Write-Host ('PASS ' + $Name) }
     else { $script:failed++; Write-Host ('FAIL ' + $Name); if ($Detail) { Write-Host ('     ' + $Detail) } }
 }
-$design = Join-Path $repo 'docs/design/spec-schema-framework'
+$paths = Get-SdTestPaths $repo
+if (-not $paths.HasDesign) { Write-Host 'SKIP 本測試以設計範例為預期結果（docs/design/spec-schema-framework），範例只在維護端 repo、不在搬運包'; exit 0 }
+$design = $paths.Design
 $base = Join-Path ([System.IO.Path]::GetTempPath()) ('ps-sdoc-run-' + [guid]::NewGuid().ToString('N'))
 # 凍結這次待測的腳本，避免並行維護同一 checkout 時被誤判成來源改變
 $tools = Join-Path $base 'framework'
@@ -215,7 +217,7 @@ function New-SdRunFixtures([string]$Example, [string]$StatusFile, $Pages, $Recor
 }
 function New-SdRunRoot([string]$Name) {
     $dir = Join-Path $base $Name
-    $src = Join-Path $repo 'claude-code/.claude/peoplesoft/sdoc'
+    $src = $paths.SdocDir
     foreach ($f in @(Get-ChildItem -LiteralPath $src -File -Recurse)) {
         $rel = $f.FullName.Substring($src.Length).TrimStart('\', '/')
         $dst = Join-Path (Join-Path $dir '.claude/peoplesoft/sdoc') $rel

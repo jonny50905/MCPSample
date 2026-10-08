@@ -13,9 +13,11 @@ function Assert-Sd([bool]$Condition, [string]$Name, [string]$Detail = '') {
     else { $script:failed++; Write-Host ('FAIL ' + $Name); if ($Detail) { Write-Host ('     ' + $Detail) } }
 }
 function Test-SdAny($List, [scriptblock]$Pred) { foreach ($x in @($List)) { if ($null -ne $x -and (& $Pred $x)) { return $true } }; return $false }
-$sdocDir = Join-Path $repo 'claude-code/.claude/peoplesoft/sdoc'
+$paths = Get-SdTestPaths $repo
+if (-not $paths.HasDesign) { Write-Host 'SKIP 本測試以設計範例為預期結果（docs/design/spec-schema-framework），範例只在維護端 repo、不在搬運包'; exit 0 }
+$sdocDir = $paths.SdocDir
 $reg = Read-PsSdSchemaDir @((Join-Path $sdocDir 'schemas'), (Join-Path $sdocDir 'schemas-runtime'))
-$design = Join-Path $repo 'docs/design/spec-schema-framework'
+$design = $paths.Design
 
 function Invoke-SdAssemble {
     # 範例 → 第 0 階段 → 研究包 → 派號 → 組裝 → 檢核。回傳 @{ Model; Built; Skeleton; Summary; Registry; Fixture; L2; L3; W; Meta; Text }
@@ -331,7 +333,7 @@ foreach ($u in $script:PsSdUnits) {
     if ($rr.Errors.Count -gt 0) { $exBad += ($u.Id + ' 驗收：' + $rr.Errors[0]) }
     $path = Join-Path $exDir ($u.Id + '.json')
     if ($WriteExamples) { if (-not (Write-PsKnAtomicText -LiteralPath $path -Text $text -Bom $false)) { throw 'TEST_WRITE_FAILED' }; $exMade++ }
-    elseif (-not [System.IO.File]::Exists($path) -or [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8) -cne $text) { $exBad += ($u.Id + '：部署的範例與重生結果不同（加 -WriteExamples 重生）') }
+    elseif (-not [System.IO.File]::Exists($path) -or [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8).Replace("`r", '') -cne $text) { $exBad += ($u.Id + '：部署的範例與重生結果不同（加 -WriteExamples 重生）') }
 }
 if ($WriteExamples) { Write-Host ('已重生研究包範例 ' + $exMade + ' 份：' + $exDir) }
 Assert-Sd ($exBad.Count -eq 0) '研究包範例：每個研究單元一份，通過研究包 schema 與驗收，且與重生結果相同' ($exBad -join '；')

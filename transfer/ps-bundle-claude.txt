@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit aadaa42）
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5cfa33e）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|claude|aadaa42|148
+@@@PSBUNDLE|1|claude|5cfa33e|148
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44|0
 ---
 name: ps-ae-flow
@@ -30650,7 +30650,7 @@ function Get-PsSdConflictFacts {
     return , $out.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-status-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc.ps1|1302|8a81a20f4ccfb026f865507982a6721391d1e90b8a0e53741db09b4fd9243cfa|1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc.ps1|1309|69dc7056794b2ea5efb1a9f47c1a45fd9adcc861a3ee18f146b353c898d8d2bc|1
 # ps-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單一入口：00-index＋14 份文件＋90 問題清單。
 # 第 0 階段三位讀者解讀 STATUS 檔（不一致的逐項第 2 輪多數決）→ 研究單元依序（每頁研究與獨立覆核分開 session）→ 外環組裝、檢核、渲染。
 # 模型只寫研究包、解讀、覆核；ID、canonical、檢核、Markdown 都由本腳本確定性產生。PowerShell 5.1；公司機資料只留本機。
@@ -31313,6 +31313,13 @@ function Get-SdFence {
     foreach ($dir in @($J.JobRoot, $J.OutputRoot)) { foreach ($p in (Get-SdFiles $dir)) { $map[$p] = [System.IO.File]::ReadAllBytes($p) } }
     return , $map
 }
+function Test-SdSamePath([string]$A, [string]$B) {
+    # Get-ChildItem 的 FullName 與 Join-Path 組出的字串分隔符號可能不同（Windows 上 / 與 \）；Windows 路徑不分大小寫
+    if ($A -eq '' -or $B -eq '') { return $false }
+    $fa = [System.IO.Path]::GetFullPath($A); $fb = [System.IO.Path]::GetFullPath($B)
+    if ([System.IO.Path]::DirectorySeparatorChar -eq [char]92) { return [string]::Equals($fa, $fb, [System.StringComparison]::OrdinalIgnoreCase) }
+    return [string]::Equals($fa, $fb, [System.StringComparison]::Ordinal)
+}
 function Restore-SdFence($Snapshot, [string]$Allowed) {
     $violations = @()
     foreach ($p in $Snapshot.Keys) {
@@ -31327,7 +31334,7 @@ function Restore-SdFence($Snapshot, [string]$Allowed) {
     }
     foreach ($dir in @($J.JobRoot, $J.OutputRoot)) {
         foreach ($p in (Get-SdFiles $dir)) {
-            if ($Snapshot.ContainsKey($p) -or $p -ceq $Allowed) { continue }
+            if ($Snapshot.ContainsKey($p) -or (Test-SdSamePath $p $Allowed)) { continue }
             $q = Join-Path (Join-Path $J.RuntimeRoot 'quarantine') ([guid]::NewGuid().ToString('N') + '-' + [System.IO.Path]::GetFileName($p))
             [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($q))
             [System.IO.File]::Move($p, $q)
@@ -37639,9 +37646,19 @@ if ($Result) {
     exit 0
 }
 @@@PSBUNDLE-END|scripts/ps-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/tests/sdoc-test-fixtures.ps1|219|6458140bb9c2bb7ac67e0ae7532a81c085e86458414bcc0077fab035b9b28b31|1
+@@@PSBUNDLE-FILE|scripts/tests/sdoc-test-fixtures.ps1|229|28393d082bc9097b3b3956b060d2705b26aa57a0240a3879b7e9613858e68b2b|1
 # sdoc-test-fixtures.ps1 — 測試用：把設計範例的 canonical 文件拆回研究包（模擬各研究單位已驗收的收據）。
 # 只給 scripts/tests/test-sdoc*.ps1 dot-source；合成資料，不含公司內容。
+
+function Get-SdTestPaths {
+    # 維護端 repo：Claude Code 版在 claude-code/ 子樹；部署版面（公司機、搬運包演練）在根目錄 .claude/。
+    # 設計範例（預期結果）只在維護端 repo 的 docs/design，不在搬運包；HasDesign=$false 時整支測試略過。
+    param([string]$Repo)
+    $sd = Join-Path $Repo 'claude-code/.claude/peoplesoft/sdoc'
+    if (-not [System.IO.Directory]::Exists($sd)) { $sd = Join-Path $Repo '.claude/peoplesoft/sdoc' }
+    $design = Join-Path $Repo 'docs/design/spec-schema-framework'
+    return @{ SdocDir = $sd; Design = $design; HasDesign = [System.IO.Directory]::Exists((Join-Path $design 'examples')) }
+}
 
 function ConvertTo-SdPacketValue {
     # canonical 的值 → 研究包的寫法：ID → '@前綴/自然鍵'；EV-xxxx → 本包的 E<n>（同時把證據加進本包）。
@@ -40420,7 +40437,7 @@ if ($problems.Count -gt 0) { Write-Host "共 $($problems.Count) 個 FAIL" -Foreg
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-ps51-static.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-assemble.ps1|345|a8f698d754ca20e6786c7755f3f8665ec889041b00c4dfd79b34e538f9e12406|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-assemble.ps1|347|c5d327aa9c3b3e252f2507cc53ffc44ce567583e751571678fc7f0016d79981b|1
 # test-sdoc-assemble.ps1 — Spec 文件流程：研究包驗收、派號、組裝、計算文件、L2／L3 檢核、外殼與 docHash、渲染。
 # 以設計範例為預期結果：把範例 canonical 拆回研究包，再組裝回來比對；另跑 20 種刻意破壞。合成資料，不查 MCP、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-assemble.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -40436,9 +40453,11 @@ function Assert-Sd([bool]$Condition, [string]$Name, [string]$Detail = '') {
     else { $script:failed++; Write-Host ('FAIL ' + $Name); if ($Detail) { Write-Host ('     ' + $Detail) } }
 }
 function Test-SdAny($List, [scriptblock]$Pred) { foreach ($x in @($List)) { if ($null -ne $x -and (& $Pred $x)) { return $true } }; return $false }
-$sdocDir = Join-Path $repo 'claude-code/.claude/peoplesoft/sdoc'
+$paths = Get-SdTestPaths $repo
+if (-not $paths.HasDesign) { Write-Host 'SKIP 本測試以設計範例為預期結果（docs/design/spec-schema-framework），範例只在維護端 repo、不在搬運包'; exit 0 }
+$sdocDir = $paths.SdocDir
 $reg = Read-PsSdSchemaDir @((Join-Path $sdocDir 'schemas'), (Join-Path $sdocDir 'schemas-runtime'))
-$design = Join-Path $repo 'docs/design/spec-schema-framework'
+$design = $paths.Design
 
 function Invoke-SdAssemble {
     # 範例 → 第 0 階段 → 研究包 → 派號 → 組裝 → 檢核。回傳 @{ Model; Built; Skeleton; Summary; Registry; Fixture; L2; L3; W; Meta; Text }
@@ -40754,7 +40773,7 @@ foreach ($u in $script:PsSdUnits) {
     if ($rr.Errors.Count -gt 0) { $exBad += ($u.Id + ' 驗收：' + $rr.Errors[0]) }
     $path = Join-Path $exDir ($u.Id + '.json')
     if ($WriteExamples) { if (-not (Write-PsKnAtomicText -LiteralPath $path -Text $text -Bom $false)) { throw 'TEST_WRITE_FAILED' }; $exMade++ }
-    elseif (-not [System.IO.File]::Exists($path) -or [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8) -cne $text) { $exBad += ($u.Id + '：部署的範例與重生結果不同（加 -WriteExamples 重生）') }
+    elseif (-not [System.IO.File]::Exists($path) -or [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8).Replace("`r", '') -cne $text) { $exBad += ($u.Id + '：部署的範例與重生結果不同（加 -WriteExamples 重生）') }
 }
 if ($WriteExamples) { Write-Host ('已重生研究包範例 ' + $exMade + ' 份：' + $exDir) }
 Assert-Sd ($exBad.Count -eq 0) '研究包範例：每個研究單元一份，通過研究包 schema 與驗收，且與重生結果相同' ($exBad -join '；')
@@ -40767,7 +40786,7 @@ Write-Host ('sdoc assemble tests: PASS=' + $script:passed + ' FAIL=' + $script:f
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-assemble.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|507|f5a06604127993b6288bdf1a7071b4bdaad9f9bd4a3710a1453b8c4cc3b233e1|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|509|2659da64f8dec54c28df153653ec9526aa31595d016096d2444bc36de11df489|1
 # test-sdoc-run.ps1 — Spec 文件流程外環（ps-sdoc.ps1）端到端：合成 worker 依工單回狀態圖解讀、研究包、覆核；不查 MCP、不呼叫模型。
 # 以設計範例（walkthrough、gate）為來源：從空目錄跑到發布，比對發布的 canonical 與範例，並驗結論碼、中斷、重試、重跑、裁決與核准。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-run.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -40780,7 +40799,9 @@ function Assert-Sd([bool]$Condition, [string]$Name, [string]$Detail = '') {
     if ($Condition) { $script:passed++; Write-Host ('PASS ' + $Name) }
     else { $script:failed++; Write-Host ('FAIL ' + $Name); if ($Detail) { Write-Host ('     ' + $Detail) } }
 }
-$design = Join-Path $repo 'docs/design/spec-schema-framework'
+$paths = Get-SdTestPaths $repo
+if (-not $paths.HasDesign) { Write-Host 'SKIP 本測試以設計範例為預期結果（docs/design/spec-schema-framework），範例只在維護端 repo、不在搬運包'; exit 0 }
+$design = $paths.Design
 $base = Join-Path ([System.IO.Path]::GetTempPath()) ('ps-sdoc-run-' + [guid]::NewGuid().ToString('N'))
 # 凍結這次待測的腳本，避免並行維護同一 checkout 時被誤判成來源改變
 $tools = Join-Path $base 'framework'
@@ -40985,7 +41006,7 @@ function New-SdRunFixtures([string]$Example, [string]$StatusFile, $Pages, $Recor
 }
 function New-SdRunRoot([string]$Name) {
     $dir = Join-Path $base $Name
-    $src = Join-Path $repo 'claude-code/.claude/peoplesoft/sdoc'
+    $src = $paths.SdocDir
     foreach ($f in @(Get-ChildItem -LiteralPath $src -File -Recurse)) {
         $rel = $f.FullName.Substring($src.Length).TrimStart('\', '/')
         $dst = Join-Path (Join-Path $dir '.claude/peoplesoft/sdoc') $rel
@@ -41276,7 +41297,7 @@ Write-Host ('sdoc run tests: PASS=' + $script:passed + ' FAIL=' + $script:failed
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-run.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|205|5a0e620831b852d1fccc0336d5a92c99c8f2ef0e08be6099812812e2ff08d376|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|209|c4c9d28243d5743c8dbcaf320e619698bace0a75fa2ba2f2a3a86f81c227e0d1|1
 # test-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單元測試；合成資料，不查 MCP、不讀企業產物、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
 $ErrorActionPreference = 'Stop'
@@ -41292,8 +41313,11 @@ function Test-SdHasError($Errors, [string]$Needle) {
     foreach ($e in @($Errors)) { if (([string]$e).Contains($Needle)) { return $true } }
     return $false
 }
-$design = Join-Path $repo 'docs/design/spec-schema-framework'
-$runtimeSchemas = Join-Path $repo 'claude-code/.claude/peoplesoft/sdoc/schemas'
+. (Join-Path $PSScriptRoot 'sdoc-test-fixtures.ps1')
+$paths = Get-SdTestPaths $repo
+if (-not $paths.HasDesign) { Write-Host 'SKIP 本測試以設計範例為預期結果（docs/design/spec-schema-framework），範例只在維護端 repo、不在搬運包'; exit 0 }
+$design = $paths.Design
+$runtimeSchemas = Join-Path $paths.SdocDir 'schemas'
 
 # ---------------- schema 驗證器 ----------------
 $reg = Read-PsSdSchemaDir $runtimeSchemas
@@ -41302,7 +41326,8 @@ $same = $true
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $design 'schemas') -Filter '*.json' -File)) {
     $rt = Join-Path $runtimeSchemas $f.Name
     if (-not (Test-Path -LiteralPath $rt)) { $same = $false; continue }
-    if ([System.IO.File]::ReadAllText($f.FullName) -cne [System.IO.File]::ReadAllText($rt)) { $same = $false }
+    # 搬運包解開的檔是 CRLF：比內容不比換行
+    if ([System.IO.File]::ReadAllText($f.FullName).Replace("`r", '') -cne [System.IO.File]::ReadAllText($rt).Replace("`r", '')) { $same = $false }
 }
 Assert-Sd $same 'schema：部署副本與設計文件的 schemas 相同'
 
@@ -43734,10 +43759,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|fe1109a889de8e607c1ea63e04477b744cc477b534445127e23fcb5737c65954|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|b8369893fade369377583101ad0f6c668376435787ea077f2b05c33c164147c2|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "aadaa42",
+  "commit": "5cfa33e",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -44599,8 +44624,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc.ps1",
-      "lines": 1302,
-      "sha256": "8a81a20f4ccfb026f865507982a6721391d1e90b8a0e53741db09b4fd9243cfa",
+      "lines": 1309,
+      "sha256": "69dc7056794b2ea5efb1a9f47c1a45fd9adcc861a3ee18f146b353c898d8d2bc",
       "bom": true
     },
     {
@@ -44647,8 +44672,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/sdoc-test-fixtures.ps1",
-      "lines": 219,
-      "sha256": "6458140bb9c2bb7ac67e0ae7532a81c085e86458414bcc0077fab035b9b28b31",
+      "lines": 229,
+      "sha256": "28393d082bc9097b3b3956b060d2705b26aa57a0240a3879b7e9613858e68b2b",
       "bom": true
     },
     {
@@ -44689,20 +44714,20 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-sdoc-assemble.ps1",
-      "lines": 345,
-      "sha256": "a8f698d754ca20e6786c7755f3f8665ec889041b00c4dfd79b34e538f9e12406",
+      "lines": 347,
+      "sha256": "c5d327aa9c3b3e252f2507cc53ffc44ce567583e751571678fc7f0016d79981b",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 507,
-      "sha256": "f5a06604127993b6288bdf1a7071b4bdaad9f9bd4a3710a1453b8c4cc3b233e1",
+      "lines": 509,
+      "sha256": "2659da64f8dec54c28df153653ec9526aa31595d016096d2444bc36de11df489",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc.ps1",
-      "lines": 205,
-      "sha256": "5a0e620831b852d1fccc0336d5a92c99c8f2ef0e08be6099812812e2ff08d376",
+      "lines": 209,
+      "sha256": "c4c9d28243d5743c8dbcaf320e619698bace0a75fa2ba2f2a3a86f81c227e0d1",
       "bom": true
     },
     {
@@ -44733,4 +44758,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|148|cd7b450d2fcf468bd5b2fee84326761049d303c2ba91f4a611af982c3564f514
+@@@PSBUNDLE-EOF|148|ec1a1b5801bf3e974bf607fa7ffcf5a1f1c67b87a7ac713887fe6e2262d92a23

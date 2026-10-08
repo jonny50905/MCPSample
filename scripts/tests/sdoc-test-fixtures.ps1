@@ -1,6 +1,16 @@
 ﻿# sdoc-test-fixtures.ps1 — 測試用：把設計範例的 canonical 文件拆回研究包（模擬各研究單位已驗收的收據）。
 # 只給 scripts/tests/test-sdoc*.ps1 dot-source；合成資料，不含公司內容。
 
+function Get-SdTestPaths {
+    # 維護端 repo：Claude Code 版在 claude-code/ 子樹；部署版面（公司機、搬運包演練）在根目錄 .claude/。
+    # 設計範例（預期結果）只在維護端 repo 的 docs/design，不在搬運包；HasDesign=$false 時整支測試略過。
+    param([string]$Repo)
+    $sd = Join-Path $Repo 'claude-code/.claude/peoplesoft/sdoc'
+    if (-not [System.IO.Directory]::Exists($sd)) { $sd = Join-Path $Repo '.claude/peoplesoft/sdoc' }
+    $design = Join-Path $Repo 'docs/design/spec-schema-framework'
+    return @{ SdocDir = $sd; Design = $design; HasDesign = [System.IO.Directory]::Exists((Join-Path $design 'examples')) }
+}
+
 function ConvertTo-SdPacketValue {
     # canonical 的值 → 研究包的寫法：ID → '@前綴/自然鍵'；EV-xxxx → 本包的 E<n>（同時把證據加進本包）。
     param($Value, $IdToKey, $EvById, $State, [string]$ParentKey)

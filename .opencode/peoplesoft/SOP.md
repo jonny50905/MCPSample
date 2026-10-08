@@ -1034,3 +1034,10 @@ Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP
 `test-sdoc.ps1`、`test-sdoc-assemble.ps1`、`test-sdoc-run.ps1`（合成 worker 端到端，PS 7 約 5 分鐘）、`test-claude-variant.ps1`、
 `test-ps51-static.ps1`。改 schema 或貫穿範例後跑 `test-sdoc-assemble.ps1 -WriteExamples` 重生 `claude-code/.claude/peoplesoft/sdoc/examples/`。
 這些測試只驗機制與合成資料，不代替公司機的真 PS 5.1、真 claude CLI 與企業資料驗收。
+
+- 三支 sdoc 測試以設計範例（`docs/design/spec-schema-framework`）為預期結果，範例不在搬運包：公司機上會印 `SKIP` 後結束（exit 0）。
+  公司機搬完後的確認改用「第一次輸入清單停在 DOC1-0-01、建出四個骨架檔」（不呼叫模型）。
+- 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude.txt` 解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
+  再把 `docs/design/spec-schema-framework` 複製進去，跑三支 sdoc 測試與第一次 `ps-sdoc.ps1`；測試比對檔案內容一律不比換行。
+- 5.1 相容的靜態檢查：除 `test-ps51-static.ps1` 外，可用 PSScriptAnalyzer 的 PSUseCompatibleSyntax／Commands／Types 規則配 Windows PowerShell 5.1
+  設定檔（模組內附 `compatibility_profiles`）；它查不到預設編碼、ConvertFrom-Json 行為、原生命令 stderr、排序文化、路徑分隔這類語意差異。

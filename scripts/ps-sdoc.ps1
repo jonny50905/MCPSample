@@ -660,6 +660,13 @@ function Get-SdFence {
     foreach ($dir in @($J.JobRoot, $J.OutputRoot)) { foreach ($p in (Get-SdFiles $dir)) { $map[$p] = [System.IO.File]::ReadAllBytes($p) } }
     return , $map
 }
+function Test-SdSamePath([string]$A, [string]$B) {
+    # Get-ChildItem 的 FullName 與 Join-Path 組出的字串分隔符號可能不同（Windows 上 / 與 \）；Windows 路徑不分大小寫
+    if ($A -eq '' -or $B -eq '') { return $false }
+    $fa = [System.IO.Path]::GetFullPath($A); $fb = [System.IO.Path]::GetFullPath($B)
+    if ([System.IO.Path]::DirectorySeparatorChar -eq [char]92) { return [string]::Equals($fa, $fb, [System.StringComparison]::OrdinalIgnoreCase) }
+    return [string]::Equals($fa, $fb, [System.StringComparison]::Ordinal)
+}
 function Restore-SdFence($Snapshot, [string]$Allowed) {
     $violations = @()
     foreach ($p in $Snapshot.Keys) {
@@ -674,7 +681,7 @@ function Restore-SdFence($Snapshot, [string]$Allowed) {
     }
     foreach ($dir in @($J.JobRoot, $J.OutputRoot)) {
         foreach ($p in (Get-SdFiles $dir)) {
-            if ($Snapshot.ContainsKey($p) -or $p -ceq $Allowed) { continue }
+            if ($Snapshot.ContainsKey($p) -or (Test-SdSamePath $p $Allowed)) { continue }
             $q = Join-Path (Join-Path $J.RuntimeRoot 'quarantine') ([guid]::NewGuid().ToString('N') + '-' + [System.IO.Path]::GetFileName($p))
             [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($q))
             [System.IO.File]::Move($p, $q)
