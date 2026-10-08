@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "18-definition-of-done",
+  "docId": "clone-0123456789abcdef/18",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "18 完成定義",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "DOD-006",
+      "key": "TASK:SLICE:TW_DEMO_REQ:SUBMIT",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "TASK",
+      "task": "TASK-005",
+      "criteria": [
+        {
+          "kind": "TESTS_PASS",
+          "statement": "本工作的測試案例全數通過。",
+          "refs": [
+            "TC-011",
+            "TC-012",
+            "TC-013"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        }
+      ]
+    }
+  ]
+}

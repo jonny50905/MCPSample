@@ -1,0 +1,391 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "items": [
+    {
+      "id": "EV-0001",
+      "kind": "PROJECT_INPUT",
+      "locator": "project.md#L7",
+      "excerpt": "| 以新系統取代舊的申請審核功能，狀態流程與審核規則維持不變 | 狀態圖上每條轉移在新系統都可操作，結果與 04／09 的規格一致；14 的測試案例全數通過 |"
+    },
+    {
+      "id": "EV-0002",
+      "kind": "PROJECT_INPUT",
+      "locator": "project.md#L13",
+      "excerpt": "| SPEC_APPROVAL | 業務單位主管 |"
+    },
+    {
+      "id": "EV-0003",
+      "kind": "PROJECT_INPUT",
+      "locator": "project.md#L14",
+      "excerpt": "| QUESTION_RESOLUTION | 業務承辦窗口 |"
+    },
+    {
+      "id": "EV-0004",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_REQ.json#pages",
+      "excerpt": "TW_DEMO_REQ: TW_DEMO_REQPG (MAIN), TW_DEMO_REQSEC (SECONDARY)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "EV-0005",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_APV.json#pages",
+      "excerpt": "TW_DEMO_APV: TW_DEMO_APVPG (MAIN)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "EV-0006",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/peoplecode.json#core",
+      "excerpt": "9 programs on core objects (component / record field events)"
+    },
+    {
+      "id": "EV-0007",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/records.json#fields",
+      "excerpt": "TW_DEMO_REQHDR 11 fields; TW_DEMO_EMP 5 used; TW_DEMO_DEPT 4 used"
+    },
+    {
+      "id": "EV-0008",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/security.json#components",
+      "excerpt": "TW_DEMO_REQ: TW_DEMO_REQUESTER\nTW_DEMO_APV: TW_DEMO_APPROVER"
+    },
+    {
+      "id": "EV-0009",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/messages.json#27000",
+      "excerpt": "27000,1..4 (ERROR)"
+    },
+    {
+      "id": "EV-0010",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_REQ.json#transfers",
+      "excerpt": "no push button / link / Transfer() opens TW_DEMO_REQSEC"
+    },
+    {
+      "id": "EV-0011",
+      "kind": "SQL",
+      "locator": "SELECT REQ_STATUS, COUNT(*) FROM PS_TW_DEMO_REQHDR GROUP BY REQ_STATUS",
+      "excerpt": "010|120  015|8  020|31  025|4\n030|980  090|57  099|12"
+    },
+    {
+      "id": "EV-0012",
+      "kind": "SQL",
+      "locator": "SELECT SUM(CASE WHEN OLD_REF_NO <> ' ' THEN 1 ELSE 0 END), SUM(CASE WHEN PRIORITY_CD <> ' ' THEN 1 ELSE 0 END), COUNT(*) FROM PS_TW_DEMO_REQHDR",
+      "excerpt": "0|0|1212"
+    },
+    {
+      "id": "EV-0013",
+      "kind": "SQL",
+      "locator": "SELECT OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3 FROM PSPCMNAME WHERE RECNAME = 'TW_DEMO_REQHDR' AND REFNAME IN ('OLD_REF_NO','PRIORITY_CD')",
+      "excerpt": "(0 rows)"
+    },
+    {
+      "id": "EV-0014",
+      "kind": "SQL",
+      "locator": "SELECT COUNT(*), SUM(CASE WHEN SUPERVISOR_ID <> ' ' THEN 1 ELSE 0 END) FROM PS_TW_DEMO_EMP",
+      "excerpt": "5210|5198"
+    },
+    {
+      "id": "EV-0015",
+      "kind": "SQL",
+      "locator": "SELECT COUNT(*), SUM(CASE WHEN MANAGER_ID <> ' ' THEN 1 ELSE 0 END) FROM PS_TW_DEMO_DEPT",
+      "excerpt": "87|85"
+    },
+    {
+      "id": "EV-0016",
+      "kind": "CHUNK",
+      "locator": "9749aec1-b169-4a6e-0a4f-f9bb9edd1ae8",
+      "excerpt": "&sup = TW_DEMO_GETSUPERVISOR(TW_DEMO_REQHDR.REQUESTER_EMPLID);\nIf None(&sup) Then Error MsgGet(27000, 3, \"找不到直屬主管，無法送出。\"); End-If;\nTW_DEMO_REQHDR.REQ_STATUS.Value = \"020\";\nTW_DEMO_REQHDR.SUBMIT_DT.Value = %Date;"
+    },
+    {
+      "id": "EV-0017",
+      "kind": "CHUNK",
+      "locator": "a8c1e14d-5f72-d369-91f0-b0c458407f19",
+      "excerpt": "TW_DEMO_REQHDR.REQ_STATUS.Value = \"090\";"
+    },
+    {
+      "id": "EV-0018",
+      "kind": "CHUNK",
+      "locator": "0d43ec68-7e00-e634-4cc7-e1dfde4ad337",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" And TW_DEMO_REQHDR.AMOUNT > 50000 Then\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"025\";\nElse\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"030\"; TW_DEMO_REQHDR.APPROVER_EMPLID.Value = %EmployeeId; TW_DEMO_REQHDR.APPROVE_DT.Value = %Date;\nEnd-If;"
+    },
+    {
+      "id": "EV-0019",
+      "kind": "CHUNK",
+      "locator": "422e08e9-6536-e965-9c9c-01d43a181f47",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" And &sup <> %EmployeeId Then Error ...;\nIf TW_DEMO_REQHDR.REQ_STATUS = \"025\" And &mgr <> %EmployeeId Then Error ...;"
+    },
+    {
+      "id": "EV-0020",
+      "kind": "CHUNK",
+      "locator": "22c168df-3068-e7c2-caa4-a8529a7e6f79",
+      "excerpt": "If None(TW_DEMO_REQHDR.COMMENTS) Then Error MsgGet(27000, 2, \"退回時必須填寫審核意見。\"); End-If;\nTW_DEMO_REQHDR.REQ_STATUS.Value = \"015\";"
+    },
+    {
+      "id": "EV-0021",
+      "kind": "CHUNK",
+      "locator": "a59851d4-2fe6-e2c9-df79-5b78c7fe373e",
+      "excerpt": "If TW_DEMO_REQHDR.AMOUNT <= 0 Then\n   Error MsgGet(27000, 1, \"金額必須大於 0。\");\nEnd-If;"
+    },
+    {
+      "id": "EV-0022",
+      "kind": "CHUNK",
+      "locator": "27d93e89-afa8-3da4-4a01-9b846fd5c6fb",
+      "excerpt": "If None(TW_DEMO_REQHDR.REQUESTER_EMPLID) Then TW_DEMO_REQHDR.REQUESTER_EMPLID = %EmployeeId; End-If;"
+    },
+    {
+      "id": "EV-0023",
+      "kind": "CHUNK",
+      "locator": "31848d0f-5c33-ee89-ac25-89ce41510031",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_ID = \"NEW\" Then\n   TW_DEMO_REQHDR.REQ_ID = TW_DEMO_NEXTREQID();\nEnd-If;"
+    },
+    {
+      "id": "EV-0024",
+      "kind": "CHUNK",
+      "locator": "a52c73e0-f63e-c571-569c-1d0c03234e97",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" Then\n   TW_DEMO_SCHEDNOTIFY(TW_DEMO_REQHDR.REQ_ID);\nEnd-If;"
+    },
+    {
+      "id": "EV-0025",
+      "kind": "CHUNK",
+      "locator": "13835936-c32b-5c08-dc51-eda7728e0ad3",
+      "excerpt": "If %Request.GetParameter(\"REOPEN\") = \"Y\" And TW_DEMO_REQHDR.REQ_STATUS = \"030\" Then\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"010\";\nEnd-If;"
+    },
+    {
+      "id": "EV-0026",
+      "kind": "CHUNK",
+      "locator": "06323a06-d258-ee9b-4140-2ae46d8d54f1",
+      "excerpt": "SQLExec(\"SELECT SUPERVISOR_ID FROM PS_TW_DEMO_EMP E WHERE EMPLID = :1 AND EFF_STATUS = 'A' AND EFFDT = (SELECT MAX(EFFDT) FROM PS_TW_DEMO_EMP WHERE EMPLID = E.EMPLID AND EFFDT <= %CurrentDateIn)\", &emplid, &sup);"
+    },
+    {
+      "id": "EV-0027",
+      "kind": "CHUNK",
+      "locator": "c4132e9c-d9b0-fb8d-ccac-22e4f83f199c",
+      "excerpt": "SQLExec(\"SELECT D.MANAGER_ID FROM PS_TW_DEMO_EMP E, PS_TW_DEMO_DEPT D WHERE ... current EFFDT rows ... AND D.DEPTID = E.DEPTID\", &emplid, &mgr);"
+    },
+    {
+      "id": "EV-0028",
+      "kind": "CHUNK",
+      "locator": "888c4b84-6157-afd1-f62b-fe6c3b98e804",
+      "excerpt": "If TW_DEMO_REQHDR.LASTUPDDTTM <> &loadedDttm Then Error MsgGet(27000, 4, \"此申請單已被其他使用者更新，請重新查詢。\"); End-If;"
+    },
+    {
+      "id": "EV-0029",
+      "kind": "CHUNK",
+      "locator": "aba1b504-3b10-cb68-5c9b-95ef6d7a49fc",
+      "excerpt": "SELECT REQ_ID, REQUESTER_EMPLID, AMOUNT FROM PS_TW_DEMO_REQHDR WHERE REQ_ID = %Bind(REQ_ID)\n-- send mail to supervisor; on failure write process log only"
+    },
+    {
+      "id": "EV-0030",
+      "kind": "CHUNK",
+      "locator": "85d4cb82-b319-3bdc-be99-8ddeb0b8ab2a",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"010\" Or TW_DEMO_REQHDR.REQ_STATUS = \"015\" Then\n   TW_DEMO_REQWRK.SUBMIT_PB.Visible = True; TW_DEMO_REQWRK.WITHDRAW_PB.Visible = True;\nElse ... Visible = False; TW_DEMO_REQHDR.AMOUNT.DisplayOnly = True; End-If;"
+    },
+    {
+      "id": "EV-0031",
+      "kind": "CHUNK",
+      "locator": "a9b03b7a-db11-866d-8e94-ef8627556681",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" Or TW_DEMO_REQHDR.REQ_STATUS = \"025\" Then\n   TW_DEMO_REQWRK.APPROVE_PB.Visible = True; TW_DEMO_REQWRK.RETURN_PB.Visible = True;\nElse ... Visible = False; End-If;"
+    },
+    {
+      "id": "EV-0032",
+      "kind": "CHUNK",
+      "locator": "e7f85ca1-1984-6109-a353-12d5d62678cc",
+      "excerpt": "search record TW_DEMO_APVSRCH: REQ_STATUS IN ('020','025') AND (supervisor = %EmployeeId OR dept manager = %EmployeeId)"
+    },
+    {
+      "id": "EV-0033",
+      "kind": "CHUNK",
+      "locator": "b47069c0-aee7-1afb-94a5-17ad4ee8bc49",
+      "excerpt": "search record TW_DEMO_REQSRCH: REQUESTER_EMPLID = %EmployeeId"
+    },
+    {
+      "id": "EV-0034",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L26",
+      "excerpt": "state \"010 草稿\" as S010"
+    },
+    {
+      "id": "EV-0035",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L27",
+      "excerpt": "state \"015 退回補件\" as S015"
+    },
+    {
+      "id": "EV-0036",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L28",
+      "excerpt": "state \"020 待主管審核\" as S020"
+    },
+    {
+      "id": "EV-0037",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L29",
+      "excerpt": "state \"025 待部門主管審核\" as S025"
+    },
+    {
+      "id": "EV-0038",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L30",
+      "excerpt": "state \"030 核准\" as S030"
+    },
+    {
+      "id": "EV-0039",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L31",
+      "excerpt": "state \"090 作廢\" as S090"
+    },
+    {
+      "id": "EV-0040",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L33",
+      "excerpt": "[*] --> S010"
+    },
+    {
+      "id": "EV-0041",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L9",
+      "excerpt": "START((開始)) -->|主流程| N010[\"010 草稿\"]"
+    },
+    {
+      "id": "EV-0042",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L34",
+      "excerpt": "S010 --> S020"
+    },
+    {
+      "id": "EV-0043",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L10",
+      "excerpt": "N010 -->|主流程| N020[\"020 待主管審核\"]"
+    },
+    {
+      "id": "EV-0044",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L35",
+      "excerpt": "S015 --> S020"
+    },
+    {
+      "id": "EV-0045",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L17",
+      "excerpt": "N015 -->|退回補件| N020"
+    },
+    {
+      "id": "EV-0046",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L42",
+      "excerpt": "S010 --> S090"
+    },
+    {
+      "id": "EV-0047",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L18",
+      "excerpt": "N010 -->|撤回作廢| N090[\"090 作廢\"]"
+    },
+    {
+      "id": "EV-0048",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L43",
+      "excerpt": "S015 --> S090"
+    },
+    {
+      "id": "EV-0049",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L19",
+      "excerpt": "N015 -->|撤回作廢| N090"
+    },
+    {
+      "id": "EV-0050",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L37",
+      "excerpt": "amount_check --> S030"
+    },
+    {
+      "id": "EV-0051",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L12",
+      "excerpt": "D1 -->|主流程| N030[\"030 核准\"]"
+    },
+    {
+      "id": "EV-0052",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L38",
+      "excerpt": "amount_check --> S025"
+    },
+    {
+      "id": "EV-0053",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L13",
+      "excerpt": "D1 -->|高額審核| N025[\"025 待部門主管審核\"]"
+    },
+    {
+      "id": "EV-0054",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L39",
+      "excerpt": "S025 --> S030"
+    },
+    {
+      "id": "EV-0055",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L14",
+      "excerpt": "N025 -->|高額審核| N030"
+    },
+    {
+      "id": "EV-0056",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L40",
+      "excerpt": "S020 --> S015"
+    },
+    {
+      "id": "EV-0057",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L15",
+      "excerpt": "N020 -->|退回補件| N015[\"015 退回補件\"]"
+    },
+    {
+      "id": "EV-0058",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L41",
+      "excerpt": "S025 --> S015"
+    },
+    {
+      "id": "EV-0059",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L16",
+      "excerpt": "N025 -->|退回補件| N015"
+    },
+    {
+      "id": "EV-0060",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L9",
+      "excerpt": "START((開始)) -->|主流程| N010[\"010 草稿\"]"
+    },
+    {
+      "id": "EV-0061",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L13",
+      "excerpt": "D1 -->|高額審核| N025[\"025 待部門主管審核\"]"
+    },
+    {
+      "id": "EV-0062",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L15",
+      "excerpt": "N020 -->|退回補件| N015[\"015 退回補件\"]"
+    },
+    {
+      "id": "EV-0063",
+      "kind": "STATUS_DOC",
+      "locator": "status-REQ_STATUS.md#L18",
+      "excerpt": "N010 -->|撤回作廢| N090[\"090 作廢\"]"
+    },
+    {
+      "id": "EV-0064",
+      "kind": "HUMAN_DECISION",
+      "locator": "decisions.md#L5",
+      "excerpt": "| Q-002 | 不重建「核准後重開為草稿」 | 這是管理者以特殊參數做的資料維護，不是業務流程；STATUS 文件不納入 | DROP | 業務單位主管 | 2026-10-08 |"
+    }
+  ]
+}

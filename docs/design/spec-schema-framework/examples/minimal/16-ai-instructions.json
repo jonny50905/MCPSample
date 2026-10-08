@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "16-ai-instructions",
+  "docId": "clone-0123456789abcdef/16",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "16 AI 實作指引",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "AI-001",
+      "key": "AI:01",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "READING",
+      "clause": "先讀 00-index：閱讀順序、ID 前綴對照、本版狀態。看到任何 ID，到前綴對照表指定的文件找定義；以 ID 為準，不以章節位置為準。"
+    }
+  ]
+}

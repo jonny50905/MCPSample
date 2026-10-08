@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "02-functional-requirements",
+  "docId": "clone-0123456789abcdef/02",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "02 功能需求",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "FR-004",
+      "key": "TW_DEMO_REQ:SUBMIT",
+      "lifecycle": "ACTIVE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-002"
+      ],
+      "name": "送出申請",
+      "description": "申請人把草稿或退回補件中的申請單送出給直屬主管審核。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-003",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-002"
+        }
+      ],
+      "realizes": [
+        "TRN-002"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "outcome": "狀態變為 020，記錄送出日，並排入送審通知。",
+      "priority": "MUST"
+    }
+  ]
+}

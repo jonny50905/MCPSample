@@ -1,0 +1,1025 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "04-workflow",
+  "docId": "clone-0123456789abcdef/04",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "04 流程與狀態機",
+  "summary": "狀態 6、轉移 10、情境 4；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "03-roles-permissions",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "STATUS_DOC",
+      "ref": "status-REQ_STATUS.md",
+      "fingerprint": "74ddc35144e7ccb6d318a2976abae48d0af373c58aaa87ab90e513480af3b12e"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/04-workflow",
+      "fingerprint": "fe19d8c99f891be965beccd13bf3011d5d8ff588a6cd6c999497e27bb569afd2"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "PASS"
+  },
+  "openQuestions": [],
+  "diagramSources": [
+    {
+      "entityKey": "REQ_STATUS",
+      "flowchart": "status-REQ_STATUS.md#L7-L20",
+      "stateDiagram": "status-REQ_STATUS.md#L24-L47",
+      "fingerprint": "74ddc35144e7ccb6d318a2976abae48d0af373c58aaa87ab90e513480af3b12e"
+    }
+  ],
+  "items": [
+    {
+      "id": "STATE-001",
+      "key": "REQ_STATUS:010",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0034",
+        "EV-0011"
+      ],
+      "entityKey": "REQ_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "010",
+      "name": "010 草稿",
+      "binding": "FLD-017",
+      "domainLabel": "草稿",
+      "isInitialTarget": true,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-002",
+      "key": "REQ_STATUS:015",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0035",
+        "EV-0011"
+      ],
+      "entityKey": "REQ_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "015",
+      "name": "015 退回補件",
+      "binding": "FLD-017",
+      "domainLabel": "退回補件",
+      "isInitialTarget": false,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-003",
+      "key": "REQ_STATUS:020",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0036",
+        "EV-0011"
+      ],
+      "entityKey": "REQ_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "020",
+      "name": "020 待主管審核",
+      "binding": "FLD-017",
+      "domainLabel": "待主管審核",
+      "isInitialTarget": false,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-004",
+      "key": "REQ_STATUS:025",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0037",
+        "EV-0011"
+      ],
+      "entityKey": "REQ_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "025",
+      "name": "025 待部門主管審核",
+      "binding": "FLD-017",
+      "domainLabel": "待部門主管審核",
+      "isInitialTarget": false,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-005",
+      "key": "REQ_STATUS:030",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0038",
+        "EV-0011"
+      ],
+      "entityKey": "REQ_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "030",
+      "name": "030 核准",
+      "binding": "FLD-017",
+      "domainLabel": "核准",
+      "isInitialTarget": false,
+      "isFinal": true,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-006",
+      "key": "REQ_STATUS:090",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0039",
+        "EV-0011"
+      ],
+      "entityKey": "REQ_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "090",
+      "name": "090 作廢",
+      "binding": "FLD-017",
+      "domainLabel": "作廢",
+      "isInitialTarget": false,
+      "isFinal": true,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "TRN-001",
+      "key": "REQ_STATUS:*>010",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0040",
+        "EV-0041",
+        "EV-0004"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "INITIAL",
+      "to": "STATE-001",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-003",
+        "action": "儲存（新增模式）"
+      },
+      "actor": {
+        "left": {
+          "ctx": "CURRENT_USER_OPRID"
+        },
+        "op": "HAS_ROLE",
+        "right": {
+          "role": "ROLE-002"
+        }
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "010",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-003",
+          "event": "Save（ADD 模式；REQ_STATUS 取 Record 預設值）"
+        }
+      ],
+      "reentry": "同一張新單存檔後畫面轉為修改模式；再按儲存是一般存檔，不會再建立一張。"
+    },
+    {
+      "id": "TRN-002",
+      "key": "REQ_STATUS:010>020",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0042",
+        "EV-0043",
+        "EV-0016"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-001",
+      "to": "STATE-003",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-003",
+        "action": "按「送出」（TW_DEMO_REQWRK.SUBMIT_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-002"
+            }
+          },
+          {
+            "left": {
+              "fld": "FLD-015"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "020",
+            "type": "CHAR"
+          }
+        },
+        {
+          "field": "FLD-018",
+          "value": {
+            "ctx": "CURRENT_DATE"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-014",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "送出後按鈕隱藏（見 05）；兩個視窗重複送出時，後存檔者因資料已被更新而被拒絕，狀態不變。"
+    },
+    {
+      "id": "TRN-003",
+      "key": "REQ_STATUS:010>090",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0046",
+        "EV-0047",
+        "EV-0017"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-001",
+      "to": "STATE-006",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-003",
+        "action": "按「撤回」（TW_DEMO_REQWRK.WITHDRAW_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-002"
+            }
+          },
+          {
+            "left": {
+              "fld": "FLD-015"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "090",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-015",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "作廢是終點；撤回後按鈕隱藏，不能再操作。"
+    },
+    {
+      "id": "TRN-004",
+      "key": "REQ_STATUS:015>020",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0044",
+        "EV-0045",
+        "EV-0016"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-002",
+      "to": "STATE-003",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-003",
+        "action": "按「送出」（TW_DEMO_REQWRK.SUBMIT_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-002"
+            }
+          },
+          {
+            "left": {
+              "fld": "FLD-015"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "020",
+            "type": "CHAR"
+          }
+        },
+        {
+          "field": "FLD-018",
+          "value": {
+            "ctx": "CURRENT_DATE"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-014",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "同 010→020；重新送出會覆寫送出日。"
+    },
+    {
+      "id": "TRN-005",
+      "key": "REQ_STATUS:015>090",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0048",
+        "EV-0049",
+        "EV-0017"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-002",
+      "to": "STATE-006",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-003",
+        "action": "按「撤回」（TW_DEMO_REQWRK.WITHDRAW_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-002"
+            }
+          },
+          {
+            "left": {
+              "fld": "FLD-015"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "090",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-015",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "同 010→090。"
+    },
+    {
+      "id": "TRN-006",
+      "key": "REQ_STATUS:020>015",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0056",
+        "EV-0057",
+        "EV-0020",
+        "EV-0019"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-003",
+      "to": "STATE-002",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-002",
+        "action": "按「退回」（TW_DEMO_REQWRK.RETURN_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-001"
+            }
+          },
+          {
+            "left": {
+              "drv": "DRV-002"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "015",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-013",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "退回後按鈕隱藏；申請人可修改後重新送出。"
+    },
+    {
+      "id": "TRN-007",
+      "key": "REQ_STATUS:020>025",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0052",
+        "EV-0053",
+        "EV-0018",
+        "EV-0019"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-003",
+      "to": "STATE-004",
+      "via": [
+        "amount_check"
+      ],
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-002",
+        "action": "按「核准」（TW_DEMO_REQWRK.APPROVE_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-001"
+            }
+          },
+          {
+            "left": {
+              "drv": "DRV-002"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "left": {
+          "fld": "FLD-010"
+        },
+        "op": "GT",
+        "right": {
+          "const": "50000",
+          "type": "NUMBER"
+        }
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "025",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-012",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "轉入 025 後由部門主管審核；直屬主管不能再操作。"
+    },
+    {
+      "id": "TRN-008",
+      "key": "REQ_STATUS:020>030",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0050",
+        "EV-0051",
+        "EV-0018",
+        "EV-0019"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-003",
+      "to": "STATE-005",
+      "via": [
+        "amount_check"
+      ],
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-002",
+        "action": "按「核准」（TW_DEMO_REQWRK.APPROVE_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-001"
+            }
+          },
+          {
+            "left": {
+              "drv": "DRV-002"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "left": {
+          "fld": "FLD-010"
+        },
+        "op": "LE",
+        "right": {
+          "const": "50000",
+          "type": "NUMBER"
+        }
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "030",
+            "type": "CHAR"
+          }
+        },
+        {
+          "field": "FLD-011",
+          "value": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        {
+          "field": "FLD-012",
+          "value": {
+            "ctx": "CURRENT_DATE"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-012",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "核准後按鈕隱藏；兩位審核者同時核准時，後存檔者被拒絕（見 08 的併發行為）。"
+    },
+    {
+      "id": "TRN-009",
+      "key": "REQ_STATUS:025>015",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0058",
+        "EV-0059",
+        "EV-0020",
+        "EV-0019"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-004",
+      "to": "STATE-002",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-002",
+        "action": "按「退回」（TW_DEMO_REQWRK.RETURN_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-001"
+            }
+          },
+          {
+            "left": {
+              "drv": "DRV-001"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "015",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-013",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "同 020→015；重新送出後回到 020，由直屬主管重新審核。"
+    },
+    {
+      "id": "TRN-010",
+      "key": "REQ_STATUS:025>030",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0054",
+        "EV-0055",
+        "EV-0018",
+        "EV-0019"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-004",
+      "to": "STATE-005",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-002",
+        "action": "按「核准」（TW_DEMO_REQWRK.APPROVE_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-001"
+            }
+          },
+          {
+            "left": {
+              "drv": "DRV-001"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "025 按核准只有一個目標"
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "030",
+            "type": "CHAR"
+          }
+        },
+        {
+          "field": "FLD-011",
+          "value": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        {
+          "field": "FLD-012",
+          "value": {
+            "ctx": "CURRENT_DATE"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-012",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "核准者欄位記錄部門主管；同 020→030 的併發行為。"
+    },
+    {
+      "id": "FLOW-001",
+      "key": "REQ_STATUS:主流程",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0060"
+      ],
+      "entityKey": "REQ_STATUS",
+      "scenarioType": "主流程",
+      "narrative": "申請人建立並送出，直屬主管核准；金額不超過 50000 時一次核准結案。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-001",
+          "description": "申請人建立草稿"
+        },
+        {
+          "seq": 2,
+          "transition": "TRN-002",
+          "description": "申請人送出"
+        },
+        {
+          "seq": 3,
+          "transition": "TRN-008",
+          "description": "直屬主管核准（金額 ≤ 50000）"
+        }
+      ],
+      "entryStates": [
+        "INITIAL"
+      ],
+      "exitStates": [
+        "STATE-005"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": "金額超過 50000 轉入「高額審核」；主管退回轉入「退回補件」；草稿可轉入「撤回作廢」。"
+    },
+    {
+      "id": "FLOW-002",
+      "key": "REQ_STATUS:撤回作廢",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0063"
+      ],
+      "entityKey": "REQ_STATUS",
+      "scenarioType": "撤回作廢",
+      "narrative": "申請人在送出前或被退回後撤回，申請單作廢結束。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-003",
+          "description": "撤回草稿"
+        },
+        {
+          "seq": 2,
+          "transition": "TRN-005",
+          "description": "撤回退回中的申請"
+        }
+      ],
+      "entryStates": [
+        "STATE-001",
+        "STATE-002"
+      ],
+      "exitStates": [
+        "STATE-006"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": {
+        "na": "作廢是終點"
+      }
+    },
+    {
+      "id": "FLOW-003",
+      "key": "REQ_STATUS:退回補件",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0062"
+      ],
+      "entityKey": "REQ_STATUS",
+      "scenarioType": "退回補件",
+      "narrative": "審核者退回後，申請人補件重新送出，回到直屬主管審核。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-006",
+          "description": "直屬主管退回"
+        },
+        {
+          "seq": 2,
+          "transition": "TRN-009",
+          "description": "部門主管退回"
+        },
+        {
+          "seq": 3,
+          "transition": "TRN-004",
+          "description": "申請人修改後重新送出"
+        }
+      ],
+      "entryStates": [
+        "STATE-003",
+        "STATE-004"
+      ],
+      "exitStates": [
+        "STATE-003"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": "退回補件中的申請人也可撤回，轉入「撤回作廢」。"
+    },
+    {
+      "id": "FLOW-004",
+      "key": "REQ_STATUS:高額審核",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0061"
+      ],
+      "entityKey": "REQ_STATUS",
+      "scenarioType": "高額審核",
+      "narrative": "金額超過 50000 時，直屬主管核准後再由部門主管核准。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-007",
+          "description": "直屬主管核准（金額 > 50000），轉部門主管"
+        },
+        {
+          "seq": 2,
+          "transition": "TRN-010",
+          "description": "部門主管核准"
+        }
+      ],
+      "entryStates": [
+        "STATE-003"
+      ],
+      "exitStates": [
+        "STATE-005"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": "部門主管可退回，轉入「退回補件」。"
+    }
+  ]
+}

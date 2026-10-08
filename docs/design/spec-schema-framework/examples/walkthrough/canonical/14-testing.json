@@ -1,0 +1,1123 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "14-testing",
+  "docId": "clone-0123456789abcdef/14",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "14 測試與驗收",
+  "summary": "測試案例 14；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "02-functional-requirements",
+    "03-roles-permissions",
+    "04-workflow",
+    "05-ui",
+    "07-database",
+    "08-api",
+    "09-business-logic"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "FAIL",
+    "L4": "PASS",
+    "L5": "NOT_APPLICABLE"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "TC-001",
+      "key": "TW_DEMO_APV:APPROVE:BOUNDARY:AMOUNT_AT_LIMIT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-001"
+      ],
+      "name": "金額剛好 50000 時一次核准",
+      "scenarioType": "BOUNDARY",
+      "fr": "FR-001",
+      "covers": {
+        "transitions": [
+          "TRN-008"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "DRV-002"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "020"
+          },
+          {
+            "field": "FLD-010",
+            "value": "50000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-003"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 開啟該申請單並按「核准」",
+          "control": "UI-005",
+          "operation": "OP-001"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-005",
+        "data": [
+          {
+            "field": "FLD-011",
+            "value": "E2001"
+          },
+          {
+            "field": "FLD-012",
+            "value": "測試當日"
+          }
+        ]
+      },
+      "verification": "查該列 REQ_STATUS＝030、APPROVER_EMPLID＝E2001、APPROVE_DT＝測試當日。"
+    },
+    {
+      "id": "TC-002",
+      "key": "TW_DEMO_APV:APPROVE:BOUNDARY:AMOUNT_OVER_LIMIT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-001"
+      ],
+      "name": "金額 50000.01 時轉部門主管",
+      "scenarioType": "BOUNDARY",
+      "fr": "FR-001",
+      "covers": {
+        "transitions": [
+          "TRN-007"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "DRV-002"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "020"
+          },
+          {
+            "field": "FLD-010",
+            "value": "50000.01"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-003"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 開啟該申請單並按「核准」",
+          "control": "UI-005",
+          "operation": "OP-001"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-004"
+      },
+      "verification": "查該列 REQ_STATUS＝025；APPROVER_EMPLID 未寫入。"
+    },
+    {
+      "id": "TC-003",
+      "key": "TW_DEMO_APV:APPROVE:NEGATIVE:NOT_SUPERVISOR",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-001"
+      ],
+      "name": "具審核角色但不是直屬主管者看不到申請單",
+      "scenarioType": "NEGATIVE",
+      "fr": "FR-001",
+      "covers": {
+        "transitions": [
+          "TRN-008"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "all": [
+            {
+              "left": {
+                "ctx": "CURRENT_USER_OPRID"
+              },
+              "op": "HAS_ROLE",
+              "right": {
+                "role": "ROLE-001"
+              }
+            },
+            {
+              "left": {
+                "drv": "DRV-002"
+              },
+              "op": "NE",
+              "right": {
+                "ctx": "CURRENT_USER_EMPLID"
+              }
+            }
+          ]
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "020"
+          },
+          {
+            "field": "FLD-010",
+            "value": "1000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-003"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2999（具審核角色、但不是 E1001 的直屬主管）查詢該申請單"
+        }
+      ],
+      "expected": {
+        "noDataChange": true
+      },
+      "verification": "查詢結果不含此單；該列資料不變。"
+    },
+    {
+      "id": "TC-004",
+      "key": "TW_DEMO_APV:APPROVE:POSITIVE:HIGH_AMOUNT_END_TO_END",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-001"
+      ],
+      "name": "高額案件兩段核准",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-001",
+      "covers": {
+        "flows": [
+          "FLOW-004"
+        ],
+        "transitions": [
+          "TRN-007",
+          "TRN-010"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "DRV-002"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "020"
+          },
+          {
+            "field": "FLD-010",
+            "value": "80000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-003"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 按「核准」，狀態轉為 025",
+          "control": "UI-005",
+          "operation": "OP-001"
+        },
+        {
+          "seq": 2,
+          "action": "以 E3001（D100 部門主管）開啟同一張單並按「核准」",
+          "control": "UI-005",
+          "operation": "OP-001"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-005",
+        "data": [
+          {
+            "field": "FLD-011",
+            "value": "E3001"
+          }
+        ]
+      },
+      "verification": "第一步後 REQ_STATUS＝025；第二步後 REQ_STATUS＝030、APPROVER_EMPLID＝E3001。"
+    },
+    {
+      "id": "TC-005",
+      "key": "TW_DEMO_APV:RETURN:NEGATIVE:BLANK_COMMENT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-002"
+      ],
+      "name": "未填意見不能退回",
+      "scenarioType": "NEGATIVE",
+      "fr": "FR-002",
+      "covers": {
+        "rules": [
+          "BR-005"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "DRV-002"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "020"
+          },
+          {
+            "field": "FLD-013",
+            "value": " ",
+            "note": "單一空白，即未填"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-003"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 不填審核意見，按「退回」",
+          "control": "UI-006",
+          "operation": "OP-002"
+        }
+      ],
+      "expected": {
+        "message": "MSG-002",
+        "noDataChange": true
+      },
+      "verification": "畫面顯示訊息 27000,2；該列 REQ_STATUS 仍為 020。"
+    },
+    {
+      "id": "TC-006",
+      "key": "TW_DEMO_APV:RETURN:POSITIVE:RETURN_WITH_COMMENT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-002"
+      ],
+      "name": "填寫意見後退回",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-002",
+      "covers": {
+        "transitions": [
+          "TRN-006"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "DRV-002"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "020"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-003"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 填寫審核意見「請補附件」，按「退回」",
+          "control": "UI-006",
+          "operation": "OP-002",
+          "inputs": [
+            {
+              "field": "FLD-013",
+              "value": "請補附件"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-002",
+        "data": [
+          {
+            "field": "FLD-013",
+            "value": "請補附件"
+          }
+        ]
+      },
+      "verification": "查該列 REQ_STATUS＝015、COMMENTS＝請補附件。"
+    },
+    {
+      "id": "TC-007",
+      "key": "TW_DEMO_REQ:CREATE:BOUNDARY:AMOUNT_MIN",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-003"
+      ],
+      "name": "金額 0.01 可建立",
+      "scenarioType": "BOUNDARY",
+      "fr": "FR-003",
+      "covers": {
+        "rules": [
+          "BR-003"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          }
+        ],
+        "synthetic": true,
+        "state": "INITIAL"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 在新增模式輸入金額 0.01 與事由後儲存",
+          "control": "UI-008",
+          "operation": "OP-003",
+          "inputs": [
+            {
+              "field": "FLD-010",
+              "value": "0.01"
+            },
+            {
+              "field": "FLD-014",
+              "value": "測試"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-001"
+      },
+      "verification": "產生一列，REQ_STATUS＝010、AMOUNT＝0.01。"
+    },
+    {
+      "id": "TC-008",
+      "key": "TW_DEMO_REQ:CREATE:NEGATIVE:AMOUNT_ZERO",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-003"
+      ],
+      "name": "金額 0 不能建立",
+      "scenarioType": "NEGATIVE",
+      "fr": "FR-003",
+      "covers": {
+        "rules": [
+          "BR-003"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          }
+        ],
+        "synthetic": true,
+        "state": "INITIAL"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 在新增模式輸入金額 0 與事由後儲存",
+          "control": "UI-008",
+          "operation": "OP-003",
+          "inputs": [
+            {
+              "field": "FLD-010",
+              "value": "0"
+            },
+            {
+              "field": "FLD-014",
+              "value": "測試"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "message": "MSG-001",
+        "noDataChange": true
+      },
+      "verification": "畫面顯示訊息 27000,1；沒有新增任何列。"
+    },
+    {
+      "id": "TC-009",
+      "key": "TW_DEMO_REQ:CREATE:POSITIVE:CREATE_DRAFT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-003"
+      ],
+      "name": "建立草稿",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-003",
+      "covers": {
+        "transitions": [
+          "TRN-001"
+        ],
+        "rules": [
+          "BR-002",
+          "BR-004"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          }
+        ],
+        "synthetic": true,
+        "state": "INITIAL"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 在新增模式輸入金額 1000 與事由後儲存",
+          "operation": "OP-003",
+          "inputs": [
+            {
+              "field": "FLD-010",
+              "value": "1000"
+            },
+            {
+              "field": "FLD-014",
+              "value": "測試"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-001",
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-016",
+            "value": "10 碼數字（不是 NEW）"
+          }
+        ]
+      },
+      "verification": "產生一列，REQ_STATUS＝010、REQUESTER_EMPLID＝E1001、REQ_ID 為 10 碼數字。"
+    },
+    {
+      "id": "TC-010",
+      "key": "TW_DEMO_REQ:CREATE:POSITIVE:MAIN_FLOW_END_TO_END",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-003"
+      ],
+      "name": "主流程：建立、送出、核准",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-003",
+      "covers": {
+        "flows": [
+          "FLOW-001"
+        ],
+        "transitions": [
+          "TRN-001",
+          "TRN-002",
+          "TRN-008"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          }
+        ],
+        "synthetic": true,
+        "state": "INITIAL"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 建立金額 1000 的申請單",
+          "operation": "OP-003",
+          "inputs": [
+            {
+              "field": "FLD-010",
+              "value": "1000"
+            },
+            {
+              "field": "FLD-014",
+              "value": "測試"
+            }
+          ]
+        },
+        {
+          "seq": 2,
+          "action": "以 E1001 按「送出」",
+          "control": "UI-011",
+          "operation": "OP-004"
+        },
+        {
+          "seq": 3,
+          "action": "以 E2001 開啟該單並按「核准」",
+          "control": "UI-005",
+          "operation": "OP-001"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-005",
+        "data": [
+          {
+            "field": "FLD-011",
+            "value": "E2001"
+          }
+        ]
+      },
+      "verification": "各步驟後 REQ_STATUS 依序為 010、020、030。"
+    },
+    {
+      "id": "TC-011",
+      "key": "TW_DEMO_REQ:SUBMIT:NEGATIVE:NO_SUPERVISOR",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-004"
+      ],
+      "name": "沒有直屬主管不能送出",
+      "scenarioType": "NEGATIVE",
+      "fr": "FR-004",
+      "covers": {
+        "rules": [
+          "BR-006"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-017",
+            "value": "010"
+          },
+          {
+            "field": "FLD-009",
+            "value": " ",
+            "note": "E1001 的目前有效任職列為單一空白"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-001"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 按「送出」",
+          "control": "UI-011",
+          "operation": "OP-004"
+        }
+      ],
+      "expected": {
+        "message": "MSG-003",
+        "noDataChange": true
+      },
+      "verification": "畫面顯示訊息 27000,3；該列 REQ_STATUS 仍為 010。"
+    },
+    {
+      "id": "TC-012",
+      "key": "TW_DEMO_REQ:SUBMIT:POSITIVE:RESUBMIT_AFTER_RETURN",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-004"
+      ],
+      "name": "退回後補件重新送出",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-004",
+      "covers": {
+        "flows": [
+          "FLOW-003"
+        ],
+        "transitions": [
+          "TRN-006",
+          "TRN-004"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "DRV-002"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "020"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-003"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 填寫意見後按「退回」",
+          "control": "UI-006",
+          "operation": "OP-002",
+          "inputs": [
+            {
+              "field": "FLD-013",
+              "value": "請補附件"
+            }
+          ]
+        },
+        {
+          "seq": 2,
+          "action": "以 E1001 修改事由後按「送出」",
+          "control": "UI-011",
+          "operation": "OP-004"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-003",
+        "data": [
+          {
+            "field": "FLD-018",
+            "value": "測試當日"
+          }
+        ]
+      },
+      "verification": "第一步後 REQ_STATUS＝015；第二步後 020，SUBMIT_DT 更新。"
+    },
+    {
+      "id": "TC-013",
+      "key": "TW_DEMO_REQ:SUBMIT:POSITIVE:SUBMIT_FROM_DRAFT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-004"
+      ],
+      "name": "草稿送出",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-004",
+      "covers": {
+        "transitions": [
+          "TRN-002"
+        ],
+        "rules": [
+          "BR-001"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-009",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-005",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "FLD-004",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "FLD-017",
+            "value": "010"
+          },
+          {
+            "field": "FLD-010",
+            "value": "1000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-001"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 按「送出」",
+          "control": "UI-011",
+          "operation": "OP-004"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-003",
+        "data": [
+          {
+            "field": "FLD-018",
+            "value": "測試當日"
+          }
+        ]
+      },
+      "verification": "查該列 REQ_STATUS＝020、SUBMIT_DT＝測試當日；送審通知程序已排入一筆。"
+    },
+    {
+      "id": "TC-014",
+      "key": "TW_DEMO_REQ:WITHDRAW:POSITIVE:WITHDRAW_DRAFT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-005"
+      ],
+      "name": "撤回草稿",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-005",
+      "covers": {
+        "flows": [
+          "FLOW-002"
+        ],
+        "transitions": [
+          "TRN-003"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-017",
+            "value": "010"
+          },
+          {
+            "field": "FLD-010",
+            "value": "1000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-001"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 按「撤回」",
+          "control": "UI-012",
+          "operation": "OP-005"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-006"
+      },
+      "verification": "查該列 REQ_STATUS＝090；畫面不再顯示送出與撤回按鈕。"
+    }
+  ]
+}

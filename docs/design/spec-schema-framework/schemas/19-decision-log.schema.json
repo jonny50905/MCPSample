@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:19-decision-log",
+  "title": "19 決策紀錄",
+  "description": "項目型別：DEC（決策）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "19-decision-log"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DEC"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "DEC": {
+      "type": "object",
+      "title": "DEC（決策）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DEC-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^DEC:\\d{4}$",
+              "description": "自然鍵：DEC:<四位序號>"
+            },
+            "title": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "決策標題"
+            },
+            "context": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "背景"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "option": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                  },
+                  "consequence": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                  }
+                },
+                "required": [
+                  "option",
+                  "consequence"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 2,
+              "description": "考慮過的選項"
+            },
+            "decision": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "決定"
+            },
+            "rationale": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "理由"
+            },
+            "decidedBy": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "決策者"
+            },
+            "decidedOn": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/date",
+              "description": "決策日期"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "ACCEPTED",
+                "SUPERSEDED",
+                "REVOKED"
+              ],
+              "description": "決策狀態"
+            },
+            "supersedes": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refDEC",
+              "description": "取代的舊決策",
+              "x-ref": [
+                "DEC"
+              ]
+            },
+            "resolves": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refQ"
+              },
+              "uniqueItems": true,
+              "description": "回答的問題",
+              "x-ref": [
+                "Q"
+              ]
+            },
+            "affects": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refSpec"
+              },
+              "uniqueItems": true,
+              "description": "影響的規格項目",
+              "x-ref": [
+                "GOAL",
+                "RESP",
+                "OBJ",
+                "ENT",
+                "FLD",
+                "DRV",
+                "XF",
+                "ROLE",
+                "PERM",
+                "STATE",
+                "TRN",
+                "FLOW",
+                "IF",
+                "FR",
+                "UI",
+                "MSG",
+                "BR",
+                "OP",
+                "TC"
+              ]
+            },
+            "effect": {
+              "type": "string",
+              "enum": [
+                "NO_CHANGE",
+                "DROP",
+                "ADD_SCOPE",
+                "ACCEPT_GAP",
+                "AMEND_INPUT"
+              ],
+              "description": "對規格的效果"
+            }
+          },
+          "required": [
+            "title",
+            "context",
+            "decision",
+            "rationale",
+            "decidedBy",
+            "decidedOn",
+            "status",
+            "resolves",
+            "affects",
+            "effect"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "HUMAN_DECISION"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

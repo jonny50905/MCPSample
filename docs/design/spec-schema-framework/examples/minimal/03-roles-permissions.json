@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "03-roles-permissions",
+  "docId": "clone-0123456789abcdef/03",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "03 角色與權限",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "ROLE-002",
+      "key": "ROLE:TW_DEMO_REQUESTER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008"
+      ],
+      "principalType": "ROLE",
+      "object": "OBJ-021",
+      "name": "申請人",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "一般員工皆有；指派作業不在本功能範圍。"
+      }
+    },
+    {
+      "id": "PERM-002",
+      "key": "ROLE:TW_DEMO_REQUESTER>COMPONENT:TW_DEMO_REQ",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008"
+      ],
+      "principal": "ROLE-002",
+      "resource": "OBJ-003",
+      "actions": [
+        "ADD"
+      ],
+      "dataScope": {
+        "condition": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "note": "只看得到自己的申請單。"
+      },
+      "denial": {
+        "effect": "ROWS_FILTERED",
+        "note": "查詢結果不含他人的申請單。"
+      },
+      "enforcement": "ROW_LEVEL_SECURITY"
+    }
+  ]
+}

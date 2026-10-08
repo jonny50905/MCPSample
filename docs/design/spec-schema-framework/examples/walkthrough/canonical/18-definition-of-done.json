@@ -1,0 +1,329 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "18-definition-of-done",
+  "docId": "clone-0123456789abcdef/18",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "18 完成定義",
+  "summary": "完成條件 7；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "03-roles-permissions",
+    "04-workflow",
+    "07-database",
+    "08-api",
+    "09-business-logic",
+    "14-testing",
+    "17-tasks"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "NOT_APPLICABLE",
+    "L5": "NOT_APPLICABLE"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "DOD-001",
+      "key": "GLOBAL:BASELINE",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "GLOBAL",
+      "criteria": [
+        {
+          "kind": "STORED_VALUES_PRESERVED",
+          "statement": "狀態碼與選項儲存值與 07 的值域完全相同。",
+          "refs": [
+            "FLD-017"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        },
+        {
+          "kind": "NO_EXCLUDED_FIELDS",
+          "statement": "07「不建置的原生欄位」沒有出現在資料結構、畫面與規則。",
+          "refs": [
+            "XF-001"
+          ],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "BLANK_SEMANTICS_PRESERVED",
+          "statement": "空白、0 與 NULL 的比較照共同定義實作。",
+          "refs": [],
+          "evidenceRequired": "TEST_REPORT"
+        },
+        {
+          "kind": "TRACE_IDS_RECORDED",
+          "statement": "程式與測試都標註實作的 ID。",
+          "refs": [],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "OPEN_QUESTIONS_CLOSED",
+          "statement": "影響本工作項目的 BLOCKING 問題都已在 19 有決策。",
+          "refs": [],
+          "evidenceRequired": "REVIEW_RECORD"
+        }
+      ]
+    },
+    {
+      "id": "DOD-002",
+      "key": "TASK:FOUNDATION:DATA_AND_SECURITY",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "TASK",
+      "task": "TASK-001",
+      "criteria": [
+        {
+          "kind": "STORED_VALUES_PRESERVED",
+          "statement": "實體、欄位、值域與衍生概念照 07 建立。",
+          "refs": [
+            "ENT-001",
+            "ENT-002",
+            "ENT-003",
+            "DRV-001",
+            "DRV-002"
+          ],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "RULES_IMPLEMENTED",
+          "statement": "角色與資料範圍照 03 建立。",
+          "refs": [
+            "PERM-001",
+            "PERM-002"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        }
+      ]
+    },
+    {
+      "id": "DOD-003",
+      "key": "TASK:SLICE:TW_DEMO_APV:APPROVE",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "TASK",
+      "task": "TASK-002",
+      "criteria": [
+        {
+          "kind": "TESTS_PASS",
+          "statement": "本工作的測試案例全數通過。",
+          "refs": [
+            "TC-001",
+            "TC-002",
+            "TC-003",
+            "TC-004"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        },
+        {
+          "kind": "RULES_IMPLEMENTED",
+          "statement": "本工作的轉移、規則與操作都已實作。",
+          "refs": [
+            "TRN-008",
+            "TRN-007",
+            "TRN-010",
+            "OP-001"
+          ],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "MESSAGES_PRESERVED",
+          "statement": "訊息原文與觸發條件與 09 一致。",
+          "refs": [
+            "MSG-004"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        }
+      ]
+    },
+    {
+      "id": "DOD-004",
+      "key": "TASK:SLICE:TW_DEMO_APV:RETURN",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "TASK",
+      "task": "TASK-003",
+      "criteria": [
+        {
+          "kind": "TESTS_PASS",
+          "statement": "本工作的測試案例全數通過。",
+          "refs": [
+            "TC-005",
+            "TC-006"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        },
+        {
+          "kind": "RULES_IMPLEMENTED",
+          "statement": "本工作的轉移、規則與操作都已實作。",
+          "refs": [
+            "TRN-006",
+            "TRN-009",
+            "BR-005",
+            "OP-002"
+          ],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "MESSAGES_PRESERVED",
+          "statement": "訊息原文與觸發條件與 09 一致。",
+          "refs": [
+            "MSG-002",
+            "MSG-004"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        }
+      ]
+    },
+    {
+      "id": "DOD-005",
+      "key": "TASK:SLICE:TW_DEMO_REQ:CREATE",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "TASK",
+      "task": "TASK-004",
+      "criteria": [
+        {
+          "kind": "TESTS_PASS",
+          "statement": "本工作的測試案例全數通過。",
+          "refs": [
+            "TC-007",
+            "TC-008",
+            "TC-009",
+            "TC-010"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        },
+        {
+          "kind": "RULES_IMPLEMENTED",
+          "statement": "本工作的轉移、規則與操作都已實作。",
+          "refs": [
+            "TRN-001",
+            "BR-002",
+            "BR-003",
+            "BR-004",
+            "OP-003"
+          ],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "MESSAGES_PRESERVED",
+          "statement": "訊息原文與觸發條件與 09 一致。",
+          "refs": [
+            "MSG-001"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        }
+      ]
+    },
+    {
+      "id": "DOD-006",
+      "key": "TASK:SLICE:TW_DEMO_REQ:SUBMIT",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "TASK",
+      "task": "TASK-005",
+      "criteria": [
+        {
+          "kind": "TESTS_PASS",
+          "statement": "本工作的測試案例全數通過。",
+          "refs": [
+            "TC-011",
+            "TC-012",
+            "TC-013"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        },
+        {
+          "kind": "RULES_IMPLEMENTED",
+          "statement": "本工作的轉移、規則與操作都已實作。",
+          "refs": [
+            "TRN-002",
+            "TRN-004",
+            "BR-001",
+            "BR-003",
+            "BR-006",
+            "OP-004"
+          ],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "MESSAGES_PRESERVED",
+          "statement": "訊息原文與觸發條件與 09 一致。",
+          "refs": [
+            "MSG-001",
+            "MSG-003",
+            "MSG-004"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        }
+      ]
+    },
+    {
+      "id": "DOD-007",
+      "key": "TASK:SLICE:TW_DEMO_REQ:WITHDRAW",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "scope": "TASK",
+      "task": "TASK-006",
+      "criteria": [
+        {
+          "kind": "TESTS_PASS",
+          "statement": "本工作的測試案例全數通過。",
+          "refs": [
+            "TC-014"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        },
+        {
+          "kind": "RULES_IMPLEMENTED",
+          "statement": "本工作的轉移、規則與操作都已實作。",
+          "refs": [
+            "TRN-003",
+            "TRN-005",
+            "BR-003",
+            "OP-005"
+          ],
+          "evidenceRequired": "CODE_REFERENCE"
+        },
+        {
+          "kind": "MESSAGES_PRESERVED",
+          "statement": "訊息原文與觸發條件與 09 一致。",
+          "refs": [
+            "MSG-001",
+            "MSG-004"
+          ],
+          "evidenceRequired": "TEST_REPORT"
+        }
+      ]
+    }
+  ]
+}

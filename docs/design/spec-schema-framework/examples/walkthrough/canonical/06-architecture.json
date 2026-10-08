@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "06-architecture",
+  "docId": "clone-0123456789abcdef/06",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "06 系統架構（技術中立）",
+  "summary": "介面 1；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "04-workflow",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/06-architecture",
+      "fingerprint": "f4021db67878dcee311f29cf5ae1aba3dfed8cb4c659a663232747b49085b355"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "PASS"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "IF-001",
+      "key": "AE:TW_DEMO_NTFY",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0024",
+        "EV-0029"
+      ],
+      "ifType": "NOTIFICATION",
+      "object": "OBJ-001",
+      "name": "送審通知",
+      "direction": "OUTBOUND",
+      "trigger": {
+        "kind": "ON_TRANSITION",
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ],
+        "note": "送出成功後由 SavePostChange 排入程序，非同步執行。"
+      },
+      "performs": [],
+      "reads": [
+        "FLD-016",
+        "FLD-015",
+        "FLD-010",
+        "FLD-009"
+      ],
+      "writes": [],
+      "parameters": [
+        {
+          "name": "REQ_ID",
+          "source": {
+            "fld": "FLD-016"
+          }
+        }
+      ],
+      "format": {
+        "na": "不是檔案介面"
+      },
+      "errorHandling": "寄送失敗只寫入程序紀錄，不影響申請單狀態。",
+      "retry": {
+        "na": "原系統不重試"
+      },
+      "idempotency": "同一張單重複排入會重複寄送通知。"
+    }
+  ]
+}

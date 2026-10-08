@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "03-roles-permissions",
+  "docId": "clone-0123456789abcdef/03",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "03 角色與權限",
+  "summary": "角色 2、權限 2；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/03-roles-permissions",
+      "fingerprint": "882c5e84d75d1e679278b2da3738075e21ebc6a4d5757e75d162c12b786e63c1"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "PASS"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "ROLE-001",
+      "key": "ROLE:TW_DEMO_APPROVER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008"
+      ],
+      "principalType": "ROLE",
+      "object": "OBJ-020",
+      "name": "審核主管",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "由系統管理者指派給擔任主管的人；指派作業不在本功能範圍。"
+      }
+    },
+    {
+      "id": "ROLE-002",
+      "key": "ROLE:TW_DEMO_REQUESTER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008"
+      ],
+      "principalType": "ROLE",
+      "object": "OBJ-021",
+      "name": "申請人",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "一般員工皆有；指派作業不在本功能範圍。"
+      }
+    },
+    {
+      "id": "PERM-001",
+      "key": "ROLE:TW_DEMO_APPROVER>COMPONENT:TW_DEMO_APV",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008",
+        "EV-0032"
+      ],
+      "principal": "ROLE-001",
+      "resource": "OBJ-002",
+      "actions": [
+        "UPDATE_DISPLAY"
+      ],
+      "dataScope": {
+        "condition": {
+          "all": [
+            {
+              "left": {
+                "fld": "FLD-017"
+              },
+              "op": "IN",
+              "right": [
+                {
+                  "const": "020",
+                  "type": "CHAR"
+                },
+                {
+                  "const": "025",
+                  "type": "CHAR"
+                }
+              ]
+            },
+            {
+              "any": [
+                {
+                  "left": {
+                    "drv": "DRV-002"
+                  },
+                  "op": "EQ",
+                  "right": {
+                    "ctx": "CURRENT_USER_EMPLID"
+                  }
+                },
+                {
+                  "left": {
+                    "drv": "DRV-001"
+                  },
+                  "op": "EQ",
+                  "right": {
+                    "ctx": "CURRENT_USER_EMPLID"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "note": "審核清單只列出待審（020、025）且自己是直屬主管或部門主管的申請單。"
+      },
+      "denial": {
+        "effect": "ROWS_FILTERED",
+        "note": "查詢結果不含他人的申請單。"
+      },
+      "enforcement": "ROW_LEVEL_SECURITY"
+    },
+    {
+      "id": "PERM-002",
+      "key": "ROLE:TW_DEMO_REQUESTER>COMPONENT:TW_DEMO_REQ",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008",
+        "EV-0033"
+      ],
+      "principal": "ROLE-002",
+      "resource": "OBJ-003",
+      "actions": [
+        "ADD",
+        "UPDATE_DISPLAY"
+      ],
+      "dataScope": {
+        "condition": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "note": "只看得到自己的申請單。"
+      },
+      "denial": {
+        "effect": "ROWS_FILTERED",
+        "note": "查詢結果不含他人的申請單。"
+      },
+      "enforcement": "ROW_LEVEL_SECURITY"
+    }
+  ]
+}

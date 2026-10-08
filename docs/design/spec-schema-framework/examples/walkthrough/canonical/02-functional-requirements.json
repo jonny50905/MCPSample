@@ -1,0 +1,273 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "02-functional-requirements",
+  "docId": "clone-0123456789abcdef/02",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "02 功能需求",
+  "summary": "功能 5；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "03-roles-permissions",
+    "04-workflow",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "PASS"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "FR-001",
+      "key": "TW_DEMO_APV:APPROVE",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-008",
+        "TRN-007",
+        "TRN-010"
+      ],
+      "name": "核准申請",
+      "description": "直屬主管核准待審申請；金額超過 50000 時轉部門主管再核准。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-002",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-001"
+        },
+        {
+          "drv": "DRV-002"
+        },
+        {
+          "drv": "DRV-001"
+        }
+      ],
+      "realizes": [
+        "TRN-008",
+        "TRN-007",
+        "TRN-010"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-003"
+          },
+          {
+            "state": "STATE-004"
+          }
+        ]
+      },
+      "outcome": "狀態變為 030 並記錄核准者與核准日；或在高額時變為 025。",
+      "priority": "MUST"
+    },
+    {
+      "id": "FR-002",
+      "key": "TW_DEMO_APV:RETURN",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-006",
+        "TRN-009"
+      ],
+      "name": "退回申請",
+      "description": "審核者填寫意見後退回，申請人可補件重新送出。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-002",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-001"
+        },
+        {
+          "drv": "DRV-002"
+        },
+        {
+          "drv": "DRV-001"
+        }
+      ],
+      "realizes": [
+        "TRN-006",
+        "TRN-009"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-003"
+          },
+          {
+            "state": "STATE-004"
+          }
+        ]
+      },
+      "outcome": "狀態變為 015，保留審核意見。",
+      "priority": "MUST"
+    },
+    {
+      "id": "FR-003",
+      "key": "TW_DEMO_REQ:CREATE",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-001"
+      ],
+      "name": "建立申請",
+      "description": "申請人在新增模式輸入金額與事由並存檔，建立狀態為草稿的申請單。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-003",
+        "modes": [
+          "ADD"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-002"
+        }
+      ],
+      "realizes": [
+        "TRN-001"
+      ],
+      "preconditions": {
+        "na": "新建沒有前置狀態"
+      },
+      "outcome": "產生一張狀態 010 的申請單，申請人為目前使用者、單號已取號。",
+      "priority": "MUST"
+    },
+    {
+      "id": "FR-004",
+      "key": "TW_DEMO_REQ:SUBMIT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-002",
+        "TRN-004"
+      ],
+      "name": "送出申請",
+      "description": "申請人把草稿或退回補件中的申請單送出給直屬主管審核。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-003",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-002"
+        }
+      ],
+      "realizes": [
+        "TRN-002",
+        "TRN-004"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "outcome": "狀態變為 020，記錄送出日，並排入送審通知。",
+      "priority": "MUST"
+    },
+    {
+      "id": "FR-005",
+      "key": "TW_DEMO_REQ:WITHDRAW",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-003",
+        "TRN-005"
+      ],
+      "name": "撤回申請",
+      "description": "申請人撤回尚未送出或被退回的申請單，申請單作廢。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-003",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-002"
+        }
+      ],
+      "realizes": [
+        "TRN-003",
+        "TRN-005"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "outcome": "狀態變為 090（終點）。",
+      "priority": "MUST"
+    }
+  ]
+}

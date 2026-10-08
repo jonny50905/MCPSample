@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "01-overview",
+  "docId": "clone-0123456789abcdef/01",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "01 專案概覽",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "projectInputStatus": "PROVIDED",
+  "items": [
+    {
+      "id": "GOAL-001",
+      "key": "GOAL:01",
+      "lifecycle": "ACTIVE",
+      "basis": "PROJECT_INPUT",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0001"
+      ],
+      "name": "取代舊的申請審核功能",
+      "statement": "以新系統取代舊的申請審核功能，狀態流程與審核規則維持不變。",
+      "successCriteria": [
+        "狀態圖上每條轉移在新系統都可操作，結果與 04、09 的規格一致。"
+      ]
+    },
+    {
+      "id": "RESP-002",
+      "key": "RESP:SPEC_APPROVAL",
+      "lifecycle": "ACTIVE",
+      "basis": "PROJECT_INPUT",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "area": "SPEC_APPROVAL",
+      "holder": "業務單位主管"
+    },
+    {
+      "id": "OBJ-018",
+      "key": "RECORD:TW_DEMO_REQHDR",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_REQHDR",
+      "inclusion": "CORE",
+      "usedBy": "兩個主頁的主要 Record",
+      "condition": {
+        "na": "兩頁一律讀寫"
+      },
+      "reason": "申請單主檔",
+      "fieldUsage": {
+        "excluded": {
+          "count": 2
+        }
+      }
+    }
+  ]
+}

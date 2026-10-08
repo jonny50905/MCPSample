@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "17-tasks",
+  "docId": "clone-0123456789abcdef/17",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "17 工作拆解與相依",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "TASK-005",
+      "key": "SLICE:TW_DEMO_REQ:SUBMIT",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "taskKind": "SLICE",
+      "fr": "FR-004",
+      "name": "送出申請",
+      "order": 3,
+      "dependsOn": [
+        "TASK-001"
+      ],
+      "members": {
+        "fields": [
+          "FLD-010",
+          "FLD-014",
+          "FLD-015",
+          "FLD-016",
+          "FLD-017",
+          "FLD-018"
+        ],
+        "derivations": [
+          "DRV-002"
+        ],
+        "roles": [
+          "ROLE-002"
+        ],
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ],
+        "controls": [
+          "UI-008",
+          "UI-009",
+          "UI-010",
+          "UI-011"
+        ],
+        "rules": [
+          "BR-001",
+          "BR-003",
+          "BR-006"
+        ],
+        "operations": [
+          "OP-004"
+        ],
+        "tests": [
+          "TC-011",
+          "TC-012",
+          "TC-013"
+        ]
+      },
+      "deliverables": [
+        "OPERATIONS"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:90-questions",
+  "title": "90 問題清單",
+  "description": "項目型別：Q（問題）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "90-questions"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Q"
+              }
+            ]
+          }
+        },
+        "suppressed": {
+          "type": "object",
+          "properties": {
+            "definitionOnlyCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "definitionOnlyCodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "entityKey": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                  },
+                  "code": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                  }
+                },
+                "required": [
+                  "entityKey",
+                  "code"
+                ],
+                "additionalProperties": false
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "definitionOnlyCount",
+            "definitionOnlyCodes"
+          ],
+          "additionalProperties": false,
+          "description": "只存在於值域定義、沒有資料也沒有核心程式使用的狀態碼（只計數，不列題）"
+        }
+      },
+      "required": [
+        "suppressed"
+      ]
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "Q": {
+      "type": "object",
+      "title": "Q（問題）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^Q-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z_]*:\\S+$",
+              "description": "自然鍵：<類別>:<自然鍵>"
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "OFF_DIAGRAM_STATE",
+                "OFF_DIAGRAM_TRANSITION",
+                "DIAGRAM_EDGE_UNIMPLEMENTED",
+                "SCOPE_CANDIDATE",
+                "EVIDENCE_GAP",
+                "READER_UNDERSPECIFIED",
+                "READER_DIVERGENT",
+                "READER_CONTRADICTION",
+                "INPUT_MISSING"
+              ],
+              "description": "問題類別"
+            },
+            "severity": {
+              "type": "string",
+              "enum": [
+                "BLOCKING",
+                "INFO"
+              ],
+              "description": "是否阻擋完成"
+            },
+            "grade": {
+              "type": "string",
+              "enum": [
+                "HIGH",
+                "LOW"
+              ],
+              "description": "圖外分級：HIGH＝PROD 有資料；LOW＝僅核心程式賦值"
+            },
+            "question": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "問題敘述"
+            },
+            "affects": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refSpec"
+              },
+              "uniqueItems": true,
+              "description": "受影響的規格項目",
+              "x-ref": [
+                "GOAL",
+                "RESP",
+                "OBJ",
+                "ENT",
+                "FLD",
+                "DRV",
+                "XF",
+                "ROLE",
+                "PERM",
+                "STATE",
+                "TRN",
+                "FLOW",
+                "IF",
+                "FR",
+                "UI",
+                "MSG",
+                "BR",
+                "OP",
+                "TC"
+              ]
+            },
+            "observed": {
+              "type": "object",
+              "properties": {
+                "entityKey": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                },
+                "code": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                "from": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                "to": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                "location": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                }
+              },
+              "required": [],
+              "additionalProperties": false,
+              "description": "觀察到的狀態碼／轉移／位置"
+            },
+            "raisedBy": {
+              "type": "string",
+              "enum": [
+                "PARSER",
+                "RESEARCH",
+                "REVIEW",
+                "READER",
+                "GATE"
+              ],
+              "description": "提出來源"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "ANSWERED",
+                "WITHDRAWN",
+                "ACCEPTED_AS_GAP"
+              ],
+              "description": "狀態（ANSWERED／ACCEPTED_AS_GAP 由 19 的決策反查）"
+            },
+            "proposedAnswer": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "研究端建議的答案（不等於決策）"
+            }
+          },
+          "required": [
+            "category",
+            "severity",
+            "question",
+            "affects",
+            "raisedBy",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "COMPUTED"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "category"
+            ],
+            "properties": {
+              "category": {
+                "enum": [
+                  "OFF_DIAGRAM_STATE",
+                  "OFF_DIAGRAM_TRANSITION"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "grade",
+              "observed"
+            ],
+            "properties": {
+              "severity": {
+                "const": "INFO"
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "grade"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "category"
+            ],
+            "properties": {
+              "category": {
+                "const": "INPUT_MISSING"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity": {
+                "const": "INFO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "category"
+            ],
+            "properties": {
+              "category": {
+                "enum": [
+                  "DIAGRAM_EDGE_UNIMPLEMENTED",
+                  "SCOPE_CANDIDATE",
+                  "EVIDENCE_GAP",
+                  "READER_UNDERSPECIFIED",
+                  "READER_DIVERGENT",
+                  "READER_CONTRADICTION"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity": {
+                "const": "BLOCKING"
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "19-decision-log",
+  "docId": "clone-0123456789abcdef/19",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "19 決策紀錄",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "DEC-001",
+      "key": "DEC:0001",
+      "lifecycle": "ACTIVE",
+      "basis": "HUMAN_DECISION",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0064"
+      ],
+      "title": "不重建「核准後重開為草稿」",
+      "context": "Q-002：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
+      "decision": "不重建。",
+      "rationale": "這是管理者以特殊參數做的資料維護，不是業務流程；STATUS 文件不納入。",
+      "decidedBy": "業務單位主管",
+      "decidedOn": "2026-10-08",
+      "status": "ACCEPTED",
+      "resolves": [
+        "Q-002"
+      ],
+      "affects": [
+        "OBJ-007"
+      ],
+      "effect": "DROP"
+    }
+  ]
+}

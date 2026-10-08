@@ -1,0 +1,550 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "01-overview",
+  "docId": "clone-0123456789abcdef/01",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "01 專案概覽",
+  "summary": "目標 1、決策責任 2、物件 22；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "PROJECT_INPUT",
+      "ref": "project.md",
+      "fingerprint": "67ab56b97948fca6c828cb753757416f5174e497ba3c5df958523b0441043eb3"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/01-overview",
+      "fingerprint": "c9aedef9ca2ad6570175bc543ac5b7e617fc590747c5f6fb3b3838e351252e8f"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "NOT_APPLICABLE"
+  },
+  "openQuestions": [],
+  "projectInputStatus": "PROVIDED",
+  "items": [
+    {
+      "id": "GOAL-001",
+      "key": "GOAL:01",
+      "lifecycle": "ACTIVE",
+      "basis": "PROJECT_INPUT",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0001"
+      ],
+      "name": "取代舊的申請審核功能",
+      "statement": "以新系統取代舊的申請審核功能，狀態流程與審核規則維持不變。",
+      "successCriteria": [
+        "狀態圖上每條轉移在新系統都可操作，結果與 04、09 的規格一致。",
+        "14 的測試案例全數通過。"
+      ]
+    },
+    {
+      "id": "RESP-001",
+      "key": "RESP:QUESTION_RESOLUTION",
+      "lifecycle": "ACTIVE",
+      "basis": "PROJECT_INPUT",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "area": "QUESTION_RESOLUTION",
+      "holder": "業務承辦窗口"
+    },
+    {
+      "id": "RESP-002",
+      "key": "RESP:SPEC_APPROVAL",
+      "lifecycle": "ACTIVE",
+      "basis": "PROJECT_INPUT",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "area": "SPEC_APPROVAL",
+      "holder": "業務單位主管"
+    },
+    {
+      "id": "OBJ-001",
+      "key": "AE:TW_DEMO_NTFY",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0024",
+        "EV-0029"
+      ],
+      "objectType": "AE",
+      "objectName": "TW_DEMO_NTFY",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_REQ.SavePostChange 在送出成功後排入",
+      "usedByRefs": [
+        "OBJ-008"
+      ],
+      "condition": "送出（010／015→020）成功後",
+      "reason": "送審通知"
+    },
+    {
+      "id": "OBJ-002",
+      "key": "COMPONENT:TW_DEMO_APV",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005"
+      ],
+      "objectType": "COMPONENT",
+      "objectName": "TW_DEMO_APV",
+      "inclusion": "CORE",
+      "usedBy": "使用者指定的根",
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "使用者指定的核心 Component（主管審核）"
+    },
+    {
+      "id": "OBJ-003",
+      "key": "COMPONENT:TW_DEMO_REQ",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004"
+      ],
+      "objectType": "COMPONENT",
+      "objectName": "TW_DEMO_REQ",
+      "inclusion": "CORE",
+      "usedBy": "使用者指定的根",
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "使用者指定的核心 Component（申請）"
+    },
+    {
+      "id": "OBJ-004",
+      "key": "MESSAGE_SET:27000",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0009"
+      ],
+      "objectType": "MESSAGE_SET",
+      "objectName": "27000",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "核心 PeopleCode 以 MsgGet 讀取",
+      "condition": "檢核失敗時",
+      "reason": "提供四則錯誤訊息原文"
+    },
+    {
+      "id": "OBJ-005",
+      "key": "PAGE:TW_DEMO_APVPG",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005"
+      ],
+      "objectType": "PAGE",
+      "objectName": "TW_DEMO_APVPG",
+      "inclusion": "CORE",
+      "parent": "OBJ-002",
+      "usedBy": "TW_DEMO_APV 的主頁",
+      "usedByRefs": [
+        "OBJ-002"
+      ],
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "審核畫面"
+    },
+    {
+      "id": "OBJ-006",
+      "key": "PAGE:TW_DEMO_REQPG",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004"
+      ],
+      "objectType": "PAGE",
+      "objectName": "TW_DEMO_REQPG",
+      "inclusion": "CORE",
+      "parent": "OBJ-003",
+      "usedBy": "TW_DEMO_REQ 的主頁",
+      "usedByRefs": [
+        "OBJ-003"
+      ],
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "申請畫面"
+    },
+    {
+      "id": "OBJ-007",
+      "key": "PEOPLECODE:TW_DEMO_APV.PostBuild",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0025"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_APV.PostBuild",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_APV 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "載入時處理（含圖外的重開邏輯）",
+      "pcEvent": "POST_BUILD"
+    },
+    {
+      "id": "OBJ-008",
+      "key": "PEOPLECODE:TW_DEMO_REQ.SavePostChange",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0024"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQ.SavePostChange",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_REQ 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "送出後排入通知",
+      "pcEvent": "SAVE_POST_CHANGE"
+    },
+    {
+      "id": "OBJ-009",
+      "key": "PEOPLECODE:TW_DEMO_REQ.SavePreChange",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0023"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQ.SavePreChange",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_REQ 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "新單取號",
+      "pcEvent": "SAVE_PRE_CHANGE"
+    },
+    {
+      "id": "OBJ-010",
+      "key": "PEOPLECODE:TW_DEMO_REQHDR.AMOUNT.SaveEdit",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0021"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQHDR.AMOUNT.SaveEdit",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_REQ 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "金額檢核",
+      "pcEvent": "SAVE_EDIT"
+    },
+    {
+      "id": "OBJ-011",
+      "key": "PEOPLECODE:TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0022"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_REQ 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "申請人預設",
+      "pcEvent": "FIELD_DEFAULT"
+    },
+    {
+      "id": "OBJ-012",
+      "key": "PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0018"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_APV 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "核准",
+      "pcEvent": "FIELD_CHANGE"
+    },
+    {
+      "id": "OBJ-013",
+      "key": "PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_APV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0020"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQWRK.RETURN_PB.FieldChange",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_APV 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "退回",
+      "pcEvent": "FIELD_CHANGE"
+    },
+    {
+      "id": "OBJ-014",
+      "key": "PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0016"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_REQ 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "送出",
+      "pcEvent": "FIELD_CHANGE"
+    },
+    {
+      "id": "OBJ-015",
+      "key": "PEOPLECODE:TW_DEMO_REQWRK.WITHDRAW_PB.FieldChange",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0006",
+        "EV-0017"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_REQWRK.WITHDRAW_PB.FieldChange",
+      "inclusion": "CORE",
+      "usedBy": "掛在 TW_DEMO_REQ 核心路徑上的程式",
+      "condition": {
+        "na": "事件觸發即執行"
+      },
+      "reason": "撤回",
+      "pcEvent": "FIELD_CHANGE"
+    },
+    {
+      "id": "OBJ-016",
+      "key": "RECORD:TW_DEMO_DEPT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0027",
+        "EV-0015"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_DEPT",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "高額案件（025）核准時查申請人部門的主管",
+      "usedByRefs": [
+        "OBJ-012"
+      ],
+      "condition": "狀態 025 的核准與退回、審核清單查詢",
+      "reason": "只提供部門主管的最小介面",
+      "fieldUsage": {
+        "noneExcludable": {
+          "checkedOn": "2026-10-01"
+        }
+      }
+    },
+    {
+      "id": "OBJ-017",
+      "key": "RECORD:TW_DEMO_EMP",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0026",
+        "EV-0014"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_EMP",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "送出、核准、退回時查申請人的直屬主管與部門；審核清單的資料範圍",
+      "usedByRefs": [
+        "OBJ-014",
+        "OBJ-012"
+      ],
+      "condition": "送出、審核清單查詢、核准、退回時",
+      "reason": "只提供直屬主管與部門的最小介面",
+      "fieldUsage": {
+        "noneExcludable": {
+          "checkedOn": "2026-10-01"
+        }
+      }
+    },
+    {
+      "id": "OBJ-018",
+      "key": "RECORD:TW_DEMO_REQHDR",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_REQHDR",
+      "inclusion": "CORE",
+      "usedBy": "兩個主頁的主要 Record",
+      "usedByRefs": [
+        "OBJ-006",
+        "OBJ-005"
+      ],
+      "condition": {
+        "na": "兩頁一律讀寫"
+      },
+      "reason": "申請單主檔",
+      "fieldUsage": {
+        "excluded": {
+          "count": 2
+        }
+      }
+    },
+    {
+      "id": "OBJ-019",
+      "key": "RECORD:TW_DEMO_REQWRK",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_REQWRK",
+      "inclusion": "CORE",
+      "usedBy": "按鈕所在的工作記錄",
+      "usedByRefs": [
+        "OBJ-006",
+        "OBJ-005"
+      ],
+      "condition": {
+        "na": "頁面載入即存在"
+      },
+      "reason": "承載送出、撤回、核准、退回四個按鈕事件",
+      "fieldUsage": {
+        "undetermined": {
+          "code": "NO_TABLE",
+          "note": "工作記錄沒有實體表，欄位都是按鈕"
+        }
+      }
+    },
+    {
+      "id": "OBJ-020",
+      "key": "ROLE:TW_DEMO_APPROVER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008"
+      ],
+      "objectType": "ROLE",
+      "objectName": "TW_DEMO_APPROVER",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_APV 的元件權限",
+      "condition": "進入審核畫面時",
+      "reason": "審核主管角色"
+    },
+    {
+      "id": "OBJ-021",
+      "key": "ROLE:TW_DEMO_REQUESTER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0008"
+      ],
+      "objectType": "ROLE",
+      "objectName": "TW_DEMO_REQUESTER",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_REQ 的元件權限",
+      "condition": "進入申請畫面時",
+      "reason": "申請人角色"
+    },
+    {
+      "id": "OBJ-022",
+      "key": "SECONDARY_PAGE:TW_DEMO_REQSEC",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0010"
+      ],
+      "objectType": "SECONDARY_PAGE",
+      "objectName": "TW_DEMO_REQSEC",
+      "inclusion": "EXCLUDED",
+      "parent": "OBJ-003",
+      "usedBy": "TW_DEMO_REQ 內有定義，但頁面上沒有按鈕、連結或程式會開啟它",
+      "condition": {
+        "na": "核心路徑不會進入"
+      },
+      "reason": "元件內存在、核心路徑沒有入口"
+    }
+  ]
+}

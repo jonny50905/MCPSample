@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "19-decision-log",
+  "docId": "clone-0123456789abcdef/19",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "19 決策紀錄",
+  "summary": "決策 1",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "90-questions"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "HUMAN_DECISION",
+      "ref": "decisions.md",
+      "fingerprint": "74ebadd01b938b98cb3a5aacb43a98122bab16f9e181a76c4922041ec8c1e863"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "NOT_APPLICABLE",
+    "L4": "NOT_APPLICABLE",
+    "L5": "NOT_APPLICABLE"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "DEC-001",
+      "key": "DEC:0001",
+      "lifecycle": "ACTIVE",
+      "basis": "HUMAN_DECISION",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0064"
+      ],
+      "title": "不重建「核准後重開為草稿」",
+      "context": "Q-002：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
+      "options": [
+        {
+          "option": "不重建",
+          "consequence": "新系統沒有重開功能；需要時以資料維護處理。"
+        },
+        {
+          "option": "補進 STATUS 文件並重建",
+          "consequence": "狀態圖新增 030→010，04、02、08、14 要補對應項目。"
+        }
+      ],
+      "decision": "不重建。",
+      "rationale": "這是管理者以特殊參數做的資料維護，不是業務流程；STATUS 文件不納入。",
+      "decidedBy": "業務單位主管",
+      "decidedOn": "2026-10-08",
+      "status": "ACCEPTED",
+      "resolves": [
+        "Q-002"
+      ],
+      "affects": [
+        "OBJ-007"
+      ],
+      "effect": "DROP"
+    }
+  ]
+}

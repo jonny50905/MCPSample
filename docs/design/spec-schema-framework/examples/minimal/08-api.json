@@ -1,0 +1,144 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "08-api",
+  "docId": "clone-0123456789abcdef/08",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "08 操作契約（API）",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "OP-004",
+      "key": "TW_DEMO_REQ:SUBMIT:SUBMIT",
+      "lifecycle": "ACTIVE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0016"
+      ],
+      "derivedFrom": [
+        "FR-004"
+      ],
+      "fr": "FR-004",
+      "name": "送出申請",
+      "opKind": "TRANSITION",
+      "invokedFrom": [
+        "UI-011"
+      ],
+      "authorization": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-002"
+            }
+          },
+          {
+            "left": {
+              "fld": "FLD-015"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "inputs": [
+        {
+          "name": "REQ_ID",
+          "field": "FLD-016",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_STATUS",
+          "field": "FLD-017"
+        }
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "validations": [
+        "BR-006"
+      ],
+      "effects": {
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ],
+        "writes": [
+          {
+            "field": "FLD-010",
+            "value": {
+              "param": "AMOUNT"
+            }
+          },
+          {
+            "field": "FLD-014",
+            "value": {
+              "param": "REASON"
+            }
+          }
+        ],
+        "interfaces": [
+          "IF-001"
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "單一列更新（TW_DEMO_REQHDR）；通知在交易提交後才排入。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "STALE_DATA_CHECK",
+          "legacyBehavior": "開啟後到存檔之間若資料已被他人更新，存檔被拒絕並顯示訊息，該筆維持先存檔者的結果，本次輸入不寫入。",
+          "message": "MSG-004"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "送出後按鈕隱藏；同一張單不能重複送出。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "OBJ-014",
+        "events": [
+          "FieldChange",
+          "SaveEdit",
+          "SavePostChange"
+        ]
+      }
+    }
+  ]
+}

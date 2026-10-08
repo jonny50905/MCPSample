@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "07-database",
+  "docId": "clone-0123456789abcdef/07",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "07 資料設計",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "ENT-003",
+      "key": "TW_DEMO_REQHDR",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "record": "OBJ-018",
+      "name": "申請單",
+      "businessMeaning": "一張申請單一列；狀態、金額、事由與審核結果都在這裡。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_REQHDR",
+      "keys": [
+        "FLD-016"
+      ],
+      "effectiveDating": {
+        "kind": "NONE"
+      }
+    },
+    {
+      "id": "FLD-010",
+      "key": "TW_DEMO_REQHDR.AMOUNT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "AMOUNT",
+      "label": "金額",
+      "dataType": "NUMBER",
+      "length": 11,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "DRV-002",
+      "key": "REQUESTER_SUPERVISOR",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0026"
+      ],
+      "name": "申請人的直屬主管",
+      "meaning": "申請人目前任職資料上登記的直屬主管；送出時必須存在，020 由此人審核。",
+      "inputs": [
+        {
+          "name": "REQUESTER",
+          "from": {
+            "fld": "FLD-015"
+          }
+        }
+      ],
+      "resultType": "PERSON_ID",
+      "resolution": {
+        "sources": [
+          "ENT-002"
+        ],
+        "joins": [
+          {
+            "left": "FLD-008",
+            "right": {
+              "param": "REQUESTER"
+            }
+          }
+        ],
+        "filter": "ALWAYS",
+        "effectiveDating": [
+          {
+            "entity": "ENT-002",
+            "rule": "CURRENT_ROW",
+            "asOf": {
+              "ctx": "CURRENT_DATE"
+            },
+            "effStatusActiveOnly": true
+          }
+        ],
+        "pick": "FLD-009",
+        "tieBreak": {
+          "na": "鍵（EMPLID＋EFFDT）加目前有效列規則保證只有一列"
+        }
+      },
+      "whenNotFound": {
+        "result": "EMPTY",
+        "note": "查無目前有效的任職列，或 SUPERVISOR_ID 為空白時結果為空；送出時由 09 的規則擋下。"
+      },
+      "whenMultiple": {
+        "rule": "UNIQUE_BY_KEY",
+        "note": "目前有效列規則下每位員工只有一列。"
+      },
+      "implementedAt": [
+        "OBJ-014"
+      ]
+    },
+    {
+      "id": "XF-001",
+      "key": "TW_DEMO_REQHDR",
+      "lifecycle": "ACTIVE",
+      "basis": "DATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0012",
+        "EV-0013"
+      ],
+      "entity": "ENT-003",
+      "fields": [
+        "OLD_REF_NO"
+      ],
+      "dataCheck": "非預設 0 筆（全表非空，查詢日 2026-10-01）",
+      "codeChecks": {
+        "a": "PeopleCode 交叉參照：核心路徑沒有指名引用。",
+        "b": "核心路徑沒有 AE、SQR 或 SQL 物件讀寫這兩欄。",
+        "c": "既有研究文件沒有指名引用的紀錄。"
+      }
+    }
+  ]
+}

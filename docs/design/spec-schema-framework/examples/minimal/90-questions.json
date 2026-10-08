@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "90-questions",
+  "docId": "clone-0123456789abcdef/90",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "90 問題清單",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "suppressed": {
+    "definitionOnlyCount": 0,
+    "definitionOnlyCodes": []
+  },
+  "items": [
+    {
+      "id": "Q-001",
+      "key": "OFF_DIAGRAM_STATE:REQ_STATUS:099",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0011"
+      ],
+      "category": "OFF_DIAGRAM_STATE",
+      "severity": "INFO",
+      "grade": "HIGH",
+      "question": "PROD 有 REQ_STATUS＝099 的資料，但狀態圖沒有這個狀態。是歷史資料（只需資料移轉對應），還是狀態圖漏畫？",
+      "affects": [
+        "FLD-017"
+      ],
+      "observed": {
+        "entityKey": "REQ_STATUS",
+        "code": "099"
+      },
+      "raisedBy": "RESEARCH",
+      "status": "OPEN"
+    }
+  ]
+}

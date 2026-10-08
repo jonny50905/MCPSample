@@ -1,0 +1,1342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:common",
+  "title": "共同定義（Layer A）",
+  "description": "所有 canonical 文件共用：文件外殼、項目共同欄位、值三態、條件式、證據與 ID 參照。",
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^\\s*(UNKNOWN|Unknown|unknown|TODO|TBD|N/A|n/a|NA|NULL|null|NONE|None|none|-+|—+|待確認|待補|待查|不明|未知|同上|略|無資料)\\s*$"
+          },
+          {
+            "pattern": "(TODO|TBD|待確認|待補|同上|依\\s*PeopleSoft\\s*標準|見\\s*NN)"
+          }
+        ]
+      },
+      "description": "敘述性文字（繁體中文為主）。不得是空白或填充字（UNKNOWN、TODO、N/A、待確認、同上、見 NN…）。"
+    },
+    "rawText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "pattern": "\\S",
+      "description": "原文字串（技術名稱、原始訊息、畫面文字、狀態圖標籤），不檢查填充字。"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,59}$",
+      "description": "大寫 ASCII 代號。"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "componentName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.$#-]{0,59}$",
+      "description": "Component 原名（與 ps-spec-author 的輸入規則相同）。"
+    },
+    "psName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_$#@][A-Za-z0-9_$#@.:-]*$",
+      "description": "PeopleSoft 物件原名；PeopleCode 程式用 <物件>.<欄位>.<事件> 形式。"
+    },
+    "refGOAL": {
+      "type": "string",
+      "pattern": "^GOAL-\\d{3,}$",
+      "description": "參照 專案目標（GOAL）。"
+    },
+    "refRESP": {
+      "type": "string",
+      "pattern": "^RESP-\\d{3,}$",
+      "description": "參照 決策責任（RESP）。"
+    },
+    "refOBJ": {
+      "type": "string",
+      "pattern": "^OBJ-\\d{3,}$",
+      "description": "參照 舊系統物件（OBJ）。"
+    },
+    "refAI": {
+      "type": "string",
+      "pattern": "^AI-\\d{3,}$",
+      "description": "參照 AI 指引條款（AI）。"
+    },
+    "refENT": {
+      "type": "string",
+      "pattern": "^ENT-\\d{3,}$",
+      "description": "參照 資料實體（ENT）。"
+    },
+    "refFLD": {
+      "type": "string",
+      "pattern": "^FLD-\\d{3,}$",
+      "description": "參照 資料欄位（FLD）。"
+    },
+    "refDRV": {
+      "type": "string",
+      "pattern": "^DRV-\\d{3,}$",
+      "description": "參照 衍生概念（DRV）。"
+    },
+    "refXF": {
+      "type": "string",
+      "pattern": "^XF-\\d{3,}$",
+      "description": "參照 不建置原生欄位（XF）。"
+    },
+    "refROLE": {
+      "type": "string",
+      "pattern": "^ROLE-\\d{3,}$",
+      "description": "參照 角色（ROLE）。"
+    },
+    "refPERM": {
+      "type": "string",
+      "pattern": "^PERM-\\d{3,}$",
+      "description": "參照 權限（PERM）。"
+    },
+    "refSTATE": {
+      "type": "string",
+      "pattern": "^STATE-\\d{3,}$",
+      "description": "參照 狀態（STATE）。"
+    },
+    "refTRN": {
+      "type": "string",
+      "pattern": "^TRN-\\d{3,}$",
+      "description": "參照 狀態轉移（TRN）。"
+    },
+    "refFLOW": {
+      "type": "string",
+      "pattern": "^FLOW-\\d{3,}$",
+      "description": "參照 情境流程（FLOW）。"
+    },
+    "refIF": {
+      "type": "string",
+      "pattern": "^IF-\\d{3,}$",
+      "description": "參照 介面／批次（IF）。"
+    },
+    "refFR": {
+      "type": "string",
+      "pattern": "^FR-\\d{3,}$",
+      "description": "參照 功能需求（FR）。"
+    },
+    "refUI": {
+      "type": "string",
+      "pattern": "^UI-\\d{3,}$",
+      "description": "參照 畫面／元件（UI）。"
+    },
+    "refMSG": {
+      "type": "string",
+      "pattern": "^MSG-\\d{3,}$",
+      "description": "參照 訊息（MSG）。"
+    },
+    "refBR": {
+      "type": "string",
+      "pattern": "^BR-\\d{3,}$",
+      "description": "參照 業務規則（BR）。"
+    },
+    "refOP": {
+      "type": "string",
+      "pattern": "^OP-\\d{3,}$",
+      "description": "參照 操作契約（OP）。"
+    },
+    "refTC": {
+      "type": "string",
+      "pattern": "^TC-\\d{3,}$",
+      "description": "參照 測試案例（TC）。"
+    },
+    "refTASK": {
+      "type": "string",
+      "pattern": "^TASK-\\d{3,}$",
+      "description": "參照 工作項（TASK）。"
+    },
+    "refDOD": {
+      "type": "string",
+      "pattern": "^DOD-\\d{3,}$",
+      "description": "參照 完成條件（DOD）。"
+    },
+    "refQ": {
+      "type": "string",
+      "pattern": "^Q-\\d{3,}$",
+      "description": "參照 問題（Q）。"
+    },
+    "refDEC": {
+      "type": "string",
+      "pattern": "^DEC-\\d{3,}$",
+      "description": "參照 決策（DEC）。"
+    },
+    "refSpec": {
+      "type": "string",
+      "pattern": "^(GOAL|RESP|OBJ|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|IF|FR|UI|MSG|BR|OP|TC)-\\d{3,}$",
+      "description": "參照任一規格本體項目（不含 TASK／DOD／Q／DEC／AI）。"
+    },
+    "evRef": {
+      "type": "string",
+      "pattern": "^EV-\\d{4,}$",
+      "description": "證據 ID（evidence.json）。"
+    },
+    "itemId": {
+      "type": "string",
+      "pattern": "^(GOAL|RESP|OBJ|AI|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|IF|FR|UI|MSG|BR|OP|TC|TASK|DOD|Q|DEC)-\\d{3,}$"
+    },
+    "notApplicable": {
+      "type": "object",
+      "required": [
+        "na"
+      ],
+      "properties": {
+        "na": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/text"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/evRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "description": "經查證的「不適用」：必附理由；主張某行為不存在時須附證據。"
+    },
+    "unresolved": {
+      "type": "object",
+      "required": [
+        "unresolved"
+      ],
+      "properties": {
+        "unresolved": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/refQ"
+        }
+      },
+      "additionalProperties": false,
+      "description": "查不清的事實：指向 90 問題清單的 Q 項目（研究包內為缺口說明，外環轉成 Q）。"
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "fld": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+            }
+          },
+          "required": [
+            "fld"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "drv": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+            }
+          },
+          "required": [
+            "drv"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "state": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refROLE"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "const": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "CHAR",
+                "NUMBER",
+                "DATE",
+                "DATETIME",
+                "BOOLEAN"
+              ]
+            }
+          },
+          "required": [
+            "const",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ctx": {
+              "type": "string",
+              "enum": [
+                "CURRENT_USER_OPRID",
+                "CURRENT_USER_EMPLID",
+                "CURRENT_DATE",
+                "CURRENT_DATETIME",
+                "CURRENT_MODE",
+                "CURRENT_ACTION"
+              ]
+            }
+          },
+          "required": [
+            "ctx"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "param": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+            }
+          },
+          "required": [
+            "param"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "dataOperand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "fld": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+            }
+          },
+          "required": [
+            "fld"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "drv": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+            }
+          },
+          "required": [
+            "drv"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "const": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "CHAR",
+                "NUMBER",
+                "DATE",
+                "DATETIME",
+                "BOOLEAN"
+              ]
+            }
+          },
+          "required": [
+            "const",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ctx": {
+              "type": "string",
+              "enum": [
+                "CURRENT_USER_OPRID",
+                "CURRENT_USER_EMPLID",
+                "CURRENT_DATE",
+                "CURRENT_DATETIME",
+                "CURRENT_MODE",
+                "CURRENT_ACTION"
+              ]
+            }
+          },
+          "required": [
+            "ctx"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "param": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+            }
+          },
+          "required": [
+            "param"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "required": [
+        "left",
+        "op"
+      ],
+      "properties": {
+        "left": {
+          "$ref": "#/$defs/operand"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "IS_BLANK",
+            "IS_NOT_BLANK",
+            "EXISTS",
+            "NOT_EXISTS",
+            "CHANGED",
+            "EQ",
+            "NE",
+            "GT",
+            "GE",
+            "LT",
+            "LE",
+            "IN",
+            "NOT_IN",
+            "BETWEEN",
+            "HAS_ROLE"
+          ]
+        },
+        "right": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/operand"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/operand"
+              },
+              "minItems": 1
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "IS_BLANK",
+                  "IS_NOT_BLANK",
+                  "EXISTS",
+                  "NOT_EXISTS",
+                  "CHANGED"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "right"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "EQ",
+                  "NE",
+                  "GT",
+                  "GE",
+                  "LT",
+                  "LE",
+                  "IN",
+                  "NOT_IN",
+                  "BETWEEN",
+                  "HAS_ROLE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "right"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "IN",
+                  "NOT_IN"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "right": {
+                "type": "array"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "BETWEEN"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "right": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "EQ",
+                  "NE",
+                  "GT",
+                  "GE",
+                  "LT",
+                  "LE",
+                  "HAS_ROLE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "right": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dataPredicate": {
+      "type": "object",
+      "required": [
+        "left",
+        "op"
+      ],
+      "properties": {
+        "left": {
+          "$ref": "#/$defs/dataOperand"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "IS_BLANK",
+            "IS_NOT_BLANK",
+            "EXISTS",
+            "NOT_EXISTS",
+            "CHANGED",
+            "EQ",
+            "NE",
+            "GT",
+            "GE",
+            "LT",
+            "LE",
+            "IN",
+            "NOT_IN",
+            "BETWEEN",
+            "HAS_ROLE"
+          ]
+        },
+        "right": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/dataOperand"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/dataOperand"
+              },
+              "minItems": 1
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "IS_BLANK",
+                  "IS_NOT_BLANK",
+                  "EXISTS",
+                  "NOT_EXISTS",
+                  "CHANGED"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "right"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "EQ",
+                  "NE",
+                  "GT",
+                  "GE",
+                  "LT",
+                  "LE",
+                  "IN",
+                  "NOT_IN",
+                  "BETWEEN",
+                  "HAS_ROLE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "right"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "IN",
+                  "NOT_IN"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "right": {
+                "type": "array"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "BETWEEN"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "right": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "EQ",
+                  "NE",
+                  "GT",
+                  "GE",
+                  "LT",
+                  "LE",
+                  "HAS_ROLE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "right": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "const": "ALWAYS"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "all": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              },
+              "minItems": 2
+            }
+          },
+          "required": [
+            "all"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "any": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              },
+              "minItems": 2
+            }
+          },
+          "required": [
+            "any"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/condition"
+            }
+          },
+          "required": [
+            "not"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/predicate"
+        }
+      ]
+    },
+    "dataCondition": {
+      "oneOf": [
+        {
+          "const": "ALWAYS"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "all": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/dataCondition"
+              },
+              "minItems": 2
+            }
+          },
+          "required": [
+            "all"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "any": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/dataCondition"
+              },
+              "minItems": 2
+            }
+          },
+          "required": [
+            "any"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/dataCondition"
+            }
+          },
+          "required": [
+            "not"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/dataPredicate"
+        }
+      ]
+    },
+    "assignment": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "urn:ps-spec:schema:common#/$defs/operand"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "expr": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                }
+              },
+              "required": [
+                "expr"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "when": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+        }
+      },
+      "required": [
+        "field",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "evidenceItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "locator",
+        "excerpt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/evRef"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "CHUNK",
+            "SQL",
+            "NN",
+            "WIKI",
+            "STATUS_DOC",
+            "PROJECT_INPUT",
+            "METADATA_RECEIPT",
+            "HUMAN_DECISION"
+          ]
+        },
+        "locator": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+        },
+        "excerpt": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\n]*(\\n[^\\n]*){0,4}$",
+          "description": "關鍵摘錄，最多 5 行。"
+        },
+        "capturedOn": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/date"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "CHUNK"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "SQL"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "^\\s*(SELECT|WITH)\\b(?![\\s\\S]*;\\s*\\S)"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "NN",
+                  "WIKI",
+                  "STATUS_DOC",
+                  "PROJECT_INPUT",
+                  "HUMAN_DECISION"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "#L\\d+(-L?\\d+)?$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "itemBase": {
+      "type": "object",
+      "required": [
+        "id",
+        "key",
+        "lifecycle",
+        "basis",
+        "certainty",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemId"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^\\S(.*\\S)?$"
+        },
+        "lifecycle": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "RETIRED",
+            "PENDING"
+          ]
+        },
+        "component": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/componentName"
+        },
+        "basis": {
+          "type": "string",
+          "enum": [
+            "AUTHORITATIVE_DOC",
+            "CODE",
+            "DATA",
+            "METADATA",
+            "KNOWLEDGE",
+            "PROJECT_INPUT",
+            "HUMAN_DECISION",
+            "DERIVED",
+            "COMPUTED",
+            "TEMPLATE"
+          ]
+        },
+        "certainty": {
+          "type": "string",
+          "enum": [
+            "CONFIRMED",
+            "INFERRED"
+          ]
+        },
+        "inference": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/text"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/evRef"
+          },
+          "uniqueItems": true
+        },
+        "derivedFrom": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/refSpec"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "certainty"
+            ],
+            "properties": {
+              "certainty": {
+                "const": "INFERRED"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "inference"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "basis"
+            ],
+            "properties": {
+              "basis": {
+                "enum": [
+                  "AUTHORITATIVE_DOC",
+                  "CODE",
+                  "DATA",
+                  "METADATA",
+                  "KNOWLEDGE",
+                  "PROJECT_INPUT",
+                  "HUMAN_DECISION"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "basis"
+            ],
+            "properties": {
+              "basis": {
+                "const": "DERIVED"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "derivedFrom"
+            ]
+          }
+        }
+      ]
+    },
+    "envelope": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "docType",
+        "docId",
+        "jobId",
+        "revision",
+        "status",
+        "title",
+        "summary",
+        "components",
+        "dependsOn",
+        "sources",
+        "gate",
+        "openQuestions",
+        "items"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "docType": {
+          "type": "string",
+          "enum": [
+            "01-overview",
+            "02-functional-requirements",
+            "03-roles-permissions",
+            "04-workflow",
+            "05-ui",
+            "06-architecture",
+            "07-database",
+            "08-api",
+            "09-business-logic",
+            "14-testing",
+            "16-ai-instructions",
+            "17-tasks",
+            "18-definition-of-done",
+            "19-decision-log",
+            "90-questions"
+          ]
+        },
+        "docId": {
+          "type": "string",
+          "pattern": "^clone-[0-9a-f]{16}/(01|02|03|04|05|06|07|08|09|14|16|17|18|19|90)$"
+        },
+        "jobId": {
+          "type": "string",
+          "pattern": "^clone-[0-9a-f]{16}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^r\\d{4}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "in_review",
+            "approved",
+            "superseded"
+          ]
+        },
+        "title": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+        },
+        "summary": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/componentName"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "01-overview",
+              "02-functional-requirements",
+              "03-roles-permissions",
+              "04-workflow",
+              "05-ui",
+              "06-architecture",
+              "07-database",
+              "08-api",
+              "09-business-logic",
+              "14-testing",
+              "16-ai-instructions",
+              "17-tasks",
+              "18-definition-of-done",
+              "19-decision-log",
+              "90-questions"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "STATUS_DOC",
+                  "PROJECT_INPUT",
+                  "HUMAN_DECISION",
+                  "KNOWLEDGE",
+                  "RESEARCH_RECEIPT",
+                  "FRAMEWORK"
+                ]
+              },
+              "ref": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+              },
+              "fingerprint": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/sha256"
+              }
+            },
+            "required": [
+              "kind",
+              "ref",
+              "fingerprint"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "gate": {
+          "type": "object",
+          "properties": {
+            "L1": {
+              "type": "string",
+              "enum": [
+                "PASS",
+                "FAIL",
+                "NOT_RUN",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "L2": {
+              "type": "string",
+              "enum": [
+                "PASS",
+                "FAIL",
+                "NOT_RUN",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "L3": {
+              "type": "string",
+              "enum": [
+                "PASS",
+                "FAIL",
+                "NOT_RUN",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "L4": {
+              "type": "string",
+              "enum": [
+                "PASS",
+                "FAIL",
+                "NOT_RUN",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "L5": {
+              "type": "string",
+              "enum": [
+                "PASS",
+                "FAIL",
+                "NOT_RUN",
+                "NOT_APPLICABLE"
+              ]
+            }
+          },
+          "required": [
+            "L1",
+            "L2",
+            "L3",
+            "L4",
+            "L5"
+          ],
+          "additionalProperties": false
+        },
+        "openQuestions": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/refQ"
+          },
+          "uniqueItems": true
+        },
+        "approval": {
+          "type": "object",
+          "properties": {
+            "approvedBy": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text"
+            },
+            "approvedOn": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/date"
+            },
+            "docHash": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/sha256"
+            }
+          },
+          "required": [
+            "approvedBy",
+            "approvedOn",
+            "docHash"
+          ],
+          "additionalProperties": false
+        },
+        "items": {
+          "type": "array"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "const": "approved"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "approval"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "90-questions",
+  "docId": "clone-0123456789abcdef/90",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "90 問題清單",
+  "summary": "問題 3（OPEN 1、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "07-database",
+    "08-api"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/90-questions",
+      "fingerprint": "500fc0d0ee6be711e9e86795ad783ce0beb9bc586d944d9b0fa9513da7615055"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "NOT_APPLICABLE",
+    "L4": "NOT_APPLICABLE",
+    "L5": "NOT_APPLICABLE"
+  },
+  "openQuestions": [],
+  "suppressed": {
+    "definitionOnlyCount": 2,
+    "definitionOnlyCodes": [
+      {
+        "entityKey": "REQ_STATUS",
+        "code": "040"
+      },
+      {
+        "entityKey": "REQ_STATUS",
+        "code": "050"
+      }
+    ]
+  },
+  "items": [
+    {
+      "id": "Q-001",
+      "key": "OFF_DIAGRAM_STATE:REQ_STATUS:099",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0011"
+      ],
+      "category": "OFF_DIAGRAM_STATE",
+      "severity": "INFO",
+      "grade": "HIGH",
+      "question": "PROD 有 REQ_STATUS＝099 的資料，但狀態圖沒有這個狀態。是歷史資料（只需資料移轉對應），還是狀態圖漏畫？",
+      "affects": [
+        "FLD-017"
+      ],
+      "observed": {
+        "entityKey": "REQ_STATUS",
+        "code": "099"
+      },
+      "raisedBy": "RESEARCH",
+      "status": "OPEN"
+    },
+    {
+      "id": "Q-002",
+      "key": "OFF_DIAGRAM_TRANSITION:REQ_STATUS:030>010",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0025"
+      ],
+      "category": "OFF_DIAGRAM_TRANSITION",
+      "severity": "INFO",
+      "grade": "LOW",
+      "question": "TW_DEMO_APV.PostBuild 在特殊參數下會把 030 改回 010（核准後重開），狀態圖沒有這條轉移。要不要重建？",
+      "affects": [
+        "OBJ-007"
+      ],
+      "observed": {
+        "entityKey": "REQ_STATUS",
+        "from": "030",
+        "to": "010",
+        "location": "TW_DEMO_APV.PostBuild"
+      },
+      "raisedBy": "RESEARCH",
+      "status": "ANSWERED",
+      "proposedAnswer": "看起來是管理者的資料維護入口，不是業務流程。"
+    },
+    {
+      "id": "Q-003",
+      "key": "READER_UNDERSPECIFIED:TW_DEMO_APV:APPROVE:APPROVE#concurrency",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "READER_UNDERSPECIFIED",
+      "severity": "BLOCKING",
+      "question": "兩位審核者同時核准同一張單時，後存檔者看到什麼、資料變成怎樣，文件沒有說明（原文只寫「原系統有檢查」）。",
+      "affects": [
+        "OP-001"
+      ],
+      "raisedBy": "READER",
+      "status": "WITHDRAWN"
+    }
+  ]
+}

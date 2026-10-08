@@ -1,0 +1,389 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:08-api",
+  "title": "08 操作契約（API）",
+  "description": "項目型別：OP（操作契約）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "08-api"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/OP"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "OP": {
+      "type": "object",
+      "title": "OP（操作契約）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^OP-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_$#.-]+:[A-Z][A-Z0-9_]*:[A-Z][A-Z0-9_]*$",
+              "description": "自然鍵：<FR 鍵>:<操作代號>"
+            },
+            "fr": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refFR",
+              "description": "所屬功能",
+              "x-ref": [
+                "FR"
+              ]
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "操作名稱"
+            },
+            "opKind": {
+              "type": "string",
+              "enum": [
+                "LOAD",
+                "SEARCH",
+                "CREATE",
+                "UPDATE",
+                "TRANSITION",
+                "DELETE",
+                "LOOKUP",
+                "BATCH_RUN"
+              ],
+              "description": "操作種類"
+            },
+            "invokedFrom": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refUI"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "觸發的畫面元件",
+              "x-ref": [
+                "UI"
+              ]
+            },
+            "authorization": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/condition",
+              "description": "誰能執行",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE"
+              ]
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                  },
+                  "field": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                  },
+                  "drv": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "required"
+                ],
+                "additionalProperties": false
+              },
+              "description": "輸入",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "outputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                  },
+                  "field": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                  },
+                  "drv": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "description": "輸出",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "preconditions": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "前置條件",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE"
+              ]
+            },
+            "validations": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refBR"
+              },
+              "uniqueItems": true,
+              "description": "套用的檢核規則",
+              "x-ref": [
+                "BR"
+              ]
+            },
+            "effects": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "transitions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    },
+                    "writes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/assignment"
+                      }
+                    },
+                    "interfaces": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refIF"
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "writes"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "轉移、寫入、觸發的介面",
+              "x-ref": [
+                "TRN",
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "IF"
+              ]
+            },
+            "transaction": {
+              "type": "object",
+              "properties": {
+                "boundary": {
+                  "type": "string",
+                  "enum": [
+                    "SINGLE_UNIT",
+                    "MULTI_STEP",
+                    "READ_ONLY"
+                  ]
+                },
+                "writeOrder": {
+                  "anyOf": [
+                    {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                    },
+                    {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                    }
+                  ]
+                },
+                "onFailure": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "ROLLBACK_ALL",
+                        "PARTIAL_COMMIT",
+                        "NOT_APPLICABLE"
+                      ]
+                    },
+                    "note": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "note"
+                  ],
+                  "additionalProperties": false
+                },
+                "concurrency": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "strategy": {
+                          "type": "string",
+                          "enum": [
+                            "LAST_WRITE_WINS",
+                            "STALE_DATA_CHECK",
+                            "ROW_LOCK",
+                            "NOT_APPLICABLE"
+                          ]
+                        },
+                        "legacyBehavior": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                        },
+                        "message": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/refMSG"
+                        }
+                      },
+                      "required": [
+                        "strategy",
+                        "legacyBehavior"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                    }
+                  ]
+                },
+                "idempotency": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "repeatable": {
+                          "type": "boolean"
+                        },
+                        "behavior": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                        }
+                      },
+                      "required": [
+                        "repeatable",
+                        "behavior"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "boundary",
+                "writeOrder",
+                "onFailure",
+                "concurrency",
+                "idempotency"
+              ],
+              "additionalProperties": false,
+              "description": "交易語意",
+              "x-ref": [
+                "MSG"
+              ]
+            },
+            "legacyOrigin": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "object",
+                "events"
+              ],
+              "additionalProperties": false,
+              "description": "原系統對應的物件與事件鏈",
+              "x-ref": [
+                "OBJ"
+              ]
+            }
+          },
+          "required": [
+            "fr",
+            "name",
+            "opKind",
+            "invokedFrom",
+            "authorization",
+            "inputs",
+            "outputs",
+            "preconditions",
+            "validations",
+            "effects",
+            "transaction",
+            "legacyOrigin"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

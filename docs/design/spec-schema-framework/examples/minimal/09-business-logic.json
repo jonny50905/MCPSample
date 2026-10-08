@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "09-business-logic",
+  "docId": "clone-0123456789abcdef/09",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "09 業務邏輯",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "programDispositions": [],
+  "items": [
+    {
+      "id": "MSG-003",
+      "key": "27000,3",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0009"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 3,
+      "text": "找不到直屬主管，無法送出。",
+      "severity": "ERROR"
+    },
+    {
+      "id": "BR-006",
+      "key": "TW_DEMO_REQWRK.SUBMIT_PB.FieldChange:SUPERVISOR_REQUIRED",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0016"
+      ],
+      "name": "送出時申請人必須有直屬主管",
+      "brKind": "VALIDATION",
+      "appliesTo": [
+        "FR-004"
+      ],
+      "trigger": {
+        "event": "FIELD_CHANGE",
+        "control": "UI-011",
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ]
+      },
+      "condition": {
+        "left": {
+          "drv": "DRV-002"
+        },
+        "op": "NOT_EXISTS"
+      },
+      "action": {
+        "kind": "REJECT",
+        "message": "MSG-003"
+      },
+      "order": 1,
+      "boundaries": "SUPERVISOR_ID 為空白（單一空白）視同找不到。",
+      "modeDifferences": {
+        "na": "只在按送出時檢查"
+      },
+      "implementedAt": {
+        "object": "OBJ-014",
+        "event": "FieldChange"
+      }
+    }
+  ]
+}

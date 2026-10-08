@@ -1,0 +1,394 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:01-overview",
+  "title": "01 專案概覽",
+  "description": "項目型別：GOAL（專案目標）、RESP（決策責任）、OBJ（舊系統物件）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "01-overview"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/GOAL"
+              },
+              {
+                "$ref": "#/$defs/RESP"
+              },
+              {
+                "$ref": "#/$defs/OBJ"
+              }
+            ]
+          }
+        },
+        "projectInputStatus": {
+          "type": "string",
+          "enum": [
+            "PROVIDED",
+            "NOT_PROVIDED"
+          ],
+          "description": "專案輸入檔是否提供"
+        }
+      },
+      "required": [
+        "projectInputStatus"
+      ]
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "GOAL": {
+      "type": "object",
+      "title": "GOAL（專案目標）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^GOAL-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^GOAL:\\d{2,}$",
+              "description": "自然鍵：GOAL:<序號>"
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "目標名稱"
+            },
+            "statement": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "目標敘述"
+            },
+            "successCriteria": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/text"
+              },
+              "minItems": 1,
+              "description": "成功標準（可判定的敘述）"
+            }
+          },
+          "required": [
+            "name",
+            "statement",
+            "successCriteria"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "PROJECT_INPUT"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "RESP": {
+      "type": "object",
+      "title": "RESP（決策責任）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^RESP-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^RESP:[A-Z_]+$",
+              "description": "自然鍵：RESP:<範圍>"
+            },
+            "area": {
+              "type": "string",
+              "enum": [
+                "SPEC_APPROVAL",
+                "QUESTION_RESOLUTION",
+                "BUSINESS_RULE_OWNER",
+                "DATA_OWNER",
+                "OTHER"
+              ],
+              "description": "負責範圍"
+            },
+            "holder": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "負責者（不寫人名）"
+            }
+          },
+          "required": [
+            "area",
+            "holder"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "PROJECT_INPUT"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "OBJ": {
+      "type": "object",
+      "title": "OBJ（舊系統物件）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^OBJ-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z_]+:[A-Za-z0-9_$#@.:-]+$",
+              "description": "自然鍵：<物件型別>:<原名>"
+            },
+            "objectType": {
+              "type": "string",
+              "enum": [
+                "COMPONENT",
+                "PAGE",
+                "SUBPAGE",
+                "SECONDARY_PAGE",
+                "RECORD",
+                "PEOPLECODE",
+                "APP_PACKAGE",
+                "AE",
+                "SQR",
+                "SQC",
+                "SQL_OBJECT",
+                "MESSAGE_SET",
+                "PERMISSION_LIST",
+                "ROLE",
+                "QUERY",
+                "IB_SERVICE",
+                "FILE_LAYOUT",
+                "COMPONENT_INTERFACE",
+                "OTHER"
+              ],
+              "description": "物件型別"
+            },
+            "objectName": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/psName",
+              "description": "PeopleSoft 物件原名"
+            },
+            "inclusion": {
+              "type": "string",
+              "enum": [
+                "CORE",
+                "DEPENDENCY",
+                "EXCLUDED"
+              ],
+              "description": "範圍分類：入口與功能路徑＝CORE；被核心實際呼叫、讀寫、查值或授權所需＝DEPENDENCY；其餘＝EXCLUDED"
+            },
+            "parent": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ",
+              "description": "上層物件（Page 的 Component 等）",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "usedBy": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "使用鏈：呼叫者、方向與中間鏈（CORE 根寫「使用者指定的根」）"
+            },
+            "usedByRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+              },
+              "uniqueItems": true,
+              "description": "使用鏈上的物件",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "condition": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "何時使用"
+            },
+            "reason": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "納入／排除理由"
+            },
+            "pcEvent": {
+              "type": "string",
+              "enum": [
+                "FIELD_DEFAULT",
+                "FIELD_FORMULA",
+                "ROW_INIT",
+                "ROW_INSERT",
+                "ROW_DELETE",
+                "ROW_SELECT",
+                "FIELD_EDIT",
+                "FIELD_CHANGE",
+                "PREPOPUP",
+                "SAVE_EDIT",
+                "SAVE_PRE_CHANGE",
+                "WORKFLOW",
+                "SAVE_POST_CHANGE",
+                "SEARCH_INIT",
+                "SEARCH_SAVE",
+                "PRE_BUILD",
+                "POST_BUILD",
+                "ACTIVATE",
+                "BATCH_STEP"
+              ],
+              "description": "PEOPLECODE 物件的事件"
+            },
+            "fieldUsage": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "excluded": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "required": [
+                        "count"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "excluded"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "noneExcludable": {
+                      "type": "object",
+                      "properties": {
+                        "checkedOn": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/date"
+                        }
+                      },
+                      "required": [
+                        "checkedOn"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "noneExcludable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "undetermined": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NO_TABLE",
+                            "EMPTY_TABLE",
+                            "NOT_PROD",
+                            "TIMEOUT",
+                            "QUERY_FAILED",
+                            "CHECK_INCOMPLETE"
+                          ]
+                        },
+                        "note": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                        }
+                      },
+                      "required": [
+                        "code"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "undetermined"
+                  ],
+                  "additionalProperties": false
+                }
+              ],
+              "description": "原生欄位判定結論；type RECORD 且 CORE／DEPENDENCY 時必填"
+            }
+          },
+          "required": [
+            "objectType",
+            "objectName",
+            "inclusion",
+            "usedBy",
+            "condition",
+            "reason"
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "objectType",
+              "inclusion"
+            ],
+            "properties": {
+              "objectType": {
+                "const": "RECORD"
+              },
+              "inclusion": {
+                "enum": [
+                  "CORE",
+                  "DEPENDENCY"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "fieldUsage"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "fieldUsage"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

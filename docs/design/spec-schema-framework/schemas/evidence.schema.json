@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:evidence",
+  "title": "證據登錄（evidence.json）",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "revision",
+    "items"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^clone-[0-9a-f]{16}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^r\\d{4}$"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ps-spec:schema:common#/$defs/evidenceItem"
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

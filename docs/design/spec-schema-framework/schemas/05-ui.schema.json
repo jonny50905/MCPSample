@@ -1,0 +1,514 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:05-ui",
+  "title": "05 畫面與互動",
+  "description": "項目型別：UI（畫面／元件）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "05-ui"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/UI"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "UI": {
+      "type": "object",
+      "title": "UI（畫面／元件）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^UI-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_$#.-]+\\.[A-Z0-9_$#@]+(\\.[A-Z0-9_$#@]+\\.[A-Z0-9_$#@]+|\\.@[A-Z0-9_]+)?$",
+              "description": "自然鍵：<Component>.<Page>[.<Record>.<欄位>]"
+            },
+            "uiKind": {
+              "type": "string",
+              "enum": [
+                "SCREEN",
+                "CONTROL"
+              ],
+              "description": "畫面或元件"
+            },
+            "usedBy": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refFR"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "使用此畫面／元件的功能",
+              "x-ref": [
+                "FR"
+              ]
+            },
+            "component": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ",
+              "description": "Component",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "page": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ",
+              "description": "Page",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "title": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
+              "description": "畫面標題"
+            },
+            "pageRole": {
+              "type": "string",
+              "enum": [
+                "MAIN",
+                "SUBPAGE",
+                "SECONDARY",
+                "SEARCH",
+                "MODAL"
+              ],
+              "description": "頁面角色"
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ADD",
+                  "UPDATE_DISPLAY",
+                  "UPDATE_DISPLAY_ALL",
+                  "CORRECTION",
+                  "DISPLAY_ONLY",
+                  "BATCH"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "可用模式"
+            },
+            "searchKeys": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "查詢鍵",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "regions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                  },
+                  "label": {
+                    "anyOf": [
+                      {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                      },
+                      {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                      }
+                    ]
+                  },
+                  "scrollLevel": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "parentRegion": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                  },
+                  "repeating": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key",
+                  "label",
+                  "scrollLevel",
+                  "repeating"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "區塊與 scroll level"
+            },
+            "screen": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refUI",
+              "description": "所屬畫面",
+              "x-ref": [
+                "UI"
+              ]
+            },
+            "region": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/slug",
+              "description": "所屬區塊"
+            },
+            "controlType": {
+              "type": "string",
+              "enum": [
+                "EDIT_BOX",
+                "DROP_DOWN",
+                "CHECKBOX",
+                "RADIO",
+                "PROMPT",
+                "LONG_EDIT",
+                "DATE",
+                "PUSH_BUTTON",
+                "HYPERLINK",
+                "GRID",
+                "SCROLL_AREA",
+                "STATIC_TEXT",
+                "IMAGE",
+                "ATTACHMENT",
+                "OTHER"
+              ],
+              "description": "控制項型別"
+            },
+            "binding": {
+              "anyOf": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "fld": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                        }
+                      },
+                      "required": [
+                        "fld"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "drv": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                        }
+                      },
+                      "required": [
+                        "drv"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "綁定的欄位或衍生值（按鈕寫 NA）",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "畫面文字"
+            },
+            "presence": {
+              "type": "string",
+              "enum": [
+                "VISIBLE",
+                "CONDITIONAL",
+                "HIDDEN_TECHNICAL"
+              ],
+              "description": "出現方式"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "const": "ALWAYS"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                }
+              ],
+              "description": "顯示條件",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE"
+              ]
+            },
+            "editability": {
+              "anyOf": [
+                {
+                  "const": "ALWAYS"
+                },
+                {
+                  "const": "NEVER"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                }
+              ],
+              "description": "可編輯條件",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE"
+              ]
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                  },
+                  "stored": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                  }
+                },
+                "required": [
+                  "label",
+                  "stored"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "選項：顯示文字↔儲存值"
+            },
+            "valueSource": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "XLAT",
+                    "PROMPT",
+                    "STATIC",
+                    "DERIVED",
+                    "FREE",
+                    "NONE"
+                  ]
+                },
+                "prompt": {
+                  "type": "object",
+                  "properties": {
+                    "entity": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/refENT"
+                    },
+                    "filter": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                    }
+                  },
+                  "required": [
+                    "entity"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false,
+              "description": "值來源",
+              "x-ref": [
+                "ENT",
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE"
+              ]
+            },
+            "displayDefault": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/operand"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "畫面初值（寫入資料的預設在 09）",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE"
+              ]
+            },
+            "interactions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "FIELD_CHANGE",
+                      "PUSH_BUTTON",
+                      "ROW_INSERT",
+                      "ROW_DELETE",
+                      "PAGE_ACTIVATE",
+                      "PROMPT_SELECT"
+                    ]
+                  },
+                  "effect": {
+                    "type": "string",
+                    "enum": [
+                      "REFRESH",
+                      "NAVIGATE",
+                      "RECALCULATE",
+                      "OPEN_MODAL",
+                      "INVOKE_FUNCTION"
+                    ]
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/refUI"
+                    },
+                    "uniqueItems": true
+                  },
+                  "note": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                  }
+                },
+                "required": [
+                  "event",
+                  "effect",
+                  "targets",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              "description": "純畫面互動（會拒絕或寫資料的邏輯寫在 09）",
+              "x-ref": [
+                "UI"
+              ]
+            }
+          },
+          "required": [
+            "uiKind",
+            "usedBy"
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "uiKind"
+            ],
+            "properties": {
+              "uiKind": {
+                "const": "SCREEN"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "component",
+              "page",
+              "title",
+              "pageRole",
+              "modes",
+              "searchKeys",
+              "regions"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "uiKind"
+            ],
+            "properties": {
+              "uiKind": {
+                "const": "CONTROL"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "screen",
+              "region",
+              "controlType",
+              "binding",
+              "label",
+              "presence",
+              "visibility",
+              "editability",
+              "valueSource",
+              "displayDefault"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "presence"
+            ],
+            "properties": {
+              "presence": {
+                "const": "CONDITIONAL"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "visibility": {
+                "not": {
+                  "const": "ALWAYS"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

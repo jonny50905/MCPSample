@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "14-testing",
+  "docId": "clone-0123456789abcdef/14",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "14 測試與驗收",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "TC-011",
+      "key": "TW_DEMO_REQ:SUBMIT:NEGATIVE:NO_SUPERVISOR",
+      "lifecycle": "ACTIVE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-004"
+      ],
+      "name": "沒有直屬主管不能送出",
+      "scenarioType": "NEGATIVE",
+      "fr": "FR-004",
+      "covers": {
+        "rules": [
+          "BR-006"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "fld": "FLD-015"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-015",
+            "value": "E1001"
+          },
+          {
+            "field": "FLD-017",
+            "value": "010"
+          },
+          {
+            "field": "FLD-009",
+            "value": " ",
+            "note": "E1001 的目前有效任職列為單一空白"
+          }
+        ],
+        "synthetic": true,
+        "state": "STATE-001"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E1001 按「送出」",
+          "control": "UI-011",
+          "operation": "OP-004"
+        }
+      ],
+      "expected": {
+        "message": "MSG-003",
+        "noDataChange": true
+      },
+      "verification": "畫面顯示訊息 27000,3；該列 REQ_STATUS 仍為 010。"
+    }
+  ]
+}

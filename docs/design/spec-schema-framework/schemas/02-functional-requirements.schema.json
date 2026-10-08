@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:02-functional-requirements",
+  "title": "02 功能需求",
+  "description": "項目型別：FR（功能需求）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "02-functional-requirements"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FR"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "FR": {
+      "type": "object",
+      "title": "FR（功能需求）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^FR-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_$#.-]+:[A-Z][A-Z0-9_]*$",
+              "description": "自然鍵：<Component>:<操作代號>"
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "功能名稱"
+            },
+            "description": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "功能說明"
+            },
+            "frKind": {
+              "type": "string",
+              "enum": [
+                "TRANSITION",
+                "MAINTAIN",
+                "QUERY",
+                "BATCH",
+                "OUTPUT"
+              ],
+              "description": "功能種類"
+            },
+            "entry": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+                },
+                "modes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "ADD",
+                      "UPDATE_DISPLAY",
+                      "UPDATE_DISPLAY_ALL",
+                      "CORRECTION",
+                      "DISPLAY_ONLY",
+                      "BATCH"
+                    ]
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "object",
+                "modes"
+              ],
+              "additionalProperties": false,
+              "description": "入口物件與模式",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "actors": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refROLE"
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "drv": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                      }
+                    },
+                    "required": [
+                      "drv"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "ctx": {
+                        "type": "string",
+                        "enum": [
+                          "CURRENT_USER_OPRID",
+                          "CURRENT_USER_EMPLID",
+                          "CURRENT_DATE",
+                          "CURRENT_DATETIME",
+                          "CURRENT_MODE",
+                          "CURRENT_ACTION"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "ctx"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "minItems": 1,
+              "description": "操作者摘要（判定細節在 04 的 actor）",
+              "x-ref": [
+                "ROLE",
+                "DRV"
+              ]
+            },
+            "realizes": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+              },
+              "uniqueItems": true,
+              "description": "實現的狀態轉移",
+              "x-ref": [
+                "TRN"
+              ]
+            },
+            "preconditions": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "前置條件",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE"
+              ]
+            },
+            "outcome": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "完成後的結果"
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "MUST",
+                "SHOULD",
+                "COULD"
+              ],
+              "description": "優先序"
+            }
+          },
+          "required": [
+            "name",
+            "description",
+            "frKind",
+            "entry",
+            "actors",
+            "realizes",
+            "preconditions",
+            "outcome",
+            "priority"
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "frKind"
+            ],
+            "properties": {
+              "frKind": {
+                "const": "TRANSITION"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "realizes": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "realizes": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

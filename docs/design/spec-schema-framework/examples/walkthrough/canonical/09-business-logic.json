@@ -1,0 +1,468 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "09-business-logic",
+  "docId": "clone-0123456789abcdef/09",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "09 業務邏輯",
+  "summary": "訊息 4、規則 6；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "02-functional-requirements",
+    "04-workflow",
+    "05-ui",
+    "06-architecture",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/09-business-logic",
+      "fingerprint": "339e5da66e6ff89c7e19726bf714140ea97528753d1ea0520084ddda93dc3433"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "PASS"
+  },
+  "openQuestions": [],
+  "programDispositions": [
+    {
+      "program": "OBJ-007",
+      "kinds": [
+        "OFF_DIAGRAM_ONLY"
+      ],
+      "items": [],
+      "note": "只有狀態圖外的「核准後重開為草稿」邏輯，列入 90 問題清單。"
+    },
+    {
+      "program": "OBJ-008",
+      "kinds": [
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "BR-001"
+      ]
+    },
+    {
+      "program": "OBJ-009",
+      "kinds": [
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "BR-002"
+      ]
+    },
+    {
+      "program": "OBJ-010",
+      "kinds": [
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "BR-003"
+      ]
+    },
+    {
+      "program": "OBJ-011",
+      "kinds": [
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "BR-004"
+      ]
+    },
+    {
+      "program": "OBJ-012",
+      "kinds": [
+        "TRANSITION_IMPL"
+      ],
+      "items": [
+        "TRN-008",
+        "TRN-007",
+        "TRN-010"
+      ]
+    },
+    {
+      "program": "OBJ-013",
+      "kinds": [
+        "TRANSITION_IMPL",
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "TRN-006",
+        "TRN-009",
+        "BR-005"
+      ]
+    },
+    {
+      "program": "OBJ-014",
+      "kinds": [
+        "TRANSITION_IMPL",
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "TRN-002",
+        "TRN-004",
+        "BR-006"
+      ]
+    },
+    {
+      "program": "OBJ-015",
+      "kinds": [
+        "TRANSITION_IMPL"
+      ],
+      "items": [
+        "TRN-003",
+        "TRN-005"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "MSG-001",
+      "key": "27000,1",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0009"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 1,
+      "text": "金額必須大於 0。",
+      "severity": "ERROR"
+    },
+    {
+      "id": "MSG-002",
+      "key": "27000,2",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0009"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 2,
+      "text": "退回時必須填寫審核意見。",
+      "severity": "ERROR"
+    },
+    {
+      "id": "MSG-003",
+      "key": "27000,3",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0009"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 3,
+      "text": "找不到直屬主管，無法送出。",
+      "severity": "ERROR"
+    },
+    {
+      "id": "MSG-004",
+      "key": "27000,4",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0009"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 4,
+      "text": "此申請單已被其他使用者更新，請重新查詢。",
+      "severity": "ERROR"
+    },
+    {
+      "id": "BR-001",
+      "key": "TW_DEMO_REQ.SavePostChange:NOTIFY_SUPERVISOR",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0024"
+      ],
+      "name": "送出後通知直屬主管",
+      "brKind": "SIDE_EFFECT",
+      "appliesTo": [
+        "FR-004"
+      ],
+      "trigger": {
+        "event": "SAVE_POST_CHANGE",
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "EQ",
+        "right": {
+          "state": "STATE-003"
+        }
+      },
+      "action": {
+        "kind": "NOTIFY",
+        "interface": "IF-001"
+      },
+      "order": 1,
+      "boundaries": {
+        "na": "沒有數值或日期判斷"
+      },
+      "modeDifferences": {
+        "na": "只在送出成功的存檔執行"
+      },
+      "implementedAt": {
+        "object": "OBJ-008",
+        "event": "SavePostChange"
+      }
+    },
+    {
+      "id": "BR-002",
+      "key": "TW_DEMO_REQ.SavePreChange:ASSIGN_REQ_ID",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0023"
+      ],
+      "name": "新單取號",
+      "brKind": "DEFAULTING",
+      "appliesTo": [
+        "FR-003"
+      ],
+      "trigger": {
+        "event": "SAVE_PRE_CHANGE",
+        "transitions": [
+          "TRN-001"
+        ],
+        "modes": [
+          "ADD"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "FLD-016"
+        },
+        "op": "EQ",
+        "right": {
+          "const": "NEW",
+          "type": "CHAR"
+        }
+      },
+      "action": {
+        "kind": "SET_VALUE",
+        "assignments": [
+          {
+            "field": "FLD-016",
+            "value": {
+              "expr": "現有最大 REQ_ID 的數值加 1，左補零到 10 碼"
+            }
+          }
+        ]
+      },
+      "order": 1,
+      "boundaries": "第一張單取 0000000001；兩張新單同時存檔可能取到同號，後存檔者因主鍵重複而失敗（原系統沒有重試）。",
+      "modeDifferences": "只在新增模式。",
+      "implementedAt": {
+        "object": "OBJ-009",
+        "event": "SavePreChange"
+      }
+    },
+    {
+      "id": "BR-003",
+      "key": "TW_DEMO_REQHDR.AMOUNT.SaveEdit:AMOUNT_POSITIVE",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0021"
+      ],
+      "name": "金額必須大於 0",
+      "brKind": "VALIDATION",
+      "appliesTo": [
+        "FR-003",
+        "FR-004",
+        "FR-005"
+      ],
+      "trigger": {
+        "event": "SAVE_EDIT",
+        "modes": [
+          "ADD",
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "FLD-010"
+        },
+        "op": "LE",
+        "right": {
+          "const": "0",
+          "type": "NUMBER"
+        }
+      },
+      "action": {
+        "kind": "REJECT",
+        "message": "MSG-001"
+      },
+      "order": 1,
+      "boundaries": "0 拒絕；最小可接受 0.01（小數 2 位）；未輸入時數值欄存 0，視同 0 拒絕。",
+      "modeDifferences": {
+        "na": "新增與修改相同"
+      },
+      "implementedAt": {
+        "object": "OBJ-010",
+        "event": "SaveEdit"
+      }
+    },
+    {
+      "id": "BR-004",
+      "key": "TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault:REQUESTER_DEFAULT",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0022"
+      ],
+      "name": "申請人預設為目前使用者",
+      "brKind": "DEFAULTING",
+      "appliesTo": [
+        "FR-003"
+      ],
+      "trigger": {
+        "event": "FIELD_DEFAULT",
+        "modes": [
+          "ADD"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "FLD-015"
+        },
+        "op": "IS_BLANK"
+      },
+      "action": {
+        "kind": "SET_VALUE",
+        "assignments": [
+          {
+            "field": "FLD-015",
+            "value": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "order": 1,
+      "boundaries": {
+        "na": "沒有數值或日期判斷"
+      },
+      "modeDifferences": "只在新增模式；修改模式不會重設申請人。",
+      "implementedAt": {
+        "object": "OBJ-011",
+        "event": "FieldDefault"
+      }
+    },
+    {
+      "id": "BR-005",
+      "key": "TW_DEMO_REQWRK.RETURN_PB.FieldChange:RETURN_COMMENT_REQUIRED",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0020"
+      ],
+      "name": "退回時必須填寫審核意見",
+      "brKind": "VALIDATION",
+      "appliesTo": [
+        "FR-002"
+      ],
+      "trigger": {
+        "event": "FIELD_CHANGE",
+        "control": "UI-006",
+        "transitions": [
+          "TRN-006",
+          "TRN-009"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "FLD-013"
+        },
+        "op": "IS_BLANK"
+      },
+      "action": {
+        "kind": "REJECT",
+        "message": "MSG-002"
+      },
+      "order": 1,
+      "boundaries": "只輸入空白字元視同未填寫。",
+      "modeDifferences": {
+        "na": "直屬主管與部門主管相同"
+      },
+      "implementedAt": {
+        "object": "OBJ-013",
+        "event": "FieldChange"
+      }
+    },
+    {
+      "id": "BR-006",
+      "key": "TW_DEMO_REQWRK.SUBMIT_PB.FieldChange:SUPERVISOR_REQUIRED",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0016",
+        "EV-0026"
+      ],
+      "name": "送出時申請人必須有直屬主管",
+      "brKind": "VALIDATION",
+      "appliesTo": [
+        "FR-004"
+      ],
+      "trigger": {
+        "event": "FIELD_CHANGE",
+        "control": "UI-011",
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ]
+      },
+      "condition": {
+        "left": {
+          "drv": "DRV-002"
+        },
+        "op": "NOT_EXISTS"
+      },
+      "action": {
+        "kind": "REJECT",
+        "message": "MSG-003"
+      },
+      "order": 1,
+      "boundaries": "SUPERVISOR_ID 為空白（單一空白）視同找不到。",
+      "modeDifferences": {
+        "na": "只在按送出時檢查"
+      },
+      "implementedAt": {
+        "object": "OBJ-014",
+        "event": "FieldChange"
+      }
+    }
+  ]
+}

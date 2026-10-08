@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "05-ui",
+  "docId": "clone-0123456789abcdef/05",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "05 畫面與互動",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "UI-011",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.SUBMIT_PB",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-004"
+      ],
+      "screen": "UI-007",
+      "region": "ACTIONS",
+      "controlType": "PUSH_BUTTON",
+      "binding": {
+        "na": "按鈕；原系統以工作記錄欄位承載事件，不保存資料"
+      },
+      "label": "送出",
+      "presence": "CONDITIONAL",
+      "visibility": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "editability": "ALWAYS",
+      "valueSource": {
+        "kind": "NONE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    }
+  ]
+}

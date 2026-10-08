@@ -1,0 +1,59 @@
+{
+  "baselineFindings": [],
+  "cases": [
+    {
+      "case": "缺欄位：TRN-008 刪掉 guard",
+      "expected": "L1 S01",
+      "caught": true,
+      "message": "TRN-008 （項目）：'guard' is a required property"
+    },
+    {
+      "case": "模糊條件：BR-006 的條件寫成「需要長官審核」",
+      "expected": "L1 S01",
+      "caught": true,
+      "message": "BR-006 condition：'需要長官審核' is not valid under any of the given schemas"
+    },
+    {
+      "case": "填充字：FR-004 的說明寫「待確認」",
+      "expected": "L1 S01",
+      "caught": true,
+      "message": "FR-004 description：命中禁用的填充字"
+    },
+    {
+      "case": "未標示推論：DRV-002 改成 INFERRED 卻沒寫推論鏈",
+      "expected": "L1 S01",
+      "caught": true,
+      "message": "DRV-002 （項目）：'inference' is a required property"
+    },
+    {
+      "case": "推測寫成事實：OP-001 的併發行為寫「應該是後存檔者覆蓋」",
+      "expected": "L1 S07",
+      "caught": true,
+      "message": "OP-001 CONFIRMED 項目出現推測用語「應該是」（警告，交覆核）"
+    },
+    {
+      "case": "缺引用：OP-004 的檢核清單指向不存在的 BR-099",
+      "expected": "L2 R01",
+      "caught": true,
+      "message": "OP-004 參照不存在的 BR-099"
+    },
+    {
+      "case": "往下游參照：FLD-010 宣稱推導自 TC-001",
+      "expected": "L2 R03",
+      "caught": true,
+      "message": "FLD-010 往下游參照 TC-001"
+    },
+    {
+      "case": "不建置欄位寫進正文：BR-003 的邊界提到 OLD_REF_NO",
+      "expected": "L2 R04",
+      "caught": true,
+      "message": "BR-003 正文寫到不建置欄位 OLD_REF_NO"
+    },
+    {
+      "case": "圖外轉移寫進 04：新增 030→010",
+      "expected": "L3 C01",
+      "caught": true,
+      "message": "04 有狀態圖沒有的轉移 ['030>010']"
+    }
+  ]
+}

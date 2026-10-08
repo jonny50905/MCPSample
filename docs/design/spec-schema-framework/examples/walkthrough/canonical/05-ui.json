@@ -1,0 +1,557 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "05-ui",
+  "docId": "clone-0123456789abcdef/05",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "05 畫面與互動",
+  "summary": "畫面元件 12；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "02-functional-requirements",
+    "04-workflow",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/05-ui",
+      "fingerprint": "5cb419e04ac42e8682a86968d8e44dc4b5e4087d33e0ba50327589783997b095"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "PASS"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "UI-001",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG",
+      "lifecycle": "ACTIVE",
+      "component": "OBJ-002",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005"
+      ],
+      "uiKind": "SCREEN",
+      "usedBy": [
+        "FR-001",
+        "FR-002"
+      ],
+      "page": "OBJ-005",
+      "title": "申請單審核",
+      "pageRole": "MAIN",
+      "modes": [
+        "UPDATE_DISPLAY"
+      ],
+      "searchKeys": [
+        "FLD-016"
+      ],
+      "regions": [
+        {
+          "key": "HEADER",
+          "label": "申請內容",
+          "scrollLevel": 0,
+          "repeating": false
+        },
+        {
+          "key": "ACTIONS",
+          "label": {
+            "na": "按鈕列沒有標題"
+          },
+          "scrollLevel": 0,
+          "repeating": false
+        }
+      ]
+    },
+    {
+      "id": "UI-002",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQHDR.AMOUNT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-001",
+        "FR-002"
+      ],
+      "screen": "UI-001",
+      "region": "HEADER",
+      "controlType": "EDIT_BOX",
+      "binding": {
+        "fld": "FLD-010"
+      },
+      "label": "金額",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": "NEVER",
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-003",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQHDR.COMMENTS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005",
+        "EV-0031"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-001",
+        "FR-002"
+      ],
+      "screen": "UI-001",
+      "region": "HEADER",
+      "controlType": "LONG_EDIT",
+      "binding": {
+        "fld": "FLD-013"
+      },
+      "label": "審核意見",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-003"
+          },
+          {
+            "state": "STATE-004"
+          }
+        ]
+      },
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-004",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQHDR.REASON",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-001",
+        "FR-002"
+      ],
+      "screen": "UI-001",
+      "region": "HEADER",
+      "controlType": "LONG_EDIT",
+      "binding": {
+        "fld": "FLD-014"
+      },
+      "label": "申請事由",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": "NEVER",
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-005",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.APPROVE_PB",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005",
+        "EV-0031"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-001"
+      ],
+      "screen": "UI-001",
+      "region": "ACTIONS",
+      "controlType": "PUSH_BUTTON",
+      "binding": {
+        "na": "按鈕；原系統以工作記錄欄位承載事件，不保存資料"
+      },
+      "label": "核准",
+      "presence": "CONDITIONAL",
+      "visibility": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-003"
+          },
+          {
+            "state": "STATE-004"
+          }
+        ]
+      },
+      "editability": "ALWAYS",
+      "valueSource": {
+        "kind": "NONE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-006",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.RETURN_PB",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0005",
+        "EV-0031"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-002"
+      ],
+      "screen": "UI-001",
+      "region": "ACTIONS",
+      "controlType": "PUSH_BUTTON",
+      "binding": {
+        "na": "按鈕；原系統以工作記錄欄位承載事件，不保存資料"
+      },
+      "label": "退回",
+      "presence": "CONDITIONAL",
+      "visibility": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-003"
+          },
+          {
+            "state": "STATE-004"
+          }
+        ]
+      },
+      "editability": "ALWAYS",
+      "valueSource": {
+        "kind": "NONE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-007",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG",
+      "lifecycle": "ACTIVE",
+      "component": "OBJ-003",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004"
+      ],
+      "uiKind": "SCREEN",
+      "usedBy": [
+        "FR-003",
+        "FR-004",
+        "FR-005"
+      ],
+      "page": "OBJ-006",
+      "title": "申請單",
+      "pageRole": "MAIN",
+      "modes": [
+        "ADD",
+        "UPDATE_DISPLAY"
+      ],
+      "searchKeys": [
+        "FLD-016"
+      ],
+      "regions": [
+        {
+          "key": "HEADER",
+          "label": "申請內容",
+          "scrollLevel": 0,
+          "repeating": false
+        },
+        {
+          "key": "ACTIONS",
+          "label": {
+            "na": "按鈕列沒有標題"
+          },
+          "scrollLevel": 0,
+          "repeating": false
+        }
+      ]
+    },
+    {
+      "id": "UI-008",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQHDR.AMOUNT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004",
+        "EV-0030"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-003",
+        "FR-004"
+      ],
+      "screen": "UI-007",
+      "region": "HEADER",
+      "controlType": "EDIT_BOX",
+      "binding": {
+        "fld": "FLD-010"
+      },
+      "label": "金額",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-009",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQHDR.REASON",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004",
+        "EV-0030"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-003",
+        "FR-004"
+      ],
+      "screen": "UI-007",
+      "region": "HEADER",
+      "controlType": "LONG_EDIT",
+      "binding": {
+        "fld": "FLD-014"
+      },
+      "label": "申請事由",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-010",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQHDR.REQ_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-003",
+        "FR-004",
+        "FR-005"
+      ],
+      "screen": "UI-007",
+      "region": "HEADER",
+      "controlType": "DROP_DOWN",
+      "binding": {
+        "fld": "FLD-017"
+      },
+      "label": "狀態",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": "NEVER",
+      "options": [
+        {
+          "label": "草稿",
+          "stored": "010"
+        },
+        {
+          "label": "退回補件",
+          "stored": "015"
+        },
+        {
+          "label": "待主管審核",
+          "stored": "020"
+        },
+        {
+          "label": "待部門主管審核",
+          "stored": "025"
+        },
+        {
+          "label": "核准",
+          "stored": "030"
+        },
+        {
+          "label": "作廢",
+          "stored": "090"
+        }
+      ],
+      "valueSource": {
+        "kind": "XLAT"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-011",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.SUBMIT_PB",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004",
+        "EV-0030"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-004"
+      ],
+      "screen": "UI-007",
+      "region": "ACTIONS",
+      "controlType": "PUSH_BUTTON",
+      "binding": {
+        "na": "按鈕；原系統以工作記錄欄位承載事件，不保存資料"
+      },
+      "label": "送出",
+      "presence": "CONDITIONAL",
+      "visibility": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "editability": "ALWAYS",
+      "valueSource": {
+        "kind": "NONE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-012",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.WITHDRAW_PB",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004",
+        "EV-0030"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-005"
+      ],
+      "screen": "UI-007",
+      "region": "ACTIONS",
+      "controlType": "PUSH_BUTTON",
+      "binding": {
+        "na": "按鈕；原系統以工作記錄欄位承載事件，不保存資料"
+      },
+      "label": "撤回",
+      "presence": "CONDITIONAL",
+      "visibility": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "editability": "ALWAYS",
+      "valueSource": {
+        "kind": "NONE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    }
+  ]
+}

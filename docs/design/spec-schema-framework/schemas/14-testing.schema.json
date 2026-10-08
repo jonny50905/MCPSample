@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:14-testing",
+  "title": "14 測試與驗收",
+  "description": "項目型別：TC（測試案例）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "14-testing"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TC"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "TC": {
+      "type": "object",
+      "title": "TC（測試案例）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^TC-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_$#.-]+:[A-Z][A-Z0-9_]*:(POSITIVE|NEGATIVE|BOUNDARY):[A-Z][A-Z0-9_]*$",
+              "description": "自然鍵：<FR 鍵>:<類型>:<代號>"
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "案例名稱"
+            },
+            "scenarioType": {
+              "type": "string",
+              "enum": [
+                "POSITIVE",
+                "NEGATIVE",
+                "BOUNDARY"
+              ],
+              "description": "正例／反例／邊界"
+            },
+            "fr": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refFR",
+              "description": "主要功能",
+              "x-ref": [
+                "FR"
+              ]
+            },
+            "covers": {
+              "type": "object",
+              "minProperties": 1,
+              "properties": {
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refBR"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "transitions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "flows": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLOW"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "controls": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refUI"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "operations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refOP"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "additionalProperties": false,
+              "description": "覆蓋的規則／轉移／情境／元件／操作",
+              "x-ref": [
+                "BR",
+                "TRN",
+                "FLOW",
+                "UI",
+                "OP"
+              ]
+            },
+            "preconditions": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "anyOf": [
+                    {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+                    },
+                    {
+                      "const": "INITIAL"
+                    }
+                  ]
+                },
+                "actor": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "note": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "synthetic": {
+                  "const": true
+                }
+              },
+              "required": [
+                "actor",
+                "data",
+                "synthetic"
+              ],
+              "additionalProperties": false,
+              "description": "前置狀態、操作者、前置資料（合成）",
+              "x-ref": [
+                "STATE",
+                "FLD",
+                "DRV",
+                "ROLE"
+              ]
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "seq": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "action": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                  },
+                  "control": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refUI"
+                  },
+                  "operation": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refOP"
+                  },
+                  "inputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "field",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "seq",
+                  "action"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "操作步驟",
+              "x-ref": [
+                "UI",
+                "OP",
+                "FLD"
+              ]
+            },
+            "expected": {
+              "type": "object",
+              "minProperties": 1,
+              "properties": {
+                "message": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refMSG"
+                },
+                "resultState": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+                },
+                "controls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "control": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refUI"
+                      },
+                      "visible": {
+                        "type": "boolean"
+                      },
+                      "editable": {
+                        "type": "boolean"
+                      },
+                      "value": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                      }
+                    },
+                    "required": [
+                      "control"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                },
+                "noDataChange": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false,
+              "description": "預期訊息、狀態、元件、資料",
+              "x-ref": [
+                "MSG",
+                "STATE",
+                "UI",
+                "FLD"
+              ]
+            },
+            "verification": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "如何核對"
+            }
+          },
+          "required": [
+            "name",
+            "scenarioType",
+            "fr",
+            "covers",
+            "preconditions",
+            "steps",
+            "expected",
+            "verification"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

@@ -1,0 +1,860 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "07-database",
+  "docId": "clone-0123456789abcdef/07",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "07 資料設計",
+  "summary": "實體 3、欄位 18、衍生概念 2、不建置欄位組 1；未解問題 1",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "01-overview"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    },
+    {
+      "kind": "RESEARCH_RECEIPT",
+      "ref": "receipts/07-database",
+      "fingerprint": "d3bc268778424882767bc925d9f52eadd9e5a3a8c940fee78afc6494884cac64"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "PASS",
+    "L5": "PASS"
+  },
+  "openQuestions": [
+    "Q-001"
+  ],
+  "items": [
+    {
+      "id": "ENT-001",
+      "key": "TW_DEMO_DEPT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "record": "OBJ-016",
+      "name": "部門（有效日）",
+      "businessMeaning": "部門資料；本功能只用來找部門主管。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_DEPT",
+      "keys": [
+        "FLD-001",
+        "FLD-002"
+      ],
+      "effectiveDating": {
+        "kind": "EFFDT",
+        "currentRow": {
+          "asOf": {
+            "ctx": "CURRENT_DATE"
+          },
+          "effStatusActiveOnly": true
+        }
+      }
+    },
+    {
+      "id": "ENT-002",
+      "key": "TW_DEMO_EMP",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "record": "OBJ-017",
+      "name": "員工任職（有效日）",
+      "businessMeaning": "員工任職資料；本功能只用來找申請人的部門與直屬主管。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_EMP",
+      "keys": [
+        "FLD-008",
+        "FLD-006"
+      ],
+      "effectiveDating": {
+        "kind": "EFFDT",
+        "currentRow": {
+          "asOf": {
+            "ctx": "CURRENT_DATE"
+          },
+          "effStatusActiveOnly": true
+        }
+      }
+    },
+    {
+      "id": "ENT-003",
+      "key": "TW_DEMO_REQHDR",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "record": "OBJ-018",
+      "name": "申請單",
+      "businessMeaning": "一張申請單一列；狀態、金額、事由與審核結果都在這裡。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_REQHDR",
+      "keys": [
+        "FLD-016"
+      ],
+      "effectiveDating": {
+        "kind": "NONE"
+      }
+    },
+    {
+      "id": "FLD-001",
+      "key": "TW_DEMO_DEPT.DEPTID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "DEPTID",
+      "label": "部門",
+      "dataType": "CHAR",
+      "length": 10,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-002",
+      "key": "TW_DEMO_DEPT.EFFDT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "EFFDT",
+      "label": "生效日",
+      "dataType": "DATE",
+      "length": {
+        "na": "日期型別沒有長度"
+      },
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-003",
+      "key": "TW_DEMO_DEPT.EFF_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "EFF_STATUS",
+      "label": "有效狀態",
+      "dataType": "CHAR",
+      "length": 1,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "A",
+            "label": "有效",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "I",
+            "label": "無效",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-004",
+      "key": "TW_DEMO_DEPT.MANAGER_ID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007",
+        "EV-0015"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "MANAGER_ID",
+      "label": "部門主管",
+      "dataType": "CHAR",
+      "length": 11,
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "prompt": {
+          "entity": "ENT-002",
+          "keyField": "FLD-008"
+        }
+      },
+      "keyRoles": [],
+      "relations": [
+        {
+          "target": "FLD-008",
+          "kind": "LOGICAL_FK"
+        }
+      ],
+      "sensitivity": "PERSONAL",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-005",
+      "key": "TW_DEMO_EMP.DEPTID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "DEPTID",
+      "label": "部門",
+      "dataType": "CHAR",
+      "length": 10,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "prompt": {
+          "entity": "ENT-001",
+          "keyField": "FLD-001"
+        }
+      },
+      "keyRoles": [],
+      "relations": [
+        {
+          "target": "FLD-001",
+          "kind": "LOGICAL_FK"
+        }
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-006",
+      "key": "TW_DEMO_EMP.EFFDT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "EFFDT",
+      "label": "生效日",
+      "dataType": "DATE",
+      "length": {
+        "na": "日期型別沒有長度"
+      },
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-007",
+      "key": "TW_DEMO_EMP.EFF_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "EFF_STATUS",
+      "label": "有效狀態",
+      "dataType": "CHAR",
+      "length": 1,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "A",
+            "label": "有效",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "I",
+            "label": "無效",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-008",
+      "key": "TW_DEMO_EMP.EMPLID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "EMPLID",
+      "label": "員工編號",
+      "dataType": "CHAR",
+      "length": 11,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "PERSONAL",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-009",
+      "key": "TW_DEMO_EMP.SUPERVISOR_ID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007",
+        "EV-0014"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "SUPERVISOR_ID",
+      "label": "直屬主管",
+      "dataType": "CHAR",
+      "length": 11,
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "prompt": {
+          "entity": "ENT-002",
+          "keyField": "FLD-008"
+        }
+      },
+      "keyRoles": [],
+      "relations": [
+        {
+          "target": "FLD-008",
+          "kind": "LOGICAL_FK"
+        }
+      ],
+      "sensitivity": "PERSONAL",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "id": "FLD-010",
+      "key": "TW_DEMO_REQHDR.AMOUNT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "AMOUNT",
+      "label": "金額",
+      "dataType": "NUMBER",
+      "length": 11,
+      "decimals": 2,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-011",
+      "key": "TW_DEMO_REQHDR.APPROVER_EMPLID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "APPROVER_EMPLID",
+      "label": "核准者",
+      "dataType": "CHAR",
+      "length": 11,
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "relations": [
+        {
+          "target": "FLD-008",
+          "kind": "LOGICAL_FK"
+        }
+      ],
+      "sensitivity": "PERSONAL",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-012",
+      "key": "TW_DEMO_REQHDR.APPROVE_DT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "APPROVE_DT",
+      "label": "核准日",
+      "dataType": "DATE",
+      "length": {
+        "na": "日期型別沒有長度"
+      },
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-013",
+      "key": "TW_DEMO_REQHDR.COMMENTS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "COMMENTS",
+      "label": "審核意見",
+      "dataType": "CHAR",
+      "length": 254,
+      "required": "CONDITIONAL",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-014",
+      "key": "TW_DEMO_REQHDR.REASON",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "REASON",
+      "label": "申請事由",
+      "dataType": "CHAR",
+      "length": 254,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-015",
+      "key": "TW_DEMO_REQHDR.REQUESTER_EMPLID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "REQUESTER_EMPLID",
+      "label": "申請人",
+      "dataType": "CHAR",
+      "length": 11,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "prompt": {
+          "entity": "ENT-002",
+          "keyField": "FLD-008"
+        }
+      },
+      "keyRoles": [],
+      "relations": [
+        {
+          "target": "FLD-008",
+          "kind": "LOGICAL_FK"
+        }
+      ],
+      "sensitivity": "PERSONAL",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-016",
+      "key": "TW_DEMO_REQHDR.REQ_ID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "REQ_ID",
+      "label": "申請單號",
+      "dataType": "CHAR",
+      "length": 10,
+      "required": "ALWAYS",
+      "default": {
+        "const": "NEW",
+        "type": "CHAR"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY",
+        "SEARCH_KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-017",
+      "key": "TW_DEMO_REQHDR.REQ_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007",
+        "EV-0011"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "REQ_STATUS",
+      "label": "狀態",
+      "dataType": "CHAR",
+      "length": 3,
+      "required": "ALWAYS",
+      "default": {
+        "const": "010",
+        "type": "CHAR"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "010",
+            "label": "草稿",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "015",
+            "label": "退回補件",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "020",
+            "label": "待主管審核",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "025",
+            "label": "待部門主管審核",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "030",
+            "label": "核准",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "090",
+            "label": "作廢",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-018",
+      "key": "TW_DEMO_REQHDR.SUBMIT_DT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "SUBMIT_DT",
+      "label": "送出日",
+      "dataType": "DATE",
+      "length": {
+        "na": "日期型別沒有長度"
+      },
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "DRV-001",
+      "key": "REQUESTER_DEPT_MANAGER",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0027",
+        "EV-0015"
+      ],
+      "name": "申請人的部門主管",
+      "meaning": "申請人目前任職部門的主管；025（高額）由此人審核。",
+      "inputs": [
+        {
+          "name": "REQUESTER",
+          "from": {
+            "fld": "FLD-015"
+          }
+        }
+      ],
+      "resultType": "PERSON_ID",
+      "resolution": {
+        "sources": [
+          "ENT-002",
+          "ENT-001"
+        ],
+        "joins": [
+          {
+            "left": "FLD-008",
+            "right": {
+              "param": "REQUESTER"
+            }
+          },
+          {
+            "left": "FLD-001",
+            "right": {
+              "fld": "FLD-005"
+            }
+          }
+        ],
+        "filter": "ALWAYS",
+        "effectiveDating": [
+          {
+            "entity": "ENT-002",
+            "rule": "CURRENT_ROW",
+            "asOf": {
+              "ctx": "CURRENT_DATE"
+            },
+            "effStatusActiveOnly": true
+          },
+          {
+            "entity": "ENT-001",
+            "rule": "CURRENT_ROW",
+            "asOf": {
+              "ctx": "CURRENT_DATE"
+            },
+            "effStatusActiveOnly": true
+          }
+        ],
+        "pick": "FLD-004",
+        "tieBreak": {
+          "na": "兩個實體都取目前有效列，結果唯一"
+        }
+      },
+      "whenNotFound": {
+        "result": "EMPTY",
+        "note": "部門沒有目前有效列或 MANAGER_ID 為空白時結果為空；原系統對此沒有檢查，案件會停在 025，審核清單中沒有人看得到。"
+      },
+      "whenMultiple": {
+        "rule": "UNIQUE_BY_KEY",
+        "note": "兩個實體的目前有效列各只有一列。"
+      },
+      "implementedAt": [
+        "OBJ-012",
+        "OBJ-013"
+      ]
+    },
+    {
+      "id": "DRV-002",
+      "key": "REQUESTER_SUPERVISOR",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0026",
+        "EV-0014"
+      ],
+      "name": "申請人的直屬主管",
+      "meaning": "申請人目前任職資料上登記的直屬主管；送出時必須存在，020 由此人審核。",
+      "inputs": [
+        {
+          "name": "REQUESTER",
+          "from": {
+            "fld": "FLD-015"
+          }
+        }
+      ],
+      "resultType": "PERSON_ID",
+      "resolution": {
+        "sources": [
+          "ENT-002"
+        ],
+        "joins": [
+          {
+            "left": "FLD-008",
+            "right": {
+              "param": "REQUESTER"
+            }
+          }
+        ],
+        "filter": "ALWAYS",
+        "effectiveDating": [
+          {
+            "entity": "ENT-002",
+            "rule": "CURRENT_ROW",
+            "asOf": {
+              "ctx": "CURRENT_DATE"
+            },
+            "effStatusActiveOnly": true
+          }
+        ],
+        "pick": "FLD-009",
+        "tieBreak": {
+          "na": "鍵（EMPLID＋EFFDT）加目前有效列規則保證只有一列"
+        }
+      },
+      "whenNotFound": {
+        "result": "EMPTY",
+        "note": "查無目前有效的任職列，或 SUPERVISOR_ID 為空白時結果為空；送出時由 09 的規則擋下。"
+      },
+      "whenMultiple": {
+        "rule": "UNIQUE_BY_KEY",
+        "note": "目前有效列規則下每位員工只有一列。"
+      },
+      "implementedAt": [
+        "OBJ-014",
+        "OBJ-012",
+        "OBJ-013"
+      ]
+    },
+    {
+      "id": "XF-001",
+      "key": "TW_DEMO_REQHDR",
+      "lifecycle": "ACTIVE",
+      "basis": "DATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0012",
+        "EV-0013"
+      ],
+      "entity": "ENT-003",
+      "fields": [
+        "OLD_REF_NO",
+        "PRIORITY_CD"
+      ],
+      "dataCheck": "非預設 0 筆（全表非空，查詢日 2026-10-01）",
+      "codeChecks": {
+        "a": "PeopleCode 交叉參照：核心路徑沒有指名引用。",
+        "b": "核心路徑沒有 AE、SQR 或 SQL 物件讀寫這兩欄。",
+        "c": "既有研究文件沒有指名引用的紀錄。"
+      }
+    }
+  ]
+}

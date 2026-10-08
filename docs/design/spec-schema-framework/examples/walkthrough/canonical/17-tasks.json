@@ -1,0 +1,382 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "17-tasks",
+  "docId": "clone-0123456789abcdef/17",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "17 工作拆解與相依",
+  "summary": "工作項 6；未解問題 0",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [
+    "02-functional-requirements",
+    "03-roles-permissions",
+    "04-workflow",
+    "05-ui",
+    "07-database",
+    "08-api",
+    "09-business-logic",
+    "14-testing"
+  ],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "PASS",
+    "L4": "NOT_APPLICABLE",
+    "L5": "NOT_APPLICABLE"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "TASK-001",
+      "key": "FOUNDATION:DATA_AND_SECURITY",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "taskKind": "FOUNDATION",
+      "fr": {
+        "na": "基礎工作，不對應單一功能"
+      },
+      "name": "資料結構、衍生概念與角色權限",
+      "order": 1,
+      "dependsOn": [],
+      "members": {
+        "entities": [
+          "ENT-001",
+          "ENT-002",
+          "ENT-003"
+        ],
+        "fields": [
+          "FLD-001",
+          "FLD-002",
+          "FLD-003",
+          "FLD-004",
+          "FLD-005",
+          "FLD-006",
+          "FLD-007",
+          "FLD-008",
+          "FLD-009",
+          "FLD-010",
+          "FLD-011",
+          "FLD-012",
+          "FLD-013",
+          "FLD-014",
+          "FLD-015",
+          "FLD-016",
+          "FLD-017",
+          "FLD-018"
+        ],
+        "derivations": [
+          "DRV-001",
+          "DRV-002"
+        ],
+        "roles": [
+          "ROLE-001",
+          "ROLE-002"
+        ]
+      },
+      "deliverables": [
+        "DATA_STRUCTURE",
+        "SECURITY"
+      ]
+    },
+    {
+      "id": "TASK-002",
+      "key": "SLICE:TW_DEMO_APV:APPROVE",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "taskKind": "SLICE",
+      "fr": "FR-001",
+      "name": "核准申請",
+      "order": 5,
+      "dependsOn": [
+        "TASK-001",
+        "TASK-005"
+      ],
+      "members": {
+        "fields": [
+          "FLD-010",
+          "FLD-011",
+          "FLD-012",
+          "FLD-013",
+          "FLD-014",
+          "FLD-016",
+          "FLD-017"
+        ],
+        "derivations": [
+          "DRV-001",
+          "DRV-002"
+        ],
+        "roles": [
+          "ROLE-001"
+        ],
+        "transitions": [
+          "TRN-008",
+          "TRN-007",
+          "TRN-010"
+        ],
+        "controls": [
+          "UI-002",
+          "UI-003",
+          "UI-004",
+          "UI-005"
+        ],
+        "rules": [],
+        "operations": [
+          "OP-001"
+        ],
+        "tests": [
+          "TC-001",
+          "TC-002",
+          "TC-003",
+          "TC-004"
+        ]
+      },
+      "deliverables": [
+        "OPERATIONS",
+        "SCREENS",
+        "RULES",
+        "TESTS"
+      ]
+    },
+    {
+      "id": "TASK-003",
+      "key": "SLICE:TW_DEMO_APV:RETURN",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "taskKind": "SLICE",
+      "fr": "FR-002",
+      "name": "退回申請",
+      "order": 6,
+      "dependsOn": [
+        "TASK-001",
+        "TASK-005"
+      ],
+      "members": {
+        "fields": [
+          "FLD-010",
+          "FLD-013",
+          "FLD-014",
+          "FLD-016",
+          "FLD-017"
+        ],
+        "derivations": [
+          "DRV-001",
+          "DRV-002"
+        ],
+        "roles": [
+          "ROLE-001"
+        ],
+        "transitions": [
+          "TRN-006",
+          "TRN-009"
+        ],
+        "controls": [
+          "UI-002",
+          "UI-003",
+          "UI-004",
+          "UI-006"
+        ],
+        "rules": [
+          "BR-005"
+        ],
+        "operations": [
+          "OP-002"
+        ],
+        "tests": [
+          "TC-005",
+          "TC-006"
+        ]
+      },
+      "deliverables": [
+        "OPERATIONS",
+        "SCREENS",
+        "RULES",
+        "TESTS"
+      ]
+    },
+    {
+      "id": "TASK-004",
+      "key": "SLICE:TW_DEMO_REQ:CREATE",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "taskKind": "SLICE",
+      "fr": "FR-003",
+      "name": "建立申請",
+      "order": 2,
+      "dependsOn": [
+        "TASK-001"
+      ],
+      "members": {
+        "fields": [
+          "FLD-010",
+          "FLD-014",
+          "FLD-015",
+          "FLD-016",
+          "FLD-017"
+        ],
+        "derivations": [],
+        "roles": [
+          "ROLE-002"
+        ],
+        "transitions": [
+          "TRN-001"
+        ],
+        "controls": [
+          "UI-008",
+          "UI-009",
+          "UI-010"
+        ],
+        "rules": [
+          "BR-002",
+          "BR-003",
+          "BR-004"
+        ],
+        "operations": [
+          "OP-003"
+        ],
+        "tests": [
+          "TC-007",
+          "TC-008",
+          "TC-009",
+          "TC-010"
+        ]
+      },
+      "deliverables": [
+        "OPERATIONS",
+        "SCREENS",
+        "RULES",
+        "TESTS"
+      ]
+    },
+    {
+      "id": "TASK-005",
+      "key": "SLICE:TW_DEMO_REQ:SUBMIT",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "taskKind": "SLICE",
+      "fr": "FR-004",
+      "name": "送出申請",
+      "order": 3,
+      "dependsOn": [
+        "TASK-001",
+        "TASK-004"
+      ],
+      "members": {
+        "fields": [
+          "FLD-010",
+          "FLD-014",
+          "FLD-015",
+          "FLD-016",
+          "FLD-017",
+          "FLD-018"
+        ],
+        "derivations": [
+          "DRV-002"
+        ],
+        "roles": [
+          "ROLE-002"
+        ],
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ],
+        "controls": [
+          "UI-008",
+          "UI-009",
+          "UI-010",
+          "UI-011"
+        ],
+        "rules": [
+          "BR-001",
+          "BR-003",
+          "BR-006"
+        ],
+        "operations": [
+          "OP-004"
+        ],
+        "tests": [
+          "TC-011",
+          "TC-012",
+          "TC-013"
+        ]
+      },
+      "deliverables": [
+        "OPERATIONS",
+        "SCREENS",
+        "RULES",
+        "TESTS"
+      ]
+    },
+    {
+      "id": "TASK-006",
+      "key": "SLICE:TW_DEMO_REQ:WITHDRAW",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "taskKind": "SLICE",
+      "fr": "FR-005",
+      "name": "撤回申請",
+      "order": 4,
+      "dependsOn": [
+        "TASK-001",
+        "TASK-004"
+      ],
+      "members": {
+        "fields": [
+          "FLD-010",
+          "FLD-015",
+          "FLD-016",
+          "FLD-017"
+        ],
+        "derivations": [],
+        "roles": [
+          "ROLE-002"
+        ],
+        "transitions": [
+          "TRN-003",
+          "TRN-005"
+        ],
+        "controls": [
+          "UI-010",
+          "UI-012"
+        ],
+        "rules": [
+          "BR-003"
+        ],
+        "operations": [
+          "OP-005"
+        ],
+        "tests": [
+          "TC-014"
+        ]
+      },
+      "deliverables": [
+        "OPERATIONS",
+        "SCREENS",
+        "RULES",
+        "TESTS"
+      ]
+    }
+  ]
+}

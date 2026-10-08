@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "06-architecture",
+  "docId": "clone-0123456789abcdef/06",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "06 系統架構（技術中立）",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "IF-001",
+      "key": "AE:TW_DEMO_NTFY",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0024"
+      ],
+      "ifType": "NOTIFICATION",
+      "object": "OBJ-001",
+      "name": "送審通知",
+      "direction": "OUTBOUND",
+      "trigger": {
+        "kind": "ON_TRANSITION",
+        "transitions": [
+          "TRN-002",
+          "TRN-004"
+        ],
+        "note": "送出成功後由 SavePostChange 排入程序，非同步執行。"
+      },
+      "performs": [],
+      "reads": [
+        "FLD-016"
+      ],
+      "writes": [],
+      "parameters": [
+        {
+          "name": "REQ_ID",
+          "source": {
+            "fld": "FLD-016"
+          }
+        }
+      ],
+      "format": {
+        "na": "不是檔案介面"
+      },
+      "errorHandling": "寄送失敗只寫入程序紀錄，不影響申請單狀態。",
+      "retry": {
+        "na": "原系統不重試"
+      },
+      "idempotency": "同一張單重複排入會重複寄送通知。"
+    }
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "04-workflow",
+  "docId": "clone-0123456789abcdef/04",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "04 流程與狀態機",
+  "summary": "最小合法文件（只過 L1）",
+  "components": [
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "diagramSources": [
+    {
+      "entityKey": "REQ_STATUS",
+      "flowchart": "status-REQ_STATUS.md#L7-L20",
+      "stateDiagram": "status-REQ_STATUS.md#L24-L47",
+      "fingerprint": "74ddc35144e7ccb6d318a2976abae48d0af373c58aaa87ab90e513480af3b12e"
+    }
+  ],
+  "items": [
+    {
+      "id": "STATE-003",
+      "key": "REQ_STATUS:020",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0036"
+      ],
+      "entityKey": "REQ_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "020",
+      "name": "020 待主管審核",
+      "binding": "FLD-017",
+      "domainLabel": "待主管審核",
+      "isInitialTarget": false,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "TRN-008",
+      "key": "REQ_STATUS:020>030",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0050"
+      ],
+      "entityKey": "REQ_STATUS",
+      "from": "STATE-003",
+      "to": "STATE-005",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-002",
+        "action": "按「核准」（TW_DEMO_REQWRK.APPROVE_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "ROLE-001"
+            }
+          },
+          {
+            "left": {
+              "drv": "DRV-002"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "left": {
+          "fld": "FLD-010"
+        },
+        "op": "LE",
+        "right": {
+          "const": "50000",
+          "type": "NUMBER"
+        }
+      },
+      "writes": [
+        {
+          "field": "FLD-017",
+          "value": {
+            "const": "030",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-012",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "核准後按鈕隱藏；兩位審核者同時核准時，後存檔者被拒絕（見 08 的併發行為）。"
+    },
+    {
+      "id": "FLOW-004",
+      "key": "REQ_STATUS:高額審核",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0061"
+      ],
+      "entityKey": "REQ_STATUS",
+      "scenarioType": "高額審核",
+      "narrative": "金額超過 50000 時，直屬主管核准後再由部門主管核准。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-007",
+          "description": "直屬主管核准（金額 > 50000），轉部門主管"
+        }
+      ],
+      "entryStates": [
+        "STATE-003"
+      ],
+      "exitStates": [
+        "STATE-005"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": "部門主管可退回，轉入「退回補件」。"
+    }
+  ]
+}

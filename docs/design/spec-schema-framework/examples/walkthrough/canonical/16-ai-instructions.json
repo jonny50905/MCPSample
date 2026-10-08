@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "16-ai-instructions",
+  "docId": "clone-0123456789abcdef/16",
+  "jobId": "clone-0123456789abcdef",
+  "revision": "r0001",
+  "status": "in_review",
+  "title": "16 AI 實作指引",
+  "summary": "條款 10",
+  "components": [
+    "TW_DEMO_APV",
+    "TW_DEMO_REQ"
+  ],
+  "dependsOn": [],
+  "sources": [
+    {
+      "kind": "FRAMEWORK",
+      "ref": "schemas/1.0",
+      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+    }
+  ],
+  "gate": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "NOT_APPLICABLE",
+    "L4": "NOT_APPLICABLE",
+    "L5": "NOT_APPLICABLE"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "AI-001",
+      "key": "AI:01",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "READING",
+      "clause": "先讀 00-index：閱讀順序、ID 前綴對照、本版狀態。看到任何 ID，到前綴對照表指定的文件找定義；以 ID 為準，不以章節位置為準。"
+    },
+    {
+      "id": "AI-002",
+      "key": "AI:02",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "SCOPE",
+      "clause": "只實作 01～19 本體列出的項目。90 問題清單中的圖外狀態與圖外轉移不實作，除非 19 有決策把它納入。"
+    },
+    {
+      "id": "AI-003",
+      "key": "AI:03",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "DATA",
+      "clause": "07「不建置的原生欄位」所列欄位不建資料欄、不上畫面、不寫規則。DEPENDENCY 實體只建文件列出的欄位（最小介面）。"
+    },
+    {
+      "id": "AI-004",
+      "key": "AI:04",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "DATA",
+      "clause": "狀態碼、選項儲存值、訊息原文一律保留原值；畫面文字可以調整，但不得更改儲存值。"
+    },
+    {
+      "id": "AI-005",
+      "key": "AI:05",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "LOGIC",
+      "clause": "條件的空白語意照共同定義實作：字元欄空白＝NULL 或單一空白；數值欄未輸入視為 0；日期欄未輸入為 NULL。"
+    },
+    {
+      "id": "AI-006",
+      "key": "AI:06",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "UNKNOWN_HANDLING",
+      "clause": "遇到 UNRESOLVED 或文件沒有說明的行為，不要自行補上；記下 ID 與問題回報，等待 19 的決策。"
+    },
+    {
+      "id": "AI-007",
+      "key": "AI:07",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "UNKNOWN_HANDLING",
+      "clause": "NOT_APPLICABLE 表示已查證「沒有」，不要補做；它不是待辦。"
+    },
+    {
+      "id": "AI-008",
+      "key": "AI:08",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "SCOPE",
+      "clause": "文件不指定技術。不要把原系統的 Component、Page、Record 結構當成必須照搬的架構；要保留的是可觀測行為與資料語意。"
+    },
+    {
+      "id": "AI-009",
+      "key": "AI:09",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "TRACEABILITY",
+      "clause": "在程式、測試與提交訊息標註實作的 ID（FR、BR、TC…），讓驗收能逐項對照 18 的完成條件。"
+    },
+    {
+      "id": "AI-010",
+      "key": "AI:10",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "CHANGE_DISCIPLINE",
+      "clause": "發現規格矛盾或錯誤時不要自行修改規格；回報 ID 與證據，由 19 的決策處理後再實作。"
+    }
+  ]
+}

@@ -1,0 +1,316 @@
+{
+  "parse": {
+    "flowchartEdges": 11,
+    "stateDiagramEdges": 13,
+    "stateCodes": [
+      "010",
+      "015",
+      "020",
+      "025",
+      "030",
+      "090"
+    ],
+    "normalizedTransitions": [
+      "*>010",
+      "010>020",
+      "010>090",
+      "015>020",
+      "015>090",
+      "020>015",
+      "020>025",
+      "020>030",
+      "025>015",
+      "025>030"
+    ],
+    "finals": [
+      "030",
+      "090"
+    ],
+    "scenarios": {
+      "主流程": [
+        "*>010",
+        "010>020",
+        "020>030"
+      ],
+      "撤回作廢": [
+        "010>090",
+        "015>090"
+      ],
+      "退回補件": [
+        "015>020",
+        "020>015",
+        "025>015"
+      ],
+      "高額審核": [
+        "020>025",
+        "025>030"
+      ]
+    },
+    "codesEqual": true,
+    "transitionsEqual": true,
+    "onlyInFlowchart": [],
+    "onlyInStateDiagram": []
+  },
+  "docs": {
+    "01-overview": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "NOT_APPLICABLE"
+      },
+      "status": "in_review",
+      "summary": "目標 1、決策責任 2、物件 22；未解問題 0",
+      "dependsOn": []
+    },
+    "02-functional-requirements": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "功能 5；未解問題 0",
+      "dependsOn": [
+        "01-overview",
+        "03-roles-permissions",
+        "04-workflow",
+        "07-database"
+      ]
+    },
+    "03-roles-permissions": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "角色 2、權限 2；未解問題 0",
+      "dependsOn": [
+        "01-overview",
+        "07-database"
+      ]
+    },
+    "04-workflow": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "狀態 6、轉移 10、情境 4；未解問題 0",
+      "dependsOn": [
+        "01-overview",
+        "03-roles-permissions",
+        "07-database"
+      ]
+    },
+    "05-ui": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "畫面元件 12；未解問題 0",
+      "dependsOn": [
+        "01-overview",
+        "02-functional-requirements",
+        "04-workflow",
+        "07-database"
+      ]
+    },
+    "06-architecture": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "介面 1；未解問題 0",
+      "dependsOn": [
+        "01-overview",
+        "04-workflow",
+        "07-database"
+      ]
+    },
+    "07-database": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "實體 3、欄位 18、衍生概念 2、不建置欄位組 1；未解問題 1",
+      "dependsOn": [
+        "01-overview"
+      ]
+    },
+    "08-api": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "操作 5；未解問題 0",
+      "dependsOn": [
+        "01-overview",
+        "02-functional-requirements",
+        "03-roles-permissions",
+        "04-workflow",
+        "05-ui",
+        "06-architecture",
+        "07-database",
+        "09-business-logic"
+      ]
+    },
+    "09-business-logic": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "PASS",
+        "L5": "PASS"
+      },
+      "status": "in_review",
+      "summary": "訊息 4、規則 6；未解問題 0",
+      "dependsOn": [
+        "01-overview",
+        "02-functional-requirements",
+        "04-workflow",
+        "05-ui",
+        "06-architecture",
+        "07-database"
+      ]
+    },
+    "14-testing": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "FAIL",
+        "L4": "PASS",
+        "L5": "NOT_APPLICABLE"
+      },
+      "status": "draft",
+      "summary": "測試案例 14；未解問題 0",
+      "dependsOn": [
+        "02-functional-requirements",
+        "03-roles-permissions",
+        "04-workflow",
+        "05-ui",
+        "07-database",
+        "08-api",
+        "09-business-logic"
+      ]
+    },
+    "16-ai-instructions": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "NOT_APPLICABLE",
+        "L4": "NOT_APPLICABLE",
+        "L5": "NOT_APPLICABLE"
+      },
+      "status": "in_review",
+      "summary": "條款 10",
+      "dependsOn": []
+    },
+    "17-tasks": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "NOT_APPLICABLE",
+        "L5": "NOT_APPLICABLE"
+      },
+      "status": "in_review",
+      "summary": "工作項 6；未解問題 0",
+      "dependsOn": [
+        "02-functional-requirements",
+        "03-roles-permissions",
+        "04-workflow",
+        "05-ui",
+        "07-database",
+        "08-api",
+        "09-business-logic",
+        "14-testing"
+      ]
+    },
+    "18-definition-of-done": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "PASS",
+        "L4": "NOT_APPLICABLE",
+        "L5": "NOT_APPLICABLE"
+      },
+      "status": "in_review",
+      "summary": "完成條件 7；未解問題 0",
+      "dependsOn": [
+        "03-roles-permissions",
+        "04-workflow",
+        "07-database",
+        "08-api",
+        "09-business-logic",
+        "14-testing",
+        "17-tasks"
+      ]
+    },
+    "19-decision-log": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "NOT_APPLICABLE",
+        "L4": "NOT_APPLICABLE",
+        "L5": "NOT_APPLICABLE"
+      },
+      "status": "in_review",
+      "summary": "決策 1",
+      "dependsOn": [
+        "01-overview",
+        "90-questions"
+      ]
+    },
+    "90-questions": {
+      "gate": {
+        "L1": "PASS",
+        "L2": "PASS",
+        "L3": "NOT_APPLICABLE",
+        "L4": "NOT_APPLICABLE",
+        "L5": "NOT_APPLICABLE"
+      },
+      "status": "in_review",
+      "summary": "問題 3（OPEN 1、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2",
+      "dependsOn": [
+        "01-overview",
+        "07-database",
+        "08-api"
+      ]
+    }
+  },
+  "violations": {
+    "14-testing/L3": [
+      "C07 TRN-005（015>090）沒有測試案例",
+      "C07 TRN-009（025>015）沒有測試案例"
+    ]
+  },
+  "evidenceErrors": [],
+  "evidenceUnused": [],
+  "evidenceMissing": []
+}
