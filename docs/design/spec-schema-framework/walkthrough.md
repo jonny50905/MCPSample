@@ -13,7 +13,7 @@
 > - [rendered/](examples/walkthrough/rendered/00-index.md)：讀者看到的 Markdown。
 > - [gate-report.json](examples/walkthrough/gate-report.json)：檢核結果。
 >
-> §9 另用第二組合成資料示範子業務守門（畫法一），檔案在 [examples/gate/](examples/gate/)。
+> §9 另用第二組合成資料示範子業務守門（畫法一），檔案在 [examples/gate/](examples/gate/)；§9.7 用它的變形示範公司機校準。
 >
 > 以上都由同一份 schema 與範例定義產生並驗證（設計期腳本，未放進 repo）；本頁的表格與程式碼區塊也是同一次產生的。
 
@@ -815,6 +815,74 @@ C07 要求守門轉移有正例與反例；逐列條件有 whenEmpty 時，還�
 
 本範例只產生 01、02、03、04、07、14，只跑 L1、R01、C01、R13 與守門的 C02、C07，結果見 [gate-report.json](examples/gate/gate-report.json)（沒有任何發現）。其他檢核需要完整的 job。
 
+### 9.7 在公司機校準：只回報代碼
+
+真實的 STATUS 檔不能帶出公司（設計 §8.9）。下面把守門範例的 STATUS 檔改幾個地方，示範第 0 階段停下來時，管理者在公司機看到什麼、回報維護端什麼，以及 project.md 的本機設定怎麼改變結果。範例裡的「只在公司機看的訊息」是合成的；真實檔的這些訊息不出公司。結果見 [calibration-report.json](examples/gate/calibration-report.json)。
+
+**1. 大圖的子業務區塊只畫摘要：獨立的 flowchart 與 stateDiagram 多畫了「020 補件中」，大圖 040 的區塊仍只有 010→090**（本機設定：預設）
+
+只在公司機看的訊息：
+
+```text
+CASEDOC_STATUS 的 P1（第 8 行起的 flowchart，subgraph DOCS）與 P4（第 80 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090
+CASEDOC_STATUS 的 P2（第 34 行起的 stateDiagram，M040 第 1 個區塊）與 P4（第 80 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090
+```
+
+回報維護端的內容：
+
+```text
+S PART_MISMATCH E2 P1 ref=P4 a=FLOW.SUBGRAPH b=STATE.WHOLE c=2/3 t=2/3 rel=SUBSET reach=ALL ends=SAME lab=NA
+S PART_MISMATCH E2 P2 ref=P4 a=STATE.REGION b=STATE.WHOLE c=2/3 t=2/3 rel=SUBSET reach=ALL ends=SAME lab=NA
+```
+
+**2. 同一份檔，project.md 的各段圖比對設為 SUMMARY**（本機設定：各段圖比對 SUMMARY）
+
+通過比對，不必回報。`CASEDOC_STATUS` 的 P1、P2 是摘要段，P3、P4 是完整段。分母取完整段：狀態碼 010、020、090；轉移 新建→010、010→020、020→090；情境「文件審查」含 新建→010、010→020、020→090；線上描述 010→020「審查人員要求補件」、020→090「審查人員按「審查完成」」。
+
+摘要段上帶標籤的線（第 11 行、第 12 行，標籤都是「文件審查」）不自動帶入，改列進 STATUS 文字逐行處置。研究還沒補上 020 之前，C01 會指出：
+
+- CASEDOC_STATUS 的 STATE 與狀態圖代碼不符：少 020
+- CASEDOC_STATUS 的 TRN 與狀態圖轉移不符：多 010>090；少 010>020、020>090
+
+**3. 狀態圖從區塊內的 D090 直接連到 M050**（本機設定：預設）
+
+只在公司機看的訊息：
+
+```text
+第 60 行：D090 跨越複合狀態或平行區塊的邊界（不支援，請改成從複合狀態本身連出）
+```
+
+回報維護端的內容：
+
+```text
+S CROSS_BOUNDARY B2 d=STATE k=EDGE from=REGION to=MAIN
+```
+
+**4. project.md 的說明範圍設為「說明」**（本機設定：說明範圍「說明」）
+
+通過，不必回報。圖外說明列舉 5 行，範圍外 2 行沒有列舉（04 的解析設定寫出這個數字）。範圍外的行只在公司機列出：
+
+```text
+第 3 行不在範圍內：本檔是 STATUS 權威文件的合成範例：主業務的每個階段畫成大框框，框內以平行區塊畫子業務，大框框之間的線上寫明往下走的條件。
+第 70 行不在範圍內：文件審查另有獨立的圖，內容與大圖 040 的第一個區塊相同。
+```
+
+**5. 說明範圍的標題寫成檔裡沒有的「補充說明」**（本機設定：說明範圍「補充說明」）
+
+只在公司機看的訊息：
+
+```text
+說明範圍的標題在檔裡找不到：「補充說明」
+```
+
+回報維護端的內容：
+
+```text
+S TEXT_SCOPE missing=1 ambiguous=0
+```
+
+第 1、2 種是同一份檔：預設的 STRICT 會停，停止行的 `rel=SUBSET reach=ALL ends=SAME` 已經說明大圖的區塊像是摘要；管理者確認大圖本來就只畫重點，把各段圖比對改成 SUMMARY 就能往下走，不必等維護端。分母取完整的獨立圖，所以 020 與兩條新轉移都要研究，C01 會盯著。
+
 ## 10. 檢核結果
 
 L1～L3 是設計期腳本實際執行的結果。L4、L5 是示意值：範例假設已執行並通過，沒有真的跑覆核與讀者。
@@ -846,7 +914,7 @@ L1～L3 是設計期腳本實際執行的結果。L4、L5 是示意值：範例�
 
 ### 壞範例：刻意破壞後由哪一層擋下
 
-設計期腳本對兩個範例做 20 種破壞（貫穿範例 10 種、守門範例 10 種），每一種都被對應的檢核擋下，結果見 [negative-report.json](examples/negative-report.json)。這就是 issue 完成標準所說的「能檢查缺欄位、缺引用或含未確認假設」。L0 PARSE 表示研究前就停止：從區塊內直接連到外面的線不支援，停在該行；同一子業務的各段圖不一致，列出差異。
+設計期腳本對兩個範例做 20 種破壞（貫穿範例 10 種、守門範例 10 種），每一種都被對應的檢核擋下，結果見 [negative-report.json](examples/negative-report.json)。這就是 issue 完成標準所說的「能檢查缺欄位、缺引用或含未確認假設」。L0 PARSE 表示研究前就停止：從區塊內直接連到外面的線不支援，停在該行；同一子業務的各段圖不一致，列出差異。兩種停止另外都印出停止行（見 [negative-report.json](examples/negative-report.json) 的 `reported` 與 §9.7）。「獨立圖多畫了 020」在預設的 STRICT 下會停；管理者若把比對方式設為 SUMMARY，這種差異會被當成摘要，改由 C01 要求研究補上 020。
 
 | 破壞方式 | 預期 | 結果 | 檢核訊息 |
 |---|---|---|---|
@@ -868,7 +936,7 @@ L1～L3 是設計期腳本實際執行的結果。L4、L5 是示意值：範例�
 | 守門範例：TRN-010 漏帶線上描述 | L3 C01 | 擋下 | TRN-010 的線上描述與狀態圖不符（圖上：文件審查與付款都完成，且已上傳結案報告） |
 | 守門範例：說明區域「審查人員逐份審查文件」那一行沒有處置 | L3 C01 | 擋下 | STATUS 文字 status-CASE_STATUS.md#L90「文件審查 010 待審查：審查人員逐份審查文件。」沒有處置 |
 | 守門範例：守門活動沒有功能可完成（FR-002 拿掉 performs） | L3 C02 | 擋下 | ACT-005 是守門活動，但沒有功能讓操作者完成它 |
-| 守門範例：文件審查的獨立圖多畫了「020 補件中」，與大圖的區塊不同 | L0 PARSE | 擋下 | 研究前停止：CASEDOC_STATUS：第 79 行起的 stateDiagram 的狀態碼 010、020、090 與其他段 010、090 不同；CASEDOC_STATUS：第 79 行起的 stateDiagram 的轉移與其他段不同（010>020、010>090、020>090） |
+| 守門範例：文件審查的獨立圖多畫了「020 補件中」，與大圖的區塊不同 | L0 PARSE | 擋下 | 研究前停止：CASEDOC_STATUS 的 P1（第 8 行起的 flowchart，subgraph DOCS）與 P4（第 79 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090。CASEDOC_STATUS 的 P2（第 34 行起的 stateDiagram，M040 第 1 個區塊）與 P4（第 79 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090。CASEDOC_STATUS 的 P3（第 73 行起的 flowchart）與 P4（第 79 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090 |
 | 守門範例：狀態圖從區塊內的 D090 直接連到 M050 | L0 PARSE | 擋下 | 解析停止：第 60 行：D090 跨越複合狀態或平行區塊的邊界（不支援，請改成從複合狀態本身連出） |
 
 「推測寫成事實」是 L1 的警告（S07）而不是失敗：用語比對無法證明一句話是假設，所以只負責把它標出來，交給 L4 覆核確認，或改開問題。
@@ -934,5 +1002,6 @@ F2 題「核准後會發生什麼」，有一位讀者另外答了「寄信通�
 | [14-testing.md](examples/walkthrough/rendered/14-testing.md) | 14 個案例；開頭標示 draft 與 L3 FAIL |
 | [90-questions.md](examples/walkthrough/rendered/90-questions.md) | 4 個問題（含原生未使用分支的證明）與只計數的定義值 |
 | [gate/rendered/04-workflow.md](examples/gate/rendered/04-workflow.md) | 守門範例的 04：平行區塊、守門轉移、中斷轉移、活動 |
+| [gate/calibration-report.json](examples/gate/calibration-report.json) | 公司機校準示範：5 種情況的停止行、只在公司機看的訊息、本機設定的效果 |
 
 其餘文件（01、02、03、05、06、08、16、17、18、19）在同一個目錄。每個項目末尾的「被引用」都由外環反查。

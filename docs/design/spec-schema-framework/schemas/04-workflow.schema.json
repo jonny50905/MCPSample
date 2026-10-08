@@ -31,6 +31,72 @@
             ]
           }
         },
+        "parseSettings": {
+          "type": "object",
+          "required": [
+            "partComparison",
+            "textScope",
+            "excludedLines"
+          ],
+          "properties": {
+            "partComparison": {
+              "type": "string",
+              "enum": [
+                "STRICT",
+                "SUMMARY"
+              ]
+            },
+            "textScope": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "HEADINGS"
+              ]
+            },
+            "textHeadings": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "excludedLines": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "textScope": {
+                    "const": "HEADINGS"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "textHeadings"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "textHeadings"
+                  ]
+                },
+                "properties": {
+                  "excludedLines": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          ],
+          "description": "這次解析用的本機設定（project.md，只有人寫）：各段圖的比對方式、說明範圍"
+        },
         "diagramSources": {
           "type": "array",
           "items": {
@@ -46,7 +112,8 @@
                   "required": [
                     "diagram",
                     "locator",
-                    "scope"
+                    "scope",
+                    "role"
                   ],
                   "properties": {
                     "diagram": {
@@ -77,6 +144,13 @@
                     },
                     "subgraph": {
                       "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "COMPLETE",
+                        "SUMMARY"
+                      ]
                     }
                   },
                   "additionalProperties": false,
@@ -156,11 +230,15 @@
                 "contains": {
                   "type": "object",
                   "required": [
-                    "diagram"
+                    "diagram",
+                    "role"
                   ],
                   "properties": {
                     "diagram": {
                       "const": "STATE_DIAGRAM"
+                    },
+                    "role": {
+                      "const": "COMPLETE"
                     }
                   }
                 }
@@ -177,7 +255,7 @@
             "additionalProperties": false
           },
           "minItems": 1,
-          "description": "狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；同一實體的各段必須一致（模型讀檔提出、外環驗證）",
+          "description": "狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；各段的比對見 parseSettings（模型讀檔提出、外環驗證）",
           "x-ref": [
             "STATE"
           ]
@@ -257,6 +335,7 @@
         }
       },
       "required": [
+        "parseSettings",
         "diagramSources",
         "statusTexts"
       ]

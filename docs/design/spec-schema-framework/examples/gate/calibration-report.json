@@ -1,0 +1,117 @@
+{
+  "purpose": "真實 STATUS 檔只在公司機。第 0 階段停止時，reported 是可以回報給維護端的行（只有不透明編號、封閉值與計數，格式符合 ^S [A-Z_]+( [BKEP][0-9]+)*( [a-z]+=[A-Z0-9_./]+)*$）；localOnly 是只在公司機看的訊息（有行號與原文）。settings 是人寫在 project.md 的本機設定。",
+  "cases": [
+    {
+      "case": "大圖的子業務區塊只畫摘要：獨立的 flowchart 與 stateDiagram 多畫了「020 補件中」，大圖 040 的區塊仍只有 010→090",
+      "settings": {},
+      "reported": [
+        "S PART_MISMATCH E2 P1 ref=P4 a=FLOW.SUBGRAPH b=STATE.WHOLE c=2/3 t=2/3 rel=SUBSET reach=ALL ends=SAME lab=NA",
+        "S PART_MISMATCH E2 P2 ref=P4 a=STATE.REGION b=STATE.WHOLE c=2/3 t=2/3 rel=SUBSET reach=ALL ends=SAME lab=NA"
+      ],
+      "localOnly": [
+        "CASEDOC_STATUS 的 P1（第 8 行起的 flowchart，subgraph DOCS）與 P4（第 80 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090",
+        "CASEDOC_STATUS 的 P2（第 34 行起的 stateDiagram，M040 第 1 個區塊）與 P4（第 80 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090"
+      ]
+    },
+    {
+      "case": "同一份檔，project.md 的各段圖比對設為 SUMMARY",
+      "settings": {
+        "partComparison": "SUMMARY"
+      },
+      "reported": [],
+      "localOnly": [],
+      "passed": true,
+      "roles": {
+        "CASEDOC_STATUS": [
+          "SUMMARY",
+          "SUMMARY",
+          "COMPLETE",
+          "COMPLETE"
+        ]
+      },
+      "denominator": {
+        "CASEDOC_STATUS": {
+          "codes": [
+            "010",
+            "020",
+            "090"
+          ],
+          "transitions": [
+            "*>010",
+            "010>020",
+            "020>090"
+          ],
+          "scenarios": {
+            "文件審查": [
+              "*>010",
+              "010>020",
+              "020>090"
+            ]
+          },
+          "labels": {
+            "010>020": [
+              "審查人員要求補件"
+            ],
+            "020>090": [
+              "審查人員按「審查完成」"
+            ]
+          }
+        }
+      },
+      "addedStatusTexts": [
+        {
+          "line": 11,
+          "text": "文件審查"
+        },
+        {
+          "line": 12,
+          "text": "文件審查"
+        }
+      ],
+      "researchStillMissing": [
+        "CASEDOC_STATUS 的 STATE 與狀態圖代碼不符：少 020",
+        "CASEDOC_STATUS 的 TRN 與狀態圖轉移不符：多 010>090；少 010>020、020>090"
+      ]
+    },
+    {
+      "case": "狀態圖從區塊內的 D090 直接連到 M050",
+      "settings": {},
+      "reported": [
+        "S CROSS_BOUNDARY B2 d=STATE k=EDGE from=REGION to=MAIN"
+      ],
+      "localOnly": [
+        "第 60 行：D090 跨越複合狀態或平行區塊的邊界（不支援，請改成從複合狀態本身連出）"
+      ]
+    },
+    {
+      "case": "project.md 的說明範圍設為「說明」",
+      "settings": {
+        "textHeadings": [
+          "說明"
+        ]
+      },
+      "reported": [],
+      "localOnly": [
+        "第 3 行不在範圍內：本檔是 STATUS 權威文件的合成範例：主業務的每個階段畫成大框框，框內以平行區塊畫子業務，大框框之間的線上寫明往下走的條件。",
+        "第 70 行不在範圍內：文件審查另有獨立的圖，內容與大圖 040 的第一個區塊相同。"
+      ],
+      "passed": true,
+      "enumeratedProse": 5,
+      "excludedLines": 2
+    },
+    {
+      "case": "說明範圍的標題寫成檔裡沒有的「補充說明」",
+      "settings": {
+        "textHeadings": [
+          "補充說明"
+        ]
+      },
+      "reported": [
+        "S TEXT_SCOPE missing=1 ambiguous=0"
+      ],
+      "localOnly": [
+        "說明範圍的標題在檔裡找不到：「補充說明」"
+      ]
+    }
+  ]
+}

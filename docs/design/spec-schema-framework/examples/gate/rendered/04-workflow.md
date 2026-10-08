@@ -83,6 +83,8 @@ flowchart TD
     N040 -->|撤案｜TRN-011| N090
 ```
 
+解析設定：各段圖比對 STRICT（各段完全一致）；說明範圍：全檔。
+
 來源圖（每個狀態實體由哪幾段圖組成）：
 
 - CASE_STATUS：flowchart status-CASE_STATUS.md#L7-L31（最外層）；stateDiagram status-CASE_STATUS.md#L33-L66（最外層）

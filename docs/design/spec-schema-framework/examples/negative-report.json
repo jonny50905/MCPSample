@@ -113,13 +113,21 @@
       "case": "守門範例：文件審查的獨立圖多畫了「020 補件中」，與大圖的區塊不同",
       "expected": "L0 PARSE",
       "caught": true,
-      "message": "研究前停止：CASEDOC_STATUS：第 79 行起的 stateDiagram 的狀態碼 010、020、090 與其他段 010、090 不同；CASEDOC_STATUS：第 79 行起的 stateDiagram 的轉移與其他段不同（010>020、010>090、020>090）"
+      "message": "研究前停止：CASEDOC_STATUS 的 P1（第 8 行起的 flowchart，subgraph DOCS）與 P4（第 79 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090。CASEDOC_STATUS 的 P2（第 34 行起的 stateDiagram，M040 第 1 個區塊）與 P4（第 79 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090。CASEDOC_STATUS 的 P3（第 73 行起的 flowchart）與 P4（第 79 行起的 stateDiagram）不同：狀態碼少 020；轉移多 010>090，少 010>020、020>090",
+      "reported": [
+        "S PART_MISMATCH E2 P1 ref=P4 a=FLOW.SUBGRAPH b=STATE.WHOLE c=2/3 t=2/3 rel=SUBSET reach=ALL ends=SAME lab=NA",
+        "S PART_MISMATCH E2 P2 ref=P4 a=STATE.REGION b=STATE.WHOLE c=2/3 t=2/3 rel=SUBSET reach=ALL ends=SAME lab=NA",
+        "S PART_MISMATCH E2 P3 ref=P4 a=FLOW.WHOLE b=STATE.WHOLE c=2/3 t=2/3 rel=SUBSET reach=ALL ends=SAME lab=NA"
+      ]
     },
     {
       "case": "守門範例：狀態圖從區塊內的 D090 直接連到 M050",
       "expected": "L0 PARSE",
       "caught": true,
-      "message": "解析停止：第 60 行：D090 跨越複合狀態或平行區塊的邊界（不支援，請改成從複合狀態本身連出）"
+      "message": "解析停止：第 60 行：D090 跨越複合狀態或平行區塊的邊界（不支援，請改成從複合狀態本身連出）",
+      "reported": [
+        "S CROSS_BOUNDARY B2 d=STATE k=EDGE from=REGION to=MAIN"
+      ]
     }
   ]
 }

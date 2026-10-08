@@ -165,7 +165,33 @@
         "text": "結案後由系統寄發結案通知給承辦人。"
       }
     ],
-    "problems": []
+    "settings": {
+      "partComparison": "STRICT",
+      "textScope": "ALL",
+      "excludedLines": 0
+    },
+    "roles": {
+      "CASE_STATUS": [
+        "COMPLETE",
+        "COMPLETE"
+      ],
+      "CASEDOC_STATUS": [
+        "COMPLETE",
+        "COMPLETE",
+        "COMPLETE",
+        "COMPLETE"
+      ],
+      "CASEPAY_STATUS": [
+        "COMPLETE",
+        "COMPLETE"
+      ],
+      "CASEAPV_STATUS": [
+        "COMPLETE",
+        "COMPLETE"
+      ]
+    },
+    "problems": [],
+    "stopLines": []
   },
   "findings": [],
   "checksRun": [

@@ -54,6 +54,8 @@ flowchart TD
     N025 -->|高額審核｜TRN-010| N030
 ```
 
+解析設定：各段圖比對 STRICT（各段完全一致）；說明範圍：全檔。
+
 來源圖（每個狀態實體由哪幾段圖組成）：
 
 - REQ_STATUS：flowchart status-REQ_STATUS.md#L7-L20（最外層）；stateDiagram status-REQ_STATUS.md#L24-L46（最外層）

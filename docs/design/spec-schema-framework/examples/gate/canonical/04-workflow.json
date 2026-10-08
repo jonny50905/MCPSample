@@ -32,6 +32,11 @@
     "L5": "NOT_RUN"
   },
   "openQuestions": [],
+  "parseSettings": {
+    "partComparison": "STRICT",
+    "textScope": "ALL",
+    "excludedLines": 0
+  },
   "diagramSources": [
     {
       "entityKey": "CASE_STATUS",
@@ -39,12 +44,14 @@
         {
           "diagram": "FLOWCHART",
           "locator": "status-CASE_STATUS.md#L7-L31",
-          "scope": "WHOLE"
+          "scope": "WHOLE",
+          "role": "COMPLETE"
         },
         {
           "diagram": "STATE_DIAGRAM",
           "locator": "status-CASE_STATUS.md#L33-L66",
-          "scope": "WHOLE"
+          "scope": "WHOLE",
+          "role": "COMPLETE"
         }
       ],
       "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
@@ -56,24 +63,28 @@
           "diagram": "FLOWCHART",
           "locator": "status-CASE_STATUS.md#L7-L31",
           "scope": "SUBGRAPH",
-          "subgraph": "DOCS"
+          "subgraph": "DOCS",
+          "role": "COMPLETE"
         },
         {
           "diagram": "STATE_DIAGRAM",
           "locator": "status-CASE_STATUS.md#L33-L66",
           "scope": "REGION",
           "composite": "STATE-008",
-          "index": 1
+          "index": 1,
+          "role": "COMPLETE"
         },
         {
           "diagram": "FLOWCHART",
           "locator": "status-CASE_STATUS.md#L72-L76",
-          "scope": "WHOLE"
+          "scope": "WHOLE",
+          "role": "COMPLETE"
         },
         {
           "diagram": "STATE_DIAGRAM",
           "locator": "status-CASE_STATUS.md#L78-L85",
-          "scope": "WHOLE"
+          "scope": "WHOLE",
+          "role": "COMPLETE"
         }
       ],
       "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
@@ -85,14 +96,16 @@
           "diagram": "FLOWCHART",
           "locator": "status-CASE_STATUS.md#L7-L31",
           "scope": "SUBGRAPH",
-          "subgraph": "PAYS"
+          "subgraph": "PAYS",
+          "role": "COMPLETE"
         },
         {
           "diagram": "STATE_DIAGRAM",
           "locator": "status-CASE_STATUS.md#L33-L66",
           "scope": "REGION",
           "composite": "STATE-008",
-          "index": 2
+          "index": 2,
+          "role": "COMPLETE"
         }
       ],
       "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
@@ -104,14 +117,16 @@
           "diagram": "FLOWCHART",
           "locator": "status-CASE_STATUS.md#L7-L31",
           "scope": "SUBGRAPH",
-          "subgraph": "APVS"
+          "subgraph": "APVS",
+          "role": "COMPLETE"
         },
         {
           "diagram": "STATE_DIAGRAM",
           "locator": "status-CASE_STATUS.md#L33-L66",
           "scope": "REGION",
           "composite": "STATE-009",
-          "index": 1
+          "index": 1,
+          "role": "COMPLETE"
         }
       ],
       "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"

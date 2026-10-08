@@ -274,13 +274,14 @@
 - **用途**：狀態、轉移、情境、狀態活動。內容是 STATUS 文件的權威內容，加上程式研究得到的「怎麼做」。
 - **輸入來源**：STATUS 文件（flowchart＋stateDiagram-v2，含大框框、平行區塊、subgraph、線上描述，以及圖外的說明區域）；程式研究；07 的狀態欄位與子表；03 的角色。
 - **何時產生**：骨架在第 0 階段（模型提出狀態圖對應，外環解析並驗證後派 ID）；細節、活動與說明文字的處置在第 4 階段。
-- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，保留大框框與平行區塊，線上標 TRN ID、線上描述、守衛與離開方式）；情境流程圖（flowchart，大框框以 subgraph 表示，線上標情境類型與 TRN ID）；來源圖；STATUS 文字的處置表；狀態、轉移、情境、活動明細。
+- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，保留大框框與平行區塊，線上標 TRN ID、線上描述、守衛與離開方式）；情境流程圖（flowchart，大框框以 subgraph 表示，線上標情境類型與 TRN ID）；解析設定與來源圖（標出摘要段）；STATUS 文字的處置表；狀態、轉移、情境、活動明細。
 - **外殼欄位**：
 
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
-| `diagramSources` | 陣列〈物件〉 | ✓ | 每個實體≥1 段 stateDiagram；scope＝WHOLE（整張圖的最外層）／REGION（大圖的平行區塊）／SUBGRAPH（flowchart 的 subgraph） | 狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；同一實體的各段必須一致（模型讀檔提出、外環驗證） |
-| `statusTexts` | 陣列〈物件〉 | ✓ | STATUS 檔圖外每一行說明（標題、空行、表頭除外）與圖上的狀態描述、note 恰一筆（C01） | STATUS 文字的處置：MAPPED＝寫進了哪些 04 項目；NO_SPEC_CONTENT＝沒有規格內容並寫明理由 |
+| `parseSettings` | 物件 | ✓ | partComparison＝STRICT／SUMMARY；textScope＝ALL／HEADINGS（HEADINGS 時列 textHeadings）；excludedLines＝範圍外沒有列舉的行數 | 這次解析用的本機設定（project.md，只有人寫）：各段圖的比對方式、說明範圍 |
+| `diagramSources` | 陣列〈物件〉 | ✓ | 每個實體≥1 段 role＝COMPLETE 的 stateDiagram；scope＝WHOLE（整張圖的最外層）／REGION（大圖的平行區塊）／SUBGRAPH（flowchart 的 subgraph）；role＝COMPLETE（完整段，分母取自這裡）／SUMMARY（摘要段，只驗證；比對方式設為 SUMMARY 才會出現） | 狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；各段的比對見 parseSettings（模型讀檔提出、外環驗證） |
+| `statusTexts` | 陣列〈物件〉 | ✓ | STATUS 檔圖外每一行說明（標題、空行、表頭除外；說明範圍外的行不列）、圖上的狀態描述與 note、摘要段上帶描述或標籤的線，各恰一筆（C01） | STATUS 文字的處置：MAPPED＝寫進了哪些 04 項目；NO_SPEC_CONTENT＝沒有規格內容並寫明理由 |
 
 ### STATE 狀態
 
@@ -356,9 +357,9 @@ STATUS 檔說明區域（或圖上的狀態描述、note）描述「這個階段
 - 有平行區塊的複合狀態：`regions` 與圖一致；區塊內的狀態 `parent` 指向它；離開它的轉移 `exitMode` 不得是 NORMAL（C01）。
 - 守門轉移（ON_COMPLETION）：每個區塊一個 `rows` ALL 條件（where＝子表狀態欄位＝終點，必寫 whenEmpty），每個守門活動一個 DONE（R13）。自動轉移的 `trigger.kind` 用 COMPLETION 並列出 `evaluatedAfter`。
 - INTERRUPT 的 `sideEffects` 寫明未完成的子業務資料怎麼處理。
-- 說明區域的每一行（與圖上的狀態描述、note）在 `statusTexts` 恰一筆；活動的 `behavior` 取自對應那一行的原文（C01）。
+- 說明區域的每一行（與圖上的狀態描述、note）在 `statusTexts` 恰一筆；說明範圍外的行不列，比對方式為 SUMMARY 時，摘要段上帶描述或標籤的線也要列；活動的 `behavior` 取自對應那一行的原文（C01）。
 - `diagramLabels` 由外環從圖上帶入，必須與圖一致（C01）；守衛與觸發要和描述一致，矛盾時開 DIAGRAM_CODE_CONFLICT。
-- 同一實體的各段圖（`diagramSources.parts`）必須一致，這在研究前就檢查（主文件 §8.3）。
+- 同一實體的各段圖（`diagramSources.parts`）必須一致，這在研究前就檢查（主文件 §8.3）；管理者可在 project.md 設為 SUMMARY，允許摘要段（主文件 §8.9）。
 - 以轉移完成的活動，`realizedBy` 從活動所在狀態出發；DONE 只能指向守門活動（R13）。
 - `actor` 只有在觸發方式是 BATCH 或 COMPLETION 時可以是 NA。
 - `implementedAt` 找不到時填 UNRESOLVED，並開 DIAGRAM_EDGE_UNIMPLEMENTED（BLOCKING）。
