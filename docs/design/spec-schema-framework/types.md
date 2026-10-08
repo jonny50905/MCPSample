@@ -25,6 +25,7 @@
 - [18 完成定義](#18-完成定義18-definition-of-done)
 - [19 決策紀錄](#19-決策紀錄19-decision-log)
 - [90 問題清單](#90-問題清單90-questions)
+- [狀態圖解讀（第 0 階段的研究包）](#狀態圖解讀第-0-階段的研究包)
 - [證據登錄（evidence.json）](#證據登錄evidencejson)
 
 ---
@@ -272,32 +273,31 @@
 ## 04 流程與狀態機（04-workflow）
 
 - **用途**：狀態、轉移、情境、狀態活動。內容是 STATUS 文件的權威內容，加上程式研究得到的「怎麼做」。
-- **輸入來源**：STATUS 文件（flowchart＋stateDiagram-v2，含大框框、平行區塊、subgraph、線上描述，以及圖外的說明區域）；程式研究；07 的狀態欄位與子表；03 的角色。
-- **何時產生**：骨架在第 0 階段（模型提出狀態圖對應，外環解析並驗證後派 ID）；細節、活動與說明文字的處置在第 4 階段。
-- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，保留大框框與平行區塊，線上標 TRN ID、線上描述、守衛與離開方式）；情境流程圖（flowchart，大框框以 subgraph 表示，線上標情境類型與 TRN ID）；解析設定與來源圖（標出摘要段）；STATUS 文字的處置表；狀態、轉移、情境、活動明細。
+- **輸入來源**：三份狀態圖解讀多數決採用的事實（狀態、轉移、子業務、線上文字、情境）；STATUS 檔圖外的說明區域；程式研究；07 的狀態欄位與子表；03 的角色。
+- **何時產生**：骨架在第 0 階段（三位讀者解讀、外環比對後派 ID）；細節、活動與說明文字的處置在第 4 階段。
+- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，主業務的狀態裡畫出子業務，線上標 TRN ID、線上文字、守衛與離開方式）；情境流程圖（flowchart，子業務以 subgraph 表示，線上標情境類型與 TRN ID）；狀態圖解讀（第 2 輪表決過的事實與票數）；STATUS 文字的處置表；狀態、轉移、情境、活動明細。
 - **外殼欄位**：
 
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
-| `parseSettings` | 物件 | ✓ | partComparison＝STRICT／SUMMARY；textScope＝ALL／HEADINGS（HEADINGS 時列 textHeadings）；excludedLines＝範圍外沒有列舉的行數 | 這次解析用的本機設定（project.md，只有人寫）：各段圖的比對方式、說明範圍 |
-| `diagramSources` | 陣列〈物件〉 | ✓ | 每個實體≥1 段 role＝COMPLETE 的 stateDiagram；scope＝WHOLE（整張圖的最外層）／REGION（大圖的平行區塊）／SUBGRAPH（flowchart 的 subgraph）；role＝COMPLETE（完整段，分母取自這裡）／SUMMARY（摘要段，只驗證；比對方式設為 SUMMARY 才會出現） | 狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；各段的比對見 parseSettings（模型讀檔提出、外環驗證） |
-| `statusTexts` | 陣列〈物件〉 | ✓ | STATUS 檔圖外每一行說明（標題、空行、表頭除外；說明範圍外的行不列）、圖上的狀態描述與 note、摘要段上帶描述或標籤的線，各恰一筆（C01） | STATUS 文字的處置：MAPPED＝寫進了哪些 04 項目；NO_SPEC_CONTENT＝沒有規格內容並寫明理由 |
+| `statusReading` | 物件 | ✓ | readers＝3；rounds＝1 或 2；contested 列出第 1 輪不一致、第 2 輪逐項表決的事實（票數為 同意:不同意[:不確定]）；unresolved＝第 2 輪仍無多數的件數（每件在 90 開 STATUS_READING_CONFLICT） | 狀態圖解讀的比對摘要（外環計算）：Mermaid 行數、事實數、三份一致的事實數、第 2 輪表決的事實與結果 |
+| `statusTexts` | 陣列〈物件〉 | ✓ | STATUS 檔圖外每一行說明（標題、空行、表頭除外），以及多數讀者列為業務文字（TEXT）的圖內行，各恰一筆（C01） | STATUS 文字的處置：MAPPED＝寫進了哪些 04 項目；NO_SPEC_CONTENT＝沒有規格內容並寫明理由 |
 
 ### STATE 狀態
 
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<狀態實體>:<狀態碼>` |  | 外環據以派發 ID |
-| `entityKey` | 代號 | ✓ |  |  | 狀態實體代號（狀態圖對應研究包給的大寫代號） |
+| `entityKey` | 代號 | ✓ |  |  | 狀態實體代號（讀者給的大寫代號，取多數讀者用的那個） |
 | `stateKind` | 列舉 | ✓ | SIMPLE／COMPOSITE |  | 狀態種類 |
-| `code` | 原文 |  | SIMPLE 必填；有平行區塊的複合狀態也必填 |  | 狀態碼（儲存值） |
-| `name` | 原文 | ✓ |  |  | 狀態圖上的名稱 |
-| `parent` | ID 參照 |  |  | STATE | 所屬複合狀態（平行區塊內的子業務狀態也填） |
-| `regions` | 陣列〈物件〉 |  | 只有 COMPOSITE 能有；依圖上順序 | STATE | 平行區塊（畫法一）：子業務狀態實體與它的終點狀態（區塊內 →[*] 的狀態） |
+| `code` | 原文 |  | SIMPLE 必填；裡面有子業務的 COMPOSITE 也必填 |  | 狀態碼（儲存值） |
+| `name` | 原文 | ✓ |  |  | 圖上的名稱（取多數讀者的寫法） |
+| `parent` | ID 參照 |  |  | STATE | 所屬的主業務狀態（子業務的狀態填它在其中進行的那個狀態） |
+| `regions` | 陣列〈物件〉 |  | 只有 COMPOSITE 能有；依圖上順序 | STATE | 在這個狀態裡進行的子業務：子業務的狀態實體與它的終點狀態 |
 | `binding` | ID 參照 |  | 有 code 時必填 | FLD | 保存狀態碼的欄位 |
 | `domainLabel` | 原文｜NA |  | 有 code 時必填 |  | 值域中的顯示文字（Translate／對照表） |
-| `isInitialTarget` | 布林 | ✓ |  |  | 是否由 [*] 進入（新建；區塊內的 [*] 表示子業務資料的新建） |
-| `isFinal` | 布林 | ✓ |  |  | 是否為終點（→[*]；區塊內的 →[*] 表示該區塊的終點） |
+| `isInitialTarget` | 布林 | ✓ |  |  | 是否為新建的進入點（子業務的進入點表示子業務資料的新建） |
+| `isFinal` | 布林 | ✓ |  |  | 是否為終點（子業務的終點就是主業務守門時看的終點） |
 | `dataPresence` | 列舉 |  | 有 code 時必填 |  | PROD 是否有此狀態碼的資料 |
 
 ### TRN 狀態轉移
@@ -308,12 +308,12 @@
 | `entityKey` | 代號 | ✓ |  |  | 狀態實體 |
 | `from` | ID 參照｜INITIAL | ✓ |  | STATE | 起始狀態（新建為 INITIAL） |
 | `to` | ID 參照 | ✓ |  | STATE | 目標狀態 |
-| `via` | 陣列〈原文〉 |  |  |  | 收合掉的 choice／fork／join 節點 |
-| `diagramLabels` | 陣列〈原文〉 |  | 外環從 stateDiagram 帶入，不由模型填寫（C01） |  | 狀態圖上這條線的描述原文；守衛與觸發必須與它一致 |
-| `exitMode` | 列舉｜UNRESOLVED | ✓ | NORMAL（一般）／ON_COMPLETION（等全部區塊到終點、守門活動完成）／INTERRUPT（不等區塊，中斷子業務）；起點有平行區塊時不得 NORMAL（C01） |  | 離開方式 |
+| `via` | 陣列〈原文〉 |  |  |  | 經過的判斷節點（菱形、choice 等；取多數讀者的寫法） |
+| `diagramLabels` | 陣列〈原文〉 |  | 外環從採用的解讀帶入，不由研究填寫（C01） |  | 圖上這條線的描述原文（情境類型以外的線上文字）；守衛與觸發必須與它一致 |
+| `exitMode` | 列舉｜UNRESOLVED | ✓ | NORMAL（一般）／ON_COMPLETION（等全部子業務到終點、守門活動完成）／INTERRUPT（不等子業務，中斷它們）；起點有子業務時不得 NORMAL（C01） |  | 離開方式 |
 | `trigger` | 物件｜UNRESOLVED | ✓ | kind＝USER_ACTION／BATCH／SYSTEM_EVENT／INTERFACE／COMPLETION；COMPLETION 必附 evaluatedAfter（系統在哪些轉移或活動之後檢查），SYSTEM_EVENT 可附（在哪些轉移之後連帶執行） | OBJ、TRN、ACT | 觸發方式、所在物件與動作原名（COMPLETION＝條件成立時由系統自動轉移） |
 | `actor` | 條件式｜NA｜UNRESOLVED | ✓ | 只有 BATCH／COMPLETION／SYSTEM_EVENT 觸發可以 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 誰能觸發（角色、資格的判定方式） |
-| `guard` | 條件式｜NA｜UNRESOLVED | ✓ | 有 via 或 ON_COMPLETION 時不得 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 轉移條件（選擇此目標的條件；守門轉移要含每個區塊與守門活動，R13） |
+| `guard` | 條件式｜NA｜UNRESOLVED | ✓ | 有 via 或 ON_COMPLETION 時不得 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 轉移條件（選擇此目標的條件；守門轉移要含每個子業務與守門活動，R13） |
 | `writes` | 陣列〈指派〉｜UNRESOLVED | ✓ | 必含狀態欄位＝目標狀態碼 | FLD、DRV、STATE、ROLE、ACT、ENT | 轉移時寫入的欄位與值 |
 | `sideEffects` | 陣列〈物件〉｜NA | ✓ |  | FLD | 其他副作用（通知、介面等於 06／09 反查；INTERRUPT 要寫明未完成的子業務資料怎麼處理） |
 | `implementedAt` | 陣列〈物件〉｜UNRESOLVED | ✓ | 找不到＝UNRESOLVED（DIAGRAM_EDGE_UNIMPLEMENTED） | OBJ | 原系統實作位置 |
@@ -325,9 +325,9 @@
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<狀態實體>:<情境類型原文>` |  | 外環據以派發 ID |
 | `entityKey` | 代號 | ✓ |  |  | 狀態實體 |
-| `scenarioType` | 原文 | ✓ | flowchart 邊標籤原文 |  | 情境類型 |
+| `scenarioType` | 原文 | ✓ | 讀者判定的情境類型（通常是 flowchart 線上的情境標籤原文） |  | 情境類型 |
 | `narrative` | 文字 | ✓ |  |  | 情境說明 |
-| `steps` | 陣列〈物件〉 | ✓ | 每條同標籤的邊恰一步 | TRN | 情境步驟（依拓撲順序） |
+| `steps` | 陣列〈物件〉 | ✓ | 情境內每條轉移恰一步 | TRN | 情境步驟（依拓撲順序） |
 | `entryStates` | 陣列〈ID｜INITIAL〉 | ✓ | ≥1 | STATE | 進入此情境的狀態 |
 | `exitStates` | 陣列〈ID〉 | ✓ | ≥1 | STATE | 離開此情境的狀態 |
 | `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE、ACT、ENT | 前置條件 |
@@ -343,7 +343,7 @@ STATUS 檔說明區域（或圖上的狀態描述、note）描述「這個階段
 | `entityKey` | 代號 | ✓ |  |  | 狀態實體 |
 | `state` | ID 參照 | ✓ |  | STATE | 活動所在的狀態 |
 | `name` | 文字 | ✓ |  |  | 活動名稱 |
-| `behavior` | 原文 | ✓ | 必須出現在 statusTexts 中對應它的那一行（C01） |  | 「這個階段誰該做什麼」的 STATUS 檔原文（說明區域，或圖上的狀態描述與 note） |
+| `behavior` | 原文 | ✓ | 必須出現在 statusTexts 中對應它的那一行（C01） |  | 「這個階段誰該做什麼」的 STATUS 檔原文（說明區域，或讀者列為業務文字的圖內行） |
 | `actors` | 陣列〈角色｜衍生概念｜情境〉｜UNRESOLVED | ✓ | ≥1 | ROLE、DRV | 誰負責：原文的「承辦人」「長官」必須對應到角色或衍生概念 |
 | `enforcement` | 列舉｜UNRESOLVED | ✓ | BY_TRANSITION／SYSTEM_GATE／EXPECTED_ONLY |  | 系統怎麼落實：做了轉移就算完成／離開狀態前系統檢查／系統不記錄也不檢查 |
 | `realizedBy` | 陣列〈ID〉 |  | BY_TRANSITION 必填，其他不得出現 | TRN | 完成此活動的轉移（須從活動所在狀態出發，R13） |
@@ -351,15 +351,15 @@ STATUS 檔說明區域（或圖上的狀態描述、note）描述「這個階段
 
 **完整性與審查準則**
 
-- 與兩張圖完全一致，不多不少（C01）。
-- 每條轉移寫入狀態欄位＝目標狀態碼；經 choice 收合的轉移必有守衛（R06）。
+- 與三份解讀多數決採用的事實完全一致，不多不少（C01）。
+- 每條轉移寫入狀態欄位＝目標狀態碼；經過判斷節點（`via`）的轉移必有守衛（R06）。
 - 狀態碼屬於綁定欄位的值域（R07）。
-- 有平行區塊的複合狀態：`regions` 與圖一致；區塊內的狀態 `parent` 指向它；離開它的轉移 `exitMode` 不得是 NORMAL（C01）。
-- 守門轉移（ON_COMPLETION）：每個區塊一個 `rows` ALL 條件（where＝子表狀態欄位＝終點，必寫 whenEmpty），每個守門活動一個 DONE（R13）。自動轉移的 `trigger.kind` 用 COMPLETION 並列出 `evaluatedAfter`。
+- 裡面有子業務的狀態（COMPOSITE）：`regions` 與採用的解讀一致；子業務的狀態 `parent` 指向它；離開它的轉移 `exitMode` 不得是 NORMAL（C01）。
+- 守門轉移（ON_COMPLETION）：每個子業務一個 `rows` ALL 條件（where＝子表狀態欄位＝終點，必寫 whenEmpty），每個守門活動一個 DONE（R13）。自動轉移的 `trigger.kind` 用 COMPLETION 並列出 `evaluatedAfter`。
 - INTERRUPT 的 `sideEffects` 寫明未完成的子業務資料怎麼處理。
-- 說明區域的每一行（與圖上的狀態描述、note）在 `statusTexts` 恰一筆；說明範圍外的行不列，比對方式為 SUMMARY 時，摘要段上帶描述或標籤的線也要列；活動的 `behavior` 取自對應那一行的原文（C01）。
-- `diagramLabels` 由外環從圖上帶入，必須與圖一致（C01）；守衛與觸發要和描述一致，矛盾時開 DIAGRAM_CODE_CONFLICT。
-- 同一實體的各段圖（`diagramSources.parts`）必須一致，這在研究前就檢查（主文件 §8.3）；管理者可在 project.md 設為 SUMMARY，允許摘要段（主文件 §8.9）。
+- 說明區域的每一行（與讀者列為業務文字的圖內行）在 `statusTexts` 恰一筆；活動的 `behavior` 取自對應那一行的原文（C01）。
+- `diagramLabels` 由外環從採用的解讀帶入，必須一致（C01）；守衛與觸發要和線上文字一致，矛盾時開 DIAGRAM_CODE_CONFLICT。
+- `statusReading` 記下三份解讀的比對摘要，必須等於外環這次比對的結果（C01）。
 - 以轉移完成的活動，`realizedBy` 從活動所在狀態出發；DONE 只能指向守門活動（R13）。
 - `actor` 只有在觸發方式是 BATCH 或 COMPLETION 時可以是 NA。
 - `implementedAt` 找不到時填 UNRESOLVED，並開 DIAGRAM_EDGE_UNIMPLEMENTED（BLOCKING）。
@@ -1395,14 +1395,14 @@ STATUS 檔說明區域（或圖上的狀態描述、note）描述「這個階段
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<類別>:<自然鍵>` |  | 外環據以派發 ID |
-| `category` | 列舉 | ✓ | OFF_DIAGRAM_STATE／OFF_DIAGRAM_TRANSITION／NATIVE_UNUSED_BRANCH／DIAGRAM_EDGE_UNIMPLEMENTED／DIAGRAM_CODE_CONFLICT／SCOPE_CANDIDATE／EVIDENCE_GAP／READER_*／INPUT_MISSING |  | 問題類別 |
+| `category` | 列舉 | ✓ | OFF_DIAGRAM_STATE／OFF_DIAGRAM_TRANSITION／NATIVE_UNUSED_BRANCH／DIAGRAM_EDGE_UNIMPLEMENTED／DIAGRAM_CODE_CONFLICT／SCOPE_CANDIDATE／EVIDENCE_GAP／READER_*／INPUT_MISSING／STATUS_READING_CONFLICT／STATUS_SELF_CONFLICT |  | 問題類別 |
 | `severity` | 列舉 | ✓ | 圖外、原生未使用分支與 INPUT_MISSING 必為 INFO，其餘必為 BLOCKING |  | 是否阻擋完成 |
 | `grade` | 列舉 |  | 圖外類必填 |  | 圖外分級：HIGH＝PROD 有資料；LOW＝僅核心程式賦值 |
 | `question` | 文字 | ✓ |  |  | 問題敘述 |
 | `affects` | 陣列〈ID〉 | ✓ | 可空 | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、ACT、IF、FR、UI、MSG、BR、OP、TC | 受影響的規格項目 |
 | `observed` | 物件 |  | 圖外類必填；原生未使用分支必填 location |  | 觀察到的狀態碼／轉移／位置 |
 | `proof` | 物件 |  | 原生未使用分支必填；kind＝DATA_VALUE_ABSENT／CONFIG_VALUE（必附 field、absentValues）／OUT_OF_SCOPE_CONTEXT（必附 context） |  | 分支不會執行的證明：原文條件、哪一項永不成立、查證敘述與日期 |
-| `raisedBy` | 列舉 | ✓ | PARSER／RESEARCH／REVIEW／READER／GATE |  | 提出來源 |
+| `raisedBy` | 列舉 | ✓ | STATUS_READING（第 0 階段的狀態圖解讀比對）／RESEARCH／REVIEW／READER／GATE |  | 提出來源 |
 | `status` | 列舉 | ✓ | OPEN／ANSWERED／WITHDRAWN／ACCEPTED_AS_GAP |  | 狀態（ANSWERED／ACCEPTED_AS_GAP 由 19 的決策反查） |
 | `proposedAnswer` | 文字 |  | 僅供參考 |  | 研究端建議的答案（不等於決策） |
 
@@ -1442,6 +1442,25 @@ STATUS 檔說明區域（或圖上的狀態描述、note）描述「這個階段
 ```
 
 ---
+
+## 狀態圖解讀（第 0 階段的研究包）
+
+- **用途**：三位讀者各自寫一份。外環檢查後拆成事實比對，多數決採用的事實就是 04 的分母（主文件 §8.2、§8.3）。這不是交付文件，不渲染。
+- **schema 與範例**：[status-reading.schema.json](schemas/status-reading.schema.json)；[gate/readings/](examples/gate/readings/)、[walkthrough/readings/](examples/walkthrough/readings/)。
+
+| 欄位 | 型別 | 必填 | 說明 |
+|---|---|---|---|
+| `reader` | R1～R3 | ✓ | 哪一位讀者 |
+| `source` | 物件 | ✓ | STATUS 檔與它的 SHA-256；檔案改了，解讀作廢重讀 |
+| `states[]` | 陣列 | ✓ | `entity`（讀者自取的大寫代號）、`code`（三位數字）、`name`、`final`、`lines`、`regions[]`（在這個狀態裡進行的子業務：`entity`、`lines`） |
+| `transitions[]` | 陣列 | ✓ | `entity`、`from`（新建寫 `*`）、`to`、`via`（經過的判斷節點）、`labels`（情境類型以外的線上文字原文）、`scenario`（情境類型，沒有就 null）、`lines` |
+| `otherLines[]` | 陣列 | ✓ | 沒被引用的行：`NO_SPEC_CONTENT` 必附 `note`；`TEXT`（圖上的業務文字）可附 `entity`、`code` |
+| `conflicts[]` | 陣列 | ✓ | 圖與圖互相矛盾、又看不出是摘要時：`description`、`lines` |
+
+**外環的檢查**（不合格就退回該讀者重寫）：
+
+- Mermaid 區塊內每一個非空行恰好交代一次：被 `states`、`regions` 或 `transitions` 引用，或列在 `otherLines`；不能兩邊都有，`otherLines` 也不能重複。
+- 引用的行都在 Mermaid 區塊內；轉移的起訖是同一實體的狀態；`regions` 的實體有狀態。
 
 ## 證據登錄（evidence.json）
 

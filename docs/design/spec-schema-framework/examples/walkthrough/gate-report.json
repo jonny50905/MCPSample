@@ -1,7 +1,15 @@
 {
-  "parse": {
-    "flowchartEdges": 11,
-    "stateDiagramEdges": 13,
+  "reading": {
+    "readers": [
+      "R1",
+      "R2",
+      "R3"
+    ],
+    "mermaidLines": 33,
+    "facts": 28,
+    "unanimous": 28,
+    "contested": [],
+    "problems": [],
     "stateCodes": [
       "010",
       "015",
@@ -46,6 +54,14 @@
         "025>030"
       ]
     },
+    "via": {
+      "020>025": [
+        "amount_check"
+      ],
+      "020>030": [
+        "amount_check"
+      ]
+    },
     "texts": [
       {
         "line": 3,
@@ -67,10 +83,7 @@
         "kind": "說明",
         "text": "090 作廢：作廢的申請單不能再修改。"
       }
-    ],
-    "codesEqual": true,
-    "transitionsEqual": true,
-    "problems": []
+    ]
   },
   "docs": {
     "01-overview": {

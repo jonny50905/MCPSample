@@ -96,7 +96,9 @@
                 "READER_UNDERSPECIFIED",
                 "READER_DIVERGENT",
                 "READER_CONTRADICTION",
-                "INPUT_MISSING"
+                "INPUT_MISSING",
+                "STATUS_READING_CONFLICT",
+                "STATUS_SELF_CONFLICT"
               ],
               "description": "問題類別"
             },
@@ -264,7 +266,7 @@
             "raisedBy": {
               "type": "string",
               "enum": [
-                "PARSER",
+                "STATUS_READING",
                 "RESEARCH",
                 "REVIEW",
                 "READER",
@@ -409,7 +411,9 @@
                   "EVIDENCE_GAP",
                   "READER_UNDERSPECIFIED",
                   "READER_DIVERGENT",
-                  "READER_CONTRADICTION"
+                  "READER_CONTRADICTION",
+                  "STATUS_READING_CONFLICT",
+                  "STATUS_SELF_CONFLICT"
                 ]
               }
             }

@@ -1,0 +1,245 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-fedcba9876543210",
+  "reader": "R1",
+  "round": 1,
+  "source": {
+    "ref": "status-CASE_STATUS.md",
+    "fingerprint": "acfcec720a226c514364c0265c58a1e5766bc8c59c952e0d2f309830993b309a"
+  },
+  "states": [
+    {
+      "entity": "CASEAPV_STATUS",
+      "code": "010",
+      "name": "010 待覆核",
+      "final": false,
+      "lines": [21],
+      "regions": []
+    },
+    {
+      "entity": "CASEAPV_STATUS",
+      "code": "090",
+      "name": "090 覆核完成",
+      "final": true,
+      "lines": [22],
+      "regions": []
+    },
+    {
+      "entity": "CASEDOC_STATUS",
+      "code": "010",
+      "name": "010 待審查",
+      "final": false,
+      "lines": [11, 56, 62],
+      "regions": []
+    },
+    {
+      "entity": "CASEDOC_STATUS",
+      "code": "090",
+      "name": "090 審查完成",
+      "final": true,
+      "lines": [12, 57, 63, 66],
+      "regions": []
+    },
+    {
+      "entity": "CASEPAY_STATUS",
+      "code": "010",
+      "name": "010 待付款",
+      "final": false,
+      "lines": [15],
+      "regions": []
+    },
+    {
+      "entity": "CASEPAY_STATUS",
+      "code": "090",
+      "name": "090 已付款",
+      "final": true,
+      "lines": [16],
+      "regions": []
+    },
+    {
+      "entity": "CASE_STATUS",
+      "code": "010",
+      "name": "010 受理",
+      "final": false,
+      "lines": [25, 35],
+      "regions": []
+    },
+    {
+      "entity": "CASE_STATUS",
+      "code": "040",
+      "name": "040 處理中",
+      "final": false,
+      "lines": [9, 36],
+      "regions": [
+        {
+          "entity": "CASEDOC_STATUS",
+          "lines": [10]
+        },
+        {
+          "entity": "CASEPAY_STATUS",
+          "lines": [14]
+        }
+      ]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "code": "050",
+      "name": "050 結案審核",
+      "final": false,
+      "lines": [19, 37],
+      "regions": [
+        {
+          "entity": "CASEAPV_STATUS",
+          "lines": [20]
+        }
+      ]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "code": "060",
+      "name": "060 結案",
+      "final": true,
+      "lines": [28, 38, 46],
+      "regions": []
+    },
+    {
+      "entity": "CASE_STATUS",
+      "code": "090",
+      "name": "090 撤案",
+      "final": true,
+      "lines": [29, 39, 47],
+      "regions": []
+    }
+  ],
+  "transitions": [
+    {
+      "entity": "CASEAPV_STATUS",
+      "from": "*",
+      "to": "010",
+      "via": [],
+      "labels": [],
+      "scenario": "主管覆核",
+      "lines": [21]
+    },
+    {
+      "entity": "CASEAPV_STATUS",
+      "from": "010",
+      "to": "090",
+      "via": [],
+      "labels": [],
+      "scenario": "主管覆核",
+      "lines": [22]
+    },
+    {
+      "entity": "CASEDOC_STATUS",
+      "from": "*",
+      "to": "010",
+      "via": [],
+      "labels": [],
+      "scenario": "文件審查",
+      "lines": [11, 56, 64]
+    },
+    {
+      "entity": "CASEDOC_STATUS",
+      "from": "010",
+      "to": "090",
+      "via": [],
+      "labels": [],
+      "scenario": "文件審查",
+      "lines": [12, 57, 65]
+    },
+    {
+      "entity": "CASEPAY_STATUS",
+      "from": "*",
+      "to": "010",
+      "via": [],
+      "labels": [],
+      "scenario": "付款",
+      "lines": [15]
+    },
+    {
+      "entity": "CASEPAY_STATUS",
+      "from": "010",
+      "to": "090",
+      "via": [],
+      "labels": [],
+      "scenario": "付款",
+      "lines": [16]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "from": "*",
+      "to": "010",
+      "via": [],
+      "labels": [],
+      "scenario": "主流程",
+      "lines": [25, 40]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "from": "010",
+      "to": "040",
+      "via": [],
+      "labels": [
+        "承辦人開始處理"
+      ],
+      "scenario": "主流程",
+      "lines": [26, 41]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "from": "010",
+      "to": "090",
+      "via": [],
+      "labels": [],
+      "scenario": "撤案",
+      "lines": [29, 44]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "from": "040",
+      "to": "050",
+      "via": [],
+      "labels": [
+        "文件審查與付款都完成，且已上傳結案報告"
+      ],
+      "scenario": "主流程",
+      "lines": [27, 42]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "from": "040",
+      "to": "090",
+      "via": [],
+      "labels": [
+        "承辦人撤案，不必等文件審查與付款"
+      ],
+      "scenario": "撤案",
+      "lines": [30, 45]
+    },
+    {
+      "entity": "CASE_STATUS",
+      "from": "050",
+      "to": "060",
+      "via": [],
+      "labels": [
+        "主管覆核完成"
+      ],
+      "scenario": "主流程",
+      "lines": [28, 43]
+    }
+  ],
+  "otherLines": [
+    {
+      "lines": [13, 17, 18, 23, 24],
+      "disposition": "NO_SPEC_CONTENT",
+      "note": "subgraph 的結尾"
+    },
+    {
+      "lines": [8, 34, 55, 61],
+      "disposition": "NO_SPEC_CONTENT",
+      "note": "圖的宣告"
+    }
+  ],
+  "conflicts": []
+}

@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "reader": "R1",
+  "round": 1,
+  "source": {
+    "ref": "status-REQ_STATUS.md",
+    "fingerprint": "6c983bb460930855f133b711a7f7a9cbe9ed4cd3bbd7a8c9d7a652067871024c"
+  },
+  "states": [
+    {
+      "entity": "REQ_STATUS",
+      "code": "010",
+      "name": "010 草稿",
+      "final": false,
+      "lines": [9, 26],
+      "regions": []
+    },
+    {
+      "entity": "REQ_STATUS",
+      "code": "015",
+      "name": "015 退回補件",
+      "final": false,
+      "lines": [15, 27],
+      "regions": []
+    },
+    {
+      "entity": "REQ_STATUS",
+      "code": "020",
+      "name": "020 待主管審核",
+      "final": false,
+      "lines": [10, 28],
+      "regions": []
+    },
+    {
+      "entity": "REQ_STATUS",
+      "code": "025",
+      "name": "025 待部門主管審核",
+      "final": false,
+      "lines": [13, 29],
+      "regions": []
+    },
+    {
+      "entity": "REQ_STATUS",
+      "code": "030",
+      "name": "030 核准",
+      "final": true,
+      "lines": [12, 30, 44],
+      "regions": []
+    },
+    {
+      "entity": "REQ_STATUS",
+      "code": "090",
+      "name": "090 作廢",
+      "final": true,
+      "lines": [18, 31, 45],
+      "regions": []
+    }
+  ],
+  "transitions": [
+    {
+      "entity": "REQ_STATUS",
+      "from": "*",
+      "to": "010",
+      "via": [],
+      "labels": [],
+      "scenario": "主流程",
+      "lines": [9, 33]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "010",
+      "to": "020",
+      "via": [],
+      "labels": [],
+      "scenario": "主流程",
+      "lines": [10, 34]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "010",
+      "to": "090",
+      "via": [],
+      "labels": [],
+      "scenario": "撤回作廢",
+      "lines": [18, 42]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "015",
+      "to": "020",
+      "via": [],
+      "labels": [],
+      "scenario": "退回補件",
+      "lines": [17, 35]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "015",
+      "to": "090",
+      "via": [],
+      "labels": [],
+      "scenario": "撤回作廢",
+      "lines": [19, 43]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "020",
+      "to": "015",
+      "via": [],
+      "labels": [],
+      "scenario": "退回補件",
+      "lines": [15, 40]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "020",
+      "to": "025",
+      "via": [
+        "amount_check"
+      ],
+      "labels": [],
+      "scenario": "高額審核",
+      "lines": [11, 13, 32, 36, 38]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "020",
+      "to": "030",
+      "via": [
+        "amount_check"
+      ],
+      "labels": [],
+      "scenario": "主流程",
+      "lines": [11, 12, 32, 36, 37]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "025",
+      "to": "015",
+      "via": [],
+      "labels": [],
+      "scenario": "退回補件",
+      "lines": [16, 41]
+    },
+    {
+      "entity": "REQ_STATUS",
+      "from": "025",
+      "to": "030",
+      "via": [],
+      "labels": [],
+      "scenario": "高額審核",
+      "lines": [14, 39]
+    }
+  ],
+  "otherLines": [
+    {
+      "lines": [8, 25],
+      "disposition": "NO_SPEC_CONTENT",
+      "note": "圖的宣告"
+    }
+  ],
+  "conflicts": []
+}

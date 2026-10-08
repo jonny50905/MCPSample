@@ -1,11 +1,112 @@
 {
-  "parse": {
-    "entities": {
-      "CASE_STATUS": {
-        "parts": [
-          "第 8 行起的 flowchart：最外層",
-          "第 34 行起的 stateDiagram：最外層"
+  "reading": {
+    "readers": [
+      "R1",
+      "R2",
+      "R3"
+    ],
+    "renamedKeys": {
+      "R1": {},
+      "R2": {
+        "CASE_DOC_STATUS": "CASEDOC_STATUS"
+      },
+      "R3": {}
+    },
+    "mermaidLines": 46,
+    "facts": 47,
+    "unanimous": 44,
+    "contested": [
+      {
+        "fact": "CASE_STATUS 的 040 裡進行子業務 CASEPAY_STATUS",
+        "lines": [
+          14
         ],
+        "round1": "2:1",
+        "round2": "3:0",
+        "result": "ACCEPTED"
+      },
+      {
+        "fact": "CASEPAY_STATUS 010→090 屬於情境「付款」",
+        "lines": [
+          16
+        ],
+        "round1": "2:1",
+        "round2": "3:0",
+        "result": "ACCEPTED"
+      },
+      {
+        "fact": "轉移 CASEPAY_STATUS 010→090",
+        "lines": [
+          16
+        ],
+        "round1": "2:1",
+        "round2": "3:0",
+        "result": "ACCEPTED"
+      }
+    ],
+    "unresolved": [],
+    "entities": {
+      "CASEAPV_STATUS": {
+        "codes": [
+          "010",
+          "090"
+        ],
+        "transitions": [
+          "*>010",
+          "010>090"
+        ],
+        "finals": [
+          "090"
+        ],
+        "scenarios": {
+          "主管覆核": [
+            "*>010",
+            "010>090"
+          ]
+        },
+        "labels": {}
+      },
+      "CASEDOC_STATUS": {
+        "codes": [
+          "010",
+          "090"
+        ],
+        "transitions": [
+          "*>010",
+          "010>090"
+        ],
+        "finals": [
+          "090"
+        ],
+        "scenarios": {
+          "文件審查": [
+            "*>010",
+            "010>090"
+          ]
+        },
+        "labels": {}
+      },
+      "CASEPAY_STATUS": {
+        "codes": [
+          "010",
+          "090"
+        ],
+        "transitions": [
+          "*>010",
+          "010>090"
+        ],
+        "finals": [
+          "090"
+        ],
+        "scenarios": {
+          "付款": [
+            "*>010",
+            "010>090"
+          ]
+        },
+        "labels": {}
+      },
+      "CASE_STATUS": {
         "codes": [
           "010",
           "040",
@@ -25,12 +126,21 @@
           "060",
           "090"
         ],
+        "scenarios": {
+          "主流程": [
+            "*>010",
+            "010>040",
+            "040>050",
+            "050>060"
+          ],
+          "撤案": [
+            "010>090",
+            "040>090"
+          ]
+        },
         "labels": {
           "010>040": [
             "承辦人開始處理"
-          ],
-          "010>090": [
-            "承辦人撤案"
           ],
           "040>050": [
             "文件審查與付款都完成，且已上傳結案報告"
@@ -42,66 +152,6 @@
             "主管覆核完成"
           ]
         }
-      },
-      "CASEDOC_STATUS": {
-        "parts": [
-          "第 8 行起的 flowchart：subgraph DOCS",
-          "第 34 行起的 stateDiagram：M040 的第 1 個區塊",
-          "第 73 行起的 flowchart：最外層",
-          "第 79 行起的 stateDiagram：最外層"
-        ],
-        "codes": [
-          "010",
-          "090"
-        ],
-        "transitions": [
-          "*>010",
-          "010>090"
-        ],
-        "finals": [
-          "090"
-        ],
-        "labels": {
-          "010>090": [
-            "審查人員按「審查完成」"
-          ]
-        }
-      },
-      "CASEPAY_STATUS": {
-        "parts": [
-          "第 8 行起的 flowchart：subgraph PAYS",
-          "第 34 行起的 stateDiagram：M040 的第 2 個區塊"
-        ],
-        "codes": [
-          "010",
-          "090"
-        ],
-        "transitions": [
-          "*>010",
-          "010>090"
-        ],
-        "finals": [
-          "090"
-        ],
-        "labels": {}
-      },
-      "CASEAPV_STATUS": {
-        "parts": [
-          "第 8 行起的 flowchart：subgraph APVS",
-          "第 34 行起的 stateDiagram：M050 的第 1 個區塊"
-        ],
-        "codes": [
-          "010",
-          "090"
-        ],
-        "transitions": [
-          "*>010",
-          "010>090"
-        ],
-        "finals": [
-          "090"
-        ],
-        "labels": {}
       }
     },
     "composites": [
@@ -132,75 +182,48 @@
       {
         "line": 3,
         "kind": "prose",
-        "text": "本檔是 STATUS 權威文件的合成範例：主業務的每個階段畫成大框框，框內以平行區塊畫子業務，大框框之間的線上寫明往下走的條件。"
+        "text": "本檔是 STATUS 權威文件的合成範例：flowchart 用 subgraph 畫主業務的大框框，框內再用 subgraph 畫子業務；stateDiagram-v2 只畫主業務。"
       },
       {
-        "line": 70,
+        "line": 52,
         "kind": "prose",
-        "text": "文件審查另有獨立的圖，內容與大圖 040 的第一個區塊相同。"
+        "text": "文件審查另有獨立的圖。"
       },
       {
-        "line": 89,
+        "line": 71,
         "kind": "prose",
         "text": "040 處理中：承辦人追蹤文件審查與付款，並上傳結案報告。"
       },
       {
-        "line": 90,
+        "line": 72,
         "kind": "prose",
         "text": "文件審查 010 待審查：審查人員逐份審查文件。"
       },
       {
-        "line": 91,
+        "line": 73,
         "kind": "prose",
         "text": "付款 010 待付款：會計人員依核定金額付款。"
       },
       {
-        "line": 92,
+        "line": 74,
         "kind": "prose",
         "text": "050 結案審核：主管確認案件資料完整後按「覆核完成」。"
       },
       {
-        "line": 93,
+        "line": 75,
         "kind": "prose",
         "text": "結案後由系統寄發結案通知給承辦人。"
       }
-    ],
-    "settings": {
-      "partComparison": "STRICT",
-      "textScope": "ALL",
-      "excludedLines": 0
-    },
-    "roles": {
-      "CASE_STATUS": [
-        "COMPLETE",
-        "COMPLETE"
-      ],
-      "CASEDOC_STATUS": [
-        "COMPLETE",
-        "COMPLETE",
-        "COMPLETE",
-        "COMPLETE"
-      ],
-      "CASEPAY_STATUS": [
-        "COMPLETE",
-        "COMPLETE"
-      ],
-      "CASEAPV_STATUS": [
-        "COMPLETE",
-        "COMPLETE"
-      ]
-    },
-    "problems": [],
-    "stopLines": []
+    ]
   },
   "findings": [],
   "checksRun": [
+    "三份解讀的逐行交代與比對",
     "L1 schema",
     "R01",
-    "C01（含平行區塊、線上描述、STATUS 文字）",
+    "C01（含子業務、線上文字、STATUS 文字）",
     "R13",
     "C02（守門活動）",
     "C07（守門轉移與活動）"
-  ],
-  "redrawMatchesSource": true
+  ]
 }

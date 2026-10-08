@@ -31,234 +31,92 @@
             ]
           }
         },
-        "parseSettings": {
+        "statusReading": {
           "type": "object",
-          "required": [
-            "partComparison",
-            "textScope",
-            "excludedLines"
-          ],
           "properties": {
-            "partComparison": {
-              "type": "string",
-              "enum": [
-                "STRICT",
-                "SUMMARY"
-              ]
+            "readers": {
+              "const": 3
             },
-            "textScope": {
-              "type": "string",
-              "enum": [
-                "ALL",
-                "HEADINGS"
-              ]
+            "rounds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2
             },
-            "textHeadings": {
-              "type": "array",
-              "items": {
-                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
-              },
-              "minItems": 1,
-              "uniqueItems": true
-            },
-            "excludedLines": {
+            "mermaidLines": {
               "type": "integer",
               "minimum": 0
-            }
-          },
-          "additionalProperties": false,
-          "allOf": [
-            {
-              "if": {
+            },
+            "facts": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unanimous": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "contested": {
+              "type": "array",
+              "items": {
+                "type": "object",
                 "properties": {
-                  "textScope": {
-                    "const": "HEADINGS"
-                  }
-                }
-              },
-              "then": {
-                "required": [
-                  "textHeadings"
-                ]
-              },
-              "else": {
-                "not": {
-                  "required": [
-                    "textHeadings"
-                  ]
-                },
-                "properties": {
-                  "excludedLines": {
-                    "const": 0
-                  }
-                }
-              }
-            }
-          ],
-          "description": "這次解析用的本機設定（project.md，只有人寫）：各段圖的比對方式、說明範圍"
-        },
-        "diagramSources": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "entityKey": {
-                "$ref": "urn:ps-spec:schema:common#/$defs/slug"
-              },
-              "parts": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "diagram",
-                    "locator",
-                    "scope",
-                    "role"
-                  ],
-                  "properties": {
-                    "diagram": {
-                      "type": "string",
-                      "enum": [
-                        "FLOWCHART",
-                        "STATE_DIAGRAM"
-                      ]
-                    },
-                    "locator": {
+                  "fact": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                  },
+                  "lines": {
+                    "type": "array",
+                    "items": {
                       "type": "string",
                       "pattern": "#L\\d+(-L?\\d+)?$"
                     },
-                    "scope": {
-                      "type": "string",
-                      "enum": [
-                        "WHOLE",
-                        "REGION",
-                        "SUBGRAPH"
-                      ]
-                    },
-                    "composite": {
-                      "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
-                    },
-                    "index": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "subgraph": {
-                      "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
-                    },
-                    "role": {
-                      "type": "string",
-                      "enum": [
-                        "COMPLETE",
-                        "SUMMARY"
-                      ]
-                    }
+                    "minItems": 1
                   },
-                  "additionalProperties": false,
-                  "allOf": [
-                    {
-                      "if": {
-                        "properties": {
-                          "scope": {
-                            "const": "REGION"
-                          }
-                        }
-                      },
-                      "then": {
-                        "required": [
-                          "composite",
-                          "index"
-                        ],
-                        "properties": {
-                          "diagram": {
-                            "const": "STATE_DIAGRAM"
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "if": {
-                        "properties": {
-                          "scope": {
-                            "const": "SUBGRAPH"
-                          }
-                        }
-                      },
-                      "then": {
-                        "required": [
-                          "subgraph"
-                        ],
-                        "properties": {
-                          "diagram": {
-                            "const": "FLOWCHART"
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "if": {
-                        "properties": {
-                          "scope": {
-                            "const": "WHOLE"
-                          }
-                        }
-                      },
-                      "then": {
-                        "not": {
-                          "anyOf": [
-                            {
-                              "required": [
-                                "composite"
-                              ]
-                            },
-                            {
-                              "required": [
-                                "index"
-                              ]
-                            },
-                            {
-                              "required": [
-                                "subgraph"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  ]
-                },
-                "minItems": 1,
-                "contains": {
-                  "type": "object",
-                  "required": [
-                    "diagram",
-                    "role"
-                  ],
-                  "properties": {
-                    "diagram": {
-                      "const": "STATE_DIAGRAM"
-                    },
-                    "role": {
-                      "const": "COMPLETE"
-                    }
+                  "round1": {
+                    "type": "string",
+                    "pattern": "^[0-3]:[0-3](:[0-3])?$"
+                  },
+                  "round2": {
+                    "type": "string",
+                    "pattern": "^[0-3]:[0-3](:[0-3])?$"
+                  },
+                  "result": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPTED",
+                      "REJECTED",
+                      "UNRESOLVED"
+                    ]
                   }
-                }
-              },
-              "fingerprint": {
-                "$ref": "urn:ps-spec:schema:common#/$defs/sha256"
+                },
+                "required": [
+                  "fact",
+                  "lines",
+                  "round1",
+                  "round2",
+                  "result"
+                ],
+                "additionalProperties": false
               }
             },
-            "required": [
-              "entityKey",
-              "parts",
-              "fingerprint"
-            ],
-            "additionalProperties": false
+            "unresolved": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fingerprint": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/sha256"
+            }
           },
-          "minItems": 1,
-          "description": "狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；各段的比對見 parseSettings（模型讀檔提出、外環驗證）",
-          "x-ref": [
-            "STATE"
-          ]
+          "required": [
+            "readers",
+            "rounds",
+            "mermaidLines",
+            "facts",
+            "unanimous",
+            "contested",
+            "unresolved",
+            "fingerprint"
+          ],
+          "additionalProperties": false,
+          "description": "狀態圖解讀的比對摘要（外環計算）：Mermaid 行數、事實數、三份一致的事實數、第 2 輪表決的事實與結果"
         },
         "statusTexts": {
           "type": "array",
@@ -335,8 +193,7 @@
         }
       },
       "required": [
-        "parseSettings",
-        "diagramSources",
+        "statusReading",
         "statusTexts"
       ]
     }
@@ -363,7 +220,7 @@
             },
             "entityKey": {
               "$ref": "urn:ps-spec:schema:common#/$defs/slug",
-              "description": "狀態實體代號（狀態圖對應研究包給的大寫代號）"
+              "description": "狀態實體代號（讀者給的大寫代號，取多數讀者用的那個）"
             },
             "stateKind": {
               "type": "string",
@@ -379,11 +236,11 @@
             },
             "name": {
               "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
-              "description": "狀態圖上的名稱"
+              "description": "圖上的名稱（取多數讀者的寫法）"
             },
             "parent": {
               "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE",
-              "description": "所屬複合狀態（平行區塊內的子業務狀態也填）",
+              "description": "所屬的主業務狀態（子業務的狀態填它在其中進行的那個狀態）",
               "x-ref": [
                 "STATE"
               ]
@@ -412,7 +269,7 @@
                 "additionalProperties": false
               },
               "minItems": 1,
-              "description": "平行區塊（畫法一）：子業務狀態實體與它的終點狀態（區塊內 →[*] 的狀態）",
+              "description": "在這個狀態裡進行的子業務：子業務的狀態實體與它的終點狀態",
               "x-ref": [
                 "STATE"
               ]
@@ -437,11 +294,11 @@
             },
             "isInitialTarget": {
               "type": "boolean",
-              "description": "是否由 [*] 進入（新建；區塊內的 [*] 表示子業務資料的新建）"
+              "description": "是否為新建的進入點（子業務的進入點表示子業務資料的新建）"
             },
             "isFinal": {
               "type": "boolean",
-              "description": "是否為終點（→[*]；區塊內的 →[*] 表示該區塊的終點）"
+              "description": "是否為終點（子業務的終點就是主業務守門時看的終點）"
             },
             "dataPresence": {
               "type": "string",
@@ -570,7 +427,7 @@
                 "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
               },
               "minItems": 1,
-              "description": "收合掉的 choice／fork／join 節點"
+              "description": "經過的判斷節點（菱形、choice 等；取多數讀者的寫法）"
             },
             "diagramLabels": {
               "type": "array",
@@ -578,7 +435,7 @@
                 "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
               },
               "minItems": 1,
-              "description": "狀態圖上這條線的描述原文；守衛與觸發必須與它一致"
+              "description": "圖上這條線的描述原文（情境類型以外的線上文字）；守衛與觸發必須與它一致"
             },
             "exitMode": {
               "anyOf": [
@@ -745,7 +602,7 @@
                   "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
                 }
               ],
-              "description": "轉移條件（選擇此目標的條件；守門轉移要含每個區塊與守門活動，R13）",
+              "description": "轉移條件（選擇此目標的條件；守門轉移要含每個子業務與守門活動，R13）",
               "x-ref": [
                 "FLD",
                 "DRV",
@@ -1164,7 +1021,7 @@
             },
             "behavior": {
               "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
-              "description": "「這個階段誰該做什麼」的 STATUS 檔原文（說明區域，或圖上的狀態描述與 note）"
+              "description": "「這個階段誰該做什麼」的 STATUS 檔原文（說明區域，或讀者列為業務文字的圖內行）"
             },
             "actors": {
               "anyOf": [

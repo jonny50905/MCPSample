@@ -21,7 +21,7 @@
     {
       "kind": "STATUS_DOC",
       "ref": "status-CASE_STATUS.md",
-      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
+      "fingerprint": "acfcec720a226c514364c0265c58a1e5766bc8c59c952e0d2f309830993b309a"
     }
   ],
   "gate": {
@@ -32,121 +32,59 @@
     "L5": "NOT_RUN"
   },
   "openQuestions": [],
-  "parseSettings": {
-    "partComparison": "STRICT",
-    "textScope": "ALL",
-    "excludedLines": 0
+  "statusReading": {
+    "readers": 3,
+    "rounds": 2,
+    "mermaidLines": 46,
+    "facts": 47,
+    "unanimous": 44,
+    "contested": [
+      {
+        "fact": "CASE_STATUS 的 040 裡進行子業務 CASEPAY_STATUS",
+        "lines": [
+          "status-CASE_STATUS.md#L14"
+        ],
+        "round1": "2:1",
+        "round2": "3:0",
+        "result": "ACCEPTED"
+      },
+      {
+        "fact": "CASEPAY_STATUS 010→090 屬於情境「付款」",
+        "lines": [
+          "status-CASE_STATUS.md#L16"
+        ],
+        "round1": "2:1",
+        "round2": "3:0",
+        "result": "ACCEPTED"
+      },
+      {
+        "fact": "轉移 CASEPAY_STATUS 010→090",
+        "lines": [
+          "status-CASE_STATUS.md#L16"
+        ],
+        "round1": "2:1",
+        "round2": "3:0",
+        "result": "ACCEPTED"
+      }
+    ],
+    "unresolved": 0,
+    "fingerprint": "acfcec720a226c514364c0265c58a1e5766bc8c59c952e0d2f309830993b309a"
   },
-  "diagramSources": [
-    {
-      "entityKey": "CASE_STATUS",
-      "parts": [
-        {
-          "diagram": "FLOWCHART",
-          "locator": "status-CASE_STATUS.md#L7-L31",
-          "scope": "WHOLE",
-          "role": "COMPLETE"
-        },
-        {
-          "diagram": "STATE_DIAGRAM",
-          "locator": "status-CASE_STATUS.md#L33-L66",
-          "scope": "WHOLE",
-          "role": "COMPLETE"
-        }
-      ],
-      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
-    },
-    {
-      "entityKey": "CASEDOC_STATUS",
-      "parts": [
-        {
-          "diagram": "FLOWCHART",
-          "locator": "status-CASE_STATUS.md#L7-L31",
-          "scope": "SUBGRAPH",
-          "subgraph": "DOCS",
-          "role": "COMPLETE"
-        },
-        {
-          "diagram": "STATE_DIAGRAM",
-          "locator": "status-CASE_STATUS.md#L33-L66",
-          "scope": "REGION",
-          "composite": "STATE-008",
-          "index": 1,
-          "role": "COMPLETE"
-        },
-        {
-          "diagram": "FLOWCHART",
-          "locator": "status-CASE_STATUS.md#L72-L76",
-          "scope": "WHOLE",
-          "role": "COMPLETE"
-        },
-        {
-          "diagram": "STATE_DIAGRAM",
-          "locator": "status-CASE_STATUS.md#L78-L85",
-          "scope": "WHOLE",
-          "role": "COMPLETE"
-        }
-      ],
-      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
-    },
-    {
-      "entityKey": "CASEPAY_STATUS",
-      "parts": [
-        {
-          "diagram": "FLOWCHART",
-          "locator": "status-CASE_STATUS.md#L7-L31",
-          "scope": "SUBGRAPH",
-          "subgraph": "PAYS",
-          "role": "COMPLETE"
-        },
-        {
-          "diagram": "STATE_DIAGRAM",
-          "locator": "status-CASE_STATUS.md#L33-L66",
-          "scope": "REGION",
-          "composite": "STATE-008",
-          "index": 2,
-          "role": "COMPLETE"
-        }
-      ],
-      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
-    },
-    {
-      "entityKey": "CASEAPV_STATUS",
-      "parts": [
-        {
-          "diagram": "FLOWCHART",
-          "locator": "status-CASE_STATUS.md#L7-L31",
-          "scope": "SUBGRAPH",
-          "subgraph": "APVS",
-          "role": "COMPLETE"
-        },
-        {
-          "diagram": "STATE_DIAGRAM",
-          "locator": "status-CASE_STATUS.md#L33-L66",
-          "scope": "REGION",
-          "composite": "STATE-009",
-          "index": 1,
-          "role": "COMPLETE"
-        }
-      ],
-      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
-    }
-  ],
   "statusTexts": [
     {
       "locator": "status-CASE_STATUS.md#L3",
-      "text": "本檔是 STATUS 權威文件的合成範例：主業務的每個階段畫成大框框，框內以平行區塊畫子業務，大框框之間的線上寫明往下走的條件。",
+      "text": "本檔是 STATUS 權威文件的合成範例：flowchart 用 subgraph 畫主業務的大框框，框內再用 subgraph 畫子業務；stateDiagram-v2 只畫主業務。",
       "disposition": "NO_SPEC_CONTENT",
       "note": "說明這份檔案的畫法，沒有規格內容。"
     },
     {
-      "locator": "status-CASE_STATUS.md#L70",
-      "text": "文件審查另有獨立的圖，內容與大圖 040 的第一個區塊相同。",
+      "locator": "status-CASE_STATUS.md#L52",
+      "text": "文件審查另有獨立的圖。",
       "disposition": "NO_SPEC_CONTENT",
-      "note": "說明圖的位置；兩段圖是否一致由外環比對。"
+      "note": "說明圖的位置，沒有規格內容。"
     },
     {
-      "locator": "status-CASE_STATUS.md#L89",
+      "locator": "status-CASE_STATUS.md#L71",
       "text": "040 處理中：承辦人追蹤文件審查與付款，並上傳結案報告。",
       "disposition": "MAPPED",
       "items": [
@@ -155,7 +93,7 @@
       ]
     },
     {
-      "locator": "status-CASE_STATUS.md#L90",
+      "locator": "status-CASE_STATUS.md#L72",
       "text": "文件審查 010 待審查：審查人員逐份審查文件。",
       "disposition": "MAPPED",
       "items": [
@@ -163,7 +101,7 @@
       ]
     },
     {
-      "locator": "status-CASE_STATUS.md#L91",
+      "locator": "status-CASE_STATUS.md#L73",
       "text": "付款 010 待付款：會計人員依核定金額付款。",
       "disposition": "MAPPED",
       "items": [
@@ -171,7 +109,7 @@
       ]
     },
     {
-      "locator": "status-CASE_STATUS.md#L92",
+      "locator": "status-CASE_STATUS.md#L74",
       "text": "050 結案審核：主管確認案件資料完整後按「覆核完成」。",
       "disposition": "MAPPED",
       "items": [
@@ -179,7 +117,7 @@
       ]
     },
     {
-      "locator": "status-CASE_STATUS.md#L93",
+      "locator": "status-CASE_STATUS.md#L75",
       "text": "結案後由系統寄發結案通知給承辦人。",
       "disposition": "MAPPED",
       "items": [
@@ -444,8 +382,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0050",
-        "EV-0051",
+        "EV-0048",
         "EV-0010"
       ],
       "entityKey": "CASEAPV_STATUS",
@@ -493,8 +430,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0052",
-        "EV-0053",
+        "EV-0049",
         "EV-0012"
       ],
       "entityKey": "CASEAPV_STATUS",
@@ -617,9 +553,6 @@
       "entityKey": "CASEDOC_STATUS",
       "from": "STATE-003",
       "to": "STATE-004",
-      "diagramLabels": [
-        "審查人員按「審查完成」"
-      ],
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -673,7 +606,6 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0046",
-        "EV-0047",
         "EV-0015"
       ],
       "entityKey": "CASEPAY_STATUS",
@@ -730,8 +662,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0048",
-        "EV-0049",
+        "EV-0047",
         "EV-0017"
       ],
       "entityKey": "CASEPAY_STATUS",
@@ -904,9 +835,6 @@
       "entityKey": "CASE_STATUS",
       "from": "STATE-007",
       "to": "STATE-011",
-      "diagramLabels": [
-        "承辦人撤案"
-      ],
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -1174,7 +1102,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0058"
+        "EV-0054"
       ],
       "entityKey": "CASEAPV_STATUS",
       "scenarioType": "主管覆核",
@@ -1211,7 +1139,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0056"
+        "EV-0052"
       ],
       "entityKey": "CASEDOC_STATUS",
       "scenarioType": "文件審查",
@@ -1248,7 +1176,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0057"
+        "EV-0053"
       ],
       "entityKey": "CASEPAY_STATUS",
       "scenarioType": "付款",
@@ -1285,7 +1213,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0054"
+        "EV-0050"
       ],
       "entityKey": "CASE_STATUS",
       "scenarioType": "主流程",
@@ -1330,7 +1258,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0055"
+        "EV-0051"
       ],
       "entityKey": "CASE_STATUS",
       "scenarioType": "撤案",
@@ -1368,7 +1296,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0063",
+        "EV-0059",
         "EV-0012"
       ],
       "entityKey": "CASEAPV_STATUS",
@@ -1395,7 +1323,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0061",
+        "EV-0057",
         "EV-0016"
       ],
       "entityKey": "CASEDOC_STATUS",
@@ -1422,7 +1350,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0062",
+        "EV-0058",
         "EV-0017"
       ],
       "entityKey": "CASEPAY_STATUS",
@@ -1449,7 +1377,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0059",
+        "EV-0055",
         "EV-0010"
       ],
       "entityKey": "CASE_STATUS",
@@ -1476,7 +1404,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0060",
+        "EV-0056",
         "EV-0018",
         "EV-0010"
       ],

@@ -20,31 +20,16 @@
     "L5": "NOT_RUN"
   },
   "openQuestions": [],
-  "parseSettings": {
-    "partComparison": "STRICT",
-    "textScope": "ALL",
-    "excludedLines": 0
+  "statusReading": {
+    "readers": 3,
+    "rounds": 1,
+    "mermaidLines": 33,
+    "facts": 28,
+    "unanimous": 28,
+    "contested": [],
+    "unresolved": 0,
+    "fingerprint": "6c983bb460930855f133b711a7f7a9cbe9ed4cd3bbd7a8c9d7a652067871024c"
   },
-  "diagramSources": [
-    {
-      "entityKey": "REQ_STATUS",
-      "parts": [
-        {
-          "diagram": "FLOWCHART",
-          "locator": "status-REQ_STATUS.md#L7-L20",
-          "scope": "WHOLE",
-          "role": "COMPLETE"
-        },
-        {
-          "diagram": "STATE_DIAGRAM",
-          "locator": "status-REQ_STATUS.md#L24-L46",
-          "scope": "WHOLE",
-          "role": "COMPLETE"
-        }
-      ],
-      "fingerprint": "6c983bb460930855f133b711a7f7a9cbe9ed4cd3bbd7a8c9d7a652067871024c"
-    }
-  ],
   "statusTexts": [],
   "items": [
     {
