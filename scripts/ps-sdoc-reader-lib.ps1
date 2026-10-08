@@ -301,16 +301,22 @@ function Test-PsSdL5Answer {
     $status = [string]$Answer['status']
     $res.Text = [string]$Answer['text']
     if ($status -ceq 'NOT_IN_SPEC') { $res.Class = 'NIS'; return $res }
+    # ID 一律大寫比對；引用正規化成「小寫檔名#大寫 ID」（容許前面帶路徑）
     $ids = [System.Collections.Generic.List[string]]::new(); $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($x in @($Answer['ids'])) { if ($null -eq $x) { continue }; $s = ([string]$x).Trim(); if ($s -ceq [string]$Question['item'] -or $script:PsSdL5ComputedPrefixes -ccontains (Get-PsSdIdPrefix $s)) { continue }; if ($seen.Add($s)) { $ids.Add($s) } }
+    foreach ($x in @($Answer['ids'])) { if ($null -eq $x) { continue }; $s = ([string]$x).Trim().ToUpperInvariant(); if ($s -eq '' -or $s -ceq [string]$Question['item'] -or $script:PsSdL5ComputedPrefixes -ccontains (Get-PsSdIdPrefix $s)) { continue }; if ($seen.Add($s)) { $ids.Add($s) } }
     $res.Ids = $ids.ToArray()
-    $res.Kind = ([string]$Answer['kind']).Trim()
+    $kinds = [System.Collections.Generic.List[string]]::new()
+    foreach ($part in ([string]$Answer['kind']).Split(',')) { $t = $part.Trim().ToUpperInvariant(); if ($t -ne '' -and -not $kinds.Contains($t)) { $kinds.Add($t) } }
+    $kinds.Sort([System.StringComparer]::Ordinal)
+    $res.Kind = $kinds.ToArray() -join ','
     $cited = [System.Text.StringBuilder]::new()
-    $cits = @($Answer['citations'] | Where-Object { $null -ne $_ })
+    $cits = @(); foreach ($c in @($Answer['citations'])) { if ($null -ne $c -and ([string]$c).Trim() -ne '') { $cits += ([string]$c).Trim() } }
     if ($cits.Count -eq 0) { $res.Reason = '沒有引用'; return $res }
     foreach ($c in $cits) {
-        $k = ([string]$c).Trim()
-        if (-not $Sections.ContainsKey($k)) { $res.Reason = ('引用的段落不存在：' + $k); return $res }
+        $k = $c -replace '\\', '/'
+        $h = $k.IndexOf('#')
+        if ($h -gt 0) { $file = $k.Substring(0, $h); $file = $file.Substring($file.LastIndexOf('/') + 1); $k = $file.ToLowerInvariant() + '#' + $k.Substring($h + 1).Trim().ToUpperInvariant() }
+        if (-not $Sections.ContainsKey($k)) { $res.Reason = ('引用的段落不存在：' + $c); return $res }
         [void]$cited.Append($Sections[$k]).Append("`n")
     }
     $all = $cited.ToString()

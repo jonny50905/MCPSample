@@ -289,6 +289,8 @@ $a2 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('ROLE-001') '' @('04-workflow.md#
 $a3 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('FLD-001') '' @('04-workflow.md#TRN-008')) $q1 $sec
 $a4 = Test-PsSdL5Answer (& $mkAns 'NOT_IN_SPEC' @() '' @()) $q1 $sec
 Assert-Sd ($a1.Class -ceq 'ANS' -and (@($a1.Ids) -join ',') -ceq 'ROLE-001,DRV-002' -and $a2.Class -ceq 'INV' -and $a3.Class -ceq 'INV' -and $a4.Class -ceq 'NIS') '引用驗證：有效、段落不存在、引用段落裡沒有該 ID、文件沒寫；自己的 ID 不算'
+$a5 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('role-001', ' DRV-002') 'user_action, ' @('docs\04-Workflow.md#trn-008')) $q1 $sec
+Assert-Sd ($a5.Class -ceq 'ANS' -and (@($a5.Ids) -join ',') -ceq 'ROLE-001,DRV-002' -and $a5.Kind -ceq 'USER_ACTION') '引用驗證：ID 大小寫、引用的路徑與大小寫、代碼的空白都先正規化'
 Assert-Sd ((Get-PsSdL5Vote $q1 $a1 '') -ceq 'MATCH' -and (Get-PsSdL5Vote $q1 @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' } '') -ceq 'MISMATCH' -and (Get-PsSdL5Vote $q2 @{ Class = 'ANS'; Ids = @('OBJ-002'); Kind = 'BATCH'; Text = '' } '') -ceq 'MISMATCH') '比對：ID 集合；KIND 題代碼也要相同'
 $va = @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' }
 $vn = @{ Class = 'NIS'; Ids = @(); Kind = ''; Text = '' }

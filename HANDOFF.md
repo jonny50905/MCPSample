@@ -12,7 +12,19 @@
 公司內容只在本機，沒有真實企業 E2E。驗證與整檔搬運清單見 `docs/design/clone-spec-handover.md`。
 下方是歷次交接紀錄，不應把舊入口當新流程的前置作業；此波未改 .NET，版本與發布紀錄以 git 為準。
 
-**Spec 文件契約框架：設計提案，尚未實作（2026-10-08，issue #37）**：管理者要把 `/ps-spec` 的單一大檔改成
+**Spec 文件流程：已實作（Claude Code 版，2026-10-08，issue #37，分支 `claude/brave-dirac-4q469u`）**：
+Claude Code 版的 `/ps-spec` 改走 `scripts/ps-sdoc.ps1`（DOC1），產 00-index＋14 份文件＋90 問題清單；OpenCode 版不動（SOP-25）。
+- 檔案：`scripts/ps-sdoc.ps1`（外環）＋`ps-sdoc-schema-lib`／`-status-lib`／`-lib`／`-check-lib`／`-render-lib`／`-reader-lib`；
+  `claude-code/.claude/peoplesoft/sdoc/`（契約、schema、每單元範例、AI 指引模板）；agents ps-status-reader、ps-sdoc-worker、
+  ps-spec-reader、ps-spec-judge；hook 路徑設定 status-reader／sdoc-worker／spec-reader／spec-judge；ps-spec-author 只跑 ps-sdoc。
+- 流程與取捨：applied.md L136（研究包＋外環組裝）、L137（L5 乾淨讀者）；操作 SOP-28。
+- 驗證（維護端 PS 7）：test-sdoc 41、test-sdoc-assemble 66、test-sdoc-run 49（合成 worker：空目錄 → REVIEW_READY → APPROVED，
+  與各種中斷、重試、改寫、讀者不一致情境）、test-claude-variant、5.1 靜態守衛。**沒有在真 Windows PowerShell 5.1、真 claude CLI、
+  真 STATUS 檔跑過**；公司機第一次跑先用 1～2 個 Component、`-MaxSessions 4`，回報結論碼與兩行計數。
+- 已知風險：模型寫研究包的合格率（不合格兩次就 BLOCKED，等 -Retry）；L5 結構題只比 ID 集合，讀者列 ID 的習慣差太多時會判不一致；
+  真實 STATUS 圖的三位讀者一致率；大 Component 的頁數與 session 成本。以上都要公司機數字才能調。
+
+以下是設計定案時的紀錄。管理者要把 `/ps-spec` 的單一大檔改成
 00-index＋14 份文件＋90 問題清單，並定案下列事項：
 - STATUS 文件（Mermaid flowchart＋stateDiagram-v2）是狀態與轉移的權威，所有圖寫在同一份檔案。畫法不限：管理者明示
   Mermaid 語法明確、LLM 讀得懂，不准規定只能怎麼畫。三位讀者各自解讀，外環不解讀圖，只檢查每份解讀逐行交代，
@@ -32,8 +44,8 @@
 
 設計見 `docs/design/spec-schema-framework.md`，附件有 types.md、walkthrough.md、schemas、examples（貫穿範例與子業務守門範例，各含三份合成解讀）。
 設計期用來產生與驗證附件的 Python 原型依管理者要求不放進 repo。
-仍待決：實體對齊的門檻、第 0 階段的成本等（設計 §15）。
-實作拆分見設計 §16，落地時再記 applied.md，並在 AGENTS.md 註明這條流程只有 Claude Code 版。
+仍待決：實體對齊的門檻、第 0 階段的成本等（設計 §15），等公司機數字。實作與設計的差異記在 L136／L137：人工輸入改放
+`.ps-private/sdoc/<jobId>/`（不和 SPEC1 的私有 pack 撞名）；知識庫更新只提示 -Refresh、不自動換版本；L5 答案格式攤平、結構題只比 ID 集合。
 
 **重建套件（2026-09-29）**：管理者要讓 AI 依 Spec 從零重建 JO（.NET＋React＋MariaDB、本機可跑的 MVP、
 業務功能完整、非業務需求不完善；模型限 Opus 4.8＋Sonnet 5）。新增 `rebuild-kit/`：新專案的 AGENTS.md、

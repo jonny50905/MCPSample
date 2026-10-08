@@ -996,3 +996,41 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
 □ 5. 接著跑 `ps-fs-doctor`（Claude Code 版另跑 `ps-claude-doctor`）。保留本機的檔（已回填的 profile 等）在檢查 M 會列為版本不符，屬正常。
 
 被覆寫或刪除的舊檔備份在 `auto-loop-logs\ps-bundle-backup\<時間>\`；要回到上一版就把備份複製回原位。
+
+## SOP-28 Spec 文件（Claude Code 版：00-index＋14 份文件＋90 問題清單；issue #37）
+
+Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP-25）。入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，
+或 `claude --agent ps-spec-author` 後輸入清單（名稱為合成範例）。結論碼見 `.claude/peoplesoft/spec/support-codes.md` 的 DOC1。
+
+### 日常操作
+
+□ 1. 第一次輸入清單：DOC1-0-01，在 `.ps-private\sdoc\<jobId>\` 建 status.md、project.md、decisions.md、approvals.md 骨架。
+□ 2. 把這組 Component 的狀態圖（Mermaid flowchart 或 stateDiagram-v2，畫法不限、可多張）與圖下的說明貼進 status.md，
+     刪掉第一行的 `<!-- SDOC:SKELETON -->`；project.md 選填（目標、決策責任）。
+□ 3. 再輸入同一份清單：第 0 階段三位讀者解讀狀態圖 → 11 個研究單元（每頁研究與獨立覆核分開 session）→ L5 乾淨讀者。
+     ps-spec-author 在 DOC1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑。
+□ 4. 依結論碼處理：
+     - DOC1-4-01：讀者對狀態圖仍無多數或圖與圖矛盾 → 看 90 的 STATUS_READING_CONFLICT／STATUS_SELF_CONFLICT，改 status.md 後重跑（開新研究版本）。
+     - DOC1-4-03：某頁兩次未通過或預算用完 → 看輸出的「缺口」行，排除原因後說「重試被擋項」（-Retry）。
+     - DOC1-5-01（DRAFT）：看 00-index「未通過的檢核」與 90 的 BLOCKING 問題，在 decisions.md 裁決（NO_CHANGE／DROP／ACCEPT_GAP／
+       AMEND_INPUT／ADD_SCOPE），同命令重新組裝；只有 ADD_SCOPE 與改 status.md 會開新研究版本。
+     - DOC1-7-01（REVIEW_READY）：五層檢核全過 → 人工審閱；同意的文件把 00-index 的 docHash 前 12 碼寫進 approvals.md。
+       文件內容改了，舊的核准自動不成立。
+     - DOC1-7-02（APPROVED）：全部文件已核准。
+□ 5. 回報維護端：只回最後一行 DOC1 結論碼、「欄位統計」與「乾淨讀者（L5）」兩行的計數；不回物件名、路徑、hash、status.md 內容。
+
+| 什麼 | 在哪 |
+|---|---|
+| 人工輸入 | `.ps-private\sdoc\<jobId>\`（gitignore，不進任何 git） |
+| 產出入口 | `docs\ps-spec\<jobId>\README.md` → `generated\<代號>\00-index.md` |
+| 執行狀態 | `.ps-runtime\sdoc\<jobId>\`（attempt、收據、ID 對照、工作中文件、inbox） |
+| session log | `.ps-runtime\sdoc-logs\` |
+
+- docs/ps-research 有更新時只提示「要以新知識重查請加 -Refresh」，不自動換版本；STATUS 檔、ADD_SCOPE 裁決或 schema 改了才自動開新版本。
+- generated 是可重建投影，不在裡面修稿；修改走 decisions.md、status.md 或重新研究。
+
+### 維護驗證
+
+`test-sdoc.ps1`、`test-sdoc-assemble.ps1`、`test-sdoc-run.ps1`（合成 worker 端到端，PS 7 約 5 分鐘）、`test-claude-variant.ps1`、
+`test-ps51-static.ps1`。改 schema 或貫穿範例後跑 `test-sdoc-assemble.ps1 -WriteExamples` 重生 `claude-code/.claude/peoplesoft/sdoc/examples/`。
+這些測試只驗機制與合成資料，不代替公司機的真 PS 5.1、真 claude CLI 與企業資料驗收。

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 6ebc14c）
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit aadaa42）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|claude|6ebc14c|148
+@@@PSBUNDLE|1|claude|aadaa42|148
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44|0
 ---
 name: ps-ae-flow
@@ -8419,38 +8419,122 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 - PASS 不代表企業實跑或重建等價驗證已完成。
 - 寫完 Read 回 output.json 確認是合法 JSON；回覆只說「已寫工單指定產物」。
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/review-contract.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/schemas-runtime/l5-answers.schema.json|37|e94f53cd34b39bf7e249fb690174d95155c1d3aa3e86499502c0060511a72043|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/schemas-runtime/l5-answers.schema.json|121|c366518b85d521495ba4d54f45dce416dc77dd2097cbba0d026cd7fbf929d91b|0
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ps-sdoc:schema:l5-answers",
   "title": "乾淨讀者的答案（L5）",
   "description": "讀者只依渲染出的文件作答。文件沒寫的答 NOT_IN_SPEC；ANSWERED 必須引用文件段落（<檔名>#<項目 ID>），答案裡的每個 ID 都要出現在引用的段落裡。",
   "type": "object",
-  "required": ["schemaVersion", "jobId", "attemptId", "reader", "round", "batch", "inputHash", "answers"],
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "attemptId",
+    "reader",
+    "round",
+    "batch",
+    "inputHash",
+    "answers"
+  ],
   "properties": {
-    "schemaVersion": { "const": "1.0" },
-    "jobId": { "type": "string", "pattern": "^clone-[0-9a-f]{16}$" },
-    "attemptId": { "type": "string", "pattern": "^a[0-9]{4,8}$" },
-    "reader": { "type": "string", "pattern": "^R[1-3]$" },
-    "round": { "type": "integer", "minimum": 1, "maximum": 2 },
-    "batch": { "type": "string", "pattern": "^b[0-9a-f]{12}$" },
-    "inputHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^clone-[0-9a-f]{16}$"
+    },
+    "attemptId": {
+      "type": "string",
+      "pattern": "^a[0-9]{4,8}$"
+    },
+    "reader": {
+      "type": "string",
+      "pattern": "^R[1-3]$"
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "batch": {
+      "type": "string",
+      "pattern": "^b[0-9a-f]{12}$"
+    },
+    "inputHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "answers": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "status", "ids", "kind", "text", "citations"],
+        "required": [
+          "id",
+          "status"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[A-Z]+-\\d{3,}/[A-Z][0-9]$", "description": "題目 ID（工單 questions 的 id）" },
-          "status": { "type": "string", "enum": ["ANSWERED", "NOT_IN_SPEC"] },
-          "ids": { "type": "array", "items": { "type": "string", "pattern": "^[A-Z]+-\\d{3,}$" }, "description": "構成答案的規格項目 ID（依題目的 ask）" },
-          "kind": { "type": "string", "maxLength": 200, "description": "題目要求的代碼；不需要時寫空字串" },
-          "text": { "type": "string", "maxLength": 2000, "description": "用文字寫的答案" },
-          "citations": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]{2}-[a-z-]+\\.md#[A-Z]+-\\d{3,}$" }, "description": "引用的段落：<檔名>#<項目 ID>" }
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z]+-\\d{3,}/[A-Z][0-9]$",
+            "description": "題目 ID（工單 questions 的 id）"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ANSWERED",
+              "NOT_IN_SPEC"
+            ]
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "description": "構成答案的規格項目 ID（依題目的 ask）"
+          },
+          "kind": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "題目要求的代碼；不需要時寫空字串"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "用文字寫的答案"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "引用的段落：<檔名>#<項目 ID>"
+          }
         },
         "additionalProperties": false,
         "allOf": [
-          { "if": { "properties": { "status": { "const": "ANSWERED" } } }, "then": { "properties": { "text": { "minLength": 1 }, "citations": { "minItems": 1 } } } }
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ANSWERED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "text",
+                "citations"
+              ],
+              "properties": {
+                "text": {
+                  "minLength": 1
+                }
+              }
+            }
+          }
         ]
       }
     }
@@ -28679,7 +28763,7 @@ function Get-PsSdEvidenceDoc {
     return , $o
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-reader-lib.ps1|367|91d931200dd645172e3626d5883a7e3eeadbce0672b30d11fdee7e0721464dd4|1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc-reader-lib.ps1|373|a6d3d5562495a46dfdea05c8ab6c5bd94dc459f9c896631437033c694ccc783b|1
 # ps-sdoc-reader-lib.ps1 — Spec 文件流程的 L5 乾淨讀者：由 canonical 確定性出題、驗證讀者的引用、比對答案、多數決。
 # 讀者只看渲染出的 Markdown；標準答案只留在外環。題目的比對方式：IDS（ID 集合）、ORDERED（有序 ID）、KIND（代碼＋ID 集合）、TEXT（交判定 session）。
 # 依賴（呼叫端先載入）：ps-sdoc-schema-lib.ps1、ps-sdoc-lib.ps1。PS 5.1 相容。
@@ -28983,16 +29067,22 @@ function Test-PsSdL5Answer {
     $status = [string]$Answer['status']
     $res.Text = [string]$Answer['text']
     if ($status -ceq 'NOT_IN_SPEC') { $res.Class = 'NIS'; return $res }
+    # ID 一律大寫比對；引用正規化成「小寫檔名#大寫 ID」（容許前面帶路徑）
     $ids = [System.Collections.Generic.List[string]]::new(); $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($x in @($Answer['ids'])) { if ($null -eq $x) { continue }; $s = ([string]$x).Trim(); if ($s -ceq [string]$Question['item'] -or $script:PsSdL5ComputedPrefixes -ccontains (Get-PsSdIdPrefix $s)) { continue }; if ($seen.Add($s)) { $ids.Add($s) } }
+    foreach ($x in @($Answer['ids'])) { if ($null -eq $x) { continue }; $s = ([string]$x).Trim().ToUpperInvariant(); if ($s -eq '' -or $s -ceq [string]$Question['item'] -or $script:PsSdL5ComputedPrefixes -ccontains (Get-PsSdIdPrefix $s)) { continue }; if ($seen.Add($s)) { $ids.Add($s) } }
     $res.Ids = $ids.ToArray()
-    $res.Kind = ([string]$Answer['kind']).Trim()
+    $kinds = [System.Collections.Generic.List[string]]::new()
+    foreach ($part in ([string]$Answer['kind']).Split(',')) { $t = $part.Trim().ToUpperInvariant(); if ($t -ne '' -and -not $kinds.Contains($t)) { $kinds.Add($t) } }
+    $kinds.Sort([System.StringComparer]::Ordinal)
+    $res.Kind = $kinds.ToArray() -join ','
     $cited = [System.Text.StringBuilder]::new()
-    $cits = @($Answer['citations'] | Where-Object { $null -ne $_ })
+    $cits = @(); foreach ($c in @($Answer['citations'])) { if ($null -ne $c -and ([string]$c).Trim() -ne '') { $cits += ([string]$c).Trim() } }
     if ($cits.Count -eq 0) { $res.Reason = '沒有引用'; return $res }
     foreach ($c in $cits) {
-        $k = ([string]$c).Trim()
-        if (-not $Sections.ContainsKey($k)) { $res.Reason = ('引用的段落不存在：' + $k); return $res }
+        $k = $c -replace '\\', '/'
+        $h = $k.IndexOf('#')
+        if ($h -gt 0) { $file = $k.Substring(0, $h); $file = $file.Substring($file.LastIndexOf('/') + 1); $k = $file.ToLowerInvariant() + '#' + $k.Substring($h + 1).Trim().ToUpperInvariant() }
+        if (-not $Sections.ContainsKey($k)) { $res.Reason = ('引用的段落不存在：' + $c); return $res }
         [void]$cited.Append($Sections[$k]).Append("`n")
     }
     $all = $cited.ToString()
@@ -40330,7 +40420,7 @@ if ($problems.Count -gt 0) { Write-Host "共 $($problems.Count) 個 FAIL" -Foreg
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-ps51-static.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-assemble.ps1|343|4338bc10a8846254fc54a5d9624881ca8fa2dae8705836ed5e1dd4beacff1435|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-assemble.ps1|345|a8f698d754ca20e6786c7755f3f8665ec889041b00c4dfd79b34e538f9e12406|1
 # test-sdoc-assemble.ps1 — Spec 文件流程：研究包驗收、派號、組裝、計算文件、L2／L3 檢核、外殼與 docHash、渲染。
 # 以設計範例為預期結果：把範例 canonical 拆回研究包，再組裝回來比對；另跑 20 種刻意破壞。合成資料，不查 MCP、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-assemble.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -40622,6 +40712,8 @@ $a2 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('ROLE-001') '' @('04-workflow.md#
 $a3 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('FLD-001') '' @('04-workflow.md#TRN-008')) $q1 $sec
 $a4 = Test-PsSdL5Answer (& $mkAns 'NOT_IN_SPEC' @() '' @()) $q1 $sec
 Assert-Sd ($a1.Class -ceq 'ANS' -and (@($a1.Ids) -join ',') -ceq 'ROLE-001,DRV-002' -and $a2.Class -ceq 'INV' -and $a3.Class -ceq 'INV' -and $a4.Class -ceq 'NIS') '引用驗證：有效、段落不存在、引用段落裡沒有該 ID、文件沒寫；自己的 ID 不算'
+$a5 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('role-001', ' DRV-002') 'user_action, ' @('docs\04-Workflow.md#trn-008')) $q1 $sec
+Assert-Sd ($a5.Class -ceq 'ANS' -and (@($a5.Ids) -join ',') -ceq 'ROLE-001,DRV-002' -and $a5.Kind -ceq 'USER_ACTION') '引用驗證：ID 大小寫、引用的路徑與大小寫、代碼的空白都先正規化'
 Assert-Sd ((Get-PsSdL5Vote $q1 $a1 '') -ceq 'MATCH' -and (Get-PsSdL5Vote $q1 @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' } '') -ceq 'MISMATCH' -and (Get-PsSdL5Vote $q2 @{ Class = 'ANS'; Ids = @('OBJ-002'); Kind = 'BATCH'; Text = '' } '') -ceq 'MISMATCH') '比對：ID 集合；KIND 題代碼也要相同'
 $va = @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' }
 $vn = @{ Class = 'NIS'; Ids = @(); Kind = ''; Text = '' }
@@ -43642,10 +43734,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|7158a9495a04e090b491d63a2c5b29f5680126b731aadc6ca49575db69ed4f0f|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|fe1109a889de8e607c1ea63e04477b744cc477b534445127e23fcb5737c65954|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "6ebc14c",
+  "commit": "aadaa42",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -44041,8 +44133,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/peoplesoft/sdoc/schemas-runtime/l5-answers.schema.json",
-      "lines": 37,
-      "sha256": "e94f53cd34b39bf7e249fb690174d95155c1d3aa3e86499502c0060511a72043",
+      "lines": 121,
+      "sha256": "c366518b85d521495ba4d54f45dce416dc77dd2097cbba0d026cd7fbf929d91b",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/schemas-runtime/l5-answers.schema.json"
     },
@@ -44483,8 +44575,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc-reader-lib.ps1",
-      "lines": 367,
-      "sha256": "91d931200dd645172e3626d5883a7e3eeadbce0672b30d11fdee7e0721464dd4",
+      "lines": 373,
+      "sha256": "a6d3d5562495a46dfdea05c8ab6c5bd94dc459f9c896631437033c694ccc783b",
       "bom": true
     },
     {
@@ -44597,8 +44689,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-sdoc-assemble.ps1",
-      "lines": 343,
-      "sha256": "4338bc10a8846254fc54a5d9624881ca8fa2dae8705836ed5e1dd4beacff1435",
+      "lines": 345,
+      "sha256": "a8f698d754ca20e6786c7755f3f8665ec889041b00c4dfd79b34e538f9e12406",
       "bom": true
     },
     {
@@ -44641,4 +44733,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|148|e3ca2183c0cf51b2cc05d425f54a4b57beb8c6d70a535047abaf81baa080afac
+@@@PSBUNDLE-EOF|148|cd7b450d2fcf468bd5b2fee84326761049d303c2ba91f4a611af982c3564f514

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6ebc14c）
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit aadaa42）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|opencode|6ebc14c|112
+@@@PSBUNDLE|1|opencode|aadaa42|112
 @@@PSBUNDLE-REMOVED|.opencode/plugin/ps-oracle-preflight-gate.js
 @@@PSBUNDLE-REMOVED|scripts/test-elasticsearch-mcp-tools-list.ps1
 @@@PSBUNDLE-REMOVED|scripts/test-mcp-tools-list.ps1
@@ -8592,7 +8592,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|998|6b865a62f460bfa31ce37bfbfbc7b25773accf9cc24b1726131751ff89092031|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1036|44c76e6237a523d1af16fed2a6c9f272cba257ea45e8316c4c521780b1411112|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -9591,6 +9591,44 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
 □ 5. 接著跑 `ps-fs-doctor`（Claude Code 版另跑 `ps-claude-doctor`）。保留本機的檔（已回填的 profile 等）在檢查 M 會列為版本不符，屬正常。
 
 被覆寫或刪除的舊檔備份在 `auto-loop-logs\ps-bundle-backup\<時間>\`；要回到上一版就把備份複製回原位。
+
+## SOP-28 Spec 文件（Claude Code 版：00-index＋14 份文件＋90 問題清單；issue #37）
+
+Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP-25）。入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，
+或 `claude --agent ps-spec-author` 後輸入清單（名稱為合成範例）。結論碼見 `.claude/peoplesoft/spec/support-codes.md` 的 DOC1。
+
+### 日常操作
+
+□ 1. 第一次輸入清單：DOC1-0-01，在 `.ps-private\sdoc\<jobId>\` 建 status.md、project.md、decisions.md、approvals.md 骨架。
+□ 2. 把這組 Component 的狀態圖（Mermaid flowchart 或 stateDiagram-v2，畫法不限、可多張）與圖下的說明貼進 status.md，
+     刪掉第一行的 `<!-- SDOC:SKELETON -->`；project.md 選填（目標、決策責任）。
+□ 3. 再輸入同一份清單：第 0 階段三位讀者解讀狀態圖 → 11 個研究單元（每頁研究與獨立覆核分開 session）→ L5 乾淨讀者。
+     ps-spec-author 在 DOC1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑。
+□ 4. 依結論碼處理：
+     - DOC1-4-01：讀者對狀態圖仍無多數或圖與圖矛盾 → 看 90 的 STATUS_READING_CONFLICT／STATUS_SELF_CONFLICT，改 status.md 後重跑（開新研究版本）。
+     - DOC1-4-03：某頁兩次未通過或預算用完 → 看輸出的「缺口」行，排除原因後說「重試被擋項」（-Retry）。
+     - DOC1-5-01（DRAFT）：看 00-index「未通過的檢核」與 90 的 BLOCKING 問題，在 decisions.md 裁決（NO_CHANGE／DROP／ACCEPT_GAP／
+       AMEND_INPUT／ADD_SCOPE），同命令重新組裝；只有 ADD_SCOPE 與改 status.md 會開新研究版本。
+     - DOC1-7-01（REVIEW_READY）：五層檢核全過 → 人工審閱；同意的文件把 00-index 的 docHash 前 12 碼寫進 approvals.md。
+       文件內容改了，舊的核准自動不成立。
+     - DOC1-7-02（APPROVED）：全部文件已核准。
+□ 5. 回報維護端：只回最後一行 DOC1 結論碼、「欄位統計」與「乾淨讀者（L5）」兩行的計數；不回物件名、路徑、hash、status.md 內容。
+
+| 什麼 | 在哪 |
+|---|---|
+| 人工輸入 | `.ps-private\sdoc\<jobId>\`（gitignore，不進任何 git） |
+| 產出入口 | `docs\ps-spec\<jobId>\README.md` → `generated\<代號>\00-index.md` |
+| 執行狀態 | `.ps-runtime\sdoc\<jobId>\`（attempt、收據、ID 對照、工作中文件、inbox） |
+| session log | `.ps-runtime\sdoc-logs\` |
+
+- docs/ps-research 有更新時只提示「要以新知識重查請加 -Refresh」，不自動換版本；STATUS 檔、ADD_SCOPE 裁決或 schema 改了才自動開新版本。
+- generated 是可重建投影，不在裡面修稿；修改走 decisions.md、status.md 或重新研究。
+
+### 維護驗證
+
+`test-sdoc.ps1`、`test-sdoc-assemble.ps1`、`test-sdoc-run.ps1`（合成 worker 端到端，PS 7 約 5 分鐘）、`test-claude-variant.ps1`、
+`test-ps51-static.ps1`。改 schema 或貫穿範例後跑 `test-sdoc-assemble.ps1 -WriteExamples` 重生 `claude-code/.claude/peoplesoft/sdoc/examples/`。
+這些測試只驗機制與合成資料，不代替公司機的真 PS 5.1、真 claude CLI 與企業資料驗收。
 @@@PSBUNDLE-END|.opencode/peoplesoft/SOP.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/capabilities.json|37|67e7a913080f50a6e268f245744d730f147db683aff100bdbca87ed7bfe01573|0
 {
@@ -22672,7 +22710,7 @@ function Get-PsSdEvidenceDoc {
     return , $o
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-reader-lib.ps1|367|91d931200dd645172e3626d5883a7e3eeadbce0672b30d11fdee7e0721464dd4|1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc-reader-lib.ps1|373|a6d3d5562495a46dfdea05c8ab6c5bd94dc459f9c896631437033c694ccc783b|1
 # ps-sdoc-reader-lib.ps1 — Spec 文件流程的 L5 乾淨讀者：由 canonical 確定性出題、驗證讀者的引用、比對答案、多數決。
 # 讀者只看渲染出的 Markdown；標準答案只留在外環。題目的比對方式：IDS（ID 集合）、ORDERED（有序 ID）、KIND（代碼＋ID 集合）、TEXT（交判定 session）。
 # 依賴（呼叫端先載入）：ps-sdoc-schema-lib.ps1、ps-sdoc-lib.ps1。PS 5.1 相容。
@@ -22976,16 +23014,22 @@ function Test-PsSdL5Answer {
     $status = [string]$Answer['status']
     $res.Text = [string]$Answer['text']
     if ($status -ceq 'NOT_IN_SPEC') { $res.Class = 'NIS'; return $res }
+    # ID 一律大寫比對；引用正規化成「小寫檔名#大寫 ID」（容許前面帶路徑）
     $ids = [System.Collections.Generic.List[string]]::new(); $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($x in @($Answer['ids'])) { if ($null -eq $x) { continue }; $s = ([string]$x).Trim(); if ($s -ceq [string]$Question['item'] -or $script:PsSdL5ComputedPrefixes -ccontains (Get-PsSdIdPrefix $s)) { continue }; if ($seen.Add($s)) { $ids.Add($s) } }
+    foreach ($x in @($Answer['ids'])) { if ($null -eq $x) { continue }; $s = ([string]$x).Trim().ToUpperInvariant(); if ($s -eq '' -or $s -ceq [string]$Question['item'] -or $script:PsSdL5ComputedPrefixes -ccontains (Get-PsSdIdPrefix $s)) { continue }; if ($seen.Add($s)) { $ids.Add($s) } }
     $res.Ids = $ids.ToArray()
-    $res.Kind = ([string]$Answer['kind']).Trim()
+    $kinds = [System.Collections.Generic.List[string]]::new()
+    foreach ($part in ([string]$Answer['kind']).Split(',')) { $t = $part.Trim().ToUpperInvariant(); if ($t -ne '' -and -not $kinds.Contains($t)) { $kinds.Add($t) } }
+    $kinds.Sort([System.StringComparer]::Ordinal)
+    $res.Kind = $kinds.ToArray() -join ','
     $cited = [System.Text.StringBuilder]::new()
-    $cits = @($Answer['citations'] | Where-Object { $null -ne $_ })
+    $cits = @(); foreach ($c in @($Answer['citations'])) { if ($null -ne $c -and ([string]$c).Trim() -ne '') { $cits += ([string]$c).Trim() } }
     if ($cits.Count -eq 0) { $res.Reason = '沒有引用'; return $res }
     foreach ($c in $cits) {
-        $k = ([string]$c).Trim()
-        if (-not $Sections.ContainsKey($k)) { $res.Reason = ('引用的段落不存在：' + $k); return $res }
+        $k = $c -replace '\\', '/'
+        $h = $k.IndexOf('#')
+        if ($h -gt 0) { $file = $k.Substring(0, $h); $file = $file.Substring($file.LastIndexOf('/') + 1); $k = $file.ToLowerInvariant() + '#' + $k.Substring($h + 1).Trim().ToUpperInvariant() }
+        if (-not $Sections.ContainsKey($k)) { $res.Reason = ('引用的段落不存在：' + $c); return $res }
         [void]$cited.Append($Sections[$k]).Append("`n")
     }
     $all = $cited.ToString()
@@ -34323,7 +34367,7 @@ if ($problems.Count -gt 0) { Write-Host "共 $($problems.Count) 個 FAIL" -Foreg
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-ps51-static.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-assemble.ps1|343|4338bc10a8846254fc54a5d9624881ca8fa2dae8705836ed5e1dd4beacff1435|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-assemble.ps1|345|a8f698d754ca20e6786c7755f3f8665ec889041b00c4dfd79b34e538f9e12406|1
 # test-sdoc-assemble.ps1 — Spec 文件流程：研究包驗收、派號、組裝、計算文件、L2／L3 檢核、外殼與 docHash、渲染。
 # 以設計範例為預期結果：把範例 canonical 拆回研究包，再組裝回來比對；另跑 20 種刻意破壞。合成資料，不查 MCP、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-assemble.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -34615,6 +34659,8 @@ $a2 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('ROLE-001') '' @('04-workflow.md#
 $a3 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('FLD-001') '' @('04-workflow.md#TRN-008')) $q1 $sec
 $a4 = Test-PsSdL5Answer (& $mkAns 'NOT_IN_SPEC' @() '' @()) $q1 $sec
 Assert-Sd ($a1.Class -ceq 'ANS' -and (@($a1.Ids) -join ',') -ceq 'ROLE-001,DRV-002' -and $a2.Class -ceq 'INV' -and $a3.Class -ceq 'INV' -and $a4.Class -ceq 'NIS') '引用驗證：有效、段落不存在、引用段落裡沒有該 ID、文件沒寫；自己的 ID 不算'
+$a5 = Test-PsSdL5Answer (& $mkAns 'ANSWERED' @('role-001', ' DRV-002') 'user_action, ' @('docs\04-Workflow.md#trn-008')) $q1 $sec
+Assert-Sd ($a5.Class -ceq 'ANS' -and (@($a5.Ids) -join ',') -ceq 'ROLE-001,DRV-002' -and $a5.Kind -ceq 'USER_ACTION') '引用驗證：ID 大小寫、引用的路徑與大小寫、代碼的空白都先正規化'
 Assert-Sd ((Get-PsSdL5Vote $q1 $a1 '') -ceq 'MATCH' -and (Get-PsSdL5Vote $q1 @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' } '') -ceq 'MISMATCH' -and (Get-PsSdL5Vote $q2 @{ Class = 'ANS'; Ids = @('OBJ-002'); Kind = 'BATCH'; Text = '' } '') -ceq 'MISMATCH') '比對：ID 集合；KIND 題代碼也要相同'
 $va = @{ Class = 'ANS'; Ids = @('ROLE-001'); Kind = ''; Text = '' }
 $vn = @{ Class = 'NIS'; Ids = @(); Kind = ''; Text = '' }
@@ -37635,10 +37681,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|18738e08737c62f57a4fbf984ae0f656ae0cef06f1fae1f579da4c4955f74893|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|638b5050707144d13b5a9f49dcd0d320743bdcf45edde21587b4062e08ccc25a|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "6ebc14c",
+  "commit": "aadaa42",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -37888,8 +37934,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 998,
-      "sha256": "6b865a62f460bfa31ce37bfbfbc7b25773accf9cc24b1726131751ff89092031",
+      "lines": 1036,
+      "sha256": "44c76e6237a523d1af16fed2a6c9f272cba257ea45e8316c4c521780b1411112",
       "bom": false
     },
     {
@@ -38146,8 +38192,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc-reader-lib.ps1",
-      "lines": 367,
-      "sha256": "91d931200dd645172e3626d5883a7e3eeadbce0672b30d11fdee7e0721464dd4",
+      "lines": 373,
+      "sha256": "a6d3d5562495a46dfdea05c8ab6c5bd94dc459f9c896631437033c694ccc783b",
       "bom": true
     },
     {
@@ -38260,8 +38306,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-sdoc-assemble.ps1",
-      "lines": 343,
-      "sha256": "4338bc10a8846254fc54a5d9624881ca8fa2dae8705836ed5e1dd4beacff1435",
+      "lines": 345,
+      "sha256": "a8f698d754ca20e6786c7755f3f8665ec889041b00c4dfd79b34e538f9e12406",
       "bom": true
     },
     {
@@ -38448,4 +38494,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|112|8ce2ac865d0657f79701afb0b82e3ad6ef3673890be17649c63d722fa8709fe3
+@@@PSBUNDLE-EOF|112|8d7e6825c962e52d76412dcd1f3f87c3f85bd19cd2cda8ac73c5e5be25b55e6d
