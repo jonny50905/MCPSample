@@ -1,7 +1,7 @@
-# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1）
+# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1）
 
 CLI 每個動詞的**最後一行**都是唯一的結論碼；上面的內容只在本機看。結論碼**不含**路徑、檔名、物件名、hash、requestId。
-形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC|CLONE)1-\d-\d\d(-\d+)?$`。
+形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC|CLONE|DOC)1-\d-\d\d(-\d+)?$`。
 公司機回報只回結論碼、drill tuple 與 PASS／FAIL；`.ps-private`、template／checklist 原文、NN 內容一律不出公司。
 
 ## KNOW1（scripts/ps-knowledge.ps1）
@@ -57,6 +57,28 @@ exit：0＝完成；2＝參數、驗證、路由、寫入錯（1-04／1-05／1-0
 | 9 | 02 | 環境／收據完整性／產物衝突等錯誤；詳細內容只在本機看 | 2 |
 
 CLONE1 不使用 drill tuple。請勿將本機錯誤文字、generated 文件或 attempt 帶出公司。
+
+## DOC1（scripts/ps-sdoc.ps1：00-index＋14 份文件＋90 問題清單）
+
+| stage | code | 意義 | exit |
+|---|---|---|---|
+| 0 | 01 | 等 STATUS 檔：把狀態圖放進 `.ps-private/sdoc/<jobId>/status.md`、刪掉第一行的 SDOC:SKELETON 標記後同命令續跑 | 0 |
+| 0 | 02 | 尚未開始（Status 唯讀） | 0 |
+| 0 | 03 | 同一組 Component 的文件工作正在執行 | 3 |
+| 3 | 02-`<n>` | RUNNABLE，n 個工作可續跑；同命令繼續 | 0 |
+| 3 | 03 | SLOT_BUSY；模型服務被其他 session 使用，稍後續跑 | 1 |
+| 3 | 04 | SESSION_FAILED；檢查 Claude Code／MCP 後續跑，不消耗失敗次數 | 1 |
+| 3 | 07 | WRITE_DEFERRED；解除檔案占用後續跑，不假裝已發布 | 1 |
+| 4 | 01 | 狀態圖解讀待人處理：三位讀者仍無多數或圖與圖矛盾（90 的 STATUS_READING_CONFLICT／STATUS_SELF_CONFLICT）；改好 status.md 後同命令重跑 | 1 |
+| 4 | 03 | BLOCKED；同一頁兩次未通過或預算用完，處理原因後加 -Retry，必要時 -Refresh | 1 |
+| 4 | 04 | STALE；STATUS 檔、ADD_SCOPE 裁決或 schema 改了，同命令建立新研究版本 | 1 |
+| 5 | 01 | DRAFT；研究完成，但仍有檢核未過、L5 未執行或 BLOCKING 問題；見 00-index 與 90，裁決寫進 decisions.md 後同命令重新組裝 | 0 |
+| 7 | 01 | REVIEW_READY；五層檢核通過，可人工審閱並寫 approvals.md；不是企業 E2E | 0 |
+| 7 | 02 | APPROVED；全部文件已由人核准 | 0 |
+| 9 | 01 | 參數不合法，或不是 Claude Code 版 | 2 |
+| 9 | 02 | 環境、收據完整性、產物衝突等錯誤；詳細內容只在本機看 | 2 |
+
+DOC1 不使用 drill tuple。對外只回報結論碼與「欄位統計」行的計數；status.md、decisions.md、generated 文件、attempt 一律不出公司。
 
 ## SPEC1（scripts/ps-spec.ps1）
 

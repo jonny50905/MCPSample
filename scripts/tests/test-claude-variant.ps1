@@ -74,11 +74,15 @@ $leak = @($ccAll | Where-Object { (Read-Norm $_.FullName) -match '(?i)opencode' 
 Assert ($leak.Count -eq 0) ("claude-code/ 的部署檔不含另一版字樣（opencode）" + $(if ($leak.Count -gt 0) { '：' + ($leak -join ', ') } else { '' }))
 
 $excludedAgents = @('explore', 'general', 'scout', 'ps-audit-orchestrator')
+# Spec 文件流程（scripts/ps-sdoc.ps1）只有 Claude Code 版：它的 worker／讀者 agent 沒有 OpenCode 對應檔
+$claudeOnlyAgents = @('ps-status-reader', 'ps-sdoc-worker')
 $ocAgents = Get-NameSet (Join-Path $oc 'agent') '*.md'
 $ccAgents = Get-NameSet (Join-Path $cc '.claude/agents') '*.md'
 $missA = @($ocAgents.Keys | Where-Object { $excludedAgents -notcontains $_ -and -not $ccAgents.ContainsKey($_) })
-$extraA = @($ccAgents.Keys | Where-Object { -not $ocAgents.ContainsKey($_) })
-Assert ($missA.Count -eq 0 -and $extraA.Count -eq 0) ("agent 一一對應（OpenCode 內建覆寫 explore／general／scout 與備用 ps-audit-orchestrator 除外）" + $(if ($missA.Count + $extraA.Count -gt 0) { '：缺 ' + ($missA -join ',') + '／多 ' + ($extraA -join ',') } else { '' }))
+$extraA = @($ccAgents.Keys | Where-Object { -not $ocAgents.ContainsKey($_) -and $claudeOnlyAgents -notcontains $_ })
+Assert ($missA.Count -eq 0 -and $extraA.Count -eq 0) ("agent 一一對應（OpenCode 內建覆寫 explore／general／scout、備用 ps-audit-orchestrator、Claude Code 獨有的 Spec 文件 agent 除外）" + $(if ($missA.Count + $extraA.Count -gt 0) { '：缺 ' + ($missA -join ',') + '／多 ' + ($extraA -join ',') } else { '' }))
+$coBad = @($claudeOnlyAgents | Where-Object { -not $ccAgents.ContainsKey($_) -or $ocAgents.ContainsKey($_) })
+Assert ($coBad.Count -eq 0) ("Claude Code 獨有的 Spec 文件 agent 存在、且 OpenCode 版沒有同名檔" + $(if ($coBad.Count -gt 0) { '：' + ($coBad -join ',') } else { '' }))
 $ocCmds = Get-NameSet (Join-Path $oc 'command') '*.md'
 $ccCmds = Get-NameSet (Join-Path $cc '.claude/commands') '*.md'
 $d1 = @($ocCmds.Keys | Where-Object { -not $ccCmds.ContainsKey($_) }) + @($ccCmds.Keys | Where-Object { -not $ocCmds.ContainsKey($_) })
@@ -124,8 +128,8 @@ function Get-YamlKeyLines([string]$Path) {
 Assert ((Get-YamlKeyLines (Join-Path $oc 'peoplesoft/customization-profile.yaml')) -ceq (Get-YamlKeyLines (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml'))) "customization-profile.yaml 去註解後鍵值逐行相同（公司機可把已回填的值原樣抄過去）"
 
 $subagents = @('ps-ui-flow', 'ps-peoplecode-flow', 'ps-sql-flow', 'ps-sqr-flow', 'ps-ae-flow', 'ps-metadata-flow', 'ps-auditor')
-$dbMain = @('ps-orchestrator', 'ps-deep-research', 'ps-clone-worker')
-$pathProfiles = @{ 'ps-spec-worker' = 'spec-worker'; 'ps-clone-worker' = 'clone-worker'; 'ps-spec-author' = 'spec-author' }
+$dbMain = @('ps-orchestrator', 'ps-deep-research', 'ps-clone-worker', 'ps-sdoc-worker')
+$pathProfiles = @{ 'ps-spec-worker' = 'spec-worker'; 'ps-clone-worker' = 'clone-worker'; 'ps-spec-author' = 'spec-author'; 'ps-status-reader' = 'status-reader'; 'ps-sdoc-worker' = 'sdoc-worker' }
 $fmBad = @()
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/agents') -File -Filter '*.md')) {
     $fm = Get-Frontmatter $f.FullName
@@ -177,7 +181,8 @@ if ($null -ne $settings) {
     Assert ($allow -contains 'mcp__oracleMCP__connect' -and $allow -contains 'mcp__oracleMCP__sql_run' -and $allow -contains 'Edit(./docs/ps-research/**)' -and $deny -contains 'mcp__oracleMCP__sqlcl_run' -and $allow -notcontains 'mcp__oracleMCP__disconnect') "settings：headless 需要的工具在允許清單、sqlcl_run 拒絕、disconnect 不預先允許"
     Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'mcp__oracleMCP__connect' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 掛 connect 與 Agent"
     Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
-    Assert ([string]$settings.env.BASH_MAX_TIMEOUT_MS -eq '7200000') "settings：Bash 上限 2 小時（ps-spec-author 的 ps-spec-build 長跑）"
+    Assert ([string]$settings.env.BASH_MAX_TIMEOUT_MS -eq '7200000') "settings：Bash 上限 2 小時（ps-spec-author 的 ps-sdoc 長跑）"
+    Assert ($allow -contains 'Bash(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'Edit(./.ps-runtime/sdoc/**)') "settings：ps-spec-author 可跑 ps-sdoc、headless worker 可寫 .ps-runtime/sdoc"
 }
 $hookPath = Join-Path $cc '.claude/hooks/ps-runtime-guard.ps1'
 $hb = [System.IO.File]::ReadAllBytes($hookPath)
@@ -258,6 +263,10 @@ try {
     $o1 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-ui-flow","prompt":"x"}}'
     $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-author","prompt":"x"}}'
     Assert ($o1.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：ps-ui-flow／ps-spec-author → 放行"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-sdoc-worker","prompt":"x"}}'
+    $d1 = Get-Deny
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-status-reader","prompt":"x"},"agent_type":"ps-orchestrator"}'
+    Assert ($d1 -like 'PS_TASK_TARGET_INVALID*主代理*' -and (Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：Spec 文件的 worker／讀者只由外環 headless 啟動，不能委派"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_response":{"content":[{"type":"text","text":"{\"status\":\"COMPLETE\",\"suggestedNext\":[{\"agent\":\"ps-data-lineage\",\"task\":\"x\"},{\"agent\":\"ps-sqr-flow\"},{\"agent\":\"nobody\"}]}"}]}}' @('-Mode', 'post')
     $note = ''
     if ($null -ne $script:hookObj) { $note = [string]$script:hookObj.hookSpecificOutput.additionalContext }
@@ -281,14 +290,34 @@ try {
     Assert (Test-PathHook 'clone-worker' 'Grep' 'path' 'docs/ps-research') "path clone-worker：Grep 研究目錄 → 放行"
     Assert (Test-PathHook 'clone-worker' 'Write' 'file_path' (Join-Path $dep '.ps-runtime/clone-spec/clone-0123456789abcdef/attempts/a1/packet.json')) "path clone-worker：寫 packet.json → 放行"
     Assert (-not (Test-PathHook 'clone-worker' 'Write' 'file_path' (Join-Path $dep 'docs/ps-research/x/01-A.md'))) "path clone-worker：寫 NN → 擋"
-    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_A,TW_B' -MaxSessions 4") "path spec-author：ps-spec-build 命令 → 放行"
-    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_A'; del x")) "path spec-author：串接命令 → 擋"
-    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_A`$X,TW#B' -Status") "path spec-author：Component 名含 `$／#（單引號內）→ 放行"
-    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components `$(whoami)")) "path spec-author：未加引號的變數／子命令 → 擋"
-    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_A' > out.txt")) "path spec-author：重導向 → 擋"
+    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A,TW_B' -MaxSessions 4") "path spec-author：ps-sdoc 命令 → 放行"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A'; del x")) "path spec-author：串接命令 → 擋"
+    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A`$X,TW#B' -Status") "path spec-author：Component 名含 `$／#（單引號內）→ 放行"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components `$(whoami)")) "path spec-author：未加引號的變數／子命令 → 擋"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A' > out.txt")) "path spec-author：重導向 → 擋"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_A'")) "path spec-author：舊的 ps-spec-build 命令 → 擋（Claude Code 版的 /ps-spec 只走 ps-sdoc）"
     Assert (-not (Test-PathHook 'spec-author' 'PowerShell' 'command' 'Remove-Item x')) "path spec-author：其他命令 → 擋"
     Assert (-not (Test-PathHook 'spec-author' 'Write' 'file_path' (Join-Path $dep 'docs/ps-spec/x.md'))) "path spec-author：任何寫檔 → 擋"
+    Assert (-not (Test-PathHook 'spec-author' 'Write' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/approvals.md'))) "path spec-author：不代寫人工輸入檔（核准、裁決）→ 擋"
     Assert (Test-PathHook 'spec-author' 'Read' 'file_path' (Join-Path $dep 'docs/ps-spec/TW_A/spec.md')) "path spec-author：讀 Spec 產物 → 放行"
+    Assert (Test-PathHook 'spec-author' 'Read' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/decisions.md')) "path spec-author：讀人工輸入檔（說明怎麼填）→ 放行"
+    $sj = Join-Path $dep '.ps-runtime/sdoc/clone-0123456789abcdef'
+    Assert (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $sj 'inbox/manifest.md')) "path status-reader：讀 inbox 工單 → 放行"
+    Assert (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/status.md')) "path status-reader：讀 STATUS 檔 → 放行"
+    Assert (Test-PathHook 'status-reader' 'Read' 'file_path' '.claude/peoplesoft/sdoc/status-reading-contract.md') "path status-reader：讀解讀契約 → 放行"
+    Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：讀其他讀者的解讀 → 擋（三位讀者互相隔離）"
+    Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/wiki/X.md'))) "path status-reader：讀研究知識 → 擋（只看 STATUS 檔）"
+    Assert (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output.json')) "path status-reader：寫 inbox/output.json → 放行"
+    Assert (-not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：寫 attempt 目錄 → 擋"
+    Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'attempts/a0004/manifest.md')) "path sdoc-worker：讀工單 → 放行"
+    Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'work/r0001/citeable.md')) "path sdoc-worker：讀可引用清單 → 放行"
+    Assert (Test-PathHook 'sdoc-worker' 'Grep' 'path' 'docs/ps-research') "path sdoc-worker：Grep 研究目錄 → 放行"
+    Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' '.claude/peoplesoft/sdoc/examples/data.json') "path sdoc-worker：讀研究包範例 → 放行"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/decisions.md'))) "path sdoc-worker：讀人工裁決檔 → 擋"
+    Assert (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'attempts/a0004/output.json')) "path sdoc-worker：寫 output.json → 放行"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'receipts/r0001/x.json'))) "path sdoc-worker：寫收據 → 擋"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'attempts/a0004/candidate.json'))) "path sdoc-worker：寫候選快照 → 擋"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Bash' 'command' 'dir')) "path sdoc-worker：Bash → 擋"
     Assert (-not (Test-PathHook 'no-such' 'Read' 'file_path' (Join-Path $att 'manifest.md'))) "path：未知設定 → 擋（hook 設定錯不放行）"
 
     Write-Host "C：外環版本層（部署模擬目錄）"

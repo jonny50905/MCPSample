@@ -4,14 +4,14 @@
 #   (1) Oracle connect 目標：本次 connection_name 必須等於 profile oracle.connectionName。
 #       未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；不一致或沒帶 → ORACLE_CONNECTION_MISMATCH；工具不執行、不改參數。
 #       env PS_ORACLE_CONNECT_GUARD=observe 或 profile oracle.connectGuard: observe → 只記錄不擋（enforce 為預設）。
-#   (2) Agent 委派目標：skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker）一律擋；
+#   (2) Agent 委派目標：skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker／ps-status-reader／ps-sdoc-worker）一律擋；
 #       呼叫者是 ps-* 主代理（hook 輸入的 agent_type）時更嚴：只准 .claude/agents 裡可當子代理的 ps-* agent——內建或不存在的代理、
 #       沒帶 subagent_type（＝內建 general-purpose）也擋。一般 session（沒有 --agent，agent_type 空）可用內建代理做維護／排錯。
 #       擋＝PS_TASK_TARGET_INVALID（訊息指出該派誰）。
 # -Mode post（PostToolUse，matcher：Agent|Task）
 #   (3) 子代理報告的 suggestedNext[].agent 是 skill 名或不是可委派的 agent → 以 additionalContext 附一段
 #       「[ps-runtime-guard] …」註記（報告本文不動）。
-# -Mode path -PathProfile <spec-worker|clone-worker|spec-author>（worker agent 的 frontmatter hooks）
+# -Mode path -PathProfile <spec-worker|clone-worker|status-reader|sdoc-worker|spec-author>（worker agent 的 frontmatter hooks）
 #   (4) 讀寫路徑白名單與 Bash 命令形狀；不在白名單 → PS_PATH_DENIED。hook 自己出錯也擋（fail-closed）。
 #
 # 擋＝stdout 印 PreToolUse 的 permissionDecision=deny JSON（理由文字就是模型看到的工具錯誤）；放行＝不印、exit 0。
@@ -27,7 +27,7 @@ $ErrorActionPreference = 'Stop'
 $script:GuardRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $script:ClaudeDir = Join-Path $script:GuardRoot '.claude'
 $script:CodeTarget = 'PS_TASK_TARGET_INVALID'
-$script:MainOnly = @('ps-orchestrator', 'ps-deep-research', 'ps-spec-worker', 'ps-clone-worker')
+$script:MainOnly = @('ps-orchestrator', 'ps-deep-research', 'ps-spec-worker', 'ps-clone-worker', 'ps-status-reader', 'ps-sdoc-worker')
 $script:SkillCarrier = @{ 'ps-security-flow' = 'ps-metadata-flow'; 'ps-data-lineage' = 'ps-metadata-flow'; 'ps-process-flow' = 'ps-metadata-flow' }
 $script:SkillPrimaryOnly = @('ps-business-discovery', 'ps-business-explain', 'ps-impact-analysis')
 
@@ -280,8 +280,14 @@ function Get-PsGuardPathPolicy {
         'clone-worker' {
             return @{ Read = @('.ps-runtime/clone-spec/*/attempts/*', '.ps-runtime/clone-spec/*/revisions/*', '.ps-runtime/clone-spec/*/receipts/*', '.claude/peoplesoft/*', 'docs/ps-research/*'); Write = @('.ps-runtime/clone-spec/*/attempts/*/packet.json', '.ps-runtime/clone-spec/*/attempts/*/review.json'); Shell = $false }
         }
+        'status-reader' {
+            return @{ Read = @('.ps-runtime/sdoc/*/inbox/*', '.ps-private/sdoc/*/status.md', '.claude/peoplesoft/sdoc/status-reading-contract.md', '.claude/peoplesoft/sdoc/schemas/status-reading.schema.json', '.claude/peoplesoft/sdoc/schemas-runtime/status-round2.schema.json'); Write = @('.ps-runtime/sdoc/*/inbox/output.json'); Shell = $false }
+        }
+        'sdoc-worker' {
+            return @{ Read = @('.ps-runtime/sdoc/*/attempts/*', '.ps-runtime/sdoc/*/receipts/*', '.ps-runtime/sdoc/*/work/*', '.ps-private/sdoc/*/status.md', '.claude/peoplesoft/*', 'docs/ps-research/*'); Write = @('.ps-runtime/sdoc/*/attempts/*/output.json'); Shell = $false }
+        }
         'spec-author' {
-            return @{ Read = @('docs/ps-spec/*', '.ps-runtime/clone-spec/*/job.json', '.claude/peoplesoft/spec/clone-contract.md'); Write = @(); Shell = $true }
+            return @{ Read = @('docs/ps-spec/*', '.ps-runtime/sdoc/*/job.json', '.ps-private/sdoc/*', '.claude/peoplesoft/sdoc/*.md', '.claude/peoplesoft/spec/support-codes.md'); Write = @(); Shell = $true }
         }
     }
     return $null
@@ -361,8 +367,8 @@ function Invoke-PsGuardPath {
         $cmd = ([string](Get-PsGuardProp $ti 'command')).Trim()
         $ok = $false
         # 參數只准三種詞：-開關、單引號包住的 Component 清單（英數 _ . $ # - , 空白）、數字——沒有串接、重導向、未加引號的變數
-        if ($policy.Shell -and $cmd -match "^powershell(\.exe)? -NoProfile -File scripts[\\/]ps-spec-build\.ps1((\s+-[A-Za-z]+)|(\s+'[A-Za-z0-9_.`$#, -]+')|(\s+[0-9]+))*\s*$") { $ok = $true }
-        if (-not $ok) { $deny = 'PS_PATH_DENIED：本代理只准執行「powershell -NoProfile -File scripts/ps-spec-build.ps1 <參數>」這一種命令，不得串接其他命令、重導向或變數。' }
+        if ($policy.Shell -and $cmd -match "^powershell(\.exe)? -NoProfile -File scripts[\\/]ps-sdoc\.ps1((\s+-[A-Za-z]+)|(\s+'[A-Za-z0-9_.`$#, -]+')|(\s+[0-9]+))*\s*$") { $ok = $true }
+        if (-not $ok) { $deny = 'PS_PATH_DENIED：本代理只准執行「powershell -NoProfile -File scripts/ps-sdoc.ps1 <參數>」這一種命令，不得串接其他命令、重導向或變數。' }
     }
     if ($deny -ne '') {
         Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'deny' -Code 'PS_PATH_DENIED' -Session $session

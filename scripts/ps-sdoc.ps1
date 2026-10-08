@@ -287,6 +287,18 @@ function Test-SdCovered([string]$Req, $Cov, $Registry) {
     }
     return ($Cov.Items.Contains($Req) -or $Cov.GapKeys.Contains($Req))
 }
+function Get-SdWrittenKeys([object[]]$Receipts) {
+    # 已驗收收據寫過的項目（型別/自然鍵）：全 job 同一個自然鍵只寫一次。
+    $set = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    foreach ($r in $Receipts) { foreach ($it in @($r.Packet['items'])) { if ($null -ne $it) { [void]$set.Add([string]$it['type'] + '/' + [string]$it['key']) } } }
+    return , $set
+}
+function Get-SdDuplicateKeys($Packet, $Written) {
+    $out = @()
+    if ($null -eq $Packet) { return , $out }
+    foreach ($it in @($Packet['items'])) { if ($null -ne $it) { $k = [string]$it['type'] + '/' + [string]$it['key']; if ($Written.Contains($k)) { $out += $k } } }
+    return , $out
+}
 function Get-SdPending([object[]]$Receipts) {
     # 上游需求還沒被產出（也沒有同鍵的 EVIDENCE_GAP）：@{ '單元|主題' = List[型別/鍵] }
     $cov = Get-SdCoverage $Receipts
@@ -323,14 +335,22 @@ function Get-SdPageState($Unit, [string]$Subject, [object[]]$Receipts, [object[]
         if (-not $Pending.ContainsKey($slot)) { return @{ State = 'DONE'; Findings = @() } }
         $requested = @($Pending[$slot])
     }
+    # 分母以全部已驗收收據判斷：別的 Component 已寫的共用欄位不必重寫
     $required = Get-SdRequired $Unit $Subject $Stage0 $Receipts
-    $cov = Get-SdCoverage $mine
+    $cov = Get-SdCoverage $Receipts
     $remaining = @(); foreach ($k in $required) { if (-not (Test-SdCovered $k $cov $J.Registry)) { $remaining += $k } }
     $key = $Unit.Id + '/' + $Subject + '/' + $page
     $s = Get-SdSlotState (Get-SdRowsFor $Ledger $key)
     $base = @{ Unit = $Unit.Id; Subject = $Subject; Page = $page; Cursor = $cursor; Key = $key; Findings = $s.Findings; Required = $remaining; Requested = $requested; Candidate = $s.Candidate }
     if ($s.Invalid -ge 2) { $base.State = 'BLOCKED'; $base.Findings = @($s.Findings) + '本頁本次預算已兩次未通過；修正原因後加 -Retry（保留既有收據）。'; return $base }
-    if ($null -ne $s.Candidate) { $base.State = 'REVIEW'; $base.Kind = 'REVIEW'; return $base }
+    if ($null -ne $s.Candidate) {
+        # 候選產生後，別的主題先驗收了同一個自然鍵：候選作廢重研究（不計次）
+        $written = Get-SdWrittenKeys $Receipts
+        $dup = Get-SdDuplicateKeys (Read-SdNode (Join-Path $s.Candidate.Dir 'candidate.json')) $written
+        if ($dup.Count -eq 0) { $base.State = 'REVIEW'; $base.Kind = 'REVIEW'; return $base }
+        $base.Candidate = $null
+        $base.Findings = @('前一份研究包寫了別頁已驗收的項目：' + (@($dup | Select-Object -First 8) -join '、') + '；改為參照，不要重寫。') + @($s.Findings)
+    }
     $base.State = 'RESEARCH'; $base.Kind = 'RESEARCH'
     return $base
 }
@@ -390,7 +410,7 @@ function Get-SdSchemaBrief($Node) {
     $t = [string]$Node['type']
     if ($t -eq 'array') { $s = '陣列〈' + (Get-SdSchemaBrief $Node['items']) + '〉'; if ($Node.Contains('minItems')) { $s += '（至少 ' + $Node['minItems'] + ' 項）' }; return $s }
     if ($t -eq 'object') {
-        if ($Node.Contains('properties')) { $ps = @(); foreach ($k in $Node['properties'].Keys) { $ps += [string]$k }; return ('物件｛' + ($ps -join '、') + '｝') }
+        if ($Node.Contains('properties')) { $ps = @(); foreach ($k in @($Node['properties'].get_Keys())) { $ps += [string]$k }; return ('物件｛' + ($ps -join '、') + '｝') }
         return '物件'
     }
     if ($t -eq 'string' -and $Node.Contains('pattern')) { return ('字串（格式 ' + $Node['pattern'] + '）') }
@@ -406,12 +426,13 @@ function Get-SdFieldGuide([string[]]$Prefixes) {
         $def = (Resolve-PsSdRef $J.SchemaReg '' (Get-PsSdItemSchemaRoot $p)).Schema
         $req = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
         foreach ($x in @($base['required'])) { [void]$req.Add([string]$x) }
-        $props = [ordered]@{}
-        foreach ($k in $base['properties'].Keys) { $props[[string]$k] = $base['properties'][$k] }
-        foreach ($part in $def['allOf']) { if ($part -is [System.Collections.IDictionary]) { if ($part.Contains('properties')) { foreach ($k in $part['properties'].Keys) { $props[[string]$k] = $part['properties'][$k] } }; if ($part.Contains('required')) { foreach ($x in @($part['required'])) { [void]$req.Add([string]$x) } } } }
+        # 欄位名另存清單：schema 有名為 keys 的欄位（ENT），不能靠字典的 .Keys 列舉
+        $props = New-PsSdMap; $names = New-Object System.Collections.Generic.List[string]
+        foreach ($k in @($base['properties'].get_Keys())) { if (-not $props.ContainsKey([string]$k)) { $names.Add([string]$k) }; $props[[string]$k] = $base['properties'][$k] }
+        foreach ($part in $def['allOf']) { if ($part -is [System.Collections.IDictionary]) { if ($part.Contains('properties')) { foreach ($k in @($part['properties'].get_Keys())) { if (-not $props.ContainsKey([string]$k)) { $names.Add([string]$k) }; $props[[string]$k] = $part['properties'][$k] } }; if ($part.Contains('required')) { foreach ($x in @($part['required'])) { [void]$req.Add([string]$x) } } } }
         $out.Add('## ' + $p + ' ' + $script:PsSdPrefixInfo[$p].Name + '（' + $script:PsSdPrefixInfo[$p].Doc + '）'); $out.Add('')
         $out.Add('| 欄位 | 必填 | 型別／值域 | 說明 |'); $out.Add('|---|---|---|---|')
-        foreach ($k in $props.Keys) {
+        foreach ($k in $names) {
             if (@('id', 'lifecycle') -ccontains $k) { continue }
             $sk = ''; if ($script:PsSdSkeletonFields.ContainsKey($p) -and $script:PsSdSkeletonFields[$p] -ccontains $k) { $sk = '（外環由狀態圖解讀帶入，不要寫）' }
             $n = $props[$k]; $d = ''; if ($n -is [System.Collections.IDictionary] -and $n.Contains('description')) { $d = [string]$n['description'] }
@@ -495,10 +516,9 @@ function Test-SdResearchOutput($Out, $Work, $State, [string]$Aid, [string]$Input
     $ctx = New-PsSdResolveContext $J.SchemaReg $J.Registry $J.Skeleton 'status.md' $J.Built 'Check'
     $res = Resolve-PsSdPacket $ctx $Out
     foreach ($e in $res.Errors) { $errs += $e }
-    # 跨頁不得重複自然鍵
-    $prior = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
-    foreach ($r in $State.Receipts) { if ([string]$r.Receipt['unit'] -ceq $Work.Unit -and [string]$r.Receipt['subject'] -ceq $Work.Subject) { foreach ($it in @($r.Packet['items'])) { [void]$prior.Add([string]$it['type'] + '/' + [string]$it['key']) } } }
-    foreach ($it in @($Out['items'])) { $k = [string]$it['type'] + '/' + [string]$it['key']; if ($prior.Contains($k)) { $errs += ($k + '：前一頁已寫過（跨頁不得重複）') } }
+    # 全 job 同一個自然鍵只寫一次（跨頁、跨主題）
+    $written = Get-SdWrittenKeys $State.Receipts
+    foreach ($k in (Get-SdDuplicateKeys $Out $written)) { $errs += ($k + '：別頁已寫過（可引用清單上有），改為參照，不要重寫') }
     # COMPLETE：分母鍵、上游需求、前頁與本頁引用的同單元後寫項目都要處置
     if ([string]$Out['coverage'] -ceq 'COMPLETE') {
         $rcpt = @{ Receipt = (New-PsSdOrderedFrom @('unit', $Work.Unit, 'subject', $Work.Subject)); Packet = $Out }
@@ -740,6 +760,8 @@ function Invoke-SdAttempt($Work, $State) {
     } else {
         $m.Add('- 規則：.claude/peoplesoft/sdoc/research-contract.md（通用規則＋「' + $Work.Unit + '」一節）'); if ($kind -eq 'REVIEW') { $m.Add('- 覆核：.claude/peoplesoft/sdoc/review-contract.md；被覆核的研究包在工單的 packet') }
         $m.Add('- 欄位說明：' + $inp['fieldGuidePath']); $m.Add('- 可引用清單：' + $inp['citeablePath']); $m.Add('- 目前已驗收的文件：' + $inp['workDir'] + '/md/'); $m.Add('- 知識索引：docs/ps-research/knowledge/index.md')
+        $ex = Join-Path $J.SdocDir ('examples/' + $Work.Unit + '.json')
+        if ([System.IO.File]::Exists($ex)) { $m.Add('- 範例（合成資料，只看格式；jobId、attemptId、inputHash 照本工單，參照的項目不一定在範例裡）：' + (Get-SdRel $ex)) }
         if ($Work.Unit -eq 'workflow') { $m.Add('- 骨架（狀態圖解讀採用的狀態、轉移、情境，含 ID）：' + $inp['skeletonPath']) }
         if ([string]$Work.Cursor -ne '') { $m.Add('- 游標：' + $Work.Cursor) }
         $hReq = '## 必須處置的分母鍵（COMPLETE 前要全部寫成項目，或開同鍵的 EVIDENCE_GAP 問題）'; $hAsk = '## 上游需求（本頁要產出這些項目，或開同鍵的 EVIDENCE_GAP 問題）'
@@ -895,16 +917,15 @@ try {
                     if ($FakeWorker -eq '') { $oc = Get-PsOcPath -Root $Root; $J.OcPath = [string]$oc.Path; if ($J.OcPath -eq '' -and $state.Work.Count -gt 0) { throw ('無法啟動 ' + $oc.Exe + '：' + $oc.Error) } }
                     elseif (-not [System.IO.File]::Exists($FakeWorker)) { throw 'FakeWorker 不存在。' }
                     $failedSubjects = @{}
-                    $lastSubject = ''
                     while ($sessions -lt $MaxSessions -and $state.Work.Count -gt 0) {
                         if ($state.Stage0.State -eq 'DONE' -and -not [System.IO.File]::Exists((Join-Path $J.WorkDir 'citeable.md'))) { [void](Update-SdWorkingSet $state) }
+                        # 先覆核已有的候選，再開新研究：候選越早驗收，別的主題越早看得到
                         $work = $null
-                        foreach ($w in $state.Work) { if (-not $failedSubjects.ContainsKey($w.Unit + '|' + $w.Subject) -and $w.Subject -cne $lastSubject) { $work = $w; break } }
+                        foreach ($w in $state.Work) { if ($w.Kind -eq 'REVIEW' -and -not $failedSubjects.ContainsKey($w.Unit + '|' + $w.Subject)) { $work = $w; break } }
                         if ($null -eq $work) { foreach ($w in $state.Work) { if (-not $failedSubjects.ContainsKey($w.Unit + '|' + $w.Subject)) { $work = $w; break } } }
                         if ($null -eq $work) { break }
                         if ((Get-SdSource).Hash -cne [string]$J.Revision['sourceHash']) { $stopReason = 'SOURCE_CHANGED'; break }
                         $r = Invoke-SdAttempt $work $state
-                        $lastSubject = $work.Subject
                         if ($r.Status -ne 'SLOT_BUSY') { $sessions++ }
                         if (@('SOURCE_CHANGED', 'SLOT_BUSY') -contains $r.Status) { $stopReason = $r.Status; break }
                         if ($r.Status -eq 'SESSION_FAILED') { $stopReason = $r.Status; $failedSubjects[$work.Unit + '|' + $work.Subject] = $true }

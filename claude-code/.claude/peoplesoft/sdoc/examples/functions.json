@@ -1,0 +1,202 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "functions",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "FR",
+      "key": "TW_DEMO_APV:APPROVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@TRN/REQ_STATUS:020>030",
+        "@TRN/REQ_STATUS:020>025",
+        "@TRN/REQ_STATUS:025>030"
+      ],
+      "name": "核准申請",
+      "description": "直屬主管核准待審申請；金額超過 50000 時轉部門主管再核准。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "@OBJ/COMPONENT:TW_DEMO_APV",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+        },
+        {
+          "drv": "@DRV/REQUESTER_SUPERVISOR"
+        },
+        {
+          "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+        }
+      ],
+      "realizes": [
+        "@TRN/REQ_STATUS:020>030",
+        "@TRN/REQ_STATUS:020>025",
+        "@TRN/REQ_STATUS:025>030"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:020"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:025"
+          }
+        ]
+      },
+      "outcome": "狀態變為 030 並記錄核准者與核准日；或在高額時變為 025。",
+      "priority": "MUST"
+    },
+    {
+      "type": "FR",
+      "key": "TW_DEMO_APV:RETURN",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@TRN/REQ_STATUS:020>015",
+        "@TRN/REQ_STATUS:025>015"
+      ],
+      "name": "退回申請",
+      "description": "審核者填寫意見後退回，申請人可補件重新送出。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "@OBJ/COMPONENT:TW_DEMO_APV",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+        },
+        {
+          "drv": "@DRV/REQUESTER_SUPERVISOR"
+        },
+        {
+          "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+        }
+      ],
+      "realizes": [
+        "@TRN/REQ_STATUS:020>015",
+        "@TRN/REQ_STATUS:025>015"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:020"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:025"
+          }
+        ]
+      },
+      "outcome": "狀態變為 015，保留審核意見。",
+      "priority": "MUST"
+    },
+    {
+      "type": "FR",
+      "key": "TW_DEMO_REQ:CREATE",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@TRN/REQ_STATUS:*>010"
+      ],
+      "name": "建立申請",
+      "description": "申請人在新增模式輸入金額與事由並存檔，建立狀態為草稿的申請單。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "modes": [
+          "ADD"
+        ]
+      },
+      "actors": [
+        {
+          "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+        }
+      ],
+      "realizes": [
+        "@TRN/REQ_STATUS:*>010"
+      ],
+      "preconditions": {
+        "na": "新建沒有前置狀態"
+      },
+      "outcome": "產生一張狀態 010 的申請單，申請人為目前使用者、單號已取號。",
+      "priority": "MUST"
+    },
+    {
+      "type": "FR",
+      "key": "TW_DEMO_REQ:SUBMIT",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@TRN/REQ_STATUS:010>020",
+        "@TRN/REQ_STATUS:015>020"
+      ],
+      "name": "送出申請",
+      "description": "申請人把草稿或退回補件中的申請單送出給直屬主管審核。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+        }
+      ],
+      "realizes": [
+        "@TRN/REQ_STATUS:010>020",
+        "@TRN/REQ_STATUS:015>020"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:010"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:015"
+          }
+        ]
+      },
+      "outcome": "狀態變為 020，記錄送出日，並排入送審通知。",
+      "priority": "MUST"
+    }
+  ],
+  "evidence": [],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}

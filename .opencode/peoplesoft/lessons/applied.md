@@ -3666,3 +3666,36 @@
   加「維護排錯可委派內建子代理（general-purpose／Explore／Plan），hook 不擋；PeopleSoft 業務檢索仍只派 ps-* 子代理」。
   claude-code/README 對照表同步。ps-orchestrator／ps-deep-research／ps-clone-worker 定義檔的「不可委派內建代理」不動（那是主代理下的規則）。
 - 教訓：放寬執行期機制時，要一起改「模型讀的對該機制的描述」——模型不會試探 guard，它照文字自我設限；描述比機制嚴，等於機制沒放寬。
+
+### L136 Spec 文件改成「研究包＋外環組裝」——模型只寫查到的內容，ID、參照、覆蓋、文件都由外環產生（issue #37，2026-10-08）
+
+- 症狀：issue #37 要一組固定的 Spec 文件（00-index＋01～09、14、16～19＋90 問題清單）給另一個 LLM 重建功能，
+  STATUS 狀態圖是流程的權威、可人工裁決與核准。CLONE1 的 packet 是自由字串欄位，文件結構、ID、追溯與完成度全靠模型自律。
+- 根因：產出沒有確定性的結構與分母；檢核只能看格式，看不出漏了哪條轉移、哪個頁面欄位、哪支程式。
+- 落點（只有 Claude Code 版；OpenCode 版 /ps-spec 仍走 ps-spec-build）：
+  - 外環 `scripts/ps-sdoc.ps1`＋共用 lib（schema 驗證、第 0 階段比對、研究包驗收與組裝、L2／L3 檢核、渲染）；結論碼 DOC1。
+    輸入 `.ps-private/sdoc/<job>/`（status.md 必備；project.md、decisions.md、approvals.md）；執行狀態 `.ps-runtime/sdoc/<job>/`；
+    產出 `docs/ps-spec/<job>/generated/<代號>/`＋current.json＋README.md。
+  - 第 0 階段三位讀者（ps-status-reader，inbox 隔離、只讀 STATUS 檔）各自解讀，不一致的逐項第 2 輪多數決；仍無多數或圖與圖矛盾就停（DOC1-4-01）。
+  - 研究單元依序加柵欄：範圍 → 資料 → 權限 → 說明區域 → 流程 → 介面 → 功能 → 畫面 → 規則 → 操作 → 測試；
+    每頁研究與獨立覆核是兩個 ps-sdoc-worker session，覆核 PASS 才寫收據。COMPLETE 前分母鍵（骨架、說明行、頁面欄位、
+    Record 欄位、PeopleCode 程式）與上游需求都要寫成項目或開同鍵 EVIDENCE_GAP。
+  - 契約 `sdoc/status-reading-contract.md`、`research-contract.md`、`review-contract.md`；每單元一份合成範例（`sdoc/examples/`，
+    由 test-sdoc-assemble -WriteExamples 從貫穿範例裁出並驗收）；工單附 schema 產生的欄位說明與可引用清單。
+  - hook 路徑設定 status-reader、sdoc-worker；兩個 agent 進 MainOnly（只由外環 headless 啟動）；ps-spec-author 只准跑 ps-sdoc.ps1；
+    settings 允許 ps-sdoc 命令與寫 `.ps-runtime/sdoc/**`；support-codes（Claude Code 版）加 DOC1 一節。
+- 設計取捨（與設計文件不同或補充的地方）：
+  - 研究來源指紋只含 STATUS 檔、ADD_SCOPE 裁決與 schema；docs/ps-research 有變只提示 -Refresh，不自動開新版本
+    （知識庫天天更新，自動換版本等於每次都整份重研究）。project.md、其他裁決、核准只重新組裝。
+  - 不支援沒有狀態圖的 Component 組：status.md 沒放就停在 DOC1-0-01。
+  - 同單元可以引用後頁才寫的項目（暫定 ID，COMPLETE 前要寫出）；全 job 同一個自然鍵只寫一次，跨 Component 的共用物件由先寫到的寫、其他參照。
+  - 圍欄只圍執行狀態與產出：人工輸入目錄不還原（session 期間人改 STATUS 檔由來源指紋判 SOURCE_CHANGED），避免把人的編輯當成越界寫入蓋掉。
+- 實作中抓到的坑：
+  - PowerShell 對不分大小寫的字典取 `.Keys`，字典若有名為 keys 的鍵就回那個值——ENT 的 schema 有 `keys` 欄位，欄位說明整段壞掉。
+    改用 ordinal 字典並另存欄位名單（`get_Keys()`）。
+  - 多個 Component 共用 Record 時，兩個 Component 的資料頁會各寫一次同一批欄位、組裝時撞鍵：分母改以全部已驗收收據判斷、
+    跨主題重寫直接退回、候選與之後驗收的頁重複就作廢重研究（不計次）；排程改成先覆核已有候選、再開新研究。
+- 驗證：test-sdoc（41）、test-sdoc-assemble（56，含 11 份範例驗收）、test-sdoc-run（42，合成 worker 端到端：從空目錄到發布、重跑、
+  裁決、核准、STALE、鎖、BLOCKED／-Retry、session 失敗、圍欄、覆核不通過、分頁前向引用、跨 Component 重寫、第 2 輪多數決與仍無多數）、
+  test-claude-variant、ps-agent-doc-lint、PS 5.1 靜態守衛。真 Windows PowerShell 5.1 與真 claude CLI 未在沙箱執行。
+- 教訓：讓模型只寫它查到的內容，ID、參照、覆蓋、渲染交給確定性外環，檢核才有固定分母；模型的自由留在狀態圖的畫法與敘述措辭，不留在結構。

@@ -1,6 +1,8 @@
 ﻿# test-sdoc-assemble.ps1 — Spec 文件流程：研究包驗收、派號、組裝、計算文件、L2／L3 檢核、外殼與 docHash、渲染。
 # 以設計範例為預期結果：把範例 canonical 拆回研究包，再組裝回來比對；另跑 20 種刻意破壞。合成資料，不查 MCP、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-assemble.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
+#       加 -WriteExamples：重生部署給 worker 看格式的研究包範例（claude-code/.claude/peoplesoft/sdoc/examples/）。
+param([switch]$WriteExamples)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 foreach ($f in @('ps-knowledge-lib', 'ps-sdoc-schema-lib', 'ps-sdoc-status-lib', 'ps-sdoc-lib', 'ps-sdoc-check-lib', 'ps-sdoc-render-lib')) { . (Join-Path $repo ('scripts/' + $f + '.ps1')) }
@@ -259,6 +261,41 @@ $same2 = $true; foreach ($k in $md.Keys) { if ($md[$k] -cne $md2[$k]) { $same2 =
 Assert-Sd $same2 '渲染：同樣的輸入產生逐位元相同的 Markdown'
 $fence = $true; foreach ($k in $md.Keys) { if ((([regex]::Matches($md[$k], '```')).Count % 2) -ne 0) { $fence = $false } }
 Assert-Sd $fence '渲染：每份的程式碼區塊都有成對的 ```'
+
+# ---------------- 研究包範例（部署給 worker 看格式；貫穿範例裁成每型別最多 4 項） ----------------
+function Get-SdEvRefs($Node, $Set) {
+    if ($Node -is [string]) { if ([regex]::IsMatch($Node, '^E[1-9][0-9]*$')) { [void]$Set.Add($Node) }; return }
+    if ($Node -is [System.Collections.IDictionary]) { foreach ($k in @($Node.get_Keys())) { Get-SdEvRefs $Node[$k] $Set }; return }
+    if ($Node -is [System.Collections.IList]) { foreach ($x in $Node) { Get-SdEvRefs $x $Set } }
+}
+$exDir = Join-Path $sdocDir 'examples'
+$exBad = @(); $exMade = 0
+foreach ($u in $script:PsSdUnits) {
+    $src = $null; foreach ($r in $wk.Fixture.Receipts) { if ($null -eq $src -and [string]$r.Packet['unit'] -ceq $u.Id) { $src = $r.Packet } }
+    if ($null -eq $src) { $exBad += ($u.Id + '：貫穿範例沒有這個單元'); continue }
+    $o = Copy-PsSdNode $src
+    if ($u.Per -eq 'job') { $o['subject'] = 'JOB' }
+    $o['summary'] = '合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。'
+    $count = @{}; $kept = @()
+    foreach ($it in @($o['items'])) { $t = [string]$it['type']; if (-not $count.ContainsKey($t)) { $count[$t] = 0 }; if ($count[$t] -lt 4) { $kept += , $it; $count[$t]++ } }
+    $o['items'] = $kept
+    $used = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($k in @($o.get_Keys())) { if ([string]$k -cne 'evidence') { Get-SdEvRefs $o[$k] $used } }
+    $evs = @(); foreach ($e in @($o['evidence'])) { if ($used.Contains([string]$e['id'])) { $evs += , $e } }
+    $o['evidence'] = $evs
+    $text = (ConvertTo-PsSdJsonText $o).Replace('"status-REQ_STATUS.md#L', '"status.md#L')
+    $node = ConvertTo-PsSdNode (ConvertFrom-PsSdJson $text)
+    $se = Test-PsSdSchema $reg 'urn:ps-sdoc:schema:research-packet' $node
+    $ctx = New-PsSdResolveContext $reg $wk.Registry $wk.Skeleton 'status.md' $wk.Built 'Check'
+    $rr = Resolve-PsSdPacket $ctx $node
+    if (@($se).Count -gt 0) { $exBad += ($u.Id + ' schema：' + @($se)[0]) }
+    if ($rr.Errors.Count -gt 0) { $exBad += ($u.Id + ' 驗收：' + $rr.Errors[0]) }
+    $path = Join-Path $exDir ($u.Id + '.json')
+    if ($WriteExamples) { if (-not (Write-PsKnAtomicText -LiteralPath $path -Text $text -Bom $false)) { throw 'TEST_WRITE_FAILED' }; $exMade++ }
+    elseif (-not [System.IO.File]::Exists($path) -or [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8) -cne $text) { $exBad += ($u.Id + '：部署的範例與重生結果不同（加 -WriteExamples 重生）') }
+}
+if ($WriteExamples) { Write-Host ('已重生研究包範例 ' + $exMade + ' 份：' + $exDir) }
+Assert-Sd ($exBad.Count -eq 0) '研究包範例：每個研究單元一份，通過研究包 schema 與驗收，且與重生結果相同' ($exBad -join '；')
 
 foreach ($rel in @('scripts/ps-sdoc-lib.ps1', 'scripts/ps-sdoc-check-lib.ps1', 'scripts/ps-sdoc-render-lib.ps1', 'scripts/tests/test-sdoc-assemble.ps1', 'scripts/tests/sdoc-test-fixtures.ps1')) {
     $b = [System.IO.File]::ReadAllBytes((Join-Path $repo $rel))

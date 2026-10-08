@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "interfaces",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "IF",
+      "key": "AE:TW_DEMO_NTFY",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "ifType": "NOTIFICATION",
+      "object": "@OBJ/AE:TW_DEMO_NTFY",
+      "name": "送審通知",
+      "direction": "OUTBOUND",
+      "trigger": {
+        "kind": "ON_TRANSITION",
+        "transitions": [
+          "@TRN/REQ_STATUS:010>020",
+          "@TRN/REQ_STATUS:015>020"
+        ],
+        "note": "送出成功後由 SavePostChange 排入程序，非同步執行。"
+      },
+      "performs": [],
+      "reads": [
+        "@FLD/TW_DEMO_REQHDR.REQ_ID",
+        "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID",
+        "@FLD/TW_DEMO_REQHDR.AMOUNT",
+        "@FLD/TW_DEMO_EMP.SUPERVISOR_ID"
+      ],
+      "writes": [],
+      "parameters": [
+        {
+          "name": "REQ_ID",
+          "source": {
+            "fld": "@FLD/TW_DEMO_REQHDR.REQ_ID"
+          }
+        }
+      ],
+      "format": {
+        "na": "不是檔案介面"
+      },
+      "errorHandling": "寄送失敗只寫入程序紀錄，不影響申請單狀態。",
+      "retry": {
+        "na": "原系統不重試"
+      },
+      "idempotency": "同一張單重複排入會重複寄送通知。"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "CHUNK",
+      "locator": "a52c73e0-f63e-c571-569c-1d0c03234e97",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" Then\n   TW_DEMO_SCHEDNOTIFY(TW_DEMO_REQHDR.REQ_ID);\nEnd-If;"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "aba1b504-3b10-cb68-5c9b-95ef6d7a49fc",
+      "excerpt": "SELECT REQ_ID, REQUESTER_EMPLID, AMOUNT FROM PS_TW_DEMO_REQHDR WHERE REQ_ID = %Bind(REQ_ID)\n-- send mail to supervisor; on failure write process log only"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}

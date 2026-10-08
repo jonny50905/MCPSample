@@ -5,7 +5,7 @@
 - `.claude/`：框架本體——主代理與子代理（`agents/`）、指令（`commands/`）、skills（`skills/ps-*`）、
   執行期 guard（`hooks/ps-runtime-guard.ps1`）、專案設定（`settings.json`）、環境設定與協定（`peoplesoft/`）。
 - `scripts/`：確定性外環（lint／auto-loop／auto-all／收據／fs-doctor／知識索引 ps-knowledge／
-  補研究 ps-supplemental／Spec 引擎 ps-spec）。外環以 `claude -p --agent <主代理>` 開新鮮 session。
+  補研究 ps-supplemental／Spec 引擎 ps-spec／Spec 文件 ps-sdoc）。外環以 `claude -p --agent <主代理>` 開新鮮 session。
 - 研究產出 `docs/ps-research/**`、Spec 產物 `docs/ps-spec/**`、私有需求包 `.ps-private/**`、
   執行狀態 `.ps-runtime/**` 都是公司機密，只留本機／內部 git。
 
@@ -15,17 +15,19 @@
 |---|---|
 | 業務問答 | `claude --agent ps-orchestrator` |
 | 產完整業務文件、稽核、教訓、知識指正 | `claude --agent ps-deep-research`，再下 `/ps-research <領域>`、`/ps-audit <領域>`、`/ps-lesson <描述>`、`/ps-correct <正確知識>` |
-| 以 Component 產重建 Spec | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
+| 以 Component 產 Spec 文件（00-index＋14 份＋90 問題清單） | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單 |
 | 框架維護、排錯、看 log | `claude`（一般 session：沒有主代理限制） |
 
-`ps-spec-worker`、`ps-clone-worker` 只由外環 headless 啟動；`/ps-audit-batch`、`/ps-supplement`、`/ps-spec-batch`、
+`ps-spec-worker`、`ps-clone-worker`、`ps-status-reader`、`ps-sdoc-worker` 只由外環 headless 啟動；`/ps-audit-batch`、`/ps-supplement`、`/ps-spec-batch`、
 `/ps-clone-batch` 只供外環呼叫。
 
 ## PeopleSoft 問題的處理方式
 
-要以一個或多個確切 Component 產生「供獨立 LLM 重建核心功能」的規格，走
+要以一個或多個確切 Component 產生「供獨立 LLM 重建功能」的 Spec 文件（00-index、14 份文件、90 問題清單），走
 `/ps-spec <Component...>`（ps-spec-author），或在 ps-spec-author 對話直接輸入清單。
-此路徑不走整個領域研究、不要求手填私有 pack；範圍與深度依 `.claude/peoplesoft/spec/clone-contract.md`。
+此路徑不走整個領域研究、不要求手填私有 pack；人工輸入只有 `.ps-private/sdoc/<jobId>/` 的 status.md（狀態圖，必備）、
+project.md、decisions.md、approvals.md。研究規則依 `.claude/peoplesoft/sdoc/research-contract.md`，結論碼見
+`.claude/peoplesoft/spec/support-codes.md` 的 DOC1。
 `docs/ps-spec/**` 同為公司機密、禁止外部 remote；REVIEW_READY 不等於企業 E2E 通過。
 
 收到 PeopleSoft 業務問題（例：兵役資料在哪維護、某選項選了會執行什麼）時：

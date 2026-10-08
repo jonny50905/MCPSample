@@ -1,0 +1,166 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "security",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "ROLE",
+      "key": "ROLE:TW_DEMO_APPROVER",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "principalType": "ROLE",
+      "object": "@OBJ/ROLE:TW_DEMO_APPROVER",
+      "name": "審核主管",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "由系統管理者指派給擔任主管的人；指派作業不在本功能範圍。"
+      }
+    },
+    {
+      "type": "ROLE",
+      "key": "ROLE:TW_DEMO_REQUESTER",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "principalType": "ROLE",
+      "object": "@OBJ/ROLE:TW_DEMO_REQUESTER",
+      "name": "申請人",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "一般員工皆有；指派作業不在本功能範圍。"
+      }
+    },
+    {
+      "type": "PERM",
+      "key": "ROLE:TW_DEMO_APPROVER>COMPONENT:TW_DEMO_APV",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "principal": "@ROLE/ROLE:TW_DEMO_APPROVER",
+      "resource": "@OBJ/COMPONENT:TW_DEMO_APV",
+      "actions": [
+        "UPDATE_DISPLAY"
+      ],
+      "dataScope": {
+        "condition": {
+          "all": [
+            {
+              "left": {
+                "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+              },
+              "op": "IN",
+              "right": [
+                {
+                  "const": "020",
+                  "type": "CHAR"
+                },
+                {
+                  "const": "025",
+                  "type": "CHAR"
+                }
+              ]
+            },
+            {
+              "any": [
+                {
+                  "left": {
+                    "drv": "@DRV/REQUESTER_SUPERVISOR"
+                  },
+                  "op": "EQ",
+                  "right": {
+                    "ctx": "CURRENT_USER_EMPLID"
+                  }
+                },
+                {
+                  "left": {
+                    "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+                  },
+                  "op": "EQ",
+                  "right": {
+                    "ctx": "CURRENT_USER_EMPLID"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "note": "審核清單只列出待審（020、025）且自己是直屬主管或部門主管的申請單。"
+      },
+      "denial": {
+        "effect": "ROWS_FILTERED",
+        "note": "查詢結果不含他人的申請單。"
+      },
+      "enforcement": "ROW_LEVEL_SECURITY"
+    },
+    {
+      "type": "PERM",
+      "key": "ROLE:TW_DEMO_REQUESTER>COMPONENT:TW_DEMO_REQ",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E3"
+      ],
+      "principal": "@ROLE/ROLE:TW_DEMO_REQUESTER",
+      "resource": "@OBJ/COMPONENT:TW_DEMO_REQ",
+      "actions": [
+        "ADD",
+        "UPDATE_DISPLAY"
+      ],
+      "dataScope": {
+        "condition": {
+          "left": {
+            "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "note": "只看得到自己的申請單。"
+      },
+      "denial": {
+        "effect": "ROWS_FILTERED",
+        "note": "查詢結果不含他人的申請單。"
+      },
+      "enforcement": "ROW_LEVEL_SECURITY"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/security.json#components",
+      "excerpt": "TW_DEMO_REQ: TW_DEMO_REQUESTER\nTW_DEMO_APV: TW_DEMO_APPROVER"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "e7f85ca1-1984-6109-a353-12d5d62678cc",
+      "excerpt": "search record TW_DEMO_APVSRCH: REQ_STATUS IN ('020','025') AND (supervisor = %EmployeeId OR dept manager = %EmployeeId)"
+    },
+    {
+      "id": "E3",
+      "kind": "CHUNK",
+      "locator": "b47069c0-aee7-1afb-94a5-17ad4ee8bc49",
+      "excerpt": "search record TW_DEMO_REQSRCH: REQUESTER_EMPLID = %EmployeeId"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}

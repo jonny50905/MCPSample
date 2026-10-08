@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "f8fe8f1",
+  "commit": "3c15d84",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -52,9 +52,16 @@
       "repo": "claude-code/.claude/agents/ps-peoplecode-flow.md"
     },
     {
+      "path": ".claude/agents/ps-sdoc-worker.md",
+      "lines": 35,
+      "sha256": "288724bf6ac8698cf6de3667b3462cd02ee71e3504e1251e47bc6a6bd8fe8e43",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-sdoc-worker.md"
+    },
+    {
       "path": ".claude/agents/ps-spec-author.md",
-      "lines": 39,
-      "sha256": "8090f176353e94bec74bf0a45d9f1687667b5e09879282e55aa31274e34d98c8",
+      "lines": 50,
+      "sha256": "80b8b2cfda967e37ac573c395878a65fd83ac0c92214362fc5cf92378077d846",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-spec-author.md"
     },
@@ -78,6 +85,13 @@
       "sha256": "1c36177e6126cd4ce45f986cfa636c41ce25b90993474db60f0f1ffc4ef713f9",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-sqr-flow.md"
+    },
+    {
+      "path": ".claude/agents/ps-status-reader.md",
+      "lines": 23,
+      "sha256": "57766833023cb29d10ead8508d9f8039de008b084785bd9b48718bce676f24c3",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-status-reader.md"
     },
     {
       "path": ".claude/agents/ps-ui-flow.md",
@@ -137,8 +151,8 @@
     },
     {
       "path": ".claude/commands/ps-spec.md",
-      "lines": 16,
-      "sha256": "fbb1afe81fc8228882d7cf1726f54b0be7f2d7b908b46938bab5358fec7e0c66",
+      "lines": 17,
+      "sha256": "a05b02491926317623a1977838cedceb678782a56cfcd13c0db79981b8a56f9c",
       "bom": false,
       "repo": "claude-code/.claude/commands/ps-spec.md"
     },
@@ -151,8 +165,8 @@
     },
     {
       "path": ".claude/hooks/ps-runtime-guard.ps1",
-      "lines": 388,
-      "sha256": "b7e8035c70f665881d6b26e58605f24674d4d43b73786c7475c02efb982052cc",
+      "lines": 394,
+      "sha256": "15454949fa7780806f4b157de7394ffc788cccd5f0f79d9165e68803663e1249",
       "bom": true,
       "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
     },
@@ -255,6 +269,258 @@
       "repo": "claude-code/.claude/peoplesoft/research-domains.txt"
     },
     {
+      "path": ".claude/peoplesoft/sdoc/ai-instructions.json",
+      "lines": 66,
+      "sha256": "5956d48dc50fc104ea8e79204254d910b04d6595355347159f09583b5f4a7640",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/ai-instructions.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/data.json",
+      "lines": 385,
+      "sha256": "a72d79c2b3ab6f94ec9eb6371ab94ddcb93c8eb369a94048fbe82d0ddffbbd26",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/data.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/functions.json",
+      "lines": 202,
+      "sha256": "5e176f6a6507eef0a2e63cd6fea2f1811265858f9e848fe52822909783a10096",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/functions.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/interfaces.json",
+      "lines": 76,
+      "sha256": "cde8875d457a8e2fd7f6604eca0f4b831e706616330319467115d471aa7bbcb7",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/interfaces.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/operations.json",
+      "lines": 633,
+      "sha256": "f8243d8a0e4bd14a4cb1bf5235a04837ef9c56fd51c99f8798c6e722178f6a21",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/operations.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/rules.json",
+      "lines": 440,
+      "sha256": "e4d547d5ff0d2ba50ba76ccfbce6bdd3219534321b0275bc7252efaf7f84b62d",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/rules.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/scope.json",
+      "lines": 198,
+      "sha256": "6bd425f786318bf394b8e47e7643096e9bb05e4b00b17c049abf43573762ae8e",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/scope.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/security.json",
+      "lines": 166,
+      "sha256": "32fc9ec132baca1041f0c885cecfeb71a699c390fd8f4cf457c3c062b30a24c8",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/security.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/testing.json",
+      "lines": 346,
+      "sha256": "b88a52e2c2605e7805f1e4f71bc5f35da4f6f5ffca36a836a14f34e162193784",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/testing.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/texts.json",
+      "lines": 120,
+      "sha256": "5be6ecd5a0db23aac3d1250fa0160c31c4134829a4407814130ab1757a4c2a96",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/texts.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/ui.json",
+      "lines": 174,
+      "sha256": "13ef2d8d077da4e40569128e4a245cad66ea954ccceebab377a81331ed832a43",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/ui.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/examples/workflow.json",
+      "lines": 628,
+      "sha256": "f9205464c490aa926f2ad844104bc4ac76dfd0e00fa6b5d0111161b0b478bbbb",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/examples/workflow.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/research-contract.md",
+      "lines": 271,
+      "sha256": "2c5ba8b2f35cf04bf68beb869cb17758d2f92c1995fc2f6cf9f87c299f7bfff4",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/research-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/review-contract.md",
+      "lines": 55,
+      "sha256": "57360b70c60885f3500b41faaaa80aa0d492acd4d022069800857ffff8c16c29",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/review-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas-runtime/research-packet.schema.json",
+      "lines": 562,
+      "sha256": "1dd46cad21ec1d42bf74b9a48294e89819732a300a98088263d84e2a964c4faa",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas-runtime/research-packet.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas-runtime/review.schema.json",
+      "lines": 117,
+      "sha256": "8bb3a1e0b3687740f6544addeb34da08872b13663e5d0fa0712a76244c93f085",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas-runtime/review.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas-runtime/status-round2.schema.json",
+      "lines": 76,
+      "sha256": "361eff59bdeef8844d2c981c05d588a5f3ccece7e01d0fb25343393fcd110b2e",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas-runtime/status-round2.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/01-overview.schema.json",
+      "lines": 394,
+      "sha256": "f17aea0598d8f8d0f68b728c3b4c586546cc8d628d2528805f4818194d2a222b",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/01-overview.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/02-functional-requirements.schema.json",
+      "lines": 256,
+      "sha256": "e486964e6c58145025a30da22e2b9375ccb6180d0f58bdd686619fd6a0e92d11",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/02-functional-requirements.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/03-roles-permissions.schema.json",
+      "lines": 251,
+      "sha256": "baddb4a1f19591d88533c0dd8dfcff8375799f6b89690cc88120384539193e81",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/03-roles-permissions.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/04-workflow.schema.json",
+      "lines": 1211,
+      "sha256": "d534c59ff293a11cccae0eb3187848380bf036e7fecf92a80d987cf5bb8256f2",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/04-workflow.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/05-ui.schema.json",
+      "lines": 519,
+      "sha256": "c15b5fc0970d536bea5f29f5adbfe4b90100696ebc1b9a41c37744c3d09924ff",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/05-ui.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/06-architecture.schema.json",
+      "lines": 331,
+      "sha256": "73118810a24f60211d1ff00e49c6f664f36b40137c93ce3465f5bccbbfdc419f",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/06-architecture.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/07-database.schema.json",
+      "lines": 863,
+      "sha256": "152a03f87f279aefaeb50e16e89482834165e88f5daef4b9a02f34102cf80f83",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/07-database.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/08-api.schema.json",
+      "lines": 395,
+      "sha256": "513b1558791b8dd47ce4e48c5d81cb044c5aaabe693b56fc7c4c5c4f51c08db5",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/08-api.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/09-business-logic.schema.json",
+      "lines": 459,
+      "sha256": "7a1104efbe2b25a8a2ff0d3f59881fc6ab0796c68d7d32b62f9808591aea568a",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/09-business-logic.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/14-testing.schema.json",
+      "lines": 332,
+      "sha256": "5dd3f9df20d1a33d1e4b5fb11862d0ef0736a74a8105dd1e28096ad96485572b",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/14-testing.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/16-ai-instructions.schema.json",
+      "lines": 86,
+      "sha256": "226cfe34ea1068a4ff7c0a2a0951d616b5eb206acbf71a8d74f2955b9a27a91b",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/16-ai-instructions.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/17-tasks.schema.json",
+      "lines": 222,
+      "sha256": "5139a050a5a4914021b35bd59c98a76a8e1e6a033d47421d0bc92bfa7db44875",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/17-tasks.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/18-definition-of-done.schema.json",
+      "lines": 173,
+      "sha256": "ad533ab4c971d362e407a8c878d14a479ad0733612db8c712cf554d8ffb61225",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/18-definition-of-done.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/19-decision-log.schema.json",
+      "lines": 189,
+      "sha256": "ae6d84f0a7541d1de72ed541712934b535bd86d2275e1d50969fef511abf548d",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/19-decision-log.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/90-questions.schema.json",
+      "lines": 433,
+      "sha256": "673ffdd381d97384d2bc1e8e9d79e9cb9a7d5c1c6c495f738cd115681ad51dfd",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/90-questions.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/common.schema.json",
+      "lines": 1530,
+      "sha256": "8854187d47882acd3718d17ec316c8e0cc224d95547917fca40cd5f5e9b9733e",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/common.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/evidence.schema.json",
+      "lines": 33,
+      "sha256": "19ef087f75047b695a4b5c9e0cfcd52801f3b985aef9cc2a7c508d2624ca0c76",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/evidence.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/schemas/status-reading.schema.json",
+      "lines": 278,
+      "sha256": "06d8aeb523bfc8f690d5e0a94888b7dfb0fea5c1e93c552eb2a43ff7a86f5fea",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/schemas/status-reading.schema.json"
+    },
+    {
+      "path": ".claude/peoplesoft/sdoc/status-reading-contract.md",
+      "lines": 93,
+      "sha256": "dcfbb15a5c6507803af3f784ae050206dd88717aed96927f3e6abd5bdc1cefe6",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/sdoc/status-reading-contract.md"
+    },
+    {
       "path": ".claude/peoplesoft/spec/capabilities.json",
       "lines": 37,
       "sha256": "67e7a913080f50a6e268f245744d730f147db683aff100bdbca87ed7bfe01573",
@@ -320,7 +586,7 @@
     {
       "path": ".claude/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "490fa9242d18d0eeff32b106e9019065ef2b63c82acda887aea07d45d78fde34",
+      "sha256": "03be6b8f6994dc60fea14450b9d87bcda5a5faadf77c6b1bffcc07bc90b4f8d2",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
     },
@@ -333,8 +599,8 @@
     },
     {
       "path": ".claude/peoplesoft/spec/support-codes.md",
-      "lines": 188,
-      "sha256": "ed605fdc62534f7b8bbae202f864c93597f742867f064112b8b3c8954e9d52c6",
+      "lines": 210,
+      "sha256": "a929d38cfd8c575e826fb4c36b98cda9d5e77cf86a1cd735e6795f4f228dc1fb",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/support-codes.md"
     },
@@ -361,8 +627,8 @@
     },
     {
       "path": ".claude/settings.json",
-      "lines": 54,
-      "sha256": "6d70c3b88806eaa04cb19fd98559e7a5d28e8c8db48b22707a507769418b39f3",
+      "lines": 57,
+      "sha256": "0a7a1f4ce23c74f15759ce5b71cf858421b6f24cc3f8fb110c427b04d803f7f9",
       "bom": false,
       "repo": "claude-code/.claude/settings.json"
     },
@@ -445,15 +711,15 @@
     },
     {
       "path": "CLAUDE.md",
-      "lines": 81,
-      "sha256": "76511f0817f82b963b5ac1de24866a1d73197d98356c201068573e8dc0817407",
+      "lines": 83,
+      "sha256": "651665bae63bb57cda249f3a2cb144b9e9f781ce79f8e8d89716a876baa5fa80",
       "bom": false,
       "repo": "claude-code/CLAUDE.md"
     },
     {
       "path": "scripts/ps-agent-doc-lint.ps1",
       "lines": 57,
-      "sha256": "89836217ad2acbe83b1ca52cc4689ddffd5cb4ea6e35ecf6aec5e714faf04c0a",
+      "sha256": "904e06975bc1401f69f402463d8b6b2749fc911ef23fc8e760eab2ff818de606",
       "bom": true
     },
     {
@@ -517,6 +783,42 @@
       "bom": true
     },
     {
+      "path": "scripts/ps-sdoc-check-lib.ps1",
+      "lines": 614,
+      "sha256": "fdd31bdb7f176c5795c3ab60e73a0032b7eb649e167dc123bef2b50e12d94c8f",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-sdoc-lib.ps1",
+      "lines": 1410,
+      "sha256": "c37324823e87994cb5a40c1283d90c3fa153d32a210d6890a3293a3c32dc3ae6",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-sdoc-render-lib.ps1",
+      "lines": 583,
+      "sha256": "ba9fb0066e7dd57bb827cb29bf0625681f815725aea28dd3199411e74c3020f4",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-sdoc-schema-lib.ps1",
+      "lines": 421,
+      "sha256": "41b681a29e512243ec2ab62cc115557e43f3aea78aac71845c2b8eec45645ce6",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-sdoc-status-lib.ps1",
+      "lines": 496,
+      "sha256": "066171dec1eff8567a5c90be8f38f95d17781bf556123134035b9b8da088e8db",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-sdoc.ps1",
+      "lines": 976,
+      "sha256": "da8953b004980830d86517c6ceb48cbfdee5951b0ba3ff83550b8b1c77903002",
+      "bom": true
+    },
+    {
       "path": "scripts/ps-session-lib.ps1",
       "lines": 312,
       "sha256": "f614cba595c0a0c21a164302f42a7e3b964cec83b23969871da6f2bdb3b701dd",
@@ -559,6 +861,12 @@
       "bom": true
     },
     {
+      "path": "scripts/tests/sdoc-test-fixtures.ps1",
+      "lines": 219,
+      "sha256": "6458140bb9c2bb7ac67e0ae7532a81c085e86458414bcc0077fab035b9b28b31",
+      "bom": true
+    },
+    {
       "path": "scripts/tests/test-auto-loop.ps1",
       "lines": 1024,
       "sha256": "eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e",
@@ -572,8 +880,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 377,
-      "sha256": "1c7b7d85b5b28eabad2f4109407ca52a48352260984135ba67cb618fefcfd472",
+      "lines": 406,
+      "sha256": "a29816b69dfdf5a3aa12e76afc1dbf0dc25f101a459481492476821cef7c86f4",
       "bom": true
     },
     {
@@ -592,6 +900,24 @@
       "path": "scripts/tests/test-ps51-static.ps1",
       "lines": 125,
       "sha256": "3825f4898a6fd35514b75e4a4923cfeda1ba5fedce2fdcbb9619a9218cf48681",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-sdoc-assemble.ps1",
+      "lines": 306,
+      "sha256": "a1c4a0703f530b82a28e84aea9af207265332f056699170b02edc58ab85cac37",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-sdoc-run.ps1",
+      "lines": 411,
+      "sha256": "9fb26475ec92bbc4eaead7f1cef2ca43e52cb1800e574cf9b517068c80d4ca58",
+      "bom": true
+    },
+    {
+      "path": "scripts/tests/test-sdoc.ps1",
+      "lines": 205,
+      "sha256": "5a0e620831b852d1fccc0336d5a92c99c8f2ef0e08be6099812812e2ff08d376",
       "bom": true
     },
     {

@@ -92,6 +92,12 @@ if ($Kind -eq 'RESEARCH') {
         else { $pk['items'] = @($all[$half..($all.Count - 1)]); if ($pk.Contains('denominators')) { $pk.Remove('denominators') } }
     }
     if ($mode -contains ('bad-packet-' + $unit) -and $all.Count -gt 0) { $pk['items'] = @($all) + @($all[0]) }
+    if (Test-FwOnce ('dup-' + $unit + '-' + $subj)) {
+        # 重寫別的主題已驗收的項目（全 job 同一個自然鍵只寫一次）
+        foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $fx ('research/' + $unit)) -Filter '*.json')) {
+            if ($f.BaseName -cne $subj) { $other = Read-FwJson $f.FullName; if (@($other['items']).Count -gt 0) { $pk['items'] = @($pk['items']) + @(@($other['items'])[0]); break } }
+        }
+    }
     Write-FwOut $pk; exit 0
 }
 if ($Kind -eq 'REVIEW') {
@@ -237,6 +243,13 @@ try {
     Assert-Sd ($nRead -eq 3 -and $nRes -eq $nRev -and $nRes -eq 20 -and -not (@($calls) -like 'STATUS_ROUND2 *')) ('派工：3 份解讀、20 頁研究（9 個 Component 單元 ×2＋說明區域＋1 個狀態實體）各配一次獨立覆核、沒有第 2 輪（實際 ' + $nRead + '／' + $nRes + '／' + $nRev + '）')
     $order = @(); foreach ($c in $calls) { if ($c -like 'RESEARCH *') { $u = ($c -split ' ')[1]; if ($order -notcontains $u) { $order += $u } } }
     Assert-Sd (($order -join ',') -ceq 'scope,data,security,texts,workflow,interfaces,functions,ui,rules,operations,testing') '研究單元依序（前一單元全部完成才開下一單元）' ($order -join ',')
+    $dataAtt = $null
+    foreach ($d in @(Get-ChildItem -LiteralPath (Join-Path $jobRootW 'attempts') -Directory | Sort-Object Name)) {
+        $i = Read-SdFxJson (Join-Path $d.FullName 'input.json')
+        if ($null -eq $dataAtt -and [string]$i['unit'] -ceq 'data' -and [string]$i['kind'] -ceq 'RESEARCH') { $dataAtt = $d.FullName }
+    }
+    $fg = [System.IO.File]::ReadAllText((Join-Path $dataAtt 'fields.md')); $mf = [System.IO.File]::ReadAllText((Join-Path $dataAtt 'manifest.md'))
+    Assert-Sd ($fg.Contains('| `keys` |') -and $fg.Contains('## FLD ') -and $mf.Contains('.claude/peoplesoft/sdoc/examples/data.json') -and $mf.Contains('research-contract.md')) '工單：欄位說明列出每個欄位（含名為 keys 的欄位），並指向契約與本單元範例'
     $pub = Get-SdPublished $rootW $jobW
     $files = @('00-index.md', '90-questions.md', 'gate.json', 'canonical/evidence.json')
     foreach ($d in $script:PsSdDocOrder) { $files += ($d + '.md'); $files += ('canonical/' + $d + '.json') }
@@ -340,7 +353,7 @@ try {
     $oc = Get-SdOutcomes $jobRootE
     $last = $oc[$oc.Length - 1]
     Assert-Sd ($r.Code -eq 'DOC1-3-04' -and [System.IO.File]::Exists((Join-Path $jobRootE 'budgets/r0002/b0002.json')) -and [string]$last.Outcome['status'] -ceq 'SESSION_FAILED' -and $last.Outcome['counted'] -eq $false) '-Retry 開新預算；session 失敗不計次 → DOC1-3-04'
-    $r = Invoke-SdRunUntilDone $rootE $comps $fxE 'stray-once,review-fail-once-data,partial-ui-TW_DEMO_APV'
+    $r = Invoke-SdRunUntilDone $rootE $comps $fxE 'stray-once,review-fail-once-data,partial-ui-TW_DEMO_APV,dup-scope-TW_DEMO_REQ'
     $oc = Get-SdOutcomes $jobRootE
     $stray = @($oc | Where-Object { [string]$_.Outcome['status'] -ceq 'INVALID' -and (@($_.Outcome['findings']) -join ' ') -like '*stray.txt*' }).Count
     $qdir = Join-Path $rootE '.ps-runtime/sdoc/quarantine'
@@ -352,6 +365,8 @@ try {
     Assert-Sd ($stray -eq 1 -and $qfiles -eq 1) 'worker 多寫檔：隔離到 quarantine、本次不合格且計次'
     Assert-Sd ($rf -eq 1) '覆核不通過：計次後重新研究，第二次覆核通過'
     Assert-Sd ($p2 -eq 1) '分頁：畫面單元第 1 頁 PARTIAL（含引用第 2 頁才寫的項目），第 2 頁 COMPLETE'
+    $dupBad = @($oc | Where-Object { [string]$_.Outcome['status'] -ceq 'INVALID' -and [string]$_.Input['unit'] -ceq 'scope' -and (@($_.Outcome['findings']) -join ' ') -like '*別頁已寫過*' }).Count
+    Assert-Sd ($dupBad -eq 1) '另一個 Component 重寫已驗收的物件：退回（改為參照），重做後通過'
     $pubE = Get-SdPublished $rootE $jobW
     $diff = @()
     foreach ($d in @('01-overview', '02-functional-requirements', '03-roles-permissions', '04-workflow', '05-ui', '06-architecture', '07-database', '08-api', '09-business-logic', '14-testing')) {

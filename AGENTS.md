@@ -11,6 +11,8 @@
 - `claude-code/`：同一框架的 **Claude Code 版**（`CLAUDE.md`＋`.claude/`：agents／commands／skills／hooks／peoplesoft），
   部署到公司機時去掉 `claude-code/` 前綴；`scripts/` 兩版共用（`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 是否存在認版本）。
   說明與對照表見 `claude-code/README.md`。
+  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、`claude-code/.claude/peoplesoft/sdoc/`、
+  agents ps-status-reader／ps-sdoc-worker）只有 Claude Code 版：Claude Code 版的 `/ps-spec` 走它（DOC1），OpenCode 版的 `/ps-spec` 走 ps-spec-build（CLONE1）。
 - `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
   lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
   說明見 `rebuild-kit/HOW-TO-USE.md`。
@@ -102,7 +104,7 @@
 - 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
   （.ps-runtime/**）是公司機密：研究產出只進**內部** git，後兩者連內部 git 都不進（已 gitignore，
   知識索引 docs/ps-research/knowledge/ 同為本機快取），嚴禁外部 remote 或公開貼出；
-  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
+  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1，見 `.opencode/peoplesoft/spec/support-codes.md`；Claude Code 版另有 DOC1）與 enum 值，
   不回報路徑、物件名、hash、requestId。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。

@@ -16,8 +16,11 @@
       "Edit(./docs/ps-research/**)",
       "Edit(./.ps-runtime/spec/**)",
       "Edit(./.ps-runtime/clone-spec/**)",
+      "Edit(./.ps-runtime/sdoc/**)",
       "Bash(powershell -NoProfile -File scripts/ps-spec-build.ps1 *)",
-      "PowerShell(powershell -NoProfile -File scripts/ps-spec-build.ps1 *)"
+      "PowerShell(powershell -NoProfile -File scripts/ps-spec-build.ps1 *)",
+      "Bash(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)",
+      "PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)"
     ],
     "deny": [
       "mcp__oracleMCP__sqlcl_run",

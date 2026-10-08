@@ -1,0 +1,198 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "scope",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "OBJ",
+      "key": "AE:TW_DEMO_NTFY",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "objectType": "AE",
+      "objectName": "TW_DEMO_NTFY",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_REQ.SavePostChange 在送出成功後排入",
+      "usedByRefs": [
+        "@OBJ/PEOPLECODE:TW_DEMO_REQ.SavePostChange"
+      ],
+      "condition": "送出（010／015→020）成功後",
+      "reason": "送審通知"
+    },
+    {
+      "type": "OBJ",
+      "key": "COMPONENT:TW_DEMO_APV",
+      "component": "TW_DEMO_APV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E3"
+      ],
+      "objectType": "COMPONENT",
+      "objectName": "TW_DEMO_APV",
+      "inclusion": "CORE",
+      "usedBy": "使用者指定的根",
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "使用者指定的核心 Component（主管審核）"
+    },
+    {
+      "type": "OBJ",
+      "key": "COMPONENT:TW_DEMO_REQ",
+      "component": "TW_DEMO_REQ",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E4"
+      ],
+      "objectType": "COMPONENT",
+      "objectName": "TW_DEMO_REQ",
+      "inclusion": "CORE",
+      "usedBy": "使用者指定的根",
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "使用者指定的核心 Component（申請）"
+    },
+    {
+      "type": "OBJ",
+      "key": "MESSAGE_SET:27000",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E5"
+      ],
+      "objectType": "MESSAGE_SET",
+      "objectName": "27000",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "核心 PeopleCode 以 MsgGet 讀取",
+      "condition": "檢核失敗時",
+      "reason": "提供核心程式使用的四則錯誤訊息原文（另一則只在已證明不會執行的分支內使用，見 90）"
+    },
+    {
+      "type": "XF",
+      "key": "TW_DEMO_REQHDR",
+      "basis": "DATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E23",
+        "E24"
+      ],
+      "entity": "@ENT/TW_DEMO_REQHDR",
+      "fields": [
+        "OLD_REF_NO",
+        "PRIORITY_CD",
+        "BUDGET_CODE"
+      ],
+      "dataCheck": "非預設 0 筆（全表非空，查詢日 2026-10-01）",
+      "codeChecks": {
+        "a": "PeopleCode 交叉參照：OLD_REF_NO、PRIORITY_CD 沒有引用；BUDGET_CODE 只在 TW_DEMO_REQHDR.AMOUNT.SaveEdit 已證明不會執行的分支內被讀取（見 90 的 NATIVE_UNUSED_BRANCH），不算引用。",
+        "b": "核心路徑沒有 AE、SQR 或 SQL 物件讀寫這三欄。",
+        "c": "既有研究文件沒有指名引用的紀錄。"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "CHUNK",
+      "locator": "a52c73e0-f63e-c571-569c-1d0c03234e97",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" Then\n   TW_DEMO_SCHEDNOTIFY(TW_DEMO_REQHDR.REQ_ID);\nEnd-If;"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "aba1b504-3b10-cb68-5c9b-95ef6d7a49fc",
+      "excerpt": "SELECT REQ_ID, REQUESTER_EMPLID, AMOUNT FROM PS_TW_DEMO_REQHDR WHERE REQ_ID = %Bind(REQ_ID)\n-- send mail to supervisor; on failure write process log only"
+    },
+    {
+      "id": "E3",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_APV.json#pages",
+      "excerpt": "TW_DEMO_APV: TW_DEMO_APVPG (MAIN)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "E4",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_REQ.json#pages",
+      "excerpt": "TW_DEMO_REQ: TW_DEMO_REQPG (MAIN), TW_DEMO_REQSEC (SECONDARY)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "E5",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/messages.json#27000",
+      "excerpt": "27000,1..5 (ERROR)"
+    },
+    {
+      "id": "E23",
+      "kind": "SQL",
+      "locator": "SELECT SUM(CASE WHEN OLD_REF_NO <> ' ' THEN 1 ELSE 0 END), SUM(CASE WHEN PRIORITY_CD <> ' ' THEN 1 ELSE 0 END), SUM(CASE WHEN BUDGET_CODE <> ' ' THEN 1 ELSE 0 END), COUNT(*) FROM PS_TW_DEMO_REQHDR",
+      "excerpt": "0|0|0|1212"
+    },
+    {
+      "id": "E24",
+      "kind": "SQL",
+      "locator": "SELECT REFNAME, OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3 FROM PSPCMNAME WHERE RECNAME = 'TW_DEMO_REQHDR' AND REFNAME IN ('OLD_REF_NO','PRIORITY_CD','BUDGET_CODE')",
+      "excerpt": "BUDGET_CODE|TW_DEMO_REQHDR|AMOUNT|SaveEdit"
+    },
+    {
+      "id": "E25",
+      "kind": "SQL",
+      "locator": "SELECT PNLNAME, FIELDNUM, RECNAME, FIELDNAME FROM PSPNLFIELD WHERE PNLNAME LIKE 'TW_DEMO%'",
+      "excerpt": "合成：頁面與 Record 欄位清單"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": "",
+  "denominators": {
+    "pages": [
+      {
+        "page": "TW_DEMO_APVPG",
+        "fields": [
+          "TW_DEMO_REQHDR.AMOUNT",
+          "TW_DEMO_REQHDR.REASON",
+          "TW_DEMO_REQHDR.COMMENTS",
+          "TW_DEMO_REQWRK.APPROVE_PB",
+          "TW_DEMO_REQWRK.RETURN_PB"
+        ],
+        "evidence": [
+          "E25"
+        ]
+      }
+    ],
+    "records": [
+      {
+        "record": "TW_DEMO_REQHDR",
+        "fields": [
+          "REQ_ID",
+          "REQUESTER_EMPLID",
+          "REQ_STATUS",
+          "REQ_TYPE",
+          "AMOUNT",
+          "REASON",
+          "COMMENTS",
+          "SUBMIT_DT",
+          "APPROVER_EMPLID",
+          "APPROVE_DT",
+          "OLD_REF_NO",
+          "PRIORITY_CD",
+          "BUDGET_CODE"
+        ],
+        "evidence": [
+          "E25"
+        ]
+      }
+    ]
+  }
+}
