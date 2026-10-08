@@ -31,7 +31,7 @@
         "EV-0008"
       ],
       "principalType": "ROLE",
-      "object": "OBJ-021",
+      "object": "OBJ-022",
       "name": "申請人",
       "membership": {
         "kind": "STATIC_ASSIGNMENT",

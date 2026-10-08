@@ -11,7 +11,7 @@
 
 - 自然鍵：`ROLE:TW_DEMO_APPROVER`
 - 主體型別：ROLE
-- 對應的原系統物件：OBJ-020（TW_DEMO_APPROVER）
+- 對應的原系統物件：OBJ-021（TW_DEMO_APPROVER）
 - 業務名稱：審核主管
 - 使用者如何取得此角色：
   - 種類：STATIC_ASSIGNMENT
@@ -23,7 +23,7 @@
 
 - 自然鍵：`ROLE:TW_DEMO_REQUESTER`
 - 主體型別：ROLE
-- 對應的原系統物件：OBJ-021（TW_DEMO_REQUESTER）
+- 對應的原系統物件：OBJ-022（TW_DEMO_REQUESTER）
 - 業務名稱：申請人
 - 使用者如何取得此角色：
   - 種類：STATIC_ASSIGNMENT

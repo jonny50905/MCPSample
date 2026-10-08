@@ -90,6 +90,7 @@
                 "OFF_DIAGRAM_TRANSITION",
                 "NATIVE_UNUSED_BRANCH",
                 "DIAGRAM_EDGE_UNIMPLEMENTED",
+                "DIAGRAM_CODE_CONFLICT",
                 "SCOPE_CANDIDATE",
                 "EVIDENCE_GAP",
                 "READER_UNDERSPECIFIED",
@@ -207,6 +208,14 @@
                 },
                 "context": {
                   "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                "branchReferences": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
                 },
                 "statement": {
                   "$ref": "urn:ps-spec:schema:common#/$defs/text"
@@ -395,6 +404,7 @@
               "category": {
                 "enum": [
                   "DIAGRAM_EDGE_UNIMPLEMENTED",
+                  "DIAGRAM_CODE_CONFLICT",
                   "SCOPE_CANDIDATE",
                   "EVIDENCE_GAP",
                   "READER_UNDERSPECIFIED",

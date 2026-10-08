@@ -20,7 +20,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
+      "fingerprint": "d4d96ae0e37df0e49d1ca709b9aad13d3a14fabda035a0faa6a45861975dcbce"
     },
     {
       "kind": "RESEARCH_RECEIPT",
@@ -64,8 +64,9 @@
       ],
       "category": "NATIVE_UNUSED_BRANCH",
       "severity": "INFO",
-      "question": "金額檢核程式有一段「申請類別＝INT（內部）時略過金額檢核」的原生分支。PROD 沒有 INT 的資料，INT 在值清單已停用、頁面不提供，核心路徑也沒有程式寫入 INT，所以不重建這段分支。新系統若要支援內部申請，需要另外決策。",
+      "question": "金額檢核程式有一段「申請類別＝INT（內部）時改查內部預算」的原生分支。PROD 沒有 INT 的資料，INT 在值清單已停用、頁面不提供，核心路徑也沒有程式寫入 INT，所以不重建這段分支；分支內讀取的內部預算表、預算代碼欄位與一則訊息也不列入規格。新系統若要支援內部申請，需要另外決策。",
       "affects": [
+        "OBJ-018",
         "OBJ-010",
         "FLD-018"
       ],
@@ -78,6 +79,11 @@
         "field": "TW_DEMO_REQHDR.REQ_TYPE",
         "absentValues": [
           "INT"
+        ],
+        "branchReferences": [
+          "RECORD:TW_DEMO_INTBUDGET",
+          "FIELD:TW_DEMO_REQHDR.BUDGET_CODE",
+          "MESSAGE:27000,5"
         ],
         "statement": "PROD 全表沒有 INT（GEN 900 筆、URG 312 筆）；INT 在值清單已停用，頁面選項不含 INT；PeopleCode 交叉參照只有這支程式讀取 REQ_TYPE，核心路徑沒有寫入 INT 的程式；Record 預設值是 GEN。",
         "checkedOn": "2026-10-01"

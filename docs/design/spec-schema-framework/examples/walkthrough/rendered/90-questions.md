@@ -14,8 +14,8 @@
 - 自然鍵：`NATIVE_UNUSED_BRANCH:TW_DEMO_REQHDR.AMOUNT.SaveEdit:REQ_TYPE=INT`
 - 問題類別：NATIVE_UNUSED_BRANCH
 - 是否阻擋完成：INFO
-- 問題敘述：金額檢核程式有一段「申請類別＝INT（內部）時略過金額檢核」的原生分支。PROD 沒有 INT 的資料，INT 在值清單已停用、頁面不提供，核心路徑也沒有程式寫入 INT，所以不重建這段分支。新系統若要支援內部申請，需要另外決策。
-- 受影響的規格項目：OBJ-010（TW_DEMO_REQHDR.AMOUNT.SaveEdit）、FLD-018（TW_DEMO_REQHDR.REQ_TYPE）
+- 問題敘述：金額檢核程式有一段「申請類別＝INT（內部）時改查內部預算」的原生分支。PROD 沒有 INT 的資料，INT 在值清單已停用、頁面不提供，核心路徑也沒有程式寫入 INT，所以不重建這段分支；分支內讀取的內部預算表、預算代碼欄位與一則訊息也不列入規格。新系統若要支援內部申請，需要另外決策。
+- 受影響的規格項目：OBJ-018（TW_DEMO_INTBUDGET）、OBJ-010（TW_DEMO_REQHDR.AMOUNT.SaveEdit）、FLD-018（TW_DEMO_REQHDR.REQ_TYPE）
 - 觀察到的狀態碼／轉移／位置：
   - 位置：TW_DEMO_REQHDR.AMOUNT.SaveEdit
 - 分支不會執行的證明：原文條件、哪一項永不成立、查證敘述與日期：
@@ -23,6 +23,7 @@
   - 分支條件原文：If TW_DEMO_REQHDR.REQ_TYPE = "INT" Then
   - 欄位：TW_DEMO_REQHDR.REQ_TYPE
   - 不會出現的值：INT
+  - branchReferences：RECORD:TW_DEMO_INTBUDGET、FIELD:TW_DEMO_REQHDR.BUDGET_CODE、MESSAGE:27000,5
   - 敘述：PROD 全表沒有 INT（GEN 900 筆、URG 312 筆）；INT 在值清單已停用，頁面選項不含 INT；PeopleCode 交叉參照只有這支程式讀取 REQ_TYPE，核心路徑沒有寫入 INT 的程式；Record 預設值是 GEN。
   - 查詢日：2026-10-01
 - 提出來源：RESEARCH

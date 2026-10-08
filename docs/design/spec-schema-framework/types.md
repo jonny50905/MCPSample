@@ -87,7 +87,7 @@
 
 ```json
 {
-  "id": "OBJ-018",
+  "id": "OBJ-019",
   "key": "RECORD:TW_DEMO_REQHDR",
   "lifecycle": "ACTIVE",
   "basis": "METADATA",
@@ -105,7 +105,7 @@
   "reason": "申請單主檔",
   "fieldUsage": {
     "excluded": {
-      "count": 2
+      "count": 3
     }
   }
 }
@@ -272,15 +272,15 @@
 ## 04 流程與狀態機（04-workflow）
 
 - **用途**：狀態、轉移、情境、狀態活動。內容是 STATUS 文件的權威內容，加上程式研究得到的「怎麼做」。
-- **輸入來源**：STATUS 文件（flowchart＋stateDiagram-v2，含平行區塊、狀態描述與 note）；程式研究；07 的狀態欄位與子表；03 的角色。
-- **何時產生**：骨架在第 0 階段（模型提出狀態圖對應，外環解析並驗證後派 ID）；細節、活動與狀態圖文字的處置在第 4 階段。
-- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，保留平行區塊，邊上標 TRN ID、守衛與離開方式）；情境流程圖（flowchart，邊上標情境類型與 TRN ID）；狀態圖文字的處置表；狀態、轉移、情境、活動明細。
+- **輸入來源**：STATUS 文件（flowchart＋stateDiagram-v2，含大框框、平行區塊、subgraph、線上描述，以及圖外的說明區域）；程式研究；07 的狀態欄位與子表；03 的角色。
+- **何時產生**：骨架在第 0 階段（模型提出狀態圖對應，外環解析並驗證後派 ID）；細節、活動與說明文字的處置在第 4 階段。
+- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，保留大框框與平行區塊，線上標 TRN ID、線上描述、守衛與離開方式）；情境流程圖（flowchart，大框框以 subgraph 表示，線上標情境類型與 TRN ID）；來源圖；STATUS 文字的處置表；狀態、轉移、情境、活動明細。
 - **外殼欄位**：
 
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
-| `diagramSources` | 陣列〈物件〉 | ✓ | ≥1；平行區塊內的子業務可以沒有 flowchart（寫 NA 並附 region） | 狀態圖來源：每個狀態實體在 STATUS 檔中的 flowchart＋stateDiagram-v2；平行區塊內的子業務另記所在複合狀態與區塊序（模型讀檔提出、外環驗證） |
-| `diagramTexts` | 陣列〈物件〉 | ✓ | 可空；解析器列出的每一行狀態描述與 note 恰一筆（C01） | 狀態圖文字的處置：每行狀態描述與 note 是不是活動、對應哪些 ACT |
+| `diagramSources` | 陣列〈物件〉 | ✓ | 每個實體≥1 段 stateDiagram；scope＝WHOLE（整張圖的最外層）／REGION（大圖的平行區塊）／SUBGRAPH（flowchart 的 subgraph） | 狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；同一實體的各段必須一致（模型讀檔提出、外環驗證） |
+| `statusTexts` | 陣列〈物件〉 | ✓ | STATUS 檔圖外每一行說明（標題、空行、表頭除外）與圖上的狀態描述、note 恰一筆（C01） | STATUS 文字的處置：MAPPED＝寫進了哪些 04 項目；NO_SPEC_CONTENT＝沒有規格內容並寫明理由 |
 
 ### STATE 狀態
 
@@ -308,9 +308,10 @@
 | `from` | ID 參照｜INITIAL | ✓ |  | STATE | 起始狀態（新建為 INITIAL） |
 | `to` | ID 參照 | ✓ |  | STATE | 目標狀態 |
 | `via` | 陣列〈原文〉 |  |  |  | 收合掉的 choice／fork／join 節點 |
+| `diagramLabels` | 陣列〈原文〉 |  | 外環從 stateDiagram 帶入，不由模型填寫（C01） |  | 狀態圖上這條線的描述原文；守衛與觸發必須與它一致 |
 | `exitMode` | 列舉｜UNRESOLVED | ✓ | NORMAL（一般）／ON_COMPLETION（等全部區塊到終點、守門活動完成）／INTERRUPT（不等區塊，中斷子業務）；起點有平行區塊時不得 NORMAL（C01） |  | 離開方式 |
-| `trigger` | 物件｜UNRESOLVED | ✓ | kind＝USER_ACTION／BATCH／SYSTEM_EVENT／INTERFACE／COMPLETION；COMPLETION 必附 evaluatedAfter（系統在哪些轉移或活動之後檢查） | OBJ、TRN、ACT | 觸發方式、所在物件與動作原名（COMPLETION＝條件成立時由系統自動轉移） |
-| `actor` | 條件式｜NA｜UNRESOLVED | ✓ | 只有 BATCH／COMPLETION 觸發可以 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 誰能觸發（角色、資格的判定方式） |
+| `trigger` | 物件｜UNRESOLVED | ✓ | kind＝USER_ACTION／BATCH／SYSTEM_EVENT／INTERFACE／COMPLETION；COMPLETION 必附 evaluatedAfter（系統在哪些轉移或活動之後檢查），SYSTEM_EVENT 可附（在哪些轉移之後連帶執行） | OBJ、TRN、ACT | 觸發方式、所在物件與動作原名（COMPLETION＝條件成立時由系統自動轉移） |
+| `actor` | 條件式｜NA｜UNRESOLVED | ✓ | 只有 BATCH／COMPLETION／SYSTEM_EVENT 觸發可以 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 誰能觸發（角色、資格的判定方式） |
 | `guard` | 條件式｜NA｜UNRESOLVED | ✓ | 有 via 或 ON_COMPLETION 時不得 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 轉移條件（選擇此目標的條件；守門轉移要含每個區塊與守門活動，R13） |
 | `writes` | 陣列〈指派〉｜UNRESOLVED | ✓ | 必含狀態欄位＝目標狀態碼 | FLD、DRV、STATE、ROLE、ACT、ENT | 轉移時寫入的欄位與值 |
 | `sideEffects` | 陣列〈物件〉｜NA | ✓ |  | FLD | 其他副作用（通知、介面等於 06／09 反查；INTERRUPT 要寫明未完成的子業務資料怎麼處理） |
@@ -333,7 +334,7 @@
 
 ### ACT 狀態活動
 
-狀態圖上描述「這個階段誰該做什麼」的業務行為（狀態描述或 note），主文件 §8.7。
+STATUS 檔說明區域（或圖上的狀態描述、note）描述「這個階段誰該做什麼」的業務行為，主文件 §8.7。不是每個階段都有；沒寫就沒有活動。
 
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
@@ -341,7 +342,7 @@
 | `entityKey` | 代號 | ✓ |  |  | 狀態實體 |
 | `state` | ID 參照 | ✓ |  | STATE | 活動所在的狀態 |
 | `name` | 文字 | ✓ |  |  | 活動名稱 |
-| `behavior` | 原文 | ✓ | STATUS 檔原文 |  | 狀態圖上描述「這個階段誰該做什麼」的原文 |
+| `behavior` | 原文 | ✓ | 必須出現在 statusTexts 中對應它的那一行（C01） |  | 「這個階段誰該做什麼」的 STATUS 檔原文（說明區域，或圖上的狀態描述與 note） |
 | `actors` | 陣列〈角色｜衍生概念｜情境〉｜UNRESOLVED | ✓ | ≥1 | ROLE、DRV | 誰負責：原文的「承辦人」「長官」必須對應到角色或衍生概念 |
 | `enforcement` | 列舉｜UNRESOLVED | ✓ | BY_TRANSITION／SYSTEM_GATE／EXPECTED_ONLY |  | 系統怎麼落實：做了轉移就算完成／離開狀態前系統檢查／系統不記錄也不檢查 |
 | `realizedBy` | 陣列〈ID〉 |  | BY_TRANSITION 必填，其他不得出現 | TRN | 完成此活動的轉移（須從活動所在狀態出發，R13） |
@@ -355,7 +356,9 @@
 - 有平行區塊的複合狀態：`regions` 與圖一致；區塊內的狀態 `parent` 指向它；離開它的轉移 `exitMode` 不得是 NORMAL（C01）。
 - 守門轉移（ON_COMPLETION）：每個區塊一個 `rows` ALL 條件（where＝子表狀態欄位＝終點，必寫 whenEmpty），每個守門活動一個 DONE（R13）。自動轉移的 `trigger.kind` 用 COMPLETION 並列出 `evaluatedAfter`。
 - INTERRUPT 的 `sideEffects` 寫明未完成的子業務資料怎麼處理。
-- 每一行狀態描述與 note 在 `diagramTexts` 恰一筆；活動的 `behavior` 取自該行原文（C01）。
+- 說明區域的每一行（與圖上的狀態描述、note）在 `statusTexts` 恰一筆；活動的 `behavior` 取自對應那一行的原文（C01）。
+- `diagramLabels` 由外環從圖上帶入，必須與圖一致（C01）；守衛與觸發要和描述一致，矛盾時開 DIAGRAM_CODE_CONFLICT。
+- 同一實體的各段圖（`diagramSources.parts`）必須一致，這在研究前就檢查（主文件 §8.3）。
 - 以轉移完成的活動，`realizedBy` 從活動所在狀態出發；DONE 只能指向守門活動（R13）。
 - `actor` 只有在觸發方式是 BATCH 或 COMPLETION 時可以是 NA。
 - `implementedAt` 找不到時填 UNRESOLVED，並開 DIAGRAM_EDGE_UNIMPLEMENTED（BLOCKING）。
@@ -707,7 +710,7 @@
 | `entity` | ID 參照 | ✓ |  | ENT | 所屬實體 |
 | `fields` | 陣列〈原名〉 | ✓ | ≥1 |  | 判定無用的欄位 |
 | `dataCheck` | 固定格式 | ✓ | 非預設 0 筆（全表非空，查詢日 YYYY-MM-DD） |  | 資料剖析結論 |
-| `codeChecks` | 物件 | ✓ | a／b／c 三種查法都要有結果 |  | 程式面查法結果 |
+| `codeChecks` | 物件 | ✓ | a／b／c 三種查法都要有結果；只出現在已證明不會執行的分支裡的引用不算（主文件 §8.8） |  | 程式面查法結果 |
 
 **完整性與審查準則**
 
@@ -1376,6 +1379,7 @@
   - 圖外狀態與圖外轉移（分級）。
   - 原生未使用分支（附證明，主文件 §8.8）。
   - 找不到實作的轉移。
+  - 圖與程式矛盾（線上描述或說明區域與程式的條件不一致）。
   - 證據缺口。
   - 讀者不一致。
   - 範圍候選。
@@ -1390,7 +1394,7 @@
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<類別>:<自然鍵>` |  | 外環據以派發 ID |
-| `category` | 列舉 | ✓ | OFF_DIAGRAM_STATE／OFF_DIAGRAM_TRANSITION／NATIVE_UNUSED_BRANCH／DIAGRAM_EDGE_UNIMPLEMENTED／SCOPE_CANDIDATE／EVIDENCE_GAP／READER_*／INPUT_MISSING |  | 問題類別 |
+| `category` | 列舉 | ✓ | OFF_DIAGRAM_STATE／OFF_DIAGRAM_TRANSITION／NATIVE_UNUSED_BRANCH／DIAGRAM_EDGE_UNIMPLEMENTED／DIAGRAM_CODE_CONFLICT／SCOPE_CANDIDATE／EVIDENCE_GAP／READER_*／INPUT_MISSING |  | 問題類別 |
 | `severity` | 列舉 | ✓ | 圖外、原生未使用分支與 INPUT_MISSING 必為 INFO，其餘必為 BLOCKING |  | 是否阻擋完成 |
 | `grade` | 列舉 |  | 圖外類必填 |  | 圖外分級：HIGH＝PROD 有資料；LOW＝僅核心程式賦值 |
 | `question` | 文字 | ✓ |  |  | 問題敘述 |
@@ -1405,7 +1409,7 @@
 
 - 圖外類必為 INFO，且有分級與觀察值（schema）。
 - 原生未使用分支必為 INFO，必附 `proof`、`observed.location` 與證據（schema）；09 的程式處置要對得上（R14）。
-- 找不到實作、範圍候選、證據缺口、讀者類必為 BLOCKING（schema）。
+- 找不到實作、圖與程式矛盾、範圍候選、證據缺口、讀者類必為 BLOCKING（schema）。
 - 人工審查：HIGH 級逐一裁決；BLOCKING 必須為 0，或有 ACCEPT_GAP 決策。
 
 **最小合法項目**

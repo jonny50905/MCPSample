@@ -2,16 +2,16 @@
 
 > `clone-0123456789abcdef/01`｜版本 r0001｜狀態 **in_review**｜L1 PASS · L2 PASS · L3 PASS · L4 PASS · L5 NOT_APPLICABLE
 > 依賴文件：無｜未解問題：Q-001（NATIVE_UNUSED_BRANCH:TW_DEMO_REQHDR.AMOUNT.SaveEdit:REQ_TYPE=INT）
-> 目標 1、決策責任 2、物件 22；未解問題 1
+> 目標 1、決策責任 2、物件 23；未解問題 1
 > 本檔由 canonical JSON 以程式產生，請勿手改；修改走研究重跑或 19 的決策。
 
 ## 範圍摘要
 
 | 分類 | 物件 |
 |---|---|
-| CORE | OBJ-002 TW_DEMO_APV、OBJ-003 TW_DEMO_REQ、OBJ-005 TW_DEMO_APVPG、OBJ-006 TW_DEMO_REQPG、OBJ-007 TW_DEMO_APV.PostBuild、OBJ-008 TW_DEMO_REQ.SavePostChange、OBJ-009 TW_DEMO_REQ.SavePreChange、OBJ-010 TW_DEMO_REQHDR.AMOUNT.SaveEdit、OBJ-011 TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault、OBJ-012 TW_DEMO_REQWRK.APPROVE_PB.FieldChange、OBJ-013 TW_DEMO_REQWRK.RETURN_PB.FieldChange、OBJ-014 TW_DEMO_REQWRK.SUBMIT_PB.FieldChange、OBJ-015 TW_DEMO_REQWRK.WITHDRAW_PB.FieldChange、OBJ-018 TW_DEMO_REQHDR、OBJ-019 TW_DEMO_REQWRK |
-| DEPENDENCY | OBJ-001 TW_DEMO_NTFY、OBJ-004 27000、OBJ-016 TW_DEMO_DEPT、OBJ-017 TW_DEMO_EMP、OBJ-020 TW_DEMO_APPROVER、OBJ-021 TW_DEMO_REQUESTER |
-| EXCLUDED | OBJ-022 TW_DEMO_REQSEC |
+| CORE | OBJ-002 TW_DEMO_APV、OBJ-003 TW_DEMO_REQ、OBJ-005 TW_DEMO_APVPG、OBJ-006 TW_DEMO_REQPG、OBJ-007 TW_DEMO_APV.PostBuild、OBJ-008 TW_DEMO_REQ.SavePostChange、OBJ-009 TW_DEMO_REQ.SavePreChange、OBJ-010 TW_DEMO_REQHDR.AMOUNT.SaveEdit、OBJ-011 TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault、OBJ-012 TW_DEMO_REQWRK.APPROVE_PB.FieldChange、OBJ-013 TW_DEMO_REQWRK.RETURN_PB.FieldChange、OBJ-014 TW_DEMO_REQWRK.SUBMIT_PB.FieldChange、OBJ-015 TW_DEMO_REQWRK.WITHDRAW_PB.FieldChange、OBJ-019 TW_DEMO_REQHDR、OBJ-020 TW_DEMO_REQWRK |
+| DEPENDENCY | OBJ-001 TW_DEMO_NTFY、OBJ-004 27000、OBJ-016 TW_DEMO_DEPT、OBJ-017 TW_DEMO_EMP、OBJ-021 TW_DEMO_APPROVER、OBJ-022 TW_DEMO_REQUESTER |
+| EXCLUDED | OBJ-018 TW_DEMO_INTBUDGET、OBJ-023 TW_DEMO_REQSEC |
 
 專案輸入檔：PROVIDED。不建置的原生欄位見 07。
 
@@ -78,7 +78,7 @@
 - 何時使用：不適用：入口物件，進入即使用
 - 納入／排除理由：使用者指定的核心 Component（申請）
 - 來源：metadata；證據 EV-0004
-- 被引用（外環反查）：OBJ-006、OBJ-022；PERM-002；TRN-001、TRN-002、TRN-003、TRN-004、TRN-005；FR-003、FR-004、FR-005；UI-007；OP-003
+- 被引用（外環反查）：OBJ-006、OBJ-023；PERM-002；TRN-001、TRN-002、TRN-003、TRN-004、TRN-005；FR-003、FR-004、FR-005；UI-007；OP-003
 
 ### OBJ-004　27000
 
@@ -88,7 +88,7 @@
 - 範圍分類：入口與功能路徑＝CORE；被核心實際呼叫、讀寫、查值或授權所需＝DEPENDENCY；其餘＝EXCLUDED：DEPENDENCY
 - 使用鏈：呼叫者、方向與中間鏈（CORE 根寫「使用者指定的根」）：核心 PeopleCode 以 MsgGet 讀取
 - 何時使用：檢核失敗時
-- 納入／排除理由：提供四則錯誤訊息原文
+- 納入／排除理由：提供核心程式使用的四則錯誤訊息原文（另一則只在已證明不會執行的分支內使用，見 90）
 - 來源：metadata；證據 EV-0009
 
 ### OBJ-005　TW_DEMO_APVPG
@@ -103,7 +103,7 @@
 - 何時使用：不適用：入口物件，進入即使用
 - 納入／排除理由：審核畫面
 - 來源：metadata；證據 EV-0005
-- 被引用（外環反查）：OBJ-018、OBJ-019；UI-001
+- 被引用（外環反查）：OBJ-019、OBJ-020；UI-001
 
 ### OBJ-006　TW_DEMO_REQPG
 
@@ -117,7 +117,7 @@
 - 何時使用：不適用：入口物件，進入即使用
 - 納入／排除理由：申請畫面
 - 來源：metadata；證據 EV-0004
-- 被引用（外環反查）：OBJ-018、OBJ-019；UI-007
+- 被引用（外環反查）：OBJ-019、OBJ-020；UI-007
 
 ### OBJ-007　TW_DEMO_APV.PostBuild
 
@@ -268,7 +268,19 @@
 - 來源：metadata；證據 EV-0030、EV-0014
 - 被引用（外環反查）：ENT-002
 
-### OBJ-018　TW_DEMO_REQHDR
+### OBJ-018　TW_DEMO_INTBUDGET
+
+- 自然鍵：`RECORD:TW_DEMO_INTBUDGET`
+- 物件型別：RECORD
+- PeopleSoft 物件原名：TW_DEMO_INTBUDGET
+- 範圍分類：入口與功能路徑＝CORE；被核心實際呼叫、讀寫、查值或授權所需＝DEPENDENCY；其餘＝EXCLUDED：EXCLUDED
+- 使用鏈：呼叫者、方向與中間鏈（CORE 根寫「使用者指定的根」）：TW_DEMO_REQHDR.AMOUNT.SaveEdit 的 INT 分支內以 SQLExec 讀取
+- 何時使用：不適用：核心路徑實際上不會讀取
+- 納入／排除理由：只在已證明不會執行的原生分支內被讀取，不構成 DEPENDENCY（見 90 的 NATIVE_UNUSED_BRANCH）
+- 來源：程式；證據 EV-0022
+- 被引用（外環反查）：Q-001
+
+### OBJ-019　TW_DEMO_REQHDR
 
 - 自然鍵：`RECORD:TW_DEMO_REQHDR`
 - 物件型別：RECORD
@@ -280,11 +292,11 @@
 - 納入／排除理由：申請單主檔
 - 原生欄位判定結論；type RECORD 且 CORE／DEPENDENCY 時必填：
   - 排除：
-    - 欄數：2
+    - 欄數：3
 - 來源：metadata；證據 EV-0007
 - 被引用（外環反查）：ENT-003
 
-### OBJ-019　TW_DEMO_REQWRK
+### OBJ-020　TW_DEMO_REQWRK
 
 - 自然鍵：`RECORD:TW_DEMO_REQWRK`
 - 物件型別：RECORD
@@ -300,7 +312,7 @@
     - 說明：工作記錄沒有實體表，欄位都是按鈕
 - 來源：metadata；證據 EV-0007
 
-### OBJ-020　TW_DEMO_APPROVER
+### OBJ-021　TW_DEMO_APPROVER
 
 - 自然鍵：`ROLE:TW_DEMO_APPROVER`
 - 物件型別：ROLE
@@ -312,7 +324,7 @@
 - 來源：metadata；證據 EV-0008
 - 被引用（外環反查）：ROLE-001
 
-### OBJ-021　TW_DEMO_REQUESTER
+### OBJ-022　TW_DEMO_REQUESTER
 
 - 自然鍵：`ROLE:TW_DEMO_REQUESTER`
 - 物件型別：ROLE
@@ -324,7 +336,7 @@
 - 來源：metadata；證據 EV-0008
 - 被引用（外環反查）：ROLE-002
 
-### OBJ-022　TW_DEMO_REQSEC
+### OBJ-023　TW_DEMO_REQSEC
 
 - 自然鍵：`SECONDARY_PAGE:TW_DEMO_REQSEC`
 - 物件型別：SECONDARY_PAGE

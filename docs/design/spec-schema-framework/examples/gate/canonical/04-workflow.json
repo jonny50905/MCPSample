@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "draft",
   "title": "04 流程與狀態機",
-  "summary": "狀態 8、轉移 9、情境 2、活動 3（守門範例，只跑部分檢核）",
+  "summary": "狀態 11、轉移 12、情境 5、活動 5（守門範例，只跑部分檢核）",
   "components": [
     "TW_DEMO_CASE",
     "TW_DEMO_DOCREV",
@@ -21,7 +21,7 @@
     {
       "kind": "STATUS_DOC",
       "ref": "status-CASE_STATUS.md",
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     }
   ],
   "gate": {
@@ -35,134 +35,190 @@
   "diagramSources": [
     {
       "entityKey": "CASE_STATUS",
-      "flowchart": "status-CASE_STATUS.md#L7-L14",
-      "stateDiagram": "status-CASE_STATUS.md#L18-L47",
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "parts": [
+        {
+          "diagram": "FLOWCHART",
+          "locator": "status-CASE_STATUS.md#L7-L31",
+          "scope": "WHOLE"
+        },
+        {
+          "diagram": "STATE_DIAGRAM",
+          "locator": "status-CASE_STATUS.md#L33-L66",
+          "scope": "WHOLE"
+        }
+      ],
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     },
     {
       "entityKey": "CASEDOC_STATUS",
-      "flowchart": {
-        "na": "子業務只畫在主狀態圖 040 的平行區塊內"
-      },
-      "stateDiagram": "status-CASE_STATUS.md#L18-L47",
-      "region": {
-        "composite": "STATE-006",
-        "index": 1
-      },
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "parts": [
+        {
+          "diagram": "FLOWCHART",
+          "locator": "status-CASE_STATUS.md#L7-L31",
+          "scope": "SUBGRAPH",
+          "subgraph": "DOCS"
+        },
+        {
+          "diagram": "STATE_DIAGRAM",
+          "locator": "status-CASE_STATUS.md#L33-L66",
+          "scope": "REGION",
+          "composite": "STATE-008",
+          "index": 1
+        },
+        {
+          "diagram": "FLOWCHART",
+          "locator": "status-CASE_STATUS.md#L72-L76",
+          "scope": "WHOLE"
+        },
+        {
+          "diagram": "STATE_DIAGRAM",
+          "locator": "status-CASE_STATUS.md#L78-L85",
+          "scope": "WHOLE"
+        }
+      ],
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     },
     {
       "entityKey": "CASEPAY_STATUS",
-      "flowchart": {
-        "na": "子業務只畫在主狀態圖 040 的平行區塊內"
-      },
-      "stateDiagram": "status-CASE_STATUS.md#L18-L47",
-      "region": {
-        "composite": "STATE-006",
-        "index": 2
-      },
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "parts": [
+        {
+          "diagram": "FLOWCHART",
+          "locator": "status-CASE_STATUS.md#L7-L31",
+          "scope": "SUBGRAPH",
+          "subgraph": "PAYS"
+        },
+        {
+          "diagram": "STATE_DIAGRAM",
+          "locator": "status-CASE_STATUS.md#L33-L66",
+          "scope": "REGION",
+          "composite": "STATE-008",
+          "index": 2
+        }
+      ],
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
+    },
+    {
+      "entityKey": "CASEAPV_STATUS",
+      "parts": [
+        {
+          "diagram": "FLOWCHART",
+          "locator": "status-CASE_STATUS.md#L7-L31",
+          "scope": "SUBGRAPH",
+          "subgraph": "APVS"
+        },
+        {
+          "diagram": "STATE_DIAGRAM",
+          "locator": "status-CASE_STATUS.md#L33-L66",
+          "scope": "REGION",
+          "composite": "STATE-009",
+          "index": 1
+        }
+      ],
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     }
   ],
-  "diagramTexts": [
+  "statusTexts": [
     {
-      "locator": "status-CASE_STATUS.md#L43",
-      "text": "承辦人上傳結案報告",
-      "disposition": "ACTIVITY",
-      "activities": [
-        "ACT-003"
+      "locator": "status-CASE_STATUS.md#L3",
+      "text": "本檔是 STATUS 權威文件的合成範例：主業務的每個階段畫成大框框，框內以平行區塊畫子業務，大框框之間的線上寫明往下走的條件。",
+      "disposition": "NO_SPEC_CONTENT",
+      "note": "說明這份檔案的畫法，沒有規格內容。"
+    },
+    {
+      "locator": "status-CASE_STATUS.md#L70",
+      "text": "文件審查另有獨立的圖，內容與大圖 040 的第一個區塊相同。",
+      "disposition": "NO_SPEC_CONTENT",
+      "note": "說明圖的位置；兩段圖是否一致由外環比對。"
+    },
+    {
+      "locator": "status-CASE_STATUS.md#L89",
+      "text": "040 處理中：承辦人追蹤文件審查與付款，並上傳結案報告。",
+      "disposition": "MAPPED",
+      "items": [
+        "ACT-004",
+        "ACT-005"
       ]
     },
     {
-      "locator": "status-CASE_STATUS.md#L44",
-      "text": "審查人員逐份審查文件",
-      "disposition": "ACTIVITY",
-      "activities": [
-        "ACT-001"
-      ]
-    },
-    {
-      "locator": "status-CASE_STATUS.md#L45",
-      "text": "會計人員依核定金額付款",
-      "disposition": "ACTIVITY",
-      "activities": [
+      "locator": "status-CASE_STATUS.md#L90",
+      "text": "文件審查 010 待審查：審查人員逐份審查文件。",
+      "disposition": "MAPPED",
+      "items": [
         "ACT-002"
       ]
     },
     {
-      "locator": "status-CASE_STATUS.md#L46",
-      "text": "結案後由系統寄發結案通知",
-      "disposition": "NOT_ACTIVITY",
-      "note": "描述轉入 050 時系統寄發的通知，不是某人在這個階段要做的事；寫在 040→050 轉移的 sideEffects。"
+      "locator": "status-CASE_STATUS.md#L91",
+      "text": "付款 010 待付款：會計人員依核定金額付款。",
+      "disposition": "MAPPED",
+      "items": [
+        "ACT-003"
+      ]
+    },
+    {
+      "locator": "status-CASE_STATUS.md#L92",
+      "text": "050 結案審核：主管確認案件資料完整後按「覆核完成」。",
+      "disposition": "MAPPED",
+      "items": [
+        "ACT-001"
+      ]
+    },
+    {
+      "locator": "status-CASE_STATUS.md#L93",
+      "text": "結案後由系統寄發結案通知給承辦人。",
+      "disposition": "MAPPED",
+      "items": [
+        "TRN-012"
+      ],
+      "note": "系統的副作用，寫在 050→060 轉移的 sideEffects。"
     }
   ],
   "items": [
     {
       "id": "STATE-001",
-      "key": "CASEDOC_STATUS:010",
+      "key": "CASEAPV_STATUS:010",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0021",
+        "EV-0028",
         "EV-0005"
       ],
-      "entityKey": "CASEDOC_STATUS",
+      "entityKey": "CASEAPV_STATUS",
       "stateKind": "SIMPLE",
       "code": "010",
-      "name": "010 待審查",
-      "parent": "STATE-006",
-      "binding": "FLD-007",
-      "domainLabel": "待審查",
+      "name": "010 待覆核",
+      "parent": "STATE-009",
+      "binding": "FLD-001",
+      "domainLabel": "待覆核",
       "isInitialTarget": true,
       "isFinal": false,
       "dataPresence": "HAS_DATA"
     },
     {
       "id": "STATE-002",
-      "key": "CASEDOC_STATUS:090",
+      "key": "CASEAPV_STATUS:090",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0022",
+        "EV-0029",
         "EV-0005"
       ],
-      "entityKey": "CASEDOC_STATUS",
+      "entityKey": "CASEAPV_STATUS",
       "stateKind": "SIMPLE",
       "code": "090",
-      "name": "090 審查完成",
-      "parent": "STATE-006",
-      "binding": "FLD-007",
-      "domainLabel": "審查完成",
+      "name": "090 覆核完成",
+      "parent": "STATE-009",
+      "binding": "FLD-001",
+      "domainLabel": "覆核完成",
       "isInitialTarget": false,
       "isFinal": true,
       "dataPresence": "HAS_DATA"
     },
     {
       "id": "STATE-003",
-      "key": "CASEPAY_STATUS:010",
-      "lifecycle": "ACTIVE",
-      "basis": "AUTHORITATIVE_DOC",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "EV-0023",
-        "EV-0006"
-      ],
-      "entityKey": "CASEPAY_STATUS",
-      "stateKind": "SIMPLE",
-      "code": "010",
-      "name": "010 待付款",
-      "parent": "STATE-006",
-      "binding": "FLD-011",
-      "domainLabel": "待付款",
-      "isInitialTarget": true,
-      "isFinal": false,
-      "dataPresence": "HAS_DATA"
-    },
-    {
-      "id": "STATE-004",
-      "key": "CASEPAY_STATUS:090",
+      "key": "CASEDOC_STATUS:010",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
@@ -170,45 +226,108 @@
         "EV-0024",
         "EV-0006"
       ],
-      "entityKey": "CASEPAY_STATUS",
+      "entityKey": "CASEDOC_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "010",
+      "name": "010 待審查",
+      "parent": "STATE-008",
+      "binding": "FLD-008",
+      "domainLabel": "待審查",
+      "isInitialTarget": true,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-004",
+      "key": "CASEDOC_STATUS:090",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0025",
+        "EV-0006"
+      ],
+      "entityKey": "CASEDOC_STATUS",
       "stateKind": "SIMPLE",
       "code": "090",
-      "name": "090 已付款",
-      "parent": "STATE-006",
-      "binding": "FLD-011",
-      "domainLabel": "已付款",
+      "name": "090 審查完成",
+      "parent": "STATE-008",
+      "binding": "FLD-008",
+      "domainLabel": "審查完成",
       "isInitialTarget": false,
       "isFinal": true,
       "dataPresence": "HAS_DATA"
     },
     {
       "id": "STATE-005",
-      "key": "CASE_STATUS:010",
+      "key": "CASEPAY_STATUS:010",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0017",
-        "EV-0004"
+        "EV-0026",
+        "EV-0007"
       ],
-      "entityKey": "CASE_STATUS",
+      "entityKey": "CASEPAY_STATUS",
       "stateKind": "SIMPLE",
       "code": "010",
-      "name": "010 受理",
-      "binding": "FLD-002",
-      "domainLabel": "受理",
+      "name": "010 待付款",
+      "parent": "STATE-008",
+      "binding": "FLD-012",
+      "domainLabel": "待付款",
       "isInitialTarget": true,
       "isFinal": false,
       "dataPresence": "HAS_DATA"
     },
     {
       "id": "STATE-006",
+      "key": "CASEPAY_STATUS:090",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0027",
+        "EV-0007"
+      ],
+      "entityKey": "CASEPAY_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "090",
+      "name": "090 已付款",
+      "parent": "STATE-008",
+      "binding": "FLD-012",
+      "domainLabel": "已付款",
+      "isInitialTarget": false,
+      "isFinal": true,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-007",
+      "key": "CASE_STATUS:010",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0019",
+        "EV-0004"
+      ],
+      "entityKey": "CASE_STATUS",
+      "stateKind": "SIMPLE",
+      "code": "010",
+      "name": "010 受理",
+      "binding": "FLD-003",
+      "domainLabel": "受理",
+      "isInitialTarget": true,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-008",
       "key": "CASE_STATUS:040",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0018",
+        "EV-0020",
         "EV-0004"
       ],
       "entityKey": "CASE_STATUS",
@@ -219,57 +338,85 @@
         {
           "entityKey": "CASEDOC_STATUS",
           "finalStates": [
-            "STATE-002"
+            "STATE-004"
           ]
         },
         {
           "entityKey": "CASEPAY_STATUS",
           "finalStates": [
-            "STATE-004"
+            "STATE-006"
           ]
         }
       ],
-      "binding": "FLD-002",
+      "binding": "FLD-003",
       "domainLabel": "處理中",
       "isInitialTarget": false,
       "isFinal": false,
       "dataPresence": "HAS_DATA"
     },
     {
-      "id": "STATE-007",
+      "id": "STATE-009",
       "key": "CASE_STATUS:050",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0019",
+        "EV-0021",
+        "EV-0004"
+      ],
+      "entityKey": "CASE_STATUS",
+      "stateKind": "COMPOSITE",
+      "code": "050",
+      "name": "050 結案審核",
+      "regions": [
+        {
+          "entityKey": "CASEAPV_STATUS",
+          "finalStates": [
+            "STATE-002"
+          ]
+        }
+      ],
+      "binding": "FLD-003",
+      "domainLabel": "結案審核",
+      "isInitialTarget": false,
+      "isFinal": false,
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "id": "STATE-010",
+      "key": "CASE_STATUS:060",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0022",
         "EV-0004"
       ],
       "entityKey": "CASE_STATUS",
       "stateKind": "SIMPLE",
-      "code": "050",
-      "name": "050 結案",
-      "binding": "FLD-002",
+      "code": "060",
+      "name": "060 結案",
+      "binding": "FLD-003",
       "domainLabel": "結案",
       "isInitialTarget": false,
       "isFinal": true,
       "dataPresence": "HAS_DATA"
     },
     {
-      "id": "STATE-008",
+      "id": "STATE-011",
       "key": "CASE_STATUS:090",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0020",
+        "EV-0023",
         "EV-0004"
       ],
       "entityKey": "CASE_STATUS",
       "stateKind": "SIMPLE",
       "code": "090",
       "name": "090 撤案",
-      "binding": "FLD-002",
+      "binding": "FLD-003",
       "domainLabel": "撤案",
       "isInitialTarget": false,
       "isFinal": true,
@@ -277,17 +424,126 @@
     },
     {
       "id": "TRN-001",
+      "key": "CASEAPV_STATUS:*>010",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0050",
+        "EV-0051",
+        "EV-0010"
+      ],
+      "entityKey": "CASEAPV_STATUS",
+      "from": "INITIAL",
+      "to": "STATE-001",
+      "exitMode": "NORMAL",
+      "trigger": {
+        "kind": "SYSTEM_EVENT",
+        "object": "OBJ-005",
+        "action": "案件轉入 050 時，同一段程式把主管覆核狀態設為 010",
+        "evaluatedAfter": [
+          "TRN-010"
+        ]
+      },
+      "actor": {
+        "na": "隨 040→050 的自動轉移一起執行，沒有操作者"
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "FLD-001",
+          "value": {
+            "const": "010",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-005",
+          "event": "FieldFormula（與 040→050 同一個 UPDATE）"
+        }
+      ],
+      "reentry": "只在轉入 050 時設定一次。"
+    },
+    {
+      "id": "TRN-002",
+      "key": "CASEAPV_STATUS:010>090",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0052",
+        "EV-0053",
+        "EV-0012"
+      ],
+      "entityKey": "CASEAPV_STATUS",
+      "from": "STATE-001",
+      "to": "STATE-002",
+      "exitMode": "NORMAL",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "OBJ-001",
+        "action": "按「覆核完成」（TW_DEMO_CASEWRK.APVOK_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "left": {
+          "ctx": "CURRENT_USER_OPRID"
+        },
+        "op": "HAS_ROLE",
+        "right": {
+          "role": "ROLE-004"
+        }
+      },
+      "guard": {
+        "left": {
+          "fld": "FLD-003"
+        },
+        "op": "EQ",
+        "right": {
+          "state": "STATE-009"
+        }
+      },
+      "writes": [
+        {
+          "field": "FLD-001",
+          "value": {
+            "const": "090",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用"
+      },
+      "implementedAt": [
+        {
+          "object": "OBJ-004",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "覆核完成後按鈕隱藏；同一段程式接著把案件改為 060（見 050→060）。"
+    },
+    {
+      "id": "TRN-003",
       "key": "CASEDOC_STATUS:*>010",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0035",
-        "EV-0013"
+        "EV-0042",
+        "EV-0043",
+        "EV-0015"
       ],
       "entityKey": "CASEDOC_STATUS",
       "from": "INITIAL",
-      "to": "STATE-001",
+      "to": "STATE-003",
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -305,16 +561,16 @@
       },
       "guard": {
         "left": {
-          "fld": "FLD-002"
+          "fld": "FLD-003"
         },
         "op": "EQ",
         "right": {
-          "state": "STATE-006"
+          "state": "STATE-008"
         }
       },
       "writes": [
         {
-          "field": "FLD-007",
+          "field": "FLD-008",
           "value": {
             "const": "010",
             "type": "CHAR"
@@ -333,18 +589,22 @@
       "reentry": "每新增一列就是一筆新的文件；重複存檔不會重複新增。"
     },
     {
-      "id": "TRN-002",
+      "id": "TRN-004",
       "key": "CASEDOC_STATUS:010>090",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0036",
-        "EV-0014"
+        "EV-0044",
+        "EV-0045",
+        "EV-0016"
       ],
       "entityKey": "CASEDOC_STATUS",
-      "from": "STATE-001",
-      "to": "STATE-002",
+      "from": "STATE-003",
+      "to": "STATE-004",
+      "diagramLabels": [
+        "審查人員按「審查完成」"
+      ],
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -363,16 +623,16 @@
       },
       "guard": {
         "left": {
-          "fld": "FLD-002"
+          "fld": "FLD-003"
         },
         "op": "EQ",
         "right": {
-          "state": "STATE-006"
+          "state": "STATE-008"
         }
       },
       "writes": [
         {
-          "field": "FLD-007",
+          "field": "FLD-008",
           "value": {
             "const": "090",
             "type": "CHAR"
@@ -388,21 +648,22 @@
           "event": "TW_DEMO_CASEWRK.DOCOK_PB.FieldChange"
         }
       ],
-      "reentry": "按下後按鈕隱藏；存檔後由守門檢查決定案件是否結案（見 040→050）。"
+      "reentry": "按下後按鈕隱藏；存檔後由守門檢查決定案件是否轉入 050（見 040→050）。"
     },
     {
-      "id": "TRN-003",
+      "id": "TRN-005",
       "key": "CASEPAY_STATUS:*>010",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0037",
-        "EV-0013"
+        "EV-0046",
+        "EV-0047",
+        "EV-0015"
       ],
       "entityKey": "CASEPAY_STATUS",
       "from": "INITIAL",
-      "to": "STATE-003",
+      "to": "STATE-005",
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -420,16 +681,16 @@
       },
       "guard": {
         "left": {
-          "fld": "FLD-002"
+          "fld": "FLD-003"
         },
         "op": "EQ",
         "right": {
-          "state": "STATE-006"
+          "state": "STATE-008"
         }
       },
       "writes": [
         {
-          "field": "FLD-011",
+          "field": "FLD-012",
           "value": {
             "const": "010",
             "type": "CHAR"
@@ -448,18 +709,19 @@
       "reentry": "每新增一列就是一筆新的付款；重複存檔不會重複新增。"
     },
     {
-      "id": "TRN-004",
+      "id": "TRN-006",
       "key": "CASEPAY_STATUS:010>090",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0038",
-        "EV-0015"
+        "EV-0048",
+        "EV-0049",
+        "EV-0017"
       ],
       "entityKey": "CASEPAY_STATUS",
-      "from": "STATE-003",
-      "to": "STATE-004",
+      "from": "STATE-005",
+      "to": "STATE-006",
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -478,16 +740,16 @@
       },
       "guard": {
         "left": {
-          "fld": "FLD-002"
+          "fld": "FLD-003"
         },
         "op": "EQ",
         "right": {
-          "state": "STATE-006"
+          "state": "STATE-008"
         }
       },
       "writes": [
         {
-          "field": "FLD-011",
+          "field": "FLD-012",
           "value": {
             "const": "090",
             "type": "CHAR"
@@ -503,22 +765,22 @@
           "event": "TW_DEMO_CASEWRK.PAYOK_PB.FieldChange"
         }
       ],
-      "reentry": "按下後按鈕隱藏；存檔後由守門檢查決定案件是否結案（見 040→050）。"
+      "reentry": "按下後按鈕隱藏；存檔後由守門檢查決定案件是否轉入 050（見 040→050）。"
     },
     {
-      "id": "TRN-005",
+      "id": "TRN-007",
       "key": "CASE_STATUS:*>010",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0025",
-        "EV-0026",
+        "EV-0030",
+        "EV-0031",
         "EV-0001"
       ],
       "entityKey": "CASE_STATUS",
       "from": "INITIAL",
-      "to": "STATE-005",
+      "to": "STATE-007",
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -539,7 +801,7 @@
       },
       "writes": [
         {
-          "field": "FLD-002",
+          "field": "FLD-003",
           "value": {
             "const": "010",
             "type": "CHAR"
@@ -558,19 +820,22 @@
       "reentry": "存檔後畫面轉為修改模式，再按儲存不會建立第二個案件。"
     },
     {
-      "id": "TRN-006",
+      "id": "TRN-008",
       "key": "CASE_STATUS:010>040",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0027",
-        "EV-0028",
-        "EV-0011"
+        "EV-0032",
+        "EV-0033",
+        "EV-0013"
       ],
       "entityKey": "CASE_STATUS",
-      "from": "STATE-005",
-      "to": "STATE-006",
+      "from": "STATE-007",
+      "to": "STATE-008",
+      "diagramLabels": [
+        "承辦人開始處理"
+      ],
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -592,7 +857,7 @@
       },
       "writes": [
         {
-          "field": "FLD-002",
+          "field": "FLD-003",
           "value": {
             "const": "040",
             "type": "CHAR"
@@ -611,19 +876,22 @@
       "reentry": "轉為 040 後按鈕隱藏，不會重複觸發。"
     },
     {
-      "id": "TRN-007",
+      "id": "TRN-009",
       "key": "CASE_STATUS:010>090",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0031",
-        "EV-0032",
-        "EV-0012"
+        "EV-0038",
+        "EV-0039",
+        "EV-0014"
       ],
       "entityKey": "CASE_STATUS",
-      "from": "STATE-005",
-      "to": "STATE-008",
+      "from": "STATE-007",
+      "to": "STATE-011",
+      "diagramLabels": [
+        "承辦人撤案"
+      ],
       "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
@@ -645,7 +913,7 @@
       },
       "writes": [
         {
-          "field": "FLD-002",
+          "field": "FLD-003",
           "value": {
             "const": "090",
             "type": "CHAR"
@@ -664,31 +932,34 @@
       "reentry": "撤案是終點；撤案後按鈕隱藏。"
     },
     {
-      "id": "TRN-008",
+      "id": "TRN-010",
       "key": "CASE_STATUS:040>050",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0029",
-        "EV-0030",
-        "EV-0008",
+        "EV-0034",
+        "EV-0035",
         "EV-0009",
         "EV-0010",
-        "EV-0007"
+        "EV-0011",
+        "EV-0008"
       ],
       "entityKey": "CASE_STATUS",
-      "from": "STATE-006",
-      "to": "STATE-007",
+      "from": "STATE-008",
+      "to": "STATE-009",
+      "diagramLabels": [
+        "文件審查與付款都完成，且已上傳結案報告"
+      ],
       "exitMode": "ON_COMPLETION",
       "trigger": {
         "kind": "COMPLETION",
-        "object": "OBJ-004",
+        "object": "OBJ-005",
         "action": "共用函式 TW_DEMO_CHKCLOSE 檢查守門條件，成立時把案件改為 050",
         "evaluatedAfter": [
-          "TRN-002",
           "TRN-004",
-          "ACT-003"
+          "TRN-006",
+          "ACT-005"
         ]
       },
       "actor": {
@@ -701,11 +972,11 @@
             "quantifier": "ALL",
             "where": {
               "left": {
-                "fld": "FLD-007"
+                "fld": "FLD-008"
               },
               "op": "EQ",
               "right": {
-                "state": "STATE-002"
+                "state": "STATE-004"
               }
             },
             "whenEmpty": "NOT_MET"
@@ -715,18 +986,18 @@
             "quantifier": "ALL",
             "where": {
               "left": {
-                "fld": "FLD-011"
+                "fld": "FLD-012"
               },
               "op": "EQ",
               "right": {
-                "state": "STATE-004"
+                "state": "STATE-006"
               }
             },
             "whenEmpty": "MET"
           },
           {
             "left": {
-              "act": "ACT-003"
+              "act": "ACT-005"
             },
             "op": "DONE"
           }
@@ -734,47 +1005,41 @@
       },
       "writes": [
         {
-          "field": "FLD-002",
+          "field": "FLD-003",
           "value": {
             "const": "050",
             "type": "CHAR"
           }
-        },
-        {
-          "field": "FLD-003",
-          "value": {
-            "ctx": "CURRENT_DATE"
-          }
         }
       ],
-      "sideEffects": [
-        {
-          "description": "寄發結案通知給案件的承辦人；寄送失敗不影響結案。",
-          "fields": []
-        }
-      ],
+      "sideEffects": {
+        "na": "轉入 050 時同一段程式把主管覆核狀態設為 010，寫在主管覆核的新建轉移"
+      },
       "implementedAt": [
         {
-          "object": "OBJ-004",
+          "object": "OBJ-005",
           "event": "FieldFormula（由 TW_DEMO_DOCREV、TW_DEMO_PAYMNT、TW_DEMO_CASE 的 SavePostChange 呼叫）"
         }
       ],
-      "reentry": "只在案件仍為 040 時轉移；轉為 050 之後再存檔不會重複結案，也不會重寄通知。"
+      "reentry": "只在案件仍為 040 時轉移；轉為 050 之後再存檔不會重複轉移。"
     },
     {
-      "id": "TRN-009",
+      "id": "TRN-011",
       "key": "CASE_STATUS:040>090",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0033",
-        "EV-0034",
-        "EV-0012"
+        "EV-0040",
+        "EV-0041",
+        "EV-0014"
       ],
       "entityKey": "CASE_STATUS",
-      "from": "STATE-006",
-      "to": "STATE-008",
+      "from": "STATE-008",
+      "to": "STATE-011",
+      "diagramLabels": [
+        "承辦人撤案，不必等文件審查與付款"
+      ],
       "exitMode": "INTERRUPT",
       "trigger": {
         "kind": "USER_ACTION",
@@ -792,11 +1057,11 @@
         }
       },
       "guard": {
-        "na": "撤案不看子業務進度；040 的另一個離開方式是自動結案"
+        "na": "撤案不看子業務進度；040 的另一個離開方式是自動轉入 050"
       },
       "writes": [
         {
-          "field": "FLD-002",
+          "field": "FLD-003",
           "value": {
             "const": "090",
             "type": "CHAR"
@@ -807,8 +1072,8 @@
         {
           "description": "未完成的文件與付款列維持原狀態，不另外作廢；案件為 090 後，這些列因子業務轉移要求案件為 040 而不能再審查或付款。",
           "fields": [
-            "FLD-007",
-            "FLD-011"
+            "FLD-008",
+            "FLD-012"
           ]
         }
       ],
@@ -821,39 +1086,222 @@
       "reentry": "同 010→090。"
     },
     {
-      "id": "FLOW-001",
-      "key": "CASE_STATUS:主流程",
+      "id": "TRN-012",
+      "key": "CASE_STATUS:050>060",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0039"
+        "EV-0036",
+        "EV-0037",
+        "EV-0012"
       ],
       "entityKey": "CASE_STATUS",
-      "scenarioType": "主流程",
-      "narrative": "承辦人受理並開始處理；文件審查與付款都完成、承辦人也上傳結案報告後，系統自動結案。",
+      "from": "STATE-009",
+      "to": "STATE-010",
+      "diagramLabels": [
+        "主管覆核完成"
+      ],
+      "exitMode": "ON_COMPLETION",
+      "trigger": {
+        "kind": "COMPLETION",
+        "object": "OBJ-004",
+        "action": "主管按「覆核完成」的同一段程式把案件改為 060",
+        "evaluatedAfter": [
+          "TRN-002"
+        ]
+      },
+      "actor": {
+        "na": "條件成立時由系統自動轉移，沒有操作者"
+      },
+      "guard": {
+        "left": {
+          "fld": "FLD-001"
+        },
+        "op": "EQ",
+        "right": {
+          "state": "STATE-002"
+        }
+      },
+      "writes": [
+        {
+          "field": "FLD-003",
+          "value": {
+            "const": "060",
+            "type": "CHAR"
+          }
+        },
+        {
+          "field": "FLD-004",
+          "value": {
+            "ctx": "CURRENT_DATE"
+          }
+        }
+      ],
+      "sideEffects": [
+        {
+          "description": "寄發結案通知給案件的承辦人；寄送失敗不影響結案。",
+          "fields": []
+        }
+      ],
+      "implementedAt": [
+        {
+          "object": "OBJ-004",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "覆核完成後按鈕隱藏，不會重複結案，也不會重寄通知。"
+    },
+    {
+      "id": "FLOW-001",
+      "key": "CASEAPV_STATUS:主管覆核",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0058"
+      ],
+      "entityKey": "CASEAPV_STATUS",
+      "scenarioType": "主管覆核",
+      "narrative": "案件轉入 050 時開始，主管確認後按覆核完成。",
       "steps": [
         {
           "seq": 1,
-          "transition": "TRN-005",
-          "description": "承辦人受理案件"
+          "transition": "TRN-001",
+          "description": "開始"
         },
         {
           "seq": 2,
-          "transition": "TRN-006",
-          "description": "承辦人開始處理"
-        },
-        {
-          "seq": 3,
-          "transition": "TRN-008",
-          "description": "守門條件全部成立時自動結案"
+          "transition": "TRN-002",
+          "description": "覆核完成"
         }
       ],
       "entryStates": [
         "INITIAL"
       ],
       "exitStates": [
-        "STATE-007"
+        "STATE-002"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": {
+        "na": "子業務沒有其他分岔"
+      }
+    },
+    {
+      "id": "FLOW-002",
+      "key": "CASEDOC_STATUS:文件審查",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0056"
+      ],
+      "entityKey": "CASEDOC_STATUS",
+      "scenarioType": "文件審查",
+      "narrative": "承辦人新增文件，審查人員逐份審查。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-003",
+          "description": "開始"
+        },
+        {
+          "seq": 2,
+          "transition": "TRN-004",
+          "description": "審查完成"
+        }
+      ],
+      "entryStates": [
+        "INITIAL"
+      ],
+      "exitStates": [
+        "STATE-004"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": {
+        "na": "子業務沒有其他分岔"
+      }
+    },
+    {
+      "id": "FLOW-003",
+      "key": "CASEPAY_STATUS:付款",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0057"
+      ],
+      "entityKey": "CASEPAY_STATUS",
+      "scenarioType": "付款",
+      "narrative": "承辦人新增付款，會計人員依核定金額付款。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-005",
+          "description": "開始"
+        },
+        {
+          "seq": 2,
+          "transition": "TRN-006",
+          "description": "付款完成"
+        }
+      ],
+      "entryStates": [
+        "INITIAL"
+      ],
+      "exitStates": [
+        "STATE-006"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": {
+        "na": "子業務沒有其他分岔"
+      }
+    },
+    {
+      "id": "FLOW-004",
+      "key": "CASE_STATUS:主流程",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0054"
+      ],
+      "entityKey": "CASE_STATUS",
+      "scenarioType": "主流程",
+      "narrative": "承辦人受理並開始處理；文件審查、付款與結案報告都完成後自動轉入結案審核；主管覆核完成後自動結案。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "TRN-007",
+          "description": "承辦人受理案件"
+        },
+        {
+          "seq": 2,
+          "transition": "TRN-008",
+          "description": "承辦人開始處理"
+        },
+        {
+          "seq": 3,
+          "transition": "TRN-010",
+          "description": "040 的守門條件全部成立時自動轉入結案審核"
+        },
+        {
+          "seq": 4,
+          "transition": "TRN-012",
+          "description": "主管覆核完成時自動結案"
+        }
+      ],
+      "entryStates": [
+        "INITIAL"
+      ],
+      "exitStates": [
+        "STATE-010"
       ],
       "preconditions": {
         "na": "進入條件即各步驟轉移的起點狀態"
@@ -861,13 +1309,13 @@
       "exceptions": "承辦人可在受理或處理中撤案，轉入「撤案」。"
     },
     {
-      "id": "FLOW-002",
+      "id": "FLOW-005",
       "key": "CASE_STATUS:撤案",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0040"
+        "EV-0055"
       ],
       "entityKey": "CASE_STATUS",
       "scenarioType": "撤案",
@@ -875,21 +1323,21 @@
       "steps": [
         {
           "seq": 1,
-          "transition": "TRN-007",
+          "transition": "TRN-009",
           "description": "受理中撤案"
         },
         {
           "seq": 2,
-          "transition": "TRN-009",
+          "transition": "TRN-011",
           "description": "處理中撤案（中斷子業務）"
         }
       ],
       "entryStates": [
-        "STATE-005",
-        "STATE-006"
+        "STATE-007",
+        "STATE-008"
       ],
       "exitStates": [
-        "STATE-008"
+        "STATE-011"
       ],
       "preconditions": {
         "na": "進入條件即各步驟轉移的起點狀態"
@@ -900,16 +1348,43 @@
     },
     {
       "id": "ACT-001",
+      "key": "CASEAPV_STATUS:010:01",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0063",
+        "EV-0012"
+      ],
+      "entityKey": "CASEAPV_STATUS",
+      "state": "STATE-001",
+      "name": "主管覆核",
+      "behavior": "主管確認案件資料完整後按「覆核完成」",
+      "actors": [
+        {
+          "role": "ROLE-004"
+        }
+      ],
+      "enforcement": "BY_TRANSITION",
+      "realizedBy": [
+        "TRN-002"
+      ],
+      "completion": {
+        "na": "按「覆核完成」（離開 010）即完成"
+      }
+    },
+    {
+      "id": "ACT-002",
       "key": "CASEDOC_STATUS:010:01",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0042",
-        "EV-0014"
+        "EV-0061",
+        "EV-0016"
       ],
       "entityKey": "CASEDOC_STATUS",
-      "state": "STATE-001",
+      "state": "STATE-003",
       "name": "審查文件",
       "behavior": "審查人員逐份審查文件",
       "actors": [
@@ -919,24 +1394,24 @@
       ],
       "enforcement": "BY_TRANSITION",
       "realizedBy": [
-        "TRN-002"
+        "TRN-004"
       ],
       "completion": {
         "na": "按「審查完成」（離開 010）即完成"
       }
     },
     {
-      "id": "ACT-002",
+      "id": "ACT-003",
       "key": "CASEPAY_STATUS:010:01",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0043",
-        "EV-0015"
+        "EV-0062",
+        "EV-0017"
       ],
       "entityKey": "CASEPAY_STATUS",
-      "state": "STATE-003",
+      "state": "STATE-005",
       "name": "付款",
       "behavior": "會計人員依核定金額付款",
       "actors": [
@@ -946,27 +1421,54 @@
       ],
       "enforcement": "BY_TRANSITION",
       "realizedBy": [
-        "TRN-004"
+        "TRN-006"
       ],
       "completion": {
         "na": "按「付款完成」（離開 010）即完成"
       }
     },
     {
-      "id": "ACT-003",
+      "id": "ACT-004",
       "key": "CASE_STATUS:040:01",
       "lifecycle": "ACTIVE",
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0041",
-        "EV-0016",
-        "EV-0009"
+        "EV-0059",
+        "EV-0010"
       ],
       "entityKey": "CASE_STATUS",
-      "state": "STATE-006",
+      "state": "STATE-008",
+      "name": "追蹤文件審查與付款",
+      "behavior": "承辦人追蹤文件審查與付款",
+      "actors": [
+        {
+          "role": "ROLE-002"
+        }
+      ],
+      "enforcement": "EXPECTED_ONLY",
+      "completion": {
+        "na": "系統沒有記錄追蹤進度，守門檢查也不看這件事",
+        "evidence": [
+          "EV-0010"
+        ]
+      }
+    },
+    {
+      "id": "ACT-005",
+      "key": "CASE_STATUS:040:02",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0060",
+        "EV-0018",
+        "EV-0010"
+      ],
+      "entityKey": "CASE_STATUS",
+      "state": "STATE-008",
       "name": "上傳結案報告",
-      "behavior": "承辦人上傳結案報告",
+      "behavior": "上傳結案報告",
       "actors": [
         {
           "role": "ROLE-002"
@@ -975,7 +1477,7 @@
       "enforcement": "SYSTEM_GATE",
       "completion": {
         "left": {
-          "fld": "FLD-004"
+          "fld": "FLD-005"
         },
         "op": "IS_NOT_BLANK"
       }

@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "draft",
   "title": "07 資料設計",
-  "summary": "實體 3、欄位 11（守門範例，只跑部分檢核）",
+  "summary": "實體 3、欄位 12（守門範例，只跑部分檢核）",
   "components": [
     "TW_DEMO_CASE",
     "TW_DEMO_DOCREV",
@@ -19,7 +19,7 @@
     {
       "kind": "STATUS_DOC",
       "ref": "status-CASE_STATUS.md",
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     }
   ],
   "gate": {
@@ -40,13 +40,13 @@
       "evidence": [
         "EV-0002"
       ],
-      "record": "OBJ-005",
+      "record": "OBJ-006",
       "name": "案件",
-      "businessMeaning": "一個案件一列；主業務狀態、結案報告與結案日在這裡。",
+      "businessMeaning": "一個案件一列；主業務狀態、主管覆核狀態、結案報告與結案日在這裡。",
       "storageKind": "SQL_TABLE",
       "physicalName": "PS_TW_DEMO_CASE",
       "keys": [
-        "FLD-001"
+        "FLD-002"
       ],
       "effectiveDating": {
         "kind": "NONE"
@@ -61,14 +61,14 @@
       "evidence": [
         "EV-0002"
       ],
-      "record": "OBJ-006",
+      "record": "OBJ-007",
       "name": "案件文件",
       "businessMeaning": "案件的每一份文件一列；文件審查（子業務）的狀態在這裡。",
       "storageKind": "SQL_TABLE",
       "physicalName": "PS_TW_DEMO_CASEDOC",
       "keys": [
-        "FLD-005",
-        "FLD-006"
+        "FLD-006",
+        "FLD-007"
       ],
       "effectiveDating": {
         "kind": "NONE"
@@ -77,8 +77,8 @@
         "entity": "ENT-001",
         "keyMap": [
           {
-            "child": "FLD-005",
-            "parent": "FLD-001"
+            "child": "FLD-006",
+            "parent": "FLD-002"
           }
         ]
       }
@@ -92,14 +92,14 @@
       "evidence": [
         "EV-0002"
       ],
-      "record": "OBJ-007",
+      "record": "OBJ-008",
       "name": "案件付款",
       "businessMeaning": "案件的每一筆付款一列；付款（子業務）的狀態在這裡。",
       "storageKind": "SQL_TABLE",
       "physicalName": "PS_TW_DEMO_CASEPAY",
       "keys": [
-        "FLD-008",
-        "FLD-010"
+        "FLD-009",
+        "FLD-011"
       ],
       "effectiveDating": {
         "kind": "NONE"
@@ -108,14 +108,53 @@
         "entity": "ENT-001",
         "keyMap": [
           {
-            "child": "FLD-008",
-            "parent": "FLD-001"
+            "child": "FLD-009",
+            "parent": "FLD-002"
           }
         ]
       }
     },
     {
       "id": "FLD-001",
+      "key": "TW_DEMO_CASE.APV_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002",
+        "EV-0005"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "APV_STATUS",
+      "label": "主管覆核狀態",
+      "dataType": "CHAR",
+      "length": 3,
+      "required": "CONDITIONAL",
+      "default": {
+        "na": "無 Record 層預設值；案件轉入 050 時由程式設為 010"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "010",
+            "label": "待覆核",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "090",
+            "label": "覆核完成",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-002",
       "key": "TW_DEMO_CASE.CASE_ID",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -143,7 +182,7 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-002",
+      "id": "FLD-003",
       "key": "TW_DEMO_CASE.CASE_STATUS",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -178,6 +217,12 @@
           },
           {
             "stored": "050",
+            "label": "結案審核",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "060",
             "label": "結案",
             "active": true,
             "dataPresence": "HAS_DATA"
@@ -195,7 +240,7 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-003",
+      "id": "FLD-004",
       "key": "TW_DEMO_CASE.CLOSE_DT",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -222,14 +267,14 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-004",
+      "id": "FLD-005",
       "key": "TW_DEMO_CASE.CLOSE_RPT_ATT",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0002",
-        "EV-0016"
+        "EV-0018"
       ],
       "entity": "ENT-001",
       "fieldName": "CLOSE_RPT_ATT",
@@ -248,7 +293,7 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-005",
+      "id": "FLD-006",
       "key": "TW_DEMO_CASEDOC.CASE_ID",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -273,7 +318,7 @@
       ],
       "relations": [
         {
-          "target": "FLD-001",
+          "target": "FLD-002",
           "kind": "PARENT_KEY"
         }
       ],
@@ -281,7 +326,7 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-006",
+      "id": "FLD-007",
       "key": "TW_DEMO_CASEDOC.DOC_SEQ",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -309,14 +354,14 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-007",
+      "id": "FLD-008",
       "key": "TW_DEMO_CASEDOC.DOC_STATUS",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0002",
-        "EV-0005"
+        "EV-0006"
       ],
       "entity": "ENT-002",
       "fieldName": "DOC_STATUS",
@@ -349,7 +394,7 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-008",
+      "id": "FLD-009",
       "key": "TW_DEMO_CASEPAY.CASE_ID",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -374,7 +419,7 @@
       ],
       "relations": [
         {
-          "target": "FLD-001",
+          "target": "FLD-002",
           "kind": "PARENT_KEY"
         }
       ],
@@ -382,7 +427,7 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-009",
+      "id": "FLD-010",
       "key": "TW_DEMO_CASEPAY.PAY_AMT",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -408,7 +453,7 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-010",
+      "id": "FLD-011",
       "key": "TW_DEMO_CASEPAY.PAY_SEQ",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -436,14 +481,14 @@
       "usageEvidence": "DATA_HAS_VALUE"
     },
     {
-      "id": "FLD-011",
+      "id": "FLD-012",
       "key": "TW_DEMO_CASEPAY.PAY_STATUS",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0002",
-        "EV-0006"
+        "EV-0007"
       ],
       "entity": "ENT-003",
       "fieldName": "PAY_STATUS",

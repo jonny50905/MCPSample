@@ -43,7 +43,7 @@
       "id": "EV-0007",
       "kind": "METADATA_RECEIPT",
       "locator": "inventory/records.json#fields",
-      "excerpt": "TW_DEMO_REQHDR 12 fields; TW_DEMO_EMP 5 used; TW_DEMO_DEPT 4 used"
+      "excerpt": "TW_DEMO_REQHDR 13 fields; TW_DEMO_EMP 5 used; TW_DEMO_DEPT 4 used"
     },
     {
       "id": "EV-0008",
@@ -55,7 +55,7 @@
       "id": "EV-0009",
       "kind": "METADATA_RECEIPT",
       "locator": "inventory/messages.json#27000",
-      "excerpt": "27000,1..4 (ERROR)"
+      "excerpt": "27000,1..5 (ERROR)"
     },
     {
       "id": "EV-0010",
@@ -72,14 +72,14 @@
     {
       "id": "EV-0012",
       "kind": "SQL",
-      "locator": "SELECT SUM(CASE WHEN OLD_REF_NO <> ' ' THEN 1 ELSE 0 END), SUM(CASE WHEN PRIORITY_CD <> ' ' THEN 1 ELSE 0 END), COUNT(*) FROM PS_TW_DEMO_REQHDR",
-      "excerpt": "0|0|1212"
+      "locator": "SELECT SUM(CASE WHEN OLD_REF_NO <> ' ' THEN 1 ELSE 0 END), SUM(CASE WHEN PRIORITY_CD <> ' ' THEN 1 ELSE 0 END), SUM(CASE WHEN BUDGET_CODE <> ' ' THEN 1 ELSE 0 END), COUNT(*) FROM PS_TW_DEMO_REQHDR",
+      "excerpt": "0|0|0|1212"
     },
     {
       "id": "EV-0013",
       "kind": "SQL",
-      "locator": "SELECT OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3 FROM PSPCMNAME WHERE RECNAME = 'TW_DEMO_REQHDR' AND REFNAME IN ('OLD_REF_NO','PRIORITY_CD')",
-      "excerpt": "(0 rows)"
+      "locator": "SELECT REFNAME, OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3 FROM PSPCMNAME WHERE RECNAME = 'TW_DEMO_REQHDR' AND REFNAME IN ('OLD_REF_NO','PRIORITY_CD','BUDGET_CODE')",
+      "excerpt": "BUDGET_CODE|TW_DEMO_REQHDR|AMOUNT|SaveEdit"
     },
     {
       "id": "EV-0014",
@@ -133,7 +133,7 @@
       "id": "EV-0022",
       "kind": "CHUNK",
       "locator": "4c3e0c29-409a-f0a7-a673-8950a6a7db11",
-      "excerpt": "If TW_DEMO_REQHDR.REQ_TYPE = \"INT\" Then\n   Exit(1); /* 內部申請不檢查金額 */\nEnd-If;"
+      "excerpt": "If TW_DEMO_REQHDR.REQ_TYPE = \"INT\" Then\n   SQLExec(\"SELECT BUDGET_BAL FROM PS_TW_DEMO_INTBUDGET WHERE BUDGET_CODE = :1\", TW_DEMO_REQHDR.BUDGET_CODE, &bal);\n   If TW_DEMO_REQHDR.AMOUNT > &bal Then Error MsgGet(27000, 5, \"內部預算不足。\"); End-If;\n   Exit(1); /* 內部申請改查內部預算，不做一般的金額檢核 */\nEnd-If;"
     },
     {
       "id": "EV-0023",
@@ -408,14 +408,14 @@
     {
       "id": "EV-0068",
       "kind": "STATUS_DOC",
-      "locator": "status-REQ_STATUS.md#L46",
-      "excerpt": "S020 : 直屬主管審核申請內容"
+      "locator": "status-REQ_STATUS.md#L50",
+      "excerpt": "- 020 待主管審核：直屬主管審核申請內容。"
     },
     {
       "id": "EV-0069",
       "kind": "STATUS_DOC",
-      "locator": "status-REQ_STATUS.md#L47",
-      "excerpt": "note right of S025 : 部門主管審核"
+      "locator": "status-REQ_STATUS.md#L51",
+      "excerpt": "- 025 待部門主管審核：部門主管審核。"
     },
     {
       "id": "EV-0070",

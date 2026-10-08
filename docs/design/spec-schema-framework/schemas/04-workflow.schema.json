@@ -35,78 +35,154 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "entityKey",
-              "flowchart",
-              "stateDiagram",
-              "fingerprint"
-            ],
             "properties": {
               "entityKey": {
                 "$ref": "urn:ps-spec:schema:common#/$defs/slug"
               },
-              "flowchart": {
-                "anyOf": [
-                  {
-                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+              "parts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "diagram",
+                    "locator",
+                    "scope"
+                  ],
+                  "properties": {
+                    "diagram": {
+                      "type": "string",
+                      "enum": [
+                        "FLOWCHART",
+                        "STATE_DIAGRAM"
+                      ]
+                    },
+                    "locator": {
+                      "type": "string",
+                      "pattern": "#L\\d+(-L?\\d+)?$"
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "WHOLE",
+                        "REGION",
+                        "SUBGRAPH"
+                      ]
+                    },
+                    "composite": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "subgraph": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                    }
                   },
-                  {
-                    "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
-                  }
-                ]
-              },
-              "stateDiagram": {
-                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
-              },
-              "region": {
-                "type": "object",
-                "properties": {
-                  "composite": {
-                    "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
-                  },
-                  "index": {
-                    "type": "integer",
-                    "minimum": 1
-                  }
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "scope": {
+                            "const": "REGION"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "composite",
+                          "index"
+                        ],
+                        "properties": {
+                          "diagram": {
+                            "const": "STATE_DIAGRAM"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "scope": {
+                            "const": "SUBGRAPH"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "subgraph"
+                        ],
+                        "properties": {
+                          "diagram": {
+                            "const": "FLOWCHART"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "scope": {
+                            "const": "WHOLE"
+                          }
+                        }
+                      },
+                      "then": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "composite"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "index"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "subgraph"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
                 },
-                "required": [
-                  "composite",
-                  "index"
-                ],
-                "additionalProperties": false
+                "minItems": 1,
+                "contains": {
+                  "type": "object",
+                  "required": [
+                    "diagram"
+                  ],
+                  "properties": {
+                    "diagram": {
+                      "const": "STATE_DIAGRAM"
+                    }
+                  }
+                }
               },
               "fingerprint": {
                 "$ref": "urn:ps-spec:schema:common#/$defs/sha256"
               }
             },
-            "additionalProperties": false,
-            "allOf": [
-              {
-                "if": {
-                  "required": [
-                    "flowchart"
-                  ],
-                  "properties": {
-                    "flowchart": {
-                      "type": "object"
-                    }
-                  }
-                },
-                "then": {
-                  "required": [
-                    "region"
-                  ]
-                }
-              }
-            ]
+            "required": [
+              "entityKey",
+              "parts",
+              "fingerprint"
+            ],
+            "additionalProperties": false
           },
           "minItems": 1,
-          "description": "狀態圖來源：每個狀態實體在 STATUS 檔中的 flowchart＋stateDiagram-v2；平行區塊內的子業務另記所在複合狀態與區塊序（模型讀檔提出、外環驗證）",
+          "description": "狀態圖來源：每個狀態實體由哪幾段圖組成（獨立圖、大圖的區塊或 subgraph）；同一實體的各段必須一致（模型讀檔提出、外環驗證）",
           "x-ref": [
             "STATE"
           ]
         },
-        "diagramTexts": {
+        "statusTexts": {
           "type": "array",
           "items": {
             "type": "object",
@@ -126,14 +202,15 @@
               "disposition": {
                 "type": "string",
                 "enum": [
-                  "ACTIVITY",
-                  "NOT_ACTIVITY"
+                  "MAPPED",
+                  "NO_SPEC_CONTENT"
                 ]
               },
-              "activities": {
+              "items": {
                 "type": "array",
                 "items": {
-                  "$ref": "urn:ps-spec:schema:common#/$defs/refACT"
+                  "type": "string",
+                  "pattern": "^(STATE|TRN|FLOW|ACT)-\\d{3,}$"
                 },
                 "minItems": 1,
                 "uniqueItems": true
@@ -148,13 +225,13 @@
                 "if": {
                   "properties": {
                     "disposition": {
-                      "const": "ACTIVITY"
+                      "const": "MAPPED"
                     }
                   }
                 },
                 "then": {
                   "required": [
-                    "activities"
+                    "items"
                   ]
                 },
                 "else": {
@@ -163,22 +240,25 @@
                   ],
                   "not": {
                     "required": [
-                      "activities"
+                      "items"
                     ]
                   }
                 }
               }
             ]
           },
-          "description": "狀態圖文字的處置：每行狀態描述與 note 是不是活動、對應哪些 ACT",
+          "description": "STATUS 文字的處置：MAPPED＝寫進了哪些 04 項目；NO_SPEC_CONTENT＝沒有規格內容並寫明理由",
           "x-ref": [
+            "STATE",
+            "TRN",
+            "FLOW",
             "ACT"
           ]
         }
       },
       "required": [
         "diagramSources",
-        "diagramTexts"
+        "statusTexts"
       ]
     }
   ],
@@ -413,6 +493,14 @@
               "minItems": 1,
               "description": "收合掉的 choice／fork／join 節點"
             },
+            "diagramLabels": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+              },
+              "minItems": 1,
+              "description": "狀態圖上這條線的描述原文；守衛與觸發必須與它一致"
+            },
             "exitMode": {
               "anyOf": [
                 {
@@ -509,8 +597,21 @@
                         "required": [
                           "evaluatedAfter"
                         ]
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "USER_ACTION",
+                              "BATCH",
+                              "INTERFACE"
+                            ]
+                          }
+                        }
                       },
-                      "else": {
+                      "then": {
                         "not": {
                           "required": [
                             "evaluatedAfter"
@@ -755,7 +856,8 @@
                     "not": {
                       "enum": [
                         "BATCH",
-                        "COMPLETION"
+                        "COMPLETION",
+                        "SYSTEM_EVENT"
                       ]
                     }
                   }
@@ -983,7 +1085,7 @@
             },
             "behavior": {
               "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
-              "description": "狀態圖上描述「這個階段誰該做什麼」的原文"
+              "description": "「這個階段誰該做什麼」的 STATUS 檔原文（說明區域，或圖上的狀態描述與 note）"
             },
             "actors": {
               "anyOf": [

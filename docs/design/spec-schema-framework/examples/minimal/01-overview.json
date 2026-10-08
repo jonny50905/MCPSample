@@ -50,7 +50,7 @@
       "holder": "業務單位主管"
     },
     {
-      "id": "OBJ-018",
+      "id": "OBJ-019",
       "key": "RECORD:TW_DEMO_REQHDR",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -68,7 +68,7 @@
       "reason": "申請單主檔",
       "fieldUsage": {
         "excluded": {
-          "count": 2
+          "count": 3
         }
       }
     }

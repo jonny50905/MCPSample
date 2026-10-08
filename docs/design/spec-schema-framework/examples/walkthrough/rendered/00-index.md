@@ -15,7 +15,7 @@
 
 | 文件 | 狀態 | L1 | L2 | L3 | L4 | L5 | 摘要 |
 |---|---|---|---|---|---|---|---|
-| [01 專案概覽](01-overview.md) | in_review | PASS | PASS | PASS | PASS | NOT_APPLICABLE | 目標 1、決策責任 2、物件 22；未解問題 1 |
+| [01 專案概覽](01-overview.md) | in_review | PASS | PASS | PASS | PASS | NOT_APPLICABLE | 目標 1、決策責任 2、物件 23；未解問題 1 |
 | [02 功能需求](02-functional-requirements.md) | in_review | PASS | PASS | PASS | PASS | PASS | 功能 5；未解問題 0 |
 | [03 角色與權限](03-roles-permissions.md) | in_review | PASS | PASS | PASS | PASS | PASS | 角色 2、權限 2；未解問題 0 |
 | [04 流程與狀態機](04-workflow.md) | in_review | PASS | PASS | PASS | PASS | PASS | 狀態 6、轉移 10、情境 4、活動 2；未解問題 0 |
@@ -82,4 +82,4 @@
 - 已回答：1；已撤回：1
 - 只計數的定義值：2
 
-欄位統計：範圍內 Record 4；已判定 3；判不了 1（NO_TABLE 1）；不建置欄位 2（1 個 Record）
+欄位統計：範圍內 Record 4；已判定 3；判不了 1（NO_TABLE 1）；不建置欄位 3（1 個 Record）

@@ -48,28 +48,29 @@
     },
     "texts": [
       {
-        "line": 46,
-        "kind": "desc",
-        "code": "020",
-        "text": "直屬主管審核申請內容"
+        "line": 3,
+        "kind": "說明",
+        "text": "本檔是 STATUS 權威文件的合成範例。所有狀態圖寫在同一份檔案；這個範例只有一個狀態實體（申請單的狀態），同時提供 flowchart 與 stateDiagram-v2。"
       },
       {
-        "line": 47,
-        "kind": "note",
-        "code": "025",
-        "text": "部門主管審核"
+        "line": 50,
+        "kind": "說明",
+        "text": "020 待主管審核：直屬主管審核申請內容。"
       },
       {
-        "line": 48,
-        "kind": "note",
-        "code": "090",
-        "text": "作廢的申請單不能再修改"
+        "line": 51,
+        "kind": "說明",
+        "text": "025 待部門主管審核：部門主管審核。"
+      },
+      {
+        "line": 52,
+        "kind": "說明",
+        "text": "090 作廢：作廢的申請單不能再修改。"
       }
     ],
     "codesEqual": true,
     "transitionsEqual": true,
-    "onlyInFlowchart": [],
-    "onlyInStateDiagram": []
+    "problems": []
   },
   "docs": {
     "01-overview": {
@@ -81,7 +82,7 @@
         "L5": "NOT_APPLICABLE"
       },
       "status": "in_review",
-      "summary": "目標 1、決策責任 2、物件 22；未解問題 1",
+      "summary": "目標 1、決策責任 2、物件 23；未解問題 1",
       "dependsOn": []
     },
     "02-functional-requirements": {

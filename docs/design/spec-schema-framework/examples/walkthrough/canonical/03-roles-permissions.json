@@ -19,7 +19,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
+      "fingerprint": "d4d96ae0e37df0e49d1ca709b9aad13d3a14fabda035a0faa6a45861975dcbce"
     },
     {
       "kind": "RESEARCH_RECEIPT",
@@ -46,7 +46,7 @@
         "EV-0008"
       ],
       "principalType": "ROLE",
-      "object": "OBJ-020",
+      "object": "OBJ-021",
       "name": "審核主管",
       "membership": {
         "kind": "STATIC_ASSIGNMENT",
@@ -63,7 +63,7 @@
         "EV-0008"
       ],
       "principalType": "ROLE",
-      "object": "OBJ-021",
+      "object": "OBJ-022",
       "name": "申請人",
       "membership": {
         "kind": "STATIC_ASSIGNMENT",

@@ -62,52 +62,64 @@
       "message": "BR-003 的條件比對 TW_DEMO_REQHDR.REQ_TYPE＝INT，但 Q-001 已證明這個值不會出現"
     },
     {
-      "case": "守門範例：TRN-008 的守衛漏掉付款區塊",
+      "case": "守門範例：TRN-010（040→050）的守衛漏掉付款區塊",
       "expected": "L2 R13",
       "caught": true,
-      "message": "TRN-008 的守衛沒有要求區塊 CASEPAY_STATUS 的資料全部到終點 090"
+      "message": "TRN-010 的守衛沒有要求區塊 CASEPAY_STATUS 的資料全部到終點 090"
     },
     {
-      "case": "守門範例：TRN-008 的守衛漏掉「上傳結案報告」",
+      "case": "守門範例：TRN-010 的守衛漏掉「上傳結案報告」",
       "expected": "L2 R13",
       "caught": true,
-      "message": "TRN-008 的守衛沒有要求守門活動 ACT-003 完成"
+      "message": "TRN-010 的守衛沒有要求守門活動 ACT-005 完成"
     },
     {
       "case": "守門範例：逐列條件 ALL 沒寫 whenEmpty",
       "expected": "L1 S01",
       "caught": true,
-      "message": "TRN-008 guard.all.0：'whenEmpty' is a required property"
+      "message": "TRN-010 guard.all.0：'whenEmpty' is a required property"
     },
     {
-      "case": "守門範例：處理中撤案（TRN-009）的 exitMode 寫成 NORMAL",
+      "case": "守門範例：處理中撤案（TRN-011）的 exitMode 寫成 NORMAL",
       "expected": "L3 C01",
       "caught": true,
-      "message": "TRN-009 從有平行區塊的 STATE-006 離開，exitMode 不得為 NORMAL"
+      "message": "TRN-011 從有平行區塊的 STATE-008 離開，exitMode 不得為 NORMAL"
     },
     {
-      "case": "守門範例：DONE 指向以轉移完成的活動 ACT-001",
+      "case": "守門範例：DONE 指向以轉移完成的活動 ACT-002",
       "expected": "L2 R13",
       "caught": true,
-      "message": "TRN-008 以 DONE 引用的 ACT-001 不是 SYSTEM_GATE 活動"
+      "message": "TRN-010 以 DONE 引用的 ACT-002 不是 SYSTEM_GATE 活動"
     },
     {
-      "case": "守門範例：狀態描述「審查人員逐份審查文件」沒有處置",
+      "case": "守門範例：TRN-010 漏帶線上描述",
       "expected": "L3 C01",
       "caught": true,
-      "message": "狀態圖文字 status-CASE_STATUS.md#L44「審查人員逐份審查文件」沒有處置"
+      "message": "TRN-010 的線上描述與狀態圖不符（圖上：文件審查與付款都完成，且已上傳結案報告）"
     },
     {
-      "case": "守門範例：守門活動沒有功能可完成（FR-001 拿掉 performs）",
+      "case": "守門範例：說明區域「審查人員逐份審查文件」那一行沒有處置",
+      "expected": "L3 C01",
+      "caught": true,
+      "message": "STATUS 文字 status-CASE_STATUS.md#L90「文件審查 010 待審查：審查人員逐份審查文件。」沒有處置"
+    },
+    {
+      "case": "守門範例：守門活動沒有功能可完成（FR-002 拿掉 performs）",
       "expected": "L3 C02",
       "caught": true,
-      "message": "ACT-003 是守門活動，但沒有功能讓操作者完成它"
+      "message": "ACT-005 是守門活動，但沒有功能讓操作者完成它"
+    },
+    {
+      "case": "守門範例：文件審查的獨立圖多畫了「020 補件中」，與大圖的區塊不同",
+      "expected": "L0 PARSE",
+      "caught": true,
+      "message": "研究前停止：CASEDOC_STATUS：第 79 行起的 stateDiagram 的狀態碼 010、020、090 與其他段 010、090 不同；CASEDOC_STATUS：第 79 行起的 stateDiagram 的轉移與其他段不同（010>020、010>090、020>090）"
     },
     {
       "case": "守門範例：狀態圖從區塊內的 D090 直接連到 M050",
       "expected": "L0 PARSE",
       "caught": true,
-      "message": "解析停止：第 38 行：D090 跨越複合狀態或平行區塊的邊界（不支援，請改成從複合狀態本身連出）"
+      "message": "解析停止：第 60 行：D090 跨越複合狀態或平行區塊的邊界（不支援，請改成從複合狀態本身連出）"
     }
   ]
 }

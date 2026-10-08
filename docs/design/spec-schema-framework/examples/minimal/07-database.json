@@ -30,7 +30,7 @@
       "evidence": [
         "EV-0007"
       ],
-      "record": "OBJ-018",
+      "record": "OBJ-019",
       "name": "申請單",
       "businessMeaning": "一張申請單一列；狀態、金額、事由與審核結果都在這裡。",
       "storageKind": "SQL_TABLE",
@@ -143,8 +143,8 @@
       ],
       "dataCheck": "非預設 0 筆（全表非空，查詢日 2026-10-01）",
       "codeChecks": {
-        "a": "PeopleCode 交叉參照：核心路徑沒有指名引用。",
-        "b": "核心路徑沒有 AE、SQR 或 SQL 物件讀寫這兩欄。",
+        "a": "PeopleCode 交叉參照：OLD_REF_NO、PRIORITY_CD 沒有引用；BUDGET_CODE 只在 TW_DEMO_REQHDR.AMOUNT.SaveEdit 已證明不會執行的分支內被讀取（見 90 的 NATIVE_UNUSED_BRANCH），不算引用。",
+        "b": "核心路徑沒有 AE、SQR 或 SQL 物件讀寫這三欄。",
         "c": "既有研究文件沒有指名引用的紀錄。"
       }
     }

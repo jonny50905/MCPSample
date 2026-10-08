@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "draft",
   "title": "01 專案概覽",
-  "summary": "物件 10（守門範例，只跑部分檢核）",
+  "summary": "物件 12（守門範例，只跑部分檢核）",
   "components": [
     "TW_DEMO_CASE",
     "TW_DEMO_DOCREV",
@@ -17,7 +17,7 @@
     {
       "kind": "STATUS_DOC",
       "ref": "status-CASE_STATUS.md",
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     }
   ],
   "gate": {
@@ -47,7 +47,7 @@
       "condition": {
         "na": "入口物件，進入即使用"
       },
-      "reason": "案件受理、處理、上傳結案報告與撤案"
+      "reason": "案件受理、處理、上傳結案報告、主管覆核與撤案"
     },
     {
       "id": "OBJ-002",
@@ -89,24 +89,42 @@
     },
     {
       "id": "OBJ-004",
+      "key": "PEOPLECODE:TW_DEMO_CASEWRK.APVOK_PB.FieldChange",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_CASE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0012"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_CASEWRK.APVOK_PB.FieldChange",
+      "inclusion": "CORE",
+      "usedBy": "TW_DEMO_CASE 的「覆核完成」按鈕",
+      "condition": "主管按「覆核完成」時",
+      "reason": "主管覆核與結案",
+      "pcEvent": "FIELD_CHANGE"
+    },
+    {
+      "id": "OBJ-005",
       "key": "PEOPLECODE:TW_DEMO_CASEWRK.CHKCLOSE.FieldFormula",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0010",
-        "EV-0009"
+        "EV-0011",
+        "EV-0010"
       ],
       "objectType": "PEOPLECODE",
       "objectName": "TW_DEMO_CASEWRK.CHKCLOSE.FieldFormula",
       "inclusion": "CORE",
       "usedBy": "三個 Component 的 SavePostChange 都呼叫",
       "condition": "文件審查、付款或上傳結案報告存檔後",
-      "reason": "結案守門檢查（共用函式）",
+      "reason": "040 的守門檢查（共用函式）",
       "pcEvent": "FIELD_FORMULA"
     },
     {
-      "id": "OBJ-005",
+      "id": "OBJ-006",
       "key": "RECORD:TW_DEMO_CASE",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -121,7 +139,7 @@
       "condition": {
         "na": "一律讀寫"
       },
-      "reason": "案件主檔",
+      "reason": "案件主檔（含主管覆核狀態）",
       "fieldUsage": {
         "noneExcludable": {
           "checkedOn": "2026-10-01"
@@ -129,7 +147,7 @@
       }
     },
     {
-      "id": "OBJ-006",
+      "id": "OBJ-007",
       "key": "RECORD:TW_DEMO_CASEDOC",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -152,7 +170,7 @@
       }
     },
     {
-      "id": "OBJ-007",
+      "id": "OBJ-008",
       "key": "RECORD:TW_DEMO_CASEPAY",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -175,7 +193,7 @@
       }
     },
     {
-      "id": "OBJ-008",
+      "id": "OBJ-009",
       "key": "ROLE:TW_DEMO_ACCT",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -191,7 +209,7 @@
       "reason": "會計人員角色"
     },
     {
-      "id": "OBJ-009",
+      "id": "OBJ-010",
       "key": "ROLE:TW_DEMO_OFFICER",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -207,7 +225,7 @@
       "reason": "承辦人角色"
     },
     {
-      "id": "OBJ-010",
+      "id": "OBJ-011",
       "key": "ROLE:TW_DEMO_REVIEWER",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -221,6 +239,22 @@
       "usedBy": "TW_DEMO_DOCREV 的元件權限",
       "condition": "進入 TW_DEMO_DOCREV 時",
       "reason": "審查人員角色"
+    },
+    {
+      "id": "OBJ-012",
+      "key": "ROLE:TW_DEMO_SUPV",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "objectType": "ROLE",
+      "objectName": "TW_DEMO_SUPV",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_CASE 的元件權限",
+      "condition": "進入 TW_DEMO_CASE 時",
+      "reason": "主管角色"
     }
   ]
 }

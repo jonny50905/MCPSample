@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "in_review",
   "title": "01 專案概覽",
-  "summary": "目標 1、決策責任 2、物件 22；未解問題 1",
+  "summary": "目標 1、決策責任 2、物件 23；未解問題 1",
   "components": [
     "TW_DEMO_APV",
     "TW_DEMO_REQ"
@@ -16,7 +16,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
+      "fingerprint": "d4d96ae0e37df0e49d1ca709b9aad13d3a14fabda035a0faa6a45861975dcbce"
     },
     {
       "kind": "PROJECT_INPUT",
@@ -26,7 +26,7 @@
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/01-overview",
-      "fingerprint": "98cb5960f959f8eb49c16a4a0d24cbb6585b1d92a2af9cd5844bd48326f9b886"
+      "fingerprint": "66e8e695ca6533fe6fc0d38c8138d9ae6f832496bde47addea95f9ce2f8d11ee"
     }
   ],
   "gate": {
@@ -153,7 +153,7 @@
       "inclusion": "DEPENDENCY",
       "usedBy": "核心 PeopleCode 以 MsgGet 讀取",
       "condition": "檢核失敗時",
-      "reason": "提供四則錯誤訊息原文"
+      "reason": "提供核心程式使用的四則錯誤訊息原文（另一則只在已證明不會執行的分支內使用，見 90）"
     },
     {
       "id": "OBJ-005",
@@ -443,6 +443,24 @@
     },
     {
       "id": "OBJ-018",
+      "key": "RECORD:TW_DEMO_INTBUDGET",
+      "lifecycle": "ACTIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0022"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_INTBUDGET",
+      "inclusion": "EXCLUDED",
+      "usedBy": "TW_DEMO_REQHDR.AMOUNT.SaveEdit 的 INT 分支內以 SQLExec 讀取",
+      "condition": {
+        "na": "核心路徑實際上不會讀取"
+      },
+      "reason": "只在已證明不會執行的原生分支內被讀取，不構成 DEPENDENCY（見 90 的 NATIVE_UNUSED_BRANCH）"
+    },
+    {
+      "id": "OBJ-019",
       "key": "RECORD:TW_DEMO_REQHDR",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -464,12 +482,12 @@
       "reason": "申請單主檔",
       "fieldUsage": {
         "excluded": {
-          "count": 2
+          "count": 3
         }
       }
     },
     {
-      "id": "OBJ-019",
+      "id": "OBJ-020",
       "key": "RECORD:TW_DEMO_REQWRK",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -497,7 +515,7 @@
       }
     },
     {
-      "id": "OBJ-020",
+      "id": "OBJ-021",
       "key": "ROLE:TW_DEMO_APPROVER",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -513,7 +531,7 @@
       "reason": "審核主管角色"
     },
     {
-      "id": "OBJ-021",
+      "id": "OBJ-022",
       "key": "ROLE:TW_DEMO_REQUESTER",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -529,7 +547,7 @@
       "reason": "申請人角色"
     },
     {
-      "id": "OBJ-022",
+      "id": "OBJ-023",
       "key": "SECONDARY_PAGE:TW_DEMO_REQSEC",
       "lifecycle": "ACTIVE",
       "component": "TW_DEMO_REQ",

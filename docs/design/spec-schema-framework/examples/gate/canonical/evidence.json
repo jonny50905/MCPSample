@@ -13,253 +13,373 @@
       "id": "EV-0002",
       "kind": "METADATA_RECEIPT",
       "locator": "inventory/records.json#fields",
-      "excerpt": "TW_DEMO_CASE 4 fields; TW_DEMO_CASEDOC 3 fields; TW_DEMO_CASEPAY 4 fields"
+      "excerpt": "TW_DEMO_CASE 5 fields; TW_DEMO_CASEDOC 3 fields; TW_DEMO_CASEPAY 4 fields"
     },
     {
       "id": "EV-0003",
       "kind": "METADATA_RECEIPT",
       "locator": "inventory/security.json#components",
-      "excerpt": "TW_DEMO_CASE: TW_DEMO_OFFICER\nTW_DEMO_DOCREV: TW_DEMO_REVIEWER\nTW_DEMO_PAYMNT: TW_DEMO_ACCT"
+      "excerpt": "TW_DEMO_CASE: TW_DEMO_OFFICER, TW_DEMO_SUPV\nTW_DEMO_DOCREV: TW_DEMO_REVIEWER\nTW_DEMO_PAYMNT: TW_DEMO_ACCT"
     },
     {
       "id": "EV-0004",
       "kind": "SQL",
       "locator": "SELECT CASE_STATUS, COUNT(*) FROM PS_TW_DEMO_CASE GROUP BY CASE_STATUS",
-      "excerpt": "010|14  040|37  050|402  090|21"
+      "excerpt": "010|14  040|37  050|9  060|393  090|21"
     },
     {
       "id": "EV-0005",
+      "kind": "SQL",
+      "locator": "SELECT APV_STATUS, COUNT(*) FROM PS_TW_DEMO_CASE WHERE CASE_STATUS IN ('050','060') GROUP BY APV_STATUS",
+      "excerpt": "010|9  090|393"
+    },
+    {
+      "id": "EV-0006",
       "kind": "SQL",
       "locator": "SELECT DOC_STATUS, COUNT(*) FROM PS_TW_DEMO_CASEDOC GROUP BY DOC_STATUS",
       "excerpt": "010|52  090|1311"
     },
     {
-      "id": "EV-0006",
+      "id": "EV-0007",
       "kind": "SQL",
       "locator": "SELECT PAY_STATUS, COUNT(*) FROM PS_TW_DEMO_CASEPAY GROUP BY PAY_STATUS",
       "excerpt": "010|18  090|655"
     },
     {
-      "id": "EV-0007",
+      "id": "EV-0008",
       "kind": "SQL",
-      "locator": "SELECT SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM PS_TW_DEMO_CASEDOC D WHERE D.CASE_ID = C.CASE_ID) THEN 1 ELSE 0 END), SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM PS_TW_DEMO_CASEPAY P WHERE P.CASE_ID = C.CASE_ID) THEN 1 ELSE 0 END) FROM PS_TW_DEMO_CASE C WHERE C.CASE_STATUS = '050'",
+      "locator": "SELECT SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM PS_TW_DEMO_CASEDOC D WHERE D.CASE_ID = C.CASE_ID) THEN 1 ELSE 0 END), SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM PS_TW_DEMO_CASEPAY P WHERE P.CASE_ID = C.CASE_ID) THEN 1 ELSE 0 END) FROM PS_TW_DEMO_CASE C WHERE C.CASE_STATUS IN ('050','060')",
       "excerpt": "0|117"
     },
     {
-      "id": "EV-0008",
+      "id": "EV-0009",
       "kind": "CHUNK",
       "locator": "8801940e-31f2-1d3b-cb04-75236d5db7e2",
       "excerpt": "SQLExec(\"SELECT COUNT(*), SUM(CASE WHEN DOC_STATUS <> '090' THEN 1 ELSE 0 END) FROM PS_TW_DEMO_CASEDOC WHERE CASE_ID = :1\", &caseId, &nDoc, &openDoc);\nSQLExec(\"SELECT COUNT(*) FROM PS_TW_DEMO_CASEPAY WHERE CASE_ID = :1 AND PAY_STATUS <> '090'\", &caseId, &openPay);"
     },
     {
-      "id": "EV-0009",
+      "id": "EV-0010",
       "kind": "CHUNK",
       "locator": "5f290af9-0a3a-0673-d338-14875cc1e71d",
-      "excerpt": "If &caseStatus = \"040\" And &nDoc > 0 And &openDoc = 0 And &openPay = 0 And All(&rptAtt) Then\n   SQLExec(\"UPDATE PS_TW_DEMO_CASE SET CASE_STATUS = '050', CLOSE_DT = %CurrentDateIn WHERE CASE_ID = :1\", &caseId);\n   TW_DEMO_SENDCLOSEMAIL(&caseId);\nEnd-If;"
+      "excerpt": "If &caseStatus = \"040\" And &nDoc > 0 And &openDoc = 0 And &openPay = 0 And All(&rptAtt) Then\n   SQLExec(\"UPDATE PS_TW_DEMO_CASE SET CASE_STATUS = '050', APV_STATUS = '010' WHERE CASE_ID = :1\", &caseId);\nEnd-If;"
     },
     {
-      "id": "EV-0010",
+      "id": "EV-0011",
       "kind": "CHUNK",
       "locator": "0ca5a0ec-34f9-9578-aa12-87b39a9cb5ff",
       "excerpt": "TW_DEMO_DOCREV.SavePostChange: TW_DEMO_CHKCLOSE(TW_DEMO_CASEDOC.CASE_ID);\nTW_DEMO_PAYMNT.SavePostChange: TW_DEMO_CHKCLOSE(TW_DEMO_CASEPAY.CASE_ID);\nTW_DEMO_CASE.SavePostChange: TW_DEMO_CHKCLOSE(TW_DEMO_CASE.CASE_ID);"
     },
     {
-      "id": "EV-0011",
+      "id": "EV-0012",
+      "kind": "CHUNK",
+      "locator": "9d999f91-ceac-938b-176d-93024b6e8249",
+      "excerpt": "TW_DEMO_CASEWRK.APVOK_PB.FieldChange:\nIf TW_DEMO_CASE.CASE_STATUS <> \"050\" Then Error ...; End-If;\nTW_DEMO_CASE.APV_STATUS.Value = \"090\"; TW_DEMO_CASE.CASE_STATUS.Value = \"060\"; TW_DEMO_CASE.CLOSE_DT.Value = %Date;\nTW_DEMO_SENDCLOSEMAIL(TW_DEMO_CASE.CASE_ID);"
+    },
+    {
+      "id": "EV-0013",
       "kind": "CHUNK",
       "locator": "a4cf80e2-5ed1-f9eb-42fe-b19057de60a4",
       "excerpt": "TW_DEMO_CASEWRK.START_PB.FieldChange:\nTW_DEMO_CASE.CASE_STATUS.Value = \"040\";"
     },
     {
-      "id": "EV-0012",
+      "id": "EV-0014",
       "kind": "CHUNK",
       "locator": "fb3127ed-dd32-383d-ef84-be5ed247f20d",
       "excerpt": "TW_DEMO_CASEWRK.CANCEL_PB.FieldChange:\nTW_DEMO_CASE.CASE_STATUS.Value = \"090\"; /* 文件與付款列不變更 */"
     },
     {
-      "id": "EV-0013",
+      "id": "EV-0015",
       "kind": "CHUNK",
       "locator": "74017460-d135-e174-0a78-ce1712bf8a81",
       "excerpt": "TW_DEMO_CASE.SaveEdit:\nIf TW_DEMO_CASE.CASE_STATUS <> \"040\" And (新增了文件或付款列) Then Error MsgGet(27100, 1, \"案件不是處理中，不能新增文件或付款。\"); End-If;"
     },
     {
-      "id": "EV-0014",
+      "id": "EV-0016",
       "kind": "CHUNK",
       "locator": "8d3f32fb-e5e7-2d44-27a5-e572fa551ab5",
       "excerpt": "TW_DEMO_CASEWRK.DOCOK_PB.FieldChange:\nIf TW_DEMO_CASE.CASE_STATUS <> \"040\" Then Error ...; End-If;\nTW_DEMO_CASEDOC.DOC_STATUS.Value = \"090\";"
     },
     {
-      "id": "EV-0015",
+      "id": "EV-0017",
       "kind": "CHUNK",
       "locator": "327820ab-6a7f-ca3e-d9d0-29aa8316462b",
       "excerpt": "TW_DEMO_CASEWRK.PAYOK_PB.FieldChange:\nIf TW_DEMO_CASE.CASE_STATUS <> \"040\" Then Error ...; End-If;\nTW_DEMO_CASEPAY.PAY_STATUS.Value = \"090\";"
     },
     {
-      "id": "EV-0016",
+      "id": "EV-0018",
       "kind": "CHUNK",
       "locator": "27cc1e67-a5f9-0d6d-4a83-91c7c5af5a48",
       "excerpt": "TW_DEMO_CASE.CLOSE_RPT_ATT 附件上傳完成後寫入附件 ID；\nTW_DEMO_CASEWRK.ATTACH_PB 只在 CASE_STATUS = \"040\" 時可用"
     },
     {
-      "id": "EV-0017",
-      "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L20",
-      "excerpt": "state \"010 受理\" as M010"
-    },
-    {
-      "id": "EV-0018",
-      "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L21",
-      "excerpt": "state \"040 處理中\" as M040 {"
-    },
-    {
       "id": "EV-0019",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L34",
-      "excerpt": "state \"050 結案\" as M050"
+      "locator": "status-CASE_STATUS.md#L35",
+      "excerpt": "state \"010 受理\" as M010"
     },
     {
       "id": "EV-0020",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L35",
-      "excerpt": "state \"090 撤案\" as M090"
+      "locator": "status-CASE_STATUS.md#L36",
+      "excerpt": "state \"040 處理中\" as M040 {"
     },
     {
       "id": "EV-0021",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L22",
-      "excerpt": "state \"010 待審查\" as D010"
+      "locator": "status-CASE_STATUS.md#L49",
+      "excerpt": "state \"050 結案審核\" as M050 {"
     },
     {
       "id": "EV-0022",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L23",
-      "excerpt": "state \"090 審查完成\" as D090"
+      "locator": "status-CASE_STATUS.md#L56",
+      "excerpt": "state \"060 結案\" as M060"
     },
     {
       "id": "EV-0023",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L28",
-      "excerpt": "state \"010 待付款\" as P010"
+      "locator": "status-CASE_STATUS.md#L57",
+      "excerpt": "state \"090 撤案\" as M090"
     },
     {
       "id": "EV-0024",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L29",
-      "excerpt": "state \"090 已付款\" as P090"
+      "locator": "status-CASE_STATUS.md#L37",
+      "excerpt": "state \"010 待審查\" as D010"
     },
     {
       "id": "EV-0025",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L36",
-      "excerpt": "[*] --> M010"
+      "locator": "status-CASE_STATUS.md#L38",
+      "excerpt": "state \"090 審查完成\" as D090"
     },
     {
       "id": "EV-0026",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L9",
-      "excerpt": "START((開始)) -->|主流程| N010[\"010 受理\"]"
+      "locator": "status-CASE_STATUS.md#L43",
+      "excerpt": "state \"010 待付款\" as P010"
     },
     {
       "id": "EV-0027",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L37",
-      "excerpt": "M010 --> M040"
+      "locator": "status-CASE_STATUS.md#L44",
+      "excerpt": "state \"090 已付款\" as P090"
     },
     {
       "id": "EV-0028",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L10",
-      "excerpt": "N010 -->|主流程| N040[\"040 處理中\"]"
+      "locator": "status-CASE_STATUS.md#L50",
+      "excerpt": "state \"010 待覆核\" as A010"
     },
     {
       "id": "EV-0029",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L38",
-      "excerpt": "M040 --> M050"
+      "locator": "status-CASE_STATUS.md#L51",
+      "excerpt": "state \"090 覆核完成\" as A090"
     },
     {
       "id": "EV-0030",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L11",
-      "excerpt": "N040 -->|主流程| N050[\"050 結案\"]"
+      "locator": "status-CASE_STATUS.md#L58",
+      "excerpt": "[*] --> M010"
     },
     {
       "id": "EV-0031",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L39",
-      "excerpt": "M010 --> M090"
+      "locator": "status-CASE_STATUS.md#L25",
+      "excerpt": "START((開始)) -->|主流程| N010[\"010 受理\"]"
     },
     {
       "id": "EV-0032",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L12",
-      "excerpt": "N010 -->|撤案| N090[\"090 撤案\"]"
+      "locator": "status-CASE_STATUS.md#L59",
+      "excerpt": "M010 --> M040 : 承辦人開始處理"
     },
     {
       "id": "EV-0033",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L40",
-      "excerpt": "M040 --> M090"
+      "locator": "status-CASE_STATUS.md#L26",
+      "excerpt": "N010 -->|主流程| M040"
     },
     {
       "id": "EV-0034",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L13",
-      "excerpt": "N040 -->|撤案| N090"
+      "locator": "status-CASE_STATUS.md#L60",
+      "excerpt": "M040 --> M050 : 文件審查與付款都完成，且已上傳結案報告"
     },
     {
       "id": "EV-0035",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L24",
-      "excerpt": "[*] --> D010"
+      "locator": "status-CASE_STATUS.md#L27",
+      "excerpt": "M040 -->|主流程| M050"
     },
     {
       "id": "EV-0036",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L25",
-      "excerpt": "D010 --> D090"
+      "locator": "status-CASE_STATUS.md#L61",
+      "excerpt": "M050 --> M060 : 主管覆核完成"
     },
     {
       "id": "EV-0037",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L30",
-      "excerpt": "[*] --> P010"
+      "locator": "status-CASE_STATUS.md#L28",
+      "excerpt": "M050 -->|主流程| N060[\"060 結案\"]"
     },
     {
       "id": "EV-0038",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L31",
-      "excerpt": "P010 --> P090"
+      "locator": "status-CASE_STATUS.md#L62",
+      "excerpt": "M010 --> M090 : 承辦人撤案"
     },
     {
       "id": "EV-0039",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L9",
-      "excerpt": "START((開始)) -->|主流程| N010[\"010 受理\"]"
+      "locator": "status-CASE_STATUS.md#L29",
+      "excerpt": "N010 -->|撤案| N090[\"090 撤案\"]"
     },
     {
       "id": "EV-0040",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L12",
-      "excerpt": "N010 -->|撤案| N090[\"090 撤案\"]"
+      "locator": "status-CASE_STATUS.md#L63",
+      "excerpt": "M040 --> M090 : 承辦人撤案，不必等文件審查與付款"
     },
     {
       "id": "EV-0041",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L43",
-      "excerpt": "M040 : 承辦人上傳結案報告"
+      "locator": "status-CASE_STATUS.md#L30",
+      "excerpt": "M040 -->|撤案| N090"
     },
     {
       "id": "EV-0042",
       "kind": "STATUS_DOC",
-      "locator": "status-CASE_STATUS.md#L44",
-      "excerpt": "D010 : 審查人員逐份審查文件"
+      "locator": "status-CASE_STATUS.md#L39",
+      "excerpt": "[*] --> D010"
     },
     {
       "id": "EV-0043",
       "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L11",
+      "excerpt": "DS((開始)) -->|文件審查| D010[\"010 待審查\"]"
+    },
+    {
+      "id": "EV-0044",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L40",
+      "excerpt": "D010 --> D090"
+    },
+    {
+      "id": "EV-0045",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L12",
+      "excerpt": "D010 -->|文件審查| D090[\"090 審查完成\"]"
+    },
+    {
+      "id": "EV-0046",
+      "kind": "STATUS_DOC",
       "locator": "status-CASE_STATUS.md#L45",
-      "excerpt": "P010 : 會計人員依核定金額付款"
+      "excerpt": "[*] --> P010"
+    },
+    {
+      "id": "EV-0047",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L15",
+      "excerpt": "PS((開始)) -->|付款| P010[\"010 待付款\"]"
+    },
+    {
+      "id": "EV-0048",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L46",
+      "excerpt": "P010 --> P090"
+    },
+    {
+      "id": "EV-0049",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L16",
+      "excerpt": "P010 -->|付款| P090[\"090 已付款\"]"
+    },
+    {
+      "id": "EV-0050",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L52",
+      "excerpt": "[*] --> A010"
+    },
+    {
+      "id": "EV-0051",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L21",
+      "excerpt": "AS((開始)) -->|主管覆核| A010[\"010 待覆核\"]"
+    },
+    {
+      "id": "EV-0052",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L53",
+      "excerpt": "A010 --> A090"
+    },
+    {
+      "id": "EV-0053",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L22",
+      "excerpt": "A010 -->|主管覆核| A090[\"090 覆核完成\"]"
+    },
+    {
+      "id": "EV-0054",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L25",
+      "excerpt": "START((開始)) -->|主流程| N010[\"010 受理\"]"
+    },
+    {
+      "id": "EV-0055",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L29",
+      "excerpt": "N010 -->|撤案| N090[\"090 撤案\"]"
+    },
+    {
+      "id": "EV-0056",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L11",
+      "excerpt": "DS((開始)) -->|文件審查| D010[\"010 待審查\"]"
+    },
+    {
+      "id": "EV-0057",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L15",
+      "excerpt": "PS((開始)) -->|付款| P010[\"010 待付款\"]"
+    },
+    {
+      "id": "EV-0058",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L21",
+      "excerpt": "AS((開始)) -->|主管覆核| A010[\"010 待覆核\"]"
+    },
+    {
+      "id": "EV-0059",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L89",
+      "excerpt": "- 040 處理中：承辦人追蹤文件審查與付款，並上傳結案報告。"
+    },
+    {
+      "id": "EV-0060",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L89",
+      "excerpt": "- 040 處理中：承辦人追蹤文件審查與付款，並上傳結案報告。"
+    },
+    {
+      "id": "EV-0061",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L90",
+      "excerpt": "- 文件審查 010 待審查：審查人員逐份審查文件。"
+    },
+    {
+      "id": "EV-0062",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L91",
+      "excerpt": "- 付款 010 待付款：會計人員依核定金額付款。"
+    },
+    {
+      "id": "EV-0063",
+      "kind": "STATUS_DOC",
+      "locator": "status-CASE_STATUS.md#L92",
+      "excerpt": "- 050 結案審核：主管確認案件資料完整後按「覆核完成」。"
     }
   ]
 }

@@ -20,12 +20,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
+      "fingerprint": "d4d96ae0e37df0e49d1ca709b9aad13d3a14fabda035a0faa6a45861975dcbce"
     },
     {
       "kind": "STATUS_DOC",
       "ref": "status-REQ_STATUS.md",
-      "fingerprint": "5b863630e30b3c5ab00039b105579cc387479b781219cdcb6b4f0d3efc2fc7f7"
+      "fingerprint": "6c983bb460930855f133b711a7f7a9cbe9ed4cd3bbd7a8c9d7a652067871024c"
     },
     {
       "kind": "RESEARCH_RECEIPT",
@@ -44,33 +44,52 @@
   "diagramSources": [
     {
       "entityKey": "REQ_STATUS",
-      "flowchart": "status-REQ_STATUS.md#L7-L20",
-      "stateDiagram": "status-REQ_STATUS.md#L24-L49",
-      "fingerprint": "5b863630e30b3c5ab00039b105579cc387479b781219cdcb6b4f0d3efc2fc7f7"
+      "parts": [
+        {
+          "diagram": "FLOWCHART",
+          "locator": "status-REQ_STATUS.md#L7-L20",
+          "scope": "WHOLE"
+        },
+        {
+          "diagram": "STATE_DIAGRAM",
+          "locator": "status-REQ_STATUS.md#L24-L46",
+          "scope": "WHOLE"
+        }
+      ],
+      "fingerprint": "6c983bb460930855f133b711a7f7a9cbe9ed4cd3bbd7a8c9d7a652067871024c"
     }
   ],
-  "diagramTexts": [
+  "statusTexts": [
     {
-      "locator": "status-REQ_STATUS.md#L46",
-      "text": "直屬主管審核申請內容",
-      "disposition": "ACTIVITY",
-      "activities": [
+      "locator": "status-REQ_STATUS.md#L3",
+      "text": "本檔是 STATUS 權威文件的合成範例。所有狀態圖寫在同一份檔案；這個範例只有一個狀態實體（申請單的狀態），同時提供 flowchart 與 stateDiagram-v2。",
+      "disposition": "NO_SPEC_CONTENT",
+      "note": "說明這份檔案的內容，沒有規格內容。"
+    },
+    {
+      "locator": "status-REQ_STATUS.md#L50",
+      "text": "020 待主管審核：直屬主管審核申請內容。",
+      "disposition": "MAPPED",
+      "items": [
         "ACT-001"
       ]
     },
     {
-      "locator": "status-REQ_STATUS.md#L47",
-      "text": "部門主管審核",
-      "disposition": "ACTIVITY",
-      "activities": [
+      "locator": "status-REQ_STATUS.md#L51",
+      "text": "025 待部門主管審核：部門主管審核。",
+      "disposition": "MAPPED",
+      "items": [
         "ACT-002"
       ]
     },
     {
-      "locator": "status-REQ_STATUS.md#L48",
-      "text": "作廢的申請單不能再修改",
-      "disposition": "NOT_ACTIVITY",
-      "note": "描述終點的性質，不是某人在這個階段要做的事；已由 090 的終點標記與 05 的按鈕顯示條件表達。"
+      "locator": "status-REQ_STATUS.md#L52",
+      "text": "090 作廢：作廢的申請單不能再修改。",
+      "disposition": "MAPPED",
+      "items": [
+        "STATE-006"
+      ],
+      "note": "090 是終點；畫面在 090 不顯示送出與撤回按鈕（見 05）。"
     }
   ],
   "items": [

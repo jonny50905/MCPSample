@@ -9,7 +9,7 @@
 
 | ID | Record | 欄位 | 資料剖析 |
 |---|---|---|---|
-| XF-001 | TW_DEMO_REQHDR | OLD_REF_NO、PRIORITY_CD | 非預設 0 筆（全表非空，查詢日 2026-10-01） |
+| XF-001 | TW_DEMO_REQHDR | OLD_REF_NO、PRIORITY_CD、BUDGET_CODE | 非預設 0 筆（全表非空，查詢日 2026-10-01） |
 
 重建時這些欄位不建資料欄、不上畫面、不寫規則。
 
@@ -52,7 +52,7 @@
 ### ENT-003　TW_DEMO_REQHDR
 
 - 自然鍵：`TW_DEMO_REQHDR`
-- 對應的 Record：OBJ-018（TW_DEMO_REQHDR）
+- 對應的 Record：OBJ-019（TW_DEMO_REQHDR）
 - 業務名稱：申請單
 - 這份資料代表什麼：一張申請單一列；狀態、金額、事由與審核結果都在這裡。
 - 儲存型態：SQL_TABLE
@@ -503,11 +503,11 @@
 
 - 自然鍵：`TW_DEMO_REQHDR`
 - 所屬實體：ENT-003（TW_DEMO_REQHDR）
-- 判定無用的欄位：OLD_REF_NO、PRIORITY_CD
+- 判定無用的欄位：OLD_REF_NO、PRIORITY_CD、BUDGET_CODE
 - 資料剖析結論：非預設 0 筆（全表非空，查詢日 2026-10-01）
 - 程式面查法結果：
-  - 查法 a：PeopleCode 交叉參照：核心路徑沒有指名引用。
-  - 查法 b：核心路徑沒有 AE、SQR 或 SQL 物件讀寫這兩欄。
+  - 查法 a：PeopleCode 交叉參照：OLD_REF_NO、PRIORITY_CD 沒有引用；BUDGET_CODE 只在 TW_DEMO_REQHDR.AMOUNT.SaveEdit 已證明不會執行的分支內被讀取（見 90 的 NATIVE_UNUSED_BRANCH），不算引用。
+  - 查法 b：核心路徑沒有 AE、SQR 或 SQL 物件讀寫這三欄。
   - 查法 c：既有研究文件沒有指名引用的紀錄。
 - 來源：資料；證據 EV-0012、EV-0013
 - 被引用（外環反查）：DOD-001

@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "draft",
   "title": "03 角色與權限",
-  "summary": "角色 3（守門範例，只跑部分檢核）",
+  "summary": "角色 4（守門範例，只跑部分檢核）",
   "components": [
     "TW_DEMO_CASE",
     "TW_DEMO_DOCREV",
@@ -19,7 +19,7 @@
     {
       "kind": "STATUS_DOC",
       "ref": "status-CASE_STATUS.md",
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     }
   ],
   "gate": {
@@ -41,7 +41,7 @@
         "EV-0003"
       ],
       "principalType": "ROLE",
-      "object": "OBJ-008",
+      "object": "OBJ-009",
       "name": "會計人員",
       "membership": {
         "kind": "STATIC_ASSIGNMENT",
@@ -58,7 +58,7 @@
         "EV-0003"
       ],
       "principalType": "ROLE",
-      "object": "OBJ-009",
+      "object": "OBJ-010",
       "name": "承辦人",
       "membership": {
         "kind": "STATIC_ASSIGNMENT",
@@ -75,8 +75,25 @@
         "EV-0003"
       ],
       "principalType": "ROLE",
-      "object": "OBJ-010",
+      "object": "OBJ-011",
       "name": "審查人員",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "由系統管理者指派；指派作業不在本範例範圍。"
+      }
+    },
+    {
+      "id": "ROLE-004",
+      "key": "ROLE:TW_DEMO_SUPV",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "principalType": "ROLE",
+      "object": "OBJ-012",
+      "name": "主管",
       "membership": {
         "kind": "STATIC_ASSIGNMENT",
         "note": "由系統管理者指派；指派作業不在本範例範圍。"

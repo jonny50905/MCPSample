@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "draft",
   "title": "14 測試與驗收",
-  "summary": "測試案例 5（守門範例，只跑部分檢核）",
+  "summary": "測試案例 7（守門範例，只跑部分檢核）",
   "components": [
     "TW_DEMO_CASE",
     "TW_DEMO_DOCREV",
@@ -22,7 +22,7 @@
     {
       "kind": "STATUS_DOC",
       "ref": "status-CASE_STATUS.md",
-      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+      "fingerprint": "15cd6af36129f9fde640a9c04dc08dc9c8beee43fe2b0abe9ca9dd84bfaf611e"
     }
   ],
   "gate": {
@@ -36,7 +36,7 @@
   "items": [
     {
       "id": "TC-001",
-      "key": "TW_DEMO_CASE:UPLOAD_REPORT:BOUNDARY:NO_DOCUMENTS",
+      "key": "TW_DEMO_CASE:SUPV_REVIEW:NEGATIVE:NOT_SUPERVISOR",
       "lifecycle": "ACTIVE",
       "component": "TW_DEMO_CASE",
       "basis": "DERIVED",
@@ -45,19 +45,17 @@
       "derivedFrom": [
         "FR-001"
       ],
-      "name": "沒有任何文件時上傳報告也不會結案",
-      "scenarioType": "BOUNDARY",
+      "name": "不是主管的人不能覆核，案件停在 050",
+      "scenarioType": "NEGATIVE",
       "fr": "FR-001",
       "covers": {
         "transitions": [
-          "TRN-008"
-        ],
-        "activities": [
-          "ACT-003"
+          "TRN-002",
+          "TRN-012"
         ]
       },
       "preconditions": {
-        "state": "STATE-006",
+        "state": "STATE-009",
         "actor": {
           "left": {
             "ctx": "CURRENT_USER_OPRID"
@@ -69,21 +67,142 @@
         },
         "data": [
           {
-            "field": "FLD-002",
-            "value": "040"
+            "field": "FLD-003",
+            "value": "050"
+          },
+          {
+            "field": "FLD-001",
+            "value": "010"
+          }
+        ],
+        "synthetic": true
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以承辦人（沒有主管角色）開啟案件，嘗試按「覆核完成」"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-009",
+        "noDataChange": true
+      },
+      "verification": "畫面不提供「覆核完成」按鈕；主管覆核狀態仍為 010，案件仍為 050。"
+    },
+    {
+      "id": "TC-002",
+      "key": "TW_DEMO_CASE:SUPV_REVIEW:POSITIVE:REVIEW_CLOSES",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_CASE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-001"
+      ],
+      "name": "主管覆核完成時自動結案",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-001",
+      "covers": {
+        "transitions": [
+          "TRN-002",
+          "TRN-012"
+        ]
+      },
+      "preconditions": {
+        "state": "STATE-009",
+        "actor": {
+          "left": {
+            "ctx": "CURRENT_USER_OPRID"
+          },
+          "op": "HAS_ROLE",
+          "right": {
+            "role": "ROLE-004"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-003",
+            "value": "050"
+          },
+          {
+            "field": "FLD-001",
+            "value": "010"
+          }
+        ],
+        "synthetic": true
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以主管開啟案件並按「覆核完成」"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-010",
+        "data": [
+          {
+            "field": "FLD-001",
+            "value": "090"
           },
           {
             "field": "FLD-004",
+            "value": "測試當日"
+          }
+        ]
+      },
+      "verification": "主管覆核狀態為 090；案件為 060、CLOSE_DT＝測試當日；承辦人收到結案通知。"
+    },
+    {
+      "id": "TC-003",
+      "key": "TW_DEMO_CASE:UPLOAD_REPORT:BOUNDARY:NO_DOCUMENTS",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_CASE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-002"
+      ],
+      "name": "沒有任何文件時上傳報告也不會轉入 050",
+      "scenarioType": "BOUNDARY",
+      "fr": "FR-002",
+      "covers": {
+        "transitions": [
+          "TRN-010"
+        ],
+        "activities": [
+          "ACT-005"
+        ]
+      },
+      "preconditions": {
+        "state": "STATE-008",
+        "actor": {
+          "left": {
+            "ctx": "CURRENT_USER_OPRID"
+          },
+          "op": "HAS_ROLE",
+          "right": {
+            "role": "ROLE-002"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-003",
+            "value": "040"
+          },
+          {
+            "field": "FLD-005",
             "value": " ",
             "note": "尚未上傳"
           },
           {
-            "field": "FLD-005",
+            "field": "FLD-006",
             "value": "（沒有任何一列）",
             "note": "此案件沒有文件"
           },
           {
-            "field": "FLD-008",
+            "field": "FLD-009",
             "value": "（沒有任何一列）",
             "note": "此案件沒有付款"
           }
@@ -96,17 +215,17 @@
           "action": "以承辦人上傳結案報告並存檔",
           "inputs": [
             {
-              "field": "FLD-004",
+              "field": "FLD-005",
               "value": "RPT0001"
             }
           ]
         }
       ],
       "expected": {
-        "resultState": "STATE-006",
+        "resultState": "STATE-008",
         "data": [
           {
-            "field": "FLD-004",
+            "field": "FLD-005",
             "value": "RPT0001"
           }
         ]
@@ -114,7 +233,7 @@
       "verification": "案件仍為 040：沒有任何文件時不算完成（whenEmpty＝NOT_MET）；沒有付款列則視為完成（whenEmpty＝MET）。"
     },
     {
-      "id": "TC-002",
+      "id": "TC-004",
       "key": "TW_DEMO_CASE:UPLOAD_REPORT:POSITIVE:REPORT_LAST",
       "lifecycle": "ACTIVE",
       "component": "TW_DEMO_CASE",
@@ -122,21 +241,21 @@
       "certainty": "CONFIRMED",
       "evidence": [],
       "derivedFrom": [
-        "FR-001"
+        "FR-002"
       ],
-      "name": "最後上傳結案報告時自動結案",
+      "name": "最後上傳結案報告時自動轉入 050",
       "scenarioType": "POSITIVE",
-      "fr": "FR-001",
+      "fr": "FR-002",
       "covers": {
         "transitions": [
-          "TRN-008"
+          "TRN-010"
         ],
         "activities": [
-          "ACT-003"
+          "ACT-005"
         ]
       },
       "preconditions": {
-        "state": "STATE-006",
+        "state": "STATE-008",
         "actor": {
           "left": {
             "ctx": "CURRENT_USER_OPRID"
@@ -148,21 +267,21 @@
         },
         "data": [
           {
-            "field": "FLD-002",
+            "field": "FLD-003",
             "value": "040"
           },
           {
-            "field": "FLD-004",
+            "field": "FLD-005",
             "value": " ",
             "note": "尚未上傳"
           },
           {
-            "field": "FLD-007",
+            "field": "FLD-008",
             "value": "090",
             "note": "文件第 1 列"
           },
           {
-            "field": "FLD-011",
+            "field": "FLD-012",
             "value": "090",
             "note": "付款第 1 列"
           }
@@ -175,25 +294,25 @@
           "action": "以承辦人上傳結案報告並存檔",
           "inputs": [
             {
-              "field": "FLD-004",
+              "field": "FLD-005",
               "value": "RPT0001"
             }
           ]
         }
       ],
       "expected": {
-        "resultState": "STATE-007",
+        "resultState": "STATE-009",
         "data": [
           {
-            "field": "FLD-003",
-            "value": "測試當日"
+            "field": "FLD-001",
+            "value": "010"
           }
         ]
       },
-      "verification": "案件為 050、CLOSE_DT＝測試當日；承辦人收到結案通知。"
+      "verification": "案件為 050、主管覆核狀態為 010。"
     },
     {
-      "id": "TC-003",
+      "id": "TC-005",
       "key": "TW_DEMO_PAYMNT:PAY:NEGATIVE:DOC_PENDING",
       "lifecycle": "ACTIVE",
       "component": "TW_DEMO_PAYMNT",
@@ -201,19 +320,19 @@
       "certainty": "CONFIRMED",
       "evidence": [],
       "derivedFrom": [
-        "FR-003"
+        "FR-004"
       ],
-      "name": "文件尚未審查完成時，付款完成不會結案",
+      "name": "文件尚未審查完成時，付款完成不會轉入 050",
       "scenarioType": "NEGATIVE",
-      "fr": "FR-003",
+      "fr": "FR-004",
       "covers": {
         "transitions": [
-          "TRN-004",
-          "TRN-008"
+          "TRN-006",
+          "TRN-010"
         ]
       },
       "preconditions": {
-        "state": "STATE-006",
+        "state": "STATE-008",
         "actor": {
           "left": {
             "ctx": "CURRENT_USER_OPRID"
@@ -225,20 +344,20 @@
         },
         "data": [
           {
-            "field": "FLD-002",
+            "field": "FLD-003",
             "value": "040"
           },
           {
-            "field": "FLD-004",
+            "field": "FLD-005",
             "value": "RPT0001"
           },
           {
-            "field": "FLD-007",
+            "field": "FLD-008",
             "value": "010",
             "note": "文件第 1 列"
           },
           {
-            "field": "FLD-011",
+            "field": "FLD-012",
             "value": "010",
             "note": "付款第 1 列"
           }
@@ -252,10 +371,10 @@
         }
       ],
       "expected": {
-        "resultState": "STATE-006",
+        "resultState": "STATE-008",
         "data": [
           {
-            "field": "FLD-011",
+            "field": "FLD-012",
             "value": "090"
           }
         ]
@@ -263,7 +382,7 @@
       "verification": "付款第 1 列為 090；案件仍為 040（文件第 1 列尚未審查完成）。"
     },
     {
-      "id": "TC-004",
+      "id": "TC-006",
       "key": "TW_DEMO_PAYMNT:PAY:NEGATIVE:REPORT_MISSING",
       "lifecycle": "ACTIVE",
       "component": "TW_DEMO_PAYMNT",
@@ -271,21 +390,21 @@
       "certainty": "CONFIRMED",
       "evidence": [],
       "derivedFrom": [
-        "FR-003"
+        "FR-004"
       ],
-      "name": "尚未上傳結案報告時，付款完成不會結案",
+      "name": "尚未上傳結案報告時，付款完成不會轉入 050",
       "scenarioType": "NEGATIVE",
-      "fr": "FR-003",
+      "fr": "FR-004",
       "covers": {
         "transitions": [
-          "TRN-008"
+          "TRN-010"
         ],
         "activities": [
-          "ACT-003"
+          "ACT-005"
         ]
       },
       "preconditions": {
-        "state": "STATE-006",
+        "state": "STATE-008",
         "actor": {
           "left": {
             "ctx": "CURRENT_USER_OPRID"
@@ -297,21 +416,21 @@
         },
         "data": [
           {
-            "field": "FLD-002",
+            "field": "FLD-003",
             "value": "040"
           },
           {
-            "field": "FLD-004",
+            "field": "FLD-005",
             "value": " ",
             "note": "尚未上傳"
           },
           {
-            "field": "FLD-007",
+            "field": "FLD-008",
             "value": "090",
             "note": "文件第 1 列"
           },
           {
-            "field": "FLD-011",
+            "field": "FLD-012",
             "value": "010",
             "note": "付款第 1 列"
           }
@@ -325,10 +444,10 @@
         }
       ],
       "expected": {
-        "resultState": "STATE-006",
+        "resultState": "STATE-008",
         "data": [
           {
-            "field": "FLD-011",
+            "field": "FLD-012",
             "value": "090"
           }
         ]
@@ -336,7 +455,7 @@
       "verification": "付款第 1 列為 090；案件仍為 040（結案報告未上傳）。"
     },
     {
-      "id": "TC-005",
+      "id": "TC-007",
       "key": "TW_DEMO_PAYMNT:PAY:POSITIVE:PAY_LAST",
       "lifecycle": "ACTIVE",
       "component": "TW_DEMO_PAYMNT",
@@ -344,19 +463,19 @@
       "certainty": "CONFIRMED",
       "evidence": [],
       "derivedFrom": [
-        "FR-003"
+        "FR-004"
       ],
-      "name": "最後一筆付款完成時自動結案",
+      "name": "最後一筆付款完成時自動轉入 050",
       "scenarioType": "POSITIVE",
-      "fr": "FR-003",
+      "fr": "FR-004",
       "covers": {
         "transitions": [
-          "TRN-004",
-          "TRN-008"
+          "TRN-006",
+          "TRN-010"
         ]
       },
       "preconditions": {
-        "state": "STATE-006",
+        "state": "STATE-008",
         "actor": {
           "left": {
             "ctx": "CURRENT_USER_OPRID"
@@ -368,20 +487,20 @@
         },
         "data": [
           {
-            "field": "FLD-002",
+            "field": "FLD-003",
             "value": "040"
           },
           {
-            "field": "FLD-004",
+            "field": "FLD-005",
             "value": "RPT0001"
           },
           {
-            "field": "FLD-007",
+            "field": "FLD-008",
             "value": "090",
             "note": "文件第 1 列"
           },
           {
-            "field": "FLD-011",
+            "field": "FLD-012",
             "value": "010",
             "note": "付款第 1 列"
           }
@@ -395,19 +514,19 @@
         }
       ],
       "expected": {
-        "resultState": "STATE-007",
+        "resultState": "STATE-009",
         "data": [
           {
-            "field": "FLD-011",
+            "field": "FLD-012",
             "value": "090"
           },
           {
-            "field": "FLD-003",
-            "value": "測試當日"
+            "field": "FLD-001",
+            "value": "010"
           }
         ]
       },
-      "verification": "付款第 1 列為 090；案件為 050、CLOSE_DT＝測試當日。"
+      "verification": "付款第 1 列為 090；案件為 050、主管覆核狀態為 010。"
     }
   ]
 }

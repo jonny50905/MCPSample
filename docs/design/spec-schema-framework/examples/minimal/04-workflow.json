@@ -23,12 +23,22 @@
   "diagramSources": [
     {
       "entityKey": "REQ_STATUS",
-      "flowchart": "status-REQ_STATUS.md#L7-L20",
-      "stateDiagram": "status-REQ_STATUS.md#L24-L49",
-      "fingerprint": "5b863630e30b3c5ab00039b105579cc387479b781219cdcb6b4f0d3efc2fc7f7"
+      "parts": [
+        {
+          "diagram": "FLOWCHART",
+          "locator": "status-REQ_STATUS.md#L7-L20",
+          "scope": "WHOLE"
+        },
+        {
+          "diagram": "STATE_DIAGRAM",
+          "locator": "status-REQ_STATUS.md#L24-L46",
+          "scope": "WHOLE"
+        }
+      ],
+      "fingerprint": "6c983bb460930855f133b711a7f7a9cbe9ed4cd3bbd7a8c9d7a652067871024c"
     }
   ],
-  "diagramTexts": [],
+  "statusTexts": [],
   "items": [
     {
       "id": "STATE-003",
