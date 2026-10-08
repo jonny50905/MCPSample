@@ -78,7 +78,7 @@ $rows = $null
 foreach ($it in $d['items']) {
     if (-not ([string]$it['id']).StartsWith('TRN-')) { continue }
     $g = $it['guard']
-    if ($g -is [hashtable] -and $g.ContainsKey('all')) { foreach ($c in $g['all']) { if ($c -is [hashtable] -and $c.ContainsKey('rows')) { $rows = $c; break } } }
+    if ($g -is [System.Collections.IDictionary] -and $g.Contains('all')) { foreach ($c in $g['all']) { if ($c -is [System.Collections.IDictionary] -and $c.Contains('rows')) { $rows = $c; break } } }
     if ($null -ne $rows) { break }
 }
 Assert-Sd ($null -ne $rows) '範例有逐列條件'
@@ -188,6 +188,13 @@ foreach ($f in $sdocFiles) {
     }
 }
 Assert-Sd ($clash.Count -eq 0) ('同一函式內沒有只差大小寫的變數（' + $sdocFiles.Count + ' 支）') (($clash | Select-Object -Unique) -join '；')
+# PowerShell 把 U+2018／U+2019／U+201C／U+201D 等彎引號當成引號：寫進字串會把字串提早結束
+$smart = @()
+foreach ($f in @($sdocFiles) + @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*sdoc*.ps1' -File)) {
+    $tx = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+    foreach ($cp in @(0x2018, 0x2019, 0x201A, 0x201B, 0x201C, 0x201D, 0x201E)) { if ($tx.IndexOf([char]$cp) -ge 0) { $smart += $f.Name } }
+}
+Assert-Sd ($smart.Count -eq 0) '沒有彎引號（PowerShell 會當成引號）' (($smart | Select-Object -Unique) -join '、')
 foreach ($rel in @('scripts/ps-sdoc-schema-lib.ps1', 'scripts/ps-sdoc-status-lib.ps1', 'scripts/tests/test-sdoc.ps1')) {
     $b = [System.IO.File]::ReadAllBytes((Join-Path $repo $rel))
     Assert-Sd ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) ('UTF-8 BOM：' + $rel)

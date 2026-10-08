@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-sdoc:schema:review",
+  "title": "證據覆核（L4）",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "attemptId",
+    "unit",
+    "subject",
+    "page",
+    "inputHash",
+    "verdict",
+    "checkedKeys",
+    "findings",
+    "summary"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^clone-[0-9a-f]{16}$"
+    },
+    "attemptId": {
+      "type": "string",
+      "pattern": "^a[0-9]{4,8}$"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "scope",
+        "data",
+        "security",
+        "texts",
+        "workflow",
+        "interfaces",
+        "functions",
+        "ui",
+        "rules",
+        "operations",
+        "testing"
+      ]
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.$#-]{0,59}$"
+    },
+    "page": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "inputHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "BLOCKED"
+      ]
+    },
+    "checkedKeys": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "項目的「型別/自然鍵」，或 TOPIC"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "MISSING_DETAIL",
+              "MISSING_BRANCH",
+              "EVIDENCE_MISMATCH",
+              "SCOPE_NOISE",
+              "CONTRADICTION",
+              "LANGUAGE",
+              "TOOL_BLOCKED",
+              "VAGUE_TERM",
+              "INFERENCE_UNSUPPORTED",
+              "DUPLICATE_KEY"
+            ]
+          },
+          "detail": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/text"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "$ref": "urn:ps-spec:schema:common#/$defs/text"
+    }
+  },
+  "additionalProperties": false
+}

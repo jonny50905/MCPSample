@@ -238,9 +238,9 @@ function Get-PsSdReadingFacts {
     foreach ($o in @($Reading['otherLines'])) {
         if ([string]$o['disposition'] -ne 'TEXT') { continue }
         $e = $null
-        if ($o.ContainsKey('entity')) { $e = [string]$o['entity']; if ($KeyMap.ContainsKey($e)) { $e = $KeyMap[$e] } }
+        if ($o.Contains('entity')) { $e = [string]$o['entity']; if ($KeyMap.ContainsKey($e)) { $e = $KeyMap[$e] } }
         $c = $null
-        if ($o.ContainsKey('code')) { $c = [string]$o['code'] }
+        if ($o.Contains('code')) { $c = [string]$o['code'] }
         foreach ($ln in @($o['lines'])) { & $add (New-PsSdFact @('TEXT', [int]$ln, $e, $c)) @([int]$ln) }
     }
     foreach ($cf in @($Reading['conflicts'])) {

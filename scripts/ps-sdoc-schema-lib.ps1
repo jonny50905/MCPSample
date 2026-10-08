@@ -2,7 +2,7 @@
 # 支援：type、enum、const、properties、required、additionalProperties、unevaluatedProperties、items、minItems、maxItems、
 #       uniqueItems、contains、pattern、minLength、maxLength、minimum、maximum、minProperties、allOf、anyOf、oneOf、not、
 #       if／then／else、$ref（同檔 #/... 與跨檔 urn:...#/...）、$defs。其他關鍵字忽略。
-# 值：ConvertFrom-Json 的結果（PSCustomObject／object[]）或 IDictionary／IList；驗證前先轉成區分大小寫的 Hashtable 與 object[]。
+# 值：ConvertFrom-Json 的結果（PSCustomObject／object[]）或 IDictionary／IList；驗證前先轉成區分大小寫的 OrderedDictionary 與 object[]。
 # pattern 用 .NET regex；結尾的 $ 視為字串結尾（\z），結尾多一個換行也算不符。
 # 用法：$reg = Read-PsSdSchemaDir <目錄>；$errs = Test-PsSdSchema $reg 'urn:ps-spec:schema:04-workflow' $doc
 #       回傳錯誤字串陣列（空＝通過）；呼叫端先指派再 @($errs)。
@@ -13,6 +13,11 @@ $script:PsSdSchemaLibVersion = '1'
 function New-PsSdMap {
     # 區分大小寫的 Hashtable（JSON 的鍵區分大小寫）。
     return [hashtable]::new([System.StringComparer]::Ordinal)
+}
+
+function New-PsSdObject {
+    # 區分大小寫、保留插入順序的物件（JSON 物件的記憶體形狀；輸出時照這個順序）。
+    return [System.Collections.Specialized.OrderedDictionary]::new([System.StringComparer]::Ordinal)
 }
 
 function ConvertFrom-PsSdJson {
@@ -41,19 +46,19 @@ function Test-PsSdIsInteger {
 }
 
 function ConvertTo-PsSdNode {
-    # 轉成驗證用的形狀：物件→區分大小寫的 Hashtable，陣列→object[]；以 return , 值 回傳（陣列原樣保留）。
+    # 轉成記憶體形狀：物件→區分大小寫、保留順序的 OrderedDictionary，陣列→object[]；以 return , 值 回傳（陣列原樣保留）。
     param($V)
     if ($null -eq $V) { return $null }
     if ($V -is [string] -or $V -is [bool]) { return $V }
     if ($V -is [System.Collections.IDictionary]) {
-        $h = New-PsSdMap
+        $h = New-PsSdObject
         foreach ($k in @($V.Keys)) { $h[[string]$k] = ConvertTo-PsSdNode $V[$k] }
-        return $h
+        return , $h
     }
     if ($V -is [System.Management.Automation.PSCustomObject]) {
-        $h = New-PsSdMap
+        $h = New-PsSdObject
         foreach ($p in $V.PSObject.Properties) { $h[$p.Name] = ConvertTo-PsSdNode $p.Value }
-        return $h
+        return , $h
     }
     if ($V -is [System.Collections.IList]) {
         $n = $V.Count
@@ -69,17 +74,20 @@ function New-PsSdSchemaRegistry {
     $map = New-PsSdMap
     foreach ($s in $Schemas) {
         $c = ConvertTo-PsSdNode $s
-        if (-not ($c -is [hashtable]) -or -not $c.ContainsKey('$id')) { throw 'SCHEMA_ID_MISSING' }
+        if (-not ($c -is [System.Collections.IDictionary]) -or -not $c.Contains('$id')) { throw 'SCHEMA_ID_MISSING' }
         $map[[string]$c['$id']] = $c
     }
     return @{ Schemas = $map; RefCache = (New-PsSdMap); Regex = (New-PsSdMap) }
 }
 
 function Read-PsSdSchemaDir {
-    param([string]$Dir)
+    # 一個或多個目錄的 *.json 全部載入同一個 registry。
+    param([string[]]$Dir)
     $list = New-Object System.Collections.ArrayList
-    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -Filter '*.json' -File | Sort-Object Name)) {
-        [void]$list.Add((Read-PsSdJsonFile $f.FullName))
+    foreach ($d in $Dir) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $d -Filter '*.json' -File | Sort-Object Name)) {
+            [void]$list.Add((Read-PsSdJsonFile $f.FullName))
+        }
     }
     return (New-PsSdSchemaRegistry $list.ToArray())
 }
@@ -115,7 +123,7 @@ function Get-PsSdTypeName {
     if ($V -is [string]) { return 'string' }
     if (Test-PsSdIsInteger $V) { return 'integer' }
     if (Test-PsSdIsNumber $V) { return 'number' }
-    if ($V -is [hashtable]) { return 'object' }
+    if ($V -is [System.Collections.IDictionary]) { return 'object' }
     if ($V -is [object[]]) { return 'array' }
     return 'unknown'
 }
@@ -124,7 +132,7 @@ function Test-PsSdType {
     param($V, [string]$T)
     switch ($T) {
         'string' { return ($V -is [string]) }
-        'object' { return ($V -is [hashtable]) }
+        'object' { return ($V -is [System.Collections.IDictionary]) }
         'array' { return ($V -is [object[]]) }
         'integer' { return (Test-PsSdIsInteger $V) }
         'number' { return (Test-PsSdIsNumber $V) }
@@ -148,7 +156,7 @@ function Resolve-PsSdRef {
     if ($frag) {
         foreach ($raw in $frag.TrimStart('/').Split('/')) {
             $tok = $raw.Replace('~1', '/').Replace('~0', '~')
-            if (-not ($node -is [hashtable]) -or -not $node.ContainsKey($tok)) { throw ('SCHEMA_REF_UNKNOWN:' + $Ref) }
+            if (-not ($node -is [System.Collections.IDictionary]) -or -not $node.Contains($tok)) { throw ('SCHEMA_REF_UNKNOWN:' + $Ref) }
             $node = $node[$tok]
         }
     }
@@ -185,7 +193,7 @@ function Format-PsSdShort {
 function Invoke-PsSdValidate {
     param($Reg, $S, $V, [string]$Path, [string]$Base)
     $errs = [System.Collections.Generic.List[string]]::new()
-    $isObj = $V -is [hashtable]
+    $isObj = $V -is [System.Collections.IDictionary]
     $ev = $null
     if ($isObj) { $ev = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal) }
     $res = @{ Errors = $errs; Evaluated = $ev }
@@ -193,16 +201,16 @@ function Invoke-PsSdValidate {
         if (-not $S) { $w = $Path; if (-not $w) { $w = '（根）' }; $errs.Add($w + '：不允許出現') }
         return $res
     }
-    if (-not ($S -is [hashtable])) { return $res }
+    if (-not ($S -is [System.Collections.IDictionary])) { return $res }
     $where = $Path
     if (-not $where) { $where = '（根）' }
 
-    if ($S.ContainsKey('$ref')) {
+    if ($S.Contains('$ref')) {
         $t = Resolve-PsSdRef $Reg $Base ([string]$S['$ref'])
         $sub = Invoke-PsSdValidate $Reg $t.Schema $V $Path $t.BaseId
         if ($sub.Errors.Count -gt 0) { $errs.AddRange($sub.Errors) } elseif ($isObj) { $ev.UnionWith($sub.Evaluated) }
     }
-    if ($S.ContainsKey('type')) {
+    if ($S.Contains('type')) {
         $tv = $S['type']
         $ok = $false
         if ($tv -is [string]) { $ok = Test-PsSdType $V $tv }
@@ -214,14 +222,14 @@ function Invoke-PsSdValidate {
             return $res
         }
     }
-    if ($S.ContainsKey('const')) {
+    if ($S.Contains('const')) {
         $c = $S['const']
         $same = $false
         if ($c -is [string] -and $V -is [string]) { $same = ($c -ceq $V) }
         else { $same = ((ConvertTo-PsSdCanonical $c) -ceq (ConvertTo-PsSdCanonical $V)) }
         if (-not $same) { $errs.Add($where + '：必須是 ' + (ConvertTo-PsSdCanonical $c)) }
     }
-    if ($S.ContainsKey('enum')) {
+    if ($S.Contains('enum')) {
         $hit = $false
         $cv = $null
         foreach ($x in $S['enum']) {
@@ -238,54 +246,54 @@ function Invoke-PsSdValidate {
         }
     }
     if ($V -is [string]) {
-        if ($S.ContainsKey('pattern')) {
+        if ($S.Contains('pattern')) {
             $rx = Get-PsSdRegex $Reg ([string]$S['pattern'])
             if (-not $rx.IsMatch($V)) { $errs.Add($where + '：格式不符（' + [string]$S['pattern'] + '）：' + (Format-PsSdShort $V)) }
         }
-        if ($S.ContainsKey('minLength') -and $V.Length -lt [int]$S['minLength']) { $errs.Add($where + '：長度至少 ' + $S['minLength']) }
-        if ($S.ContainsKey('maxLength') -and $V.Length -gt [int]$S['maxLength']) { $errs.Add($where + '：長度最多 ' + $S['maxLength']) }
+        if ($S.Contains('minLength') -and $V.Length -lt [int]$S['minLength']) { $errs.Add($where + '：長度至少 ' + $S['minLength']) }
+        if ($S.Contains('maxLength') -and $V.Length -gt [int]$S['maxLength']) { $errs.Add($where + '：長度最多 ' + $S['maxLength']) }
     }
     elseif ($V -is [int] -or $V -is [long] -or $V -is [double] -or $V -is [decimal] -or $V -is [single] -or $V -is [int16] -or $V -is [byte]) {
-        if ($S.ContainsKey('minimum') -and [double]$V -lt [double]$S['minimum']) { $errs.Add($where + '：不得小於 ' + $S['minimum']) }
-        if ($S.ContainsKey('maximum') -and [double]$V -gt [double]$S['maximum']) { $errs.Add($where + '：不得大於 ' + $S['maximum']) }
+        if ($S.Contains('minimum') -and [double]$V -lt [double]$S['minimum']) { $errs.Add($where + '：不得小於 ' + $S['minimum']) }
+        if ($S.Contains('maximum') -and [double]$V -gt [double]$S['maximum']) { $errs.Add($where + '：不得大於 ' + $S['maximum']) }
     }
     elseif ($V -is [object[]]) {
         $n = $V.Length
-        if ($S.ContainsKey('minItems') -and $n -lt [int]$S['minItems']) { $errs.Add($where + '：至少 ' + $S['minItems'] + ' 項') }
-        if ($S.ContainsKey('maxItems') -and $n -gt [int]$S['maxItems']) { $errs.Add($where + '：最多 ' + $S['maxItems'] + ' 項') }
-        if ($S.ContainsKey('uniqueItems') -and $S['uniqueItems'] -eq $true) {
+        if ($S.Contains('minItems') -and $n -lt [int]$S['minItems']) { $errs.Add($where + '：至少 ' + $S['minItems'] + ' 項') }
+        if ($S.Contains('maxItems') -and $n -gt [int]$S['maxItems']) { $errs.Add($where + '：最多 ' + $S['maxItems'] + ' 項') }
+        if ($S.Contains('uniqueItems') -and $S['uniqueItems'] -eq $true) {
             $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
             foreach ($x in $V) {
                 $cx = ConvertTo-PsSdCanonical $x
                 if (-not $seen.Add($cx)) { $errs.Add($where + '：項目重複：' + (Format-PsSdShort $cx)); break }
             }
         }
-        if ($S.ContainsKey('items')) {
+        if ($S.Contains('items')) {
             $is = $S['items']
             for ($i = 0; $i -lt $n; $i++) {
                 $sub = Invoke-PsSdValidate $Reg $is $V[$i] ($Path + '[' + $i + ']') $Base
                 if ($sub.Errors.Count -gt 0) { $errs.AddRange($sub.Errors) }
             }
         }
-        if ($S.ContainsKey('contains')) {
+        if ($S.Contains('contains')) {
             $found = $false
             foreach ($x in $V) { $sub = Invoke-PsSdValidate $Reg $S['contains'] $x $Path $Base; if ($sub.Errors.Count -eq 0) { $found = $true; break } }
             if (-not $found) { $errs.Add($where + '：至少要有一項符合規定的形狀') }
         }
     }
     elseif ($isObj) {
-        if ($S.ContainsKey('minProperties') -and $V.Count -lt [int]$S['minProperties']) { $errs.Add($where + '：至少要有 ' + $S['minProperties'] + ' 個欄位') }
-        if ($S.ContainsKey('required')) {
-            foreach ($rq in $S['required']) { if (-not $V.ContainsKey([string]$rq)) { $errs.Add($where + '：缺必填欄位 ' + $rq) } }
+        if ($S.Contains('minProperties') -and $V.Count -lt [int]$S['minProperties']) { $errs.Add($where + '：至少要有 ' + $S['minProperties'] + ' 個欄位') }
+        if ($S.Contains('required')) {
+            foreach ($rq in $S['required']) { if (-not $V.Contains([string]$rq)) { $errs.Add($where + '：缺必填欄位 ' + $rq) } }
         }
         $props = $null
-        if ($S.ContainsKey('properties')) { $props = $S['properties'] }
+        if ($S.Contains('properties')) { $props = $S['properties'] }
         $names = [System.Collections.Generic.List[string]]::new()
         foreach ($k in $V.Keys) { $names.Add([string]$k) }
         $names.Sort([System.StringComparer]::Ordinal)
         if ($null -ne $props) {
             foreach ($nm in $names) {
-                if ($props.ContainsKey($nm)) {
+                if ($props.Contains($nm)) {
                     [void]$ev.Add($nm)
                     $cp = $nm
                     if ($Path) { $cp = $Path + '.' + $nm }
@@ -294,10 +302,10 @@ function Invoke-PsSdValidate {
                 }
             }
         }
-        if ($S.ContainsKey('additionalProperties')) {
+        if ($S.Contains('additionalProperties')) {
             $ap = $S['additionalProperties']
             foreach ($nm in $names) {
-                if ($null -ne $props -and $props.ContainsKey($nm)) { continue }
+                if ($null -ne $props -and $props.Contains($nm)) { continue }
                 [void]$ev.Add($nm)
                 if ($ap -is [bool]) {
                     if (-not $ap) { $errs.Add($where + '：不允許的欄位 ' + $nm) }
@@ -311,13 +319,13 @@ function Invoke-PsSdValidate {
         }
     }
 
-    if ($S.ContainsKey('allOf')) {
+    if ($S.Contains('allOf')) {
         foreach ($s0 in $S['allOf']) {
             $sub = Invoke-PsSdValidate $Reg $s0 $V $Path $Base
             if ($sub.Errors.Count -gt 0) { $errs.AddRange($sub.Errors) } elseif ($isObj) { $ev.UnionWith($sub.Evaluated) }
         }
     }
-    if ($S.ContainsKey('anyOf')) {
+    if ($S.Contains('anyOf')) {
         $results = [System.Collections.Generic.List[object]]::new()
         $okAny = $false
         foreach ($b in $S['anyOf']) {
@@ -327,7 +335,7 @@ function Invoke-PsSdValidate {
         }
         if (-not $okAny) { $errs.Add((Format-PsSdAlternatives $where $results)) }
     }
-    if ($S.ContainsKey('oneOf')) {
+    if ($S.Contains('oneOf')) {
         $results = [System.Collections.Generic.List[object]]::new()
         $valid = [System.Collections.Generic.List[object]]::new()
         foreach ($b in $S['oneOf']) {
@@ -339,23 +347,23 @@ function Invoke-PsSdValidate {
         elseif ($valid.Count -eq 0) { $errs.Add((Format-PsSdAlternatives $where $results)) }
         else { $errs.Add($where + '：同時符合 ' + $valid.Count + ' 種寫法，只能符合一種') }
     }
-    if ($S.ContainsKey('not')) {
+    if ($S.Contains('not')) {
         $sub = Invoke-PsSdValidate $Reg $S['not'] $V $Path $Base
         if ($sub.Errors.Count -eq 0) { $errs.Add($where + '：' + (Format-PsSdNot $S['not'] $V)) }
     }
-    if ($S.ContainsKey('if')) {
+    if ($S.Contains('if')) {
         $ifr = Invoke-PsSdValidate $Reg $S['if'] $V $Path $Base
         $branch = $null
         if ($ifr.Errors.Count -eq 0) {
             if ($isObj) { $ev.UnionWith($ifr.Evaluated) }
-            if ($S.ContainsKey('then')) { $branch = $S['then'] }
-        } elseif ($S.ContainsKey('else')) { $branch = $S['else'] }
+            if ($S.Contains('then')) { $branch = $S['then'] }
+        } elseif ($S.Contains('else')) { $branch = $S['else'] }
         if ($null -ne $branch) {
             $sub = Invoke-PsSdValidate $Reg $branch $V $Path $Base
             if ($sub.Errors.Count -gt 0) { $errs.AddRange($sub.Errors) } elseif ($isObj) { $ev.UnionWith($sub.Evaluated) }
         }
     }
-    if ($isObj -and $S.ContainsKey('unevaluatedProperties')) {
+    if ($isObj -and $S.Contains('unevaluatedProperties')) {
         $up = $S['unevaluatedProperties']
         $names2 = [System.Collections.Generic.List[string]]::new()
         foreach ($k in $V.Keys) { $names2.Add([string]$k) }
@@ -378,11 +386,11 @@ function Invoke-PsSdValidate {
 
 function Format-PsSdNot {
     param($NotSchema, $Value)
-    if ($NotSchema -is [hashtable]) {
-        if ($NotSchema.ContainsKey('required')) { return ('不得同時出現 ' + [string]::Join('、', [string[]]@($NotSchema['required']))) }
-        if ($NotSchema.ContainsKey('anyOf')) {
+    if ($NotSchema -is [System.Collections.IDictionary]) {
+        if ($NotSchema.Contains('required')) { return ('不得同時出現 ' + [string]::Join('、', [string[]]@($NotSchema['required']))) }
+        if ($NotSchema.Contains('anyOf')) {
             $names = [System.Collections.Generic.List[string]]::new()
-            foreach ($b in $NotSchema['anyOf']) { if ($b -is [hashtable] -and $b.ContainsKey('required')) { foreach ($x in $b['required']) { $names.Add([string]$x) } } }
+            foreach ($b in $NotSchema['anyOf']) { if ($b -is [System.Collections.IDictionary] -and $b.Contains('required')) { foreach ($x in $b['required']) { $names.Add([string]$x) } } }
             if ($names.Count -gt 0) { return ('不得出現 ' + [string]::Join('／', $names)) }
         }
     }
