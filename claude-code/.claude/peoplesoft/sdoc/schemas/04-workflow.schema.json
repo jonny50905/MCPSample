@@ -1,0 +1,1211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:04-workflow",
+  "title": "04 流程與狀態機",
+  "description": "項目型別：STATE（狀態）、TRN（狀態轉移）、FLOW（情境流程）、ACT（狀態活動）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "04-workflow"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/STATE"
+              },
+              {
+                "$ref": "#/$defs/TRN"
+              },
+              {
+                "$ref": "#/$defs/FLOW"
+              },
+              {
+                "$ref": "#/$defs/ACT"
+              }
+            ]
+          }
+        },
+        "statusReading": {
+          "type": "object",
+          "properties": {
+            "readers": {
+              "const": 3
+            },
+            "rounds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2
+            },
+            "mermaidLines": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "facts": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unanimous": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "contested": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "fact": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                  },
+                  "lines": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "#L\\d+(-L?\\d+)?$"
+                    },
+                    "minItems": 1
+                  },
+                  "round1": {
+                    "type": "string",
+                    "pattern": "^[0-3]:[0-3](:[0-3])?$"
+                  },
+                  "round2": {
+                    "type": "string",
+                    "pattern": "^[0-3]:[0-3](:[0-3])?$"
+                  },
+                  "result": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPTED",
+                      "REJECTED",
+                      "UNRESOLVED"
+                    ]
+                  }
+                },
+                "required": [
+                  "fact",
+                  "lines",
+                  "round1",
+                  "round2",
+                  "result"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "unresolved": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fingerprint": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/sha256"
+            }
+          },
+          "required": [
+            "readers",
+            "rounds",
+            "mermaidLines",
+            "facts",
+            "unanimous",
+            "contested",
+            "unresolved",
+            "fingerprint"
+          ],
+          "additionalProperties": false,
+          "description": "狀態圖解讀的比對摘要（外環計算）：Mermaid 行數、事實數、三份一致的事實數、第 2 輪表決的事實與結果"
+        },
+        "statusTexts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "locator",
+              "text",
+              "disposition"
+            ],
+            "properties": {
+              "locator": {
+                "type": "string",
+                "pattern": "#L\\d+(-L?\\d+)?$"
+              },
+              "text": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+              },
+              "disposition": {
+                "type": "string",
+                "enum": [
+                  "MAPPED",
+                  "NO_SPEC_CONTENT"
+                ]
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(STATE|TRN|FLOW|ACT)-\\d{3,}$"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "note": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/text"
+              }
+            },
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "disposition": {
+                      "const": "MAPPED"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "items"
+                  ]
+                },
+                "else": {
+                  "required": [
+                    "note"
+                  ],
+                  "not": {
+                    "required": [
+                      "items"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "description": "STATUS 文字的處置：MAPPED＝寫進了哪些 04 項目；NO_SPEC_CONTENT＝沒有規格內容並寫明理由",
+          "x-ref": [
+            "STATE",
+            "TRN",
+            "FLOW",
+            "ACT"
+          ]
+        }
+      },
+      "required": [
+        "statusReading",
+        "statusTexts"
+      ]
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "STATE": {
+      "type": "object",
+      "title": "STATE（狀態）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^STATE-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*:[^\\s:]+$",
+              "description": "自然鍵：<狀態實體>:<狀態碼>"
+            },
+            "entityKey": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/slug",
+              "description": "狀態實體代號（讀者給的大寫代號，取多數讀者用的那個）"
+            },
+            "stateKind": {
+              "type": "string",
+              "enum": [
+                "SIMPLE",
+                "COMPOSITE"
+              ],
+              "description": "狀態種類"
+            },
+            "code": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
+              "description": "狀態碼（儲存值）"
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
+              "description": "圖上的名稱（取多數讀者的寫法）"
+            },
+            "parent": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE",
+              "description": "所屬的主業務狀態（子業務的狀態填它在其中進行的那個狀態）",
+              "x-ref": [
+                "STATE"
+              ]
+            },
+            "regions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "entityKey": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                  },
+                  "finalStates": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "entityKey",
+                  "finalStates"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "在這個狀態裡進行的子業務：子業務的狀態實體與它的終點狀態",
+              "x-ref": [
+                "STATE"
+              ]
+            },
+            "binding": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refFLD",
+              "description": "保存狀態碼的欄位",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "domainLabel": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "值域中的顯示文字（Translate／對照表）"
+            },
+            "isInitialTarget": {
+              "type": "boolean",
+              "description": "是否為新建的進入點（子業務的進入點表示子業務資料的新建）"
+            },
+            "isFinal": {
+              "type": "boolean",
+              "description": "是否為終點（子業務的終點就是主業務守門時看的終點）"
+            },
+            "dataPresence": {
+              "type": "string",
+              "enum": [
+                "HAS_DATA",
+                "NO_DATA",
+                "NOT_CHECKED"
+              ],
+              "description": "PROD 是否有此狀態碼的資料"
+            }
+          },
+          "required": [
+            "entityKey",
+            "stateKind",
+            "name",
+            "isInitialTarget",
+            "isFinal"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "AUTHORITATIVE_DOC"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "stateKind"
+            ],
+            "properties": {
+              "stateKind": {
+                "const": "SIMPLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "code"
+            ],
+            "not": {
+              "required": [
+                "regions"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "required": [
+              "binding",
+              "domainLabel",
+              "dataPresence"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "regions"
+            ]
+          },
+          "then": {
+            "required": [
+              "code"
+            ]
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TRN": {
+      "type": "object",
+      "title": "TRN（狀態轉移）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^TRN-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*:[^\\s>]+>[^\\s>]+$",
+              "description": "自然鍵：<狀態實體>:<起>><迄>（新建的起點寫 *）"
+            },
+            "entityKey": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/slug",
+              "description": "狀態實體"
+            },
+            "from": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+                },
+                {
+                  "const": "INITIAL"
+                }
+              ],
+              "description": "起始狀態（新建為 INITIAL）",
+              "x-ref": [
+                "STATE"
+              ]
+            },
+            "to": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE",
+              "description": "目標狀態",
+              "x-ref": [
+                "STATE"
+              ]
+            },
+            "via": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+              },
+              "minItems": 1,
+              "description": "經過的判斷節點（菱形、choice 等；取多數讀者的寫法）"
+            },
+            "diagramLabels": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+              },
+              "minItems": 1,
+              "description": "圖上這條線的描述原文（情境類型以外的線上文字）；守衛與觸發必須與它一致"
+            },
+            "exitMode": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "NORMAL",
+                    "ON_COMPLETION",
+                    "INTERRUPT"
+                  ]
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "離開方式"
+            },
+            "trigger": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "object",
+                    "action"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "USER_ACTION",
+                        "BATCH",
+                        "SYSTEM_EVENT",
+                        "INTERFACE",
+                        "COMPLETION"
+                      ]
+                    },
+                    "object": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+                    },
+                    "action": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": [
+                        "FIELD_DEFAULT",
+                        "FIELD_FORMULA",
+                        "ROW_INIT",
+                        "ROW_INSERT",
+                        "ROW_DELETE",
+                        "ROW_SELECT",
+                        "FIELD_EDIT",
+                        "FIELD_CHANGE",
+                        "PREPOPUP",
+                        "SAVE_EDIT",
+                        "SAVE_PRE_CHANGE",
+                        "WORKFLOW",
+                        "SAVE_POST_CHANGE",
+                        "SEARCH_INIT",
+                        "SEARCH_SAVE",
+                        "PRE_BUILD",
+                        "POST_BUILD",
+                        "ACTIVATE",
+                        "BATCH_STEP"
+                      ]
+                    },
+                    "evaluatedAfter": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+                          },
+                          {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/refACT"
+                          }
+                        ]
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  },
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "const": "COMPLETION"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "evaluatedAfter"
+                        ]
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "USER_ACTION",
+                              "BATCH",
+                              "INTERFACE"
+                            ]
+                          }
+                        }
+                      },
+                      "then": {
+                        "not": {
+                          "required": [
+                            "evaluatedAfter"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "觸發方式、所在物件與動作原名（COMPLETION＝條件成立時由系統自動轉移）",
+              "x-ref": [
+                "OBJ",
+                "TRN",
+                "ACT"
+              ]
+            },
+            "actor": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "誰能觸發（角色、資格的判定方式）",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT"
+              ]
+            },
+            "guard": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "轉移條件（選擇此目標的條件；守門轉移要含每個子業務與守門活動，R13）",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT"
+              ]
+            },
+            "writes": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/assignment"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "轉移時寫入的欄位與值",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT"
+              ]
+            },
+            "sideEffects": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                      },
+                      "fields": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                        },
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "description",
+                      "fields"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "其他副作用（通知、介面等於 06／09 反查；INTERRUPT 要寫明未完成的子業務資料怎麼處理）",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "implementedAt": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "object": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+                      },
+                      "event": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                      }
+                    },
+                    "required": [
+                      "object",
+                      "event"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "原系統實作位置",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "reentry": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "重複觸發或同時操作時的行為"
+            }
+          },
+          "required": [
+            "entityKey",
+            "from",
+            "to",
+            "exitMode",
+            "trigger",
+            "actor",
+            "guard",
+            "writes",
+            "sideEffects",
+            "implementedAt",
+            "reentry"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "AUTHORITATIVE_DOC"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "via"
+            ]
+          },
+          "then": {
+            "properties": {
+              "guard": {
+                "not": {
+                  "required": [
+                    "na"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "exitMode"
+            ],
+            "properties": {
+              "exitMode": {
+                "const": "ON_COMPLETION"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "guard": {
+                "not": {
+                  "required": [
+                    "na"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "trigger"
+            ],
+            "properties": {
+              "trigger": {
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "not": {
+                      "enum": [
+                        "BATCH",
+                        "COMPLETION",
+                        "SYSTEM_EVENT"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "actor": {
+                "not": {
+                  "required": [
+                    "na"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "trigger"
+            ],
+            "properties": {
+              "trigger": {
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "COMPLETION"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "exitMode": {
+                "const": "ON_COMPLETION"
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "FLOW": {
+      "type": "object",
+      "title": "FLOW（情境流程）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^FLOW-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*:\\S.*$",
+              "description": "自然鍵：<狀態實體>:<情境類型原文>"
+            },
+            "entityKey": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/slug",
+              "description": "狀態實體"
+            },
+            "scenarioType": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
+              "description": "情境類型"
+            },
+            "narrative": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "情境說明"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "seq": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "transition": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+                  },
+                  "description": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                  }
+                },
+                "required": [
+                  "seq",
+                  "transition",
+                  "description"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "情境步驟（依拓撲順序）",
+              "x-ref": [
+                "TRN"
+              ]
+            },
+            "entryStates": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+                  },
+                  {
+                    "const": "INITIAL"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "進入此情境的狀態",
+              "x-ref": [
+                "STATE"
+              ]
+            },
+            "exitStates": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "離開此情境的狀態",
+              "x-ref": [
+                "STATE"
+              ]
+            },
+            "preconditions": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "前置條件",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT"
+              ]
+            },
+            "exceptions": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "例外與中斷"
+            }
+          },
+          "required": [
+            "entityKey",
+            "scenarioType",
+            "narrative",
+            "steps",
+            "entryStates",
+            "exitStates",
+            "preconditions",
+            "exceptions"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "AUTHORITATIVE_DOC"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ACT": {
+      "type": "object",
+      "title": "ACT（狀態活動）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^ACT-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*:[^\\s:]+:\\d{2}$",
+              "description": "自然鍵：<狀態實體>:<狀態碼>:<兩碼序號>"
+            },
+            "entityKey": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/slug",
+              "description": "狀態實體"
+            },
+            "state": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refSTATE",
+              "description": "活動所在的狀態",
+              "x-ref": [
+                "STATE"
+              ]
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "活動名稱"
+            },
+            "behavior": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
+              "description": "「這個階段誰該做什麼」的 STATUS 檔原文（說明區域，或讀者列為業務文字的圖內行）"
+            },
+            "actors": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/refROLE"
+                          }
+                        },
+                        "required": [
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "drv": {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                          }
+                        },
+                        "required": [
+                          "drv"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "ctx": {
+                            "type": "string",
+                            "enum": [
+                              "CURRENT_USER_OPRID",
+                              "CURRENT_USER_EMPLID",
+                              "CURRENT_DATE",
+                              "CURRENT_DATETIME",
+                              "CURRENT_MODE",
+                              "CURRENT_ACTION"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "ctx"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "誰負責：原文的「承辦人」「長官」必須對應到角色或衍生概念",
+              "x-ref": [
+                "ROLE",
+                "DRV"
+              ]
+            },
+            "enforcement": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "BY_TRANSITION",
+                    "SYSTEM_GATE",
+                    "EXPECTED_ONLY"
+                  ]
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "系統怎麼落實：做了轉移就算完成／離開狀態前系統檢查／系統不記錄也不檢查"
+            },
+            "realizedBy": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "完成此活動的轉移（須從活動所在狀態出發，R13）",
+              "x-ref": [
+                "TRN"
+              ]
+            },
+            "completion": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/condition"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "系統判定活動已完成的條件（對活動所在狀態的那筆資料求值；守門轉移以 DONE 引用）",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT"
+              ]
+            }
+          },
+          "required": [
+            "entityKey",
+            "state",
+            "name",
+            "behavior",
+            "actors",
+            "enforcement",
+            "completion"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "AUTHORITATIVE_DOC"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "enforcement"
+            ],
+            "properties": {
+              "enforcement": {
+                "const": "BY_TRANSITION"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "realizedBy"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "realizedBy"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "enforcement"
+            ],
+            "properties": {
+              "enforcement": {
+                "const": "SYSTEM_GATE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "completion": {
+                "not": {
+                  "required": [
+                    "na"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

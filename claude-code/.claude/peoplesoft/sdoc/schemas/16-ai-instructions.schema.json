@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:16-ai-instructions",
+  "title": "16 AI 實作指引",
+  "description": "項目型別：AI（AI 指引條款）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "16-ai-instructions"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/AI"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "AI": {
+      "type": "object",
+      "title": "AI（AI 指引條款）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^AI-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^AI:\\d{2,}$",
+              "description": "自然鍵：AI:<序號>"
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "READING",
+                "SCOPE",
+                "DATA",
+                "LOGIC",
+                "UNKNOWN_HANDLING",
+                "CHANGE_DISCIPLINE",
+                "TRACEABILITY",
+                "LANGUAGE"
+              ],
+              "description": "條款類別"
+            },
+            "clause": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "條款內容"
+            }
+          },
+          "required": [
+            "category",
+            "clause"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "TEMPLATE"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:03-roles-permissions",
+  "title": "03 角色與權限",
+  "description": "項目型別：ROLE（角色）、PERM（權限）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "03-roles-permissions"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ROLE"
+              },
+              {
+                "$ref": "#/$defs/PERM"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "ROLE": {
+      "type": "object",
+      "title": "ROLE（角色）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^ROLE-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^(ROLE|PERMISSION_LIST|DYNAMIC_ROLE|OTHER):[A-Za-z0-9_$#@.-]+$",
+              "description": "自然鍵：<主體型別>:<原名>"
+            },
+            "principalType": {
+              "type": "string",
+              "enum": [
+                "ROLE",
+                "PERMISSION_LIST",
+                "DYNAMIC_ROLE",
+                "OTHER"
+              ],
+              "description": "主體型別"
+            },
+            "object": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ",
+              "description": "對應的原系統物件",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "業務名稱"
+            },
+            "membership": {
+              "type": "object",
+              "required": [
+                "kind",
+                "note"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "STATIC_ASSIGNMENT",
+                    "DYNAMIC_RULE"
+                  ]
+                },
+                "rule": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                },
+                "note": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                }
+              },
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "DYNAMIC_RULE"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "rule"
+                    ]
+                  }
+                }
+              ],
+              "description": "使用者如何取得此角色",
+              "x-ref": [
+                "DRV"
+              ]
+            }
+          },
+          "required": [
+            "principalType",
+            "object",
+            "name",
+            "membership"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "PERM": {
+      "type": "object",
+      "title": "PERM（權限）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^PERM-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z_]+:[A-Za-z0-9_$#@.-]+>[A-Z_]+:[A-Za-z0-9_$#@.-]+$",
+              "description": "自然鍵：<主體鍵>><資源鍵>"
+            },
+            "principal": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refROLE",
+              "description": "權限主體",
+              "x-ref": [
+                "ROLE"
+              ]
+            },
+            "resource": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ",
+              "description": "受控資源（Component／Page／程序）",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ADD",
+                  "UPDATE_DISPLAY",
+                  "UPDATE_DISPLAY_ALL",
+                  "CORRECTION",
+                  "DISPLAY_ONLY",
+                  "RUN_PROCESS",
+                  "VIEW_ONLY"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "允許的動作"
+            },
+            "dataScope": {
+              "oneOf": [
+                {
+                  "const": "ALL_ROWS"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "condition": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/dataCondition"
+                    },
+                    "note": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                    }
+                  },
+                  "required": [
+                    "condition"
+                  ],
+                  "additionalProperties": false
+                }
+              ],
+              "description": "資料範圍（列層級）",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "denial": {
+              "type": "object",
+              "properties": {
+                "effect": {
+                  "type": "string",
+                  "enum": [
+                    "NOT_IN_NAVIGATION",
+                    "ACCESS_DENIED_MESSAGE",
+                    "ROWS_FILTERED",
+                    "CONTROL_HIDDEN",
+                    "CONTROL_DISABLED"
+                  ]
+                },
+                "note": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                }
+              },
+              "required": [
+                "effect"
+              ],
+              "additionalProperties": false,
+              "description": "無權時的效果"
+            },
+            "enforcement": {
+              "type": "string",
+              "enum": [
+                "COMPONENT_SECURITY",
+                "ROW_LEVEL_SECURITY",
+                "PEOPLECODE_CHECK",
+                "PAGE_DISPLAY_CONTROL"
+              ],
+              "description": "檢查位置"
+            }
+          },
+          "required": [
+            "principal",
+            "resource",
+            "actions",
+            "dataScope",
+            "denial",
+            "enforcement"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

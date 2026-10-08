@@ -1,0 +1,459 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:09-business-logic",
+  "title": "09 業務邏輯",
+  "description": "項目型別：MSG（訊息）、BR（業務規則）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "09-business-logic"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MSG"
+              },
+              {
+                "$ref": "#/$defs/BR"
+              }
+            ]
+          }
+        },
+        "programDispositions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "program": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+              },
+              "kinds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "BUSINESS_RULES",
+                    "UI_BEHAVIOR",
+                    "TRANSITION_IMPL",
+                    "DERIVATION_IMPL",
+                    "NO_BUSINESS_LOGIC",
+                    "OFF_DIAGRAM_ONLY",
+                    "NATIVE_UNUSED_BRANCH"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(BR|MSG|TRN|DRV|UI|IF)-\\d{3,}$"
+                },
+                "uniqueItems": true
+              },
+              "note": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/text"
+              }
+            },
+            "required": [
+              "program",
+              "kinds",
+              "items"
+            ],
+            "additionalProperties": false
+          },
+          "description": "PeopleCode 程式處置（覆蓋率分母）",
+          "x-ref": [
+            "OBJ",
+            "BR",
+            "MSG",
+            "TRN",
+            "DRV",
+            "UI",
+            "IF"
+          ]
+        }
+      },
+      "required": [
+        "programDispositions"
+      ]
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "MSG": {
+      "type": "object",
+      "title": "MSG（訊息）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^MSG-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^(\\d+,\\d+|TEXT:[0-9a-f]{8})$",
+              "description": "自然鍵：<訊息集>,<編號>｜TEXT:<雜湊>"
+            },
+            "messageSet": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "訊息集"
+            },
+            "messageNumber": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "訊息編號"
+            },
+            "text": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/rawText",
+              "description": "訊息原文"
+            },
+            "severity": {
+              "type": "string",
+              "enum": [
+                "ERROR",
+                "WARNING",
+                "MESSAGE",
+                "CANCEL"
+              ],
+              "description": "嚴重度"
+            },
+            "parameters": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/text"
+              },
+              "minItems": 1,
+              "description": "參數意義（依序）"
+            }
+          },
+          "required": [
+            "messageSet",
+            "messageNumber",
+            "text",
+            "severity"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "BR": {
+      "type": "object",
+      "title": "BR（業務規則）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^BR-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_$#@.]+:[A-Z][A-Z0-9_]*$",
+              "description": "自然鍵：<實作位置>:<規則代號>"
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "規則名稱"
+            },
+            "brKind": {
+              "type": "string",
+              "enum": [
+                "VALIDATION",
+                "CALCULATION",
+                "DEFAULTING",
+                "DERIVATION",
+                "AUTHORIZATION",
+                "SIDE_EFFECT",
+                "CONSTRAINT"
+              ],
+              "description": "規則種類"
+            },
+            "appliesTo": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refFR"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "適用的功能",
+              "x-ref": [
+                "FR"
+              ]
+            },
+            "trigger": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "enum": [
+                    "FIELD_DEFAULT",
+                    "FIELD_FORMULA",
+                    "ROW_INIT",
+                    "ROW_INSERT",
+                    "ROW_DELETE",
+                    "ROW_SELECT",
+                    "FIELD_EDIT",
+                    "FIELD_CHANGE",
+                    "PREPOPUP",
+                    "SAVE_EDIT",
+                    "SAVE_PRE_CHANGE",
+                    "WORKFLOW",
+                    "SAVE_POST_CHANGE",
+                    "SEARCH_INIT",
+                    "SEARCH_SAVE",
+                    "PRE_BUILD",
+                    "POST_BUILD",
+                    "ACTIVATE",
+                    "BATCH_STEP"
+                  ]
+                },
+                "control": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refUI"
+                },
+                "transitions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "modes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "ADD",
+                      "UPDATE_DISPLAY",
+                      "UPDATE_DISPLAY_ALL",
+                      "CORRECTION",
+                      "DISPLAY_ONLY",
+                      "BATCH"
+                    ]
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "event"
+              ],
+              "additionalProperties": false,
+              "description": "觸發事件、元件、轉移、模式",
+              "x-ref": [
+                "UI",
+                "TRN"
+              ]
+            },
+            "condition": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/condition",
+              "description": "精確條件",
+              "x-ref": [
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT"
+              ]
+            },
+            "action": {
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "REJECT",
+                    "WARN",
+                    "SET_VALUE",
+                    "CLEAR_VALUE",
+                    "INVOKE_INTERFACE",
+                    "NOTIFY"
+                  ]
+                },
+                "message": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refMSG"
+                },
+                "assignments": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/assignment"
+                  },
+                  "minItems": 1
+                },
+                "interface": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refIF"
+                }
+              },
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "REJECT",
+                          "WARN"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "message"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "SET_VALUE",
+                          "CLEAR_VALUE"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "assignments"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "INVOKE_INTERFACE",
+                          "NOTIFY"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "interface"
+                    ]
+                  }
+                }
+              ],
+              "description": "動作",
+              "x-ref": [
+                "MSG",
+                "FLD",
+                "DRV",
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT",
+                "IF"
+              ]
+            },
+            "order": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "同一觸發點內的執行順序"
+            },
+            "boundaries": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "NULL／空白／0／日期邊界的處理"
+            },
+            "modeDifferences": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "不同模式或角色的差異"
+            },
+            "implementedAt": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+                },
+                "event": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                }
+              },
+              "required": [
+                "object",
+                "event"
+              ],
+              "additionalProperties": false,
+              "description": "原系統實作位置",
+              "x-ref": [
+                "OBJ"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "brKind",
+            "appliesTo",
+            "trigger",
+            "condition",
+            "action",
+            "order",
+            "boundaries",
+            "modeDifferences",
+            "implementedAt"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

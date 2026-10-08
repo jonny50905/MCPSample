@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:18-definition-of-done",
+  "title": "18 完成定義",
+  "description": "項目型別：DOD（完成條件）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "18-definition-of-done"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DOD"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "DOD": {
+      "type": "object",
+      "title": "DOD（完成條件）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DOD-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^(GLOBAL:[A-Z][A-Z0-9_]*|TASK:\\S+)$",
+              "description": "自然鍵：GLOBAL:<代號>｜TASK:<工作鍵>"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "GLOBAL",
+                "TASK"
+              ],
+              "description": "適用範圍"
+            },
+            "task": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refTASK",
+              "description": "對應工作",
+              "x-ref": [
+                "TASK"
+              ]
+            },
+            "criteria": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "TESTS_PASS",
+                      "RULES_IMPLEMENTED",
+                      "STORED_VALUES_PRESERVED",
+                      "MESSAGES_PRESERVED",
+                      "NO_EXCLUDED_FIELDS",
+                      "OPEN_QUESTIONS_CLOSED",
+                      "TRACE_IDS_RECORDED",
+                      "BLANK_SEMANTICS_PRESERVED"
+                    ]
+                  },
+                  "statement": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                  },
+                  "refs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(GOAL|RESP|OBJ|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|ACT|IF|FR|UI|MSG|BR|OP|TC|TASK)-\\d{3,}$"
+                    },
+                    "uniqueItems": true
+                  },
+                  "evidenceRequired": {
+                    "type": "string",
+                    "enum": [
+                      "TEST_REPORT",
+                      "CODE_REFERENCE",
+                      "REVIEW_RECORD"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "statement",
+                  "refs",
+                  "evidenceRequired"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "完成條件",
+              "x-ref": [
+                "GOAL",
+                "RESP",
+                "OBJ",
+                "ENT",
+                "FLD",
+                "DRV",
+                "XF",
+                "ROLE",
+                "PERM",
+                "STATE",
+                "TRN",
+                "FLOW",
+                "ACT",
+                "IF",
+                "FR",
+                "UI",
+                "MSG",
+                "BR",
+                "OP",
+                "TC",
+                "TASK"
+              ]
+            }
+          },
+          "required": [
+            "scope",
+            "criteria"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "COMPUTED",
+                "TEMPLATE"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "scope"
+            ],
+            "properties": {
+              "scope": {
+                "const": "TASK"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task"
+            ]
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
