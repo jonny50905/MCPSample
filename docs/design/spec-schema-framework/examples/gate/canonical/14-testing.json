@@ -1,0 +1,413 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "14-testing",
+  "docId": "clone-fedcba9876543210/14",
+  "jobId": "clone-fedcba9876543210",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "14 測試與驗收",
+  "summary": "測試案例 5（守門範例，只跑部分檢核）",
+  "components": [
+    "TW_DEMO_CASE",
+    "TW_DEMO_DOCREV",
+    "TW_DEMO_PAYMNT"
+  ],
+  "dependsOn": [
+    "02-functional-requirements",
+    "03-roles-permissions",
+    "04-workflow",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "STATUS_DOC",
+      "ref": "status-CASE_STATUS.md",
+      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+    }
+  ],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "TC-001",
+      "key": "TW_DEMO_CASE:UPLOAD_REPORT:BOUNDARY:NO_DOCUMENTS",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_CASE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-001"
+      ],
+      "name": "沒有任何文件時上傳報告也不會結案",
+      "scenarioType": "BOUNDARY",
+      "fr": "FR-001",
+      "covers": {
+        "transitions": [
+          "TRN-008"
+        ],
+        "activities": [
+          "ACT-003"
+        ]
+      },
+      "preconditions": {
+        "state": "STATE-006",
+        "actor": {
+          "left": {
+            "ctx": "CURRENT_USER_OPRID"
+          },
+          "op": "HAS_ROLE",
+          "right": {
+            "role": "ROLE-002"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-002",
+            "value": "040"
+          },
+          {
+            "field": "FLD-004",
+            "value": " ",
+            "note": "尚未上傳"
+          },
+          {
+            "field": "FLD-005",
+            "value": "（沒有任何一列）",
+            "note": "此案件沒有文件"
+          },
+          {
+            "field": "FLD-008",
+            "value": "（沒有任何一列）",
+            "note": "此案件沒有付款"
+          }
+        ],
+        "synthetic": true
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以承辦人上傳結案報告並存檔",
+          "inputs": [
+            {
+              "field": "FLD-004",
+              "value": "RPT0001"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-006",
+        "data": [
+          {
+            "field": "FLD-004",
+            "value": "RPT0001"
+          }
+        ]
+      },
+      "verification": "案件仍為 040：沒有任何文件時不算完成（whenEmpty＝NOT_MET）；沒有付款列則視為完成（whenEmpty＝MET）。"
+    },
+    {
+      "id": "TC-002",
+      "key": "TW_DEMO_CASE:UPLOAD_REPORT:POSITIVE:REPORT_LAST",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_CASE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-001"
+      ],
+      "name": "最後上傳結案報告時自動結案",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-001",
+      "covers": {
+        "transitions": [
+          "TRN-008"
+        ],
+        "activities": [
+          "ACT-003"
+        ]
+      },
+      "preconditions": {
+        "state": "STATE-006",
+        "actor": {
+          "left": {
+            "ctx": "CURRENT_USER_OPRID"
+          },
+          "op": "HAS_ROLE",
+          "right": {
+            "role": "ROLE-002"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-002",
+            "value": "040"
+          },
+          {
+            "field": "FLD-004",
+            "value": " ",
+            "note": "尚未上傳"
+          },
+          {
+            "field": "FLD-007",
+            "value": "090",
+            "note": "文件第 1 列"
+          },
+          {
+            "field": "FLD-011",
+            "value": "090",
+            "note": "付款第 1 列"
+          }
+        ],
+        "synthetic": true
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以承辦人上傳結案報告並存檔",
+          "inputs": [
+            {
+              "field": "FLD-004",
+              "value": "RPT0001"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-007",
+        "data": [
+          {
+            "field": "FLD-003",
+            "value": "測試當日"
+          }
+        ]
+      },
+      "verification": "案件為 050、CLOSE_DT＝測試當日；承辦人收到結案通知。"
+    },
+    {
+      "id": "TC-003",
+      "key": "TW_DEMO_PAYMNT:PAY:NEGATIVE:DOC_PENDING",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_PAYMNT",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-003"
+      ],
+      "name": "文件尚未審查完成時，付款完成不會結案",
+      "scenarioType": "NEGATIVE",
+      "fr": "FR-003",
+      "covers": {
+        "transitions": [
+          "TRN-004",
+          "TRN-008"
+        ]
+      },
+      "preconditions": {
+        "state": "STATE-006",
+        "actor": {
+          "left": {
+            "ctx": "CURRENT_USER_OPRID"
+          },
+          "op": "HAS_ROLE",
+          "right": {
+            "role": "ROLE-001"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-002",
+            "value": "040"
+          },
+          {
+            "field": "FLD-004",
+            "value": "RPT0001"
+          },
+          {
+            "field": "FLD-007",
+            "value": "010",
+            "note": "文件第 1 列"
+          },
+          {
+            "field": "FLD-011",
+            "value": "010",
+            "note": "付款第 1 列"
+          }
+        ],
+        "synthetic": true
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以會計人員把付款第 1 列標為付款完成"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-006",
+        "data": [
+          {
+            "field": "FLD-011",
+            "value": "090"
+          }
+        ]
+      },
+      "verification": "付款第 1 列為 090；案件仍為 040（文件第 1 列尚未審查完成）。"
+    },
+    {
+      "id": "TC-004",
+      "key": "TW_DEMO_PAYMNT:PAY:NEGATIVE:REPORT_MISSING",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_PAYMNT",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-003"
+      ],
+      "name": "尚未上傳結案報告時，付款完成不會結案",
+      "scenarioType": "NEGATIVE",
+      "fr": "FR-003",
+      "covers": {
+        "transitions": [
+          "TRN-008"
+        ],
+        "activities": [
+          "ACT-003"
+        ]
+      },
+      "preconditions": {
+        "state": "STATE-006",
+        "actor": {
+          "left": {
+            "ctx": "CURRENT_USER_OPRID"
+          },
+          "op": "HAS_ROLE",
+          "right": {
+            "role": "ROLE-001"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-002",
+            "value": "040"
+          },
+          {
+            "field": "FLD-004",
+            "value": " ",
+            "note": "尚未上傳"
+          },
+          {
+            "field": "FLD-007",
+            "value": "090",
+            "note": "文件第 1 列"
+          },
+          {
+            "field": "FLD-011",
+            "value": "010",
+            "note": "付款第 1 列"
+          }
+        ],
+        "synthetic": true
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以會計人員把付款第 1 列標為付款完成"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-006",
+        "data": [
+          {
+            "field": "FLD-011",
+            "value": "090"
+          }
+        ]
+      },
+      "verification": "付款第 1 列為 090；案件仍為 040（結案報告未上傳）。"
+    },
+    {
+      "id": "TC-005",
+      "key": "TW_DEMO_PAYMNT:PAY:POSITIVE:PAY_LAST",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_PAYMNT",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "FR-003"
+      ],
+      "name": "最後一筆付款完成時自動結案",
+      "scenarioType": "POSITIVE",
+      "fr": "FR-003",
+      "covers": {
+        "transitions": [
+          "TRN-004",
+          "TRN-008"
+        ]
+      },
+      "preconditions": {
+        "state": "STATE-006",
+        "actor": {
+          "left": {
+            "ctx": "CURRENT_USER_OPRID"
+          },
+          "op": "HAS_ROLE",
+          "right": {
+            "role": "ROLE-001"
+          }
+        },
+        "data": [
+          {
+            "field": "FLD-002",
+            "value": "040"
+          },
+          {
+            "field": "FLD-004",
+            "value": "RPT0001"
+          },
+          {
+            "field": "FLD-007",
+            "value": "090",
+            "note": "文件第 1 列"
+          },
+          {
+            "field": "FLD-011",
+            "value": "010",
+            "note": "付款第 1 列"
+          }
+        ],
+        "synthetic": true
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以會計人員把付款第 1 列標為付款完成"
+        }
+      ],
+      "expected": {
+        "resultState": "STATE-007",
+        "data": [
+          {
+            "field": "FLD-011",
+            "value": "090"
+          },
+          {
+            "field": "FLD-003",
+            "value": "測試當日"
+          }
+        ]
+      },
+      "verification": "付款第 1 列為 090；案件為 050、CLOSE_DT＝測試當日。"
+    }
+  ]
+}

@@ -37,7 +37,7 @@
       "name": "送出申請",
       "opKind": "TRANSITION",
       "invokedFrom": [
-        "UI-011"
+        "UI-012"
       ],
       "authorization": {
         "all": [
@@ -107,6 +107,12 @@
             "field": "FLD-014",
             "value": {
               "param": "REASON"
+            }
+          },
+          {
+            "field": "FLD-018",
+            "value": {
+              "param": "REQ_TYPE"
             }
           }
         ],

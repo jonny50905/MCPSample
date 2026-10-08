@@ -43,5 +43,7 @@ stateDiagram-v2
     S015 --> S090
     S030 --> [*]
     S090 --> [*]
+    S020 : 直屬主管審核申請內容
     note right of S025 : 部門主管審核
+    note left of S090 : 作廢的申請單不能再修改
 ```

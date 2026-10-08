@@ -129,7 +129,8 @@
 | `entry` | 物件 | ✓ |  | OBJ | 入口物件與模式 |
 | `actors` | 陣列〈角色｜衍生概念｜情境〉 | ✓ | ≥1 | ROLE、DRV | 操作者摘要（判定細節在 04 的 actor） |
 | `realizes` | 陣列〈ID〉 | ✓ | TRANSITION 時≥1，其他種類必須為空 | TRN | 實現的狀態轉移 |
-| `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE | 前置條件 |
+| `performs` | 陣列〈ID〉 |  | SYSTEM_GATE 活動至少要有一個功能（C02） | ACT | 讓操作者完成的狀態活動（以轉移完成的活動不必列） |
+| `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE、ACT、ENT | 前置條件 |
 | `outcome` | 文字 | ✓ |  |  | 完成後的結果 |
 | `priority` | 列舉 | ✓ | MUST／SHOULD／COULD（預設 MUST） |  | 優先序 |
 
@@ -137,6 +138,7 @@
 
 - 每條轉移至少被一個 FR 實現（C02）。
 - TRANSITION 類 FR 的 `realizes` 不得為空，其他種類必須為空（schema）。
+- 守門活動（SYSTEM_GATE）至少要有一個 FR 以 `performs` 讓操作者完成它（C02）；以轉移完成的活動不必列。
 - FR 入口的 Component 與其轉移的觸發 Component 一致（R09）。
 - 每個 FR 都有操作契約（C08）與正例（C07）。
 - 粒度：同一個入口、同一個動作只算一個 FR，不要把一個情境拆成重複的 FR。
@@ -269,15 +271,16 @@
 
 ## 04 流程與狀態機（04-workflow）
 
-- **用途**：狀態、轉移、情境。內容是 STATUS 文件的權威內容，加上程式研究得到的「怎麼做」。
-- **輸入來源**：STATUS 文件（flowchart＋stateDiagram-v2）；程式研究；07 的狀態欄位；03 的角色。
-- **何時產生**：骨架在第 0 階段（模型提出狀態圖對應，外環解析並驗證後派 ID），細節在第 4 階段。
-- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，邊上標 TRN ID 與守衛）；情境流程圖（flowchart，邊上標情境類型與 TRN ID）；狀態、轉移、情境明細。
+- **用途**：狀態、轉移、情境、狀態活動。內容是 STATUS 文件的權威內容，加上程式研究得到的「怎麼做」。
+- **輸入來源**：STATUS 文件（flowchart＋stateDiagram-v2，含平行區塊、狀態描述與 note）；程式研究；07 的狀態欄位與子表；03 的角色。
+- **何時產生**：骨架在第 0 階段（模型提出狀態圖對應，外環解析並驗證後派 ID）；細節、活動與狀態圖文字的處置在第 4 階段。
+- **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，保留平行區塊，邊上標 TRN ID、守衛與離開方式）；情境流程圖（flowchart，邊上標情境類型與 TRN ID）；狀態圖文字的處置表；狀態、轉移、情境、活動明細。
 - **外殼欄位**：
 
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
-| `diagramSources` | 陣列〈物件〉 | ✓ | ≥1 | 狀態圖來源：每個狀態實體在 STATUS 檔中的一組 flowchart＋stateDiagram-v2（模型讀檔提出、外環驗證） |
+| `diagramSources` | 陣列〈物件〉 | ✓ | ≥1；平行區塊內的子業務可以沒有 flowchart（寫 NA 並附 region） | 狀態圖來源：每個狀態實體在 STATUS 檔中的 flowchart＋stateDiagram-v2；平行區塊內的子業務另記所在複合狀態與區塊序（模型讀檔提出、外環驗證） |
+| `diagramTexts` | 陣列〈物件〉 | ✓ | 可空；解析器列出的每一行狀態描述與 note 恰一筆（C01） | 狀態圖文字的處置：每行狀態描述與 note 是不是活動、對應哪些 ACT |
 
 ### STATE 狀態
 
@@ -286,14 +289,15 @@
 | `key` | 自然鍵 | ✓ | `<狀態實體>:<狀態碼>` |  | 外環據以派發 ID |
 | `entityKey` | 代號 | ✓ |  |  | 狀態實體代號（狀態圖對應研究包給的大寫代號） |
 | `stateKind` | 列舉 | ✓ | SIMPLE／COMPOSITE |  | 狀態種類 |
-| `code` | 原文 |  | SIMPLE 必填 |  | 狀態碼（儲存值） |
+| `code` | 原文 |  | SIMPLE 必填；有平行區塊的複合狀態也必填 |  | 狀態碼（儲存值） |
 | `name` | 原文 | ✓ |  |  | 狀態圖上的名稱 |
-| `parent` | ID 參照 |  |  | STATE | 所屬複合狀態 |
-| `binding` | ID 參照 |  | SIMPLE 必填 | FLD | 保存狀態碼的欄位 |
-| `domainLabel` | 原文｜NA |  | SIMPLE 必填 |  | 值域中的顯示文字（Translate／對照表） |
-| `isInitialTarget` | 布林 | ✓ |  |  | 是否由 [*] 進入（新建） |
-| `isFinal` | 布林 | ✓ |  |  | 是否為終點（→[*]） |
-| `dataPresence` | 列舉 |  | SIMPLE 必填 |  | PROD 是否有此狀態碼的資料 |
+| `parent` | ID 參照 |  |  | STATE | 所屬複合狀態（平行區塊內的子業務狀態也填） |
+| `regions` | 陣列〈物件〉 |  | 只有 COMPOSITE 能有；依圖上順序 | STATE | 平行區塊（畫法一）：子業務狀態實體與它的終點狀態（區塊內 →[*] 的狀態） |
+| `binding` | ID 參照 |  | 有 code 時必填 | FLD | 保存狀態碼的欄位 |
+| `domainLabel` | 原文｜NA |  | 有 code 時必填 |  | 值域中的顯示文字（Translate／對照表） |
+| `isInitialTarget` | 布林 | ✓ |  |  | 是否由 [*] 進入（新建；區塊內的 [*] 表示子業務資料的新建） |
+| `isFinal` | 布林 | ✓ |  |  | 是否為終點（→[*]；區塊內的 →[*] 表示該區塊的終點） |
+| `dataPresence` | 列舉 |  | 有 code 時必填 |  | PROD 是否有此狀態碼的資料 |
 
 ### TRN 狀態轉移
 
@@ -304,11 +308,12 @@
 | `from` | ID 參照｜INITIAL | ✓ |  | STATE | 起始狀態（新建為 INITIAL） |
 | `to` | ID 參照 | ✓ |  | STATE | 目標狀態 |
 | `via` | 陣列〈原文〉 |  |  |  | 收合掉的 choice／fork／join 節點 |
-| `trigger` | 物件｜UNRESOLVED | ✓ | kind＝USER_ACTION／BATCH／SYSTEM_EVENT／INTERFACE | OBJ | 觸發方式、所在物件與動作原名 |
-| `actor` | 條件式｜NA｜UNRESOLVED | ✓ | 非 BATCH 觸發不得 NA（schema） | FLD、DRV、STATE、ROLE | 誰能觸發（角色、資格的判定方式）；只有批次觸發可以是 NA |
-| `guard` | 條件式｜NA｜UNRESOLVED | ✓ | 有 via（經 choice 收合）時不得 NA（schema） | FLD、DRV、STATE、ROLE | 轉移條件（選擇此目標的條件） |
-| `writes` | 陣列〈指派〉｜UNRESOLVED | ✓ | 必含狀態欄位＝目標狀態碼 | FLD、DRV、STATE、ROLE | 轉移時寫入的欄位與值 |
-| `sideEffects` | 陣列〈物件〉｜NA | ✓ |  | FLD | 其他副作用（通知、介面等於 06／09 反查） |
+| `exitMode` | 列舉｜UNRESOLVED | ✓ | NORMAL（一般）／ON_COMPLETION（等全部區塊到終點、守門活動完成）／INTERRUPT（不等區塊，中斷子業務）；起點有平行區塊時不得 NORMAL（C01） |  | 離開方式 |
+| `trigger` | 物件｜UNRESOLVED | ✓ | kind＝USER_ACTION／BATCH／SYSTEM_EVENT／INTERFACE／COMPLETION；COMPLETION 必附 evaluatedAfter（系統在哪些轉移或活動之後檢查） | OBJ、TRN、ACT | 觸發方式、所在物件與動作原名（COMPLETION＝條件成立時由系統自動轉移） |
+| `actor` | 條件式｜NA｜UNRESOLVED | ✓ | 只有 BATCH／COMPLETION 觸發可以 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 誰能觸發（角色、資格的判定方式） |
+| `guard` | 條件式｜NA｜UNRESOLVED | ✓ | 有 via 或 ON_COMPLETION 時不得 NA（schema） | FLD、DRV、STATE、ROLE、ACT、ENT | 轉移條件（選擇此目標的條件；守門轉移要含每個區塊與守門活動，R13） |
+| `writes` | 陣列〈指派〉｜UNRESOLVED | ✓ | 必含狀態欄位＝目標狀態碼 | FLD、DRV、STATE、ROLE、ACT、ENT | 轉移時寫入的欄位與值 |
+| `sideEffects` | 陣列〈物件〉｜NA | ✓ |  | FLD | 其他副作用（通知、介面等於 06／09 反查；INTERRUPT 要寫明未完成的子業務資料怎麼處理） |
 | `implementedAt` | 陣列〈物件〉｜UNRESOLVED | ✓ | 找不到＝UNRESOLVED（DIAGRAM_EDGE_UNIMPLEMENTED） | OBJ | 原系統實作位置 |
 | `reentry` | 文字｜UNRESOLVED | ✓ |  |  | 重複觸發或同時操作時的行為 |
 
@@ -323,18 +328,39 @@
 | `steps` | 陣列〈物件〉 | ✓ | 每條同標籤的邊恰一步 | TRN | 情境步驟（依拓撲順序） |
 | `entryStates` | 陣列〈ID｜INITIAL〉 | ✓ | ≥1 | STATE | 進入此情境的狀態 |
 | `exitStates` | 陣列〈ID〉 | ✓ | ≥1 | STATE | 離開此情境的狀態 |
-| `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE | 前置條件 |
+| `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE、ACT、ENT | 前置條件 |
 | `exceptions` | 文字｜NA | ✓ |  |  | 例外與中斷 |
+
+### ACT 狀態活動
+
+狀態圖上描述「這個階段誰該做什麼」的業務行為（狀態描述或 note），主文件 §8.7。
+
+| 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
+|---|---|---|---|---|---|
+| `key` | 自然鍵 | ✓ | `<狀態實體>:<狀態碼>:<兩碼序號>` |  | 外環據以派發 ID |
+| `entityKey` | 代號 | ✓ |  |  | 狀態實體 |
+| `state` | ID 參照 | ✓ |  | STATE | 活動所在的狀態 |
+| `name` | 文字 | ✓ |  |  | 活動名稱 |
+| `behavior` | 原文 | ✓ | STATUS 檔原文 |  | 狀態圖上描述「這個階段誰該做什麼」的原文 |
+| `actors` | 陣列〈角色｜衍生概念｜情境〉｜UNRESOLVED | ✓ | ≥1 | ROLE、DRV | 誰負責：原文的「承辦人」「長官」必須對應到角色或衍生概念 |
+| `enforcement` | 列舉｜UNRESOLVED | ✓ | BY_TRANSITION／SYSTEM_GATE／EXPECTED_ONLY |  | 系統怎麼落實：做了轉移就算完成／離開狀態前系統檢查／系統不記錄也不檢查 |
+| `realizedBy` | 陣列〈ID〉 |  | BY_TRANSITION 必填，其他不得出現 | TRN | 完成此活動的轉移（須從活動所在狀態出發，R13） |
+| `completion` | 條件式｜NA｜UNRESOLVED | ✓ | SYSTEM_GATE 不得 NA 或 ALWAYS | FLD、DRV、STATE、ROLE、ACT、ENT | 系統判定活動已完成的條件（對活動所在狀態的那筆資料求值；守門轉移以 DONE 引用） |
 
 **完整性與審查準則**
 
 - 與兩張圖完全一致，不多不少（C01）。
 - 每條轉移寫入狀態欄位＝目標狀態碼；經 choice 收合的轉移必有守衛（R06）。
 - 狀態碼屬於綁定欄位的值域（R07）。
-- `actor` 只有在觸發方式是 BATCH 時可以是 NA。
+- 有平行區塊的複合狀態：`regions` 與圖一致；區塊內的狀態 `parent` 指向它；離開它的轉移 `exitMode` 不得是 NORMAL（C01）。
+- 守門轉移（ON_COMPLETION）：每個區塊一個 `rows` ALL 條件（where＝子表狀態欄位＝終點，必寫 whenEmpty），每個守門活動一個 DONE（R13）。自動轉移的 `trigger.kind` 用 COMPLETION 並列出 `evaluatedAfter`。
+- INTERRUPT 的 `sideEffects` 寫明未完成的子業務資料怎麼處理。
+- 每一行狀態描述與 note 在 `diagramTexts` 恰一筆；活動的 `behavior` 取自該行原文（C01）。
+- 以轉移完成的活動，`realizedBy` 從活動所在狀態出發；DONE 只能指向守門活動（R13）。
+- `actor` 只有在觸發方式是 BATCH 或 COMPLETION 時可以是 NA。
 - `implementedAt` 找不到時填 UNRESOLVED，並開 DIAGRAM_EDGE_UNIMPLEMENTED（BLOCKING）。
 - 圖外發現只記錄位置與起迄，寫進 90。
-- 人工審查：每條轉移的守衛是否足以實作（L5 的 T3 題）。
+- 人工審查：每條轉移的守衛是否足以實作（L5 的 T3 題）；守門轉移的條件與檢查時機（T7、T8）；活動的負責人與完成條件（A1）。
 
 **最小合法項目（TRN）**
 
@@ -346,11 +372,12 @@
   "basis": "AUTHORITATIVE_DOC",
   "certainty": "CONFIRMED",
   "evidence": [
-    "EV-0050"
+    "EV-0054"
   ],
   "entityKey": "REQ_STATUS",
   "from": "STATE-003",
   "to": "STATE-005",
+  "exitMode": "NORMAL",
   "trigger": {
     "kind": "USER_ACTION",
     "object": "OBJ-002",
@@ -411,6 +438,37 @@
 }
 ```
 
+**最小合法項目（ACT）**
+
+```json
+{
+  "id": "ACT-001",
+  "key": "REQ_STATUS:020:01",
+  "lifecycle": "ACTIVE",
+  "basis": "AUTHORITATIVE_DOC",
+  "certainty": "CONFIRMED",
+  "evidence": [
+    "EV-0068"
+  ],
+  "entityKey": "REQ_STATUS",
+  "state": "STATE-003",
+  "name": "直屬主管審核申請",
+  "behavior": "直屬主管審核申請內容",
+  "actors": [
+    {
+      "drv": "DRV-002"
+    }
+  ],
+  "enforcement": "BY_TRANSITION",
+  "realizedBy": [
+    "TRN-008"
+  ],
+  "completion": {
+    "na": "核准或退回（離開 020）即完成；系統沒有另外記錄審核進度"
+  }
+}
+```
+
 ---
 
 ## 05 畫面與互動（05-ui）
@@ -438,10 +496,10 @@
 | `binding` | 物件｜NA |  | CONTROL 必填 | FLD、DRV | 綁定的欄位或衍生值（按鈕寫 NA） |
 | `label` | 原文｜NA |  | CONTROL 必填 |  | 畫面文字 |
 | `presence` | 列舉 |  | VISIBLE／CONDITIONAL／HIDDEN_TECHNICAL；CONTROL 必填 |  | 出現方式 |
-| `visibility` | ALWAYS｜條件式 |  | CONTROL 必填 | FLD、DRV、STATE、ROLE | 顯示條件 |
-| `editability` | ALWAYS｜NEVER｜條件式 |  | CONTROL 必填 | FLD、DRV、STATE、ROLE | 可編輯條件 |
+| `visibility` | ALWAYS｜條件式 |  | CONTROL 必填 | FLD、DRV、STATE、ROLE、ACT、ENT | 顯示條件 |
+| `editability` | ALWAYS｜NEVER｜條件式 |  | CONTROL 必填 | FLD、DRV、STATE、ROLE、ACT、ENT | 可編輯條件 |
 | `options` | 陣列〈物件〉 |  | 儲存值須屬於欄位值域 |  | 選項：顯示文字↔儲存值 |
-| `valueSource` | 物件 |  | CONTROL 必填 | ENT、FLD、DRV、STATE、ROLE | 值來源 |
+| `valueSource` | 物件 |  | CONTROL 必填 | FLD、DRV、STATE、ROLE、ACT、ENT | 值來源 |
 | `displayDefault` | 運算元｜NA |  | CONTROL 必填 | FLD、DRV、STATE、ROLE | 畫面初值（寫入資料的預設在 09） |
 | `interactions` | 陣列〈物件〉 |  |  | UI | 純畫面互動（會拒絕或寫資料的邏輯寫在 09） |
 
@@ -457,7 +515,7 @@
 
 ```json
 {
-  "id": "UI-011",
+  "id": "UI-012",
   "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.SUBMIT_PB",
   "lifecycle": "ACTIVE",
   "basis": "METADATA",
@@ -547,7 +605,7 @@
   "basis": "CODE",
   "certainty": "CONFIRMED",
   "evidence": [
-    "EV-0024"
+    "EV-0028"
   ],
   "ifType": "NOTIFICATION",
   "object": "OBJ-001",
@@ -671,7 +729,7 @@
   "basis": "CODE",
   "certainty": "CONFIRMED",
   "evidence": [
-    "EV-0026"
+    "EV-0030"
   ],
   "name": "申請人的直屬主管",
   "meaning": "申請人目前任職資料上登記的直屬主管；送出時必須存在，020 由此人審核。",
@@ -742,12 +800,12 @@
 | `name` | 文字 | ✓ |  |  | 操作名稱 |
 | `opKind` | 列舉 | ✓ | LOAD／SEARCH／CREATE／UPDATE／TRANSITION／DELETE／LOOKUP／BATCH_RUN |  | 操作種類 |
 | `invokedFrom` | 陣列〈ID〉｜NA | ✓ |  | UI | 觸發的畫面元件 |
-| `authorization` | 條件式 | ✓ |  | FLD、DRV、STATE、ROLE | 誰能執行 |
+| `authorization` | 條件式 | ✓ |  | FLD、DRV、STATE、ROLE、ACT、ENT | 誰能執行 |
 | `inputs` | 陣列〈物件〉 | ✓ | 可空 | FLD、DRV | 輸入 |
 | `outputs` | 陣列〈物件〉 | ✓ | 可空 | FLD、DRV | 輸出 |
-| `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE | 前置條件 |
+| `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE、ACT、ENT | 前置條件 |
 | `validations` | 陣列〈ID〉 | ✓ | 依執行順序；可空 | BR | 套用的檢核規則 |
-| `effects` | 物件｜NA | ✓ | 唯讀操作寫 NA | TRN、FLD、DRV、STATE、ROLE、IF | 轉移、寫入、觸發的介面 |
+| `effects` | 物件｜NA | ✓ | 唯讀操作寫 NA | TRN、FLD、DRV、STATE、ROLE、ACT、ENT、IF | 轉移、寫入、觸發的介面 |
 | `transaction` | 物件 | ✓ | boundary／writeOrder／onFailure／concurrency／idempotency | MSG | 交易語意 |
 | `legacyOrigin` | 物件 | ✓ |  | OBJ | 原系統對應的物件與事件鏈 |
 
@@ -778,7 +836,7 @@
   "name": "送出申請",
   "opKind": "TRANSITION",
   "invokedFrom": [
-    "UI-011"
+    "UI-012"
   ],
   "authorization": {
     "all": [
@@ -849,6 +907,12 @@
         "value": {
           "param": "REASON"
         }
+      },
+      {
+        "field": "FLD-018",
+        "value": {
+          "param": "REQ_TYPE"
+        }
       }
     ],
     "interfaces": [
@@ -917,8 +981,8 @@
 | `brKind` | 列舉 | ✓ | VALIDATION／CALCULATION／DEFAULTING／DERIVATION／AUTHORIZATION／SIDE_EFFECT／CONSTRAINT |  | 規則種類 |
 | `appliesTo` | 陣列〈ID〉 | ✓ | ≥1 | FR | 適用的功能 |
 | `trigger` | 物件 | ✓ | event 必填 | UI、TRN | 觸發事件、元件、轉移、模式 |
-| `condition` | 條件式 | ✓ | 無條件寫 ALWAYS | FLD、DRV、STATE、ROLE | 精確條件 |
-| `action` | 物件 | ✓ | REJECT／WARN 必附 message；SET_VALUE 必附 assignments；INVOKE_INTERFACE／NOTIFY 必附 interface | MSG、FLD、DRV、STATE、ROLE、IF | 動作 |
+| `condition` | 條件式 | ✓ | 無條件寫 ALWAYS | FLD、DRV、STATE、ROLE、ACT、ENT | 精確條件 |
+| `action` | 物件 | ✓ | REJECT／WARN 必附 message；SET_VALUE 必附 assignments；INVOKE_INTERFACE／NOTIFY 必附 interface | MSG、FLD、DRV、STATE、ROLE、ACT、ENT、IF | 動作 |
 | `order` | 整數｜UNRESOLVED | ✓ |  |  | 同一觸發點內的執行順序 |
 | `boundaries` | 文字｜NA | ✓ |  |  | NULL／空白／0／日期邊界的處理 |
 | `modeDifferences` | 文字｜NA | ✓ |  |  | 不同模式或角色的差異 |
@@ -927,6 +991,7 @@
 **完整性與審查準則**
 
 - 核心 PeopleCode 程式每支恰一筆處置（C05）。
+- 已證明不會執行的原生分支不寫成規則，也不出現在任何條件裡；程式處置加上 NATIVE_UNUSED_BRANCH，證明寫在 90（R14，主文件 §8.8）。
 - REJECT、WARN 必附訊息（schema）。
 - 觸發元件屬於規則適用的功能（R10）。
 - 條件只能用運算元，所以「需要長官審核」這類寫法不可能出現。
@@ -951,7 +1016,7 @@
   ],
   "trigger": {
     "event": "FIELD_CHANGE",
-    "control": "UI-011",
+    "control": "UI-012",
     "transitions": [
       "TRN-002",
       "TRN-004"
@@ -994,8 +1059,8 @@
 | `name` | 文字 | ✓ |  |  | 案例名稱 |
 | `scenarioType` | 列舉 | ✓ | POSITIVE／NEGATIVE／BOUNDARY |  | 正例／反例／邊界 |
 | `fr` | ID 參照 | ✓ |  | FR | 主要功能 |
-| `covers` | 物件 | ✓ | 至少一類 | BR、TRN、FLOW、UI、OP | 覆蓋的規則／轉移／情境／元件／操作 |
-| `preconditions` | 物件 | ✓ | synthetic 必為 true | STATE、FLD、DRV、ROLE | 前置狀態、操作者、前置資料（合成） |
+| `covers` | 物件 | ✓ | 至少一類 | BR、TRN、FLOW、UI、OP、ACT | 覆蓋的規則／轉移／情境／元件／操作／活動 |
+| `preconditions` | 物件 | ✓ | synthetic 必為 true | FLD、DRV、STATE、ROLE、ACT、ENT | 前置狀態、操作者、前置資料（合成） |
 | `steps` | 陣列〈物件〉 | ✓ | ≥1 | UI、OP、FLD | 操作步驟 |
 | `expected` | 物件 | ✓ | 至少一項 | MSG、STATE、UI、FLD | 預期訊息、狀態、元件、資料 |
 | `verification` | 文字 | ✓ |  |  | 如何核對 |
@@ -1007,6 +1072,7 @@
   - 每條拒絕型規則有反例。
   - 條件含大小比較或區間的規則與守衛有邊界例。
   - 每條轉移、每個情境都有案例。
+  - 守門轉移有正例與反例；逐列條件有 whenEmpty 時另有「一列都沒有」的邊界例；每個守門活動有案例（`covers.activities`）。
 - 前置資料一律是合成資料（`synthetic＝true`）。
 - 預期結果至少一項（schema）。
 
@@ -1063,7 +1129,7 @@
     {
       "seq": 1,
       "action": "以 E1001 按「送出」",
-      "control": "UI-011",
+      "control": "UI-012",
       "operation": "OP-004"
     }
   ],
@@ -1121,7 +1187,7 @@
 
 - **用途**：重建端的工作骨架：一個基礎工作（資料結構、衍生概念、角色），加上每個 FR 一個垂直切片。
 - **產生方式**（外環計算）：
-  - `members` 由反查得到。
+  - `members` 由反查得到；切片的 `activities` 是它的轉移所完成的活動，加上它 `performs` 的活動。
   - 順序：從新建開始，對狀態圖做廣度優先，依各 FR 最早轉移的層級排序。
   - 相依：到達前置狀態的第一條轉移，所屬的 FR 就是前置工作。
 - **重建端**：可以再細分、估時，但不回寫 Spec。
@@ -1134,7 +1200,7 @@
 | `name` | 文字 | ✓ |  |  | 工作名稱 |
 | `order` | 整數 | ✓ |  |  | 建議順序 |
 | `dependsOn` | 陣列〈ID〉 | ✓ | 可空 | TASK | 前置工作 |
-| `members` | 物件 | ✓ | 外環計算 | ENT、FLD、DRV、ROLE、TRN、UI、BR、OP、TC | 本工作涵蓋的項目 |
+| `members` | 物件 | ✓ | 外環計算 | ENT、FLD、DRV、ROLE、TRN、ACT、UI、BR、OP、TC | 本工作涵蓋的項目 |
 | `deliverables` | 陣列〈列舉〉 | ✓ | DATA_STRUCTURE／OPERATIONS／SCREENS／RULES／SECURITY／TESTS |  | 交付物 |
 
 **完整性與審查準則**：每個 FR 恰一個切片（C10）；相依無循環。
@@ -1163,7 +1229,8 @@
       "FLD-015",
       "FLD-016",
       "FLD-017",
-      "FLD-018"
+      "FLD-018",
+      "FLD-019"
     ],
     "derivations": [
       "DRV-002"
@@ -1179,7 +1246,8 @@
       "UI-008",
       "UI-009",
       "UI-010",
-      "UI-011"
+      "UI-011",
+      "UI-012"
     ],
     "rules": [
       "BR-001",
@@ -1213,7 +1281,7 @@
 | `key` | 自然鍵 | ✓ | `GLOBAL:<代號>｜TASK:<工作鍵>` |  | 外環據以派發 ID |
 | `scope` | 列舉 | ✓ | GLOBAL／TASK |  | 適用範圍 |
 | `task` | ID 參照 |  | scope＝TASK 時必填 | TASK | 對應工作 |
-| `criteria` | 陣列〈物件〉 | ✓ | kind／statement／refs／evidenceRequired | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、IF、FR、UI、MSG、BR、OP、TC、TASK | 完成條件 |
+| `criteria` | 陣列〈物件〉 | ✓ | kind／statement／refs／evidenceRequired | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、ACT、IF、FR、UI、MSG、BR、OP、TC、TASK | 完成條件 |
 
 **完整性與審查準則**：每個 TASK 都有 DOD（C10）；`refs` 指向的項目都存在（R01）。
 
@@ -1268,7 +1336,7 @@
 | `status` | 列舉 | ✓ | ACCEPTED／SUPERSEDED／REVOKED |  | 決策狀態 |
 | `supersedes` | ID 參照 |  |  | DEC | 取代的舊決策 |
 | `resolves` | 陣列〈ID〉 | ✓ | 可空 | Q | 回答的問題 |
-| `affects` | 陣列〈ID〉 | ✓ | 可空 | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、IF、FR、UI、MSG、BR、OP、TC | 影響的規格項目 |
+| `affects` | 陣列〈ID〉 | ✓ | 可空 | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、ACT、IF、FR、UI、MSG、BR、OP、TC | 影響的規格項目 |
 | `effect` | 列舉 | ✓ | NO_CHANGE／DROP／ADD_SCOPE／ACCEPT_GAP／AMEND_INPUT |  | 對規格的效果 |
 
 **最小合法項目**
@@ -1281,17 +1349,17 @@
   "basis": "HUMAN_DECISION",
   "certainty": "CONFIRMED",
   "evidence": [
-    "EV-0064"
+    "EV-0070"
   ],
   "title": "不重建「核准後重開為草稿」",
-  "context": "Q-002：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
+  "context": "Q-003：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
   "decision": "不重建。",
   "rationale": "這是管理者以特殊參數做的資料維護，不是業務流程；STATUS 文件不納入。",
   "decidedBy": "業務單位主管",
   "decidedOn": "2026-10-08",
   "status": "ACCEPTED",
   "resolves": [
-    "Q-002"
+    "Q-003"
   ],
   "affects": [
     "OBJ-007"
@@ -1306,6 +1374,7 @@
 
 - **用途**：所有未解或待裁決的問題：
   - 圖外狀態與圖外轉移（分級）。
+  - 原生未使用分支（附證明，主文件 §8.8）。
   - 找不到實作的轉移。
   - 證據缺口。
   - 讀者不一致。
@@ -1321,12 +1390,13 @@
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<類別>:<自然鍵>` |  | 外環據以派發 ID |
-| `category` | 列舉 | ✓ | OFF_DIAGRAM_STATE／OFF_DIAGRAM_TRANSITION／DIAGRAM_EDGE_UNIMPLEMENTED／SCOPE_CANDIDATE／EVIDENCE_GAP／READER_*／INPUT_MISSING |  | 問題類別 |
-| `severity` | 列舉 | ✓ | 圖外與 INPUT_MISSING 必為 INFO，其餘必為 BLOCKING |  | 是否阻擋完成 |
+| `category` | 列舉 | ✓ | OFF_DIAGRAM_STATE／OFF_DIAGRAM_TRANSITION／NATIVE_UNUSED_BRANCH／DIAGRAM_EDGE_UNIMPLEMENTED／SCOPE_CANDIDATE／EVIDENCE_GAP／READER_*／INPUT_MISSING |  | 問題類別 |
+| `severity` | 列舉 | ✓ | 圖外、原生未使用分支與 INPUT_MISSING 必為 INFO，其餘必為 BLOCKING |  | 是否阻擋完成 |
 | `grade` | 列舉 |  | 圖外類必填 |  | 圖外分級：HIGH＝PROD 有資料；LOW＝僅核心程式賦值 |
 | `question` | 文字 | ✓ |  |  | 問題敘述 |
-| `affects` | 陣列〈ID〉 | ✓ | 可空 | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、IF、FR、UI、MSG、BR、OP、TC | 受影響的規格項目 |
-| `observed` | 物件 |  | 圖外類必填 |  | 觀察到的狀態碼／轉移／位置 |
+| `affects` | 陣列〈ID〉 | ✓ | 可空 | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、ACT、IF、FR、UI、MSG、BR、OP、TC | 受影響的規格項目 |
+| `observed` | 物件 |  | 圖外類必填；原生未使用分支必填 location |  | 觀察到的狀態碼／轉移／位置 |
+| `proof` | 物件 |  | 原生未使用分支必填；kind＝DATA_VALUE_ABSENT／CONFIG_VALUE（必附 field、absentValues）／OUT_OF_SCOPE_CONTEXT（必附 context） |  | 分支不會執行的證明：原文條件、哪一項永不成立、查證敘述與日期 |
 | `raisedBy` | 列舉 | ✓ | PARSER／RESEARCH／REVIEW／READER／GATE |  | 提出來源 |
 | `status` | 列舉 | ✓ | OPEN／ANSWERED／WITHDRAWN／ACCEPTED_AS_GAP |  | 狀態（ANSWERED／ACCEPTED_AS_GAP 由 19 的決策反查） |
 | `proposedAnswer` | 文字 |  | 僅供參考 |  | 研究端建議的答案（不等於決策） |
@@ -1334,6 +1404,7 @@
 **完整性與審查準則**
 
 - 圖外類必為 INFO，且有分級與觀察值（schema）。
+- 原生未使用分支必為 INFO，必附 `proof`、`observed.location` 與證據（schema）；09 的程式處置要對得上（R14）。
 - 找不到實作、範圍候選、證據缺口、讀者類必為 BLOCKING（schema）。
 - 人工審查：HIGH 級逐一裁決；BLOCKING 必須為 0，或有 ACCEPT_GAP 決策。
 
@@ -1341,7 +1412,7 @@
 
 ```json
 {
-  "id": "Q-001",
+  "id": "Q-002",
   "key": "OFF_DIAGRAM_STATE:REQ_STATUS:099",
   "lifecycle": "ACTIVE",
   "basis": "COMPUTED",

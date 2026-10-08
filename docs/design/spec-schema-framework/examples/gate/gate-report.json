@@ -1,0 +1,107 @@
+{
+  "parse": {
+    "entities": {
+      "CASE_STATUS": {
+        "scope": null,
+        "codes": [
+          "010",
+          "040",
+          "050",
+          "090"
+        ],
+        "transitions": [
+          "*>010",
+          "010>040",
+          "010>090",
+          "040>050",
+          "040>090"
+        ],
+        "finals": [
+          "050",
+          "090"
+        ]
+      },
+      "CASEDOC_STATUS": {
+        "scope": "M040 第 1 區塊",
+        "codes": [
+          "010",
+          "090"
+        ],
+        "transitions": [
+          "*>010",
+          "010>090"
+        ],
+        "finals": [
+          "090"
+        ]
+      },
+      "CASEPAY_STATUS": {
+        "scope": "M040 第 2 區塊",
+        "codes": [
+          "010",
+          "090"
+        ],
+        "transitions": [
+          "*>010",
+          "010>090"
+        ],
+        "finals": [
+          "090"
+        ]
+      }
+    },
+    "composites": [
+      {
+        "entityKey": "CASE_STATUS",
+        "code": "040",
+        "regions": [
+          "CASEDOC_STATUS",
+          "CASEPAY_STATUS"
+        ],
+        "exits": [
+          "050",
+          "090"
+        ]
+      }
+    ],
+    "texts": [
+      {
+        "line": 43,
+        "kind": "desc",
+        "entityKey": "CASE_STATUS",
+        "code": "040",
+        "text": "承辦人上傳結案報告"
+      },
+      {
+        "line": 44,
+        "kind": "desc",
+        "entityKey": "CASEDOC_STATUS",
+        "code": "010",
+        "text": "審查人員逐份審查文件"
+      },
+      {
+        "line": 45,
+        "kind": "desc",
+        "entityKey": "CASEPAY_STATUS",
+        "code": "010",
+        "text": "會計人員依核定金額付款"
+      },
+      {
+        "line": 46,
+        "kind": "note",
+        "entityKey": "CASE_STATUS",
+        "code": "050",
+        "text": "結案後由系統寄發結案通知"
+      }
+    ]
+  },
+  "findings": [],
+  "checksRun": [
+    "L1 schema",
+    "R01",
+    "C01（含平行區塊、狀態圖文字）",
+    "R13",
+    "C02（守門活動）",
+    "C07（守門轉移與活動）"
+  ]
+}

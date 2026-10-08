@@ -166,6 +166,18 @@
                 "TRN"
               ]
             },
+            "performs": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refACT"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "讓操作者完成的狀態活動（以轉移完成的活動不必列）",
+              "x-ref": [
+                "ACT"
+              ]
+            },
             "preconditions": {
               "anyOf": [
                 {
@@ -180,7 +192,9 @@
                 "FLD",
                 "DRV",
                 "STATE",
-                "ROLE"
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "outcome": {

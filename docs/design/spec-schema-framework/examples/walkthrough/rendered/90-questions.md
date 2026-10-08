@@ -2,14 +2,34 @@
 
 > `clone-0123456789abcdef/90`｜版本 r0001｜狀態 **in_review**｜L1 PASS · L2 PASS · L3 NOT_APPLICABLE · L4 NOT_APPLICABLE · L5 NOT_APPLICABLE
 > 依賴文件：01、07、08｜未解問題：無
-> 問題 3（OPEN 1、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2
+> 問題 4（OPEN 2、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2
 > 本檔由 canonical JSON 以程式產生，請勿手改；修改走研究重跑或 19 的決策。
 
 只存在於值域定義、沒有資料也沒有核心程式使用的狀態碼：2 個（REQ_STATUS=040、REQ_STATUS=050），只計數、不列題。
 
 ## 問題（Q）
 
-### Q-001　OFF_DIAGRAM_STATE:REQ_STATUS:099
+### Q-001　NATIVE_UNUSED_BRANCH:TW_DEMO_REQHDR.AMOUNT.SaveEdit:REQ_TYPE=INT
+
+- 自然鍵：`NATIVE_UNUSED_BRANCH:TW_DEMO_REQHDR.AMOUNT.SaveEdit:REQ_TYPE=INT`
+- 問題類別：NATIVE_UNUSED_BRANCH
+- 是否阻擋完成：INFO
+- 問題敘述：金額檢核程式有一段「申請類別＝INT（內部）時略過金額檢核」的原生分支。PROD 沒有 INT 的資料，INT 在值清單已停用、頁面不提供，核心路徑也沒有程式寫入 INT，所以不重建這段分支。新系統若要支援內部申請，需要另外決策。
+- 受影響的規格項目：OBJ-010（TW_DEMO_REQHDR.AMOUNT.SaveEdit）、FLD-018（TW_DEMO_REQHDR.REQ_TYPE）
+- 觀察到的狀態碼／轉移／位置：
+  - 位置：TW_DEMO_REQHDR.AMOUNT.SaveEdit
+- 分支不會執行的證明：原文條件、哪一項永不成立、查證敘述與日期：
+  - 種類：DATA_VALUE_ABSENT
+  - 分支條件原文：If TW_DEMO_REQHDR.REQ_TYPE = "INT" Then
+  - 欄位：TW_DEMO_REQHDR.REQ_TYPE
+  - 不會出現的值：INT
+  - 敘述：PROD 全表沒有 INT（GEN 900 筆、URG 312 筆）；INT 在值清單已停用，頁面選項不含 INT；PeopleCode 交叉參照只有這支程式讀取 REQ_TYPE，核心路徑沒有寫入 INT 的程式；Record 預設值是 GEN。
+  - 查詢日：2026-10-01
+- 提出來源：RESEARCH
+- 狀態（ANSWERED／ACCEPTED_AS_GAP 由 19 的決策反查）：OPEN
+- 來源：外環計算；證據 EV-0022、EV-0023、EV-0024、EV-0025
+
+### Q-002　OFF_DIAGRAM_STATE:REQ_STATUS:099
 
 - 自然鍵：`OFF_DIAGRAM_STATE:REQ_STATUS:099`
 - 問題類別：OFF_DIAGRAM_STATE
@@ -24,7 +44,7 @@
 - 狀態（ANSWERED／ACCEPTED_AS_GAP 由 19 的決策反查）：OPEN
 - 來源：外環計算；證據 EV-0011
 
-### Q-002　OFF_DIAGRAM_TRANSITION:REQ_STATUS:030>010
+### Q-003　OFF_DIAGRAM_TRANSITION:REQ_STATUS:030>010
 
 - 自然鍵：`OFF_DIAGRAM_TRANSITION:REQ_STATUS:030>010`
 - 問題類別：OFF_DIAGRAM_TRANSITION
@@ -40,10 +60,10 @@
 - 提出來源：RESEARCH
 - 狀態（ANSWERED／ACCEPTED_AS_GAP 由 19 的決策反查）：ANSWERED
 - 研究端建議的答案（不等於決策）：看起來是管理者的資料維護入口，不是業務流程。
-- 來源：外環計算；證據 EV-0025
+- 來源：外環計算；證據 EV-0029
 - 被引用（外環反查）：DEC-001
 
-### Q-003　READER_UNDERSPECIFIED:TW_DEMO_APV:APPROVE:APPROVE#concurrency
+### Q-004　READER_UNDERSPECIFIED:TW_DEMO_APV:APPROVE:APPROVE#concurrency
 
 - 自然鍵：`READER_UNDERSPECIFIED:TW_DEMO_APV:APPROVE:APPROVE#concurrency`
 - 問題類別：READER_UNDERSPECIFIED

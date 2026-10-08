@@ -19,10 +19,13 @@
 - 技術選型不入規格。
 - 只做 Claude Code 版（Sonnet 5）。
 - 除外環判定完成外，另加乾淨讀者交叉解讀（L5）：3 位讀者、最多 2 輪、多數決，抓幻覺與過度簡略。
+- 子業務守門用畫法一（主業務狀態畫成複合狀態、內含 `--` 平行區塊）；守門條件寫成逐列條件（必寫一列都沒有時算不算）。
+  狀態圖上描述「這個階段誰該做什麼」的文字是狀態活動，每一行都要處置（設計 §8.7）。
+- 非狀態的原生分支：能以資料、設定或範圍外情境證明永不執行的只進問題清單，證明不了的保留（設計 §8.8）。
 
-設計見 `docs/design/spec-schema-framework.md`，附件有 types.md、walkthrough.md、schemas、examples。
+設計見 `docs/design/spec-schema-framework.md`，附件有 types.md、walkthrough.md、schemas、examples（貫穿範例與畫法一守門範例）。
 設計期用來產生與驗證附件的 Python 原型依管理者要求不放進 repo。
-討論中：子業務守門（主狀態等多個子業務狀態與 activity 到位）的畫法與條件寫法、非狀態欄位原生未使用分支的判斷方法（設計 §15）。
+待第一份真實 STATUS 檔校準：子業務在 flowchart 的畫法、跨區塊箭頭等目前不支援的寫法、活動文字的位置（設計 §15）。
 實作拆分見設計 §16，落地時再記 applied.md，並在 AGENTS.md 註明這條流程只有 Claude Code 版。
 
 **重建套件（2026-09-29）**：管理者要讓 AI 依 Spec 從零重建 JO（.NET＋React＋MariaDB、本機可跑的 MVP、

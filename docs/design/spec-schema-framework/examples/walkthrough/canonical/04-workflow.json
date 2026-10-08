@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "in_review",
   "title": "04 流程與狀態機",
-  "summary": "狀態 6、轉移 10、情境 4；未解問題 0",
+  "summary": "狀態 6、轉移 10、情境 4、活動 2；未解問題 0",
   "components": [
     "TW_DEMO_APV",
     "TW_DEMO_REQ"
@@ -20,17 +20,17 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "STATUS_DOC",
       "ref": "status-REQ_STATUS.md",
-      "fingerprint": "de0f15829df41238955cb9fddbba169be9ef1542a46cb00af292c5b2d767f676"
+      "fingerprint": "5b863630e30b3c5ab00039b105579cc387479b781219cdcb6b4f0d3efc2fc7f7"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/04-workflow",
-      "fingerprint": "fe19d8c99f891be965beccd13bf3011d5d8ff588a6cd6c999497e27bb569afd2"
+      "fingerprint": "cedd38ebc85d637dcef3f94c30962355b7b5d230e9d4f1ec19b80879e99237bc"
     }
   ],
   "gate": {
@@ -45,8 +45,32 @@
     {
       "entityKey": "REQ_STATUS",
       "flowchart": "status-REQ_STATUS.md#L7-L20",
-      "stateDiagram": "status-REQ_STATUS.md#L24-L47",
-      "fingerprint": "de0f15829df41238955cb9fddbba169be9ef1542a46cb00af292c5b2d767f676"
+      "stateDiagram": "status-REQ_STATUS.md#L24-L49",
+      "fingerprint": "5b863630e30b3c5ab00039b105579cc387479b781219cdcb6b4f0d3efc2fc7f7"
+    }
+  ],
+  "diagramTexts": [
+    {
+      "locator": "status-REQ_STATUS.md#L46",
+      "text": "直屬主管審核申請內容",
+      "disposition": "ACTIVITY",
+      "activities": [
+        "ACT-001"
+      ]
+    },
+    {
+      "locator": "status-REQ_STATUS.md#L47",
+      "text": "部門主管審核",
+      "disposition": "ACTIVITY",
+      "activities": [
+        "ACT-002"
+      ]
+    },
+    {
+      "locator": "status-REQ_STATUS.md#L48",
+      "text": "作廢的申請單不能再修改",
+      "disposition": "NOT_ACTIVITY",
+      "note": "描述終點的性質，不是某人在這個階段要做的事；已由 090 的終點標記與 05 的按鈕顯示條件表達。"
     }
   ],
   "items": [
@@ -57,7 +81,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0034",
+        "EV-0038",
         "EV-0011"
       ],
       "entityKey": "REQ_STATUS",
@@ -77,7 +101,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0035",
+        "EV-0039",
         "EV-0011"
       ],
       "entityKey": "REQ_STATUS",
@@ -97,7 +121,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0036",
+        "EV-0040",
         "EV-0011"
       ],
       "entityKey": "REQ_STATUS",
@@ -117,7 +141,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0037",
+        "EV-0041",
         "EV-0011"
       ],
       "entityKey": "REQ_STATUS",
@@ -137,7 +161,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0038",
+        "EV-0042",
         "EV-0011"
       ],
       "entityKey": "REQ_STATUS",
@@ -157,7 +181,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0039",
+        "EV-0043",
         "EV-0011"
       ],
       "entityKey": "REQ_STATUS",
@@ -177,13 +201,14 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0040",
-        "EV-0041",
+        "EV-0044",
+        "EV-0045",
         "EV-0004"
       ],
       "entityKey": "REQ_STATUS",
       "from": "INITIAL",
       "to": "STATE-001",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-003",
@@ -228,13 +253,14 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0042",
-        "EV-0043",
+        "EV-0046",
+        "EV-0047",
         "EV-0016"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-001",
       "to": "STATE-003",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-003",
@@ -275,7 +301,7 @@
           }
         },
         {
-          "field": "FLD-018",
+          "field": "FLD-019",
           "value": {
             "ctx": "CURRENT_DATE"
           }
@@ -299,13 +325,14 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0046",
-        "EV-0047",
+        "EV-0050",
+        "EV-0051",
         "EV-0017"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-001",
       "to": "STATE-006",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-003",
@@ -364,13 +391,14 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0044",
-        "EV-0045",
+        "EV-0048",
+        "EV-0049",
         "EV-0016"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-002",
       "to": "STATE-003",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-003",
@@ -411,7 +439,7 @@
           }
         },
         {
-          "field": "FLD-018",
+          "field": "FLD-019",
           "value": {
             "ctx": "CURRENT_DATE"
           }
@@ -435,13 +463,14 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0048",
-        "EV-0049",
+        "EV-0052",
+        "EV-0053",
         "EV-0017"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-002",
       "to": "STATE-006",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-003",
@@ -500,14 +529,15 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0056",
-        "EV-0057",
+        "EV-0060",
+        "EV-0061",
         "EV-0020",
         "EV-0019"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-003",
       "to": "STATE-002",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-002",
@@ -566,8 +596,8 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0052",
-        "EV-0053",
+        "EV-0056",
+        "EV-0057",
         "EV-0018",
         "EV-0019"
       ],
@@ -577,6 +607,7 @@
       "via": [
         "amount_check"
       ],
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-002",
@@ -642,8 +673,8 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0050",
-        "EV-0051",
+        "EV-0054",
+        "EV-0055",
         "EV-0018",
         "EV-0019"
       ],
@@ -653,6 +684,7 @@
       "via": [
         "amount_check"
       ],
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-002",
@@ -730,14 +762,15 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0058",
-        "EV-0059",
+        "EV-0062",
+        "EV-0063",
         "EV-0020",
         "EV-0019"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-004",
       "to": "STATE-002",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-002",
@@ -796,14 +829,15 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0054",
-        "EV-0055",
+        "EV-0058",
+        "EV-0059",
         "EV-0018",
         "EV-0019"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-004",
       "to": "STATE-005",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-002",
@@ -874,7 +908,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0060"
+        "EV-0064"
       ],
       "entityKey": "REQ_STATUS",
       "scenarioType": "主流程",
@@ -914,7 +948,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0063"
+        "EV-0067"
       ],
       "entityKey": "REQ_STATUS",
       "scenarioType": "撤回作廢",
@@ -952,7 +986,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0062"
+        "EV-0066"
       ],
       "entityKey": "REQ_STATUS",
       "scenarioType": "退回補件",
@@ -993,7 +1027,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0061"
+        "EV-0065"
       ],
       "entityKey": "REQ_STATUS",
       "scenarioType": "高額審核",
@@ -1020,6 +1054,63 @@
         "na": "進入條件即各步驟轉移的起點狀態"
       },
       "exceptions": "部門主管可退回，轉入「退回補件」。"
+    },
+    {
+      "id": "ACT-001",
+      "key": "REQ_STATUS:020:01",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0068",
+        "EV-0019"
+      ],
+      "entityKey": "REQ_STATUS",
+      "state": "STATE-003",
+      "name": "直屬主管審核申請",
+      "behavior": "直屬主管審核申請內容",
+      "actors": [
+        {
+          "drv": "DRV-002"
+        }
+      ],
+      "enforcement": "BY_TRANSITION",
+      "realizedBy": [
+        "TRN-008",
+        "TRN-007",
+        "TRN-006"
+      ],
+      "completion": {
+        "na": "核准或退回（離開 020）即完成；系統沒有另外記錄審核進度"
+      }
+    },
+    {
+      "id": "ACT-002",
+      "key": "REQ_STATUS:025:01",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0069",
+        "EV-0019"
+      ],
+      "entityKey": "REQ_STATUS",
+      "state": "STATE-004",
+      "name": "部門主管審核高額申請",
+      "behavior": "部門主管審核",
+      "actors": [
+        {
+          "drv": "DRV-001"
+        }
+      ],
+      "enforcement": "BY_TRANSITION",
+      "realizedBy": [
+        "TRN-010",
+        "TRN-009"
+      ],
+      "completion": {
+        "na": "核准或退回（離開 025）即完成；系統沒有另外記錄審核進度"
+      }
     }
   ]
 }

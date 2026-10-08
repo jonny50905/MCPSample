@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "in_review",
   "title": "90 問題清單",
-  "summary": "問題 3（OPEN 1、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2",
+  "summary": "問題 4（OPEN 2、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2",
   "components": [
     "TW_DEMO_APV",
     "TW_DEMO_REQ"
@@ -20,12 +20,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/90-questions",
-      "fingerprint": "500fc0d0ee6be711e9e86795ad783ce0beb9bc586d944d9b0fa9513da7615055"
+      "fingerprint": "776024b2636034d639400c00b5132bae3339c35637b4e77288cb0321096177bb"
     }
   ],
   "gate": {
@@ -52,6 +52,41 @@
   "items": [
     {
       "id": "Q-001",
+      "key": "NATIVE_UNUSED_BRANCH:TW_DEMO_REQHDR.AMOUNT.SaveEdit:REQ_TYPE=INT",
+      "lifecycle": "ACTIVE",
+      "basis": "COMPUTED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0022",
+        "EV-0023",
+        "EV-0024",
+        "EV-0025"
+      ],
+      "category": "NATIVE_UNUSED_BRANCH",
+      "severity": "INFO",
+      "question": "金額檢核程式有一段「申請類別＝INT（內部）時略過金額檢核」的原生分支。PROD 沒有 INT 的資料，INT 在值清單已停用、頁面不提供，核心路徑也沒有程式寫入 INT，所以不重建這段分支。新系統若要支援內部申請，需要另外決策。",
+      "affects": [
+        "OBJ-010",
+        "FLD-018"
+      ],
+      "observed": {
+        "location": "TW_DEMO_REQHDR.AMOUNT.SaveEdit"
+      },
+      "proof": {
+        "kind": "DATA_VALUE_ABSENT",
+        "branchCondition": "If TW_DEMO_REQHDR.REQ_TYPE = \"INT\" Then",
+        "field": "TW_DEMO_REQHDR.REQ_TYPE",
+        "absentValues": [
+          "INT"
+        ],
+        "statement": "PROD 全表沒有 INT（GEN 900 筆、URG 312 筆）；INT 在值清單已停用，頁面選項不含 INT；PeopleCode 交叉參照只有這支程式讀取 REQ_TYPE，核心路徑沒有寫入 INT 的程式；Record 預設值是 GEN。",
+        "checkedOn": "2026-10-01"
+      },
+      "raisedBy": "RESEARCH",
+      "status": "OPEN"
+    },
+    {
+      "id": "Q-002",
       "key": "OFF_DIAGRAM_STATE:REQ_STATUS:099",
       "lifecycle": "ACTIVE",
       "basis": "COMPUTED",
@@ -74,13 +109,13 @@
       "status": "OPEN"
     },
     {
-      "id": "Q-002",
+      "id": "Q-003",
       "key": "OFF_DIAGRAM_TRANSITION:REQ_STATUS:030>010",
       "lifecycle": "ACTIVE",
       "basis": "COMPUTED",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0025"
+        "EV-0029"
       ],
       "category": "OFF_DIAGRAM_TRANSITION",
       "severity": "INFO",
@@ -100,7 +135,7 @@
       "proposedAnswer": "看起來是管理者的資料維護入口，不是業務流程。"
     },
     {
-      "id": "Q-003",
+      "id": "Q-004",
       "key": "READER_UNDERSPECIFIED:TW_DEMO_APV:APPROVE:APPROVE#concurrency",
       "lifecycle": "ACTIVE",
       "basis": "COMPUTED",

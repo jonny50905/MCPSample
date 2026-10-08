@@ -88,6 +88,7 @@
               "enum": [
                 "OFF_DIAGRAM_STATE",
                 "OFF_DIAGRAM_TRANSITION",
+                "NATIVE_UNUSED_BRANCH",
                 "DIAGRAM_EDGE_UNIMPLEMENTED",
                 "SCOPE_CANDIDATE",
                 "EVIDENCE_GAP",
@@ -138,6 +139,7 @@
                 "STATE",
                 "TRN",
                 "FLOW",
+                "ACT",
                 "IF",
                 "FR",
                 "UI",
@@ -169,6 +171,86 @@
               "required": [],
               "additionalProperties": false,
               "description": "觀察到的狀態碼／轉移／位置"
+            },
+            "proof": {
+              "type": "object",
+              "required": [
+                "kind",
+                "branchCondition",
+                "statement",
+                "checkedOn"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "DATA_VALUE_ABSENT",
+                    "CONFIG_VALUE",
+                    "OUT_OF_SCOPE_CONTEXT"
+                  ]
+                },
+                "branchCondition": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                "field": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9_$#@]+\\.[A-Z0-9_$#@]+$"
+                },
+                "absentValues": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "context": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                "statement": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                "checkedOn": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/date"
+                }
+              },
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "DATA_VALUE_ABSENT",
+                          "CONFIG_VALUE"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "field",
+                      "absentValues"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "OUT_OF_SCOPE_CONTEXT"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "context"
+                    ]
+                  }
+                }
+              ],
+              "description": "分支不會執行的證明：原文條件、哪一項永不成立、查證敘述與日期"
             },
             "raisedBy": {
               "type": "string",
@@ -263,6 +345,44 @@
               "severity": {
                 "const": "INFO"
               }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "category"
+            ],
+            "properties": {
+              "category": {
+                "const": "NATIVE_UNUSED_BRANCH"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "proof",
+              "observed"
+            ],
+            "properties": {
+              "severity": {
+                "const": "INFO"
+              },
+              "observed": {
+                "required": [
+                  "location"
+                ]
+              },
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "proof"
+              ]
             }
           }
         },

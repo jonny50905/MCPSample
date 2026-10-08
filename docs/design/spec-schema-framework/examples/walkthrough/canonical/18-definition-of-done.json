@@ -24,7 +24,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     }
   ],
   "gate": {
@@ -137,11 +137,13 @@
         },
         {
           "kind": "RULES_IMPLEMENTED",
-          "statement": "本工作的轉移、規則與操作都已實作。",
+          "statement": "本工作的轉移、活動、規則與操作都已實作。",
           "refs": [
             "TRN-008",
             "TRN-007",
             "TRN-010",
+            "ACT-001",
+            "ACT-002",
             "OP-001"
           ],
           "evidenceRequired": "CODE_REFERENCE"
@@ -177,10 +179,12 @@
         },
         {
           "kind": "RULES_IMPLEMENTED",
-          "statement": "本工作的轉移、規則與操作都已實作。",
+          "statement": "本工作的轉移、活動、規則與操作都已實作。",
           "refs": [
             "TRN-006",
             "TRN-009",
+            "ACT-001",
+            "ACT-002",
             "BR-005",
             "OP-002"
           ],

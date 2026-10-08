@@ -71,7 +71,7 @@
         {
           "seq": 1,
           "action": "以 E1001 按「送出」",
-          "control": "UI-011",
+          "control": "UI-012",
           "operation": "OP-004"
         }
       ],

@@ -12,7 +12,7 @@
 | OBJ-007（TW_DEMO_APV.PostBuild） | OFF_DIAGRAM_ONLY | —；只有狀態圖外的「核准後重開為草稿」邏輯，列入 90 問題清單。 |
 | OBJ-008（TW_DEMO_REQ.SavePostChange） | BUSINESS_RULES | BR-001 |
 | OBJ-009（TW_DEMO_REQ.SavePreChange） | BUSINESS_RULES | BR-002 |
-| OBJ-010（TW_DEMO_REQHDR.AMOUNT.SaveEdit） | BUSINESS_RULES | BR-003 |
+| OBJ-010（TW_DEMO_REQHDR.AMOUNT.SaveEdit） | BUSINESS_RULES、NATIVE_UNUSED_BRANCH | BR-003；另有一段已證明不會執行的原生分支，不重建（見 90）。 |
 | OBJ-011（TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault） | BUSINESS_RULES | BR-004 |
 | OBJ-012（TW_DEMO_REQWRK.APPROVE_PB.FieldChange） | TRANSITION_IMPL | TRN-008、TRN-007、TRN-010 |
 | OBJ-013（TW_DEMO_REQWRK.RETURN_PB.FieldChange） | TRANSITION_IMPL、BUSINESS_RULES | TRN-006、TRN-009、BR-005 |
@@ -82,7 +82,7 @@
 - 原系統實作位置：
   - 物件：OBJ-008（TW_DEMO_REQ.SavePostChange）
   - 事件：SavePostChange
-- 來源：程式；證據 EV-0024
+- 來源：程式；證據 EV-0028
 - 被引用（外環反查）：OBJ-008；TC-013；TASK-005；DOD-006
 
 ### BR-002　新單取號
@@ -105,7 +105,7 @@
 - 原系統實作位置：
   - 物件：OBJ-009（TW_DEMO_REQ.SavePreChange）
   - 事件：SavePreChange
-- 來源：程式；證據 EV-0023
+- 來源：程式；證據 EV-0027
 - 被引用（外環反查）：OBJ-009；TC-009；TASK-004；DOD-005
 
 ### BR-003　金額必須大於 0
@@ -149,7 +149,7 @@
 - 原系統實作位置：
   - 物件：OBJ-011（TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault）
   - 事件：FieldDefault
-- 來源：程式；證據 EV-0022
+- 來源：程式；證據 EV-0026
 - 被引用（外環反查）：OBJ-011；TC-009；TASK-004；DOD-005
 
 ### BR-005　退回時必須填寫審核意見
@@ -183,7 +183,7 @@
 - 適用的功能：FR-004（送出申請）
 - 觸發事件、元件、轉移、模式：
   - 事件：FIELD_CHANGE
-  - 元件：UI-011（送出）
+  - 元件：UI-012（送出）
   - 轉移：TRN-002（010→020）、TRN-004（015→020）
 - 精確條件：〈申請人的直屬主管〉（DRV-002） 查不到（結果為空）
 - 動作：
@@ -195,5 +195,5 @@
 - 原系統實作位置：
   - 物件：OBJ-014（TW_DEMO_REQWRK.SUBMIT_PB.FieldChange）
   - 事件：FieldChange
-- 來源：程式；證據 EV-0016、EV-0026
+- 來源：程式；證據 EV-0016、EV-0030
 - 被引用（外環反查）：OBJ-014；OP-004；TC-011；TASK-005；DOD-006

@@ -20,12 +20,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/06-architecture",
-      "fingerprint": "f4021db67878dcee311f29cf5ae1aba3dfed8cb4c659a663232747b49085b355"
+      "fingerprint": "7da865f282e23d2e02cbbf4eefaf2ee65f18b80e09768adbb04ab36f7f731fbf"
     }
   ],
   "gate": {
@@ -44,8 +44,8 @@
       "basis": "CODE",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0024",
-        "EV-0029"
+        "EV-0028",
+        "EV-0033"
       ],
       "ifType": "NOTIFICATION",
       "object": "OBJ-001",

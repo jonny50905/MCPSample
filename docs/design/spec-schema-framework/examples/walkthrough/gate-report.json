@@ -46,6 +46,26 @@
         "025>030"
       ]
     },
+    "texts": [
+      {
+        "line": 46,
+        "kind": "desc",
+        "code": "020",
+        "text": "直屬主管審核申請內容"
+      },
+      {
+        "line": 47,
+        "kind": "note",
+        "code": "025",
+        "text": "部門主管審核"
+      },
+      {
+        "line": 48,
+        "kind": "note",
+        "code": "090",
+        "text": "作廢的申請單不能再修改"
+      }
+    ],
     "codesEqual": true,
     "transitionsEqual": true,
     "onlyInFlowchart": [],
@@ -61,7 +81,7 @@
         "L5": "NOT_APPLICABLE"
       },
       "status": "in_review",
-      "summary": "目標 1、決策責任 2、物件 22；未解問題 0",
+      "summary": "目標 1、決策責任 2、物件 22；未解問題 1",
       "dependsOn": []
     },
     "02-functional-requirements": {
@@ -105,7 +125,7 @@
         "L5": "PASS"
       },
       "status": "in_review",
-      "summary": "狀態 6、轉移 10、情境 4；未解問題 0",
+      "summary": "狀態 6、轉移 10、情境 4、活動 2；未解問題 0",
       "dependsOn": [
         "01-overview",
         "03-roles-permissions",
@@ -121,7 +141,7 @@
         "L5": "PASS"
       },
       "status": "in_review",
-      "summary": "畫面元件 12；未解問題 0",
+      "summary": "畫面元件 13；未解問題 0",
       "dependsOn": [
         "01-overview",
         "02-functional-requirements",
@@ -154,7 +174,7 @@
         "L5": "PASS"
       },
       "status": "in_review",
-      "summary": "實體 3、欄位 18、衍生概念 2、不建置欄位組 1；未解問題 1",
+      "summary": "實體 3、欄位 19、衍生概念 2、不建置欄位組 1；未解問題 2",
       "dependsOn": [
         "01-overview"
       ]
@@ -228,7 +248,7 @@
         "L5": "NOT_APPLICABLE"
       },
       "status": "in_review",
-      "summary": "條款 10",
+      "summary": "條款 12",
       "dependsOn": []
     },
     "17-tasks": {
@@ -296,7 +316,7 @@
         "L5": "NOT_APPLICABLE"
       },
       "status": "in_review",
-      "summary": "問題 3（OPEN 1、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2",
+      "summary": "問題 4（OPEN 2、ANSWERED 1、WITHDRAWN 1）；未解 BLOCKING 0；只計數的定義值 2",
       "dependsOn": [
         "01-overview",
         "07-database",

@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "03-roles-permissions",
+  "docId": "clone-fedcba9876543210/03",
+  "jobId": "clone-fedcba9876543210",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "03 角色與權限",
+  "summary": "角色 3（守門範例，只跑部分檢核）",
+  "components": [
+    "TW_DEMO_CASE",
+    "TW_DEMO_DOCREV",
+    "TW_DEMO_PAYMNT"
+  ],
+  "dependsOn": [
+    "01-overview"
+  ],
+  "sources": [
+    {
+      "kind": "STATUS_DOC",
+      "ref": "status-CASE_STATUS.md",
+      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+    }
+  ],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "ROLE-001",
+      "key": "ROLE:TW_DEMO_ACCT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "principalType": "ROLE",
+      "object": "OBJ-008",
+      "name": "會計人員",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "由系統管理者指派；指派作業不在本範例範圍。"
+      }
+    },
+    {
+      "id": "ROLE-002",
+      "key": "ROLE:TW_DEMO_OFFICER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "principalType": "ROLE",
+      "object": "OBJ-009",
+      "name": "承辦人",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "由系統管理者指派；指派作業不在本範例範圍。"
+      }
+    },
+    {
+      "id": "ROLE-003",
+      "key": "ROLE:TW_DEMO_REVIEWER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "principalType": "ROLE",
+      "object": "OBJ-010",
+      "name": "審查人員",
+      "membership": {
+        "kind": "STATIC_ASSIGNMENT",
+        "note": "由系統管理者指派；指派作業不在本範例範圍。"
+      }
+    }
+  ]
+}

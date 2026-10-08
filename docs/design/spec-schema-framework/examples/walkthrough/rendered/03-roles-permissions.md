@@ -46,7 +46,7 @@
   - 效果：ROWS_FILTERED
   - 說明：查詢結果不含他人的申請單。
 - 檢查位置：ROW_LEVEL_SECURITY
-- 來源：程式；證據 EV-0008、EV-0032
+- 來源：程式；證據 EV-0008、EV-0036
 - 被引用（外環反查）：DOD-002
 
 ### PERM-002　ROLE:TW_DEMO_REQUESTER>COMPONENT:TW_DEMO_REQ
@@ -62,5 +62,5 @@
   - 效果：ROWS_FILTERED
   - 說明：查詢結果不含他人的申請單。
 - 檢查位置：ROW_LEVEL_SECURITY
-- 來源：程式；證據 EV-0008、EV-0033
+- 來源：程式；證據 EV-0008、EV-0037
 - 被引用（外環反查）：DOD-002

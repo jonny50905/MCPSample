@@ -43,7 +43,8 @@
                     "TRANSITION_IMPL",
                     "DERIVATION_IMPL",
                     "NO_BUSINESS_LOGIC",
-                    "OFF_DIAGRAM_ONLY"
+                    "OFF_DIAGRAM_ONLY",
+                    "NATIVE_UNUSED_BRANCH"
                   ]
                 },
                 "minItems": 1,
@@ -281,7 +282,9 @@
                 "FLD",
                 "DRV",
                 "STATE",
-                "ROLE"
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "action": {
@@ -376,6 +379,8 @@
                 "DRV",
                 "STATE",
                 "ROLE",
+                "ACT",
+                "ENT",
                 "IF"
               ]
             },

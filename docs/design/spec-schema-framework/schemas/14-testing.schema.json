@@ -109,16 +109,25 @@
                   },
                   "minItems": 1,
                   "uniqueItems": true
+                },
+                "activities": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refACT"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
                 }
               },
               "additionalProperties": false,
-              "description": "覆蓋的規則／轉移／情境／元件／操作",
+              "description": "覆蓋的規則／轉移／情境／元件／操作／活動",
               "x-ref": [
                 "BR",
                 "TRN",
                 "FLOW",
                 "UI",
-                "OP"
+                "OP",
+                "ACT"
               ]
             },
             "preconditions": {
@@ -171,10 +180,12 @@
               "additionalProperties": false,
               "description": "前置狀態、操作者、前置資料（合成）",
               "x-ref": [
-                "STATE",
                 "FLD",
                 "DRV",
-                "ROLE"
+                "STATE",
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "steps": {

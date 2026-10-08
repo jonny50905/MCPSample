@@ -1,0 +1,479 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "07-database",
+  "docId": "clone-fedcba9876543210/07",
+  "jobId": "clone-fedcba9876543210",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "07 資料設計",
+  "summary": "實體 3、欄位 11（守門範例，只跑部分檢核）",
+  "components": [
+    "TW_DEMO_CASE",
+    "TW_DEMO_DOCREV",
+    "TW_DEMO_PAYMNT"
+  ],
+  "dependsOn": [
+    "01-overview"
+  ],
+  "sources": [
+    {
+      "kind": "STATUS_DOC",
+      "ref": "status-CASE_STATUS.md",
+      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+    }
+  ],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "ENT-001",
+      "key": "TW_DEMO_CASE",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "record": "OBJ-005",
+      "name": "案件",
+      "businessMeaning": "一個案件一列；主業務狀態、結案報告與結案日在這裡。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_CASE",
+      "keys": [
+        "FLD-001"
+      ],
+      "effectiveDating": {
+        "kind": "NONE"
+      }
+    },
+    {
+      "id": "ENT-002",
+      "key": "TW_DEMO_CASEDOC",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "record": "OBJ-006",
+      "name": "案件文件",
+      "businessMeaning": "案件的每一份文件一列；文件審查（子業務）的狀態在這裡。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_CASEDOC",
+      "keys": [
+        "FLD-005",
+        "FLD-006"
+      ],
+      "effectiveDating": {
+        "kind": "NONE"
+      },
+      "parent": {
+        "entity": "ENT-001",
+        "keyMap": [
+          {
+            "child": "FLD-005",
+            "parent": "FLD-001"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ENT-003",
+      "key": "TW_DEMO_CASEPAY",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "record": "OBJ-007",
+      "name": "案件付款",
+      "businessMeaning": "案件的每一筆付款一列；付款（子業務）的狀態在這裡。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_CASEPAY",
+      "keys": [
+        "FLD-008",
+        "FLD-010"
+      ],
+      "effectiveDating": {
+        "kind": "NONE"
+      },
+      "parent": {
+        "entity": "ENT-001",
+        "keyMap": [
+          {
+            "child": "FLD-008",
+            "parent": "FLD-001"
+          }
+        ]
+      }
+    },
+    {
+      "id": "FLD-001",
+      "key": "TW_DEMO_CASE.CASE_ID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "CASE_ID",
+      "label": "案件編號",
+      "dataType": "CHAR",
+      "length": 10,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY",
+        "SEARCH_KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-002",
+      "key": "TW_DEMO_CASE.CASE_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002",
+        "EV-0004"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "CASE_STATUS",
+      "label": "案件狀態",
+      "dataType": "CHAR",
+      "length": 3,
+      "required": "ALWAYS",
+      "default": {
+        "const": "010",
+        "type": "CHAR"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "010",
+            "label": "受理",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "040",
+            "label": "處理中",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "050",
+            "label": "結案",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "090",
+            "label": "撤案",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-003",
+      "key": "TW_DEMO_CASE.CLOSE_DT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "CLOSE_DT",
+      "label": "結案日",
+      "dataType": "DATE",
+      "length": {
+        "na": "日期型別沒有長度"
+      },
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-004",
+      "key": "TW_DEMO_CASE.CLOSE_RPT_ATT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002",
+        "EV-0016"
+      ],
+      "entity": "ENT-001",
+      "fieldName": "CLOSE_RPT_ATT",
+      "label": "結案報告附件",
+      "dataType": "CHAR",
+      "length": 64,
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-005",
+      "key": "TW_DEMO_CASEDOC.CASE_ID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "CASE_ID",
+      "label": "案件編號",
+      "dataType": "CHAR",
+      "length": 10,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "relations": [
+        {
+          "target": "FLD-001",
+          "kind": "PARENT_KEY"
+        }
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-006",
+      "key": "TW_DEMO_CASEDOC.DOC_SEQ",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "DOC_SEQ",
+      "label": "文件序號",
+      "dataType": "NUMBER",
+      "length": 3,
+      "decimals": 0,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-007",
+      "key": "TW_DEMO_CASEDOC.DOC_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002",
+        "EV-0005"
+      ],
+      "entity": "ENT-002",
+      "fieldName": "DOC_STATUS",
+      "label": "文件審查狀態",
+      "dataType": "CHAR",
+      "length": 3,
+      "required": "ALWAYS",
+      "default": {
+        "const": "010",
+        "type": "CHAR"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "010",
+            "label": "待審查",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "090",
+            "label": "審查完成",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-008",
+      "key": "TW_DEMO_CASEPAY.CASE_ID",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "CASE_ID",
+      "label": "案件編號",
+      "dataType": "CHAR",
+      "length": 10,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "relations": [
+        {
+          "target": "FLD-001",
+          "kind": "PARENT_KEY"
+        }
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-009",
+      "key": "TW_DEMO_CASEPAY.PAY_AMT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "PAY_AMT",
+      "label": "核定金額",
+      "dataType": "NUMBER",
+      "length": 11,
+      "decimals": 2,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-010",
+      "key": "TW_DEMO_CASEPAY.PAY_SEQ",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "PAY_SEQ",
+      "label": "付款序號",
+      "dataType": "NUMBER",
+      "length": 3,
+      "decimals": 0,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-011",
+      "key": "TW_DEMO_CASEPAY.PAY_STATUS",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002",
+        "EV-0006"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "PAY_STATUS",
+      "label": "付款狀態",
+      "dataType": "CHAR",
+      "length": 3,
+      "required": "ALWAYS",
+      "default": {
+        "const": "010",
+        "type": "CHAR"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "010",
+            "label": "待付款",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "090",
+            "label": "已付款",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    }
+  ]
+}

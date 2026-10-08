@@ -126,6 +126,13 @@
                   },
                   "uniqueItems": true
                 },
+                "activities": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refACT"
+                  },
+                  "uniqueItems": true
+                },
                 "controls": {
                   "type": "array",
                   "items": {
@@ -164,6 +171,7 @@
                 "DRV",
                 "ROLE",
                 "TRN",
+                "ACT",
                 "UI",
                 "BR",
                 "OP",

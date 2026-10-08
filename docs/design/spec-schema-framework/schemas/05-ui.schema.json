@@ -277,7 +277,9 @@
                 "FLD",
                 "DRV",
                 "STATE",
-                "ROLE"
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "editability": {
@@ -297,7 +299,9 @@
                 "FLD",
                 "DRV",
                 "STATE",
-                "ROLE"
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "options": {
@@ -357,11 +361,12 @@
               "additionalProperties": false,
               "description": "值來源",
               "x-ref": [
-                "ENT",
                 "FLD",
                 "DRV",
                 "STATE",
-                "ROLE"
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "displayDefault": {

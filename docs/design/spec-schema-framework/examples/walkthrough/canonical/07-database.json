@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "in_review",
   "title": "07 資料設計",
-  "summary": "實體 3、欄位 18、衍生概念 2、不建置欄位組 1；未解問題 1",
+  "summary": "實體 3、欄位 19、衍生概念 2、不建置欄位組 1；未解問題 2",
   "components": [
     "TW_DEMO_APV",
     "TW_DEMO_REQ"
@@ -18,12 +18,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/07-database",
-      "fingerprint": "d3bc268778424882767bc925d9f52eadd9e5a3a8c940fee78afc6494884cac64"
+      "fingerprint": "ef497e1c80ec556aa2746f65b6ddda097c516f779a4ae905a18f23e743940217"
     }
   ],
   "gate": {
@@ -34,7 +34,8 @@
     "L5": "PASS"
   },
   "openQuestions": [
-    "Q-001"
+    "Q-001",
+    "Q-002"
   ],
   "items": [
     {
@@ -669,6 +670,53 @@
     },
     {
       "id": "FLD-018",
+      "key": "TW_DEMO_REQHDR.REQ_TYPE",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0007",
+        "EV-0023",
+        "EV-0024"
+      ],
+      "entity": "ENT-003",
+      "fieldName": "REQ_TYPE",
+      "label": "申請類別",
+      "dataType": "CHAR",
+      "length": 3,
+      "required": "ALWAYS",
+      "default": {
+        "const": "GEN",
+        "type": "CHAR"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "GEN",
+            "label": "一般",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "URG",
+            "label": "急件",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "INT",
+            "label": "內部",
+            "active": false,
+            "dataPresence": "NO_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "DATA_HAS_VALUE"
+    },
+    {
+      "id": "FLD-019",
       "key": "TW_DEMO_REQHDR.SUBMIT_DT",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
@@ -701,7 +749,7 @@
       "basis": "CODE",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0027",
+        "EV-0031",
         "EV-0015"
       ],
       "name": "申請人的部門主管",
@@ -778,7 +826,7 @@
       "basis": "CODE",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0026",
+        "EV-0030",
         "EV-0014"
       ],
       "name": "申請人的直屬主管",

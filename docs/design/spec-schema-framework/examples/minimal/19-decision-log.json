@@ -28,17 +28,17 @@
       "basis": "HUMAN_DECISION",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0064"
+        "EV-0070"
       ],
       "title": "不重建「核准後重開為草稿」",
-      "context": "Q-002：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
+      "context": "Q-003：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
       "decision": "不重建。",
       "rationale": "這是管理者以特殊參數做的資料維護，不是業務流程；STATUS 文件不納入。",
       "decidedBy": "業務單位主管",
       "decidedOn": "2026-10-08",
       "status": "ACCEPTED",
       "resolves": [
-        "Q-002"
+        "Q-003"
       ],
       "affects": [
         "OBJ-007"

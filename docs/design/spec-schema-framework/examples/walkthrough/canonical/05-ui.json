@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "in_review",
   "title": "05 畫面與互動",
-  "summary": "畫面元件 12；未解問題 0",
+  "summary": "畫面元件 13；未解問題 0",
   "components": [
     "TW_DEMO_APV",
     "TW_DEMO_REQ"
@@ -21,12 +21,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/05-ui",
-      "fingerprint": "5cb419e04ac42e8682a86968d8e44dc4b5e4087d33e0ba50327589783997b095"
+      "fingerprint": "e18fe74fcba46066bbebe0113cdba9a70b5ad00b60c1ac57f06a0182c9e2589a"
     }
   ],
   "gate": {
@@ -118,7 +118,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0005",
-        "EV-0031"
+        "EV-0035"
       ],
       "uiKind": "CONTROL",
       "usedBy": [
@@ -194,7 +194,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0005",
-        "EV-0031"
+        "EV-0035"
       ],
       "uiKind": "CONTROL",
       "usedBy": [
@@ -238,7 +238,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0005",
-        "EV-0031"
+        "EV-0035"
       ],
       "uiKind": "CONTROL",
       "usedBy": [
@@ -325,7 +325,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0004",
-        "EV-0030"
+        "EV-0034"
       ],
       "uiKind": "CONTROL",
       "usedBy": [
@@ -370,7 +370,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0004",
-        "EV-0030"
+        "EV-0034"
       ],
       "uiKind": "CONTROL",
       "usedBy": [
@@ -467,13 +467,69 @@
     },
     {
       "id": "UI-011",
+      "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQHDR.REQ_TYPE",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0004",
+        "EV-0034",
+        "EV-0024"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "FR-003",
+        "FR-004"
+      ],
+      "screen": "UI-007",
+      "region": "HEADER",
+      "controlType": "DROP_DOWN",
+      "binding": {
+        "fld": "FLD-018"
+      },
+      "label": "申請類別",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": {
+        "left": {
+          "fld": "FLD-017"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "STATE-001"
+          },
+          {
+            "state": "STATE-002"
+          }
+        ]
+      },
+      "options": [
+        {
+          "label": "一般",
+          "stored": "GEN"
+        },
+        {
+          "label": "急件",
+          "stored": "URG"
+        }
+      ],
+      "valueSource": {
+        "kind": "XLAT"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "id": "UI-012",
       "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.SUBMIT_PB",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0004",
-        "EV-0030"
+        "EV-0034"
       ],
       "uiKind": "CONTROL",
       "usedBy": [
@@ -510,14 +566,14 @@
       }
     },
     {
-      "id": "UI-012",
+      "id": "UI-013",
       "key": "TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.WITHDRAW_PB",
       "lifecycle": "ACTIVE",
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0004",
-        "EV-0030"
+        "EV-0034"
       ],
       "uiKind": "CONTROL",
       "usedBy": [

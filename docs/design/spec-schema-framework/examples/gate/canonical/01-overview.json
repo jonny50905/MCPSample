@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "01-overview",
+  "docId": "clone-fedcba9876543210/01",
+  "jobId": "clone-fedcba9876543210",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "01 專案概覽",
+  "summary": "物件 10（守門範例，只跑部分檢核）",
+  "components": [
+    "TW_DEMO_CASE",
+    "TW_DEMO_DOCREV",
+    "TW_DEMO_PAYMNT"
+  ],
+  "dependsOn": [],
+  "sources": [
+    {
+      "kind": "STATUS_DOC",
+      "ref": "status-CASE_STATUS.md",
+      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+    }
+  ],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "projectInputStatus": "NOT_PROVIDED",
+  "items": [
+    {
+      "id": "OBJ-001",
+      "key": "COMPONENT:TW_DEMO_CASE",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_CASE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0001"
+      ],
+      "objectType": "COMPONENT",
+      "objectName": "TW_DEMO_CASE",
+      "inclusion": "CORE",
+      "usedBy": "使用者指定的根",
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "案件受理、處理、上傳結案報告與撤案"
+    },
+    {
+      "id": "OBJ-002",
+      "key": "COMPONENT:TW_DEMO_DOCREV",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_DOCREV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0001"
+      ],
+      "objectType": "COMPONENT",
+      "objectName": "TW_DEMO_DOCREV",
+      "inclusion": "CORE",
+      "usedBy": "使用者指定的根",
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "文件審查"
+    },
+    {
+      "id": "OBJ-003",
+      "key": "COMPONENT:TW_DEMO_PAYMNT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_PAYMNT",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0001"
+      ],
+      "objectType": "COMPONENT",
+      "objectName": "TW_DEMO_PAYMNT",
+      "inclusion": "CORE",
+      "usedBy": "使用者指定的根",
+      "condition": {
+        "na": "入口物件，進入即使用"
+      },
+      "reason": "付款"
+    },
+    {
+      "id": "OBJ-004",
+      "key": "PEOPLECODE:TW_DEMO_CASEWRK.CHKCLOSE.FieldFormula",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0010",
+        "EV-0009"
+      ],
+      "objectType": "PEOPLECODE",
+      "objectName": "TW_DEMO_CASEWRK.CHKCLOSE.FieldFormula",
+      "inclusion": "CORE",
+      "usedBy": "三個 Component 的 SavePostChange 都呼叫",
+      "condition": "文件審查、付款或上傳結案報告存檔後",
+      "reason": "結案守門檢查（共用函式）",
+      "pcEvent": "FIELD_FORMULA"
+    },
+    {
+      "id": "OBJ-005",
+      "key": "RECORD:TW_DEMO_CASE",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_CASE",
+      "inclusion": "CORE",
+      "usedBy": "核心 Component 讀寫的 Record",
+      "condition": {
+        "na": "一律讀寫"
+      },
+      "reason": "案件主檔",
+      "fieldUsage": {
+        "noneExcludable": {
+          "checkedOn": "2026-10-01"
+        }
+      }
+    },
+    {
+      "id": "OBJ-006",
+      "key": "RECORD:TW_DEMO_CASEDOC",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_CASEDOC",
+      "inclusion": "CORE",
+      "usedBy": "核心 Component 讀寫的 Record",
+      "condition": {
+        "na": "一律讀寫"
+      },
+      "reason": "案件文件（子業務：文件審查）",
+      "fieldUsage": {
+        "noneExcludable": {
+          "checkedOn": "2026-10-01"
+        }
+      }
+    },
+    {
+      "id": "OBJ-007",
+      "key": "RECORD:TW_DEMO_CASEPAY",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0002"
+      ],
+      "objectType": "RECORD",
+      "objectName": "TW_DEMO_CASEPAY",
+      "inclusion": "CORE",
+      "usedBy": "核心 Component 讀寫的 Record",
+      "condition": {
+        "na": "一律讀寫"
+      },
+      "reason": "案件付款（子業務：付款）",
+      "fieldUsage": {
+        "noneExcludable": {
+          "checkedOn": "2026-10-01"
+        }
+      }
+    },
+    {
+      "id": "OBJ-008",
+      "key": "ROLE:TW_DEMO_ACCT",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "objectType": "ROLE",
+      "objectName": "TW_DEMO_ACCT",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_PAYMNT 的元件權限",
+      "condition": "進入 TW_DEMO_PAYMNT 時",
+      "reason": "會計人員角色"
+    },
+    {
+      "id": "OBJ-009",
+      "key": "ROLE:TW_DEMO_OFFICER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "objectType": "ROLE",
+      "objectName": "TW_DEMO_OFFICER",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_CASE 的元件權限",
+      "condition": "進入 TW_DEMO_CASE 時",
+      "reason": "承辦人角色"
+    },
+    {
+      "id": "OBJ-010",
+      "key": "ROLE:TW_DEMO_REVIEWER",
+      "lifecycle": "ACTIVE",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0003"
+      ],
+      "objectType": "ROLE",
+      "objectName": "TW_DEMO_REVIEWER",
+      "inclusion": "DEPENDENCY",
+      "usedBy": "TW_DEMO_DOCREV 的元件權限",
+      "condition": "進入 TW_DEMO_DOCREV 時",
+      "reason": "審查人員角色"
+    }
+  ]
+}

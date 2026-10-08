@@ -24,7 +24,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     }
   ],
   "gate": {
@@ -800,7 +800,7 @@
         {
           "seq": 2,
           "action": "以 E1001 按「送出」",
-          "control": "UI-011",
+          "control": "UI-012",
           "operation": "OP-004"
         },
         {
@@ -872,7 +872,7 @@
         {
           "seq": 1,
           "action": "以 E1001 按「送出」",
-          "control": "UI-011",
+          "control": "UI-012",
           "operation": "OP-004"
         }
       ],
@@ -959,7 +959,7 @@
         {
           "seq": 2,
           "action": "以 E1001 修改事由後按「送出」",
-          "control": "UI-011",
+          "control": "UI-012",
           "operation": "OP-004"
         }
       ],
@@ -967,7 +967,7 @@
         "resultState": "STATE-003",
         "data": [
           {
-            "field": "FLD-018",
+            "field": "FLD-019",
             "value": "測試當日"
           }
         ]
@@ -1042,7 +1042,7 @@
         {
           "seq": 1,
           "action": "以 E1001 按「送出」",
-          "control": "UI-011",
+          "control": "UI-012",
           "operation": "OP-004"
         }
       ],
@@ -1050,7 +1050,7 @@
         "resultState": "STATE-003",
         "data": [
           {
-            "field": "FLD-018",
+            "field": "FLD-019",
             "value": "測試當日"
           }
         ]
@@ -1110,7 +1110,7 @@
         {
           "seq": 1,
           "action": "以 E1001 按「撤回」",
-          "control": "UI-012",
+          "control": "UI-013",
           "operation": "OP-005"
         }
       ],

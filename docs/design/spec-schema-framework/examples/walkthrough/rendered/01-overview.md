@@ -1,8 +1,8 @@
 # 01 專案概覽
 
 > `clone-0123456789abcdef/01`｜版本 r0001｜狀態 **in_review**｜L1 PASS · L2 PASS · L3 PASS · L4 PASS · L5 NOT_APPLICABLE
-> 依賴文件：無｜未解問題：無
-> 目標 1、決策責任 2、物件 22；未解問題 0
+> 依賴文件：無｜未解問題：Q-001（NATIVE_UNUSED_BRANCH:TW_DEMO_REQHDR.AMOUNT.SaveEdit:REQ_TYPE=INT）
+> 目標 1、決策責任 2、物件 22；未解問題 1
 > 本檔由 canonical JSON 以程式產生，請勿手改；修改走研究重跑或 19 的決策。
 
 ## 範圍摘要
@@ -53,7 +53,7 @@
 - 使用鏈上的物件：OBJ-008（TW_DEMO_REQ.SavePostChange）
 - 何時使用：送出（010／015→020）成功後
 - 納入／排除理由：送審通知
-- 來源：metadata；證據 EV-0024、EV-0029
+- 來源：metadata；證據 EV-0028、EV-0033
 - 被引用（外環反查）：IF-001
 
 ### OBJ-002　TW_DEMO_APV
@@ -129,8 +129,8 @@
 - 何時使用：不適用：事件觸發即執行
 - 納入／排除理由：載入時處理（含圖外的重開邏輯）
 - PEOPLECODE 物件的事件：POST_BUILD
-- 來源：metadata；證據 EV-0006、EV-0025
-- 被引用（外環反查）：Q-002；DEC-001
+- 來源：metadata；證據 EV-0006、EV-0029
+- 被引用（外環反查）：Q-003；DEC-001
 
 ### OBJ-008　TW_DEMO_REQ.SavePostChange
 
@@ -142,7 +142,7 @@
 - 何時使用：不適用：事件觸發即執行
 - 納入／排除理由：送出後排入通知
 - PEOPLECODE 物件的事件：SAVE_POST_CHANGE
-- 來源：metadata；證據 EV-0006、EV-0024
+- 來源：metadata；證據 EV-0006、EV-0028
 - 被引用（外環反查）：OBJ-001；BR-001
 
 ### OBJ-009　TW_DEMO_REQ.SavePreChange
@@ -155,7 +155,7 @@
 - 何時使用：不適用：事件觸發即執行
 - 納入／排除理由：新單取號
 - PEOPLECODE 物件的事件：SAVE_PRE_CHANGE
-- 來源：metadata；證據 EV-0006、EV-0023
+- 來源：metadata；證據 EV-0006、EV-0027
 - 被引用（外環反查）：BR-002
 
 ### OBJ-010　TW_DEMO_REQHDR.AMOUNT.SaveEdit
@@ -169,7 +169,7 @@
 - 納入／排除理由：金額檢核
 - PEOPLECODE 物件的事件：SAVE_EDIT
 - 來源：metadata；證據 EV-0006、EV-0021
-- 被引用（外環反查）：BR-003
+- 被引用（外環反查）：BR-003；Q-001
 
 ### OBJ-011　TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault
 
@@ -181,7 +181,7 @@
 - 何時使用：不適用：事件觸發即執行
 - 納入／排除理由：申請人預設
 - PEOPLECODE 物件的事件：FIELD_DEFAULT
-- 來源：metadata；證據 EV-0006、EV-0022
+- 來源：metadata；證據 EV-0006、EV-0026
 - 被引用（外環反查）：BR-004
 
 ### OBJ-012　TW_DEMO_REQWRK.APPROVE_PB.FieldChange
@@ -249,7 +249,7 @@
 - 原生欄位判定結論；type RECORD 且 CORE／DEPENDENCY 時必填：
   - 無可排除：
     - 查詢日：2026-10-01
-- 來源：metadata；證據 EV-0027、EV-0015
+- 來源：metadata；證據 EV-0031、EV-0015
 - 被引用（外環反查）：ENT-001
 
 ### OBJ-017　TW_DEMO_EMP
@@ -265,7 +265,7 @@
 - 原生欄位判定結論；type RECORD 且 CORE／DEPENDENCY 時必填：
   - 無可排除：
     - 查詢日：2026-10-01
-- 來源：metadata；證據 EV-0026、EV-0014
+- 來源：metadata；證據 EV-0030、EV-0014
 - 被引用（外環反查）：ENT-002
 
 ### OBJ-018　TW_DEMO_REQHDR

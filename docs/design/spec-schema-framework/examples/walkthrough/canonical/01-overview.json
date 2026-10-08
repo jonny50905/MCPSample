@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "in_review",
   "title": "01 專案概覽",
-  "summary": "目標 1、決策責任 2、物件 22；未解問題 0",
+  "summary": "目標 1、決策責任 2、物件 22；未解問題 1",
   "components": [
     "TW_DEMO_APV",
     "TW_DEMO_REQ"
@@ -16,7 +16,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "PROJECT_INPUT",
@@ -26,7 +26,7 @@
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/01-overview",
-      "fingerprint": "c9aedef9ca2ad6570175bc543ac5b7e617fc590747c5f6fb3b3838e351252e8f"
+      "fingerprint": "98cb5960f959f8eb49c16a4a0d24cbb6585b1d92a2af9cd5844bd48326f9b886"
     }
   ],
   "gate": {
@@ -36,7 +36,9 @@
     "L4": "PASS",
     "L5": "NOT_APPLICABLE"
   },
-  "openQuestions": [],
+  "openQuestions": [
+    "Q-001"
+  ],
   "projectInputStatus": "PROVIDED",
   "items": [
     {
@@ -86,8 +88,8 @@
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0024",
-        "EV-0029"
+        "EV-0028",
+        "EV-0033"
       ],
       "objectType": "AE",
       "objectName": "TW_DEMO_NTFY",
@@ -208,7 +210,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0006",
-        "EV-0025"
+        "EV-0029"
       ],
       "objectType": "PEOPLECODE",
       "objectName": "TW_DEMO_APV.PostBuild",
@@ -229,7 +231,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0006",
-        "EV-0024"
+        "EV-0028"
       ],
       "objectType": "PEOPLECODE",
       "objectName": "TW_DEMO_REQ.SavePostChange",
@@ -250,7 +252,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0006",
-        "EV-0023"
+        "EV-0027"
       ],
       "objectType": "PEOPLECODE",
       "objectName": "TW_DEMO_REQ.SavePreChange",
@@ -292,7 +294,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0006",
-        "EV-0022"
+        "EV-0026"
       ],
       "objectType": "PEOPLECODE",
       "objectName": "TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault",
@@ -395,7 +397,7 @@
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0027",
+        "EV-0031",
         "EV-0015"
       ],
       "objectType": "RECORD",
@@ -420,7 +422,7 @@
       "basis": "METADATA",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0026",
+        "EV-0030",
         "EV-0014"
       ],
       "objectType": "RECORD",

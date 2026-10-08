@@ -23,12 +23,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/09-business-logic",
-      "fingerprint": "339e5da66e6ff89c7e19726bf714140ea97528753d1ea0520084ddda93dc3433"
+      "fingerprint": "d143eae16ef4bc16928ef07c7a9418e3380af5612b9927a4b251aa534db5cd4b"
     }
   ],
   "gate": {
@@ -69,11 +69,13 @@
     {
       "program": "OBJ-010",
       "kinds": [
-        "BUSINESS_RULES"
+        "BUSINESS_RULES",
+        "NATIVE_UNUSED_BRANCH"
       ],
       "items": [
         "BR-003"
-      ]
+      ],
+      "note": "另有一段已證明不會執行的原生分支，不重建（見 90）。"
     },
     {
       "program": "OBJ-011",
@@ -194,7 +196,7 @@
       "basis": "CODE",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0024"
+        "EV-0028"
       ],
       "name": "送出後通知直屬主管",
       "brKind": "SIDE_EFFECT",
@@ -240,7 +242,7 @@
       "basis": "CODE",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0023"
+        "EV-0027"
       ],
       "name": "新單取號",
       "brKind": "DEFAULTING",
@@ -339,7 +341,7 @@
       "basis": "CODE",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0022"
+        "EV-0026"
       ],
       "name": "申請人預設為目前使用者",
       "brKind": "DEFAULTING",
@@ -429,7 +431,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0016",
-        "EV-0026"
+        "EV-0030"
       ],
       "name": "送出時申請人必須有直屬主管",
       "brKind": "VALIDATION",
@@ -438,7 +440,7 @@
       ],
       "trigger": {
         "event": "FIELD_CHANGE",
-        "control": "UI-011",
+        "control": "UI-012",
         "transitions": [
           "TRN-002",
           "TRN-004"

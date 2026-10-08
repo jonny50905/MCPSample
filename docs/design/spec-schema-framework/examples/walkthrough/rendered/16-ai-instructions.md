@@ -2,7 +2,7 @@
 
 > `clone-0123456789abcdef/16`｜版本 r0001｜狀態 **in_review**｜L1 PASS · L2 PASS · L3 NOT_APPLICABLE · L4 NOT_APPLICABLE · L5 NOT_APPLICABLE
 > 依賴文件：無｜未解問題：無
-> 條款 10
+> 條款 12
 > 本檔由 canonical JSON 以程式產生，請勿手改；修改走研究重跑或 19 的決策。
 
 ## 條款（AI）
@@ -75,4 +75,18 @@
 - 自然鍵：`AI:10`
 - 條款類別：CHANGE_DISCIPLINE
 - 條款內容：發現規格矛盾或錯誤時不要自行修改規格；回報 ID 與證據，由 19 的決策處理後再實作。
+- 來源：框架模板
+
+### AI-011　LOGIC
+
+- 自然鍵：`AI:11`
+- 條款類別：LOGIC
+- 條款內容：04 的守門轉移（exitMode＝ON_COMPLETION）照 guard 實作：逐列條件對所有子資料求值，沒有子資料時依 whenEmpty；SYSTEM_GATE 活動由系統檢查完成條件，EXPECTED_ONLY 活動不要自行加上檢查。
+- 來源：框架模板
+
+### AI-012　SCOPE
+
+- 自然鍵：`AI:12`
+- 條款類別：SCOPE
+- 條款內容：90 的 NATIVE_UNUSED_BRANCH 是已證明不會執行的原系統分支：不要實作，也不要為它加條件或保留選項，除非 19 有決策納入。
 - 來源：框架模板

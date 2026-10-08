@@ -1,0 +1,185 @@
+{
+  "schemaVersion": "1.0",
+  "docType": "02-functional-requirements",
+  "docId": "clone-fedcba9876543210/02",
+  "jobId": "clone-fedcba9876543210",
+  "revision": "r0001",
+  "status": "draft",
+  "title": "02 功能需求",
+  "summary": "功能 3（守門範例，只跑部分檢核）",
+  "components": [
+    "TW_DEMO_CASE",
+    "TW_DEMO_DOCREV",
+    "TW_DEMO_PAYMNT"
+  ],
+  "dependsOn": [
+    "01-overview",
+    "03-roles-permissions",
+    "04-workflow",
+    "07-database"
+  ],
+  "sources": [
+    {
+      "kind": "STATUS_DOC",
+      "ref": "status-CASE_STATUS.md",
+      "fingerprint": "0283f700874b894540d804c4e6082f7c7d818b0e7ea43576bd09e432bd2fb3fe"
+    }
+  ],
+  "gate": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN",
+    "L5": "NOT_RUN"
+  },
+  "openQuestions": [],
+  "items": [
+    {
+      "id": "FR-001",
+      "key": "TW_DEMO_CASE:UPLOAD_REPORT",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_CASE",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "ACT-003"
+      ],
+      "name": "上傳結案報告",
+      "description": "承辦人在案件處理中上傳結案報告；這是 040 的守門活動。",
+      "frKind": "MAINTAIN",
+      "entry": {
+        "object": "OBJ-001",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-002"
+        }
+      ],
+      "realizes": [],
+      "performs": [
+        "ACT-003"
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "FLD-002"
+        },
+        "op": "EQ",
+        "right": {
+          "state": "STATE-006"
+        }
+      },
+      "outcome": "結案報告附件有值；若文件與付款也都已完成，案件自動轉為 050。",
+      "priority": "MUST"
+    },
+    {
+      "id": "FR-002",
+      "key": "TW_DEMO_DOCREV:REVIEW",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_DOCREV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-002"
+      ],
+      "name": "審查文件",
+      "description": "審查人員逐份審查案件文件，審查完成後標記為 090。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-002",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-003"
+        }
+      ],
+      "realizes": [
+        "TRN-002"
+      ],
+      "preconditions": {
+        "all": [
+          {
+            "left": {
+              "fld": "FLD-002"
+            },
+            "op": "EQ",
+            "right": {
+              "state": "STATE-006"
+            }
+          },
+          {
+            "left": {
+              "fld": "FLD-007"
+            },
+            "op": "EQ",
+            "right": {
+              "state": "STATE-001"
+            }
+          }
+        ]
+      },
+      "outcome": "文件狀態變為 090；若這是最後一項未完成的條件，案件自動結案。",
+      "priority": "MUST"
+    },
+    {
+      "id": "FR-003",
+      "key": "TW_DEMO_PAYMNT:PAY",
+      "lifecycle": "ACTIVE",
+      "component": "TW_DEMO_PAYMNT",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "TRN-004"
+      ],
+      "name": "付款",
+      "description": "會計人員依核定金額付款，付款完成後標記為 090。",
+      "frKind": "TRANSITION",
+      "entry": {
+        "object": "OBJ-003",
+        "modes": [
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "actors": [
+        {
+          "role": "ROLE-001"
+        }
+      ],
+      "realizes": [
+        "TRN-004"
+      ],
+      "preconditions": {
+        "all": [
+          {
+            "left": {
+              "fld": "FLD-002"
+            },
+            "op": "EQ",
+            "right": {
+              "state": "STATE-006"
+            }
+          },
+          {
+            "left": {
+              "fld": "FLD-011"
+            },
+            "op": "EQ",
+            "right": {
+              "state": "STATE-003"
+            }
+          }
+        ]
+      },
+      "outcome": "付款狀態變為 090；若這是最後一項未完成的條件，案件自動結案。",
+      "priority": "MUST"
+    }
+  ]
+}

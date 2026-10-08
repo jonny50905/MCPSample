@@ -19,12 +19,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/03-roles-permissions",
-      "fingerprint": "882c5e84d75d1e679278b2da3738075e21ebc6a4d5757e75d162c12b786e63c1"
+      "fingerprint": "9281a9c413760c2f7270536c24f592cead171fef04b2430455d075be13980eb5"
     }
   ],
   "gate": {
@@ -78,7 +78,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0008",
-        "EV-0032"
+        "EV-0036"
       ],
       "principal": "ROLE-001",
       "resource": "OBJ-002",
@@ -144,7 +144,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0008",
-        "EV-0033"
+        "EV-0037"
       ],
       "principal": "ROLE-002",
       "resource": "OBJ-003",

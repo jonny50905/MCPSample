@@ -19,12 +19,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "HUMAN_DECISION",
       "ref": "decisions.md",
-      "fingerprint": "74ebadd01b938b98cb3a5aacb43a98122bab16f9e181a76c4922041ec8c1e863"
+      "fingerprint": "d195b7211af03391f0689a0e7546d4dca4452531aa40bf7e5236cef023fcf5df"
     }
   ],
   "gate": {
@@ -43,10 +43,10 @@
       "basis": "HUMAN_DECISION",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0064"
+        "EV-0070"
       ],
       "title": "不重建「核准後重開為草稿」",
-      "context": "Q-002：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
+      "context": "Q-003：TW_DEMO_APV.PostBuild 有一段狀態圖外的 030→010 邏輯。",
       "options": [
         {
           "option": "不重建",
@@ -63,7 +63,7 @@
       "decidedOn": "2026-10-08",
       "status": "ACCEPTED",
       "resolves": [
-        "Q-002"
+        "Q-003"
       ],
       "affects": [
         "OBJ-007"

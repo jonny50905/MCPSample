@@ -25,12 +25,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     },
     {
       "kind": "RESEARCH_RECEIPT",
       "ref": "receipts/08-api",
-      "fingerprint": "694c1667bef47c1395b00875b80f6b1f799a914ba1d4a6473d6fb5acf0c5891f"
+      "fingerprint": "6a582b5dc3908c6d27bbb800a5f7a861662c2647eaf1d291ece82ce143d1b49a"
     }
   ],
   "gate": {
@@ -51,7 +51,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0018",
-        "EV-0028"
+        "EV-0032"
       ],
       "derivedFrom": [
         "FR-001"
@@ -218,7 +218,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0020",
-        "EV-0028"
+        "EV-0032"
       ],
       "derivedFrom": [
         "FR-002"
@@ -415,6 +415,11 @@
           "name": "REASON",
           "field": "FLD-014",
           "required": true
+        },
+        {
+          "name": "REQ_TYPE",
+          "field": "FLD-018",
+          "required": false
         }
       ],
       "outputs": [
@@ -448,6 +453,12 @@
             "field": "FLD-014",
             "value": {
               "param": "REASON"
+            }
+          },
+          {
+            "field": "FLD-018",
+            "value": {
+              "param": "REQ_TYPE"
             }
           }
         ]
@@ -486,7 +497,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0016",
-        "EV-0028"
+        "EV-0032"
       ],
       "derivedFrom": [
         "FR-004"
@@ -495,7 +506,7 @@
       "name": "送出申請",
       "opKind": "TRANSITION",
       "invokedFrom": [
-        "UI-011"
+        "UI-012"
       ],
       "authorization": {
         "all": [
@@ -534,6 +545,11 @@
           "name": "REASON",
           "field": "FLD-014",
           "required": true
+        },
+        {
+          "name": "REQ_TYPE",
+          "field": "FLD-018",
+          "required": false
         }
       ],
       "outputs": [
@@ -577,6 +593,12 @@
             "value": {
               "param": "REASON"
             }
+          },
+          {
+            "field": "FLD-018",
+            "value": {
+              "param": "REQ_TYPE"
+            }
           }
         ],
         "interfaces": [
@@ -618,7 +640,7 @@
       "certainty": "CONFIRMED",
       "evidence": [
         "EV-0017",
-        "EV-0028"
+        "EV-0032"
       ],
       "derivedFrom": [
         "FR-005"
@@ -627,7 +649,7 @@
       "name": "撤回申請",
       "opKind": "TRANSITION",
       "invokedFrom": [
-        "UI-012"
+        "UI-013"
       ],
       "authorization": {
         "all": [

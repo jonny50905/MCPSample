@@ -25,7 +25,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     }
   ],
   "gate": {
@@ -75,7 +75,8 @@
           "FLD-015",
           "FLD-016",
           "FLD-017",
-          "FLD-018"
+          "FLD-018",
+          "FLD-019"
         ],
         "derivations": [
           "DRV-001",
@@ -127,6 +128,10 @@
           "TRN-008",
           "TRN-007",
           "TRN-010"
+        ],
+        "activities": [
+          "ACT-001",
+          "ACT-002"
         ],
         "controls": [
           "UI-002",
@@ -186,6 +191,10 @@
           "TRN-006",
           "TRN-009"
         ],
+        "activities": [
+          "ACT-001",
+          "ACT-002"
+        ],
         "controls": [
           "UI-002",
           "UI-003",
@@ -230,7 +239,8 @@
           "FLD-014",
           "FLD-015",
           "FLD-016",
-          "FLD-017"
+          "FLD-017",
+          "FLD-018"
         ],
         "derivations": [],
         "roles": [
@@ -242,7 +252,8 @@
         "controls": [
           "UI-008",
           "UI-009",
-          "UI-010"
+          "UI-010",
+          "UI-011"
         ],
         "rules": [
           "BR-002",
@@ -288,7 +299,8 @@
           "FLD-015",
           "FLD-016",
           "FLD-017",
-          "FLD-018"
+          "FLD-018",
+          "FLD-019"
         ],
         "derivations": [
           "DRV-002"
@@ -304,7 +316,8 @@
           "UI-008",
           "UI-009",
           "UI-010",
-          "UI-011"
+          "UI-011",
+          "UI-012"
         ],
         "rules": [
           "BR-001",
@@ -359,7 +372,7 @@
         ],
         "controls": [
           "UI-010",
-          "UI-012"
+          "UI-013"
         ],
         "rules": [
           "BR-003"

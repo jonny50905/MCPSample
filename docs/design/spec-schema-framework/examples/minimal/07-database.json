@@ -74,7 +74,7 @@
       "basis": "CODE",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0026"
+        "EV-0030"
       ],
       "name": "申請人的直屬主管",
       "meaning": "申請人目前任職資料上登記的直屬主管；送出時必須存在，020 由此人審核。",

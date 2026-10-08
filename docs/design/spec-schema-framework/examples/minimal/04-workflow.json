@@ -24,10 +24,11 @@
     {
       "entityKey": "REQ_STATUS",
       "flowchart": "status-REQ_STATUS.md#L7-L20",
-      "stateDiagram": "status-REQ_STATUS.md#L24-L47",
-      "fingerprint": "de0f15829df41238955cb9fddbba169be9ef1542a46cb00af292c5b2d767f676"
+      "stateDiagram": "status-REQ_STATUS.md#L24-L49",
+      "fingerprint": "5b863630e30b3c5ab00039b105579cc387479b781219cdcb6b4f0d3efc2fc7f7"
     }
   ],
+  "diagramTexts": [],
   "items": [
     {
       "id": "STATE-003",
@@ -36,7 +37,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0036"
+        "EV-0040"
       ],
       "entityKey": "REQ_STATUS",
       "stateKind": "SIMPLE",
@@ -55,11 +56,12 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0050"
+        "EV-0054"
       ],
       "entityKey": "REQ_STATUS",
       "from": "STATE-003",
       "to": "STATE-005",
+      "exitMode": "NORMAL",
       "trigger": {
         "kind": "USER_ACTION",
         "object": "OBJ-002",
@@ -125,7 +127,7 @@
       "basis": "AUTHORITATIVE_DOC",
       "certainty": "CONFIRMED",
       "evidence": [
-        "EV-0061"
+        "EV-0065"
       ],
       "entityKey": "REQ_STATUS",
       "scenarioType": "高額審核",
@@ -147,6 +149,32 @@
         "na": "進入條件即各步驟轉移的起點狀態"
       },
       "exceptions": "部門主管可退回，轉入「退回補件」。"
+    },
+    {
+      "id": "ACT-001",
+      "key": "REQ_STATUS:020:01",
+      "lifecycle": "ACTIVE",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "EV-0068"
+      ],
+      "entityKey": "REQ_STATUS",
+      "state": "STATE-003",
+      "name": "直屬主管審核申請",
+      "behavior": "直屬主管審核申請內容",
+      "actors": [
+        {
+          "drv": "DRV-002"
+        }
+      ],
+      "enforcement": "BY_TRANSITION",
+      "realizedBy": [
+        "TRN-008"
+      ],
+      "completion": {
+        "na": "核准或退回（離開 020）即完成；系統沒有另外記錄審核進度"
+      }
     }
   ]
 }

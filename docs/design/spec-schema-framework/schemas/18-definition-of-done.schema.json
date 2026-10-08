@@ -86,7 +86,7 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "pattern": "^(GOAL|RESP|OBJ|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|IF|FR|UI|MSG|BR|OP|TC|TASK)-\\d{3,}$"
+                      "pattern": "^(GOAL|RESP|OBJ|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|ACT|IF|FR|UI|MSG|BR|OP|TC|TASK)-\\d{3,}$"
                     },
                     "uniqueItems": true
                   },
@@ -122,6 +122,7 @@
                 "STATE",
                 "TRN",
                 "FLOW",
+                "ACT",
                 "IF",
                 "FR",
                 "UI",

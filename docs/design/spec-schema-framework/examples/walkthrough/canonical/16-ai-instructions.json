@@ -6,7 +6,7 @@
   "revision": "r0001",
   "status": "in_review",
   "title": "16 AI 實作指引",
-  "summary": "條款 10",
+  "summary": "條款 12",
   "components": [
     "TW_DEMO_APV",
     "TW_DEMO_REQ"
@@ -16,7 +16,7 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
+      "fingerprint": "226ffa73c375b0f81f58b3682787467df6f0a623f81195f813cb2111825bfaba"
     }
   ],
   "gate": {
@@ -127,6 +127,26 @@
       "evidence": [],
       "category": "CHANGE_DISCIPLINE",
       "clause": "發現規格矛盾或錯誤時不要自行修改規格；回報 ID 與證據，由 19 的決策處理後再實作。"
+    },
+    {
+      "id": "AI-011",
+      "key": "AI:11",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "LOGIC",
+      "clause": "04 的守門轉移（exitMode＝ON_COMPLETION）照 guard 實作：逐列條件對所有子資料求值，沒有子資料時依 whenEmpty；SYSTEM_GATE 活動由系統檢查完成條件，EXPECTED_ONLY 活動不要自行加上檢查。"
+    },
+    {
+      "id": "AI-012",
+      "key": "AI:12",
+      "lifecycle": "ACTIVE",
+      "basis": "TEMPLATE",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "category": "SCOPE",
+      "clause": "90 的 NATIVE_UNUSED_BRANCH 是已證明不會執行的原系統分支：不要實作，也不要為它加條件或保留選項，除非 19 有決策納入。"
     }
   ]
 }

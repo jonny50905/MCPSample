@@ -115,6 +115,11 @@
       "pattern": "^FLOW-\\d{3,}$",
       "description": "參照 情境流程（FLOW）。"
     },
+    "refACT": {
+      "type": "string",
+      "pattern": "^ACT-\\d{3,}$",
+      "description": "參照 狀態活動（ACT）。"
+    },
     "refIF": {
       "type": "string",
       "pattern": "^IF-\\d{3,}$",
@@ -172,7 +177,7 @@
     },
     "refSpec": {
       "type": "string",
-      "pattern": "^(GOAL|RESP|OBJ|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|IF|FR|UI|MSG|BR|OP|TC)-\\d{3,}$",
+      "pattern": "^(GOAL|RESP|OBJ|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|ACT|IF|FR|UI|MSG|BR|OP|TC)-\\d{3,}$",
       "description": "參照任一規格本體項目（不含 TASK／DOD／Q／DEC／AI）。"
     },
     "evRef": {
@@ -182,7 +187,7 @@
     },
     "itemId": {
       "type": "string",
-      "pattern": "^(GOAL|RESP|OBJ|AI|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|IF|FR|UI|MSG|BR|OP|TC|TASK|DOD|Q|DEC)-\\d{3,}$"
+      "pattern": "^(GOAL|RESP|OBJ|AI|ENT|FLD|DRV|XF|ROLE|PERM|STATE|TRN|FLOW|ACT|IF|FR|UI|MSG|BR|OP|TC|TASK|DOD|Q|DEC)-\\d{3,}$"
     },
     "notApplicable": {
       "type": "object",
@@ -416,7 +421,23 @@
       ],
       "properties": {
         "left": {
-          "$ref": "#/$defs/operand"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/operand"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "act": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refACT"
+                }
+              },
+              "required": [
+                "act"
+              ],
+              "additionalProperties": false
+            }
+          ]
         },
         "op": {
           "type": "string",
@@ -426,6 +447,8 @@
             "EXISTS",
             "NOT_EXISTS",
             "CHANGED",
+            "DONE",
+            "NOT_DONE",
             "EQ",
             "NE",
             "GT",
@@ -457,6 +480,54 @@
       "allOf": [
         {
           "if": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "enum": [
+                  "DONE",
+                  "NOT_DONE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "left": {
+                "required": [
+                  "act"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "left"
+            ],
+            "properties": {
+              "left": {
+                "required": [
+                  "act"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "DONE",
+                  "NOT_DONE"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
             "properties": {
               "op": {
                 "enum": [
@@ -464,7 +535,9 @@
                   "IS_NOT_BLANK",
                   "EXISTS",
                   "NOT_EXISTS",
-                  "CHANGED"
+                  "CHANGED",
+                  "DONE",
+                  "NOT_DONE"
                 ]
               }
             }
@@ -722,6 +795,118 @@
         }
       ]
     },
+    "rowsPredicate": {
+      "type": "object",
+      "required": [
+        "rows",
+        "quantifier",
+        "where"
+      ],
+      "properties": {
+        "rows": {
+          "$ref": "urn:ps-spec:schema:common#/$defs/refENT"
+        },
+        "quantifier": {
+          "type": "string",
+          "enum": [
+            "ALL",
+            "ANY",
+            "NONE",
+            "COUNT"
+          ]
+        },
+        "where": {
+          "$ref": "#/$defs/condition"
+        },
+        "whenEmpty": {
+          "type": "string",
+          "enum": [
+            "MET",
+            "NOT_MET"
+          ]
+        },
+        "count": {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "EQ",
+                "NE",
+                "GT",
+                "GE",
+                "LT",
+                "LE"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "op",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "quantifier"
+            ],
+            "properties": {
+              "quantifier": {
+                "enum": [
+                  "ALL",
+                  "NONE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "whenEmpty"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "whenEmpty"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "quantifier"
+            ],
+            "properties": {
+              "quantifier": {
+                "const": "COUNT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "count"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "count"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "逐列條件：對 rows 實體中、以 parent 鍵對應連到目前這筆資料的每一列求 where。ALL／NONE 必須寫 whenEmpty（沒有任何一列時算成立或不成立）；COUNT 必附 count。"
+    },
     "condition": {
       "oneOf": [
         {
@@ -773,6 +958,9 @@
         },
         {
           "$ref": "#/$defs/predicate"
+        },
+        {
+          "$ref": "#/$defs/rowsPredicate"
         }
       ]
     },

@@ -52,7 +52,7 @@
       ],
       "trigger": {
         "event": "FIELD_CHANGE",
-        "control": "UI-011",
+        "control": "UI-012",
         "transitions": [
           "TRN-002",
           "TRN-004"

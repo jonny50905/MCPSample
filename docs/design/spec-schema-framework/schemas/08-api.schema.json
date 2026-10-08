@@ -97,7 +97,9 @@
                 "FLD",
                 "DRV",
                 "STATE",
-                "ROLE"
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "inputs": {
@@ -170,7 +172,9 @@
                 "FLD",
                 "DRV",
                 "STATE",
-                "ROLE"
+                "ROLE",
+                "ACT",
+                "ENT"
               ]
             },
             "validations": {
@@ -228,6 +232,8 @@
                 "DRV",
                 "STATE",
                 "ROLE",
+                "ACT",
+                "ENT",
                 "IF"
               ]
             },

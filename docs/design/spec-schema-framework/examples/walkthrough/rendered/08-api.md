@@ -41,8 +41,8 @@
 - 原系統對應的物件與事件鏈：
   - 物件：OBJ-012（TW_DEMO_REQWRK.APPROVE_PB.FieldChange）
   - 事件鏈：FieldChange、SaveEdit
-- 來源：推導；推導自 FR-001；證據 EV-0018、EV-0028
-- 被引用（外環反查）：TC-001、TC-002、TC-004、TC-010；TASK-002；DOD-003；Q-003
+- 來源：推導；推導自 FR-001；證據 EV-0018、EV-0032
+- 被引用（外環反查）：TC-001、TC-002、TC-004、TC-010；TASK-002；DOD-003；Q-004
 
 ### OP-002　退回申請
 
@@ -78,7 +78,7 @@
 - 原系統對應的物件與事件鏈：
   - 物件：OBJ-013（TW_DEMO_REQWRK.RETURN_PB.FieldChange）
   - 事件鏈：FieldChange、SaveEdit
-- 來源：推導；推導自 FR-002；證據 EV-0020、EV-0028
+- 來源：推導；推導自 FR-002；證據 EV-0020、EV-0032
 - 被引用（外環反查）：TC-005、TC-006、TC-012；TASK-003；DOD-004
 
 ### OP-003　儲存新申請單
@@ -92,6 +92,7 @@
 - 輸入：
   - 名稱：AMOUNT；欄位：FLD-010（TW_DEMO_REQHDR.AMOUNT）；必填：是
   - 名稱：REASON；欄位：FLD-014（TW_DEMO_REQHDR.REASON）；必填：是
+  - 名稱：REQ_TYPE；欄位：FLD-018（TW_DEMO_REQHDR.REQ_TYPE）；必填：否
 - 輸出：
   - 名稱：REQ_ID；欄位：FLD-016（TW_DEMO_REQHDR.REQ_ID）
   - 名稱：REQ_STATUS；欄位：FLD-017（TW_DEMO_REQHDR.REQ_STATUS）
@@ -99,7 +100,7 @@
 - 套用的檢核規則：BR-003（金額必須大於 0）
 - 轉移、寫入、觸發的介面：
   - 轉移：TRN-001（新建→010）
-  - 寫入：FLD-010（TW_DEMO_REQHDR.AMOUNT） ← 參數 AMOUNT、FLD-014（TW_DEMO_REQHDR.REASON） ← 參數 REASON
+  - 寫入：FLD-010（TW_DEMO_REQHDR.AMOUNT） ← 參數 AMOUNT、FLD-014（TW_DEMO_REQHDR.REASON） ← 參數 REASON、FLD-018（TW_DEMO_REQHDR.REQ_TYPE） ← 參數 REQ_TYPE
 - 交易語意：
   - 交易邊界：SINGLE_UNIT
   - 寫入順序：新增一列（TW_DEMO_REQHDR）。
@@ -124,19 +125,20 @@
 - 所屬功能：FR-004（送出申請）
 - 操作名稱：送出申請
 - 操作種類：TRANSITION
-- 觸發的畫面元件：UI-011（送出）
+- 觸發的畫面元件：UI-012（送出）
 - 誰能執行：（目前使用者帳號 具有角色 ROLE-002（申請人））且（FLD-015（TW_DEMO_REQHDR.REQUESTER_EMPLID） ＝ 目前使用者員工編號）
 - 輸入：
   - 名稱：REQ_ID；欄位：FLD-016（TW_DEMO_REQHDR.REQ_ID）；必填：是
   - 名稱：AMOUNT；欄位：FLD-010（TW_DEMO_REQHDR.AMOUNT）；必填：是
   - 名稱：REASON；欄位：FLD-014（TW_DEMO_REQHDR.REASON）；必填：是
+  - 名稱：REQ_TYPE；欄位：FLD-018（TW_DEMO_REQHDR.REQ_TYPE）；必填：否
 - 輸出：
   - 名稱：REQ_STATUS；欄位：FLD-017（TW_DEMO_REQHDR.REQ_STATUS）
 - 前置條件：FLD-017（TW_DEMO_REQHDR.REQ_STATUS） 屬於 {'010'（STATE-001 草稿）、'015'（STATE-002 退回補件）}
 - 套用的檢核規則：BR-006（送出時申請人必須有直屬主管）、BR-003（金額必須大於 0）
 - 轉移、寫入、觸發的介面：
   - 轉移：TRN-002（010→020）、TRN-004（015→020）
-  - 寫入：FLD-010（TW_DEMO_REQHDR.AMOUNT） ← 參數 AMOUNT、FLD-014（TW_DEMO_REQHDR.REASON） ← 參數 REASON
+  - 寫入：FLD-010（TW_DEMO_REQHDR.AMOUNT） ← 參數 AMOUNT、FLD-014（TW_DEMO_REQHDR.REASON） ← 參數 REASON、FLD-018（TW_DEMO_REQHDR.REQ_TYPE） ← 參數 REQ_TYPE
   - 介面：IF-001（送審通知）
 - 交易語意：
   - 交易邊界：SINGLE_UNIT
@@ -154,7 +156,7 @@
 - 原系統對應的物件與事件鏈：
   - 物件：OBJ-014（TW_DEMO_REQWRK.SUBMIT_PB.FieldChange）
   - 事件鏈：FieldChange、SaveEdit、SavePostChange
-- 來源：推導；推導自 FR-004；證據 EV-0016、EV-0028
+- 來源：推導；推導自 FR-004；證據 EV-0016、EV-0032
 - 被引用（外環反查）：TC-010、TC-011、TC-012、TC-013；TASK-005；DOD-006
 
 ### OP-005　撤回申請
@@ -163,7 +165,7 @@
 - 所屬功能：FR-005（撤回申請）
 - 操作名稱：撤回申請
 - 操作種類：TRANSITION
-- 觸發的畫面元件：UI-012（撤回）
+- 觸發的畫面元件：UI-013（撤回）
 - 誰能執行：（目前使用者帳號 具有角色 ROLE-002（申請人））且（FLD-015（TW_DEMO_REQHDR.REQUESTER_EMPLID） ＝ 目前使用者員工編號）
 - 輸入：
   - 名稱：REQ_ID；欄位：FLD-016（TW_DEMO_REQHDR.REQ_ID）；必填：是
@@ -190,5 +192,5 @@
 - 原系統對應的物件與事件鏈：
   - 物件：OBJ-015（TW_DEMO_REQWRK.WITHDRAW_PB.FieldChange）
   - 事件鏈：FieldChange、SaveEdit
-- 來源：推導；推導自 FR-005；證據 EV-0017、EV-0028
+- 來源：推導；推導自 FR-005；證據 EV-0017、EV-0032
 - 被引用（外環反查）：TC-014；TASK-006；DOD-007
