@@ -413,7 +413,7 @@ function New-PsSdResolveContext {
         SchemaReg = $SchemaReg; Registry = $Registry; Skeleton = $Skeleton; StatusRef = $StatusRef; Built = $Built; Mode = $Mode
         IdKeys = (Get-PsSdIdKeyMap $Registry)
         Evidence = [System.Collections.Generic.List[object]]::new(); EvidenceBySig = (New-PsSdMap)
-        Temp = 900
+        Temp = 900000
     }
 }
 
@@ -456,12 +456,31 @@ function Resolve-PsSdKeyRef {
     return $null
 }
 
+function Resolve-PsSdStateRef {
+    # 參照 → ID：本包、registry、本包的暫定 ID；Check／Collect 模式下，同單元型別的未知鍵視為後頁才寫的項目（給暫定 ID、記進 Forward，
+    # 單元寫完 COMPLETE 前要出現）。找不到回 $null。
+    param($Ctx, $State, [string]$Value)
+    $id = Resolve-PsSdKeyRef $Ctx $State.Local $Value
+    if ($null -ne $id) { return $id }
+    if ($State.LocalIds.Contains($Value)) { return $Value }
+    if ($Ctx.Mode -eq 'Build') { return $null }
+    $m = $script:PsSdKeyRefRx.Match($Value)
+    if (-not $m.Success -or @($State.UnitTypes) -notcontains $m.Groups[1].Value) { return $null }
+    $lk = $m.Groups[1].Value + '/' + $m.Groups[2].Value
+    $Ctx.Temp++
+    $id = $m.Groups[1].Value + '-' + $Ctx.Temp
+    $State.Local[$lk] = $id
+    [void]$State.LocalIds.Add($id)
+    $State.Forward.Add($lk)
+    return $id
+}
+
 function Resolve-PsSdValue {
     # 深走一個值，換掉參照、證據與缺口；錯誤寫進 $State.Errors。
     param($Ctx, $State, $Value, [string]$ParentKey, [string]$Path)
     if ($Value -is [string]) {
         if ($Value.Length -gt 1 -and $Value[0] -eq '@') {
-            $id = Resolve-PsSdKeyRef $Ctx $State.Local $Value
+            $id = Resolve-PsSdStateRef $Ctx $State $Value
             if ($null -eq $id) { $State.Errors.Add($State.Where + ' ' + $Path + '：參照不存在的 ' + $Value); return $Value }
             return $id
         }
@@ -503,14 +522,15 @@ function Resolve-PsSdValue {
 }
 
 function Resolve-PsSdPacket {
-    # 研究包 → 合成後的 canonical 項目。回傳 @{ Errors; Items（@{Prefix;Key;Id;Item}）; Questions（@{Key;Id;Item}）; Gaps; Requests; Extras }。
+    # 研究包 → 合成後的 canonical 項目。回傳 @{ Errors; Items（@{Prefix;Key;Id;Item}）; Questions（@{Key;Id;Item}）; Gaps; Requests; Implicit; Extras; Forward（同單元後頁才寫的鍵） }。
     # Check 模式另以各文件 schema 驗證每個合成後的項目與問題。
     param($Ctx, $Packet)
     $errs = [System.Collections.Generic.List[string]]::new()
     $unitId = [string]$Packet['unit']
     $unit = Get-PsSdUnit $unitId
+    $unitTypes = @(); if ($null -ne $unit) { $unitTypes = @($unit.Types) }
     $state = @{ Errors = $errs; Local = (New-PsSdMap); LocalEv = (New-PsSdMap); LocalIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-        Gaps = [System.Collections.Generic.List[object]]::new(); Where = ''; ItemKey = ''; ItemId = ''; ItemEvidence = @() }
+        Gaps = [System.Collections.Generic.List[object]]::new(); Where = ''; ItemKey = ''; ItemId = ''; ItemEvidence = @(); UnitTypes = $unitTypes; Forward = [System.Collections.Generic.List[string]]::new() }
     # 證據
     foreach ($ev in @($Packet['evidence'])) {
         if ($null -eq $ev) { continue }
@@ -590,7 +610,7 @@ function Resolve-PsSdPacket {
             if ($null -ne $Ctx.Skeleton -and $Ctx.Skeleton[$p].Contains($k)) { $sk = $Ctx.Skeleton[$p][$k] }
             if ($null -eq $sk) { $errs.Add($state.Where + '：不是狀態圖解讀採用的' + $script:PsSdPrefixInfo[$p].Name + '（研究只能補細節，不能增減）'); continue }
             if ($unitId -eq 'workflow' -and [string]$sk['entityKey'] -cne [string]$Packet['subject']) { $errs.Add($state.Where + '：不屬於本單元的狀態實體 ' + $Packet['subject']) }
-            $skState = @{ Errors = $errs; Local = (New-PsSdMap); LocalEv = (New-PsSdMap); LocalIds = $state.LocalIds; Gaps = $state.Gaps; Where = $state.Where; ItemKey = $k; ItemId = $id; ItemEvidence = @() }
+            $skState = @{ Errors = $errs; Local = (New-PsSdMap); LocalEv = (New-PsSdMap); LocalIds = $state.LocalIds; Gaps = $state.Gaps; Where = $state.Where; ItemKey = $k; ItemId = $id; ItemEvidence = @(); UnitTypes = @(); Forward = $state.Forward }
             $skr = Resolve-PsSdValue $Ctx $skState $sk '' ''
             foreach ($f in @($skr.Keys)) { $merged[[string]$f] = $skr[$f] }
         }
@@ -622,8 +642,7 @@ function Resolve-PsSdPacket {
         $aff = @()
         foreach ($a in @($q['affects'])) {
             if ($null -eq $a) { continue }
-            $aid = Resolve-PsSdKeyRef $Ctx $state.Local ([string]$a)
-            if ($null -eq $aid -and $state.LocalIds.Contains([string]$a)) { $aid = [string]$a }
+            $aid = Resolve-PsSdStateRef $Ctx $state ([string]$a)
             if ($null -eq $aid) { $errs.Add($state.Where + ' affects：參照不存在的 ' + $a) } else { $aff += $aid }
         }
         $o['affects'] = $aff
@@ -655,7 +674,7 @@ function Resolve-PsSdPacket {
             $o['disposition'] = $st['disposition']
             if ($st.Contains('items')) {
                 $ids = @()
-                foreach ($x in @($st['items'])) { $rid = Resolve-PsSdKeyRef $Ctx $state.Local ([string]$x); if ($null -eq $rid -and $state.LocalIds.Contains([string]$x)) { $rid = [string]$x }; if ($null -eq $rid) { $errs.Add($state.Where + '：參照不存在的 ' + $x) } else { $ids += $rid } }
+                foreach ($x in @($st['items'])) { $rid = Resolve-PsSdStateRef $Ctx $state ([string]$x); if ($null -eq $rid) { $errs.Add($state.Where + '：參照不存在的 ' + $x) } else { $ids += $rid } }
                 $o['items'] = $ids
             }
             if ($st.Contains('note')) { $o['note'] = $st['note'] }
@@ -669,12 +688,12 @@ function Resolve-PsSdPacket {
             if ($null -eq $pd) { continue }
             $state.Where = 'programDispositions ' + $pd['program']; $state.ItemKey = [string]$pd['program']
             $o = New-PsSdObject
-            $pid0 = Resolve-PsSdKeyRef $Ctx $state.Local ([string]$pd['program'])
+            $pid0 = Resolve-PsSdStateRef $Ctx $state ([string]$pd['program'])
             if ($null -eq $pid0) { $errs.Add($state.Where + '：參照不存在的程式') ; continue }
             $o['program'] = $pid0
             $o['kinds'] = $pd['kinds']
             $ids = @()
-            foreach ($x in @($pd['items'])) { if ($null -eq $x) { continue }; $rid = Resolve-PsSdKeyRef $Ctx $state.Local ([string]$x); if ($null -eq $rid -and $state.LocalIds.Contains([string]$x)) { $rid = [string]$x }; if ($null -eq $rid) { $errs.Add($state.Where + '：參照不存在的 ' + $x) } else { $ids += $rid } }
+            foreach ($x in @($pd['items'])) { if ($null -eq $x) { continue }; $rid = Resolve-PsSdStateRef $Ctx $state ([string]$x); if ($null -eq $rid) { $errs.Add($state.Where + '：參照不存在的 ' + $x) } else { $ids += $rid } }
             $o['items'] = $ids
             if ($pd.Contains('note')) { $o['note'] = $pd['note'] }
             $rows.Add($o)
@@ -695,7 +714,7 @@ function Resolve-PsSdPacket {
         foreach ($dc in @($Packet['definitionOnlyCodes'])) { if ($null -eq $dc) { continue }; $o = New-PsSdObject; $o['entityKey'] = [string]$Packet['subject']; $o['code'] = [string]$dc['code']; $rows.Add($o) }
         $extras['definitionOnlyCodes'] = $rows.ToArray()
     }
-    return @{ Errors = $errs; Items = $items.ToArray(); Questions = $questions.ToArray(); Gaps = $state.Gaps.ToArray(); Requests = $requests.ToArray(); Implicit = $implicit.ToArray(); Extras = $extras }
+    return @{ Errors = $errs; Items = $items.ToArray(); Questions = $questions.ToArray(); Gaps = $state.Gaps.ToArray(); Requests = $requests.ToArray(); Implicit = $implicit.ToArray(); Extras = $extras; Forward = $state.Forward.ToArray() }
 }
 
 # ---------------- 派號：骨架與收據 ----------------

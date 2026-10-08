@@ -84,7 +84,8 @@ function Complete-SdPacket {
 
 function Get-SdExampleReceipts {
     # 回傳 @{ Receipts; ExtraQuestions; Docs; IdToKey; EvById }。$Pages／$Records：分母（範例 canonical 沒有，測試另給）。
-    param([string]$Dir, [string]$JobId, [string]$StatusRef, $Pages, $Records)
+    # $UiPerComponent：畫面項目依鍵的 Component 前綴分包（外環逐 Component 檢查畫面分母時用）。
+    param([string]$Dir, [string]$JobId, [string]$StatusRef, $Pages, $Records, [switch]$UiPerComponent)
     $docs = @{}
     foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Dir 'canonical') -Filter '*.json' -File)) {
         $docs[[System.IO.Path]::GetFileNameWithoutExtension($f.Name)] = ConvertTo-PsSdNode (Read-PsSdJsonFile $f.FullName)
@@ -162,8 +163,17 @@ function Get-SdExampleReceipts {
         }
         $receipts.Add(@{ Ref = 'workflow/' + $e + '/p1'; Packet = (Complete-SdPacket $pk) })
     }
-    foreach ($u in @(@('interfaces', @('IF')), @('functions', @('FR')), @('ui', @('UI')))) {
+    $plain = @(@('interfaces', @('IF')), @('functions', @('FR')))
+    if (-not $UiPerComponent) { $plain += , @('ui', @('UI')) }
+    foreach ($u in $plain) {
         $receipts.Add(@{ Ref = $u[0] + '/' + $subject + '/p1'; Packet = (Complete-SdPacket (& $mk $u[0] $subject $u[1])) })
+    }
+    if ($UiPerComponent) {
+        foreach ($comp in $comps) {
+            $pk = New-SdPacket $JobId 'ui' ([string]$comp) 1
+            if ($byPrefix.ContainsKey('UI')) { foreach ($it in $byPrefix['UI']) { if (([string]$it['key']).StartsWith([string]$comp + '.')) { Add-SdPacketItem $pk $it $idToKey $evById } } }
+            $receipts.Add(@{ Ref = 'ui/' + $comp + '/p1'; Packet = (Complete-SdPacket $pk) })
+        }
     }
     $pk = & $mk 'rules' $subject @('MSG', 'BR')
     if ($docs.ContainsKey('09-business-logic')) {
