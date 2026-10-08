@@ -12,9 +12,3 @@
 |---|---|
 | SPEC_APPROVAL | 業務單位主管 |
 | QUESTION_RESOLUTION | 業務承辦窗口 |
-
-## 狀態圖
-
-| 狀態實體 | 檔案 | 狀態欄位（選填） |
-|---|---|---|
-| REQ_STATUS | status-REQ_STATUS.md | TW_DEMO_REQHDR.REQ_STATUS |

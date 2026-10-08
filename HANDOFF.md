@@ -14,13 +14,15 @@
 
 **Spec 文件契約框架：設計提案，尚未實作（2026-10-08，issue #37）**：管理者要把 `/ps-spec` 的單一大檔改成
 00-index＋14 份文件＋90 問題清單，並定案下列事項：
-- STATUS 文件（Mermaid flowchart＋stateDiagram-v2）是狀態與轉移的權威；圖外狀態與轉移只進問題清單並分級。
+- STATUS 文件（Mermaid flowchart＋stateDiagram-v2）是狀態與轉移的權威，所有圖寫在同一份檔案，由模型讀檔判斷每張圖屬於哪個
+  狀態實體、外環解析並驗證；圖外狀態與轉移只進問題清單並分級。狀態碼是三位數字字元（含前導 0）。
 - 技術選型不入規格。
 - 只做 Claude Code 版（Sonnet 5）。
-- 除外環判定完成外，另加乾淨讀者交叉解讀（L5），抓幻覺與過度簡略。
+- 除外環判定完成外，另加乾淨讀者交叉解讀（L5）：3 位讀者、最多 2 輪、多數決，抓幻覺與過度簡略。
 
 設計見 `docs/design/spec-schema-framework.md`，附件有 types.md、walkthrough.md、schemas、examples。
-`tools/build.py` 是設計期 Python 原型，負責重建並驗證上述附件；它不是框架、不搬公司機。
+設計期用來產生與驗證附件的 Python 原型依管理者要求不放進 repo。
+討論中：子業務守門（主狀態等多個子業務狀態與 activity 到位）的畫法與條件寫法、非狀態欄位原生未使用分支的判斷方法（設計 §15）。
 實作拆分見設計 §16，落地時再記 applied.md，並在 AGENTS.md 註明這條流程只有 Claude Code 版。
 
 **重建套件（2026-09-29）**：管理者要讓 AI 依 Spec 從零重建 JO（.NET＋React＋MariaDB、本機可跑的 MVP、

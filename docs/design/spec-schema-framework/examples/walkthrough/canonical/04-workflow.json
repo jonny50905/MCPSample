@@ -20,12 +20,12 @@
     {
       "kind": "FRAMEWORK",
       "ref": "schemas/1.0",
-      "fingerprint": "2067762d0d783ce3580403a10ee80cf10e83f223781ef946e2a9fbc1229eef1d"
+      "fingerprint": "31e023e779fab1261dafb8c39bc7c13e408f204df61401315ec2f4245a81a76a"
     },
     {
       "kind": "STATUS_DOC",
       "ref": "status-REQ_STATUS.md",
-      "fingerprint": "74ddc35144e7ccb6d318a2976abae48d0af373c58aaa87ab90e513480af3b12e"
+      "fingerprint": "de0f15829df41238955cb9fddbba169be9ef1542a46cb00af292c5b2d767f676"
     },
     {
       "kind": "RESEARCH_RECEIPT",
@@ -46,7 +46,7 @@
       "entityKey": "REQ_STATUS",
       "flowchart": "status-REQ_STATUS.md#L7-L20",
       "stateDiagram": "status-REQ_STATUS.md#L24-L47",
-      "fingerprint": "74ddc35144e7ccb6d318a2976abae48d0af373c58aaa87ab90e513480af3b12e"
+      "fingerprint": "de0f15829df41238955cb9fddbba169be9ef1542a46cb00af292c5b2d767f676"
     }
   ],
   "items": [

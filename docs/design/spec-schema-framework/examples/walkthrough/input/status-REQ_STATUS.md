@@ -1,6 +1,6 @@
 # 申請單狀態流程（合成範例）
 
-本檔是 STATUS 權威文件的合成範例：一個狀態實體（申請單的 REQ_STATUS），同時提供 flowchart 與 stateDiagram-v2。
+本檔是 STATUS 權威文件的合成範例。所有狀態圖寫在同一份檔案；這個範例只有一個狀態實體（申請單的狀態），同時提供 flowchart 與 stateDiagram-v2。
 
 ## 情境流程
 

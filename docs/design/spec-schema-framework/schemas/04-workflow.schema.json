@@ -55,7 +55,7 @@
             "additionalProperties": false
           },
           "minItems": 1,
-          "description": "狀態圖來源（每個狀態實體一組 flowchart＋stateDiagram-v2）"
+          "description": "狀態圖來源：每個狀態實體在 STATUS 檔中的一組 flowchart＋stateDiagram-v2（模型讀檔提出、外環驗證）"
         }
       },
       "required": [
@@ -85,7 +85,7 @@
             },
             "entityKey": {
               "$ref": "urn:ps-spec:schema:common#/$defs/slug",
-              "description": "狀態實體（輸入檔的狀態圖分組）"
+              "description": "狀態實體代號（狀態圖對應研究包給的大寫代號）"
             },
             "stateKind": {
               "type": "string",

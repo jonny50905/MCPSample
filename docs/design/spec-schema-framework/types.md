@@ -2,7 +2,7 @@
 
 > [設計提案](../spec-schema-framework.md)的附件。
 >
-> - **欄位表**：由 `schemas/` 產生（`tools/build.py`）；兩者不一致時以 schema 為準。
+> - **欄位表**：由 `schemas/` 整理而來；兩者不一致時以 schema 為準。
 > - **共同欄位**：`id`、`key`、`lifecycle`、`basis`、`certainty`、`evidence` 等，以及值的三態、條件式，見主文件 §5。
 > - **型別欄的「｜NA」「｜UNRESOLVED」**：表示該欄允許 NOT_APPLICABLE 或 UNRESOLVED；沒標的欄位只能是具體值。
 > - **參照欄**：列出該欄可以指向的 ID 前綴（含條件式裡的運算元）。
@@ -37,36 +37,29 @@
 - **渲染章節**：範圍摘要（CORE、DEPENDENCY、EXCLUDED）、目標與成功標準、決策責任、範圍物件明細。不建置欄位的數量會寫在這裡，明細連到 07。
 - **外殼欄位**：
 
-<!-- GEN:extra:01-overview -->
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
 | `projectInputStatus` | 列舉 | ✓ | PROVIDED／NOT_PROVIDED | 專案輸入檔是否提供 |
-<!-- /GEN -->
 
 ### GOAL 專案目標
 
-<!-- GEN:fields:GOAL -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `GOAL:<序號>` |  | 外環據以派發 ID |
 | `name` | 文字 | ✓ |  |  | 目標名稱 |
 | `statement` | 文字 | ✓ |  |  | 目標敘述 |
 | `successCriteria` | 陣列〈文字〉 | ✓ | ≥1 |  | 成功標準（可判定的敘述） |
-<!-- /GEN -->
 
 ### RESP 決策責任
 
-<!-- GEN:fields:RESP -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `RESP:<範圍>` |  | 外環據以派發 ID |
 | `area` | 列舉 | ✓ | SPEC_APPROVAL／QUESTION_RESOLUTION／BUSINESS_RULE_OWNER／DATA_OWNER／OTHER |  | 負責範圍 |
 | `holder` | 文字 | ✓ | 只寫職稱或單位類別 |  | 負責者（不寫人名） |
-<!-- /GEN -->
 
 ### OBJ 舊系統物件（範圍）
 
-<!-- GEN:fields:OBJ -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<物件型別>:<原名>` |  | 外環據以派發 ID |
@@ -80,7 +73,6 @@
 | `reason` | 文字 | ✓ |  |  | 納入／排除理由 |
 | `pcEvent` | 列舉 |  | PeopleCode 事件 |  | PEOPLECODE 物件的事件 |
 | `fieldUsage` | 三擇一物件 |  | excluded{count}／noneExcludable{checkedOn}／undetermined{code} |  | 原生欄位判定結論；type RECORD 且 CORE／DEPENDENCY 時必填 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -93,7 +85,6 @@
 
 **最小合法項目（OBJ）**
 
-<!-- GEN:minimal:OBJ -->
 ```json
 {
   "id": "OBJ-018",
@@ -119,7 +110,6 @@
   }
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -130,7 +120,6 @@
 - **何時產生**：第 6 階段（04 完成後）。
 - **渲染章節**：功能清單；每個功能的明細，包含反查到的畫面、規則、操作、測試、工作。
 
-<!-- GEN:fields:FR -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<Component>:<操作代號>` |  | 外環據以派發 ID |
@@ -143,7 +132,6 @@
 | `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE | 前置條件 |
 | `outcome` | 文字 | ✓ |  |  | 完成後的結果 |
 | `priority` | 列舉 | ✓ | MUST／SHOULD／COULD（預設 MUST） |  | 優先序 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -155,7 +143,6 @@
 
 **最小合法項目**
 
-<!-- GEN:minimal:FR -->
 ```json
 {
   "id": "FR-004",
@@ -202,7 +189,6 @@
   "priority": "MUST"
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -215,7 +201,6 @@
 
 ### ROLE 角色
 
-<!-- GEN:fields:ROLE -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<主體型別>:<原名>` |  | 外環據以派發 ID |
@@ -223,11 +208,9 @@
 | `object` | ID 參照 | ✓ |  | OBJ | 對應的原系統物件 |
 | `name` | 文字 | ✓ |  |  | 業務名稱 |
 | `membership` | 物件 | ✓ | kind＝STATIC_ASSIGNMENT／DYNAMIC_RULE（後者必附 DRV） | DRV | 使用者如何取得此角色 |
-<!-- /GEN -->
 
 ### PERM 權限
 
-<!-- GEN:fields:PERM -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<主體鍵>><資源鍵>` |  | 外環據以派發 ID |
@@ -237,7 +220,6 @@
 | `dataScope` | ALL_ROWS｜物件 | ✓ | condition 只能用資料運算元 | FLD、DRV | 資料範圍（列層級） |
 | `denial` | 物件 | ✓ | NOT_IN_NAVIGATION／ACCESS_DENIED_MESSAGE／ROWS_FILTERED／CONTROL_HIDDEN／CONTROL_DISABLED |  | 無權時的效果 |
 | `enforcement` | 列舉 | ✓ | COMPONENT_SECURITY／ROW_LEVEL_SECURITY／PEOPLECODE_CHECK／PAGE_DISPLAY_CONTROL |  | 檢查位置 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -248,7 +230,6 @@
 
 **最小合法項目（PERM）**
 
-<!-- GEN:minimal:PERM -->
 ```json
 {
   "id": "PERM-002",
@@ -283,7 +264,6 @@
   "enforcement": "ROW_LEVEL_SECURITY"
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -291,23 +271,20 @@
 
 - **用途**：狀態、轉移、情境。內容是 STATUS 文件的權威內容，加上程式研究得到的「怎麼做」。
 - **輸入來源**：STATUS 文件（flowchart＋stateDiagram-v2）；程式研究；07 的狀態欄位；03 的角色。
-- **何時產生**：骨架在第 0 階段（解析兩圖後派 ID），細節在第 4 階段。
+- **何時產生**：骨架在第 0 階段（模型提出狀態圖對應，外環解析並驗證後派 ID），細節在第 4 階段。
 - **渲染章節**：狀態圖（由 STATE、TRN 重新產生的 stateDiagram-v2，邊上標 TRN ID 與守衛）；情境流程圖（flowchart，邊上標情境類型與 TRN ID）；狀態、轉移、情境明細。
 - **外殼欄位**：
 
-<!-- GEN:extra:04-workflow -->
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
-| `diagramSources` | 陣列〈物件〉 | ✓ | ≥1 | 狀態圖來源（每個狀態實體一組 flowchart＋stateDiagram-v2） |
-<!-- /GEN -->
+| `diagramSources` | 陣列〈物件〉 | ✓ | ≥1 | 狀態圖來源：每個狀態實體在 STATUS 檔中的一組 flowchart＋stateDiagram-v2（模型讀檔提出、外環驗證） |
 
 ### STATE 狀態
 
-<!-- GEN:fields:STATE -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<狀態實體>:<狀態碼>` |  | 外環據以派發 ID |
-| `entityKey` | 代號 | ✓ |  |  | 狀態實體（輸入檔的狀態圖分組） |
+| `entityKey` | 代號 | ✓ |  |  | 狀態實體代號（狀態圖對應研究包給的大寫代號） |
 | `stateKind` | 列舉 | ✓ | SIMPLE／COMPOSITE |  | 狀態種類 |
 | `code` | 原文 |  | SIMPLE 必填 |  | 狀態碼（儲存值） |
 | `name` | 原文 | ✓ |  |  | 狀態圖上的名稱 |
@@ -317,11 +294,9 @@
 | `isInitialTarget` | 布林 | ✓ |  |  | 是否由 [*] 進入（新建） |
 | `isFinal` | 布林 | ✓ |  |  | 是否為終點（→[*]） |
 | `dataPresence` | 列舉 |  | SIMPLE 必填 |  | PROD 是否有此狀態碼的資料 |
-<!-- /GEN -->
 
 ### TRN 狀態轉移
 
-<!-- GEN:fields:TRN -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<狀態實體>:<起>><迄>（新建的起點寫 *）` |  | 外環據以派發 ID |
@@ -336,11 +311,9 @@
 | `sideEffects` | 陣列〈物件〉｜NA | ✓ |  | FLD | 其他副作用（通知、介面等於 06／09 反查） |
 | `implementedAt` | 陣列〈物件〉｜UNRESOLVED | ✓ | 找不到＝UNRESOLVED（DIAGRAM_EDGE_UNIMPLEMENTED） | OBJ | 原系統實作位置 |
 | `reentry` | 文字｜UNRESOLVED | ✓ |  |  | 重複觸發或同時操作時的行為 |
-<!-- /GEN -->
 
 ### FLOW 情境流程
 
-<!-- GEN:fields:FLOW -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<狀態實體>:<情境類型原文>` |  | 外環據以派發 ID |
@@ -352,7 +325,6 @@
 | `exitStates` | 陣列〈ID〉 | ✓ | ≥1 | STATE | 離開此情境的狀態 |
 | `preconditions` | 條件式｜NA | ✓ |  | FLD、DRV、STATE、ROLE | 前置條件 |
 | `exceptions` | 文字｜NA | ✓ |  |  | 例外與中斷 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -366,7 +338,6 @@
 
 **最小合法項目（TRN）**
 
-<!-- GEN:minimal:TRN -->
 ```json
 {
   "id": "TRN-008",
@@ -439,7 +410,6 @@
   "reentry": "核准後按鈕隱藏；兩位審核者同時核准時，後存檔者被拒絕（見 08 的併發行為）。"
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -450,7 +420,6 @@
 - **何時產生**：第 7 階段。
 - **渲染章節**：畫面清單；每個畫面的區塊與元件明細，包含反查到的規則與測試。
 
-<!-- GEN:fields:UI -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<Component>.<Page>[.<Record>.<欄位>]` |  | 外環據以派發 ID |
@@ -475,7 +444,6 @@
 | `valueSource` | 物件 |  | CONTROL 必填 | ENT、FLD、DRV、STATE、ROLE | 值來源 |
 | `displayDefault` | 運算元｜NA |  | CONTROL 必填 | FLD、DRV、STATE、ROLE | 畫面初值（寫入資料的預設在 09） |
 | `interactions` | 陣列〈物件〉 |  |  | UI | 純畫面互動（會拒絕或寫資料的邏輯寫在 09） |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -487,7 +455,6 @@
 
 **最小合法項目（按鈕元件）**
 
-<!-- GEN:minimal:UI -->
 ```json
 {
   "id": "UI-011",
@@ -533,7 +500,6 @@
   }
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -548,7 +514,6 @@
   - 資料流（由 08、06 的讀寫投影）。
   - 交易邊界總覽（由 08 投影）。
 
-<!-- GEN:fields:IF -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<物件型別>:<原名>` |  | 外環據以派發 ID |
@@ -565,7 +530,6 @@
 | `errorHandling` | 文字｜UNRESOLVED | ✓ |  |  | 錯誤處理 |
 | `retry` | 文字｜NA｜UNRESOLVED | ✓ |  |  | 重試 |
 | `idempotency` | 文字｜UNRESOLVED | ✓ |  |  | 重送／重複執行的結果 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -575,7 +539,6 @@
 
 **最小合法項目**
 
-<!-- GEN:minimal:IF -->
 ```json
 {
   "id": "IF-001",
@@ -621,7 +584,6 @@
   "idempotency": "同一張單重複排入會重複寄送通知。"
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -634,7 +596,6 @@
 
 ### ENT 資料實體
 
-<!-- GEN:fields:ENT -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<Record 原名>` |  | 外環據以派發 ID |
@@ -646,11 +607,9 @@
 | `keys` | 陣列〈ID〉｜NA | ✓ | 有序 | FLD | 邏輯鍵欄位（依序） |
 | `effectiveDating` | 物件 | ✓ | kind＝NONE／EFFDT／EFFDT_EFFSEQ；有效日時必附 currentRow | FLD、DRV | 有效日規則：目前有效列＝基準日當天或之前最大 EFFDT（再取最大 EFFSEQ），可限定有效狀態 |
 | `parent` | 物件 |  |  | ENT、FLD | 父子關係與鍵對應 |
-<!-- /GEN -->
 
 ### FLD 資料欄位
 
-<!-- GEN:fields:FLD -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<Record>.<欄位>` |  | 外環據以派發 ID |
@@ -667,11 +626,9 @@
 | `relations` | 陣列〈物件〉 |  |  | FLD | 與其他欄位的關聯 |
 | `sensitivity` | 列舉 | ✓ | NONE／PERSONAL／CONFIDENTIAL |  | 敏感分類 |
 | `usageEvidence` | 列舉 | ✓ | DATA_HAS_VALUE／CODE_REFERENCED／METADATA_ONLY／NOT_CHECKED |  | 使用證據等級（供排優先序，不代表排除） |
-<!-- /GEN -->
 
 ### DRV 衍生概念
 
-<!-- GEN:fields:DRV -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<代號>` |  | 外環據以派發 ID |
@@ -683,11 +640,9 @@
 | `whenNotFound` | 物件 | ✓ | result＝EMPTY／FALLBACK | DRV | 查無結果時的行為（訊息與阻擋寫在 09） |
 | `whenMultiple` | 物件 | ✓ | rule＝UNIQUE_BY_KEY／FIRST_BY_ORDER／ALL_ROWS | FLD | 多筆時的取法 |
 | `implementedAt` | 陣列〈ID〉 | ✓ | ≥1 | OBJ | 原系統實作位置 |
-<!-- /GEN -->
 
 ### XF 不建置的原生欄位
 
-<!-- GEN:fields:XF -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<Record 原名>` |  | 外環據以派發 ID |
@@ -695,7 +650,6 @@
 | `fields` | 陣列〈原名〉 | ✓ | ≥1 |  | 判定無用的欄位 |
 | `dataCheck` | 固定格式 | ✓ | 非預設 0 筆（全表非空，查詢日 YYYY-MM-DD） |  | 資料剖析結論 |
 | `codeChecks` | 物件 | ✓ | a／b／c 三種查法都要有結果 |  | 程式面查法結果 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -709,7 +663,6 @@
 
 **最小合法項目（DRV）**
 
-<!-- GEN:minimal:DRV -->
 ```json
 {
   "id": "DRV-002",
@@ -772,7 +725,6 @@
   ]
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -783,7 +735,6 @@
 - **何時產生**：第 9 階段。
 - **渲染章節**：操作清單；每個操作明細，錯誤與訊息由檢核規則反查。
 
-<!-- GEN:fields:OP -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<FR 鍵>:<操作代號>` |  | 外環據以派發 ID |
@@ -799,7 +750,6 @@
 | `effects` | 物件｜NA | ✓ | 唯讀操作寫 NA | TRN、FLD、DRV、STATE、ROLE、IF | 轉移、寫入、觸發的介面 |
 | `transaction` | 物件 | ✓ | boundary／writeOrder／onFailure／concurrency／idempotency | MSG | 交易語意 |
 | `legacyOrigin` | 物件 | ✓ |  | OBJ | 原系統對應的物件與事件鏈 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -811,7 +761,6 @@
 
 **最小合法項目**
 
-<!-- GEN:minimal:OP -->
 ```json
 {
   "id": "OP-004",
@@ -933,7 +882,6 @@
   }
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -945,15 +893,12 @@
 - **渲染章節**：程式處置表；規則清單與明細；訊息表。
 - **外殼欄位**：
 
-<!-- GEN:extra:09-business-logic -->
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
 | `programDispositions` | 陣列〈物件〉 | ✓ | 核心 PeopleCode 清單每支恰一筆；items 只能指 BR／MSG／TRN／DRV／UI／IF | PeopleCode 程式處置（覆蓋率分母） |
-<!-- /GEN -->
 
 ### MSG 訊息
 
-<!-- GEN:fields:MSG -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<訊息集>,<編號>｜TEXT:<雜湊>` |  | 外環據以派發 ID |
@@ -962,11 +907,9 @@
 | `text` | 原文 | ✓ |  |  | 訊息原文 |
 | `severity` | 列舉 | ✓ | ERROR／WARNING／MESSAGE／CANCEL |  | 嚴重度 |
 | `parameters` | 陣列〈文字〉 |  |  |  | 參數意義（依序） |
-<!-- /GEN -->
 
 ### BR 業務規則
 
-<!-- GEN:fields:BR -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<實作位置>:<規則代號>` |  | 外環據以派發 ID |
@@ -980,7 +923,6 @@
 | `boundaries` | 文字｜NA | ✓ |  |  | NULL／空白／0／日期邊界的處理 |
 | `modeDifferences` | 文字｜NA | ✓ |  |  | 不同模式或角色的差異 |
 | `implementedAt` | 物件 | ✓ |  | OBJ | 原系統實作位置 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -992,7 +934,6 @@
 
 **最小合法項目（BR）**
 
-<!-- GEN:minimal:BR -->
 ```json
 {
   "id": "BR-006",
@@ -1037,7 +978,6 @@
   }
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -1048,7 +988,6 @@
 - **何時產生**：第 10 階段。
 - **渲染章節**：覆蓋摘要（外環計算每個 FR、BR、TRN、FLOW 有哪些案例）；案例明細。
 
-<!-- GEN:fields:TC -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<FR 鍵>:<類型>:<代號>` |  | 外環據以派發 ID |
@@ -1060,7 +999,6 @@
 | `steps` | 陣列〈物件〉 | ✓ | ≥1 | UI、OP、FLD | 操作步驟 |
 | `expected` | 物件 | ✓ | 至少一項 | MSG、STATE、UI、FLD | 預期訊息、狀態、元件、資料 |
 | `verification` | 文字 | ✓ |  |  | 如何核對 |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -1074,7 +1012,6 @@
 
 **最小合法項目**
 
-<!-- GEN:minimal:TC -->
 ```json
 {
   "id": "TC-011",
@@ -1137,7 +1074,6 @@
   "verification": "畫面顯示訊息 27000,3；該列 REQ_STATUS 仍為 010。"
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -1156,19 +1092,16 @@
   - 程式與測試標註 ID。
   - 發現矛盾時回報，不自行修改規格。
 
-<!-- GEN:fields:AI -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `AI:<序號>` |  | 外環據以派發 ID |
 | `category` | 列舉 | ✓ | READING／SCOPE／DATA／LOGIC／UNKNOWN_HANDLING／CHANGE_DISCIPLINE／TRACEABILITY／LANGUAGE |  | 條款類別 |
 | `clause` | 文字 | ✓ |  |  | 條款內容 |
-<!-- /GEN -->
 
 **完整性與審查準則**：條款不含個案內容；修改條款要提高框架的 schema 版本。
 
 **最小合法項目**
 
-<!-- GEN:minimal:AI -->
 ```json
 {
   "id": "AI-001",
@@ -1181,7 +1114,6 @@
   "clause": "先讀 00-index：閱讀順序、ID 前綴對照、本版狀態。看到任何 ID，到前綴對照表指定的文件找定義；以 ID 為準，不以章節位置為準。"
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -1194,7 +1126,6 @@
   - 相依：到達前置狀態的第一條轉移，所屬的 FR 就是前置工作。
 - **重建端**：可以再細分、估時，但不回寫 Spec。
 
-<!-- GEN:fields:TASK -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `FOUNDATION:<代號>｜SLICE:<FR 鍵>` |  | 外環據以派發 ID |
@@ -1205,13 +1136,11 @@
 | `dependsOn` | 陣列〈ID〉 | ✓ | 可空 | TASK | 前置工作 |
 | `members` | 物件 | ✓ | 外環計算 | ENT、FLD、DRV、ROLE、TRN、UI、BR、OP、TC | 本工作涵蓋的項目 |
 | `deliverables` | 陣列〈列舉〉 | ✓ | DATA_STRUCTURE／OPERATIONS／SCREENS／RULES／SECURITY／TESTS |  | 交付物 |
-<!-- /GEN -->
 
 **完整性與審查準則**：每個 FR 恰一個切片（C10）；相依無循環。
 
 **最小合法項目**
 
-<!-- GEN:minimal:TASK -->
 ```json
 {
   "id": "TASK-005",
@@ -1271,7 +1200,6 @@
   ]
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -1280,20 +1208,17 @@
 - **用途**：每個工作的完成條件與要交的證據，另有一份全域條件。重建端用它判定完成；Spec 端不標記完成。
 - **產生方式**：外環計算。全域條件來自框架模板；工作條件由工作成員反查得到（測試、規則、訊息）。
 
-<!-- GEN:fields:DOD -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `GLOBAL:<代號>｜TASK:<工作鍵>` |  | 外環據以派發 ID |
 | `scope` | 列舉 | ✓ | GLOBAL／TASK |  | 適用範圍 |
 | `task` | ID 參照 |  | scope＝TASK 時必填 | TASK | 對應工作 |
 | `criteria` | 陣列〈物件〉 | ✓ | kind／statement／refs／evidenceRequired | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、IF、FR、UI、MSG、BR、OP、TC、TASK | 完成條件 |
-<!-- /GEN -->
 
 **完整性與審查準則**：每個 TASK 都有 DOD（C10）；`refs` 指向的項目都存在（R01）。
 
 **最小合法項目**
 
-<!-- GEN:minimal:DOD -->
 ```json
 {
   "id": "DOD-006",
@@ -1318,7 +1243,6 @@
   ]
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -1331,7 +1255,6 @@
   - 被取代的決策保留並標 SUPERSEDED。
   - 撤銷的決策標 REVOKED。
 
-<!-- GEN:fields:DEC -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `DEC:<四位序號>` |  | 外環據以派發 ID |
@@ -1347,11 +1270,9 @@
 | `resolves` | 陣列〈ID〉 | ✓ | 可空 | Q | 回答的問題 |
 | `affects` | 陣列〈ID〉 | ✓ | 可空 | GOAL、RESP、OBJ、ENT、FLD、DRV、XF、ROLE、PERM、STATE、TRN、FLOW、IF、FR、UI、MSG、BR、OP、TC | 影響的規格項目 |
 | `effect` | 列舉 | ✓ | NO_CHANGE／DROP／ADD_SCOPE／ACCEPT_GAP／AMEND_INPUT |  | 對規格的效果 |
-<!-- /GEN -->
 
 **最小合法項目**
 
-<!-- GEN:minimal:DEC -->
 ```json
 {
   "id": "DEC-001",
@@ -1378,7 +1299,6 @@
   "effect": "DROP"
 }
 ```
-<!-- /GEN -->
 
 ---
 
@@ -1394,13 +1314,10 @@
 - **產生方式**：外環彙整研究、解析、讀者、檢核的結果。問題的 ANSWERED、ACCEPTED_AS_GAP 狀態由 19 的決策反查。
 - **外殼欄位**：
 
-<!-- GEN:extra:90-questions -->
 | 外殼欄位 | 型別 | 必填 | 值域／限制 | 說明 |
 |---|---|---|---|---|
 | `suppressed` | 物件 | ✓ |  | 只存在於值域定義、沒有資料也沒有核心程式使用的狀態碼（只計數，不列題） |
-<!-- /GEN -->
 
-<!-- GEN:fields:Q -->
 | 欄位 | 型別 | 必填 | 值域／限制 | 參照 | 說明 |
 |---|---|---|---|---|---|
 | `key` | 自然鍵 | ✓ | `<類別>:<自然鍵>` |  | 外環據以派發 ID |
@@ -1413,7 +1330,6 @@
 | `raisedBy` | 列舉 | ✓ | PARSER／RESEARCH／REVIEW／READER／GATE |  | 提出來源 |
 | `status` | 列舉 | ✓ | OPEN／ANSWERED／WITHDRAWN／ACCEPTED_AS_GAP |  | 狀態（ANSWERED／ACCEPTED_AS_GAP 由 19 的決策反查） |
 | `proposedAnswer` | 文字 |  | 僅供參考 |  | 研究端建議的答案（不等於決策） |
-<!-- /GEN -->
 
 **完整性與審查準則**
 
@@ -1423,7 +1339,6 @@
 
 **最小合法項目**
 
-<!-- GEN:minimal:Q -->
 ```json
 {
   "id": "Q-001",
@@ -1449,7 +1364,6 @@
   "status": "OPEN"
 }
 ```
-<!-- /GEN -->
 
 ---
 
