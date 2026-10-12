@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5cfa33e）
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 271e746）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|opencode|5cfa33e|112
+@@@PSBUNDLE|1|opencode|271e746|112
 @@@PSBUNDLE-REMOVED|.opencode/plugin/ps-oracle-preflight-gate.js
 @@@PSBUNDLE-REMOVED|scripts/test-elasticsearch-mcp-tools-list.ps1
 @@@PSBUNDLE-REMOVED|scripts/test-mcp-tools-list.ps1
@@ -2837,7 +2837,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
 能力目錄代號與屬性見 `.opencode/peoplesoft/spec/capabilities.json`（例：`DATA.FILE_INPUT` 的 `present,layout,fields`）。
 該領域尚無研究 → 建議 `/ps-research <領域>`；答錯的事實 → 建議 `/ps-correct <正確知識>`。
 @@@PSBUNDLE-END|.opencode/peoplesoft/knowledge-retrieval-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3754|d21b8d9cddb62e9852bbc49314b55d9fd4410a169a2af6cdc87c9b5c91ee8ef6|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3760|13a2ea51020264e0153366b0ff9cafc4f7d05e48ec8f707fb76228adb7be02a0|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -6580,6 +6580,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
     設計範例只在維護端，沒有就整支測試印 SKIP、exit 0。test-sdoc 的 schema 副本比對、test-sdoc-assemble 的研究包範例比對改成不比換行。
   - `scripts/ps-sdoc.ps1` 圍欄改用 Test-SdSamePath（GetFullPath 正規化；Windows 不分大小寫）。
   - SOP-28「維護驗證」補部署版面演練與公司機搬完後的確認方式。
+  - `.github/workflows/ps51-tests.yml`（管理者同意後加入；在 manifest 範圍外，不搬到公司機）：repo 版面每支測試一個 job，
+    checkout 保留 LF；部署版面 job 以 ps-bundle.ps1 解開搬運包後跑 sdoc 三支與第一次 ps-sdoc.ps1。
 - 5.1 靜態檢查：官方 PSScriptAnalyzer 1.23.0 的 PSUseCompatibleSyntax／Commands／Types，配模組內附的三份 Windows PowerShell 5.1 設定檔
   （Windows 10 1809、Server 2019、Server 2016），掃 scripts/** 與 hook 共 39 支：語法 0、型別 0；命令 420 筆全是誤報（ps-auto-loop.ps1
   自訂的 Write-Log 417 筆、test-auto-loop.ps1 呼叫 node 3 筆）。先以金絲雀檔確認它抓得到 ??、三元、&&、-AsHashtable、-AsByteStream、
@@ -6589,7 +6591,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
   多字元 Split、-replace scriptblock、`u{}、$IsWindows（都沒有用到）。
 - 驗證：PS 7 上 repo 版面 test-sdoc 41、test-sdoc-assemble 67、test-sdoc-run 49 全過；把 Claude Code 搬運包以 ps-bundle.ps1 解到空目錄
   （結論 G）、補設計範例後三支同樣全過；部署版面第一次執行 ps-sdoc.ps1（沒有輸入檔）停在 DOC1-0-01 並建出四個骨架檔。
-  真 Windows PowerShell 5.1 未執行：沙箱沒有；GitHub Actions 的 Windows runner 可以跑，但要在 repo 加工作流程，待管理者決定。
+  真 Windows PowerShell 5.1：沙箱沒有，經管理者同意加 GitHub Actions 工作流程 `ps51-tests`（Windows runner、`powershell.exe`
+  5.1.26100、.NET Framework 4）。首輪 13 個 job 全綠：repo 版面 12 支測試（ps51-static、sdoc 41、sdoc-assemble 67、sdoc-run 49、
+  bundle、claude-variant、knowledge、spec、spec-build、spec-clone 148、supplemental、auto-loop），以及部署版面演練（ps-bundle.ps1
+  解開結論 G、sdoc 41／67／49、第一次 ps-sdoc.ps1 停在 DOC1-0-01）。5.1 比 PS 7 慢約 2.5～3 倍（sdoc-run 約 11 分），
+  與真 session 的分鐘級耗時相比可忽略。test-oracle-runtime 需要真 OpenCode session，不在其中。
 - 教訓：「5.1 相容」分兩層——語法與 API 用有官方 5.1 設定檔的相容性分析器；編碼、JSON、原生命令、排序文化、路徑這類語意差異只能盤點或真跑。
   測試要在部署版面（搬運包解開後的位置與換行）跑過，才算公司機能用。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
@@ -8617,7 +8623,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1043|fad9dab93a68f3925585f0e119c652a360f15889a4846e9a73734b91a92863c3|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1046|5c6ab42747551f224811c4b3bb7ec081c5e2489664acd9a35a52ea959c8a49ba|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -9659,6 +9665,9 @@ Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP
   公司機搬完後的確認改用「第一次輸入清單停在 DOC1-0-01、建出四個骨架檔」（不呼叫模型）。
 - 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude.txt` 解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
   再把 `docs/design/spec-schema-framework` 複製進去，跑三支 sdoc 測試與第一次 `ps-sdoc.ps1`；測試比對檔案內容一律不比換行。
+- 真 Windows PowerShell 5.1：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`）在 Windows runner 以 `powershell.exe`
+  跑上述測試與部署版面演練；推到 `claude/**` 且動到 scripts、claude-code、設計範例或搬運包時自動跑，也可在 Actions 頁手動觸發。
+  新增測試要加進工作流程的清單；`test-oracle-runtime.ps1` 需要真 OpenCode session，不放進去。
 - 5.1 相容的靜態檢查：除 `test-ps51-static.ps1` 外，可用 PSScriptAnalyzer 的 PSUseCompatibleSyntax／Commands／Types 規則配 Windows PowerShell 5.1
   設定檔（模組內附 `compatibility_profiles`）；它查不到預設編碼、ConvertFrom-Json 行為、原生命令 stderr、排序文化、路徑分隔這類語意差異。
 @@@PSBUNDLE-END|.opencode/peoplesoft/SOP.md
@@ -37738,10 +37747,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|1ae2696b7305e79572559c1b300892e2ccd936d5a2316d24e935c9cef5ef86c1|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|1ef181c6e52c263c38301f134023244e5c87ed340396a89aaf5d9d686069cacb|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "5cfa33e",
+  "commit": "271e746",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -37919,8 +37928,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3754,
-      "sha256": "d21b8d9cddb62e9852bbc49314b55d9fd4410a169a2af6cdc87c9b5c91ee8ef6",
+      "lines": 3760,
+      "sha256": "13a2ea51020264e0153366b0ff9cafc4f7d05e48ec8f707fb76228adb7be02a0",
       "bom": false
     },
     {
@@ -37991,8 +38000,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1043,
-      "sha256": "fad9dab93a68f3925585f0e119c652a360f15889a4846e9a73734b91a92863c3",
+      "lines": 1046,
+      "sha256": "5c6ab42747551f224811c4b3bb7ec081c5e2489664acd9a35a52ea959c8a49ba",
       "bom": false
     },
     {
@@ -38551,4 +38560,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|112|3ce84ac7354d77fef060db2d1e289bc90ce0308bc488acf8206e73059e8d1e20
+@@@PSBUNDLE-EOF|112|6ea3b7e1481895cd69febd6df7f10f4a884f498429986d53b0933501cdc71d16

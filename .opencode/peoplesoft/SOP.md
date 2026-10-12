@@ -1039,5 +1039,8 @@ Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP
   公司機搬完後的確認改用「第一次輸入清單停在 DOC1-0-01、建出四個骨架檔」（不呼叫模型）。
 - 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude.txt` 解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
   再把 `docs/design/spec-schema-framework` 複製進去，跑三支 sdoc 測試與第一次 `ps-sdoc.ps1`；測試比對檔案內容一律不比換行。
+- 真 Windows PowerShell 5.1：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`）在 Windows runner 以 `powershell.exe`
+  跑上述測試與部署版面演練；推到 `claude/**` 且動到 scripts、claude-code、設計範例或搬運包時自動跑，也可在 Actions 頁手動觸發。
+  新增測試要加進工作流程的清單；`test-oracle-runtime.ps1` 需要真 OpenCode session，不放進去。
 - 5.1 相容的靜態檢查：除 `test-ps51-static.ps1` 外，可用 PSScriptAnalyzer 的 PSUseCompatibleSyntax／Commands／Types 規則配 Windows PowerShell 5.1
   設定檔（模組內附 `compatibility_profiles`）；它查不到預設編碼、ConvertFrom-Json 行為、原生命令 stderr、排序文化、路徑分隔這類語意差異。

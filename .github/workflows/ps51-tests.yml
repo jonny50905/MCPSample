@@ -48,7 +48,7 @@ jobs:
       - name: Keep the repository bytes (LF)
         shell: cmd
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run under Windows PowerShell 5.1
         run: |
           chcp 65001 | Out-Null
@@ -68,7 +68,7 @@ jobs:
       - name: Keep the repository bytes (LF)
         shell: cmd
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Unpack the Claude Code bundle into an empty folder
         run: |
           chcp 65001 | Out-Null

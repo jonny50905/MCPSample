@@ -3740,6 +3740,8 @@
     設計範例只在維護端，沒有就整支測試印 SKIP、exit 0。test-sdoc 的 schema 副本比對、test-sdoc-assemble 的研究包範例比對改成不比換行。
   - `scripts/ps-sdoc.ps1` 圍欄改用 Test-SdSamePath（GetFullPath 正規化；Windows 不分大小寫）。
   - SOP-28「維護驗證」補部署版面演練與公司機搬完後的確認方式。
+  - `.github/workflows/ps51-tests.yml`（管理者同意後加入；在 manifest 範圍外，不搬到公司機）：repo 版面每支測試一個 job，
+    checkout 保留 LF；部署版面 job 以 ps-bundle.ps1 解開搬運包後跑 sdoc 三支與第一次 ps-sdoc.ps1。
 - 5.1 靜態檢查：官方 PSScriptAnalyzer 1.23.0 的 PSUseCompatibleSyntax／Commands／Types，配模組內附的三份 Windows PowerShell 5.1 設定檔
   （Windows 10 1809、Server 2019、Server 2016），掃 scripts/** 與 hook 共 39 支：語法 0、型別 0；命令 420 筆全是誤報（ps-auto-loop.ps1
   自訂的 Write-Log 417 筆、test-auto-loop.ps1 呼叫 node 3 筆）。先以金絲雀檔確認它抓得到 ??、三元、&&、-AsHashtable、-AsByteStream、
@@ -3749,6 +3751,10 @@
   多字元 Split、-replace scriptblock、`u{}、$IsWindows（都沒有用到）。
 - 驗證：PS 7 上 repo 版面 test-sdoc 41、test-sdoc-assemble 67、test-sdoc-run 49 全過；把 Claude Code 搬運包以 ps-bundle.ps1 解到空目錄
   （結論 G）、補設計範例後三支同樣全過；部署版面第一次執行 ps-sdoc.ps1（沒有輸入檔）停在 DOC1-0-01 並建出四個骨架檔。
-  真 Windows PowerShell 5.1 未執行：沙箱沒有；GitHub Actions 的 Windows runner 可以跑，但要在 repo 加工作流程，待管理者決定。
+  真 Windows PowerShell 5.1：沙箱沒有，經管理者同意加 GitHub Actions 工作流程 `ps51-tests`（Windows runner、`powershell.exe`
+  5.1.26100、.NET Framework 4）。首輪 13 個 job 全綠：repo 版面 12 支測試（ps51-static、sdoc 41、sdoc-assemble 67、sdoc-run 49、
+  bundle、claude-variant、knowledge、spec、spec-build、spec-clone 148、supplemental、auto-loop），以及部署版面演練（ps-bundle.ps1
+  解開結論 G、sdoc 41／67／49、第一次 ps-sdoc.ps1 停在 DOC1-0-01）。5.1 比 PS 7 慢約 2.5～3 倍（sdoc-run 約 11 分），
+  與真 session 的分鐘級耗時相比可忽略。test-oracle-runtime 需要真 OpenCode session，不在其中。
 - 教訓：「5.1 相容」分兩層——語法與 API 用有官方 5.1 設定檔的相容性分析器；編碼、JSON、原生命令、排序文化、路徑這類語意差異只能盤點或真跑。
   測試要在部署版面（搬運包解開後的位置與換行）跑過，才算公司機能用。

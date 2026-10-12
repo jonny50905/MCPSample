@@ -18,9 +18,13 @@ Claude Code 版的 `/ps-spec` 改走 `scripts/ps-sdoc.ps1`（DOC1），產 00-in
   `claude-code/.claude/peoplesoft/sdoc/`（契約、schema、每單元範例、AI 指引模板）；agents ps-status-reader、ps-sdoc-worker、
   ps-spec-reader、ps-spec-judge；hook 路徑設定 status-reader／sdoc-worker／spec-reader／spec-judge；ps-spec-author 只跑 ps-sdoc。
 - 流程與取捨：applied.md L136（研究包＋外環組裝）、L137（L5 乾淨讀者）；操作 SOP-28。
-- 驗證（維護端 PS 7）：test-sdoc 41、test-sdoc-assemble 66、test-sdoc-run 49（合成 worker：空目錄 → REVIEW_READY → APPROVED，
-  與各種中斷、重試、改寫、讀者不一致情境）、test-claude-variant、5.1 靜態守衛。**沒有在真 Windows PowerShell 5.1、真 claude CLI、
-  真 STATUS 檔跑過**；公司機第一次跑先用 1～2 個 Component、`-MaxSessions 4`，回報結論碼與兩行計數。
+- 驗證（維護端 PS 7）：test-sdoc 41、test-sdoc-assemble 67、test-sdoc-run 49（合成 worker：空目錄 → REVIEW_READY → APPROVED，
+  與各種中斷、重試、改寫、讀者不一致情境）、test-claude-variant、5.1 靜態守衛。
+- 真 Windows PowerShell 5.1（2026-10-12 起）：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`，Windows runner、
+  `powershell.exe` 5.1.26100、.NET Framework 4）跑 12 支測試，另把搬運包以 ps-bundle.ps1 解到空目錄（CRLF、`.claude\` 在根目錄）
+  跑三支 sdoc 測試與第一次 ps-sdoc.ps1（DOC1-0-01）；首輪 13 個 job 全綠（L138）。推到 `claude/**` 且動到 scripts、claude-code、
+  設計範例或搬運包時自動跑，也可在 Actions 頁手動觸發。**仍沒有在真 claude CLI、真 STATUS 檔跑過**；公司機第一次跑先用
+  1～2 個 Component、`-MaxSessions 4`，回報結論碼與兩行計數。
 - 已知風險：模型寫研究包的合格率（不合格兩次就 BLOCKED，等 -Retry）；L5 結構題只比 ID 集合，讀者列 ID 的習慣差太多時會判不一致；
   真實 STATUS 圖的三位讀者一致率；大 Component 的頁數與 session 成本。以上都要公司機數字才能調。
 
