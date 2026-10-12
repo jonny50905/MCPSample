@@ -2,9 +2,10 @@ name: ps51-tests
 # Runs the framework tests under Windows PowerShell 5.1 (the company machine's shell) on a GitHub-hosted Windows runner.
 # Synthetic data only (TW_DEMO_*); no model, no MCP, no company files.
 #   repo-layout: one job per test script, maintainer checkout (LF, claude-code/ prefix present).
-#   deployed-layout: unpack transfer/ps-bundle-claude.txt with scripts/ps-bundle.ps1 into an empty folder
-#     (CRLF files, .claude/ at the root, exactly what the company machine gets), then run the Spec document
-#     tests there and a first real run of scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call).
+#   deployed-layout: save the parts transfer/ps-bundle-claude-NNofMM.txt the way the company machine does
+#     (any file name, reversed order, CRLF, UTF-8 with BOM) into one folder, unpack them with scripts/ps-bundle.ps1
+#     into an empty folder (CRLF files, .claude/ at the root), then run the Spec document tests there and a first
+#     real run of scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call).
 on:
   push:
     branches: ['claude/**']
@@ -69,15 +70,24 @@ jobs:
         shell: cmd
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v5
-      - name: Unpack the Claude Code bundle into an empty folder
+      - name: Unpack the Claude Code bundle parts into an empty folder
         run: |
           chcp 65001 | Out-Null
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           $dst = Join-Path $env:RUNNER_TEMP 'company'
+          $inc = Join-Path $env:RUNNER_TEMP 'incoming'
           New-Item -ItemType Directory -Path (Join-Path $dst 'scripts') -Force | Out-Null
+          New-Item -ItemType Directory -Path $inc -Force | Out-Null
           Copy-Item -LiteralPath 'scripts\ps-bundle.ps1' -Destination (Join-Path $dst 'scripts\ps-bundle.ps1')
-          Copy-Item -LiteralPath 'transfer\ps-bundle-claude.txt' -Destination (Join-Path $dst 'ps-bundle-claude.txt')
-          & powershell.exe -NoProfile -NonInteractive -File (Join-Path $dst 'scripts\ps-bundle.ps1') -Bundle (Join-Path $dst 'ps-bundle-claude.txt')
+          $parts = @(Get-ChildItem -LiteralPath 'transfer' -File | Where-Object { $_.Name -match '^ps-bundle-claude-[0-9]{2}of[0-9]{2}\.txt$' } | Sort-Object Name)
+          if ($parts.Count -lt 2) { Write-Host ('expected the Claude Code bundle in several parts, found ' + $parts.Count); exit 1 }
+          $k = 0
+          foreach ($p in $parts) {
+            $k++
+            $text = [System.IO.File]::ReadAllText($p.FullName, [System.Text.Encoding]::UTF8).Replace("`r`n", "`n").Replace("`n", "`r`n")
+            [System.IO.File]::WriteAllText((Join-Path $inc ('part' + (100 - $k) + '.txt')), $text, (New-Object System.Text.UTF8Encoding($true)))
+          }
+          & powershell.exe -NoProfile -NonInteractive -File (Join-Path $dst 'scripts\ps-bundle.ps1') -Bundle $inc
           if ($LASTEXITCODE -ne 0) { Write-Host ('ps-bundle exit=' + $LASTEXITCODE); exit 1 }
           if (-not (Test-Path -LiteralPath (Join-Path $dst '.claude\peoplesoft\sdoc\schemas'))) { Write-Host 'missing .claude\peoplesoft\sdoc after unpack'; exit 1 }
           if (Test-Path -LiteralPath (Join-Path $dst 'claude-code')) { Write-Host 'unexpected claude-code folder after unpack'; exit 1 }

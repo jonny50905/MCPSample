@@ -983,16 +983,19 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
 允許清單與信任（臨時換權限模式用 `$env:PS_CLAUDE_PERMISSION_MODE`）；SOP-21 的恢復是該 session `/mcp` 選 oracleMCP 重新連線，
 沒有自動重掛，hook 紀錄在 `auto-loop-logs\ps-runtime-guard\hook-<日期>.jsonl`。
 
-## SOP-27 搬運包（一版一個文字檔）
+## SOP-27 搬運包（一版收成幾份文字檔）
 
-公司機不能 git 下載時，每版要搬的檔收成一個文字檔：OpenCode 版 `transfer/ps-bundle-opencode.txt`、Claude Code 版
-`transfer/ps-bundle-claude.txt`（維護端 `ps-fs-doctor -WriteManifest` 自動重生；使用說明在 `transfer/README.md`）。
+公司機不能 git 下載時，每版要搬的檔收成幾份文字檔（每份約 500 KB 以內，只在檔與檔之間切）：OpenCode 版
+`transfer/ps-bundle-opencode-01ofNN.txt`…、Claude Code 版 `transfer/ps-bundle-claude-01ofNN.txt`…（維護端 `ps-fs-doctor -WriteManifest`
+自動重生；使用說明在 `transfer/README.md`）。
 
-□ 1. 第一次：手動搬 `scripts/ps-bundle.ps1`（UTF-8 with BOM）。之後每個搬運包都帶新版的它。
-□ 2. 開對應搬運包的 GitHub Raw → 全選複製 → 記事本另存 UTF-8（或 Download raw file）。
-□ 3. `powershell -NoProfile -File .\scripts\ps-bundle.ps1 -Bundle <檔> -DryRun` 看計畫；沒問題再去掉 `-DryRun` 執行。
+□ 1. 第一次：手動搬 `scripts/ps-bundle.ps1`（UTF-8 with BOM）。之後每個搬運包都帶新版的它。本機還是只認單一檔的舊版時也先手動換新版。
+□ 2. 開一個空資料夾；對應版本的每一份都開 GitHub Raw → 全選複製 → 記事本另存 UTF-8 的 .txt 放進去（檔名不拘；或 Download raw file）。
+□ 3. `powershell -NoProfile -File .\scripts\ps-bundle.ps1 -Bundle <資料夾> -DryRun` 看計畫；沒問題再去掉 `-DryRun` 執行
+     （`-Bundle` 給其中任一份也可以，同資料夾的其他份自動找齊）。
 □ 4. 結論代號：G 完成；C 有衝突（本機改過、搬運包也改了）→ 比對 `<檔>.incoming` 合併後刪掉它；
-     T 不完整（重新複製整份）；H 雜湊不符（多半不是存成 UTF-8）；P 路徑不合法；W 寫入後驗證失敗。T／H／P 時一個檔都沒寫。
+     T 不完整（訊息指出缺哪一份或哪一份被截斷，重新複製那一份；資料夾混了別次打包的份也是 T，只留這次的）；
+     H 雜湊不符（多半不是存成 UTF-8；訊息指出第幾份）；P 路徑不合法；W 寫入後驗證失敗。T／H／P 時一個檔都沒寫。
 □ 5. 接著跑 `ps-fs-doctor`（Claude Code 版另跑 `ps-claude-doctor`）。保留本機的檔（已回填的 profile 等）在檢查 M 會列為版本不符，屬正常。
 
 被覆寫或刪除的舊檔備份在 `auto-loop-logs\ps-bundle-backup\<時間>\`；要回到上一版就把備份複製回原位。
@@ -1037,7 +1040,7 @@ Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP
 
 - 三支 sdoc 測試以設計範例（`docs/design/spec-schema-framework`）為預期結果，範例不在搬運包：公司機上會印 `SKIP` 後結束（exit 0）。
   公司機搬完後的確認改用「第一次輸入清單停在 DOC1-0-01、建出四個骨架檔」（不呼叫模型）。
-- 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude.txt` 解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
+- 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude-*of*.txt` 各份解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
   再把 `docs/design/spec-schema-framework` 複製進去，跑三支 sdoc 測試與第一次 `ps-sdoc.ps1`；測試比對檔案內容一律不比換行。
 - 真 Windows PowerShell 5.1：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`）在 Windows runner 以 `powershell.exe`
   跑上述測試與部署版面演練；推到 `claude/**` 且動到 scripts、claude-code、設計範例或搬運包時自動跑，也可在 Actions 頁手動觸發。

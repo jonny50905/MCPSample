@@ -78,6 +78,12 @@ general-purpose／Explore／Plan（業務檢索仍派 ps-*）。
 備份到 `auto-loop-logs\ps-bundle-backup\`。交接清單只列搬運包（第一次另列 `scripts/ps-bundle.ps1`）。測試 `scripts/tests/test-bundle.ps1`
 （含「repo 的搬運包是最新」）。SOP-27、`transfer/README.md`。
 
+**搬運包分份（2026-10-12，L139）**：管理者反映單一搬運包（約 2.6 MB）太大。`ps-bundle.ps1 -Pack` 現在在檔與檔之間切成
+每份約 500 KB 的幾份（`transfer/ps-bundle-<版>-01ofNN.txt`…，`-PartKB` 可調、`-PartKB 0`＝舊式單一檔；同名舊份與舊式單一檔自動刪），
+每份有「組代號＋第幾份／共幾份＋行數＋雜湊」的頭尾。公司機把各份放進同一個資料夾，`-Bundle <資料夾>`（或任一份）解開：
+逐份驗證（缺份、截斷＝T，被改＝H，混了別次打包的份＝T 並列出各組）後組回，再走原本的整包驗證與三方比對；UTF-16 另存也讀得懂。
+舊版 ps-bundle.ps1 讀不懂分份（單給一份會停在 T、不寫檔），但讀得懂各份依序接成的單一檔。交接清單列該版各份（含行數）。
+
 **Claude Code 版（2026-10-06，L132）**：管理者取得 Claude Code CLI，要一版用 Claude Code＋Sonnet 跑、OpenCode 版保留、
 公司機**只搬一版**。新增 `claude-code/`（`CLAUDE.md`＋`.claude/`：agents 12、commands 9、skills 11、hook、settings、peoplesoft 契約），
 部署時去前綴；`scripts/` 兩版共用，`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 認版本，外環改開
