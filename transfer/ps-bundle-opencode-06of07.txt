@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a9abd37）第 6／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit f14c90b）第 6／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a9abd37|bb3ef281d473b863|6|7|6301|f3f2887ff07762c8e1f01138002d6102f6a64fe80c239932d5dc87cb2dad29f7
+@@@PSBUNDLE-PART|1|opencode|f14c90b|2bb0a5a870769052|6|7|6301|f3f2887ff07762c8e1f01138002d6102f6a64fe80c239932d5dc87cb2dad29f7
 @@@PSBUNDLE-FILE|scripts/ps-spec-lib.ps1|2729|d8460ec0599c9b21cbff47a32e295f91d3710b431384912aee8bcc905c47ad67|1
 # ps-spec-lib.ps1 — Spec 引擎共用邏輯：Component＋私有需求包（pack）→ EXTRACT facts／COMPOSE 單位 → 外環派工與驗收
 #                   → 確定性 render（模板副本：markers 置換 {{slot:Sxx}}／headings 綁章節標題與原生佔位符）→ gate；結論碼 SPEC1-<stage>-<code>[-<count>]。
@@ -6302,4 +6302,4 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-claude-variant.ps1
-@@@PSBUNDLE-PART-END|bb3ef281d473b863|6|7
+@@@PSBUNDLE-PART-END|2bb0a5a870769052|6|7

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a9abd37）第 3／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit f14c90b）第 3／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a9abd37|bb3ef281d473b863|3|7|5543|f3f2ed54337132d584b3f4a4b92b51ce995718213d32e2f27a6c2f80ab195921
+@@@PSBUNDLE-PART|1|opencode|f14c90b|2bb0a5a870769052|3|7|5543|f3f2ed54337132d584b3f4a4b92b51ce995718213d32e2f27a6c2f80ab195921
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1049|7ed8317eab8b24d429cf08cc69599f43f2b3da60096021cb7a46fe7ca7ff6c75|0
 # 管理者 SOP（人工作業標準程序）
 
@@ -5544,4 +5544,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|bb3ef281d473b863|3|7
+@@@PSBUNDLE-PART-END|2bb0a5a870769052|3|7
