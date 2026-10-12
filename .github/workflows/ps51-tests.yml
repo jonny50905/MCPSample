@@ -1,0 +1,120 @@
+name: ps51-tests
+# Runs the framework tests under Windows PowerShell 5.1 (the company machine's shell) on a GitHub-hosted Windows runner.
+# Synthetic data only (TW_DEMO_*); no model, no MCP, no company files.
+#   repo-layout: one job per test script, maintainer checkout (LF, claude-code/ prefix present).
+#   deployed-layout: unpack transfer/ps-bundle-claude.txt with scripts/ps-bundle.ps1 into an empty folder
+#     (CRLF files, .claude/ at the root, exactly what the company machine gets), then run the Spec document
+#     tests there and a first real run of scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call).
+on:
+  push:
+    branches: ['claude/**']
+    paths:
+      - 'scripts/**'
+      - 'claude-code/**'
+      - 'docs/design/spec-schema-framework/**'
+      - 'transfer/**'
+      - '.github/workflows/ps51-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ps51-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  repo-layout:
+    name: ${{ matrix.test }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - test-ps51-static.ps1
+          - test-sdoc.ps1
+          - test-sdoc-assemble.ps1
+          - test-sdoc-run.ps1
+          - test-bundle.ps1
+          - test-claude-variant.ps1
+          - test-knowledge.ps1
+          - test-spec.ps1
+          - test-spec-build.ps1
+          - test-spec-clone.ps1
+          - test-supplemental.ps1
+          - test-auto-loop.ps1
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Keep the repository bytes (LF)
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - name: Run under Windows PowerShell 5.1
+        run: |
+          chcp 65001 | Out-Null
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          Write-Host ('PowerShell ' + $PSVersionTable.PSVersion + ' ' + $PSVersionTable.PSEdition + ' / CLR ' + $PSVersionTable.CLRVersion)
+          & powershell.exe -NoProfile -NonInteractive -File ('scripts\tests\${{ matrix.test }}')
+          exit $LASTEXITCODE
+
+  deployed-layout:
+    name: deployed layout (transfer bundle)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Keep the repository bytes (LF)
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - name: Unpack the Claude Code bundle into an empty folder
+        run: |
+          chcp 65001 | Out-Null
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $dst = Join-Path $env:RUNNER_TEMP 'company'
+          New-Item -ItemType Directory -Path (Join-Path $dst 'scripts') -Force | Out-Null
+          Copy-Item -LiteralPath 'scripts\ps-bundle.ps1' -Destination (Join-Path $dst 'scripts\ps-bundle.ps1')
+          Copy-Item -LiteralPath 'transfer\ps-bundle-claude.txt' -Destination (Join-Path $dst 'ps-bundle-claude.txt')
+          & powershell.exe -NoProfile -NonInteractive -File (Join-Path $dst 'scripts\ps-bundle.ps1') -Bundle (Join-Path $dst 'ps-bundle-claude.txt')
+          if ($LASTEXITCODE -ne 0) { Write-Host ('ps-bundle exit=' + $LASTEXITCODE); exit 1 }
+          if (-not (Test-Path -LiteralPath (Join-Path $dst '.claude\peoplesoft\sdoc\schemas'))) { Write-Host 'missing .claude\peoplesoft\sdoc after unpack'; exit 1 }
+          if (Test-Path -LiteralPath (Join-Path $dst 'claude-code')) { Write-Host 'unexpected claude-code folder after unpack'; exit 1 }
+          exit 0
+      - name: Add the design examples (test expectations; maintainer side only, not in the bundle)
+        run: |
+          $dst = Join-Path $env:RUNNER_TEMP 'company'
+          New-Item -ItemType Directory -Path (Join-Path $dst 'docs\design') -Force | Out-Null
+          Copy-Item -LiteralPath 'docs\design\spec-schema-framework' -Destination (Join-Path $dst 'docs\design\spec-schema-framework') -Recurse
+      - name: Spec document tests in the deployed layout
+        run: |
+          chcp 65001 | Out-Null
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $dst = Join-Path $env:RUNNER_TEMP 'company'
+          $failed = @()
+          foreach ($t in @('test-sdoc.ps1', 'test-sdoc-assemble.ps1', 'test-sdoc-run.ps1')) {
+            Write-Host ('::group::' + $t)
+            & powershell.exe -NoProfile -NonInteractive -File (Join-Path $dst ('scripts\tests\' + $t))
+            $code = $LASTEXITCODE
+            Write-Host '::endgroup::'
+            Write-Host ($t + ' exit=' + $code)
+            if ($code -ne 0) { $failed += $t }
+          }
+          if ($failed.Count -gt 0) { Write-Host ('FAILED: ' + ($failed -join ', ')); exit 1 }
+          exit 0
+      - name: First real run of ps-sdoc.ps1 without inputs (stops before any model call)
+        run: |
+          chcp 65001 | Out-Null
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $dst = Join-Path $env:RUNNER_TEMP 'company'
+          Set-Location -LiteralPath $dst
+          $out = @(& powershell.exe -NoProfile -NonInteractive -File '.\scripts\ps-sdoc.ps1' -Components 'TW_DEMO_REQ,TW_DEMO_APV')
+          $code = $LASTEXITCODE
+          $last = ''
+          foreach ($l in $out) { Write-Host $l; if (([string]$l).Trim() -ne '') { $last = ([string]$l).Trim() } }
+          Write-Host ('exit=' + $code + ' last=' + $last)
+          if ($last -ne 'DOC1-0-01') { exit 1 }
+          $sk = @(Get-ChildItem -LiteralPath (Join-Path $dst '.ps-private\sdoc') -Recurse -Filter 'status.md' -File)
+          if ($sk.Count -ne 1) { Write-Host 'status.md skeleton missing'; exit 1 }
+          exit 0
