@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 271e746）
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0d9d18b）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|claude|271e746|148
+@@@PSBUNDLE|1|claude|0d9d18b|148
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44|0
 ---
 name: ps-ae-flow
@@ -43759,10 +43759,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|f030a835eb8799552980aa88a3dbb61118d7161f4a6ec52f1991d01dc100fa31|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|fb97afe427ab6e24c4ebf98cb2824426ab0f0156906117de703e6ee858ca527c|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "271e746",
+  "commit": "0d9d18b",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -44758,4 +44758,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|148|897cc554b24492e8f2ea50639c77c80f96339bb380aec37d6c39540bf11508c3
+@@@PSBUNDLE-EOF|148|7434872bb1794205f09da7ce6e3242844a5a2bae0f606915f1118620f06b68ea

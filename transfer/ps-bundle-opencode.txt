@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 271e746）
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0d9d18b）
 # 整份另存成一個 UTF-8 文字檔，用 scripts\ps-bundle.ps1 -Bundle <檔> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE|1|opencode|271e746|112
+@@@PSBUNDLE|1|opencode|0d9d18b|112
 @@@PSBUNDLE-REMOVED|.opencode/plugin/ps-oracle-preflight-gate.js
 @@@PSBUNDLE-REMOVED|scripts/test-elasticsearch-mcp-tools-list.ps1
 @@@PSBUNDLE-REMOVED|scripts/test-mcp-tools-list.ps1
@@ -37747,10 +37747,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|1ef181c6e52c263c38301f134023244e5c87ed340396a89aaf5d9d686069cacb|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|36d727fcd32c7c61e4d508da9c2e4350835bfbb2a09b6d2117110d55b9f04e43|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "271e746",
+  "commit": "0d9d18b",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -38433,7 +38433,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|125|1581980847852f2676936ac01d5a6106d0b47b51915eabbfe5d1f6dce75c0789|0
+@@@PSBUNDLE-FILE|AGENTS.md|127|3a0da571e5a45f8687b11f2d38d4f54e9775fcc81b325bb01e68db7edf0f571b|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -38510,8 +38510,10 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（由 `claude/peoplesoft-framework-handover-0u6b5g`
-   快轉而來；更早接續自 `claude/review-implement-requirement-svqhqt` 的 `67e9b36`）。
+4. **維護版線**：`main` 是正式版線（最近一次：2026-10-12 由 `claude/brave-dirac-4q469u` 快轉併入
+   ——issue #37 Claude Code 版 Spec 文件流程與 Windows PowerShell 5.1 CI，併入前 `main` 頭 `baae9f9`；
+   再之前由 `claude/peoplesoft-framework-handover-0u6b5g` 快轉而來；更早接續自
+   `claude/review-implement-requirement-svqhqt` 的 `67e9b36`）。
    新的維護 session 從 `main` 頭開自己的分支，交接時併回 `main` 並**回來更新本行**；
    前後 `main` 頭的 diff＝該任 session 的全部改動（review 邊界）。
 
@@ -38560,4 +38562,4 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|112|6ea3b7e1481895cd69febd6df7f10f4a884f498429986d53b0933501cdc71d16
+@@@PSBUNDLE-EOF|112|aeeb81699ba8d1c237f9e8e855f4fd2e52875b5d165ea299163916df73b4d800
