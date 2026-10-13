@@ -3932,6 +3932,9 @@
   - 兩版同時跑時兩邊都查 oracleMCP（各自的 MCP 註冊；跨行程是否共用連線仍未證實，R42 topology 實驗待做）：照 SOP-12，重載期間錯開。
   - 訊息：slot 被占的 log 帶版本（「session slot 被占用（OpenCode 版）」「同一版另一個…（另一版不受影響）」），保留「session slot 被占用」字樣
     （test-scenarios S6 照樣找得到）；結論碼不變。
+- 實作中抓到的坑：`scripts/ps-spec-build.ps1` 在兩版 spec 引擎的 generic 集合裡（`generic.manifest.json` 記正規化 hash），連註解都動不得——
+  一動就要重生兩份 manifest，其中 Claude Code 版那份在 `claude-code/` 底下。本課只想改它一行 slot 註解，test-spec 與 test-claude-variant 的
+  generic manifest 檢查立刻 FAIL；原句「模型服務仍由共用 session slot 串行」照新規則也成立（同一版的外環共用那把），改回原樣、`claude-code/` 不動。
 - 驗證：test-sdoc-run `-Only opencode` 加 4 項（slot 名對照；Claude Code 版那把被占時 OpenCode 版取得、Claude Code 版的 session 回 SLOT_BUSY 不啟動；
   反過來同理，含同資料夾 PS_CLI=opencode；放開後兩把都取得到）；Windows 另 3 項（Claude Code 版那把被占時 OpenCode 版外環真的經 cmd.exe 開 session；
   OpenCode 版那把被占時外環 DOC1-3-03、沒有 opencode run；這時 Claude Code 版的 session 經 cmd.exe 照樣啟動）。反證：兩把改成同名，3 項跨版本測試失敗。

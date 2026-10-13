@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit beadc2b）第 6／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5e41696）第 6／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|beadc2b|83a71210a894d4f3|6|6|2660|ba72bce3c4a1fd771037acdb2900045a3834cd9c649ac0cd72788989c1e0576f
+@@@PSBUNDLE-PART|1|claude|5e41696|c39f1691415e3f02|6|6|2660|876402290b446645a833ba333812125152d0c3e96a6f06654f90edc98fe11bb5
 @@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1661,10 +1661,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|2858338868a58556d4f65f2e8a520af261a86af649c06ed5fb8248acc126ac4f|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|c79abcebc7bb318e166fe83ce2f5d5b9949dc66cafe2dc9dec3163dc12c1ea13|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "beadc2b",
+  "commit": "5e41696",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -2539,7 +2539,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-spec-build.ps1",
       "lines": 455,
-      "sha256": "8c478efa7961e73e636ac7a2adab554a5ab1f07812f5595125780083cce1a51e",
+      "sha256": "40a57f84050ae399e03871d9eb799f908defb3999eedabc4c2ba4dea5b6d7b2c",
       "bom": true
     },
     {
@@ -2660,5 +2660,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|148|bb84417b9e714416ce588f6f5a2d37f568fa6df4b78dd00efed89249cbbccc40
-@@@PSBUNDLE-PART-END|83a71210a894d4f3|6|6
+@@@PSBUNDLE-EOF|148|97b5951dc79acb641e309f1c05cc47163fe4d80370038ca07e3eb818ffa77b79
+@@@PSBUNDLE-PART-END|c39f1691415e3f02|6|6

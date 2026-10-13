@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit beadc2b）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5e41696）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|beadc2b|25511e256f145339|8|8|2763|f3f7fbcd3405c21db5db75f412652f5535034dd4eb9213287015f2b938e8dbb4
+@@@PSBUNDLE-PART|1|opencode|5e41696|798512946ea8e3ea|8|8|2763|c9868d25d473efb1f99a2a4a5c648b9a7c63d3b1e0162607ccfbc4386b8c3a9b
 @@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1661,10 +1661,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|954|43fd67aa17e48d3ce9598dd639649d91d034cffc8b3a9e1e0c443ddd9131c2cc|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|954|d16ea06d890a02a60e7605b2bf4ee6c7596fbc56f91ce657410d367c820778c3|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "beadc2b",
+  "commit": "5e41696",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -1866,8 +1866,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3938,
-      "sha256": "b4dc26e7585a176e0ec76af4e0bcaa45a7b349af68a49f4940769f3b4bf39aaa",
+      "lines": 3941,
+      "sha256": "29fb6d5efbe91afd9e7c423f79a2633f28cd684fdb284a4de5c9fa8a24d31583",
       "bom": false
     },
     {
@@ -2479,7 +2479,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-spec-build.ps1",
       "lines": 455,
-      "sha256": "8c478efa7961e73e636ac7a2adab554a5ab1f07812f5595125780083cce1a51e",
+      "sha256": "40a57f84050ae399e03871d9eb799f908defb3999eedabc4c2ba4dea5b6d7b2c",
       "bom": true
     },
     {
@@ -2763,5 +2763,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|157|eb64016d08327f8214f75488433dad2ed9ff30a2b57ee703d9fef3af57210ee2
-@@@PSBUNDLE-PART-END|25511e256f145339|8|8
+@@@PSBUNDLE-EOF|157|52778d38cdea8019acb88d047fbdf81cc8911bf0727d28dbbf78b833a6c71906
+@@@PSBUNDLE-PART-END|798512946ea8e3ea|8|8

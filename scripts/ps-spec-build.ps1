@@ -372,7 +372,7 @@ try {
     if ($Model -ne '') { $nextCommand += " -Model '" + $Model + "'" }
     $profile = Get-PsCloneProfile -Root $Root
     if ($null -eq $profile -or @($profile.topics).Count -eq 0 -or [string]$profile.topics[0].id -ne 'scope') { throw 'clone profile 缺少 scope-first topics。' }
-    # 不同 checkout 的同名 Component 是不同工作；模型服務仍由同一版的 session slot 串行。
+    # 不同 checkout 的同名 Component 是不同工作；模型服務仍由共用 session slot 串行。
     $rootLockId = (Get-PsKnTextHash -Text $Root.ToUpperInvariant()).Substring(0, 16)
     $mutex = New-Object System.Threading.Mutex($false, ('Global\MCPSample-CloneSpec-' + $rootLockId + '-' + $jobId))
     try { $held = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $held = $true }
