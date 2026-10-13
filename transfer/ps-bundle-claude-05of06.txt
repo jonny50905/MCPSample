@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3bc2a84）第 5／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 98c21f6）第 5／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|3bc2a84|910b17f9ac4f513c|5|6|4927|0d1f67324cffae9cddcdfcd6ba9a5b8c59bf2eb41fbc8f0119bf6658c4db2181
+@@@PSBUNDLE-PART|1|claude|98c21f6|9923681ccfa42d13|5|6|4927|0d1f67324cffae9cddcdfcd6ba9a5b8c59bf2eb41fbc8f0119bf6658c4db2181
 @@@PSBUNDLE-FILE|scripts/tests/sdoc-test-fixtures.ps1|234|44438f4f087f56687a7c640d69c3fe4f01f81c8ae2f53fed6f01e19b978ff632|1
 # sdoc-test-fixtures.ps1 — 測試用：把設計範例的 canonical 文件拆回研究包（模擬各研究單位已驗收的收據）。
 # 只給 scripts/tests/test-sdoc*.ps1 dot-source；合成資料，不含公司內容。
@@ -4928,4 +4928,4 @@ Write-Host ('clone tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-spec-clone.ps1
-@@@PSBUNDLE-PART-END|910b17f9ac4f513c|5|6
+@@@PSBUNDLE-PART-END|9923681ccfa42d13|5|6

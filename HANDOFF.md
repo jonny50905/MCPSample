@@ -11,7 +11,7 @@
   模型只在 `.opencode/peoplesoft/sdoc/model.yaml`（預設 `anthropic/claude-haiku-4-5`），開第一個 session 前 `opencode models` 預檢；
   `.opencode/agent/` 新增 ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge（permission 取代 hook），`.opencode/peoplesoft/sdoc/` 是契約與 schema 的一份
   （資料檔逐字相同）；OpenCode 版 `/ps-spec`＋ps-spec-author 改走 DOC1（CLONE1 改成直接跑 ps-spec-build.ps1）。操作 SOP-29。
-- `claude-code/` 一個檔都沒動（含給人看的 claude-code/README.md——它的對照表仍寫 DOC1「本版獨有」，依管理者「不可以改到 Claude 版」刻意不改）。
+- `claude-code/` 一個檔都沒動（含給人看的 claude-code/README.md——它的對照表仍寫 DOC1「本版獨有」、開頭仍寫「公司機只裝其中一版」，依管理者「不可以改到 Claude 版」刻意不改）。
   共用的 `scripts/` 有改（ps-sdoc／ps-session-lib／ps-bundle／ps-agent-doc-lint 與測試），Claude Code 路徑的行為不變：既有測試原樣全過，
   同一份合成 worker 輸出兩版發布的文件逐位元相同。Claude Code 版的檔不用換；備案另搬 OpenCode 版搬運包（同資料夾或另開資料夾都可）。
   同資料夾時同一次交接的 Claude Code 版搬運包也要解（本機模擬：只更新它的 manifest 一個檔；不解的話 ps-fs-doctor 會把共用 scripts 報「版本不符」）。

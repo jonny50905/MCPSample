@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3bc2a84）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 98c21f6）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3bc2a84|baf7d0ace4c0d4c1|3|8|13255|922c4cad8a6f8d1456d1d75b49524f46a8bb02676faa0a92ecc16dca60e81d43
+@@@PSBUNDLE-PART|1|opencode|98c21f6|1122203caeb3094c|3|8|13256|e42eb985170e91c1321f1946c1c041928a2928231de33ced1bd288adb2d12580
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/rules.json|440|e4d547d5ff0d2ba50ba76ccfbce6bdd3219534321b0275bc7252efaf7f84b62d|0
 {
   "schemaVersion": "1.0",
@@ -11505,7 +11505,7 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1159|d031d1d367ce7aeeb6482b4a9015a5ef9fa9c9dc00cc7f6c8cc449f3a3735b8a|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1160|646e3e9115c38708c1e5eff865775532ea276374b63e711f4a183c11da647d22|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -12474,7 +12474,8 @@ PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-gua
 
 ## SOP-26 Claude Code 版（另一個前端；只搬一版）
 
-同一套框架另有 Claude Code CLI＋Sonnet 的前端，原始檔在 repo 的 `claude-code/`。公司機**只裝一版、只搬那一版**；
+同一套框架另有 Claude Code CLI＋Sonnet 的前端，原始檔在 repo 的 `claude-code/`。公司機**只裝一版、只搬那一版**
+（例外：Spec 文件流程的 OpenCode 版當備案、兩版同一個資料夾並行時兩版都搬，SOP-29）；
 安裝步驟、日常使用與兩版對照（主代理、委派、hook、MCP 工具全名、headless 權限）見 `claude-code/README.md`（給人看，不搬）。
 
 □ 1. 搬運：`scripts/**` 原樣＋`claude-code/CLAUDE.md`、`claude-code/.claude/**` 去掉 `claude-code/` 前綴；
@@ -12606,7 +12607,7 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 
 Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的問題時，用 OpenCode CLI＋另一個模型跑同一個 Spec 文件流程。
 研究規則、檢核、產出格式與 Claude Code 版相同（同一個外環 `scripts/ps-sdoc.ps1`；同一份 worker 輸出兩版發布的文件逐位元相同），
-只換 CLI 與模型。Claude Code 版的檔（`CLAUDE.md`、`.claude/**`）不必動、不必重搬。
+只換 CLI 與模型。Claude Code 版的檔（`CLAUDE.md`、`.claude/**`）不必動（同一個資料夾時仍要解同一次交接的 Claude Code 版搬運包，見第 1 步）。
 
 □ 1. 搬運：OpenCode 版搬運包（`transfer/ps-bundle-opencode-01ofNN.txt`…，SOP-27）。可以解在 Claude Code 版的同一個資料夾
      （`scripts/**` 兩版共用、`.claude/` 不受影響；研究知識 `docs/ps-research`、狀態圖都在原地），也可以另開資料夾。
@@ -13256,4 +13257,4 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
   }
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/pack.schema.json
-@@@PSBUNDLE-PART-END|baf7d0ace4c0d4c1|3|8
+@@@PSBUNDLE-PART-END|1122203caeb3094c|3|8

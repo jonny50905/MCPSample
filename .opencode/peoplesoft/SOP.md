@@ -966,7 +966,8 @@ PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-gua
 
 ## SOP-26 Claude Code 版（另一個前端；只搬一版）
 
-同一套框架另有 Claude Code CLI＋Sonnet 的前端，原始檔在 repo 的 `claude-code/`。公司機**只裝一版、只搬那一版**；
+同一套框架另有 Claude Code CLI＋Sonnet 的前端，原始檔在 repo 的 `claude-code/`。公司機**只裝一版、只搬那一版**
+（例外：Spec 文件流程的 OpenCode 版當備案、兩版同一個資料夾並行時兩版都搬，SOP-29）；
 安裝步驟、日常使用與兩版對照（主代理、委派、hook、MCP 工具全名、headless 權限）見 `claude-code/README.md`（給人看，不搬）。
 
 □ 1. 搬運：`scripts/**` 原樣＋`claude-code/CLAUDE.md`、`claude-code/.claude/**` 去掉 `claude-code/` 前綴；
@@ -1098,7 +1099,7 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 
 Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的問題時，用 OpenCode CLI＋另一個模型跑同一個 Spec 文件流程。
 研究規則、檢核、產出格式與 Claude Code 版相同（同一個外環 `scripts/ps-sdoc.ps1`；同一份 worker 輸出兩版發布的文件逐位元相同），
-只換 CLI 與模型。Claude Code 版的檔（`CLAUDE.md`、`.claude/**`）不必動、不必重搬。
+只換 CLI 與模型。Claude Code 版的檔（`CLAUDE.md`、`.claude/**`）不必動（同一個資料夾時仍要解同一次交接的 Claude Code 版搬運包，見第 1 步）。
 
 □ 1. 搬運：OpenCode 版搬運包（`transfer/ps-bundle-opencode-01ofNN.txt`…，SOP-27）。可以解在 Claude Code 版的同一個資料夾
      （`scripts/**` 兩版共用、`.claude/` 不受影響；研究知識 `docs/ps-research`、狀態圖都在原地），也可以另開資料夾。
