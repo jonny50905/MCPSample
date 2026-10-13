@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit d5f6d6f）第 1／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3457765）第 1／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|d5f6d6f|8a95f0c004f43103|1|6|11457|27a7a9857c82628b8fed32ef250d249a92c8749b80b042452bccb09156bad9b2
-@@@PSBUNDLE|1|claude|d5f6d6f|148
+@@@PSBUNDLE-PART|1|claude|3457765|7c9acfc1c0e74583|1|6|11457|d6292b8f98eb85dec37982c2f04d4f7e9100de4ef2f3f73c89d661031b0ea4e7
+@@@PSBUNDLE|1|claude|3457765|148
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44|0
 ---
 name: ps-ae-flow
@@ -11458,4 +11458,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   }
 }
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/schemas/04-workflow.schema.json
-@@@PSBUNDLE-PART-END|8a95f0c004f43103|1|6
+@@@PSBUNDLE-PART-END|7c9acfc1c0e74583|1|6

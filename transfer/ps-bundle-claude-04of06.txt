@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit d5f6d6f）第 4／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3457765）第 4／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|d5f6d6f|8a95f0c004f43103|4|6|7401|711ec16988c9ccef7a481f35d75ecfcb8c856ee59a73c0c4a0dedcb291df7d0c
+@@@PSBUNDLE-PART|1|claude|3457765|7c9acfc1c0e74583|4|6|7401|711ec16988c9ccef7a481f35d75ecfcb8c856ee59a73c0c4a0dedcb291df7d0c
 @@@PSBUNDLE-FILE|scripts/ps-sdoc.ps1|1377|b5583e4e849380ad714175dc2c1936637e065e7a7d07fdba2459a1faa8cc27a4|1
 # ps-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單一入口：00-index＋14 份文件＋90 問題清單。
 # 第 0 階段三位讀者解讀 STATUS 檔（不一致的逐項第 2 輪多數決）→ 研究單元依序（每頁研究與獨立覆核分開 session）→ 外環組裝、檢核、渲染。
@@ -7402,4 +7402,4 @@ function ConvertTo-SdComparable {
     return $Value
 }
 @@@PSBUNDLE-END|scripts/tests/sdoc-test-fixtures.ps1
-@@@PSBUNDLE-PART-END|8a95f0c004f43103|4|6
+@@@PSBUNDLE-PART-END|7c9acfc1c0e74583|4|6

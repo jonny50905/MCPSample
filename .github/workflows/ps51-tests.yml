@@ -4,8 +4,9 @@ name: ps51-tests
 #   repo-layout: one job per test script, maintainer checkout (LF, claude-code/ prefix present).
 #   deployed-layout: save the parts transfer/ps-bundle-claude-NNofMM.txt the way the company machine does
 #     (any file name, reversed order, CRLF, UTF-8 with BOM) into one folder, unpack them with scripts/ps-bundle.ps1
-#     into an empty folder (CRLF files, .claude/ at the root), then run the Spec document tests there and a first
-#     real run of scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call).
+#     into an empty folder (CRLF files, .claude/ at the root), then run test-sdoc and the short gate group of
+#     test-sdoc-run there, and a first real run of scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call).
+#     The full end-to-end test runs in repo-layout, split into three groups (-Only walk|edge|gate) in parallel.
 # When it runs (it takes about 20 minutes, so not on every push):
 #   - every push to main that touches the paths below (the version the company machine takes);
 #   - a push to a claude/** branch only when the head commit message starts with [ps51]
@@ -30,7 +31,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   repo-layout:
-    name: ${{ matrix.test }}
+    name: ${{ matrix.test }} ${{ matrix.args }}
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.event.head_commit.message, '[ps51]')
     runs-on: windows-latest
     timeout-minutes: 60
@@ -41,7 +42,6 @@ jobs:
           - test-ps51-static.ps1
           - test-sdoc.ps1
           - test-sdoc-assemble.ps1
-          - test-sdoc-run.ps1
           - test-bundle.ps1
           - test-claude-variant.ps1
           - test-knowledge.ps1
@@ -50,6 +50,13 @@ jobs:
           - test-spec-clone.ps1
           - test-supplemental.ps1
           - test-auto-loop.ps1
+        include:
+          - test: test-sdoc-run.ps1
+            args: -Only walk
+          - test: test-sdoc-run.ps1
+            args: -Only edge
+          - test: test-sdoc-run.ps1
+            args: -Only gate
     defaults:
       run:
         shell: powershell
@@ -63,7 +70,7 @@ jobs:
           chcp 65001 | Out-Null
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           Write-Host ('PowerShell ' + $PSVersionTable.PSVersion + ' ' + $PSVersionTable.PSEdition + ' / CLR ' + $PSVersionTable.CLRVersion)
-          & powershell.exe -NoProfile -NonInteractive -File ('scripts\tests\${{ matrix.test }}')
+          & powershell.exe -NoProfile -NonInteractive -File ('scripts\tests\${{ matrix.test }}') ${{ matrix.args }}
           exit $LASTEXITCODE
 
   deployed-layout:
@@ -106,19 +113,22 @@ jobs:
           $dst = Join-Path $env:RUNNER_TEMP 'company'
           New-Item -ItemType Directory -Path (Join-Path $dst 'docs\design') -Force | Out-Null
           Copy-Item -LiteralPath 'docs\design\spec-schema-framework' -Destination (Join-Path $dst 'docs\design\spec-schema-framework') -Recurse
-      - name: Spec document tests in the deployed layout
+      - name: Spec document tests in the deployed layout (test-sdoc, gate group of test-sdoc-run)
         run: |
           chcp 65001 | Out-Null
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           $dst = Join-Path $env:RUNNER_TEMP 'company'
           $failed = @()
-          foreach ($t in @('test-sdoc.ps1', 'test-sdoc-assemble.ps1', 'test-sdoc-run.ps1')) {
-            Write-Host ('::group::' + $t)
-            & powershell.exe -NoProfile -NonInteractive -File (Join-Path $dst ('scripts\tests\' + $t))
+          # test-sdoc in full; of the end-to-end test only the short gate group (stage 0, split readings) on CRLF files
+          foreach ($t in @(, @('test-sdoc.ps1')) + @(, @('test-sdoc-run.ps1', '-Only', 'gate'))) {
+            $name = ($t -join ' ')
+            $rest = @($t | Select-Object -Skip 1)
+            Write-Host ('::group::' + $name)
+            & powershell.exe -NoProfile -NonInteractive -File (Join-Path $dst ('scripts\tests\' + $t[0])) @rest
             $code = $LASTEXITCODE
             Write-Host '::endgroup::'
-            Write-Host ($t + ' exit=' + $code)
-            if ($code -ne 0) { $failed += $t }
+            Write-Host ($name + ' exit=' + $code)
+            if ($code -ne 0) { $failed += $name }
           }
           if ($failed.Count -gt 0) { Write-Host ('FAILED: ' + ($failed -join ', ')); exit 1 }
           exit 0

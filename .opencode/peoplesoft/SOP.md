@@ -1076,9 +1076,10 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 - 三支 sdoc 測試以設計範例（`docs/design/spec-schema-framework`）為預期結果，範例不在搬運包：公司機上會印 `SKIP` 後結束（exit 0）。
   公司機搬完後的確認改用「第一次輸入清單停在 DOC1-0-01、建出四個骨架檔」（不呼叫模型）。
 - 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude-*of*.txt` 各份解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
-  再把 `docs/design/spec-schema-framework` 複製進去，跑三支 sdoc 測試與第一次 `ps-sdoc.ps1`；測試比對檔案內容一律不比換行。
+  再把 `docs/design/spec-schema-framework` 複製進去，跑 test-sdoc、test-sdoc-run 的守門組（`-Only gate`）與第一次 `ps-sdoc.ps1`；
+  測試比對檔案內容一律不比換行。
 - 真 Windows PowerShell 5.1：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`）在 Windows runner 以 `powershell.exe`
-  跑上述測試與部署版面演練，一輪約 20 分鐘，所以不是每次推都跑（只限動到 scripts、claude-code、設計範例、搬運包或工作流程本身）：
+  跑上述測試與部署版面演練。test-sdoc-run 拆成三組平行（`-Only walk｜edge｜gate`，本機也能這樣只跑一組），一輪約 10 分鐘，仍不是每次推都跑（只限動到 scripts、claude-code、設計範例、搬運包或工作流程本身）：
   推到 `main` 一定跑（公司機拿的版本）；推到 `claude/**` 只有 head commit 的標題以 `[ps51]` 開頭才跑（說明裡提到不算）（PS 7 本機測試證明不了 5.1 行為的改動才加：
   編碼、檔案共用、cmd.exe／Start-Process、JSON 解析、文化設定、腳本新用到的 .NET API）；也可在 Actions 頁手動觸發。
   其他推送會開一筆 run，但兩個 job 立刻略過。平常以本機 PS 7 測試與 5.1 靜態守衛為準，不等 CI。

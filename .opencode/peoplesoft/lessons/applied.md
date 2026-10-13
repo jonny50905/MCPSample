@@ -3846,3 +3846,16 @@
 - 驗證：test-sdoc-run 加一項：另開 powershell -File，`-Components tw_demo_req TW_DEMO_APV -Root … -Status -MaxSessions 1 -TimeoutMin 5`
   與留著單引號的 `"'tw_demo_req," "TW_DEMO_APV'"` 都停在 DOC1-0-01、認成同一個工作。
 - 教訓：給人直接打的腳本，除了主要清單以外的參數一律具名；多出來的引數要有去處並經過驗證，不要讓它落到型別不同的參數上。
+
+### L143 Windows 5.1 CI 一輪約 20 分鐘——長測試拆組平行、部署版面不重跑（2026-10-13）
+
+- 症狀：管理者反映時間都耗在等 CI。實測（main 3457765）：13 個 job 裡 11 個在 2.5 分鐘內完成，test-sdoc-run 約 17.5 分鐘，
+  部署版面 job 約 19 分鐘（裡面又依序跑了一次 test-sdoc-run 與 test-sdoc-assemble）。
+- 根因：關鍵路徑是同一支端到端測試被跑兩次，而且整支只能在一個 job 裡循序跑。
+- 落點：
+  - `scripts/tests/test-sdoc-run.ps1` 加 `-Only walk｜edge｜gate`（貫穿範例到核准／中斷重試等邊界情境／守門範例、第 2 輪、分段寫），
+    不給＝全部；兩組共用的預期值（14 的案例鍵）移到共用設定。本機 PS 7：walk 163 秒、edge 128 秒、gate 25 秒，三組合計 55 項與整支相同。
+  - `.github/workflows/ps51-tests.yml`：repo 版面把 test-sdoc-run 拆成三個 job 平行；部署版面只跑 test-sdoc、test-sdoc-run 的 gate 組
+    與第一次 ps-sdoc（CRLF 版面仍有實際派工與分段合併的驗證）。預計一輪約 10 分鐘（walk 組是新的關鍵路徑）。
+  - SOP-28、HANDOFF 同步；維護端不再等 CI 才回覆，結果出來再補。
+- 教訓：CI 慢先看關鍵路徑，不是平均：把最長的那支拆開平行、刪掉重複跑的，其他短 job 不用動。

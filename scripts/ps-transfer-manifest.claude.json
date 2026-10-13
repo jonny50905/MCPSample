@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "d5f6d6f",
+  "commit": "3457765",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -958,8 +958,8 @@
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 560,
-      "sha256": "f3b423a55cda429bb24fcabab22b407100c9612e601c0b085de75859bc9590be",
+      "lines": 569,
+      "sha256": "d4ec4b1177c2965d9c9d958cb2bd480eab180111b09e7bc2a85b39fbeaae7da9",
       "bom": true
     },
     {

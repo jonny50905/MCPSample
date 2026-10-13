@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit d5f6d6f）第 2／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3457765）第 2／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|d5f6d6f|cef7dc63285891d9|2|7|5874|08d8b696e5ac9202b8dcab25bc6e2546fa6bf0d7e61c93c766549e0e2a7afaff
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3848|03abbf6510b13267343985d44bab803f820a4b299e26f87850eae04295c9dd50|0
+@@@PSBUNDLE-PART|1|opencode|3457765|00f492a1263b3d61|2|7|5887|68bfac2414fdbff4b3c509c18cf92248702b95f26bc1ccbfd62392832dc12583
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3861|811f494419d05909b13e322c7f9482a5d02a4af2ace112565a1da338533a3b90|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -3850,6 +3850,19 @@
 - 驗證：test-sdoc-run 加一項：另開 powershell -File，`-Components tw_demo_req TW_DEMO_APV -Root … -Status -MaxSessions 1 -TimeoutMin 5`
   與留著單引號的 `"'tw_demo_req," "TW_DEMO_APV'"` 都停在 DOC1-0-01、認成同一個工作。
 - 教訓：給人直接打的腳本，除了主要清單以外的參數一律具名；多出來的引數要有去處並經過驗證，不要讓它落到型別不同的參數上。
+
+### L143 Windows 5.1 CI 一輪約 20 分鐘——長測試拆組平行、部署版面不重跑（2026-10-13）
+
+- 症狀：管理者反映時間都耗在等 CI。實測（main 3457765）：13 個 job 裡 11 個在 2.5 分鐘內完成，test-sdoc-run 約 17.5 分鐘，
+  部署版面 job 約 19 分鐘（裡面又依序跑了一次 test-sdoc-run 與 test-sdoc-assemble）。
+- 根因：關鍵路徑是同一支端到端測試被跑兩次，而且整支只能在一個 job 裡循序跑。
+- 落點：
+  - `scripts/tests/test-sdoc-run.ps1` 加 `-Only walk｜edge｜gate`（貫穿範例到核准／中斷重試等邊界情境／守門範例、第 2 輪、分段寫），
+    不給＝全部；兩組共用的預期值（14 的案例鍵）移到共用設定。本機 PS 7：walk 163 秒、edge 128 秒、gate 25 秒，三組合計 55 項與整支相同。
+  - `.github/workflows/ps51-tests.yml`：repo 版面把 test-sdoc-run 拆成三個 job 平行；部署版面只跑 test-sdoc、test-sdoc-run 的 gate 組
+    與第一次 ps-sdoc（CRLF 版面仍有實際派工與分段合併的驗證）。預計一輪約 10 分鐘（walk 組是新的關鍵路徑）。
+  - SOP-28、HANDOFF 同步；維護端不再等 CI 才回覆，結果出來再補。
+- 教訓：CI 慢先看關鍵路徑，不是平均：把最長的那支拆開平行、刪掉重複跑的，其他短 job 不用動。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -5875,4 +5888,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-PART-END|cef7dc63285891d9|2|7
+@@@PSBUNDLE-PART-END|00f492a1263b3d61|2|7
