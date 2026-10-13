@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3457765）第 3／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3a32ad4）第 3／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3457765|00f492a1263b3d61|3|7|5582|4e935213ef40026b8677c5d77a27deb398f3b2680751e758281e4b063ffb6939
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1088|e8e19157d67033b051afee2f43ad4cd4d717d61aa0b49f8a58314fba6785f5d8|0
+@@@PSBUNDLE-PART|1|opencode|3a32ad4|14892736d66df32f|3|7|5586|ed9d2844c390310e459c299b32c1fcb1bef69d7e1e7fb2f3a6f662b201f7c53c
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1092|741b303a23a5ce05cad34cda984aee912efc76e4b2d655e989e4e3c00a9f7a02|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -1003,6 +1003,10 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
 □ 5. 接著跑 `ps-fs-doctor`（Claude Code 版另跑 `ps-claude-doctor`）。保留本機的檔（已回填的 profile 等）在檢查 M 會列為版本不符，屬正常。
 
 被覆寫或刪除的舊檔備份在 `auto-loop-logs\ps-bundle-backup\<時間>\`；要回到上一版就把備份複製回原位。
+
+- 只換一個檔也用搬運包，不要從 GitHub 網頁複製單一檔貼上：網頁內容開頭帶著 BOM 字元，編輯器存成「UTF-8 with BOM」時會再加一個，
+  變成雙 BOM。雙 BOM 的 `.ps1` 在 5.1 報的錯會指在檔案開頭（例如 `Unexpected attribute 'CmdletBinding'`／「未預期的屬性」），
+  看起來像語法錯。遇到就跑 `ps-fs-doctor` 看檢查 D，再用搬運包重解一次：`scripts\` 底下的檔一律以新版覆寫，雙 BOM 會一起修掉。
 
 ## SOP-28 Spec 文件（Claude Code 版：00-index＋14 份文件＋90 問題清單；issue #37）
 
@@ -5583,4 +5587,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|00f492a1263b3d61|3|7
+@@@PSBUNDLE-PART-END|14892736d66df32f|3|7

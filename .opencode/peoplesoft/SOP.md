@@ -1000,6 +1000,10 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
 
 被覆寫或刪除的舊檔備份在 `auto-loop-logs\ps-bundle-backup\<時間>\`；要回到上一版就把備份複製回原位。
 
+- 只換一個檔也用搬運包，不要從 GitHub 網頁複製單一檔貼上：網頁內容開頭帶著 BOM 字元，編輯器存成「UTF-8 with BOM」時會再加一個，
+  變成雙 BOM。雙 BOM 的 `.ps1` 在 5.1 報的錯會指在檔案開頭（例如 `Unexpected attribute 'CmdletBinding'`／「未預期的屬性」），
+  看起來像語法錯。遇到就跑 `ps-fs-doctor` 看檢查 D，再用搬運包重解一次：`scripts\` 底下的檔一律以新版覆寫，雙 BOM 會一起修掉。
+
 ## SOP-28 Spec 文件（Claude Code 版：00-index＋14 份文件＋90 問題清單；issue #37）
 
 Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP-25）。入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，

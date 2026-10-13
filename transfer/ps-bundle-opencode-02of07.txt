@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3457765）第 2／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3a32ad4）第 2／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3457765|00f492a1263b3d61|2|7|5887|68bfac2414fdbff4b3c509c18cf92248702b95f26bc1ccbfd62392832dc12583
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3861|811f494419d05909b13e322c7f9482a5d02a4af2ace112565a1da338533a3b90|0
+@@@PSBUNDLE-PART|1|opencode|3a32ad4|14892736d66df32f|2|7|5898|5c4d3f366e8fb79ce95671d18e123c1344c188b69f22f5e0679df37495b9e140
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3872|792ace761850faa9c8066e97051c858b991e0d554356814e6c50d0faf9447f43|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -3863,6 +3863,17 @@
     與第一次 ps-sdoc（CRLF 版面仍有實際派工與分段合併的驗證）。預計一輪約 10 分鐘（walk 組是新的關鍵路徑）。
   - SOP-28、HANDOFF 同步；維護端不再等 CI 才回覆，結果出來再補。
 - 教訓：CI 慢先看關鍵路徑，不是平均：把最長的那支拆開平行、刪掉重複跑的，其他短 job 不用動。
+
+### L144 「PositionalBinding 不預期的 attribute」其實是雙 BOM；併回 main 改成驗證過就直接做（2026-10-13）
+
+- 症狀：L142 併回 main 後，管理者在公司機跑 ps-sdoc.ps1 報 `[CmdletBinding(PositionalBinding = $false)]` 是未預期的屬性；
+  同一份檔在 5.1 CI（部署版面第一次 ps-sdoc 與 test-sdoc-run 另開 powershell -File）都正常。管理者查出是本機那份檔雙 BOM。
+- 根因：單一檔從 GitHub 網頁複製貼上時，內容開頭的 BOM 字元加上編輯器存檔時再加的 BOM，成了雙 BOM；第二個 BOM 在 5.1 被當成
+  一個敘述，param 前的 attribute 就變成「未預期」。錯誤訊息指在檔案開頭，看起來像語法問題。
+- 落點：SOP-27 加一段：只換一個檔也用搬運包；看到指在檔案開頭的怪語法錯先跑 ps-fs-doctor 檢查 D，再重解搬運包
+  （ps-bundle 以正規化後的雜湊比對，雙 BOM 的 `scripts\` 檔雜湊不同，一律以新版覆寫）。
+  AGENTS.md 協作鐵律加「併回 main 已授權」：管理者要求驗證過的改動直接快轉併回 main，不必再等指示。
+- 教訓：同一份檔「CI 正常、本機報語法錯」先查搬運與編碼（雙 BOM、無 BOM、換行），不是先改程式。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -5888,4 +5899,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-PART-END|00f492a1263b3d61|2|7
+@@@PSBUNDLE-PART-END|14892736d66df32f|2|7

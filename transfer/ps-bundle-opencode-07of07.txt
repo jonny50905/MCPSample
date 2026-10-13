@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3457765）第 7／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3a32ad4）第 7／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3457765|00f492a1263b3d61|7|7|5197|7a81d2029e4289a4c6b3638b361d325980a003b825e1e31a5f3fb7c208fa7e14
+@@@PSBUNDLE-PART|1|opencode|3a32ad4|14892736d66df32f|7|7|5200|bb1a09718fe74cab07a41bc7ac8a14667cbe569fd6a7b3a08eb08854efd47051
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|338|dc18bdc60f9607362f1b474ceb11c3b35974bd142221ac361b132e056f3cee76|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4379,10 +4379,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|3baf4ada0cd6e290f2c364fe1e497085cb8862e91cf615fe5cd8a2b5a2a4261d|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|c5957165b51a2eaa9baf62d8fbe2cc3f41e1923fe977487eb3fd87f668468e81|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "3457765",
+  "commit": "3a32ad4",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -4560,8 +4560,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3861,
-      "sha256": "811f494419d05909b13e322c7f9482a5d02a4af2ace112565a1da338533a3b90",
+      "lines": 3872,
+      "sha256": "792ace761850faa9c8066e97051c858b991e0d554356814e6c50d0faf9447f43",
       "bom": false
     },
     {
@@ -4632,8 +4632,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1088,
-      "sha256": "e8e19157d67033b051afee2f43ad4cd4d717d61aa0b49f8a58314fba6785f5d8",
+      "lines": 1092,
+      "sha256": "741b303a23a5ce05cad34cda984aee912efc76e4b2d655e989e4e3c00a9f7a02",
       "bom": false
     },
     {
@@ -5065,7 +5065,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|130|a5b6ba1db1616043a6ee488b2f7591bbe4e0142098021840131a2b6c1c5df00b|0
+@@@PSBUNDLE-FILE|AGENTS.md|133|d4cd6cfe35c7022aef2970a0f6a4e6421575bac98733e4b4682764003ed1c385|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -5143,7 +5143,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-13 再由 `claude/brave-dirac-4q469u` 快轉併入
-   ——ps-sdoc 的 Component 用空白分開不再誤塞給 -TimeoutMin（L142），併入前 `main` 頭 `48578f1`；
+   ——Windows 5.1 CI 的端到端測試拆三組平行、部署版面不重跑長測試（L143），併入前 `main` 頭 `3457765`；
+   同日稍早同一分支併入 ps-sdoc 的 Component 用空白分開不再誤塞給 -TimeoutMin（L142），併入前 `main` 頭 `48578f1`；
    同日稍早同一分支併入狀態圖解讀分段寫出、Windows 5.1 CI 改成需要時才跑（L141），併入前 `main` 頭 `e906726`；
    同日稍早同一分支併入模型端 504 判讀、session 上限預設 60 分、ps-spec-author 每次一個 session（L140），併入前 `main` 頭 `cf42295`；
    2026-10-12 同一分支併入搬運包分份（L139），併入前 `main` 頭 `a9abd37`；同日稍早同一分支併入 issue #37 Claude Code 版 Spec 文件流程與
@@ -5154,6 +5155,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
 
 與管理者（使用者）協作的鐵律（只活在這裡，別的檔案沒有）：
 
+- **併回 `main` 已授權**（2026-10-13 管理者）：改動在本機測試（需要時加 5.1 CI）驗證過，就直接快轉併回 `main`，
+  不必等管理者說「併回 main」；照樣更新上面的維護版線、重產搬運包，回覆裡說明併回了什麼並附搬運清單。
 - 使用者在**公司內網 Windows＋PowerShell 5.1＋OpenCode CLI** 操作，
   目標模型是本機部署（見 applied.md L6）；一切只經 opencode cli，
   沒有任何 web UI。
@@ -5197,5 +5200,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|112|06192582c410c1b8b9205db511ff02e43c3dcc305294470d870f7bb62fb47697
-@@@PSBUNDLE-PART-END|00f492a1263b3d61|7|7
+@@@PSBUNDLE-EOF|112|7a62b565d4cbe1aef188d1937515287dee94ad0f1f8fd7bf1dee93e3dfcb2127
+@@@PSBUNDLE-PART-END|14892736d66df32f|7|7

@@ -3859,3 +3859,14 @@
     與第一次 ps-sdoc（CRLF 版面仍有實際派工與分段合併的驗證）。預計一輪約 10 分鐘（walk 組是新的關鍵路徑）。
   - SOP-28、HANDOFF 同步；維護端不再等 CI 才回覆，結果出來再補。
 - 教訓：CI 慢先看關鍵路徑，不是平均：把最長的那支拆開平行、刪掉重複跑的，其他短 job 不用動。
+
+### L144 「PositionalBinding 不預期的 attribute」其實是雙 BOM；併回 main 改成驗證過就直接做（2026-10-13）
+
+- 症狀：L142 併回 main 後，管理者在公司機跑 ps-sdoc.ps1 報 `[CmdletBinding(PositionalBinding = $false)]` 是未預期的屬性；
+  同一份檔在 5.1 CI（部署版面第一次 ps-sdoc 與 test-sdoc-run 另開 powershell -File）都正常。管理者查出是本機那份檔雙 BOM。
+- 根因：單一檔從 GitHub 網頁複製貼上時，內容開頭的 BOM 字元加上編輯器存檔時再加的 BOM，成了雙 BOM；第二個 BOM 在 5.1 被當成
+  一個敘述，param 前的 attribute 就變成「未預期」。錯誤訊息指在檔案開頭，看起來像語法問題。
+- 落點：SOP-27 加一段：只換一個檔也用搬運包；看到指在檔案開頭的怪語法錯先跑 ps-fs-doctor 檢查 D，再重解搬運包
+  （ps-bundle 以正規化後的雜湊比對，雙 BOM 的 `scripts\` 檔雜湊不同，一律以新版覆寫）。
+  AGENTS.md 協作鐵律加「併回 main 已授權」：管理者要求驗證過的改動直接快轉併回 main，不必再等指示。
+- 教訓：同一份檔「CI 正常、本機報語法錯」先查搬運與編碼（雙 BOM、無 BOM、換行），不是先改程式。
