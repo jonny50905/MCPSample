@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 65ef9f0）第 5／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 13db7b9）第 5／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|65ef9f0|27001766ff6f3bad|5|6|4450|1c90be568b8518fa1a3da904574b1021418c4676a1ca38f96b18c59bab2f0342
+@@@PSBUNDLE-PART|1|claude|13db7b9|650dd11f8d21b0ef|5|6|4450|1c90be568b8518fa1a3da904574b1021418c4676a1ca38f96b18c59bab2f0342
 @@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1024|eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e|1
 # scripts/tests/test-auto-loop.ps1 — 外環函式的功能測試（AST 抽真實函式，跑 fixture 情境）
 # 用法：pwsh -NoProfile -File scripts/tests/test-auto-loop.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4451,4 +4451,4 @@ Write-Host ('clone tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-spec-clone.ps1
-@@@PSBUNDLE-PART-END|27001766ff6f3bad|5|6
+@@@PSBUNDLE-PART-END|650dd11f8d21b0ef|5|6
