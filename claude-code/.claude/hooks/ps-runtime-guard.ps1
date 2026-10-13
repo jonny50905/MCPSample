@@ -281,7 +281,7 @@ function Get-PsGuardPathPolicy {
             return @{ Read = @('.ps-runtime/clone-spec/*/attempts/*', '.ps-runtime/clone-spec/*/revisions/*', '.ps-runtime/clone-spec/*/receipts/*', '.claude/peoplesoft/*', 'docs/ps-research/*'); Write = @('.ps-runtime/clone-spec/*/attempts/*/packet.json', '.ps-runtime/clone-spec/*/attempts/*/review.json'); Shell = $false }
         }
         'status-reader' {
-            return @{ Read = @('.ps-runtime/sdoc/*/inbox/*', '.ps-private/sdoc/*/status.md', '.claude/peoplesoft/sdoc/status-reading-contract.md', '.claude/peoplesoft/sdoc/schemas/status-reading.schema.json', '.claude/peoplesoft/sdoc/schemas-runtime/status-round2.schema.json'); Write = @('.ps-runtime/sdoc/*/inbox/output.json'); Shell = $false }
+            return @{ Read = @('.ps-runtime/sdoc/*/inbox/*', '.ps-private/sdoc/*/status.md', '.claude/peoplesoft/sdoc/status-reading-contract.md', '.claude/peoplesoft/sdoc/schemas/status-reading.schema.json', '.claude/peoplesoft/sdoc/schemas-runtime/status-round2.schema.json'); Write = @('.ps-runtime/sdoc/*/inbox/output.json', '.ps-runtime/sdoc/*/inbox/output-part-[0-9][0-9].json'); Shell = $false }
         }
         'sdoc-worker' {
             return @{ Read = @('.ps-runtime/sdoc/*/attempts/*', '.ps-runtime/sdoc/*/receipts/*', '.ps-runtime/sdoc/*/work/*', '.ps-private/sdoc/*/status.md', '.claude/peoplesoft/*', 'docs/ps-research/*'); Write = @('.ps-runtime/sdoc/*/attempts/*/output.json'); Shell = $false }

@@ -22,12 +22,15 @@ Claude Code 版的 `/ps-spec` 改走 `scripts/ps-sdoc.ps1`（DOC1），產 00-in
   與各種中斷、重試、改寫、讀者不一致情境）、test-claude-variant、5.1 靜態守衛。
 - 真 Windows PowerShell 5.1（2026-10-12 起）：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`，Windows runner、
   `powershell.exe` 5.1.26100、.NET Framework 4）跑 12 支測試，另把搬運包以 ps-bundle.ps1 解到空目錄（CRLF、`.claude\` 在根目錄）
-  跑三支 sdoc 測試與第一次 ps-sdoc.ps1（DOC1-0-01）；首輪 13 個 job 全綠（L138）。推到 `claude/**` 且動到 scripts、claude-code、
-  設計範例或搬運包時自動跑，也可在 Actions 頁手動觸發。公司機第一次跑先用 1～2 個 Component，回報結論碼與兩行計數。
+  跑三支 sdoc 測試與第一次 ps-sdoc.ps1（DOC1-0-01）；首輪 13 個 job 全綠（L138）。一輪約 20 分鐘，2026-10-13 起只在推到 `main`、
+  分支 head commit 訊息含 `[ps51]` 或手動觸發時跑（L141）；平常以本機 PS 7 測試與 5.1 靜態守衛為準。公司機第一次跑先用 1～2 個 Component，回報結論碼與兩行計數。
 - 公司機第一次真跑（2026-10-13）：第 0 階段 DOC1-3-04。三個讀者 session 都撞公司 gateway 的 504：兩個重試後有進展（被拖慢），
   一個最後同一個請求連續失敗到被 30 分逾時強殺；舊判讀因重試事件讓 stream 一直變大而誤報「上限太短」。已改（L140）：session 上限
   預設 60 分、ps-spec-author 每次呼叫一個 session（`-MaxSessions 1`，可帶 `-TimeoutMin` 1～110）、ps-session-lib 讀 stream 的
   `api_retry`／`api_error_status` 分出被拖慢／卡住（心跳、強殺、結束判讀與 outcome findings）。待公司機回報新判讀與 gateway 逾時值。
+- 公司機的 status.md 371 行、18 KB、8 個 Mermaid 區塊（範例的 5～7 倍），三位讀者都沒寫出 output.json；長回應實測：約 1.27 萬輸出 token
+  花 352 秒（約每秒 36 token），偶發 50 秒就失敗。已改（L141）：讀者分段寫出（每段 Mermaid 行上限 60，`PS_SDOC_READING_PART_LINES` 可調），
+  外環合併後驗收。待公司機回報分段後第 0 階段的結果。
 - 已知風險：模型寫研究包的合格率（不合格兩次就 BLOCKED，等 -Retry）；L5 結構題只比 ID 集合，讀者列 ID 的習慣差太多時會判不一致；
   真實 STATUS 圖的三位讀者一致率；大 Component 的頁數與 session 成本。以上都要公司機數字才能調。
 

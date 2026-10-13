@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "c6e1698",
+  "commit": "e906726",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -103,7 +103,7 @@
     {
       "path": ".claude/agents/ps-status-reader.md",
       "lines": 23,
-      "sha256": "57766833023cb29d10ead8508d9f8039de008b084785bd9b48718bce676f24c3",
+      "sha256": "4d68e4f45614eb3dfeaa16829c15a23228d967b655b7c1d9bea44c17c9a9c151",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-status-reader.md"
     },
@@ -180,7 +180,7 @@
     {
       "path": ".claude/hooks/ps-runtime-guard.ps1",
       "lines": 400,
-      "sha256": "07e6b964c5608d30f2ff4e191973ff09d46d708adb45c44ca924eb9f0f832358",
+      "sha256": "c7d79c992550515fe0f2ff2c484cf5db7db8899923760211aab3f424564e5597",
       "bom": true,
       "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
     },
@@ -557,8 +557,8 @@
     },
     {
       "path": ".claude/peoplesoft/sdoc/status-reading-contract.md",
-      "lines": 93,
-      "sha256": "dcfbb15a5c6507803af3f784ae050206dd88717aed96927f3e6abd5bdc1cefe6",
+      "lines": 105,
+      "sha256": "e6a54029a5eda1f2ad109e97262862b642e7c952288a41caf3256d58ea2fc367",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/status-reading-contract.md"
     },
@@ -856,14 +856,14 @@
     },
     {
       "path": "scripts/ps-sdoc-status-lib.ps1",
-      "lines": 496,
-      "sha256": "066171dec1eff8567a5c90be8f38f95d17781bf556123134035b9b8da088e8db",
+      "lines": 630,
+      "sha256": "2fa4f8b1e95a126bd529463810ff266947e44d25dbc3e385be72524d01774bdd",
       "bom": true
     },
     {
       "path": "scripts/ps-sdoc.ps1",
-      "lines": 1325,
-      "sha256": "65daf74200f12761e3679ec6959043972dda63c76bf23aedaa9c234b9084cc5a",
+      "lines": 1374,
+      "sha256": "1bc531c7770d1307505532d62016877e049b31328da1539cded3fff66609a8fe",
       "bom": true
     },
     {
@@ -928,8 +928,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 463,
-      "sha256": "e18de109635f7d38a4e9adcd5c30884c61a5094cbccfe3e1b2b24e0bcf851b93",
+      "lines": 464,
+      "sha256": "8ecd7c0983c0ca5d2537e5bcfbb11e23fcfb2b1f1040b25bc98ba5f4292caa9f",
       "bom": true
     },
     {
@@ -958,14 +958,14 @@
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 511,
-      "sha256": "eb2521aa700aeb0fe7d310b14a37a5114ad0c0b3f5fcd804e69b5b41147dd6e8",
+      "lines": 554,
+      "sha256": "ab622fdcff29beb576ca252f5a9eccbef6b8084cdc45a79ecc726aeb073b5d59",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc.ps1",
-      "lines": 209,
-      "sha256": "c4c9d28243d5743c8dbcaf320e619698bace0a75fa2ba2f2a3a86f81c227e0d1",
+      "lines": 266,
+      "sha256": "ea65487e7a6dd5c713d986b6a49d88e22b5ef57803974fb46998621e16a25cd9",
       "bom": true
     },
     {

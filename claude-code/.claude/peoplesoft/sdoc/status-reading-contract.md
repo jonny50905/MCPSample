@@ -74,6 +74,18 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 同一件事在兩張圖畫得不一樣、又看不出是摘要（例如大圖有 `040→060`，獨立圖沒有）：`{"description": "哪裡不一致", "lines": [相關的行]}`。沒有就 `[]`。
 
+### 分段寫出
+
+工單 input.json 的 `outputParts` 把 Mermaid 區塊的行分成幾段，每段 `{part, from, to, mermaidLines, path}`。一段寫一個檔，依段序各用一次 Write 寫到該段的 `path`：
+
+- 先讀完整份 STATUS 檔再開始寫；判斷照整份檔來（哪條線是摘要、哪裡互相矛盾），只是分段寫出。
+- 每段的檔是上面同一個 JSON 物件，表頭（`schemaVersion`、`jobId`、`reader`、`round`、`source`）每段照抄，四個陣列只放第 `from`～`to` 行的內容：
+  - `states`、`regions`、`transitions`、`otherLines` 的 `lines` 只列這段範圍內的行；範圍內沒有行的項目不寫進這段。
+  - 同一個狀態或轉移在好幾段都出現，就每段各寫一筆，外環依「實體＋狀態碼」「實體＋起訖」合併各段的 `lines`、`regions`、`via`、`labels`。同一個狀態的 `final`、同一條轉移的 `scenario` 每段要寫成一樣；`name` 照第一次寫的。
+  - `conflicts` 全部寫在最後一段，其他段寫 `[]`。
+- 這段沒有任何內容也要寫檔（四個陣列都是 `[]`）。每一段都要寫，少一段整份退回。
+- 外環把各段合成一份後才檢查逐行交代：Mermaid 區塊裡每一個非空行在所有段合起來恰好交代一次。
+
 ## 第 2 輪：逐項確認（工單種類 STATUS_ROUND2）
 
 工單 input.json 的 `questions` 是第 1 輪三份解讀不一致的事實，每題 `{id, fact, lines}`，`lines` 附了引用的行號與原文。回頭讀 STATUS 檔對應的行，逐題判斷「是不是這樣」：

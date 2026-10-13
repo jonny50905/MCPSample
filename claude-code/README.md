@@ -123,6 +123,8 @@ SOP 編號照用；有差異的只有：
    `-TimeoutMin` 續跑；同一個請求連續失敗 3 次以上或重試用完＝**卡在模型端**，把狀態碼、次數與時間交 IT。執行中每 5 分鐘的「進行中」
    行也會列出重試次數與目前連續失敗幾次。attempt 的 `outcome.json` 的 findings 記失敗種類（`TIMED_OUT`、`EXIT_<n>`、
    `API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`）。
+6. 第 0 階段的讀者把解讀分段寫（每段一個檔，外環合併後驗收），一次回應不會太長。每段的 Mermaid 行上限預設 60；
+   要調就在跑 ps-sdoc 的 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '40'`（5～1000）。各段原樣留在 attempt 的 `output-part-NN.json`。
 
 ## 回報維護端
 

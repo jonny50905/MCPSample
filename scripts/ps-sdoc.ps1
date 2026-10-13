@@ -667,7 +667,7 @@ function Test-SdSamePath([string]$A, [string]$B) {
     if ([System.IO.Path]::DirectorySeparatorChar -eq [char]92) { return [string]::Equals($fa, $fb, [System.StringComparison]::OrdinalIgnoreCase) }
     return [string]::Equals($fa, $fb, [System.StringComparison]::Ordinal)
 }
-function Restore-SdFence($Snapshot, [string]$Allowed) {
+function Restore-SdFence($Snapshot, [string[]]$Allowed) {
     $violations = @()
     foreach ($p in $Snapshot.Keys) {
         $now = $null; if ([System.IO.File]::Exists($p)) { $now = [System.IO.File]::ReadAllBytes($p) }
@@ -681,7 +681,9 @@ function Restore-SdFence($Snapshot, [string]$Allowed) {
     }
     foreach ($dir in @($J.JobRoot, $J.OutputRoot)) {
         foreach ($p in (Get-SdFiles $dir)) {
-            if ($Snapshot.ContainsKey($p) -or (Test-SdSamePath $p $Allowed)) { continue }
+            if ($Snapshot.ContainsKey($p)) { continue }
+            $ok = $false; foreach ($a in @($Allowed)) { if (Test-SdSamePath $p $a) { $ok = $true; break } }
+            if ($ok) { continue }
             $q = Join-Path (Join-Path $J.RuntimeRoot 'quarantine') ([guid]::NewGuid().ToString('N') + '-' + [System.IO.Path]::GetFileName($p))
             [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($q))
             [System.IO.File]::Move($p, $q)
@@ -984,6 +986,13 @@ function Get-SdSkeletonForEntity([string]$Entity) {
     }
     return , $out
 }
+# 狀態圖解讀每段要交代的 Mermaid 行上限：環境變數 PS_SDOC_READING_PART_LINES（5～1000）可覆寫；0＝用 status-lib 的預設
+function Get-SdReadingPartLines {
+    $v = 0
+    if ([int]::TryParse(([string]$env:PS_SDOC_READING_PART_LINES).Trim(), [ref]$v) -and $v -ge 5 -and $v -le 1000) { return $v }
+    return 0
+}
+
 # SESSION_FAILED 的 findings：逾時、結束碼、容量事件、模型端重試判讀的 enum；都沒有時為 NONE
 function Get-SdSessionFindings($Sr) {
     $f = @()
@@ -1011,6 +1020,13 @@ function Invoke-SdAttempt($Work, $State) {
         [void][System.IO.Directory]::CreateDirectory($box)
     }
     $outPath = Join-Path $box 'output.json'
+    # 狀態圖解讀分段寫：一段一個檔，外環合併後才驗收（一次回應太長，經公司 gateway 會逾時或被切斷）
+    $readingParts = @()
+    if ($kind -eq 'STATUS_READ') {
+        foreach ($pt in (Get-PsSdReadingParts $State.Stage0.Text (Get-SdReadingPartLines))) {
+            $readingParts += , @{ Part = $pt.Part; From = $pt.From; To = $pt.To; Count = $pt.Count; Path = (Join-Path $box ('output-part-' + ([int]$pt.Part).ToString('00', [System.Globalization.CultureInfo]::InvariantCulture) + '.json')) }
+        }
+    }
     $packet = $null; $candidateId = ''; $candidateHash = ''
     if ($kind -eq 'REVIEW') {
         $candidateId = $Work.Candidate.Id
@@ -1036,6 +1052,11 @@ function Invoke-SdAttempt($Work, $State) {
         $inp['reader'] = $Work.Reader
         $inp['statusRef'] = 'status.md'
         $inp['statusFingerprint'] = $State.Stage0.Fingerprint
+        if ($kind -eq 'STATUS_READ') {
+            $ops = @()
+            foreach ($rp in $readingParts) { $o = New-PsSdObject; $o['part'] = $rp.Part; $o['from'] = $rp.From; $o['to'] = $rp.To; $o['mermaidLines'] = $rp.Count; $o['path'] = Get-SdRel $rp.Path; $ops += , $o }
+            $inp['outputParts'] = $ops
+        }
         if ($kind -eq 'STATUS_ROUND2') { $qs = @(); foreach ($q in $Work.Questions) { $o = New-PsSdObject; $o['id'] = $q.id; $o['fact'] = $q.fact; $o['lines'] = $q.lines; $qs += , $o }; $inp['questions'] = $qs }
     } else {
         $inp['cursor'] = [string]$Work.Cursor
@@ -1058,7 +1079,13 @@ function Invoke-SdAttempt($Work, $State) {
     elseif (-not $isolated) { $unitTitle = $Work.Unit + '（' + (Get-PsSdUnit $Work.Unit).Title + '）' }
     $m = New-Object System.Collections.Generic.List[string]
     $m.Add('# Spec 文件工單'); $m.Add('')
-    foreach ($l in @(('- Job：' + $J.JobId), ('- Attempt：' + $aid), ('- 種類：' + $kind), ('- 研究單元：' + $unitTitle + '；主題：' + $Work.Subject + '；第 ' + $Work.Page + ' 頁'), ('- 工單：' + (Get-SdRel (Join-Path $box 'input.json')) + '（inputHash ' + $inp['inputHash'] + '）'), ('- 輸出：' + (Get-SdRel $outPath) + '（只准寫這一個檔）'), ('- STATUS 檔：' + $inp['statusPath']))) { $m.Add($l) }
+    foreach ($l in @(('- Job：' + $J.JobId), ('- Attempt：' + $aid), ('- 種類：' + $kind), ('- 研究單元：' + $unitTitle + '；主題：' + $Work.Subject + '；第 ' + $Work.Page + ' 頁'), ('- 工單：' + (Get-SdRel (Join-Path $box 'input.json')) + '（inputHash ' + $inp['inputHash'] + '）'))) { $m.Add($l) }
+    if ($kind -eq 'STATUS_READ') {
+        $m.Add('- 輸出：分 ' + $readingParts.Count + ' 段寫，一段一個檔，只准寫這些檔（寫法見規則的「分段寫出」）')
+        foreach ($rp in $readingParts) { $m.Add('  - 第 ' + $rp.Part + ' 段：STATUS 檔第 ' + $rp.From + '～' + $rp.To + ' 行（要交代 ' + $rp.Count + ' 行）→ ' + (Get-SdRel $rp.Path)) }
+    }
+    else { $m.Add('- 輸出：' + (Get-SdRel $outPath) + '（只准寫這一個檔）') }
+    $m.Add('- STATUS 檔：' + $inp['statusPath'])
     if ($kind -eq 'READER') {
         $m.Add('- 規則：.claude/peoplesoft/sdoc/reader-contract.md')
         $m.Add('- 你的視角：' + $inp['perspective'])
@@ -1120,9 +1147,30 @@ function Invoke-SdAttempt($Work, $State) {
         else { $sr = Invoke-PsOcSession -OcPath $J.OcPath -Root $J.Root -LogRoot (Join-Path $J.Root '.ps-runtime/sdoc-logs') -Model $Model -ExtraArgs ('--agent ' + $agent) -PromptText ($J.JobId + '/' + $aid) -TimeoutMin $TimeoutMin -Tag ($J.JobId + '-' + $aid) -Log { param($msg) Write-Host $msg } -SlotWaitMin 0 -TimeoutParamName 'TimeoutMin' }
     }
     catch { $sr = @{ ExitCode = -1; TimedOut = $false; SlotBusy = $false; FailureKind = 'DISPATCH_ERROR'; ApiKind = 'NONE' }; Write-Host ('session 未完成：' + $_.Exception.Message) }
-    $violations = Restore-SdFence $fence $outPath
-    $outText = $null
-    if ([System.IO.File]::Exists($outPath)) { $outText = [System.IO.File]::ReadAllText($outPath, [System.Text.Encoding]::UTF8) }
+    $allowed = @($outPath); foreach ($rp in $readingParts) { $allowed += $rp.Path }
+    $violations = Restore-SdFence $fence $allowed
+    $outText = $null; $mergeErrors = @()
+    if ($kind -eq 'STATUS_READ') {
+        # 各段原樣留在 attempt 目錄（方便查）；合併成一份才驗收。沒有任何一段而有 output.json＝一次寫完，照舊驗收
+        $nodes = @(); $any = $false
+        foreach ($rp in $readingParts) {
+            $node = $null
+            if ([System.IO.File]::Exists($rp.Path)) {
+                $any = $true
+                $raw = [System.IO.File]::ReadAllText($rp.Path, [System.Text.Encoding]::UTF8)
+                Write-SdText (Join-Path $ad ([System.IO.Path]::GetFileName($rp.Path))) $raw
+                try { $node = ConvertTo-PsSdNode (ConvertFrom-PsSdJson $raw) } catch { $node = $null }
+            }
+            $nodes += , $node
+        }
+        if ($any) {
+            $mg = Merge-PsSdReadingParts $nodes
+            if (@($mg.Errors).Count -gt 0) { $mergeErrors = @($mg.Errors) } else { $outText = ConvertTo-PsSdJsonText $mg.Reading }
+        }
+        elseif ([System.IO.File]::Exists($outPath)) { $outText = [System.IO.File]::ReadAllText($outPath, [System.Text.Encoding]::UTF8) }
+        else { $mergeErrors = @('一段解讀都沒有寫（工單 outputParts 列的檔）') }
+    }
+    elseif ([System.IO.File]::Exists($outPath)) { $outText = [System.IO.File]::ReadAllText($outPath, [System.Text.Encoding]::UTF8) }
     if ($isolated) {
         if ($null -ne $outText) { Write-SdText (Join-Path $ad 'output.json') $outText }
         foreach ($f in (Get-SdFiles $box)) { [System.IO.File]::Delete($f) }
@@ -1137,7 +1185,8 @@ function Invoke-SdAttempt($Work, $State) {
         $out = $null
         if ($null -ne $outText) { try { $out = ConvertTo-PsSdNode (ConvertFrom-PsSdJson $outText) } catch { $out = $null } }
         if ($kind -eq 'STATUS_READ') {
-            $e = Test-SdReadingOutput $out $Work.Reader $State.Stage0.Fingerprint $State.Stage0.Text
+            $e = @($mergeErrors)
+            if ($e.Count -eq 0) { $e = Test-SdReadingOutput $out $Work.Reader $State.Stage0.Fingerprint $State.Stage0.Text }
             if ($e.Count -gt 0) { $outcome['status'] = 'INVALID'; $outcome['counted'] = $true; $outcome['findings'] = @($e | Select-Object -First 30) } else { $outcome['status'] = 'ACCEPTED' }
         }
         elseif ($kind -eq 'STATUS_ROUND2') {

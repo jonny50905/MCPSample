@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c6e1698）第 6／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit e906726）第 6／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|c6e1698|48f7ce7e6bdecc1b|6|7|6345|7bb270a8ddd69287c2402f1251708389dd8ff820c4c83357748f961885373521
+@@@PSBUNDLE-PART|1|opencode|e906726|32a2fb76d7da8ac9|6|7|6346|afd4c555300750f79a761230913eda631553646e53df93e91fedde248f361d04
 @@@PSBUNDLE-FILE|scripts/ps-spec-lib.ps1|2729|d8460ec0599c9b21cbff47a32e295f91d3710b431384912aee8bcc905c47ad67|1
 # ps-spec-lib.ps1 — Spec 引擎共用邏輯：Component＋私有需求包（pack）→ EXTRACT facts／COMPOSE 單位 → 外環派工與驗收
 #                   → 確定性 render（模板副本：markers 置換 {{slot:Sxx}}／headings 綁章節標題與原生佔位符）→ gate；結論碼 SPEC1-<stage>-<code>[-<count>]。
@@ -5881,7 +5881,7 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-bundle.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|463|e18de109635f7d38a4e9adcd5c30884c61a5094cbccfe3e1b2b24e0bcf851b93|1
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|464|8ecd7c0983c0ca5d2537e5bcfbb11e23fcfb2b1f1040b25bc98ba5f4292caa9f|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
 #       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
@@ -6199,6 +6199,7 @@ try {
     Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：讀其他讀者的解讀 → 擋（三位讀者互相隔離）"
     Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/wiki/X.md'))) "path status-reader：讀研究知識 → 擋（只看 STATUS 檔）"
     Assert (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output.json')) "path status-reader：寫 inbox/output.json → 放行"
+    Assert ((Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output-part-03.json')) -and -not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output-part-x.json')) -and -not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/manifest.md'))) "path status-reader：寫分段檔 inbox/output-part-NN.json → 放行；其他檔名 → 擋"
     Assert (-not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：寫 attempt 目錄 → 擋"
     Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'attempts/a0004/manifest.md')) "path sdoc-worker：讀工單 → 放行"
     Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'work/r0001/citeable.md')) "path sdoc-worker：讀可引用清單 → 放行"
@@ -6346,4 +6347,4 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-claude-variant.ps1
-@@@PSBUNDLE-PART-END|48f7ce7e6bdecc1b|6|7
+@@@PSBUNDLE-PART-END|32a2fb76d7da8ac9|6|7

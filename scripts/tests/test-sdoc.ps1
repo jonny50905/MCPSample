@@ -128,6 +128,63 @@ $bad = Copy-SdNode $gateR[0]
 $bad['otherLines'] = @($bad['otherLines']) + @(@{ lines = @(8); disposition = 'NO_SPEC_CONTENT'; note = '重複' })
 $codes = Get-SdCodes (Test-PsSdReading $gateText $bad)
 Assert-Sd ($codes -contains 'LINE_TWICE') '第 0 階段擋：同一行列兩次'
+
+# ---------------- 第 0 階段：解讀分段寫出 ----------------
+$pp = Get-PsSdReadingParts $gateText 8
+$covered = 0; $sum = 0
+foreach ($p in $pp) { $sum += $p.Count; foreach ($ln in $mm.Keys) { if ($ln -ge $p.From -and $ln -le $p.To) { $covered++ } } }
+Assert-Sd ($pp.Count -ge 5 -and $covered -eq 46 -and $sum -eq 46 -and @($pp | Where-Object { $_.Count -gt 8 }).Count -eq 0) ('分段：每段不超過上限、每個 Mermaid 行恰好落在一段（' + $pp.Count + ' 段）')
+$one = Get-PsSdReadingParts $gateText 0
+Assert-Sd ($one.Count -eq 1 -and $one[0].Count -eq 46 -and $one[0].From -eq $pp[0].From) '分段：預設上限 60，小檔只有一段'
+$big = "# 大圖`n" + '```mermaid' + "`n" + ((1..25 | ForEach-Object { 'A' + $_ + ' --> B' + $_ }) -join "`n") + "`n" + '```' + "`n" + '```mermaid' + "`n" + 'X --> Y' + "`n" + '```' + "`n"
+$bp = Get-PsSdReadingParts $big 10
+Assert-Sd ($bp.Count -eq 3 -and $bp[0].Count -eq 10 -and $bp[1].Count -eq 10 -and $bp[2].Count -eq 6 -and $bp[2].To -eq 30) ('分段：單一區塊超過上限才在行與行之間切，剩下的行和後面的小區塊同一段（' + (($bp | ForEach-Object { '' + $_.From + '-' + $_.To }) -join ',') + '）')
+$none = Get-PsSdReadingParts ("# 沒有圖`n說明`n") 8
+Assert-Sd ($none.Count -eq 1 -and $none[0].Count -eq 0) '分段：沒有 Mermaid 區塊 → 一段'
+function Split-SdReading($R, $Parts) {
+    # 照讀者的寫法切：每段只放這段範圍內的行，同一狀態、轉移在多段都出現就各段都寫；conflicts 放最後一段
+    $out = @()
+    foreach ($pt in $Parts) {
+        $o = New-PsSdObject; foreach ($k in @('schemaVersion', 'jobId', 'reader', 'round', 'source')) { $o[$k] = $R[$k] }
+        $ss = @(); $tt = @(); $oo = @()
+        foreach ($s in @($R['states'])) {
+            $ls = @(@($s['lines']) | Where-Object { $_ -ge $pt.From -and $_ -le $pt.To })
+            $rg = @(); foreach ($g in @($s['regions'])) { $gl = @(@($g['lines']) | Where-Object { $_ -ge $pt.From -and $_ -le $pt.To }); if ($gl.Count -gt 0) { $x = New-PsSdObject; $x['entity'] = $g['entity']; $x['lines'] = $gl; $rg += , $x } }
+            if ($ls.Count -gt 0 -or $rg.Count -gt 0) { $x = Copy-PsSdNodeShallow $s; $x['lines'] = $ls; $x['regions'] = $rg; $ss += , $x }
+        }
+        foreach ($t in @($R['transitions'])) { $ls = @(@($t['lines']) | Where-Object { $_ -ge $pt.From -and $_ -le $pt.To }); if ($ls.Count -gt 0) { $x = Copy-PsSdNodeShallow $t; $x['lines'] = $ls; $tt += , $x } }
+        foreach ($q in @($R['otherLines'])) { $ls = @(@($q['lines']) | Where-Object { $_ -ge $pt.From -and $_ -le $pt.To }); if ($ls.Count -gt 0) { $x = Copy-PsSdNodeShallow $q; $x['lines'] = $ls; $oo += , $x } }
+        $o['states'] = $ss; $o['transitions'] = $tt; $o['otherLines'] = $oo; $o['conflicts'] = @()
+        if ($pt.Part -eq $Parts.Count) { $o['conflicts'] = @($R['conflicts']) }
+        $out += , $o
+    }
+    return , $out
+}
+$ok = $true; $detail = ''
+foreach ($r in $gateR) {
+    $mg = Merge-PsSdReadingParts (Split-SdReading $r $pp)
+    $pr = @(); if ($null -ne $mg.Reading) { $pr = Test-PsSdReading $gateText $mg.Reading }
+    if (@($mg.Errors).Count -gt 0 -or $null -eq $mg.Reading -or @($pr).Count -gt 0 -or @($mg.Reading['states']).Count -ne @($r['states']).Count -or @($mg.Reading['transitions']).Count -ne @($r['transitions']).Count) { $ok = $false; $detail = (@($mg.Errors) + @($pr | ForEach-Object { $_.Message })) -join '；' }
+}
+Assert-Sd $ok '合併：三份解讀切成多段再合回來，逐行交代照樣通過、狀態與轉移筆數不變' $detail
+$mg = Merge-PsSdReadingParts (Split-SdReading $gateR[0] $pp)
+$st = @($mg.Reading['states'] | Where-Object { $_['entity'] -eq 'CASEDOC_STATUS' -and $_['code'] -eq '010' })
+Assert-Sd ($st.Count -eq 1 -and (@($st[0]['lines']) -join ',') -eq '11,56,62') ('合併：同一狀態在多段出現 → 一筆、lines 取聯集（' + (@($st[0]['lines']) -join ',') + '）')
+$mg1 = Merge-PsSdReadingParts @($gateR[0])
+Assert-Sd (@($mg1.Errors).Count -eq 0 -and @($mg1.Reading['states']).Count -eq @($gateR[0]['states']).Count -and [string]$mg1.Reading['reader'] -ceq 'R1') '合併：只有一段 → 原樣'
+$sp = Split-SdReading $gateR[0] $pp
+$e = (Merge-PsSdReadingParts @($sp[0], $null)).Errors
+Assert-Sd (Test-SdHasError $e '第 2 段沒有寫') '合併擋：少一段（指出第幾段）'
+$x = Copy-SdNode $sp[1]; $x['reader'] = 'R2'
+Assert-Sd (Test-SdHasError (Merge-PsSdReadingParts @($sp[0], $x)).Errors 'jobId／reader') '合併擋：某段的 reader 與第一段不同'
+$x = Copy-SdNode $sp[0]; $x['states'] = 'x'
+Assert-Sd (Test-SdHasError (Merge-PsSdReadingParts @($x)).Errors '不是陣列') '合併擋：states 不是陣列'
+$a = Copy-SdNode $sp[0]; $b = Copy-SdNode $sp[0]; $b['otherLines'] = @(); $b['transitions'] = @()
+$b['states'] = @(Copy-SdNode $a['states'][0]); $b['states'][0]['final'] = -not [bool]$a['states'][0]['final']
+Assert-Sd (Test-SdHasError (Merge-PsSdReadingParts @($a, $b)).Errors 'final') '合併擋：同一狀態在兩段的 final 不同'
+$t0 = @($a['transitions'])[0]
+$b = Copy-SdNode $sp[0]; $b['states'] = @(); $b['otherLines'] = @(); $b['transitions'] = @(Copy-SdNode $t0); $b['transitions'][0]['scenario'] = '另一種情境' + [string]$t0['scenario']
+Assert-Sd (Test-SdHasError (Merge-PsSdReadingParts @($a, $b)).Errors 'scenario') '合併擋：同一轉移在兩段的 scenario 不同'
 $bad = Copy-SdNode $gateR[0]
 $bad['transitions'][0]['to'] = '777'
 $codes = Get-SdCodes (Test-PsSdReading $gateText $bad)

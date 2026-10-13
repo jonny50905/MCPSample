@@ -72,6 +72,140 @@ function Get-PsSdProseLines {
     return , $out.ToArray()
 }
 
+# ---------------- 分段寫出 ----------------
+# 讀者一段寫一個檔：一次回應太長時，經公司 gateway 會逾時或被切斷。數字是每段要交代的 Mermaid 非空行上限。
+$script:PsSdReadingPartLines = 60
+
+function Get-PsSdReadingParts {
+    # Mermaid 行分段：只在區塊與區塊之間切，單一區塊超過上限才在行與行之間切。
+    # 回傳 @{ Part; From; To; Count } 陣列（From／To 是 STATUS 檔行號，含頭尾；Count＝這段要交代的非空行數）。沒有 Mermaid 行時回一段。
+    param([string]$Text, [int]$MaxLines = 0)
+    if ($MaxLines -le 0) { $MaxLines = $script:PsSdReadingPartLines }
+    $lines = ConvertTo-PsSdLines $Text
+    $blocks = [System.Collections.Generic.List[object]]::new()
+    $cur = $null
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        $t = $lines[$i].Trim()
+        if ($null -eq $cur -and $t.StartsWith('```mermaid')) { $cur = [System.Collections.Generic.List[int]]::new(); continue }
+        if ($null -ne $cur -and $t.StartsWith('```')) { if ($cur.Count -gt 0) { $blocks.Add($cur) }; $cur = $null; continue }
+        if ($null -ne $cur -and $t.Length -gt 0) { $cur.Add($i + 1) }
+    }
+    if ($null -ne $cur -and $cur.Count -gt 0) { $blocks.Add($cur) }
+    $groups = [System.Collections.Generic.List[object]]::new()
+    $acc = [System.Collections.Generic.List[int]]::new()
+    foreach ($b in $blocks) {
+        if ($acc.Count -gt 0 -and $acc.Count + $b.Count -gt $MaxLines) { $groups.Add($acc); $acc = [System.Collections.Generic.List[int]]::new() }
+        if ($b.Count -le $MaxLines) { $acc.AddRange($b); continue }
+        # 單一區塊超過上限：切成幾塊，最後一塊留給後面的區塊接著放
+        $s = 0
+        while ($b.Count - $s -gt $MaxLines) { $groups.Add($b.GetRange($s, $MaxLines)); $s += $MaxLines }
+        $acc = $b.GetRange($s, $b.Count - $s)
+    }
+    if ($acc.Count -gt 0) { $groups.Add($acc) }
+    if ($groups.Count -eq 0) { return , @(@{ Part = 1; From = 1; To = [Math]::Max(1, $lines.Length); Count = 0 }) }
+    $out = @()
+    $k = 0
+    foreach ($g in $groups) { $k++; $out += , @{ Part = $k; From = $g[0]; To = $g[$g.Count - 1]; Count = $g.Count } }
+    return , $out
+}
+
+function Join-PsSdLineSet($A, $B) {
+    # 行號聯集（由小到大）；不是整數的值原樣留在後面，交給 schema 檢查報錯。
+    $set = [System.Collections.Generic.SortedSet[int]]::new()
+    $odd = @()
+    foreach ($x in @(@($A) + @($B))) {
+        if ($null -eq $x) { continue }
+        if ((Test-PsSdIsInteger $x) -and [double]$x -ge [int]::MinValue -and [double]$x -le [int]::MaxValue) { [void]$set.Add([int]$x) } else { $odd += , $x }
+    }
+    $out = @(); foreach ($n in $set) { $out += $n }
+    return , @($out + $odd)
+}
+
+function Join-PsSdTextSet($A, $B) {
+    # 字串聯集（保留先出現的順序，區分大小寫）。
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $out = @()
+    foreach ($x in @(@($A) + @($B))) { if ($null -ne $x -and $seen.Add([string]$x)) { $out += , $x } }
+    return , $out
+}
+
+function Copy-PsSdNodeShallow($Node) {
+    $c = New-PsSdObject
+    foreach ($k in @($Node.Keys)) { $c[[string]$k] = $Node[$k] }
+    return , $c
+}
+
+function Merge-PsSdReadingParts {
+    # 分段寫的解讀合成一份（與一次寫完的格式相同）。$Parts：依段序的各段（ConvertTo-PsSdNode 的結果；沒寫或不是合法 JSON 為 $null）。
+    # 同一狀態（實體＋狀態碼）、同一轉移（實體＋起訖）在多段出現就合併：lines、regions、via、labels 取聯集；name 取最早那段；
+    # final 要一致；scenario 要一致（寫 null 的段不算）。otherLines、conflicts 依段序串接。
+    # 回 @{ Reading; Errors }：缺段、不是物件、欄位不是陣列、jobId／reader／指紋與第 1 段不同、final 或 scenario 不一致 → Errors（Reading 為 $null）。
+    param([object[]]$Parts)
+    $errs = @()
+    $head = $null
+    $states = [System.Collections.Generic.List[object]]::new(); $stateIdx = New-PsSdMap
+    $trans = [System.Collections.Generic.List[object]]::new(); $transIdx = New-PsSdMap
+    $others = @(); $conflicts = @()
+    $k = 0
+    foreach ($p in @($Parts)) {
+        $k++
+        $tag = '第 ' + $k + ' 段'
+        if (-not ($p -is [System.Collections.IDictionary])) { $errs += ($tag + '沒有寫，或不是合法 JSON 物件'); continue }
+        if ($null -eq $head) { $head = $p }
+        else {
+            $hf = ''; $pf = ''
+            if ($head['source'] -is [System.Collections.IDictionary]) { $hf = [string]$head['source']['fingerprint'] }
+            if ($p['source'] -is [System.Collections.IDictionary]) { $pf = [string]$p['source']['fingerprint'] }
+            if ([string]$p['jobId'] -cne [string]$head['jobId'] -or [string]$p['reader'] -cne [string]$head['reader'] -or $pf -cne $hf) { $errs += ($tag + '的 jobId／reader／source.fingerprint 與第一段不同') }
+        }
+        $bad = $false
+        foreach ($f in @('states', 'transitions', 'otherLines', 'conflicts')) {
+            if ($null -ne $p[$f] -and -not ($p[$f] -is [System.Collections.IList])) { $errs += ($tag + '的 ' + $f + ' 不是陣列'); $bad = $true }
+        }
+        if ($bad) { continue }
+        foreach ($s in @($p['states'])) {
+            if (-not ($s -is [System.Collections.IDictionary])) { if ($null -ne $s) { $errs += ($tag + '的 states 有一項不是物件') }; continue }
+            $key = [string]$s['entity'] + [char]0 + [string]$s['code']
+            $regs = @(); foreach ($g in @($s['regions'])) { if ($g -is [System.Collections.IDictionary]) { $regs += , (Copy-PsSdNodeShallow $g) } elseif ($null -ne $g) { $regs += , $g } }
+            if (-not $stateIdx.ContainsKey($key)) {
+                $m = Copy-PsSdNodeShallow $s
+                if ($s.Contains('regions')) { $m['regions'] = $regs }
+                $stateIdx[$key] = $m; $states.Add($m); continue
+            }
+            $m = $stateIdx[$key]
+            if ([string]$m['final'] -cne [string]$s['final']) { $errs += ($tag + '的狀態 ' + [string]$s['entity'] + ' ' + [string]$s['code'] + ' 的 final 與前面的段不同') }
+            $m['lines'] = Join-PsSdLineSet $m['lines'] $s['lines']
+            $mr = @($m['regions'] | Where-Object { $null -ne $_ })
+            foreach ($g in $regs) {
+                $hit = $null
+                foreach ($x in $mr) { if ($x -is [System.Collections.IDictionary] -and $g -is [System.Collections.IDictionary] -and [string]$x['entity'] -ceq [string]$g['entity']) { $hit = $x; break } }
+                if ($null -ne $hit) { $hit['lines'] = Join-PsSdLineSet $hit['lines'] $g['lines'] } else { $mr += , $g }
+            }
+            if ($m.Contains('regions') -or $mr.Count -gt 0) { $m['regions'] = $mr }
+        }
+        foreach ($t in @($p['transitions'])) {
+            if (-not ($t -is [System.Collections.IDictionary])) { if ($null -ne $t) { $errs += ($tag + '的 transitions 有一項不是物件') }; continue }
+            $key = [string]$t['entity'] + [char]0 + [string]$t['from'] + [char]0 + [string]$t['to']
+            if (-not $transIdx.ContainsKey($key)) { $m = Copy-PsSdNodeShallow $t; $transIdx[$key] = $m; $trans.Add($m); continue }
+            $m = $transIdx[$key]
+            if ($null -ne $t['scenario']) {
+                if ($null -eq $m['scenario']) { $m['scenario'] = $t['scenario'] }
+                elseif ([string]$m['scenario'] -cne [string]$t['scenario']) { $errs += ($tag + '的轉移 ' + [string]$t['entity'] + ' ' + [string]$t['from'] + '>' + [string]$t['to'] + ' 的 scenario 與前面的段不同') }
+            }
+            $m['lines'] = Join-PsSdLineSet $m['lines'] $t['lines']
+            $m['via'] = Join-PsSdTextSet $m['via'] $t['via']
+            $m['labels'] = Join-PsSdTextSet $m['labels'] $t['labels']
+        }
+        foreach ($o in @($p['otherLines'])) { if ($null -ne $o) { $others += , $o } }
+        foreach ($c in @($p['conflicts'])) { if ($null -ne $c) { $conflicts += , $c } }
+    }
+    if ($errs.Count -gt 0) { return @{ Reading = $null; Errors = $errs } }
+    $r = New-PsSdObject
+    foreach ($f in @('schemaVersion', 'jobId', 'reader', 'round', 'source')) { if ($head.Contains($f)) { $r[$f] = $head[$f] } }
+    $r['states'] = $states.ToArray(); $r['transitions'] = $trans.ToArray(); $r['otherLines'] = $others; $r['conflicts'] = $conflicts
+    return @{ Reading = $r; Errors = @() }
+}
+
 # ---------------- 每份解讀的檢查 ----------------
 function Test-PsSdReading {
     # 回傳 @{ Code; Message } 陣列：BAD_CODE、DUPLICATE、BAD_REF、NO_LINES、CITE_OUTSIDE、LINE_TWICE、LINE_UNACCOUNTED。

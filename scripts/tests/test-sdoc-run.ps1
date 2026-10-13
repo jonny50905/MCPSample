@@ -21,9 +21,11 @@ foreach ($n in @('ps-sdoc.ps1', 'ps-sdoc-schema-lib.ps1', 'ps-sdoc-status-lib.ps
     Copy-Item -LiteralPath (Join-Path $repo ('scripts/' + $n)) -Destination (Join-Path $tools $n)
 }
 $cli = Join-Path $tools 'ps-sdoc.ps1'
-$priorEnv = @{ Cli = $env:PS_CLI; Lib = $env:PS_SDOC_TEST_LIB; Fx = $env:PS_SDOC_TEST_FIXTURES; Mode = $env:PS_SDOC_TEST_MODE }
+$priorEnv = @{ Cli = $env:PS_CLI; Lib = $env:PS_SDOC_TEST_LIB; Fx = $env:PS_SDOC_TEST_FIXTURES; Mode = $env:PS_SDOC_TEST_MODE; Part = $env:PS_SDOC_READING_PART_LINES }
 $env:PS_CLI = ''
 $env:PS_SDOC_TEST_LIB = $tools
+# 範例的狀態圖不大：每段 8 行，讓解讀一定分成好幾段（走合併）
+$env:PS_SDOC_READING_PART_LINES = '8'
 
 function Write-SdFx([string]$Path, [string]$Text, [bool]$Bom = $false) {
     if (-not (Write-PsKnAtomicText -LiteralPath $Path -Text $Text -Bom $Bom)) { throw 'TEST_WRITE_FAILED' }
@@ -59,7 +61,32 @@ if ($Kind -eq 'STATUS_READ') {
     $r = Read-FwJson (Join-Path $fx ('readings/' + [string]$inp['reader'] + '.json'))
     $r['jobId'] = [string]$inp['jobId']; $r['source']['ref'] = 'status.md'; $r['source']['fingerprint'] = [string]$inp['statusFingerprint']
     if ($mode -contains ('bad-read-' + [string]$inp['reader'])) { $r['source']['fingerprint'] = ('0' * 64) }
-    Write-FwOut $r; exit 0
+    if ($mode -contains ('read-whole-' + [string]$inp['reader'])) { Write-FwOut $r; exit 0 }
+    # 照工單 outputParts 分段寫：每段只放這段行號範圍內的行（同一狀態、轉移在多段都出現就各段都寫），conflicts 放最後一段
+    $parts = @($inp['outputParts']); $skipLast = Test-FwOnce 'read-skip-part-once'
+    for ($pi = 0; $pi -lt $parts.Count; $pi++) {
+        $pt = $parts[$pi]; $from = [int]$pt['from']; $to = [int]$pt['to']
+        if ($skipLast -and $pi -eq $parts.Count - 1) { continue }
+        $o = New-PsSdObject; foreach ($k in @('schemaVersion', 'jobId', 'reader', 'round', 'source')) { $o[$k] = $r[$k] }
+        $ss = @(); $tt = @(); $oo = @()
+        foreach ($s in @($r['states'])) {
+            $ls = @(@($s['lines']) | Where-Object { [int]$_ -ge $from -and [int]$_ -le $to })
+            $rg = @(); foreach ($g in @($s['regions'])) { $gl = @(@($g['lines']) | Where-Object { [int]$_ -ge $from -and [int]$_ -le $to }); if ($gl.Count -gt 0) { $x = New-PsSdObject; $x['entity'] = $g['entity']; $x['lines'] = $gl; $rg += , $x } }
+            if ($ls.Count -gt 0 -or $rg.Count -gt 0) { $x = New-PsSdObject; foreach ($k in @($s.Keys)) { $x[[string]$k] = $s[$k] }; $x['lines'] = $ls; $x['regions'] = $rg; $ss += , $x }
+        }
+        foreach ($t in @($r['transitions'])) {
+            $ls = @(@($t['lines']) | Where-Object { [int]$_ -ge $from -and [int]$_ -le $to })
+            if ($ls.Count -gt 0) { $x = New-PsSdObject; foreach ($k in @($t.Keys)) { $x[[string]$k] = $t[$k] }; $x['lines'] = $ls; $tt += , $x }
+        }
+        foreach ($q in @($r['otherLines'])) {
+            $ls = @(@($q['lines']) | Where-Object { [int]$_ -ge $from -and [int]$_ -le $to })
+            if ($ls.Count -gt 0) { $x = New-PsSdObject; foreach ($k in @($q.Keys)) { $x[[string]$k] = $q[$k] }; $x['lines'] = $ls; $oo += , $x }
+        }
+        $o['states'] = $ss; $o['transitions'] = $tt; $o['otherLines'] = $oo; $o['conflicts'] = @()
+        if ($pi -eq $parts.Count - 1) { $o['conflicts'] = @($r['conflicts']) }
+        [System.IO.File]::WriteAllText((Join-Path $Root ([string]$pt['path'])), ((ConvertTo-PsKnJson -Value $o) + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    }
+    exit 0
 }
 if ($Kind -eq 'STATUS_ROUND2') {
     $truth = Read-FwJson (Join-Path $fx 'round2.json')
@@ -501,9 +528,25 @@ try {
     $conf = @($pubU.Docs['90-questions']['items'] | Where-Object { [string]$_['category'] -ceq 'STATUS_READING_CONFLICT' }).Count
     $callsU = Get-SdCalls $fxU
     Assert-Sd ($r.Code -eq 'DOC1-4-01' -and $r.Exit -eq 1 -and $conf -gt 0 -and -not (@($callsU) -like 'RESEARCH *')) ('第 2 輪仍無多數：不研究，發布 90 的 STATUS_READING_CONFLICT（' + $conf + ' 題）→ DOC1-4-01')
+
+    # ================= 解讀分段寫：缺段退回、一次寫完的 output.json 照收 =================
+    $fxP = New-SdRunFixtures 'gate' 'status-CASE_STATUS.md' @() @() $true 'parts'
+    $rootP = New-SdRunRoot 'parts'
+    [void](Invoke-SdRun $rootP $gComps $fxP)
+    Write-SdFx (Join-Path $rootP ('.ps-private/sdoc/' + $jobG + '/status.md')) $fxP.Text
+    $r = Invoke-SdRun $rootP $gComps $fxP 'read-skip-part-once,read-whole-R3' @{ MaxSessions = 4 }
+    $ocP = Get-SdOutcomes (Join-Path $rootP ('.ps-runtime/sdoc/' + $jobG))
+    $byReader = @{}; foreach ($e in $ocP) { $k = [string]$e.Input['workKey']; if (-not $byReader.ContainsKey($k)) { $byReader[$k] = @() }; $byReader[$k] += , $e }
+    $r1 = @($byReader['stage0/read/R1']); $r2 = @($byReader['stage0/read/R2']); $r3 = @($byReader['stage0/read/R3'])
+    $nParts = @($r1[0].Input['outputParts']).Count
+    $r2Dir = Join-Path $rootP ('.ps-runtime/sdoc/' + $jobG + '/attempts/' + $r2[0].Id)
+    $manP = [System.IO.File]::ReadAllText((Join-Path (Join-Path $rootP ('.ps-runtime/sdoc/' + $jobG + '/attempts/' + $r1[0].Id)) 'manifest.md'), [System.Text.Encoding]::UTF8)
+    Assert-Sd ($nParts -ge 5 -and $manP.Contains('分 ' + $nParts + ' 段寫') -and [System.IO.File]::Exists((Join-Path $r2Dir 'output-part-01.json')) -and [System.IO.File]::Exists((Join-Path $r2Dir ('output-part-' + $nParts.ToString('00') + '.json'))) -and [System.IO.File]::Exists((Join-Path $r2Dir 'output.json')) -and [string]$r2[0].Outcome['status'] -ceq 'ACCEPTED') ('分段寫：工單與 manifest 列出 ' + $nParts + ' 段；各段原樣留在 attempt、合併成 output.json 後驗收通過')
+    Assert-Sd ($r1.Count -eq 2 -and [string]$r1[0].Outcome['status'] -ceq 'INVALID' -and $r1[0].Outcome['counted'] -eq $true -and (@($r1[0].Outcome['findings']) -join ' ') -like ('*第 ' + $nParts + ' 段沒有寫*') -and [string]$r1[1].Outcome['status'] -ceq 'ACCEPTED') '分段寫：少寫一段 → INVALID（指出第幾段），重派後通過' ((@($r1[0].Outcome['findings']) -join ' ') + ' / ' + $r.Code)
+    Assert-Sd ($r3.Count -eq 1 -and [string]$r3[0].Outcome['status'] -ceq 'ACCEPTED') '分段寫：讀者一次寫完 output.json 也照收'
 }
 finally {
-    $env:PS_CLI = $priorEnv.Cli; $env:PS_SDOC_TEST_LIB = $priorEnv.Lib; $env:PS_SDOC_TEST_FIXTURES = $priorEnv.Fx; $env:PS_SDOC_TEST_MODE = $priorEnv.Mode
+    $env:PS_CLI = $priorEnv.Cli; $env:PS_SDOC_TEST_LIB = $priorEnv.Lib; $env:PS_SDOC_TEST_FIXTURES = $priorEnv.Fx; $env:PS_SDOC_TEST_MODE = $priorEnv.Mode; $env:PS_SDOC_READING_PART_LINES = $priorEnv.Part
     if ($env:PS_SDOC_TEST_KEEP) { Write-Host ('保留測試目錄：' + $base) } else { try { Remove-Item -LiteralPath $base -Recurse -Force } catch { Write-Host ('無法刪除測試目錄：' + $base) } }
 }
 Write-Host ('sdoc run tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)

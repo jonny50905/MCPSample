@@ -1055,6 +1055,18 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 - 卡在模型端時要問 IT 的：gateway 對這個端點的逾時秒數、能否拉到 10 分以上（Claude Code 單次請求最多等 10 分）、是否串流直通、
   尖峰時段的容量或排隊限制。只給狀態碼、次數與時間，不給內容。
 
+### 狀態圖解讀分段寫出
+
+第 0 階段每位讀者把解讀分段寫：外環把 status.md 的 Mermaid 行切成幾段（只在區塊與區塊之間切，單一區塊太大才在行與行之間切），
+工單 input.json 的 `outputParts` 與 manifest 列出每段的行號範圍與檔名（inbox 的 `output-part-NN.json`），讀者一段寫一個檔，
+外環合併後照原本的規則驗收。目的：一次回應不要太長（公司 gateway 下約每秒 30～40 token，整份解讀一次寫完要好幾分鐘，中途斷一次就整段重來）。
+
+- 每段的 Mermaid 行上限預設 60；要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '40'`（5～1000），
+  只影響這個視窗。
+- 各段原樣留在 attempt 目錄（`output-part-NN.json`），合併後的整份是同目錄的 `output.json`。
+- 少寫一段、某段不是合法 JSON、某段的 reader／指紋和第一段不同、同一狀態的 final 或同一轉移的 scenario 各段不一致：整份 INVALID，
+  findings 指出第幾段；讀者若一次寫完 `output.json`（沒有分段）也照收。
+
 ### 維護驗證
 
 `test-sdoc.ps1`、`test-sdoc-assemble.ps1`、`test-sdoc-run.ps1`（合成 worker 端到端，PS 7 約 5 分鐘）、`test-claude-variant.ps1`、
@@ -1066,7 +1078,10 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 - 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude-*of*.txt` 各份解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
   再把 `docs/design/spec-schema-framework` 複製進去，跑三支 sdoc 測試與第一次 `ps-sdoc.ps1`；測試比對檔案內容一律不比換行。
 - 真 Windows PowerShell 5.1：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`）在 Windows runner 以 `powershell.exe`
-  跑上述測試與部署版面演練；推到 `claude/**` 且動到 scripts、claude-code、設計範例或搬運包時自動跑，也可在 Actions 頁手動觸發。
+  跑上述測試與部署版面演練，一輪約 20 分鐘，所以不是每次推都跑（只限動到 scripts、claude-code、設計範例、搬運包或工作流程本身）：
+  推到 `main` 一定跑（公司機拿的版本）；推到 `claude/**` 只有 head commit 訊息含 `[ps51]` 才跑（PS 7 本機測試證明不了 5.1 行為的改動才加：
+  編碼、檔案共用、cmd.exe／Start-Process、JSON 解析、文化設定、腳本新用到的 .NET API）；也可在 Actions 頁手動觸發。
+  其他推送會開一筆 run，但兩個 job 立刻略過。平常以本機 PS 7 測試與 5.1 靜態守衛為準，不等 CI。
   新增測試要加進工作流程的清單；`test-oracle-runtime.ps1` 需要真 OpenCode session，不放進去。
 - 5.1 相容的靜態檢查：除 `test-ps51-static.ps1` 外，可用 PSScriptAnalyzer 的 PSUseCompatibleSyntax／Commands／Types 規則配 Windows PowerShell 5.1
   設定檔（模組內附 `compatibility_profiles`）；它查不到預設編碼、ConvertFrom-Json 行為、原生命令 stderr、排序文化、路徑分隔這類語意差異。

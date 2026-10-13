@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c6e1698）第 2／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit e906726）第 2／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|c6e1698|48f7ce7e6bdecc1b|2|7|5836|74737c538f3ce82cd59807f3e7f057a08878a4fe21483e3e96fa96ea98b27262
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3810|cc9c10a36d6caa6a70f4a9ca691f14b5dcbe50b4ab44d4f2f5cca4883aaf9cf2|0
+@@@PSBUNDLE-PART|1|opencode|e906726|32a2fb76d7da8ac9|2|7|5862|04a9e60ddb73442c30c46e74ebeed12a15e2ed8167f5c302555e148b2cec1829
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3836|2fad64911dfb505c8debe120ce661a532d01214ea99a4a9a21a39465d79ec720|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -3812,6 +3812,32 @@
   其餘 test-sdoc、test-sdoc-assemble、test-auto-loop、test-spec、test-spec-build、test-bundle、5.1 靜態守衛照舊全過。
 - 教訓：外環判讀「卡死還是跑得久」不能只看輸出檔有沒有變大——CLI 自己的重試也會寫輸出。要讀 CLI 明確寫出的事件
   （重試、狀態碼、是否恢復），並把分類記進 outcome，讓人不用等下一輪逾時就能決定調上限還是找 IT。
+
+### L141 一次回應太長就容易被打斷——狀態圖解讀分段寫出；Windows 5.1 CI 改成需要時才跑（2026-10-13）
+
+- 症狀：L140 之後追數字：公司機的 status.md 371 行、18 KB、8 個 Mermaid 區塊（範例 52～75 行），三位讀者都沒寫出 output.json。
+  依範例比例，整份解讀約 40 KB、1 萬多 token，要在同一次回應的一個 Write 寫完。直接量長回應：數到 1000 花 96 秒；數到 4000
+  一次 50 秒就失敗，重跑成功時約 1.27 萬輸出 token、352 秒（約每秒 36 token）。互動時也常見等好幾分鐘後
+  `Connection lost mid-response`（gateway 在回應中途結束連線；Claude Code 不重試，已寫的部分可能遺失）。
+- 根因：長回應本身傳得完，但要好幾分鐘；這段時間只要遇到一次 504 或斷線就整段重來，第 0 階段的讀者每次都卡在這一步。
+- 落點：
+  - `scripts/ps-sdoc-status-lib.ps1`：`Get-PsSdReadingParts` 把 Mermaid 行分段（只在區塊之間切，單一區塊超過上限才在行之間切，
+    剩下的行與後面的小區塊同段；上限 `$script:PsSdReadingPartLines`＝60）；`Merge-PsSdReadingParts` 依「實體＋狀態碼」「實體＋起訖」
+    合併各段（lines、regions、via、labels 聯集，name 取最早，final、scenario 要一致），otherLines、conflicts 串接；缺段、非物件、
+    表頭不一致會報第幾段。
+  - `scripts/ps-sdoc.ps1`：STATUS_READ 的工單加 `outputParts`（part、from、to、mermaidLines、path），manifest 列出每段；圍欄允許
+    各段檔與 output.json；各段原樣存進 attempt、合併成 output.json 後照原規則驗收；讀者若一次寫完 output.json 也照收。
+    `PS_SDOC_READING_PART_LINES`（5～1000）可覆寫上限。
+  - `claude-code/.claude/peoplesoft/sdoc/status-reading-contract.md` 加「分段寫出」；`ps-status-reader` 改成依 outputParts 寫、每寫完一個
+    檔就讀回確認；hook 的 status-reader 寫入白名單加 `inbox/output-part-[0-9][0-9].json`。
+  - `.github/workflows/ps51-tests.yml`：一輪約 20 分鐘，改成推到 main、分支 head commit 訊息含 `[ps51]` 或手動觸發才跑兩個 job，
+    其他推送立刻略過（管理者要求：不要每次都等）。SOP-28、HANDOFF、claude-code/README 同步。
+- 驗證：test-sdoc 加 12 項（分段上限、每行恰落一段、大區塊切法、沒有圖、三份範例解讀切成 7 段再合回來逐行交代照樣通過且筆數不變、
+  同一狀態 lines 聯集、單段原樣、缺段、表頭不一致、非陣列、final／scenario 不一致）；test-sdoc-run 的假讀者改成照 outputParts 分段寫
+  （測試把上限設 8，貫穿範例與守門範例都走多段合併），全流程照樣跑到 REVIEW_READY 並與範例相同，另加缺段退回後重派通過、
+  一次寫完 output.json 照收；test-claude-variant 加 hook 放行分段檔、擋其他檔名。
+- 教訓：模型一次產出的長度要跟傳輸路徑的可靠度一起設計：長輸出拆成幾次短回應，失敗只重來一小段；拆法由外環決定、
+  合併與檢查也在外環，模型只照工單逐段寫。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -5837,4 +5863,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-PART-END|48f7ce7e6bdecc1b|2|7
+@@@PSBUNDLE-PART-END|32a2fb76d7da8ac9|2|7

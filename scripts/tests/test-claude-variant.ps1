@@ -315,6 +315,7 @@ try {
     Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：讀其他讀者的解讀 → 擋（三位讀者互相隔離）"
     Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/wiki/X.md'))) "path status-reader：讀研究知識 → 擋（只看 STATUS 檔）"
     Assert (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output.json')) "path status-reader：寫 inbox/output.json → 放行"
+    Assert ((Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output-part-03.json')) -and -not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output-part-x.json')) -and -not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/manifest.md'))) "path status-reader：寫分段檔 inbox/output-part-NN.json → 放行；其他檔名 → 擋"
     Assert (-not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：寫 attempt 目錄 → 擋"
     Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'attempts/a0004/manifest.md')) "path sdoc-worker：讀工單 → 放行"
     Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'work/r0001/citeable.md')) "path sdoc-worker：讀可引用清單 → 放行"
