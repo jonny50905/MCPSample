@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit df83c1b）第 6／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 6f598dc）第 6／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|df83c1b|14db2ab287324588|6|6|2660|91d33109fcb55c9a434d9920337210b1f28688ac8273bc0f1ceea9c4d3a83964
+@@@PSBUNDLE-PART|1|claude|6f598dc|70e4e853264ab569|6|6|2660|b22e61e747485bdaf67701eaaf0663d4a6a47431897154c1a3506ae666bb6176
 @@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1661,10 +1661,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|dc00716047b2db7df0b249ca130dda37e77d2583c8036a821dbd8987dc2e69c8|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|c5617d4d23214e3cd9d6d0d8a55bdf51b555845d39bc502ab7389c8820b020f7|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "df83c1b",
+  "commit": "6f598dc",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -2660,5 +2660,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|148|220dc9ef1435205559acffc4ebf8c99eb3b959a4578208461891fb1aae7a14bb
-@@@PSBUNDLE-PART-END|14db2ab287324588|6|6
+@@@PSBUNDLE-EOF|148|4364c179c128cc9601c2917d89bf29798f07c888aedb785f9afb87ec39297332
+@@@PSBUNDLE-PART-END|70e4e853264ab569|6|6

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit df83c1b）第 4／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6f598dc）第 4／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|df83c1b|c1a15d5658105fb1|4|8|7292|e09adbe957badda2a00b58b57a25de78228224793c609ac86046a696b0539234
+@@@PSBUNDLE-PART|1|opencode|6f598dc|99a790981cab40e1|4|8|7292|e09adbe957badda2a00b58b57a25de78228224793c609ac86046a696b0539234
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/support-codes.md|210|bd1636db6bfa690f805d231ae9e45b871061e71af90c30868237033de2c0faf3|0
 # 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1）
 
@@ -7293,4 +7293,4 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-PART-END|c1a15d5658105fb1|4|8
+@@@PSBUNDLE-PART-END|99a790981cab40e1|4|8

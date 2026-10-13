@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit df83c1b）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6f598dc）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|df83c1b|c1a15d5658105fb1|2|8|7320|6a7fa2aaa73f7d7ad00d446d7159195248bf1f9faaf4f4c16f1bb9b0322c7d3d
+@@@PSBUNDLE-PART|1|opencode|6f598dc|99a790981cab40e1|2|8|7320|6a7fa2aaa73f7d7ad00d446d7159195248bf1f9faaf4f4c16f1bb9b0322c7d3d
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3910|11c5bb799d009c8b2b311dbf680b060d3e3c1eab14653752bc3d918374f1b2c5|0
 # 教訓歸檔（applied）
 
@@ -7321,4 +7321,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   "nextCursor": ""
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/operations.json
-@@@PSBUNDLE-PART-END|c1a15d5658105fb1|2|8
+@@@PSBUNDLE-PART-END|99a790981cab40e1|2|8

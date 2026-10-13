@@ -43,7 +43,7 @@ chat.message 的 messageID 集合＝export 真實題目 id 集合；task before 
 | 檔 | 驗什麼 | 跑法 |
 |---|---|---|
 | `run-clone-smoke.mjs` | `/ps-spec`（ps-spec-author）只准 `powershell -NoProfile -File scripts/ps-sdoc.ps1 -Cli opencode …`（舊的 ps-spec-build 與漏了 `-Cli opencode` 的命令都擋）、`-Status` 回 DOC1-0-01；`/ps-clone-batch`（ps-clone-worker）只寫 packet.json | `OPENCODE_BIN=<binary> node tests/runtime-guard/run-clone-smoke.mjs` |
-| `run-sdoc-smoke.mjs` | Spec 文件外環的四個 agent（ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）照外環的叫法 `opencode run --agent <名> --model <model> "<jobId>/<attemptId>"` 啟動：沒有退回預設 agent、回覆來自 `--model`；read／write 權限只放行工單範圍（讀者讀不到 attempt 的標準答案與研究、只寫 inbox/output.json，狀態圖讀者只寫 output-part-NN.json／output.json）；看得到的工具（讀者與判定只有 read／write＋共用 edit 權限的 edit）；`OPENCODE_DISABLE_CLAUDE_CODE=1` 時不載入 `~/.claude/CLAUDE.md` | `OPENCODE_BIN=<binary> node tests/runtime-guard/run-sdoc-smoke.mjs` |
+| `run-sdoc-smoke.mjs` | Spec 文件外環的四個 agent（ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）照外環的叫法 `opencode run --agent <名> --model <model> "<jobId>/<attemptId>"` 啟動：沒有退回預設 agent、回覆來自 `--model`；read／write 權限只放行工單範圍（讀者讀不到 attempt 的標準答案與研究、只寫 inbox/output.json，狀態圖讀者只寫 output-part-NN.json／output.json）；看得到的工具（讀者與判定只有 read／write＋共用 edit 權限的 edit）；`OPENCODE_DISABLE_CLAUDE_CODE=1` 時不載入 `~/.claude/CLAUDE.md`；專案是 git repo、`.ps-runtime/`／`.ps-private/` 在 .gitignore 裡照樣讀寫 | `OPENCODE_BIN=<binary> node tests/runtime-guard/run-sdoc-smoke.mjs` |
 
 取得 binary（沙箱）：`npm pack opencode-linux-x64@1.18.29` 解開後 `package/bin/opencode`。PATH 上要有 `powershell`（沙箱用 pwsh 的同名連結）。
 e2e 每個 run 類情境約 12～30 秒（含臨時 XDG 目錄的首次初始化），serve 類 35～80 秒；`--keep` 保留工作目錄

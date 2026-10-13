@@ -51,6 +51,9 @@ if (process.argv[2] === '--model') {
   for (const name of ['.opencode', 'scripts']) fs.cpSync(path.join(repo, name), path.join(project, name), { recursive: true, filter: p => !/[\\/]node_modules(?:[\\/]|$)/.test(p) })
   fs.copyFileSync(path.join(repo, 'AGENTS.md'), path.join(project, 'AGENTS.md'))
   const write = (p, text) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text) }
+  // 公司機的專案資料夾是 git repo，執行狀態與人工輸入都在 .gitignore 裡：讀寫照樣要能用
+  write(path.join(project, '.gitignore'), '.ps-private/\n.ps-runtime/\ndocs/ps-spec-opencode/\n')
+  spawnSync('git', ['init', '-q'], { cwd: project })
   // 合成的 OpenCode 版工作目錄（*-opencode）；家目錄另放 Claude Code 的 ~/.claude/CLAUDE.md，外環以 OPENCODE_DISABLE_CLAUDE_CODE=1 啟動時不該被載入
   const job = 'clone-0000000000000000'
   const rt = path.join(project, '.ps-runtime/sdoc-opencode', job)
