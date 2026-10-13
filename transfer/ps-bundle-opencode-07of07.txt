@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 48578f1）第 7／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit d5f6d6f）第 7／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|48578f1|d56e05bb7ff1f7bb|7|7|5187|44d12c5e9e387c6e0c1a9e6d703622d2215e17332e72962cd151e782d438fce4
+@@@PSBUNDLE-PART|1|opencode|d5f6d6f|cef7dc63285891d9|7|7|5188|7da156246dd0d1c97c4ae8024420f56232154215841b8f11ef94ceb99f798149
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|338|dc18bdc60f9607362f1b474ceb11c3b35974bd142221ac361b132e056f3cee76|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4370,10 +4370,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|d6435d34acb05c4feb117fd4ffc44ee9f1183500252b55052ea21b5729eca280|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|b42587304787a0cb55919d7ce16069736375b9cf31dd62021d0eac54c4f08b11|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "48578f1",
+  "commit": "d5f6d6f",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -5056,7 +5056,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|129|99f19fee1318a20c358b1c4b840f3a14b5f9583173c7b36da45bcece0a003f4c|0
+@@@PSBUNDLE-FILE|AGENTS.md|130|a5b6ba1db1616043a6ee488b2f7591bbe4e0142098021840131a2b6c1c5df00b|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -5134,7 +5134,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-13 再由 `claude/brave-dirac-4q469u` 快轉併入
-   ——狀態圖解讀分段寫出、Windows 5.1 CI 改成需要時才跑（L141），併入前 `main` 頭 `e906726`；
+   ——ps-sdoc 的 Component 用空白分開不再誤塞給 -TimeoutMin（L142），併入前 `main` 頭 `48578f1`；
+   同日稍早同一分支併入狀態圖解讀分段寫出、Windows 5.1 CI 改成需要時才跑（L141），併入前 `main` 頭 `e906726`；
    同日稍早同一分支併入模型端 504 判讀、session 上限預設 60 分、ps-spec-author 每次一個 session（L140），併入前 `main` 頭 `cf42295`；
    2026-10-12 同一分支併入搬運包分份（L139），併入前 `main` 頭 `a9abd37`；同日稍早同一分支併入 issue #37 Claude Code 版 Spec 文件流程與
    Windows PowerShell 5.1 CI，併入前 `main` 頭 `baae9f9`；再之前由 `claude/peoplesoft-framework-handover-0u6b5g`
@@ -5187,5 +5188,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|112|fc966f40e1388ada1549c5209b2e52bde234d95b07439a4c2c44131b49fd9b0e
-@@@PSBUNDLE-PART-END|d56e05bb7ff1f7bb|7|7
+@@@PSBUNDLE-EOF|112|b89fd522c6745f72b54d18b6d1e0b8a3d66b3ca81fe3aaccab0227f7328354fa
+@@@PSBUNDLE-PART-END|cef7dc63285891d9|7|7
