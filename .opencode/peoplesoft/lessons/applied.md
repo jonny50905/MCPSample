@@ -3909,5 +3909,9 @@
   可見工具、不載入 ~/.claude/CLAUDE.md）；run-clone-smoke 的 `/ps-spec` 改驗 DOC1 命令形狀；test-claude-variant（兩版 sdoc 一一對應、資料檔逐字相同、契約標題相同）；
   test-bundle（model.yaml 保留本機、無基準不覆寫）；既有測試原樣全過；`claude-code/` 一個檔都沒改。CI：repo 版面加 `-Only opencode`，部署版面改兩個 job
   （Claude Code 版照舊、OpenCode 版搬運包解開後跑 test-sdoc、`-Only opencode` 與第一次 ps-sdoc）。
-- 待公司機驗：model.yaml 填的 provider／model 能否被 `opencode models` 列出；小模型照契約寫出合格解讀與研究包的比例（不合格兩次就 BLOCKED）；同資料夾兩版並存時的 fs-doctor。
+- 同資料夾兩版並存時的 fs-doctor（本機模擬：空資料夾先解上一次交接的 Claude Code 版搬運包，再解這次的 OpenCode 版）：ps-bundle 新增 118／更新 10（共用 scripts）／
+  衝突 0；ps-fs-doctor 依 `.claude/peoplesoft` 認成 Claude Code 版、照它舊的 manifest 把 10 支共用 scripts 報「版本不符」（M），`PS_CLI=opencode` 時全一致。
+  再解這次的 Claude Code 版搬運包：更新 1（只有它的 manifest）／相同 147，兩版的 fs-doctor 都一致；ps-claude-doctor 照樣認成 Claude Code 版。
+  所以同資料夾時兩版搬運包都要解、交接清單兩包都列（SOP-29 第 1 步、AGENTS.md）。
+- 待公司機驗：model.yaml 填的 provider／model 能否被 `opencode models` 列出；小模型照契約寫出合格解讀與研究包的比例（不合格兩次就 BLOCKED）。
 - 教訓：做備案時把「換什麼」收斂到最少——同一個外環與契約、獨立的狀態目錄、一個設定檔；用「同一份輸入兩版產出逐位元相同」證明只換了前端。

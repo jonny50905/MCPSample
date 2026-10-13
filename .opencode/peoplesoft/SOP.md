@@ -1102,6 +1102,10 @@ Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的�
 
 □ 1. 搬運：OpenCode 版搬運包（`transfer/ps-bundle-opencode-01ofNN.txt`…，SOP-27）。可以解在 Claude Code 版的同一個資料夾
      （`scripts/**` 兩版共用、`.claude/` 不受影響；研究知識 `docs/ps-research`、狀態圖都在原地），也可以另開資料夾。
+     同一個資料夾時，同一次交接的 Claude Code 版搬運包也要解：有 `.claude/` 的資料夾 ps-fs-doctor 照 Claude Code 版的 manifest 檢查，
+     只解 OpenCode 版會把更新過的共用 scripts 報成「版本不符」（M）；兩包都解之後兩版都一致（沒改的 `.claude/`、`CLAUDE.md` 顯示「相同」）。
+     OpenCode 版那邊的檢查：`$env:PS_CLI = 'opencode'` 後再跑 ps-fs-doctor（檢查完關掉這個視窗或 `Remove-Item Env:PS_CLI`）。
+     另開資料夾只解 OpenCode 版；研究知識 `docs\ps-research` 要另外複製過去。
 □ 2. **唯一要填的地方**：`.opencode/peoplesoft/sdoc/model.yaml` 的 `model` 那一行，寫 `<provider>/<model>`，照
      `opencode models <provider>` 列出的原樣（大小寫、冒號、斜線照抄）。預設先放小模型 `anthropic/claude-haiku-4-5`。
      provider 的連線（網址、金鑰）在 OpenCode 自己的全域 `opencode.json`，不寫進 repo。狀態圖讀者、研究、覆核、乾淨讀者、判定的

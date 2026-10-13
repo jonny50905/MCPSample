@@ -13,7 +13,8 @@
   （資料檔逐字相同）；OpenCode 版 `/ps-spec`＋ps-spec-author 改走 DOC1（CLONE1 改成直接跑 ps-spec-build.ps1）。操作 SOP-29。
 - `claude-code/` 一個檔都沒動（含給人看的 claude-code/README.md——它的對照表仍寫 DOC1「本版獨有」，依管理者「不可以改到 Claude 版」刻意不改）。
   共用的 `scripts/` 有改（ps-sdoc／ps-session-lib／ps-bundle／ps-agent-doc-lint 與測試），Claude Code 路徑的行為不變：既有測試原樣全過，
-  同一份合成 worker 輸出兩版發布的文件逐位元相同。公司機的 Claude Code 資料夾不必重搬；備案另搬 OpenCode 版搬運包（同資料夾或另開資料夾都可）。
+  同一份合成 worker 輸出兩版發布的文件逐位元相同。Claude Code 版的檔不用換；備案另搬 OpenCode 版搬運包（同資料夾或另開資料夾都可）。
+  同資料夾時同一次交接的 Claude Code 版搬運包也要解（本機模擬：只更新它的 manifest 一個檔；不解的話 ps-fs-doctor 會把共用 scripts 報「版本不符」）。
   同資料夾時搬進來的 `AGENTS.md` 不影響 Claude Code 版：實測 Claude Code 2.1.296 有 `CLAUDE.md` 就只讀 `CLAUDE.md`（SOP-29、L145）。
 - 待公司機回報：model.yaml 填的 provider 能否被 `opencode models` 列出、小模型跑第 0 階段與研究的合格率（結論碼與兩行計數）。
 

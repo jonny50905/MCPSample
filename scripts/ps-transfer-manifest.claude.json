@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "4ae231a",
+  "commit": "3bc2a84",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
