@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit cf42295）第 4／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c6e1698）第 4／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|cf42295|b9c0139367a827df|4|7|7373|c0f473562a8d658ec34fce5314fb07a350ba5f5b1e5c98e0877686cefd03fe0f
+@@@PSBUNDLE-PART|1|opencode|c6e1698|48f7ce7e6bdecc1b|4|7|7373|c0f473562a8d658ec34fce5314fb07a350ba5f5b1e5c98e0877686cefd03fe0f
 @@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2645|e32c9c7d8323cb9a0b203df981cb716f81949dd44d13d78cd082e0ede1321f0a|1
 # ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
 # 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
@@ -7374,4 +7374,4 @@ function Get-PsSdSpeculationWarnings {
     return , $v.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-check-lib.ps1
-@@@PSBUNDLE-PART-END|b9c0139367a827df|4|7
+@@@PSBUNDLE-PART-END|48f7ce7e6bdecc1b|4|7

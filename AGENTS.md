@@ -74,8 +74,9 @@
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-10-12 再由 `claude/brave-dirac-4q469u` 快轉併入
-   ——搬運包分份（L139），併入前 `main` 頭 `a9abd37`；同日稍早同一分支併入 issue #37 Claude Code 版 Spec 文件流程與
+4. **維護版線**：`main` 是正式版線（最近一次：2026-10-13 再由 `claude/brave-dirac-4q469u` 快轉併入
+   ——模型端 504 判讀、session 上限預設 60 分、ps-spec-author 每次一個 session（L140），併入前 `main` 頭 `cf42295`；
+   2026-10-12 同一分支併入搬運包分份（L139），併入前 `main` 頭 `a9abd37`；同日稍早同一分支併入 issue #37 Claude Code 版 Spec 文件流程與
    Windows PowerShell 5.1 CI，併入前 `main` 頭 `baae9f9`；再之前由 `claude/peoplesoft-framework-handover-0u6b5g`
    快轉而來；更早接續自 `claude/review-implement-requirement-svqhqt` 的 `67e9b36`）。
    新的維護 session 從 `main` 頭開自己的分支，交接時併回 `main` 並**回來更新本行**；
