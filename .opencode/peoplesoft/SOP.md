@@ -1134,6 +1134,8 @@ Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的�
 
 - 兩版同一資料夾並存：jobId 相同，但目錄分開、各有自己的研究版本，互不覆蓋；換來換去不會讓另一版重開研究版本。
   同一台機器同一時間只跑一個 headless session（session slot）：另一版正在跑時會停在 DOC1-3-03，錯開時間再跑。
+- 同一資料夾有 `CLAUDE.md` 時，Claude Code 只讀 `CLAUDE.md`、不讀 OpenCode 版帶進來的 `AGENTS.md`（沒有 `CLAUDE.md` 時才讀 `AGENTS.md`）：
+  Claude Code 版的指引不變。Claude Code 的 `/config` 把 Project instructions 改成 `claude-md-and-agents-md` 才會兩個都讀——公司機保持預設。
 - 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：不載入家目錄 `~/.claude/CLAUDE.md` 與 `.claude/skills`
   （公司機也裝了 Claude Code，不讓兩邊的設定混在一起）。只在 ps-sdoc 這個行程內，跑完還原。
 - 自己開 OpenCode 對話（TUI）時，同一資料夾的 `.claude/skills` 會和 `.opencode/skills` 同名；要在同一資料夾開對話，先在同一個

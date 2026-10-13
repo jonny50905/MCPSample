@@ -107,7 +107,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   `claude-code/` 去前綴的 `CLAUDE.md`／`.claude/**`，manifest `scripts/ps-transfer-manifest.claude.json`，每列 `repo` 欄＝GitHub 位置）。
   改模型讀的規則時兩版對應檔都要改（Claude Code 版只換機制用語）；`scripts/tests/test-claude-variant.ps1` 驗兩版檔案一一對應。
   管理者要兩版並行時（OpenCode 版的 Spec 文件流程當 Claude Code 版的備案），另搬 OpenCode 版搬運包；可以解在同一個資料夾
-  （`scripts/**` 兩版共用、`.claude/` 不動），也可以另開資料夾。
+  （`scripts/**` 兩版共用、`.claude/` 不動；有 `CLAUDE.md` 時 Claude Code 不讀 `AGENTS.md`），也可以另開資料夾。
 - **搬運包（優先）**：`ps-fs-doctor -WriteManifest` 會把每版要搬的檔收成幾份文字檔（每份約 500 KB 以內，只在檔與檔之間切）
   `transfer/ps-bundle-opencode-01ofNN.txt`…／`transfer/ps-bundle-claude-01ofNN.txt`…，公司機把各份放進同一個資料夾，以
   `scripts\ps-bundle.ps1 -Bundle <資料夾>` 解開（逐份驗證、整包驗證、三方比對保留本機改過的檔、衝突另存 `.incoming`）。

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6f598dc）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 4ae231a）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|6f598dc|99a790981cab40e1|8|8|2761|5949d2be3322a8f63e44bf1055d80c8c367b464610fb51b2ed2ec9627d1f2685
+@@@PSBUNDLE-PART|1|opencode|4ae231a|f18a890d0fee81f9|8|8|2761|6863b3e09a29fdcdc6da1fe14b4ec65278a133928cd2ff11491a9caf8c8c4847
 @@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1661,10 +1661,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|954|5ac43dae9dc55358ce6b1c6c533b1f65f7e45d467db167009398b9455a58ad3c|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|954|ea540d0d2f8b7c89d5a58d8ad52fb3007e4ff7ff698ae46bcd09aebac6753d7c|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "6f598dc",
+  "commit": "4ae231a",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -1866,8 +1866,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3910,
-      "sha256": "11c5bb799d009c8b2b311dbf680b060d3e3c1eab14653752bc3d918374f1b2c5",
+      "lines": 3913,
+      "sha256": "f5e9e65ced8e2bd30dd2afb0f9a5ac934b6529b0b152fb273cf8e1d12dee05f1",
       "bom": false
     },
     {
@@ -2184,8 +2184,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1153,
-      "sha256": "7089260c9d9e405467ef60c9f0cd203eacc486e6c559092ed119e48654463fb4",
+      "lines": 1155,
+      "sha256": "7b805a47b58b74f366685355d6d440cbf872ed37e2bbbc897fb45e51a24ea740",
       "bom": false
     },
     {
@@ -2617,7 +2617,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|142|ad62bb06acea58cb2c3eaf95c5009c7b20afcf8a14c128a5d1adcf5bd70d2307|0
+@@@PSBUNDLE-FILE|AGENTS.md|142|a6c907c2d5ef936bb5581a0a9fa3c7d09e57640471993e72dd67a91706af6214|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -2727,7 +2727,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   `claude-code/` 去前綴的 `CLAUDE.md`／`.claude/**`，manifest `scripts/ps-transfer-manifest.claude.json`，每列 `repo` 欄＝GitHub 位置）。
   改模型讀的規則時兩版對應檔都要改（Claude Code 版只換機制用語）；`scripts/tests/test-claude-variant.ps1` 驗兩版檔案一一對應。
   管理者要兩版並行時（OpenCode 版的 Spec 文件流程當 Claude Code 版的備案），另搬 OpenCode 版搬運包；可以解在同一個資料夾
-  （`scripts/**` 兩版共用、`.claude/` 不動），也可以另開資料夾。
+  （`scripts/**` 兩版共用、`.claude/` 不動；有 `CLAUDE.md` 時 Claude Code 不讀 `AGENTS.md`），也可以另開資料夾。
 - **搬運包（優先）**：`ps-fs-doctor -WriteManifest` 會把每版要搬的檔收成幾份文字檔（每份約 500 KB 以內，只在檔與檔之間切）
   `transfer/ps-bundle-opencode-01ofNN.txt`…／`transfer/ps-bundle-claude-01ofNN.txt`…，公司機把各份放進同一個資料夾，以
   `scripts\ps-bundle.ps1 -Bundle <資料夾>` 解開（逐份驗證、整包驗證、三方比對保留本機改過的檔、衝突另存 `.incoming`）。
@@ -2761,5 +2761,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|157|54f11e3417f2cf36a00858a58b7c666d65fa04e6d8df9b69fc7244cab881bd0c
-@@@PSBUNDLE-PART-END|99a790981cab40e1|8|8
+@@@PSBUNDLE-EOF|157|4604aa274d03d21b370e50b3add62df66270a1886273b88603bdaa72ce53ea3d
+@@@PSBUNDLE-PART-END|f18a890d0fee81f9|8|8

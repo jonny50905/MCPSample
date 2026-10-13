@@ -14,6 +14,7 @@
 - `claude-code/` 一個檔都沒動（含給人看的 claude-code/README.md——它的對照表仍寫 DOC1「本版獨有」，依管理者「不可以改到 Claude 版」刻意不改）。
   共用的 `scripts/` 有改（ps-sdoc／ps-session-lib／ps-bundle／ps-agent-doc-lint 與測試），Claude Code 路徑的行為不變：既有測試原樣全過，
   同一份合成 worker 輸出兩版發布的文件逐位元相同。公司機的 Claude Code 資料夾不必重搬；備案另搬 OpenCode 版搬運包（同資料夾或另開資料夾都可）。
+  同資料夾時搬進來的 `AGENTS.md` 不影響 Claude Code 版：實測 Claude Code 2.1.296 有 `CLAUDE.md` 就只讀 `CLAUDE.md`（SOP-29、L145）。
 - 待公司機回報：model.yaml 填的 provider 能否被 `opencode models` 列出、小模型跑第 0 階段與研究的合格率（結論碼與兩行計數）。
 
 **目前優先入口（2026-09-20）**：管理者要的不是先手填私有 pack，而是輸入一個或多個 Component，

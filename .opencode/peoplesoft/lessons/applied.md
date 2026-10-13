@@ -3893,6 +3893,9 @@
     .opencode 路徑）。`/ps-spec`＋ps-spec-author 改走 DOC1（bash 只准 `powershell -NoProfile -File scripts/ps-sdoc.ps1 -Cli opencode *`）；CLONE1 改成直接跑 ps-spec-build.ps1。
   - 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：實測 OpenCode 1.18.29 會把家目錄 `~/.claude/CLAUDE.md` 併進系統提示、也掃 `.claude/skills`
     （公司機裝了 Claude Code，兩邊設定會混）；設了就不載入（smoke 有正反對照）。
+  - 反方向：同資料夾的 `AGENTS.md` 不進 Claude Code 版。實測 Claude Code 2.1.296（兩個暫存資料夾各放標記字）：`CLAUDE.md` 與 `AGENTS.md` 都在時只讀到
+    `CLAUDE.md` 的標記；只有 `AGENTS.md` 時讀到它的標記（證明這版本會讀 AGENTS.md，前一項才有意義）。預設 claude-md-or-agents-md；改成
+    claude-md-and-agents-md 才兩個都讀（SOP-29 記下）。
   - OpenCode 版 profile 沒填 oracle.connectionName 時只提醒（同資料夾 Claude Code 版填好了就給整份複製的命令），不擋。
 - OpenCode 1.18.29 實測（binary 內的實作與真跑）：permission 的萬用字元只有 `*`、`?`，`[0-9]` 是字面（分段檔改寫 `output-part-??.json`），比對區分大小寫、
   路徑是相對 worktree；write 與 edit 共用 edit 權限（開 write 就看得到 edit，只能改放行的檔）；grep／glob 權限比對的是搜尋字樣不是路徑——乾淨讀者與判定

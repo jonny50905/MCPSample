@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6f598dc）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 4ae231a）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|6f598dc|99a790981cab40e1|2|8|7320|6a7fa2aaa73f7d7ad00d446d7159195248bf1f9faaf4f4c16f1bb9b0322c7d3d
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3910|11c5bb799d009c8b2b311dbf680b060d3e3c1eab14653752bc3d918374f1b2c5|0
+@@@PSBUNDLE-PART|1|opencode|4ae231a|f18a890d0fee81f9|2|8|7323|f9d4cee931cdfa010f48bc89409f3bce1525837667519770df26af70a03cb470
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3913|f5e9e65ced8e2bd30dd2afb0f9a5ac934b6529b0b152fb273cf8e1d12dee05f1|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -3897,6 +3897,9 @@
     .opencode 路徑）。`/ps-spec`＋ps-spec-author 改走 DOC1（bash 只准 `powershell -NoProfile -File scripts/ps-sdoc.ps1 -Cli opencode *`）；CLONE1 改成直接跑 ps-spec-build.ps1。
   - 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：實測 OpenCode 1.18.29 會把家目錄 `~/.claude/CLAUDE.md` 併進系統提示、也掃 `.claude/skills`
     （公司機裝了 Claude Code，兩邊設定會混）；設了就不載入（smoke 有正反對照）。
+  - 反方向：同資料夾的 `AGENTS.md` 不進 Claude Code 版。實測 Claude Code 2.1.296（兩個暫存資料夾各放標記字）：`CLAUDE.md` 與 `AGENTS.md` 都在時只讀到
+    `CLAUDE.md` 的標記；只有 `AGENTS.md` 時讀到它的標記（證明這版本會讀 AGENTS.md，前一項才有意義）。預設 claude-md-or-agents-md；改成
+    claude-md-and-agents-md 才兩個都讀（SOP-29 記下）。
   - OpenCode 版 profile 沒填 oracle.connectionName 時只提醒（同資料夾 Claude Code 版填好了就給整份複製的命令），不擋。
 - OpenCode 1.18.29 實測（binary 內的實作與真跑）：permission 的萬用字元只有 `*`、`?`，`[0-9]` 是字面（分段檔改寫 `output-part-??.json`），比對區分大小寫、
   路徑是相對 worktree；write 與 edit 共用 edit 權限（開 write 就看得到 edit，只能改放行的檔）；grep／glob 權限比對的是搜尋字樣不是路徑——乾淨讀者與判定
@@ -7321,4 +7324,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   "nextCursor": ""
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/operations.json
-@@@PSBUNDLE-PART-END|99a790981cab40e1|2|8
+@@@PSBUNDLE-PART-END|f18a890d0fee81f9|2|8

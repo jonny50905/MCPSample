@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 6f598dc）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 4ae231a）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|6f598dc|99a790981cab40e1|3|8|13249|d8cf009408aa6f8ba92259705ebda2b581af6d359df27775c9f50f5c58aacfce
+@@@PSBUNDLE-PART|1|opencode|4ae231a|f18a890d0fee81f9|3|8|13251|9d738a041f6d55001c28133196f7e65bb43f6dd9668bb96246905ce4d0449287
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/rules.json|440|e4d547d5ff0d2ba50ba76ccfbce6bdd3219534321b0275bc7252efaf7f84b62d|0
 {
   "schemaVersion": "1.0",
@@ -11505,7 +11505,7 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1153|7089260c9d9e405467ef60c9f0cd203eacc486e6c559092ed119e48654463fb4|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1155|7b805a47b58b74f366685355d6d440cbf872ed37e2bbbc897fb45e51a24ea740|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -12642,6 +12642,8 @@ Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的�
 
 - 兩版同一資料夾並存：jobId 相同，但目錄分開、各有自己的研究版本，互不覆蓋；換來換去不會讓另一版重開研究版本。
   同一台機器同一時間只跑一個 headless session（session slot）：另一版正在跑時會停在 DOC1-3-03，錯開時間再跑。
+- 同一資料夾有 `CLAUDE.md` 時，Claude Code 只讀 `CLAUDE.md`、不讀 OpenCode 版帶進來的 `AGENTS.md`（沒有 `CLAUDE.md` 時才讀 `AGENTS.md`）：
+  Claude Code 版的指引不變。Claude Code 的 `/config` 把 Project instructions 改成 `claude-md-and-agents-md` 才會兩個都讀——公司機保持預設。
 - 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：不載入家目錄 `~/.claude/CLAUDE.md` 與 `.claude/skills`
   （公司機也裝了 Claude Code，不讓兩邊的設定混在一起）。只在 ps-sdoc 這個行程內，跑完還原。
 - 自己開 OpenCode 對話（TUI）時，同一資料夾的 `.claude/skills` 會和 `.opencode/skills` 同名；要在同一資料夾開對話，先在同一個
@@ -13250,4 +13252,4 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
   }
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/pack.schema.json
-@@@PSBUNDLE-PART-END|99a790981cab40e1|3|8
+@@@PSBUNDLE-PART-END|f18a890d0fee81f9|3|8
