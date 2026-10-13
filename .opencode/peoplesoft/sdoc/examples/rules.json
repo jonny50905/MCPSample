@@ -1,0 +1,440 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "rules",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "MSG",
+      "key": "27000,1",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 1,
+      "text": "金額必須大於 0。",
+      "severity": "ERROR"
+    },
+    {
+      "type": "MSG",
+      "key": "27000,2",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 2,
+      "text": "退回時必須填寫審核意見。",
+      "severity": "ERROR"
+    },
+    {
+      "type": "MSG",
+      "key": "27000,3",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 3,
+      "text": "找不到直屬主管，無法送出。",
+      "severity": "ERROR"
+    },
+    {
+      "type": "MSG",
+      "key": "27000,4",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "messageSet": 27000,
+      "messageNumber": 4,
+      "text": "此申請單已被其他使用者更新，請重新查詢。",
+      "severity": "ERROR"
+    },
+    {
+      "type": "BR",
+      "key": "TW_DEMO_REQ.SavePostChange:NOTIFY_SUPERVISOR",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E2"
+      ],
+      "name": "送出後通知直屬主管",
+      "brKind": "SIDE_EFFECT",
+      "appliesTo": [
+        "@FR/TW_DEMO_REQ:SUBMIT"
+      ],
+      "trigger": {
+        "event": "SAVE_POST_CHANGE",
+        "transitions": [
+          "@TRN/REQ_STATUS:010>020",
+          "@TRN/REQ_STATUS:015>020"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "EQ",
+        "right": {
+          "state": "@STATE/REQ_STATUS:020"
+        }
+      },
+      "action": {
+        "kind": "NOTIFY",
+        "interface": "@IF/AE:TW_DEMO_NTFY"
+      },
+      "order": 1,
+      "boundaries": {
+        "na": "沒有數值或日期判斷"
+      },
+      "modeDifferences": {
+        "na": "只在送出成功的存檔執行"
+      },
+      "implementedAt": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQ.SavePostChange",
+        "event": "SavePostChange"
+      }
+    },
+    {
+      "type": "BR",
+      "key": "TW_DEMO_REQ.SavePreChange:ASSIGN_REQ_ID",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E3"
+      ],
+      "name": "新單取號",
+      "brKind": "DEFAULTING",
+      "appliesTo": [
+        "@FR/TW_DEMO_REQ:CREATE"
+      ],
+      "trigger": {
+        "event": "SAVE_PRE_CHANGE",
+        "transitions": [
+          "@TRN/REQ_STATUS:*>010"
+        ],
+        "modes": [
+          "ADD"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_ID"
+        },
+        "op": "EQ",
+        "right": {
+          "const": "NEW",
+          "type": "CHAR"
+        }
+      },
+      "action": {
+        "kind": "SET_VALUE",
+        "assignments": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_ID",
+            "value": {
+              "expr": "現有最大 REQ_ID 的數值加 1，左補零到 10 碼"
+            }
+          }
+        ]
+      },
+      "order": 1,
+      "boundaries": "第一張單取 0000000001；兩張新單同時存檔可能取到同號，後存檔者因主鍵重複而失敗（原系統沒有重試）。",
+      "modeDifferences": "只在新增模式。",
+      "implementedAt": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQ.SavePreChange",
+        "event": "SavePreChange"
+      }
+    },
+    {
+      "type": "BR",
+      "key": "TW_DEMO_REQHDR.AMOUNT.SaveEdit:AMOUNT_POSITIVE",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E4"
+      ],
+      "name": "金額必須大於 0",
+      "brKind": "VALIDATION",
+      "appliesTo": [
+        "@FR/TW_DEMO_REQ:CREATE",
+        "@FR/TW_DEMO_REQ:SUBMIT",
+        "@FR/TW_DEMO_REQ:WITHDRAW"
+      ],
+      "trigger": {
+        "event": "SAVE_EDIT",
+        "modes": [
+          "ADD",
+          "UPDATE_DISPLAY"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.AMOUNT"
+        },
+        "op": "LE",
+        "right": {
+          "const": "0",
+          "type": "NUMBER"
+        }
+      },
+      "action": {
+        "kind": "REJECT",
+        "message": "@MSG/27000,1"
+      },
+      "order": 1,
+      "boundaries": "0 拒絕；最小可接受 0.01（小數 2 位）；未輸入時數值欄存 0，視同 0 拒絕。",
+      "modeDifferences": {
+        "na": "新增與修改相同"
+      },
+      "implementedAt": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQHDR.AMOUNT.SaveEdit",
+        "event": "SaveEdit"
+      }
+    },
+    {
+      "type": "BR",
+      "key": "TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault:REQUESTER_DEFAULT",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E5"
+      ],
+      "name": "申請人預設為目前使用者",
+      "brKind": "DEFAULTING",
+      "appliesTo": [
+        "@FR/TW_DEMO_REQ:CREATE"
+      ],
+      "trigger": {
+        "event": "FIELD_DEFAULT",
+        "modes": [
+          "ADD"
+        ]
+      },
+      "condition": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+        },
+        "op": "IS_BLANK"
+      },
+      "action": {
+        "kind": "SET_VALUE",
+        "assignments": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID",
+            "value": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "order": 1,
+      "boundaries": {
+        "na": "沒有數值或日期判斷"
+      },
+      "modeDifferences": "只在新增模式；修改模式不會重設申請人。",
+      "implementedAt": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault",
+        "event": "FieldDefault"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/messages.json#27000",
+      "excerpt": "27000,1..5 (ERROR)"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "a52c73e0-f63e-c571-569c-1d0c03234e97",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" Then\n   TW_DEMO_SCHEDNOTIFY(TW_DEMO_REQHDR.REQ_ID);\nEnd-If;"
+    },
+    {
+      "id": "E3",
+      "kind": "CHUNK",
+      "locator": "31848d0f-5c33-ee89-ac25-89ce41510031",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_ID = \"NEW\" Then\n   TW_DEMO_REQHDR.REQ_ID = TW_DEMO_NEXTREQID();\nEnd-If;"
+    },
+    {
+      "id": "E4",
+      "kind": "CHUNK",
+      "locator": "a59851d4-2fe6-e2c9-df79-5b78c7fe373e",
+      "excerpt": "If TW_DEMO_REQHDR.AMOUNT <= 0 Then\n   Error MsgGet(27000, 1, \"金額必須大於 0。\");\nEnd-If;"
+    },
+    {
+      "id": "E5",
+      "kind": "CHUNK",
+      "locator": "27d93e89-afa8-3da4-4a01-9b846fd5c6fb",
+      "excerpt": "If None(TW_DEMO_REQHDR.REQUESTER_EMPLID) Then TW_DEMO_REQHDR.REQUESTER_EMPLID = %EmployeeId; End-If;"
+    },
+    {
+      "id": "E9",
+      "kind": "CHUNK",
+      "locator": "4c3e0c29-409a-f0a7-a673-8950a6a7db11",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_TYPE = \"INT\" Then\n   SQLExec(\"SELECT BUDGET_BAL FROM PS_TW_DEMO_INTBUDGET WHERE BUDGET_CODE = :1\", TW_DEMO_REQHDR.BUDGET_CODE, &bal);\n   If TW_DEMO_REQHDR.AMOUNT > &bal Then Error MsgGet(27000, 5, \"內部預算不足。\"); End-If;\n   Exit(1); /* 內部申請改查內部預算，不做一般的金額檢核 */\nEnd-If;"
+    },
+    {
+      "id": "E10",
+      "kind": "SQL",
+      "locator": "SELECT REQ_TYPE, COUNT(*) FROM PS_TW_DEMO_REQHDR GROUP BY REQ_TYPE",
+      "excerpt": "GEN|900  URG|312"
+    },
+    {
+      "id": "E11",
+      "kind": "SQL",
+      "locator": "SELECT FIELDVALUE, EFF_STATUS FROM PSXLATITEM WHERE FIELDNAME = 'REQ_TYPE'",
+      "excerpt": "GEN|A  URG|A  INT|I"
+    },
+    {
+      "id": "E12",
+      "kind": "SQL",
+      "locator": "SELECT OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3 FROM PSPCMNAME WHERE RECNAME = 'TW_DEMO_REQHDR' AND REFNAME = 'REQ_TYPE'",
+      "excerpt": "TW_DEMO_REQHDR|AMOUNT|SaveEdit"
+    }
+  ],
+  "questions": [
+    {
+      "category": "NATIVE_UNUSED_BRANCH",
+      "key": "TW_DEMO_REQHDR.AMOUNT.SaveEdit:REQ_TYPE=INT",
+      "question": "金額檢核程式有一段「申請類別＝INT（內部）時改查內部預算」的原生分支。PROD 沒有 INT 的資料，INT 在值清單已停用、頁面不提供，核心路徑也沒有程式寫入 INT，所以不重建這段分支；分支內讀取的內部預算表、預算代碼欄位與一則訊息也不列入規格。新系統若要支援內部申請，需要另外決策。",
+      "affects": [
+        "@OBJ/RECORD:TW_DEMO_INTBUDGET",
+        "@OBJ/PEOPLECODE:TW_DEMO_REQHDR.AMOUNT.SaveEdit",
+        "@FLD/TW_DEMO_REQHDR.REQ_TYPE"
+      ],
+      "observed": {
+        "location": "TW_DEMO_REQHDR.AMOUNT.SaveEdit"
+      },
+      "proof": {
+        "kind": "DATA_VALUE_ABSENT",
+        "branchCondition": "If TW_DEMO_REQHDR.REQ_TYPE = \"INT\" Then",
+        "field": "TW_DEMO_REQHDR.REQ_TYPE",
+        "absentValues": [
+          "INT"
+        ],
+        "branchReferences": [
+          "RECORD:TW_DEMO_INTBUDGET",
+          "FIELD:TW_DEMO_REQHDR.BUDGET_CODE",
+          "MESSAGE:27000,5"
+        ],
+        "statement": "PROD 全表沒有 INT（GEN 900 筆、URG 312 筆）；INT 在值清單已停用，頁面選項不含 INT；PeopleCode 交叉參照只有這支程式讀取 REQ_TYPE，核心路徑沒有寫入 INT 的程式；Record 預設值是 GEN。",
+        "checkedOn": "2026-10-01"
+      },
+      "evidence": [
+        "E9",
+        "E10",
+        "E11",
+        "E12"
+      ]
+    }
+  ],
+  "requests": [],
+  "nextCursor": "",
+  "programDispositions": [
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_APV.PostBuild",
+      "kinds": [
+        "OFF_DIAGRAM_ONLY"
+      ],
+      "items": [],
+      "note": "只有狀態圖外的「核准後重開為草稿」邏輯，列入 90 問題清單。"
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQ.SavePostChange",
+      "kinds": [
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "@BR/TW_DEMO_REQ.SavePostChange:NOTIFY_SUPERVISOR"
+      ]
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQ.SavePreChange",
+      "kinds": [
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "@BR/TW_DEMO_REQ.SavePreChange:ASSIGN_REQ_ID"
+      ]
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQHDR.AMOUNT.SaveEdit",
+      "kinds": [
+        "BUSINESS_RULES",
+        "NATIVE_UNUSED_BRANCH"
+      ],
+      "items": [
+        "@BR/TW_DEMO_REQHDR.AMOUNT.SaveEdit:AMOUNT_POSITIVE"
+      ],
+      "note": "另有一段已證明不會執行的原生分支，不重建（見 90）。"
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault",
+      "kinds": [
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "@BR/TW_DEMO_REQHDR.REQUESTER_EMPLID.FieldDefault:REQUESTER_DEFAULT"
+      ]
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
+      "kinds": [
+        "TRANSITION_IMPL"
+      ],
+      "items": [
+        "@TRN/REQ_STATUS:020>030",
+        "@TRN/REQ_STATUS:020>025",
+        "@TRN/REQ_STATUS:025>030"
+      ]
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange",
+      "kinds": [
+        "TRANSITION_IMPL",
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "@TRN/REQ_STATUS:020>015",
+        "@TRN/REQ_STATUS:025>015",
+        "@BR/TW_DEMO_REQWRK.RETURN_PB.FieldChange:RETURN_COMMENT_REQUIRED"
+      ]
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+      "kinds": [
+        "TRANSITION_IMPL",
+        "BUSINESS_RULES"
+      ],
+      "items": [
+        "@TRN/REQ_STATUS:010>020",
+        "@TRN/REQ_STATUS:015>020",
+        "@BR/TW_DEMO_REQWRK.SUBMIT_PB.FieldChange:SUPERVISOR_REQUIRED"
+      ]
+    },
+    {
+      "program": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.WITHDRAW_PB.FieldChange",
+      "kinds": [
+        "TRANSITION_IMPL"
+      ],
+      "items": [
+        "@TRN/REQ_STATUS:010>090",
+        "@TRN/REQ_STATUS:015>090"
+      ]
+    }
+  ]
+}

@@ -25,3 +25,6 @@ docs/ps-research/*/supplemental-parts/
 
 # 核心功能重建 Spec（機敏產物，只在公司本機，不可進外部 remote）
 docs/ps-spec/
+
+# Spec 文件 OpenCode 版（ps-sdoc.ps1 -Cli opencode）的產出：同上，機敏、只在公司本機
+docs/ps-spec-opencode/

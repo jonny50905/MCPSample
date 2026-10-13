@@ -2,11 +2,12 @@ name: ps51-tests
 # Runs the framework tests under Windows PowerShell 5.1 (the company machine's shell) on a GitHub-hosted Windows runner.
 # Synthetic data only (TW_DEMO_*); no model, no MCP, no company files.
 #   repo-layout: one job per test script, maintainer checkout (LF, claude-code/ prefix present).
-#   deployed-layout: save the parts transfer/ps-bundle-claude-NNofMM.txt the way the company machine does
-#     (any file name, reversed order, CRLF, UTF-8 with BOM) into one folder, unpack them with scripts/ps-bundle.ps1
-#     into an empty folder (CRLF files, .claude/ at the root), then run test-sdoc and the short gate group of
-#     test-sdoc-run there, and a first real run of scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call).
-#     The full end-to-end test runs in repo-layout, split into three groups (-Only walk|edge|gate) in parallel.
+#   deployed-layout (one job per front end): save the parts transfer/ps-bundle-<claude|opencode>-NNofMM.txt the way the
+#     company machine does (any file name, reversed order, CRLF, UTF-8 with BOM) into one folder, unpack them with
+#     scripts/ps-bundle.ps1 into an empty folder (CRLF files, .claude/ or .opencode/ at the root), then run test-sdoc and
+#     one short group of test-sdoc-run there (Claude Code: gate; OpenCode: opencode), and a first real run of
+#     scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call; OpenCode writes to .ps-private/sdoc-opencode).
+#     The full end-to-end test runs in repo-layout, split into four groups (-Only walk|edge|gate|opencode) in parallel.
 # When it runs (it takes about 20 minutes, so not on every push):
 #   - every push to main that touches the paths below (the version the company machine takes);
 #   - a push to a claude/** branch only when the head commit message starts with [ps51]
@@ -20,6 +21,7 @@ on:
     paths:
       - 'scripts/**'
       - 'claude-code/**'
+      - '.opencode/**'
       - 'docs/design/spec-schema-framework/**'
       - 'transfer/**'
       - '.github/workflows/ps51-tests.yml'
@@ -57,6 +59,8 @@ jobs:
             args: -Only edge
           - test: test-sdoc-run.ps1
             args: -Only gate
+          - test: test-sdoc-run.ps1
+            args: -Only opencode
     defaults:
       run:
         shell: powershell
@@ -74,10 +78,22 @@ jobs:
           exit $LASTEXITCODE
 
   deployed-layout:
-    name: deployed layout (transfer bundle)
+    name: deployed layout (${{ matrix.variant }} transfer bundle)
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.event.head_commit.message, '[ps51]')
     runs-on: windows-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: claude
+            fwdir: .claude
+            group: gate
+            private: sdoc
+          - variant: opencode
+            fwdir: .opencode
+            group: opencode
+            private: sdoc-opencode
     defaults:
       run:
         shell: powershell
@@ -86,7 +102,7 @@ jobs:
         shell: cmd
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v5
-      - name: Unpack the Claude Code bundle parts into an empty folder
+      - name: Unpack the ${{ matrix.variant }} bundle parts into an empty folder
         run: |
           chcp 65001 | Out-Null
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -95,8 +111,8 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $dst 'scripts') -Force | Out-Null
           New-Item -ItemType Directory -Path $inc -Force | Out-Null
           Copy-Item -LiteralPath 'scripts\ps-bundle.ps1' -Destination (Join-Path $dst 'scripts\ps-bundle.ps1')
-          $parts = @(Get-ChildItem -LiteralPath 'transfer' -File | Where-Object { $_.Name -match '^ps-bundle-claude-[0-9]{2}of[0-9]{2}\.txt$' } | Sort-Object Name)
-          if ($parts.Count -lt 2) { Write-Host ('expected the Claude Code bundle in several parts, found ' + $parts.Count); exit 1 }
+          $parts = @(Get-ChildItem -LiteralPath 'transfer' -File | Where-Object { $_.Name -match '^ps-bundle-${{ matrix.variant }}-[0-9]{2}of[0-9]{2}\.txt$' } | Sort-Object Name)
+          if ($parts.Count -lt 2) { Write-Host ('expected the ${{ matrix.variant }} bundle in several parts, found ' + $parts.Count); exit 1 }
           $k = 0
           foreach ($p in $parts) {
             $k++
@@ -105,7 +121,7 @@ jobs:
           }
           & powershell.exe -NoProfile -NonInteractive -File (Join-Path $dst 'scripts\ps-bundle.ps1') -Bundle $inc
           if ($LASTEXITCODE -ne 0) { Write-Host ('ps-bundle exit=' + $LASTEXITCODE); exit 1 }
-          if (-not (Test-Path -LiteralPath (Join-Path $dst '.claude\peoplesoft\sdoc\schemas'))) { Write-Host 'missing .claude\peoplesoft\sdoc after unpack'; exit 1 }
+          if (-not (Test-Path -LiteralPath (Join-Path $dst '${{ matrix.fwdir }}\peoplesoft\sdoc\schemas'))) { Write-Host 'missing ${{ matrix.fwdir }}\peoplesoft\sdoc after unpack'; exit 1 }
           if (Test-Path -LiteralPath (Join-Path $dst 'claude-code')) { Write-Host 'unexpected claude-code folder after unpack'; exit 1 }
           exit 0
       - name: Add the design examples (test expectations; maintainer side only, not in the bundle)
@@ -113,14 +129,15 @@ jobs:
           $dst = Join-Path $env:RUNNER_TEMP 'company'
           New-Item -ItemType Directory -Path (Join-Path $dst 'docs\design') -Force | Out-Null
           Copy-Item -LiteralPath 'docs\design\spec-schema-framework' -Destination (Join-Path $dst 'docs\design\spec-schema-framework') -Recurse
-      - name: Spec document tests in the deployed layout (test-sdoc, gate group of test-sdoc-run)
+      - name: Spec document tests in the deployed layout (test-sdoc, ${{ matrix.group }} group of test-sdoc-run)
         run: |
           chcp 65001 | Out-Null
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           $dst = Join-Path $env:RUNNER_TEMP 'company'
           $failed = @()
-          # test-sdoc in full; of the end-to-end test only the short gate group (stage 0, split readings) on CRLF files
-          foreach ($t in @(, @('test-sdoc.ps1')) + @(, @('test-sdoc-run.ps1', '-Only', 'gate'))) {
+          # test-sdoc in full; of the end-to-end test only one short group on CRLF files
+          # (Claude Code: gate = stage 0, split readings; OpenCode: opencode = own folders, model.yaml, model preflight through cmd.exe)
+          foreach ($t in @(, @('test-sdoc.ps1')) + @(, @('test-sdoc-run.ps1', '-Only', '${{ matrix.group }}'))) {
             $name = ($t -join ' ')
             $rest = @($t | Select-Object -Skip 1)
             Write-Host ('::group::' + $name)
@@ -144,6 +161,7 @@ jobs:
           foreach ($l in $out) { Write-Host $l; if (([string]$l).Trim() -ne '') { $last = ([string]$l).Trim() } }
           Write-Host ('exit=' + $code + ' last=' + $last)
           if ($last -ne 'DOC1-0-01') { exit 1 }
-          $sk = @(Get-ChildItem -LiteralPath (Join-Path $dst '.ps-private\sdoc') -Recurse -Filter 'status.md' -File)
+          $sk = @(Get-ChildItem -LiteralPath (Join-Path $dst '.ps-private\${{ matrix.private }}') -Recurse -Filter 'status.md' -File)
           if ($sk.Count -ne 1) { Write-Host 'status.md skeleton missing'; exit 1 }
+          if ('${{ matrix.variant }}' -eq 'opencode' -and -not (($out -join "`n").Contains('OpenCode'))) { Write-Host 'OpenCode model line missing'; exit 1 }
           exit 0

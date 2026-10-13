@@ -11,18 +11,23 @@
 - `claude-code/`：同一框架的 **Claude Code 版**（`CLAUDE.md`＋`.claude/`：agents／commands／skills／hooks／peoplesoft），
   部署到公司機時去掉 `claude-code/` 前綴；`scripts/` 兩版共用（`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 是否存在認版本）。
   說明與對照表見 `claude-code/README.md`。
-  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、`claude-code/.claude/peoplesoft/sdoc/`、
-  agents ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）只有 Claude Code 版：Claude Code 版的 `/ps-spec` 走它（DOC1），OpenCode 版的 `/ps-spec` 走 ps-spec-build（CLONE1）。
+  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、agents ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）
+  兩版都有，`/ps-spec` 都走它（DOC1）：Claude Code 版的契約在 `claude-code/.claude/peoplesoft/sdoc/`；OpenCode 版在
+  `.opencode/peoplesoft/sdoc/`，外環加 `-Cli opencode`，人工輸入、執行狀態、產出與 log 各放 `*-opencode` 目錄
+  （與 Claude Code 版同一資料夾並存時各自一份工作），外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
+  單一 spec.md 的 CLONE1 仍可直接跑 `scripts/ps-spec-build.ps1`。
 - `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
   lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
   說明見 `rebuild-kit/HOW-TO-USE.md`。
 
 ## PeopleSoft 問題的處理方式
 
-要以一個或多個確切 Component 產生「供獨立 LLM 重建核心功能」的規格，走
+要以一個或多個確切 Component 產生「供獨立 LLM 重建功能」的 Spec 文件（00-index、14 份文件、90 問題清單），走
 `/ps-spec <Component...>`（ps-spec-author），或在 ps-spec-author 對話直接輸入清單。
-此路徑不走整個領域研究、不要求手填私有 pack；範圍與深度依 `spec/clone-contract.md`。
-`docs/ps-spec/**` 同為公司機密、禁止外部 remote；REVIEW_READY 不等於企業 E2E 通過。
+此路徑不走整個領域研究、不要求手填私有 pack；人工輸入只有 `.ps-private/sdoc-opencode/<jobId>/` 的 status.md（狀態圖，必備）、
+project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft/sdoc/research-contract.md`，結論碼見
+`.opencode/peoplesoft/spec/support-codes.md` 的 DOC1；外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
+`docs/ps-spec-opencode/**`、`docs/ps-spec/**` 同為公司機密、禁止外部 remote；REVIEW_READY 不等於企業 E2E 通過。
 
 收到 PeopleSoft 業務問題（例：兵役資料在哪維護、某選項選了會執行什麼）時：
 
@@ -99,6 +104,8 @@
   （OpenCode＝`scripts/**`＋`.opencode/**`，manifest `scripts/ps-transfer-manifest.json`；Claude Code＝`scripts/**`＋
   `claude-code/` 去前綴的 `CLAUDE.md`／`.claude/**`，manifest `scripts/ps-transfer-manifest.claude.json`，每列 `repo` 欄＝GitHub 位置）。
   改模型讀的規則時兩版對應檔都要改（Claude Code 版只換機制用語）；`scripts/tests/test-claude-variant.ps1` 驗兩版檔案一一對應。
+  管理者要兩版並行時（OpenCode 版的 Spec 文件流程當 Claude Code 版的備案），另搬 OpenCode 版搬運包；可以解在同一個資料夾
+  （`scripts/**` 兩版共用、`.claude/` 不動），也可以另開資料夾。
 - **搬運包（優先）**：`ps-fs-doctor -WriteManifest` 會把每版要搬的檔收成幾份文字檔（每份約 500 KB 以內，只在檔與檔之間切）
   `transfer/ps-bundle-opencode-01ofNN.txt`…／`transfer/ps-bundle-claude-01ofNN.txt`…，公司機把各份放進同一個資料夾，以
   `scripts\ps-bundle.ps1 -Bundle <資料夾>` 解開（逐份驗證、整包驗證、三方比對保留本機改過的檔、衝突另存 `.incoming`）。
@@ -112,7 +119,7 @@
 - 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
   （.ps-runtime/**）是公司機密：研究產出只進**內部** git，後兩者連內部 git 都不進（已 gitignore，
   知識索引 docs/ps-research/knowledge/ 同為本機快取），嚴禁外部 remote 或公開貼出；
-  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1，見 `.opencode/peoplesoft/spec/support-codes.md`；Claude Code 版另有 DOC1）與 enum 值，
+  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1／DOC1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
   不回報路徑、物件名、hash、requestId。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。

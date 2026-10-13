@@ -74,15 +74,15 @@ $leak = @($ccAll | Where-Object { (Read-Norm $_.FullName) -match '(?i)opencode' 
 Assert ($leak.Count -eq 0) ("claude-code/ 的部署檔不含另一版字樣（opencode）" + $(if ($leak.Count -gt 0) { '：' + ($leak -join ', ') } else { '' }))
 
 $excludedAgents = @('explore', 'general', 'scout', 'ps-audit-orchestrator')
-# Spec 文件流程（scripts/ps-sdoc.ps1）只有 Claude Code 版：它的 worker／讀者 agent 沒有 OpenCode 對應檔
-$claudeOnlyAgents = @('ps-status-reader', 'ps-sdoc-worker', 'ps-spec-reader', 'ps-spec-judge')
+# Spec 文件流程（scripts/ps-sdoc.ps1）兩版都有：Claude Code 版照舊，OpenCode 版以 -Cli opencode 跑（目錄各加 -opencode）
+$sdocAgents = @('ps-status-reader', 'ps-sdoc-worker', 'ps-spec-reader', 'ps-spec-judge')
 $ocAgents = Get-NameSet (Join-Path $oc 'agent') '*.md'
 $ccAgents = Get-NameSet (Join-Path $cc '.claude/agents') '*.md'
 $missA = @($ocAgents.Keys | Where-Object { $excludedAgents -notcontains $_ -and -not $ccAgents.ContainsKey($_) })
-$extraA = @($ccAgents.Keys | Where-Object { -not $ocAgents.ContainsKey($_) -and $claudeOnlyAgents -notcontains $_ })
-Assert ($missA.Count -eq 0 -and $extraA.Count -eq 0) ("agent 一一對應（OpenCode 內建覆寫 explore／general／scout、備用 ps-audit-orchestrator、Claude Code 獨有的 Spec 文件 agent 除外）" + $(if ($missA.Count + $extraA.Count -gt 0) { '：缺 ' + ($missA -join ',') + '／多 ' + ($extraA -join ',') } else { '' }))
-$coBad = @($claudeOnlyAgents | Where-Object { -not $ccAgents.ContainsKey($_) -or $ocAgents.ContainsKey($_) })
-Assert ($coBad.Count -eq 0) ("Claude Code 獨有的 Spec 文件 agent 存在、且 OpenCode 版沒有同名檔" + $(if ($coBad.Count -gt 0) { '：' + ($coBad -join ',') } else { '' }))
+$extraA = @($ccAgents.Keys | Where-Object { -not $ocAgents.ContainsKey($_) })
+Assert ($missA.Count -eq 0 -and $extraA.Count -eq 0) ("agent 一一對應（OpenCode 內建覆寫 explore／general／scout、備用 ps-audit-orchestrator 除外）" + $(if ($missA.Count + $extraA.Count -gt 0) { '：缺 ' + ($missA -join ',') + '／多 ' + ($extraA -join ',') } else { '' }))
+$coBad = @($sdocAgents | Where-Object { -not $ccAgents.ContainsKey($_) -or -not $ocAgents.ContainsKey($_) })
+Assert ($coBad.Count -eq 0) ("Spec 文件的讀者／worker／判定 agent 兩版都有" + $(if ($coBad.Count -gt 0) { '：' + ($coBad -join ',') } else { '' }))
 $ocCmds = Get-NameSet (Join-Path $oc 'command') '*.md'
 $ccCmds = Get-NameSet (Join-Path $cc '.claude/commands') '*.md'
 $d1 = @($ocCmds.Keys | Where-Object { -not $ccCmds.ContainsKey($_) }) + @($ccCmds.Keys | Where-Object { -not $ocCmds.ContainsKey($_) })
@@ -96,13 +96,20 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft') -File -
     if (@('SOP.md', 'README.md', 'test-scenarios.md') -contains $f.Name) { continue }
     if (-not (Test-Path -LiteralPath (Join-Path $cc ('.claude/peoplesoft/' + $f.Name)))) { $contractMiss += $f.Name }
 }
-foreach ($sub in @('report-templates', 'spec')) {
+# sdoc/model.yaml 只有 OpenCode 版（Claude Code 版的模型在 .claude/settings.json）
+$ocOnly = @('sdoc/model.yaml')
+foreach ($sub in @('report-templates', 'spec', 'sdoc')) {
     foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc ('peoplesoft/' + $sub)) -File -Recurse)) {
         $rel = Get-RelUnder (Join-Path $oc 'peoplesoft') $f.FullName
+        if ($ocOnly -contains $rel) { continue }
         if (-not (Test-Path -LiteralPath (Join-Path $cc ('.claude/peoplesoft/' + $rel)))) { $contractMiss += $rel }
     }
 }
-Assert ($contractMiss.Count -eq 0) ("契約／模板／spec 檔一一對應（SOP.md、README.md、test-scenarios.md 為人讀文件，不部署）" + $(if ($contractMiss.Count -gt 0) { '：缺 ' + ($contractMiss -join ',') } else { '' }))
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/peoplesoft/sdoc') -File -Recurse)) {
+    $rel = Get-RelUnder (Join-Path $cc '.claude/peoplesoft') $f.FullName
+    if (-not (Test-Path -LiteralPath (Join-Path $oc ('peoplesoft/' + $rel)))) { $contractMiss += ('OpenCode 版缺 ' + $rel) }
+}
+Assert ($contractMiss.Count -eq 0) ("契約／模板／spec／sdoc 檔一一對應（SOP.md、README.md、test-scenarios.md 為人讀文件，不部署；sdoc/model.yaml 只有 OpenCode 版）" + $(if ($contractMiss.Count -gt 0) { '：缺 ' + ($contractMiss -join ',') } else { '' }))
 
 $dataDiff = @()
 $dataFiles = @('business-domain-map.yaml', 'research-domains.txt')
@@ -110,12 +117,27 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/spec') -F
     if ($f.Extension -eq '.md' -or $f.Name -eq 'generic.manifest.json') { continue }
     $dataFiles += ('spec/' + (Get-RelUnder (Join-Path $oc 'peoplesoft/spec') $f.FullName))
 }
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/sdoc') -File -Recurse)) {
+    if ($f.Extension -eq '.md' -or $f.Name -eq 'model.yaml') { continue }
+    $dataFiles += ('sdoc/' + (Get-RelUnder (Join-Path $oc 'peoplesoft/sdoc') $f.FullName))
+}
 foreach ($rel in $dataFiles) {
     $a = Join-Path $oc ('peoplesoft/' + $rel)
     $b = Join-Path $cc ('.claude/peoplesoft/' + $rel)
     if (-not (Test-Path -LiteralPath $b) -or (Read-Norm $a) -cne (Read-Norm $b)) { $dataDiff += $rel }
 }
-Assert ($dataDiff.Count -eq 0) ("資料檔兩版逐字相同（domain map、研究佇列、spec 的 JSON 與範例 pack）" + $(if ($dataDiff.Count -gt 0) { '：' + ($dataDiff -join ',') } else { '' }))
+Assert ($dataDiff.Count -eq 0) ("資料檔兩版逐字相同（domain map、研究佇列、spec 的 JSON 與範例 pack、sdoc 的 schema／範例／AI 指引）" + $(if ($dataDiff.Count -gt 0) { '：' + ($dataDiff -join ',') } else { '' }))
+# sdoc 契約兩版只差機制用語：標題逐行相同，OpenCode 版不出現 Claude Code 的工具名與路徑
+$sdocBad = @()
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/sdoc') -File -Filter '*.md')) {
+    $ccf = Join-Path $cc ('.claude/peoplesoft/sdoc/' + $f.Name)
+    if (-not (Test-Path -LiteralPath $ccf)) { continue }
+    $ho = @((Read-Norm $f.FullName) -split "`n" | Where-Object { $_ -match '^#' }) -join "`n"
+    $hc = @((Read-Norm $ccf) -split "`n" | Where-Object { $_ -match '^#' }) -join "`n"
+    if ($ho -cne $hc) { $sdocBad += ($f.Name + ':標題不同') }
+    if ((Read-Norm $f.FullName) -cmatch '\.claude/|mcp__|Agent 工具|子代理|\b(Read|Write|Grep|Glob|Bash)\b') { $sdocBad += ($f.Name + ':Claude Code 用語') }
+}
+Assert ($sdocBad.Count -eq 0) ("sdoc 契約兩版標題相同、OpenCode 版只用 OpenCode 的工具名與 .opencode 路徑" + $(if ($sdocBad.Count -gt 0) { '：' + ($sdocBad -join '，') } else { '' }))
 function Get-YamlKeyLines([string]$Path) {
     $out = @()
     foreach ($ln in @((Read-Norm $Path) -split "`n")) {

@@ -4,7 +4,7 @@
 #   各份接成一個檔也能解；重跑全相同；三方比對（本機改過＋上游沒動＝保留本機、本機沒改＋上游改＝更新並備份、兩邊都改＝.incoming、
 #   設定檔無基準＝.incoming）；scripts 本機改過一律更新；必刪舊檔移到備份；
 #   整包驗證（截斷＝T、內容被改＝H、路徑跳出或不屬於該版＝P、缺份＝T、某一份截斷＝T、某一份被改＝H、資料夾混了兩組＝T）時一個檔都不寫；
-#   舊式單一檔照樣能解；OpenCode 版含 AGENTS.md。
+#   舊式單一檔照樣能解；OpenCode 版含 AGENTS.md、Spec 文件的 agent 與 sdoc，已填的 sdoc/model.yaml 保留本機、沒有基準時不覆寫。
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ErrorActionPreference = 'Stop'
 $bundleScript = Join-Path $repoRoot 'scripts/ps-bundle.ps1'
@@ -243,6 +243,16 @@ try {
     $o = Invoke-Unpack $t4 $inO
     $fsd4 = ((& (Join-Path $t4 'scripts/ps-fs-doctor.ps1') *>&1 | ForEach-Object { [string]$_ }) -join "`n")
     Assert ((Get-Code $o) -eq 'G' -and (Test-Path -LiteralPath (Join-Path $t4 'AGENTS.md')) -and -not (Test-Path -LiteralPath (Join-Path $t4 '.claude')) -and $fsd4 -match 'OpenCode 版' -and $fsd4 -match '結論代號：G') "OpenCode 版：含 AGENTS.md、不含 .claude、fs-doctor G"
+    $mY4 = Join-Path $t4 '.opencode/peoplesoft/sdoc/model.yaml'
+    Assert ((Test-Path -LiteralPath $mY4) -and (Test-Path -LiteralPath (Join-Path $t4 '.opencode/agent/ps-sdoc-worker.md')) -and (Test-Path -LiteralPath (Join-Path $t4 '.opencode/peoplesoft/sdoc/schemas/common.schema.json'))) "OpenCode 版：含 Spec 文件的 agent、sdoc 契約與 schema、模型設定 model.yaml"
+    Write-Text $mY4 "model: company-gw/my-model`n"
+    $o = Invoke-Unpack $t4 $inO
+    Assert ((Get-Code $o) -eq 'G' -and $o -match '保留本機 1／' -and (Read-Text $mY4) -match 'company-gw/my-model') "已填的 model.yaml：再解同一個搬運包 → 保留本機"
+    $t5 = New-Target
+    $mY5 = Join-Path $t5 '.opencode/peoplesoft/sdoc/model.yaml'
+    Write-Text $mY5 "model: company-gw/my-model`n"
+    $o = Invoke-Unpack $t5 $inO
+    Assert ((Get-Code $o) -eq 'C' -and (Read-Text $mY5) -match 'company-gw/my-model' -and (Test-Path -LiteralPath ($mY5 + '.incoming'))) "沒有 manifest 記錄的本機 model.yaml → 衝突、不覆寫"
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

@@ -21,7 +21,7 @@
 #   新增＝本機沒有；相同＝本機已一致；更新＝本機沒改過（＝上次 manifest 記錄）→ 覆寫；
 #   保留本機＝本機改過、搬運包這次沒動它 → 不碰（例：已回填的 profile、/ps-lesson 改過的檔）；
 #   衝突＝本機改過、搬運包也改了 → 本機不動，新版另存「<檔>.incoming」請人工合併；
-#   本機設定檔（profile、domain map、研究佇列、教訓帳本）沒有 manifest 記錄可比時一律當衝突，不覆寫。
+#   本機設定檔（profile、domain map、研究佇列、教訓帳本、OpenCode 版 Spec 文件的模型 sdoc/model.yaml）沒有 manifest 記錄可比時一律當衝突，不覆寫。
 #   scripts/** 不在本機改（外環腳本只由維護端改）：內容不同一律更新（舊檔照樣備份），不走保留／衝突。
 #   覆寫與刪除前先備份到 auto-loop-logs\ps-bundle-backup\<時間>\。manifest 最後才寫（中途中斷，重跑可接續）。
 # 結論代號：G 全部完成／C 有衝突待合併（.incoming）／T 搬運包不完整（缺份、截斷、混了別次打包的份：照訊息重新複製）／
@@ -41,7 +41,7 @@ $ErrorActionPreference = 'Stop'
 $script:BdMark = '@@@PSBUNDLE'
 $script:BdManifestNames = @{ opencode = 'ps-transfer-manifest.json'; claude = 'ps-transfer-manifest.claude.json' }
 $script:BdPrefixes = @{ opencode = @('scripts/', '.opencode/', 'AGENTS.md'); claude = @('scripts/', '.claude/', 'CLAUDE.md') }
-$script:BdProtected = '^(\.opencode|\.claude)/peoplesoft/(customization-profile\.yaml|business-domain-map\.yaml|research-domains\.txt|lessons/applied\.md|lessons/pending\.md)$'
+$script:BdProtected = '^(\.opencode|\.claude)/peoplesoft/(customization-profile\.yaml|business-domain-map\.yaml|research-domains\.txt|lessons/applied\.md|lessons/pending\.md|sdoc/model\.yaml)$'
 
 function Get-PsBdNorm([string]$Text) {
     if ($null -eq $Text) { $Text = '' }

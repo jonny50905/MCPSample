@@ -1,0 +1,628 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "workflow",
+  "subject": "REQ_STATUS",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "STATE",
+      "key": "REQ_STATUS:010",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "binding": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+      "domainLabel": "草稿",
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "type": "STATE",
+      "key": "REQ_STATUS:015",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E3",
+        "E2"
+      ],
+      "binding": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+      "domainLabel": "退回補件",
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "type": "STATE",
+      "key": "REQ_STATUS:020",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E4",
+        "E2"
+      ],
+      "binding": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+      "domainLabel": "待主管審核",
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "type": "STATE",
+      "key": "REQ_STATUS:025",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E5",
+        "E2"
+      ],
+      "binding": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+      "domainLabel": "待部門主管審核",
+      "dataPresence": "HAS_DATA"
+    },
+    {
+      "type": "TRN",
+      "key": "REQ_STATUS:*>010",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E8",
+        "E9",
+        "E10"
+      ],
+      "exitMode": "NORMAL",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "action": "儲存（新增模式）"
+      },
+      "actor": {
+        "left": {
+          "ctx": "CURRENT_USER_OPRID"
+        },
+        "op": "HAS_ROLE",
+        "right": {
+          "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+        }
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+          "value": {
+            "const": "010",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+          "event": "Save（ADD 模式；REQ_STATUS 取 Record 預設值）"
+        }
+      ],
+      "reentry": "同一張新單存檔後畫面轉為修改模式；再按儲存是一般存檔，不會再建立一張。"
+    },
+    {
+      "type": "TRN",
+      "key": "REQ_STATUS:010>020",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E11",
+        "E12",
+        "E13"
+      ],
+      "exitMode": "NORMAL",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "action": "按「送出」（TW_DEMO_REQWRK.SUBMIT_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+            }
+          },
+          {
+            "left": {
+              "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+          "value": {
+            "const": "020",
+            "type": "CHAR"
+          }
+        },
+        {
+          "field": "@FLD/TW_DEMO_REQHDR.SUBMIT_DT",
+          "value": {
+            "ctx": "CURRENT_DATE"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "送出後按鈕隱藏（見 05）；兩個視窗重複送出時，後存檔者因資料已被更新而被拒絕，狀態不變。"
+    },
+    {
+      "type": "TRN",
+      "key": "REQ_STATUS:010>090",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E14",
+        "E15",
+        "E16"
+      ],
+      "exitMode": "NORMAL",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "action": "按「撤回」（TW_DEMO_REQWRK.WITHDRAW_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+            }
+          },
+          {
+            "left": {
+              "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+          "value": {
+            "const": "090",
+            "type": "CHAR"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.WITHDRAW_PB.FieldChange",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "作廢是終點；撤回後按鈕隱藏，不能再操作。"
+    },
+    {
+      "type": "TRN",
+      "key": "REQ_STATUS:015>020",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E17",
+        "E18",
+        "E13"
+      ],
+      "exitMode": "NORMAL",
+      "trigger": {
+        "kind": "USER_ACTION",
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "action": "按「送出」（TW_DEMO_REQWRK.SUBMIT_PB）",
+        "event": "FIELD_CHANGE"
+      },
+      "actor": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+            }
+          },
+          {
+            "left": {
+              "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "guard": {
+        "na": "起點只有這一個目標，沒有條件分岔"
+      },
+      "writes": [
+        {
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+          "value": {
+            "const": "020",
+            "type": "CHAR"
+          }
+        },
+        {
+          "field": "@FLD/TW_DEMO_REQHDR.SUBMIT_DT",
+          "value": {
+            "ctx": "CURRENT_DATE"
+          }
+        }
+      ],
+      "sideEffects": {
+        "na": "轉移本身沒有其他副作用；送出通知由 09 的規則觸發"
+      },
+      "implementedAt": [
+        {
+          "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+          "event": "FieldChange"
+        }
+      ],
+      "reentry": "同 010→020；重新送出會覆寫送出日。"
+    },
+    {
+      "type": "FLOW",
+      "key": "REQ_STATUS:主流程",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E34"
+      ],
+      "narrative": "申請人建立並送出，直屬主管核准；金額不超過 50000 時一次核准結案。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "@TRN/REQ_STATUS:*>010",
+          "description": "申請人建立草稿"
+        },
+        {
+          "seq": 2,
+          "transition": "@TRN/REQ_STATUS:010>020",
+          "description": "申請人送出"
+        },
+        {
+          "seq": 3,
+          "transition": "@TRN/REQ_STATUS:020>030",
+          "description": "直屬主管核准（金額 ≤ 50000）"
+        }
+      ],
+      "entryStates": [
+        "INITIAL"
+      ],
+      "exitStates": [
+        "@STATE/REQ_STATUS:030"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": "金額超過 50000 轉入「高額審核」；主管退回轉入「退回補件」；草稿可轉入「撤回作廢」。"
+    },
+    {
+      "type": "FLOW",
+      "key": "REQ_STATUS:撤回作廢",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E35"
+      ],
+      "narrative": "申請人在送出前或被退回後撤回，申請單作廢結束。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "@TRN/REQ_STATUS:010>090",
+          "description": "撤回草稿"
+        },
+        {
+          "seq": 2,
+          "transition": "@TRN/REQ_STATUS:015>090",
+          "description": "撤回退回中的申請"
+        }
+      ],
+      "entryStates": [
+        "@STATE/REQ_STATUS:010",
+        "@STATE/REQ_STATUS:015"
+      ],
+      "exitStates": [
+        "@STATE/REQ_STATUS:090"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": {
+        "na": "作廢是終點"
+      }
+    },
+    {
+      "type": "FLOW",
+      "key": "REQ_STATUS:退回補件",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E36"
+      ],
+      "narrative": "審核者退回後，申請人補件重新送出，回到直屬主管審核。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "@TRN/REQ_STATUS:020>015",
+          "description": "直屬主管退回"
+        },
+        {
+          "seq": 2,
+          "transition": "@TRN/REQ_STATUS:025>015",
+          "description": "部門主管退回"
+        },
+        {
+          "seq": 3,
+          "transition": "@TRN/REQ_STATUS:015>020",
+          "description": "申請人修改後重新送出"
+        }
+      ],
+      "entryStates": [
+        "@STATE/REQ_STATUS:020",
+        "@STATE/REQ_STATUS:025"
+      ],
+      "exitStates": [
+        "@STATE/REQ_STATUS:020"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": "退回補件中的申請人也可撤回，轉入「撤回作廢」。"
+    },
+    {
+      "type": "FLOW",
+      "key": "REQ_STATUS:高額審核",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E37"
+      ],
+      "narrative": "金額超過 50000 時，直屬主管核准後再由部門主管核准。",
+      "steps": [
+        {
+          "seq": 1,
+          "transition": "@TRN/REQ_STATUS:020>025",
+          "description": "直屬主管核准（金額 > 50000），轉部門主管"
+        },
+        {
+          "seq": 2,
+          "transition": "@TRN/REQ_STATUS:025>030",
+          "description": "部門主管核准"
+        }
+      ],
+      "entryStates": [
+        "@STATE/REQ_STATUS:020"
+      ],
+      "exitStates": [
+        "@STATE/REQ_STATUS:030"
+      ],
+      "preconditions": {
+        "na": "進入條件即各步驟轉移的起點狀態"
+      },
+      "exceptions": "部門主管可退回，轉入「退回補件」。"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L26",
+      "excerpt": "state \"010 草稿\" as S010"
+    },
+    {
+      "id": "E2",
+      "kind": "SQL",
+      "locator": "SELECT REQ_STATUS, COUNT(*) FROM PS_TW_DEMO_REQHDR GROUP BY REQ_STATUS",
+      "excerpt": "010|120  015|8  020|31  025|4\n030|980  090|57  099|12"
+    },
+    {
+      "id": "E3",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L27",
+      "excerpt": "state \"015 退回補件\" as S015"
+    },
+    {
+      "id": "E4",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L28",
+      "excerpt": "state \"020 待主管審核\" as S020"
+    },
+    {
+      "id": "E5",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L29",
+      "excerpt": "state \"025 待部門主管審核\" as S025"
+    },
+    {
+      "id": "E8",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L33",
+      "excerpt": "[*] --> S010"
+    },
+    {
+      "id": "E9",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L9",
+      "excerpt": "START((開始)) -->|主流程| N010[\"010 草稿\"]"
+    },
+    {
+      "id": "E10",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_REQ.json#pages",
+      "excerpt": "TW_DEMO_REQ: TW_DEMO_REQPG (MAIN), TW_DEMO_REQSEC (SECONDARY)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "E11",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L34",
+      "excerpt": "S010 --> S020"
+    },
+    {
+      "id": "E12",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L10",
+      "excerpt": "N010 -->|主流程| N020[\"020 待主管審核\"]"
+    },
+    {
+      "id": "E13",
+      "kind": "CHUNK",
+      "locator": "9749aec1-b169-4a6e-0a4f-f9bb9edd1ae8",
+      "excerpt": "&sup = TW_DEMO_GETSUPERVISOR(TW_DEMO_REQHDR.REQUESTER_EMPLID);\nIf None(&sup) Then Error MsgGet(27000, 3, \"找不到直屬主管，無法送出。\"); End-If;\nTW_DEMO_REQHDR.REQ_STATUS.Value = \"020\";\nTW_DEMO_REQHDR.SUBMIT_DT.Value = %Date;"
+    },
+    {
+      "id": "E14",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L42",
+      "excerpt": "S010 --> S090"
+    },
+    {
+      "id": "E15",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L18",
+      "excerpt": "N010 -->|撤回作廢| N090[\"090 作廢\"]"
+    },
+    {
+      "id": "E16",
+      "kind": "CHUNK",
+      "locator": "a8c1e14d-5f72-d369-91f0-b0c458407f19",
+      "excerpt": "TW_DEMO_REQHDR.REQ_STATUS.Value = \"090\";"
+    },
+    {
+      "id": "E17",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L35",
+      "excerpt": "S015 --> S020"
+    },
+    {
+      "id": "E18",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L17",
+      "excerpt": "N015 -->|退回補件| N020"
+    },
+    {
+      "id": "E34",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L9",
+      "excerpt": "START((開始)) -->|主流程| N010[\"010 草稿\"]"
+    },
+    {
+      "id": "E35",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L18",
+      "excerpt": "N010 -->|撤回作廢| N090[\"090 作廢\"]"
+    },
+    {
+      "id": "E36",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L15",
+      "excerpt": "N020 -->|退回補件| N015[\"015 退回補件\"]"
+    },
+    {
+      "id": "E37",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L13",
+      "excerpt": "D1 -->|高額審核| N025[\"025 待部門主管審核\"]"
+    },
+    {
+      "id": "E38",
+      "kind": "CHUNK",
+      "locator": "13835936-c32b-5c08-dc51-eda7728e0ad3",
+      "excerpt": "If %Request.GetParameter(\"REOPEN\") = \"Y\" And TW_DEMO_REQHDR.REQ_STATUS = \"030\" Then\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"010\";\nEnd-If;"
+    }
+  ],
+  "questions": [
+    {
+      "category": "OFF_DIAGRAM_STATE",
+      "key": "REQ_STATUS:099",
+      "question": "PROD 有 REQ_STATUS＝099 的資料，但狀態圖沒有這個狀態。是歷史資料（只需資料移轉對應），還是狀態圖漏畫？",
+      "affects": [
+        "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+      ],
+      "grade": "HIGH",
+      "observed": {
+        "entityKey": "REQ_STATUS",
+        "code": "099"
+      },
+      "evidence": [
+        "E2"
+      ]
+    },
+    {
+      "category": "OFF_DIAGRAM_TRANSITION",
+      "key": "REQ_STATUS:030>010",
+      "question": "TW_DEMO_APV.PostBuild 在特殊參數下會把 030 改回 010（核准後重開），狀態圖沒有這條轉移。要不要重建？",
+      "affects": [
+        "@OBJ/PEOPLECODE:TW_DEMO_APV.PostBuild"
+      ],
+      "grade": "LOW",
+      "observed": {
+        "entityKey": "REQ_STATUS",
+        "from": "030",
+        "to": "010",
+        "location": "TW_DEMO_APV.PostBuild"
+      },
+      "proposedAnswer": "看起來是管理者的資料維護入口，不是業務流程。",
+      "evidence": [
+        "E38"
+      ]
+    }
+  ],
+  "requests": [],
+  "nextCursor": "",
+  "definitionOnlyCodes": [
+    {
+      "code": "040"
+    },
+    {
+      "code": "050"
+    }
+  ]
+}

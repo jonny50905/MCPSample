@@ -3870,3 +3870,41 @@
   （ps-bundle 以正規化後的雜湊比對，雙 BOM 的 `scripts\` 檔雜湊不同，一律以新版覆寫）。
   AGENTS.md 協作鐵律加「併回 main 已授權」：管理者要求驗證過的改動直接快轉併回 main，不必再等指示。
 - 教訓：同一份檔「CI 正常、本機報語法錯」先查搬運與編碼（雙 BOM、無 BOM、換行），不是先改程式。
+
+### L145 Spec 文件要有不靠 Claude Code 的備案——同一個外環加 -Cli opencode，模型只在一個檔設定，兩版並行互不覆蓋（2026-10-13）
+
+- 起因：管理者在公司機以 Claude Code＋Sonnet 跑 Spec 文件流程（DOC1），公司環境的問題（gateway 504、回應中途斷線，L140／L141）還在處理。
+  為了解不了時有路可走，要一個 OpenCode CLI＋另一個模型跑同一流程的版本：模型先預設小模型、到公司再填、只填一個地方；
+  不能改到 Claude Code 版，兩版並行。
+- 設計：
+  - 外環只留一份（L132）：`scripts/ps-sdoc.ps1` 加 `-Cli opencode`（只在本行程設 PS_CLI，跑完還原）；`.opencode/peoplesoft/sdoc` 存在才放行
+    （原本 Claude Code 以外一律 DOC1-9-01）。Claude Code 版的路徑、jobId、工單內容、命令列、訊息與結論碼一字不變。
+  - 兩版並存：jobId 照舊（schema 規定 `^clone-[0-9a-f]{16}$`）；OpenCode 版的人工輸入、執行狀態、產出、log 各放 `*-opencode`
+    （`.ps-private/sdoc-opencode`、`.ps-runtime/sdoc-opencode`、`docs/ps-spec-opencode`、`.ps-runtime/sdoc-opencode-logs`），job 鎖名加 -opencode。
+    不共用狀態：研究來源指紋含 schema 的相對路徑（`.claude/…` 與 `.opencode/…` 不同），共用就會兩版輪流開新研究版本、作廢彼此的收據。
+    session slot 照舊共用（同一台機器一次一個 headless session）。OpenCode 版第一次跑、同資料夾 Claude Code 版已有 status.md 就複製過來（之後各自獨立）。
+  - 模型只在 `.opencode/peoplesoft/sdoc/model.yaml`（一行 `model: <provider>/<model>`，預設 `anthropic/claude-haiku-4-5`）。不放 profile
+    （兩版 profile 鍵值逐行相同是「整份複製」的前提）、不放 opencode.json 的 `model`（會改到 OpenCode 版所有對話與外環）、不寫進四個 agent 的
+    frontmatter（四個地方）。外環沒給 -Model 就讀它、驗形狀（provider/model、FILL_ME、cmd 不安全字元）→ DOC1-9-01；每次印「OpenCode 模型：…（設定檔）」；
+    開第一個 session 前 `opencode models <provider>` 預檢（不在清單／Provider not found → DOC1-9-01「模型不能用」；查不了只提醒）——OpenCode 對
+    模型名或 provider 錯只回「Unexpected server error」，不預檢就要等 session 失敗才知道、還看不出原因。ps-bundle 把 model.yaml 列為本機設定檔（無基準不覆寫）。
+  - OpenCode 版 agent：ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge 為 `mode: primary`（`opencode run --agent` 遇到 subagent 會退回預設 agent），
+    讀寫邊界用 permission（Claude Code 版靠 hook）；契約、schema、範例複製一份（資料檔逐字相同，契約只換工具用語：read／write／task、`oracleMCP_connect`、
+    .opencode 路徑）。`/ps-spec`＋ps-spec-author 改走 DOC1（bash 只准 `powershell -NoProfile -File scripts/ps-sdoc.ps1 -Cli opencode *`）；CLONE1 改成直接跑 ps-spec-build.ps1。
+  - 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：實測 OpenCode 1.18.29 會把家目錄 `~/.claude/CLAUDE.md` 併進系統提示、也掃 `.claude/skills`
+    （公司機裝了 Claude Code，兩邊設定會混）；設了就不載入（smoke 有正反對照）。
+  - OpenCode 版 profile 沒填 oracle.connectionName 時只提醒（同資料夾 Claude Code 版填好了就給整份複製的命令），不擋。
+- OpenCode 1.18.29 實測（binary 內的實作與真跑）：permission 的萬用字元只有 `*`、`?`，`[0-9]` 是字面（分段檔改寫 `output-part-??.json`），比對區分大小寫、
+  路徑是相對 worktree；write 與 edit 共用 edit 權限（開 write 就看得到 edit，只能改放行的檔）；grep／glob 權限比對的是搜尋字樣不是路徑——乾淨讀者與判定
+  因此不開 grep／glob（只用 read，read 目錄會列檔名），研究 worker 與 ps-clone-worker 一樣開著；bash 工具的 timeout 照呼叫端給的值、沒有上限
+  （預設 2 分）；headless 的 permission ask 一律自動拒絕。
+- 實作中抓到的坑：新參數 `-Cli` 與主程式原本的 `$cli`（前端版本描述）不分大小寫是同一個變數，`[string]` 型別把雜湊表轉成字串、`.PsDir` 變空。
+  區域變數改名 `$fe`；test-sdoc 的「只差大小寫的變數」檢查原本只看函式內，擴大到主程式（以改名前的檔反證抓得到）。
+- 驗證：test-sdoc-run 新增 `-Only opencode` 組 20 項（OpenCode 版目錄、model.yaml 各種寫法、-Model／-Cli 檢查、貫穿範例跑到 REVIEW_READY 且工單全指向
+  .opencode 契約、同一份合成 worker 輸出兩版的派工順序與 generated 逐位元相同、同資料夾兩版並存互不影響且環境變數還原、profile 提醒、模型預檢四種結果；
+  Windows 另以假 opencode.cmd 經 cmd.exe 走預檢與 session 命令列）；`tests/runtime-guard/run-sdoc-smoke.mjs`（真 OpenCode 四個 agent 的啟動、模型、讀寫邊界、
+  可見工具、不載入 ~/.claude/CLAUDE.md）；run-clone-smoke 的 `/ps-spec` 改驗 DOC1 命令形狀；test-claude-variant（兩版 sdoc 一一對應、資料檔逐字相同、契約標題相同）；
+  test-bundle（model.yaml 保留本機、無基準不覆寫）；既有測試原樣全過；`claude-code/` 一個檔都沒改。CI：repo 版面加 `-Only opencode`，部署版面改兩個 job
+  （Claude Code 版照舊、OpenCode 版搬運包解開後跑 test-sdoc、`-Only opencode` 與第一次 ps-sdoc）。
+- 待公司機驗：model.yaml 填的 provider／model 能否被 `opencode models` 列出；小模型照契約寫出合格解讀與研究包的比例（不合格兩次就 BLOCKED）；同資料夾兩版並存時的 fs-doctor。
+- 教訓：做備案時把「換什麼」收斂到最少——同一個外環與契約、獨立的狀態目錄、一個設定檔；用「同一份輸入兩版產出逐位元相同」證明只換了前端。

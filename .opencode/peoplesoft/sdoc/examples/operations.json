@@ -1,0 +1,633 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "operations",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "OP",
+      "key": "TW_DEMO_APV:APPROVE:APPROVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:APPROVE"
+      ],
+      "fr": "@FR/TW_DEMO_APV:APPROVE",
+      "name": "核准申請",
+      "opKind": "TRANSITION",
+      "invokedFrom": [
+        "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.APPROVE_PB"
+      ],
+      "authorization": {
+        "any": [
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:020"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_SUPERVISOR"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:025"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "inputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID",
+          "required": true
+        },
+        {
+          "name": "COMMENTS",
+          "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:020"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:025"
+          }
+        ]
+      },
+      "validations": [],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:020>030",
+          "@TRN/REQ_STATUS:020>025",
+          "@TRN/REQ_STATUS:025>030"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+            "value": {
+              "param": "COMMENTS"
+            }
+          }
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "單一列更新（TW_DEMO_REQHDR）；通知在交易提交後才排入。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "STALE_DATA_CHECK",
+          "legacyBehavior": "開啟後到存檔之間若資料已被他人更新，存檔被拒絕並顯示訊息，該筆維持先存檔者的結果，本次輸入不寫入。",
+          "message": "@MSG/27000,4"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "核准後按鈕隱藏；同一狀態不能重複核准。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
+        "events": [
+          "FieldChange",
+          "SaveEdit"
+        ]
+      }
+    },
+    {
+      "type": "OP",
+      "key": "TW_DEMO_APV:RETURN:RETURN",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E3",
+        "E2"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:RETURN"
+      ],
+      "fr": "@FR/TW_DEMO_APV:RETURN",
+      "name": "退回申請",
+      "opKind": "TRANSITION",
+      "invokedFrom": [
+        "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.RETURN_PB"
+      ],
+      "authorization": {
+        "any": [
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:020"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_SUPERVISOR"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:025"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "inputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID",
+          "required": true
+        },
+        {
+          "name": "COMMENTS",
+          "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:020"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:025"
+          }
+        ]
+      },
+      "validations": [
+        "@BR/TW_DEMO_REQWRK.RETURN_PB.FieldChange:RETURN_COMMENT_REQUIRED"
+      ],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:020>015",
+          "@TRN/REQ_STATUS:025>015"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+            "value": {
+              "param": "COMMENTS"
+            }
+          }
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "單一列更新（TW_DEMO_REQHDR）；通知在交易提交後才排入。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "STALE_DATA_CHECK",
+          "legacyBehavior": "開啟後到存檔之間若資料已被他人更新，存檔被拒絕並顯示訊息，該筆維持先存檔者的結果，本次輸入不寫入。",
+          "message": "@MSG/27000,4"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "退回後按鈕隱藏；同一狀態不能重複退回。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange",
+        "events": [
+          "FieldChange",
+          "SaveEdit"
+        ]
+      }
+    },
+    {
+      "type": "OP",
+      "key": "TW_DEMO_REQ:CREATE:SAVE_NEW",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E4"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_REQ:CREATE"
+      ],
+      "fr": "@FR/TW_DEMO_REQ:CREATE",
+      "name": "儲存新申請單",
+      "opKind": "CREATE",
+      "invokedFrom": {
+        "na": "新增模式的工具列儲存，不是頁面上的元件"
+      },
+      "authorization": {
+        "left": {
+          "ctx": "CURRENT_USER_OPRID"
+        },
+        "op": "HAS_ROLE",
+        "right": {
+          "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+        }
+      },
+      "inputs": [
+        {
+          "name": "AMOUNT",
+          "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+          "required": true
+        },
+        {
+          "name": "REASON",
+          "field": "@FLD/TW_DEMO_REQHDR.REASON",
+          "required": true
+        },
+        {
+          "name": "REQ_TYPE",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID"
+        },
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "na": "新建沒有前置狀態"
+      },
+      "validations": [
+        "@BR/TW_DEMO_REQHDR.AMOUNT.SaveEdit:AMOUNT_POSITIVE"
+      ],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:*>010"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": {
+              "param": "AMOUNT"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REASON",
+            "value": {
+              "param": "REASON"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+            "value": {
+              "param": "REQ_TYPE"
+            }
+          }
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "新增一列（TW_DEMO_REQHDR）。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "NOT_APPLICABLE",
+          "legacyBehavior": "新單不存在併發更新；取號的併發行為見 09 的取號規則。"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "存檔後畫面轉為修改模式，再按儲存不會建立第二張單。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "events": [
+          "FieldDefault",
+          "SaveEdit",
+          "SavePreChange"
+        ]
+      }
+    },
+    {
+      "type": "OP",
+      "key": "TW_DEMO_REQ:SUBMIT:SUBMIT",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E5",
+        "E2"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_REQ:SUBMIT"
+      ],
+      "fr": "@FR/TW_DEMO_REQ:SUBMIT",
+      "name": "送出申請",
+      "opKind": "TRANSITION",
+      "invokedFrom": [
+        "@UI/TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.SUBMIT_PB"
+      ],
+      "authorization": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+            }
+          },
+          {
+            "left": {
+              "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "inputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID",
+          "required": true
+        },
+        {
+          "name": "AMOUNT",
+          "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+          "required": true
+        },
+        {
+          "name": "REASON",
+          "field": "@FLD/TW_DEMO_REQHDR.REASON",
+          "required": true
+        },
+        {
+          "name": "REQ_TYPE",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:010"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:015"
+          }
+        ]
+      },
+      "validations": [
+        "@BR/TW_DEMO_REQWRK.SUBMIT_PB.FieldChange:SUPERVISOR_REQUIRED",
+        "@BR/TW_DEMO_REQHDR.AMOUNT.SaveEdit:AMOUNT_POSITIVE"
+      ],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:010>020",
+          "@TRN/REQ_STATUS:015>020"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": {
+              "param": "AMOUNT"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REASON",
+            "value": {
+              "param": "REASON"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+            "value": {
+              "param": "REQ_TYPE"
+            }
+          }
+        ],
+        "interfaces": [
+          "@IF/AE:TW_DEMO_NTFY"
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "單一列更新（TW_DEMO_REQHDR）；通知在交易提交後才排入。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "STALE_DATA_CHECK",
+          "legacyBehavior": "開啟後到存檔之間若資料已被他人更新，存檔被拒絕並顯示訊息，該筆維持先存檔者的結果，本次輸入不寫入。",
+          "message": "@MSG/27000,4"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "送出後按鈕隱藏；同一張單不能重複送出。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+        "events": [
+          "FieldChange",
+          "SaveEdit",
+          "SavePostChange"
+        ]
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "CHUNK",
+      "locator": "0d43ec68-7e00-e634-4cc7-e1dfde4ad337",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" And TW_DEMO_REQHDR.AMOUNT > 50000 Then\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"025\";\nElse\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"030\"; TW_DEMO_REQHDR.APPROVER_EMPLID.Value = %EmployeeId; TW_DEMO_REQHDR.APPROVE_DT.Value = %Date;\nEnd-If;"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "888c4b84-6157-afd1-f62b-fe6c3b98e804",
+      "excerpt": "If TW_DEMO_REQHDR.LASTUPDDTTM <> &loadedDttm Then Error MsgGet(27000, 4, \"此申請單已被其他使用者更新，請重新查詢。\"); End-If;"
+    },
+    {
+      "id": "E3",
+      "kind": "CHUNK",
+      "locator": "22c168df-3068-e7c2-caa4-a8529a7e6f79",
+      "excerpt": "If None(TW_DEMO_REQHDR.COMMENTS) Then Error MsgGet(27000, 2, \"退回時必須填寫審核意見。\"); End-If;\nTW_DEMO_REQHDR.REQ_STATUS.Value = \"015\";"
+    },
+    {
+      "id": "E4",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_REQ.json#pages",
+      "excerpt": "TW_DEMO_REQ: TW_DEMO_REQPG (MAIN), TW_DEMO_REQSEC (SECONDARY)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "E5",
+      "kind": "CHUNK",
+      "locator": "9749aec1-b169-4a6e-0a4f-f9bb9edd1ae8",
+      "excerpt": "&sup = TW_DEMO_GETSUPERVISOR(TW_DEMO_REQHDR.REQUESTER_EMPLID);\nIf None(&sup) Then Error MsgGet(27000, 3, \"找不到直屬主管，無法送出。\"); End-If;\nTW_DEMO_REQHDR.REQ_STATUS.Value = \"020\";\nTW_DEMO_REQHDR.SUBMIT_DT.Value = %Date;"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}

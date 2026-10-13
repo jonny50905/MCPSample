@@ -1,0 +1,863 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:07-database",
+  "title": "07 資料設計",
+  "description": "項目型別：ENT（資料實體）、FLD（資料欄位）、DRV（衍生概念）、XF（不建置原生欄位）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "07-database"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ENT"
+              },
+              {
+                "$ref": "#/$defs/FLD"
+              },
+              {
+                "$ref": "#/$defs/DRV"
+              },
+              {
+                "$ref": "#/$defs/XF"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "ENT": {
+      "type": "object",
+      "title": "ENT（資料實體）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^ENT-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_$#@]+$",
+              "description": "自然鍵：<Record 原名>"
+            },
+            "record": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ",
+              "description": "對應的 Record",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "業務名稱"
+            },
+            "businessMeaning": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "這份資料代表什麼"
+            },
+            "storageKind": {
+              "type": "string",
+              "enum": [
+                "SQL_TABLE",
+                "SQL_VIEW",
+                "DYNAMIC_VIEW",
+                "DERIVED_WORK",
+                "SUBRECORD",
+                "TEMP_TABLE",
+                "QUERY_VIEW",
+                "OTHER_LOGICAL"
+              ],
+              "description": "儲存型態"
+            },
+            "physicalName": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "實體表名（DERIVED_WORK 等寫 NA）"
+            },
+            "keys": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "邏輯鍵欄位（依序）",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "effectiveDating": {
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "NONE",
+                    "EFFDT",
+                    "EFFDT_EFFSEQ"
+                  ]
+                },
+                "currentRow": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/dataOperand"
+                    },
+                    "effStatusActiveOnly": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "effStatusActiveOnly"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "EFFDT",
+                          "EFFDT_EFFSEQ"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "currentRow"
+                    ]
+                  }
+                }
+              ],
+              "description": "有效日規則：目前有效列＝基準日當天或之前最大 EFFDT（再取最大 EFFSEQ），可限定有效狀態",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "parent": {
+              "type": "object",
+              "properties": {
+                "entity": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refENT"
+                },
+                "keyMap": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "child": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                      },
+                      "parent": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                      }
+                    },
+                    "required": [
+                      "child",
+                      "parent"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "entity",
+                "keyMap"
+              ],
+              "additionalProperties": false,
+              "description": "父子關係與鍵對應",
+              "x-ref": [
+                "ENT",
+                "FLD"
+              ]
+            }
+          },
+          "required": [
+            "record",
+            "name",
+            "businessMeaning",
+            "storageKind",
+            "physicalName",
+            "keys",
+            "effectiveDating"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "FLD": {
+      "type": "object",
+      "title": "FLD（資料欄位）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^FLD-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_$#@]+\\.[A-Z0-9_$#@]+$",
+              "description": "自然鍵：<Record>.<欄位>"
+            },
+            "entity": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refENT",
+              "description": "所屬實體",
+              "x-ref": [
+                "ENT"
+              ]
+            },
+            "fieldName": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_$#@]+$",
+              "description": "欄位原名"
+            },
+            "label": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "業務標籤"
+            },
+            "dataType": {
+              "type": "string",
+              "enum": [
+                "CHAR",
+                "LONG_CHAR",
+                "NUMBER",
+                "SIGNED_NUMBER",
+                "DATE",
+                "DATETIME",
+                "TIME",
+                "IMAGE",
+                "ATTACHMENT"
+              ],
+              "description": "型別"
+            },
+            "length": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "長度"
+            },
+            "decimals": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "小數位數"
+            },
+            "required": {
+              "type": "string",
+              "enum": [
+                "ALWAYS",
+                "CONDITIONAL",
+                "NO"
+              ],
+              "description": "Record 層必填；CONDITIONAL 的條件寫在 09 的業務規則"
+            },
+            "default": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/dataOperand"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "Record 層預設值",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "valueDomain": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "xlat": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stored": {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                          },
+                          "label": {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "dataPresence": {
+                            "type": "string",
+                            "enum": [
+                              "HAS_DATA",
+                              "NO_DATA",
+                              "NOT_CHECKED"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "stored",
+                          "label",
+                          "active",
+                          "dataPresence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "xlat"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "prompt": {
+                      "type": "object",
+                      "properties": {
+                        "entity": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/refENT"
+                        },
+                        "keyField": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                        },
+                        "filter": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/dataCondition"
+                        }
+                      },
+                      "required": [
+                        "entity",
+                        "keyField"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "prompt"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "range": {
+                      "type": "object",
+                      "properties": {
+                        "min": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                        },
+                        "max": {
+                          "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                        }
+                      },
+                      "required": [],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "range"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "free": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "free"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "derived": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                    }
+                  },
+                  "required": [
+                    "derived"
+                  ],
+                  "additionalProperties": false
+                }
+              ],
+              "description": "值域；狀態欄位的 xlat 只列狀態圖上的代碼",
+              "x-ref": [
+                "ENT",
+                "FLD",
+                "DRV"
+              ]
+            },
+            "keyRoles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "KEY",
+                  "DUP_ORDER_KEY",
+                  "SEARCH_KEY",
+                  "ALT_SEARCH_KEY",
+                  "LIST_BOX_ITEM"
+                ]
+              },
+              "uniqueItems": true,
+              "description": "鍵屬性"
+            },
+            "relations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "LOGICAL_FK",
+                      "PARENT_KEY",
+                      "PROMPT_LOOKUP"
+                    ]
+                  },
+                  "note": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                  }
+                },
+                "required": [
+                  "target",
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              "description": "與其他欄位的關聯",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "sensitivity": {
+              "type": "string",
+              "enum": [
+                "NONE",
+                "PERSONAL",
+                "CONFIDENTIAL"
+              ],
+              "description": "敏感分類"
+            },
+            "usageEvidence": {
+              "type": "string",
+              "enum": [
+                "DATA_HAS_VALUE",
+                "CODE_REFERENCED",
+                "METADATA_ONLY",
+                "NOT_CHECKED"
+              ],
+              "description": "使用證據等級（供排優先序，不代表排除）"
+            }
+          },
+          "required": [
+            "entity",
+            "fieldName",
+            "label",
+            "dataType",
+            "length",
+            "required",
+            "default",
+            "valueDomain",
+            "keyRoles",
+            "sensitivity",
+            "usageEvidence"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "DRV": {
+      "type": "object",
+      "title": "DRV（衍生概念）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DRV-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{1,59}$",
+              "description": "自然鍵：<代號>"
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "概念名稱（例：申請人的直屬主管）"
+            },
+            "meaning": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "業務意義"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/slug"
+                  },
+                  "from": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/dataOperand"
+                  }
+                },
+                "required": [
+                  "name",
+                  "from"
+                ],
+                "additionalProperties": false
+              },
+              "description": "輸入參數與來源",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "resultType": {
+              "type": "string",
+              "enum": [
+                "PERSON_ID",
+                "CODE",
+                "NUMBER",
+                "DATE",
+                "TEXT",
+                "BOOLEAN",
+                "ROW_SET"
+              ],
+              "description": "結果型別"
+            },
+            "resolution": {
+              "type": "object",
+              "properties": {
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refENT"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "joins": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                      },
+                      "right": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/dataOperand"
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "right"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "filter": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/dataCondition"
+                },
+                "effectiveDating": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "entity": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/refENT"
+                      },
+                      "rule": {
+                        "type": "string",
+                        "enum": [
+                          "CURRENT_ROW",
+                          "AS_OF",
+                          "NONE"
+                        ]
+                      },
+                      "asOf": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/dataOperand"
+                      },
+                      "effStatusActiveOnly": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "entity",
+                      "rule",
+                      "effStatusActiveOnly"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "pick": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                },
+                "tieBreak": {
+                  "anyOf": [
+                    {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                    },
+                    {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "sources",
+                "joins",
+                "filter",
+                "effectiveDating",
+                "pick",
+                "tieBreak"
+              ],
+              "additionalProperties": false,
+              "description": "查找規則：從哪些表、怎麼串、篩選、取哪一欄",
+              "x-ref": [
+                "ENT",
+                "FLD",
+                "DRV"
+              ]
+            },
+            "whenNotFound": {
+              "type": "object",
+              "required": [
+                "result",
+                "note"
+              ],
+              "properties": {
+                "result": {
+                  "type": "string",
+                  "enum": [
+                    "EMPTY",
+                    "FALLBACK"
+                  ]
+                },
+                "fallback": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                },
+                "note": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                }
+              },
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "result": {
+                        "const": "FALLBACK"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "fallback"
+                    ]
+                  }
+                }
+              ],
+              "description": "查無結果時的行為（訊息與阻擋寫在 09）",
+              "x-ref": [
+                "DRV"
+              ]
+            },
+            "whenMultiple": {
+              "type": "object",
+              "properties": {
+                "rule": {
+                  "type": "string",
+                  "enum": [
+                    "UNIQUE_BY_KEY",
+                    "FIRST_BY_ORDER",
+                    "ALL_ROWS"
+                  ]
+                },
+                "orderBy": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                  },
+                  "minItems": 1
+                },
+                "note": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                }
+              },
+              "required": [
+                "rule",
+                "note"
+              ],
+              "additionalProperties": false,
+              "description": "多筆時的取法",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "implementedAt": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "原系統實作位置",
+              "x-ref": [
+                "OBJ"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "meaning",
+            "inputs",
+            "resultType",
+            "resolution",
+            "whenNotFound",
+            "whenMultiple",
+            "implementedAt"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "XF": {
+      "type": "object",
+      "title": "XF（不建置原生欄位）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^XF-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_$#@]+$",
+              "description": "自然鍵：<Record 原名>"
+            },
+            "entity": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refENT",
+              "description": "所屬實體",
+              "x-ref": [
+                "ENT"
+              ]
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z0-9_$#@]+$"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "判定無用的欄位"
+            },
+            "dataCheck": {
+              "type": "string",
+              "pattern": "^非預設 0 筆（全表非空，查詢日 \\d{4}-\\d{2}-\\d{2}）$",
+              "description": "資料剖析結論"
+            },
+            "codeChecks": {
+              "type": "object",
+              "properties": {
+                "a": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                "b": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                "c": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                }
+              },
+              "required": [
+                "a",
+                "b",
+                "c"
+              ],
+              "additionalProperties": false,
+              "description": "程式面查法結果"
+            }
+          },
+          "required": [
+            "entity",
+            "fields",
+            "dataCheck",
+            "codeChecks"
+          ]
+        },
+        {
+          "properties": {
+            "evidence": {
+              "minItems": 2
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

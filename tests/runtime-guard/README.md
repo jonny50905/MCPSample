@@ -38,7 +38,14 @@ chat.message 的 messageID 集合＝export 真實題目 id 集合；task before 
 | vanish-observe（serve，auto off） | 同上 | recovery 列只有 would-remount；假 MCP 只起一次；A3 仍看不到工具、模型回報 DOWN |
 | transport-close（serve，auto on） | 假 MCP 行程結束（狀態 failed: Connection closed） | 事件觸發：recovery [transport-closed remount-start, remount-ok, verified-by-call]；假 MCP 起過兩次；A2 新 session 恢復、零 invalid、connect 回覆附註 |
 
-取得 binary（沙箱）：`npm pack opencode-linux-x64@1.18.29` 解開後 `package/bin/opencode`。
+另外兩支 smoke（同樣是真 OpenCode＋localhost 劇本模型、不連 MCP，與 plugin 無關）：
+
+| 檔 | 驗什麼 | 跑法 |
+|---|---|---|
+| `run-clone-smoke.mjs` | `/ps-spec`（ps-spec-author）只准 `powershell -NoProfile -File scripts/ps-sdoc.ps1 -Cli opencode …`（舊的 ps-spec-build 與漏了 `-Cli opencode` 的命令都擋）、`-Status` 回 DOC1-0-01；`/ps-clone-batch`（ps-clone-worker）只寫 packet.json | `OPENCODE_BIN=<binary> node tests/runtime-guard/run-clone-smoke.mjs` |
+| `run-sdoc-smoke.mjs` | Spec 文件外環的四個 agent（ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）照外環的叫法 `opencode run --agent <名> --model <model> "<jobId>/<attemptId>"` 啟動：沒有退回預設 agent、回覆來自 `--model`；read／write 權限只放行工單範圍（讀者讀不到 attempt 的標準答案與研究、只寫 inbox/output.json，狀態圖讀者只寫 output-part-NN.json／output.json）；看得到的工具（讀者與判定只有 read／write＋共用 edit 權限的 edit）；`OPENCODE_DISABLE_CLAUDE_CODE=1` 時不載入 `~/.claude/CLAUDE.md` | `OPENCODE_BIN=<binary> node tests/runtime-guard/run-sdoc-smoke.mjs` |
+
+取得 binary（沙箱）：`npm pack opencode-linux-x64@1.18.29` 解開後 `package/bin/opencode`。PATH 上要有 `powershell`（沙箱用 pwsh 的同名連結）。
 e2e 每個 run 類情境約 12～30 秒（含臨時 XDG 目錄的首次初始化），serve 類 35～80 秒；`--keep` 保留工作目錄
 （含 run.stdout／stderr、guard jsonl、`_mcp-diag.jsonl`、export.json、mcp／model 紀錄）。
 注意：OpenCode 用 `PWD` 環境變數決定專案目錄（run.ts），執行器已為子行程設定 `PWD`；`serve` 啟動後第一個請求可能掛住（執行器 20 秒逾時重試）。

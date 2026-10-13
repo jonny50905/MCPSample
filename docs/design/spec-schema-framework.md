@@ -1,6 +1,6 @@
 # AI 產生規格的文件契約框架——設計提案（issue #37）
 
-> **狀態**：設計提案；Claude Code 版已依本設計實作（`scripts/ps-sdoc.ps1`，SOP-28）。實作與本文不同處記在 applied.md L136、L137，
+> **狀態**：設計提案；Claude Code 版已依本設計實作（`scripts/ps-sdoc.ps1`，SOP-28），OpenCode 版以同一個外環加 `-Cli opencode` 執行（SOP-29）。實作與本文不同處記在 applied.md L136、L137，
 > 主要是：人工輸入放 `.ps-private/sdoc/<jobId>/`（本文的 `.ps-private/spec/<job>/` 改名，避免和 SPEC1 私有 pack 撞名）；
 > 知識庫更新只提示 -Refresh、不自動換版本；L5 答案格式攤平、結構題只比 ID 集合。
 > **基準**：`main` @ `baae9f9`；分支 `claude/brave-dirac-4q469u`；2026-10-08。

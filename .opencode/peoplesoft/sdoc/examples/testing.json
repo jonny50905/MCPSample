@@ -1,0 +1,346 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "testing",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "TC",
+      "key": "TW_DEMO_APV:APPROVE:BOUNDARY:AMOUNT_AT_LIMIT",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:APPROVE"
+      ],
+      "name": "金額剛好 50000 時一次核准",
+      "scenarioType": "BOUNDARY",
+      "fr": "@FR/TW_DEMO_APV:APPROVE",
+      "covers": {
+        "transitions": [
+          "@TRN/REQ_STATUS:020>030"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "@DRV/REQUESTER_SUPERVISOR"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID",
+            "value": "E1001"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.SUPERVISOR_ID",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.DEPTID",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_DEPT.MANAGER_ID",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+            "value": "020"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": "50000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "@STATE/REQ_STATUS:020"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 開啟該申請單並按「核准」",
+          "control": "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.APPROVE_PB",
+          "operation": "@OP/TW_DEMO_APV:APPROVE:APPROVE"
+        }
+      ],
+      "expected": {
+        "resultState": "@STATE/REQ_STATUS:030",
+        "data": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.APPROVER_EMPLID",
+            "value": "E2001"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.APPROVE_DT",
+            "value": "測試當日"
+          }
+        ]
+      },
+      "verification": "查該列 REQ_STATUS＝030、APPROVER_EMPLID＝E2001、APPROVE_DT＝測試當日。"
+    },
+    {
+      "type": "TC",
+      "key": "TW_DEMO_APV:APPROVE:BOUNDARY:AMOUNT_OVER_LIMIT",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:APPROVE"
+      ],
+      "name": "金額 50000.01 時轉部門主管",
+      "scenarioType": "BOUNDARY",
+      "fr": "@FR/TW_DEMO_APV:APPROVE",
+      "covers": {
+        "transitions": [
+          "@TRN/REQ_STATUS:020>025"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "@DRV/REQUESTER_SUPERVISOR"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID",
+            "value": "E1001"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.SUPERVISOR_ID",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.DEPTID",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_DEPT.MANAGER_ID",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+            "value": "020"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": "50000.01"
+          }
+        ],
+        "synthetic": true,
+        "state": "@STATE/REQ_STATUS:020"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 開啟該申請單並按「核准」",
+          "control": "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.APPROVE_PB",
+          "operation": "@OP/TW_DEMO_APV:APPROVE:APPROVE"
+        }
+      ],
+      "expected": {
+        "resultState": "@STATE/REQ_STATUS:025"
+      },
+      "verification": "查該列 REQ_STATUS＝025；APPROVER_EMPLID 未寫入。"
+    },
+    {
+      "type": "TC",
+      "key": "TW_DEMO_APV:APPROVE:NEGATIVE:NOT_SUPERVISOR",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:APPROVE"
+      ],
+      "name": "具審核角色但不是直屬主管者看不到申請單",
+      "scenarioType": "NEGATIVE",
+      "fr": "@FR/TW_DEMO_APV:APPROVE",
+      "covers": {
+        "transitions": [
+          "@TRN/REQ_STATUS:020>030"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "all": [
+            {
+              "left": {
+                "ctx": "CURRENT_USER_OPRID"
+              },
+              "op": "HAS_ROLE",
+              "right": {
+                "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+              }
+            },
+            {
+              "left": {
+                "drv": "@DRV/REQUESTER_SUPERVISOR"
+              },
+              "op": "NE",
+              "right": {
+                "ctx": "CURRENT_USER_EMPLID"
+              }
+            }
+          ]
+        },
+        "data": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID",
+            "value": "E1001"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.SUPERVISOR_ID",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.DEPTID",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_DEPT.MANAGER_ID",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+            "value": "020"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": "1000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "@STATE/REQ_STATUS:020"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2999（具審核角色、但不是 E1001 的直屬主管）查詢該申請單"
+        }
+      ],
+      "expected": {
+        "noDataChange": true
+      },
+      "verification": "查詢結果不含此單；該列資料不變。"
+    },
+    {
+      "type": "TC",
+      "key": "TW_DEMO_APV:APPROVE:POSITIVE:HIGH_AMOUNT_END_TO_END",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:APPROVE"
+      ],
+      "name": "高額案件兩段核准",
+      "scenarioType": "POSITIVE",
+      "fr": "@FR/TW_DEMO_APV:APPROVE",
+      "covers": {
+        "flows": [
+          "@FLOW/REQ_STATUS:高額審核"
+        ],
+        "transitions": [
+          "@TRN/REQ_STATUS:020>025",
+          "@TRN/REQ_STATUS:025>030"
+        ]
+      },
+      "preconditions": {
+        "actor": {
+          "left": {
+            "drv": "@DRV/REQUESTER_SUPERVISOR"
+          },
+          "op": "EQ",
+          "right": {
+            "ctx": "CURRENT_USER_EMPLID"
+          }
+        },
+        "data": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID",
+            "value": "E1001"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.SUPERVISOR_ID",
+            "value": "E2001",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_EMP.DEPTID",
+            "value": "D100",
+            "note": "E1001 的目前有效任職列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_DEPT.MANAGER_ID",
+            "value": "E3001",
+            "note": "D100 的目前有效列"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS",
+            "value": "020"
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": "80000.00"
+          }
+        ],
+        "synthetic": true,
+        "state": "@STATE/REQ_STATUS:020"
+      },
+      "steps": [
+        {
+          "seq": 1,
+          "action": "以 E2001 按「核准」，狀態轉為 025",
+          "control": "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.APPROVE_PB",
+          "operation": "@OP/TW_DEMO_APV:APPROVE:APPROVE"
+        },
+        {
+          "seq": 2,
+          "action": "以 E3001（D100 部門主管）開啟同一張單並按「核准」",
+          "control": "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.APPROVE_PB",
+          "operation": "@OP/TW_DEMO_APV:APPROVE:APPROVE"
+        }
+      ],
+      "expected": {
+        "resultState": "@STATE/REQ_STATUS:030",
+        "data": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.APPROVER_EMPLID",
+            "value": "E3001"
+          }
+        ]
+      },
+      "verification": "第一步後 REQ_STATUS＝025；第二步後 REQ_STATUS＝030、APPROVER_EMPLID＝E3001。"
+    }
+  ],
+  "evidence": [],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}

@@ -886,12 +886,14 @@ Render 使用新綁定；內容事實有改仍須 Plan。NO_EVIDENCE 不是不�
 
 ## SOP-25 Component 直接產生核心功能重建 Spec
 
+> OpenCode 版的 `/ps-spec` 與 `ps-spec-author` 已改走 Spec 文件流程（00-index＋14 份＋90，SOP-28／SOP-29）。
+> 本節的單一 spec.md（CLONE1）仍可用：在 PowerShell 直接執行下方的 `scripts/ps-spec-build.ps1`；第 1、2 步的對話入口只剩歷史參考。
+
 ### 日常操作
 
-1. OpenCode 對話輸入 `/ps-spec TW_DEMO_A TW_DEMO_B`；也可切至 `ps-spec-author` 後輸入
-   `TW_DEMO_A,TW_DEMO_B`。ps-orchestrator 遇到明確寫 Spec 要求或純 Component 清單也會轉交。
-   所有名稱均為合成範例，實際名稱只在公司機輸入。無須 Pack／Domain／自行挑內部階段。
-2. author 自動分輪呼叫 `scripts/ps-spec-build.ps1`，每輪預設 4 個 session，RUNNABLE 就續跑。
+1. （對話入口已改走 SOP-29）在 repo 根目錄的 PowerShell 執行下方的 `scripts/ps-spec-build.ps1` 命令，輸入
+   `TW_DEMO_A,TW_DEMO_B`。所有名稱均為合成範例，實際名稱只在公司機輸入。無須 Pack／Domain／自行挑內部階段。
+2. 每次呼叫預設跑 4 個 session，RUNNABLE（`CLONE1-3-02-<n>`）就用同一個命令續跑。
    範圍先研究再獨立覆核；之後依 10 個 topic 分段查證及覆核。每頁最多 40 筆，每 topic 最多 20 頁。
    兩次無效或覆核失敗後暫停該頁；可繼續的其他 Component／主題仍會處理，不無限重試。
 3. 回覆會顯示 `docs/ps-spec/<job>/README.md` 與最新文件位置。spec.md 是自足的核心行為契約，
@@ -1004,9 +1006,10 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
   變成雙 BOM。雙 BOM 的 `.ps1` 在 5.1 報的錯會指在檔案開頭（例如 `Unexpected attribute 'CmdletBinding'`／「未預期的屬性」），
   看起來像語法錯。遇到就跑 `ps-fs-doctor` 看檢查 D，再用搬運包重解一次：`scripts\` 底下的檔一律以新版覆寫，雙 BOM 會一起修掉。
 
-## SOP-28 Spec 文件（Claude Code 版：00-index＋14 份文件＋90 問題清單；issue #37）
+## SOP-28 Spec 文件（00-index＋14 份文件＋90 問題清單；issue #37）
 
-Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP-25）。入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，
+兩版的 `/ps-spec` 都走 `scripts/ps-sdoc.ps1`。本節以 Claude Code 版為主；OpenCode 版（外環加 `-Cli opencode`、目錄各加 `-opencode`、
+模型在 `.opencode/peoplesoft/sdoc/model.yaml`）的差異見 SOP-29。Claude Code 版入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，
 或 `claude --agent ps-spec-author` 後輸入清單（名稱為合成範例）。結論碼見 `.claude/peoplesoft/spec/support-codes.md` 的 DOC1。
 
 ### 日常操作
@@ -1090,3 +1093,61 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
   新增測試要加進工作流程的清單；`test-oracle-runtime.ps1` 需要真 OpenCode session，不放進去。
 - 5.1 相容的靜態檢查：除 `test-ps51-static.ps1` 外，可用 PSScriptAnalyzer 的 PSUseCompatibleSyntax／Commands／Types 規則配 Windows PowerShell 5.1
   設定檔（模組內附 `compatibility_profiles`）；它查不到預設編碼、ConvertFrom-Json 行為、原生命令 stderr、排序文化、路徑分隔這類語意差異。
+
+## SOP-29 Spec 文件 OpenCode 版（Claude Code 版的備案；兩版並行）
+
+Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的問題時，用 OpenCode CLI＋另一個模型跑同一個 Spec 文件流程。
+研究規則、檢核、產出格式與 Claude Code 版相同（同一個外環 `scripts/ps-sdoc.ps1`；同一份 worker 輸出兩版發布的文件逐位元相同），
+只換 CLI 與模型。Claude Code 版的檔（`CLAUDE.md`、`.claude/**`）不必動、不必重搬。
+
+□ 1. 搬運：OpenCode 版搬運包（`transfer/ps-bundle-opencode-01ofNN.txt`…，SOP-27）。可以解在 Claude Code 版的同一個資料夾
+     （`scripts/**` 兩版共用、`.claude/` 不受影響；研究知識 `docs/ps-research`、狀態圖都在原地），也可以另開資料夾。
+□ 2. **唯一要填的地方**：`.opencode/peoplesoft/sdoc/model.yaml` 的 `model` 那一行，寫 `<provider>/<model>`，照
+     `opencode models <provider>` 列出的原樣（大小寫、冒號、斜線照抄）。預設先放小模型 `anthropic/claude-haiku-4-5`。
+     provider 的連線（網址、金鑰）在 OpenCode 自己的全域 `opencode.json`，不寫進 repo。狀態圖讀者、研究、覆核、乾淨讀者、判定的
+     session 全用這個模型；臨時試別的模型可在命令加 `-Model <provider>/<model>`（不改檔）。搬運包重解時，已填的 model.yaml 保留本機。
+□ 3. 其他沿用 OpenCode 版原本的設定：全域 `opencode.json` 註冊的四個 MCP（名字逐字相同）、SOP-17 第 0 步的 headless 權限
+     （`doom_loop: deny`、`external_directory: allow`）、`.opencode/peoplesoft/customization-profile.yaml` 已回填的值
+     （兩版 profile 鍵值相同：沒填過就把 `.claude\peoplesoft\customization-profile.yaml` 整份複製過來；外環看到沒填會提醒）。
+□ 4. 執行（在專案資料夾的 PowerShell）：
+     `powershell -NoProfile -File scripts\ps-sdoc.ps1 -Cli opencode -Components 'TW_DEMO_A,TW_DEMO_B'`
+     （名稱為合成範例）。同一資料夾有 `.claude/` 時 `-Cli opencode` 一定要帶，不帶就是 Claude Code 版；另開的資料夾只有
+     `.opencode/` 時可省略。也可在 OpenCode 對話切到 `ps-spec-author` 後輸入 `/ps-spec TW_DEMO_A TW_DEMO_B`（它固定帶 `-Cli opencode`、
+     每次一個 session、DOC1-3-02-<n> 自動續跑）。輸出最前面一行 `OpenCode 模型：<model>（<設定檔>）` 是這次用的模型。
+□ 5. 第一次：DOC1-0-01，在 `.ps-private\sdoc-opencode\<jobId>\` 建四個骨架檔（填法同 SOP-28）。同一資料夾的 Claude Code 版
+     已放好同一組 Component 的 status.md 時，自動複製 status.md（與已填的 project.md）過來；之後兩版各自獨立，改一邊不影響另一邊。
+□ 6. 開第一個 session 前，外環先問 `opencode models <provider>`：模型不在清單或 provider 沒設定 → 印「模型不能用」並停在 DOC1-9-01
+     （不必等 session 失敗）；查不了（逾時、無法執行）只提醒、照常開 session。
+□ 7. 結論碼與 SOP-28 相同（`.opencode/peoplesoft/spec/support-codes.md` 的 DOC1）。DOC1-3-04（session 失敗）時：OpenCode 沒有
+     Claude Code 的 api_retry 事件，判讀行只有逾時與靜止時間；錯誤訊息在 `.ps-runtime\sdoc-opencode-logs\` 最新的 `.err.txt`
+     （OpenCode 對模型名、provider 錯誤常只回「Unexpected server error」——先回第 2 步確認模型）。
+
+| 什麼 | Claude Code 版 | OpenCode 版 |
+|---|---|---|
+| 命令 | `scripts\ps-sdoc.ps1 -Components '…'` | 同左加 `-Cli opencode` |
+| 模型 | `.claude/settings.json`（sonnet） | `.opencode/peoplesoft/sdoc/model.yaml`（唯一要填） |
+| 人工輸入 | `.ps-private\sdoc\<jobId>\` | `.ps-private\sdoc-opencode\<jobId>\` |
+| 產出入口 | `docs\ps-spec\<jobId>\README.md` | `docs\ps-spec-opencode\<jobId>\README.md` |
+| 執行狀態／log | `.ps-runtime\sdoc\`／`.ps-runtime\sdoc-logs\` | `.ps-runtime\sdoc-opencode\`／`.ps-runtime\sdoc-opencode-logs\` |
+| 契約、schema、範例 | `.claude/peoplesoft/sdoc/` | `.opencode/peoplesoft/sdoc/`（資料檔逐字相同，契約只換工具用語） |
+| agent 讀寫範圍 | hook（PowerShell） | agent 檔的 permission（read／edit／task） |
+
+- 兩版同一資料夾並存：jobId 相同，但目錄分開、各有自己的研究版本，互不覆蓋；換來換去不會讓另一版重開研究版本。
+  同一台機器同一時間只跑一個 headless session（session slot）：另一版正在跑時會停在 DOC1-3-03，錯開時間再跑。
+- 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：不載入家目錄 `~/.claude/CLAUDE.md` 與 `.claude/skills`
+  （公司機也裝了 Claude Code，不讓兩邊的設定混在一起）。只在 ps-sdoc 這個行程內，跑完還原。
+- 自己開 OpenCode 對話（TUI）時，同一資料夾的 `.claude/skills` 會和 `.opencode/skills` 同名；要在同一資料夾開對話，先在同一個
+  PowerShell 視窗設 `$env:OPENCODE_DISABLE_CLAUDE_CODE = '1'` 再執行 `opencode`。
+- 小模型調整：狀態圖解讀每段行數 `$env:PS_SDOC_READING_PART_LINES`（預設 60；回應常被截斷時調小，例如 30）；每個 session 上限 `-TimeoutMin`。
+- OpenCode 的 grep／glob 權限只比對搜尋字樣、不比對路徑：研究 worker 的 grep 可能搜到工單範圍外的檔（讀檔仍受 read 權限限制，
+  與 ps-clone-worker 相同）；乾淨讀者與判定因此不開 grep／glob，只用 read（讀目錄會列出檔名）。
+- 回報維護端：最後一行 DOC1 結論碼、說明是 OpenCode 版，以及「欄位統計」「乾淨讀者（L5）」兩行的計數；模型只講類別（例：地端小模型），
+  不貼 provider 網址、路徑、物件名。
+
+### 維護驗證
+
+`test-sdoc-run.ps1 -Only opencode`（OpenCode 版的目錄、model.yaml、`-Model`／`-Cli` 檢查、與 Claude Code 版同資料夾並存、
+同一份合成 worker 輸出兩版發布的文件逐位元相同、模型預檢；Windows 另以假 `opencode.cmd` 真的經 cmd.exe 走一次預檢與 session 命令列）、
+`node tests/runtime-guard/run-sdoc-smoke.mjs`（真 OpenCode：四個外環 agent 以 `--agent`＋`--model` 啟動、read／write 權限邊界、
+不載入 `~/.claude/CLAUDE.md`）、`node tests/runtime-guard/run-clone-smoke.mjs`（`/ps-spec` 只准 `ps-sdoc.ps1 -Cli opencode …`）、
+`test-claude-variant.ps1`（兩版 sdoc 一一對應、資料檔逐字相同、契約標題相同）、`test-bundle.ps1`（model.yaml 保留本機）。

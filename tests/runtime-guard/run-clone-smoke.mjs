@@ -1,4 +1,4 @@
-// 真 OpenCode + localhost 劇本模型：驗 /ps-spec、工單 command、工具權限。
+// 真 OpenCode + localhost 劇本模型：驗 /ps-spec（Spec 文件流程的入口）、clone 工單 command、工具權限。
 // 不驗模型理解或企業功能；只用 TW_DEMO_A 合成資料，不連 MCP。
 // OPENCODE_BIN=<exe> node tests/runtime-guard/run-clone-smoke.mjs
 import fs from 'node:fs'
@@ -88,13 +88,17 @@ if (process.argv[2] === '--model') {
     } finally { model.kill() }
   }
   console.log('synthetic workdir: ' + base)
+  // /ps-spec 走 Spec 文件流程（ps-sdoc -Cli opencode）；舊的 ps-spec-build 命令與漏了 -Cli opencode 的 ps-sdoc 命令都被擋
   await scenario('author-command', ['--command', 'ps-spec', '狀態 TW_DEMO_A'], [
-    { name: 'bash', args: { command: "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A' -Status", description: '合成規格狀態', timeout: 7200000 } },
+    { name: 'bash', args: { command: "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A' -Status", description: '舊的規格命令', timeout: 7200000 } },
+    { name: 'bash', args: { command: "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_DEMO_A' -Status", description: '漏了 -Cli opencode', timeout: 7200000 } },
+    { name: 'bash', args: { command: "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Cli opencode -Components 'TW_DEMO_A' -Status", description: '合成文件狀態', timeout: 7200000 } },
   ], (parts, logs) => {
-    assert.equal(parts.length, 1)
-    assert.equal(parts[0].tool, 'bash')
-    assert.equal(parts[0].state.status, 'completed')
-    assert.match(parts[0].state.output, /CLONE1-0-02/)
+    assert.equal(parts.length, 3)
+    assert.deepEqual(parts.map(p => p.tool), ['bash', 'bash', 'bash'])
+    assert.deepEqual(parts.map(p => p.state.status), ['error', 'error', 'completed'])
+    assert.match(parts[2].state.output, /DOC1-0-01/)
+    assert.match(parts[2].state.output, /OpenCode 模型：/)
     for (const row of logs) { assert.ok(row.names.includes('bash')); assert.ok(!row.names.includes('write')); assert.ok(!row.names.includes('task')) }
   })
   await scenario('worker-command', ['--command', 'ps-clone-batch', job + '/a0001'], [

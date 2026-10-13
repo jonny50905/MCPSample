@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "texts",
+  "subject": "JOB",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "ACT",
+      "key": "REQ_STATUS:020:01",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "entityKey": "REQ_STATUS",
+      "state": "@STATE/REQ_STATUS:020",
+      "name": "直屬主管審核申請",
+      "behavior": "直屬主管審核申請內容",
+      "actors": [
+        {
+          "drv": "@DRV/REQUESTER_SUPERVISOR"
+        }
+      ],
+      "enforcement": "BY_TRANSITION",
+      "realizedBy": [
+        "@TRN/REQ_STATUS:020>030",
+        "@TRN/REQ_STATUS:020>025",
+        "@TRN/REQ_STATUS:020>015"
+      ],
+      "completion": {
+        "na": "核准或退回（離開 020）即完成；系統沒有另外記錄審核進度"
+      }
+    },
+    {
+      "type": "ACT",
+      "key": "REQ_STATUS:025:01",
+      "basis": "AUTHORITATIVE_DOC",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E3",
+        "E2"
+      ],
+      "entityKey": "REQ_STATUS",
+      "state": "@STATE/REQ_STATUS:025",
+      "name": "部門主管審核高額申請",
+      "behavior": "部門主管審核",
+      "actors": [
+        {
+          "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+        }
+      ],
+      "enforcement": "BY_TRANSITION",
+      "realizedBy": [
+        "@TRN/REQ_STATUS:025>030",
+        "@TRN/REQ_STATUS:025>015"
+      ],
+      "completion": {
+        "na": "核准或退回（離開 025）即完成；系統沒有另外記錄審核進度"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L50",
+      "excerpt": "- 020 待主管審核：直屬主管審核申請內容。"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "422e08e9-6536-e965-9c9c-01d43a181f47",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" And &sup <> %EmployeeId Then Error ...;\nIf TW_DEMO_REQHDR.REQ_STATUS = \"025\" And &mgr <> %EmployeeId Then Error ...;"
+    },
+    {
+      "id": "E3",
+      "kind": "STATUS_DOC",
+      "locator": "status.md#L51",
+      "excerpt": "- 025 待部門主管審核：部門主管審核。"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": "",
+  "statusTexts": [
+    {
+      "line": 3,
+      "disposition": "NO_SPEC_CONTENT",
+      "note": "說明這份檔案的內容，沒有規格內容。"
+    },
+    {
+      "line": 50,
+      "disposition": "MAPPED",
+      "items": [
+        "@ACT/REQ_STATUS:020:01"
+      ]
+    },
+    {
+      "line": 51,
+      "disposition": "MAPPED",
+      "items": [
+        "@ACT/REQ_STATUS:025:01"
+      ]
+    },
+    {
+      "line": 52,
+      "disposition": "MAPPED",
+      "items": [
+        "@STATE/REQ_STATUS:090"
+      ],
+      "note": "090 是終點；畫面在 090 不顯示送出與撤回按鈕（見 05）。"
+    }
+  ]
+}

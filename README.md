@@ -44,18 +44,20 @@ Record 定義與 Portal Registry 裡，客製（`TW_` 前綴等）又疊在原�
 ## 用 Component 直接產生重建規格
 
 在 OpenCode 對話輸入 `/ps-spec TW_DEMO_A TW_DEMO_B`，或切到 `ps-spec-author`
-後直接輸入一個或多個 Component。名稱只是合成範例，請在公司機換成確切名稱。
-不必先填 pack JSON、不必指定 Domain、不必先研究整個領域。
+後直接輸入一個或多個 Component；不開對話也可以在 PowerShell 執行
+`powershell -NoProfile -File scripts\ps-sdoc.ps1 -Cli opencode -Components 'TW_DEMO_A,TW_DEMO_B'`。
+名稱只是合成範例，請在公司機換成確切名稱。不必先填 pack JSON、不必指定 Domain、不必先研究整個領域。
 
-流程會先確認核心範圍，再逐段研究畫面、資料、欄位條件、狀態機、交易、介面、權限與驗收情境，
-由另一個 session 覆核後組成繁體中文 Spec；技術識別字與原始值保留原文。
-只納入指定功能真正使用的 PeopleSoft 依賴，不展開無關原生功能。
+產出是給另一個 LLM 重建功能用的 Spec 文件：00-index（入口）、14 份文件、90 問題清單（DOC1，與 Claude Code 版同一個外環）。
+人工輸入是這組 Component 的狀態圖（`.ps-private/sdoc-opencode/<job>/status.md`）；之後三位讀者解讀狀態圖、
+依序研究範圍、資料、權限、流程、介面、功能、畫面、規則、操作、測試（每頁研究與獨立覆核分開 session），
+最後由只看文件的乾淨讀者驗證讀得懂。外環開的 session 用的模型**只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定**。
 
-輸出位於 `docs/ps-spec/<job>/README.md`（最新文件入口）與同目錄的 `current.json`。
-中斷後重送相同清單即續跑；缺證據會留下草稿與缺口，不會宣稱已完成。
-`REVIEW_READY` 表示可供內部審閱，**不是企業 E2E 或重建等價保證**。
-詳見 [SOP-25](.opencode/peoplesoft/SOP.md#sop-25-component-直接產生核心功能重建-spec)。
-既有公司 Template／Checklist 精準映射仍可用 SOP-24 的私有 pack 路徑，但不是這個入口的前置步驟。
+輸出位於 `docs/ps-spec-opencode/<job>/README.md`（最新文件入口）。中斷後重送相同清單即續跑；
+缺證據會留下草稿與 90 的問題，不會宣稱已完成。`REVIEW_READY` 表示可供內部審閱，**不是企業 E2E 或重建等價保證**。
+詳見 [SOP-29](.opencode/peoplesoft/SOP.md#sop-29-spec-文件-opencode-版claude-code-版的備案兩版並行)（與 Claude Code 版並行的方式）
+與 SOP-28。舊的單一 spec.md（CLONE1）仍可直接跑 `scripts/ps-spec-build.ps1`（SOP-25）；
+既有公司 Template／Checklist 精準映射仍可用 SOP-24 的私有 pack 路徑。
 
 ## 證據契約（整個框架的地基）
 
@@ -115,7 +117,7 @@ skill    決定「怎麼做」   載入當下 context 的作業程序（查法�
 
 | 指令 | 做什麼 |
 |---|---|
-| `/ps-spec <Component...>` | 直接產核心功能重建規格；支援複數 Component、分段查證／獨立覆核與續跑 |
+| `/ps-spec <Component...>` | 直接產 Spec 文件（00-index＋14 份＋90 問題清單）；支援複數 Component、分頁研究／獨立覆核、乾淨讀者驗證與續跑 |
 | `/ps-research <領域>` | 產完整業務文件：總覽 ＋ 逐功能深查 → `docs/ps-research/<領域>/`。中斷後重跑即續跑 |
 | `/ps-audit <領域>` | 稽核：逐檔委派 `ps-auditor` 做證據解引用、claim 反駁抽驗、完整性 diff → 產 `90-audit.md`，問題回灌 checklist |
 | `/ps-lesson <描述>` | 模型答錯時登錄教訓：自動分類落點、套用最小修改、記進 `applied.md` |
@@ -132,8 +134,12 @@ OpenCode 內建 agent 重新上鎖。
 
 | Agent | 類型 | 職責 |
 |---|---|---|
-| `ps-spec-author` | all | 對話／委派入口：接收 Component，執行規格外環，回報文件與缺口 |
-| `ps-clone-worker` | primary | 外環專用：只研究或覆核一個 Component／topic／頁，不直接寫最終 Spec |
+| `ps-spec-author` | all | 對話／委派入口：接收 Component，執行 Spec 文件外環（`ps-sdoc.ps1 -Cli opencode`），回報文件與缺口 |
+| `ps-status-reader` | primary | Spec 文件外環專用：三位讀者之一，獨立解讀狀態圖（或回答第 2 輪確認），只寫工單指定的檔 |
+| `ps-sdoc-worker` | primary | Spec 文件外環專用：一頁研究或獨立覆核，委派 flow subagent 查證，只寫該 attempt 的 output.json |
+| `ps-spec-reader` | primary | Spec 文件外環專用：L5 乾淨讀者，只讀渲染後文件作答 |
+| `ps-spec-judge` | primary | Spec 文件外環專用：L5 文字題判定 |
+| `ps-clone-worker` | primary | CLONE1 外環專用（`ps-spec-build.ps1`）：只研究或覆核一個 Component／topic／頁，不直接寫最終 Spec |
 | `ps-orchestrator` | primary | 業務問答主流程：解析領域與客製政策，把重檢索委派出去，彙整 JSON 報告後產出業務說明 |
 | `ps-deep-research` | primary | 文件生成：總覽 ＋ 調查 checklist ＋ 逐功能深查，可中斷續跑 |
 | `ps-auditor` | subagent | 稽核：證據解引用驗證（chunk／SQL 重查比對）、claim 反駁、換角度完整性盤點 |
@@ -289,6 +295,7 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-supplemental.ps1`（＋`ps-supplemental-lib.ps1`） | 補研究 request 提交／狀態／結果；執行在 `ps-auto-loop -SupplementalOnly` | `docs/ps-research/supplemental/requests/` |
 | `ps-spec.ps1`（＋`ps-spec-lib.ps1`） | Spec 引擎：私有需求包驗證、規劃、外環、render、gate、doctor | `.ps-runtime/spec/`（gitignore） |
 | `ps-spec-build.ps1`（＋`ps-spec-clone-lib.ps1`） | Component 直接產核心重建 Spec：範圍、分段研究、獨立覆核、自動組文／續跑 | `.ps-runtime/clone-spec/`、`docs/ps-spec/`（皆 gitignore） |
+| `ps-sdoc.ps1 -Cli opencode`（＋`ps-sdoc-*-lib.ps1`） | Spec 文件（`/ps-spec` 的外環）：狀態圖解讀、依序研究與獨立覆核、乾淨讀者、組裝發布；模型讀 `.opencode/peoplesoft/sdoc/model.yaml` | `.ps-private/sdoc-opencode/`、`.ps-runtime/sdoc-opencode/`、`docs/ps-spec-opencode/`（皆 gitignore） |
 | `ps-session-lib.ps1` | headless session 啟動（`opencode run`／`claude -p --agent`）＋session slot 互斥鎖（函式庫） | log |
 | `ps-cli-lib.ps1` | 前端版本描述：`.claude/peoplesoft` 存在＝Claude Code 版（`PS_CLI` 可強制），決定框架目錄、CLI 與搬運 manifest（函式庫） | — |
 | `ps-claude-doctor.ps1` | Claude Code 版安裝健檢（hook 自測、MCP 註冊、`-Live` 第 0 步開線） | 唯讀（`-Live` 寫 log） |

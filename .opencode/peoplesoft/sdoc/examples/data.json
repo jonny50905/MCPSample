@@ -1,0 +1,385 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "data",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "ENT",
+      "key": "TW_DEMO_DEPT",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "record": "@OBJ/RECORD:TW_DEMO_DEPT",
+      "name": "部門（有效日）",
+      "businessMeaning": "部門資料；本功能只用來找部門主管。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_DEPT",
+      "keys": [
+        "@FLD/TW_DEMO_DEPT.DEPTID",
+        "@FLD/TW_DEMO_DEPT.EFFDT"
+      ],
+      "effectiveDating": {
+        "kind": "EFFDT",
+        "currentRow": {
+          "asOf": {
+            "ctx": "CURRENT_DATE"
+          },
+          "effStatusActiveOnly": true
+        }
+      }
+    },
+    {
+      "type": "ENT",
+      "key": "TW_DEMO_EMP",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "record": "@OBJ/RECORD:TW_DEMO_EMP",
+      "name": "員工任職（有效日）",
+      "businessMeaning": "員工任職資料；本功能只用來找申請人的部門與直屬主管。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_EMP",
+      "keys": [
+        "@FLD/TW_DEMO_EMP.EMPLID",
+        "@FLD/TW_DEMO_EMP.EFFDT"
+      ],
+      "effectiveDating": {
+        "kind": "EFFDT",
+        "currentRow": {
+          "asOf": {
+            "ctx": "CURRENT_DATE"
+          },
+          "effStatusActiveOnly": true
+        }
+      }
+    },
+    {
+      "type": "ENT",
+      "key": "TW_DEMO_REQHDR",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "record": "@OBJ/RECORD:TW_DEMO_REQHDR",
+      "name": "申請單",
+      "businessMeaning": "一張申請單一列；狀態、金額、事由與審核結果都在這裡。",
+      "storageKind": "SQL_TABLE",
+      "physicalName": "PS_TW_DEMO_REQHDR",
+      "keys": [
+        "@FLD/TW_DEMO_REQHDR.REQ_ID"
+      ],
+      "effectiveDating": {
+        "kind": "NONE"
+      }
+    },
+    {
+      "type": "FLD",
+      "key": "TW_DEMO_DEPT.DEPTID",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "entity": "@ENT/TW_DEMO_DEPT",
+      "fieldName": "DEPTID",
+      "label": "部門",
+      "dataType": "CHAR",
+      "length": 10,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "type": "FLD",
+      "key": "TW_DEMO_DEPT.EFFDT",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "entity": "@ENT/TW_DEMO_DEPT",
+      "fieldName": "EFFDT",
+      "label": "生效日",
+      "dataType": "DATE",
+      "length": {
+        "na": "日期型別沒有長度"
+      },
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "free": true
+      },
+      "keyRoles": [
+        "KEY"
+      ],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "type": "FLD",
+      "key": "TW_DEMO_DEPT.EFF_STATUS",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "entity": "@ENT/TW_DEMO_DEPT",
+      "fieldName": "EFF_STATUS",
+      "label": "有效狀態",
+      "dataType": "CHAR",
+      "length": 1,
+      "required": "ALWAYS",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "xlat": [
+          {
+            "stored": "A",
+            "label": "有效",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          },
+          {
+            "stored": "I",
+            "label": "無效",
+            "active": true,
+            "dataPresence": "HAS_DATA"
+          }
+        ]
+      },
+      "keyRoles": [],
+      "sensitivity": "NONE",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "type": "FLD",
+      "key": "TW_DEMO_DEPT.MANAGER_ID",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "entity": "@ENT/TW_DEMO_DEPT",
+      "fieldName": "MANAGER_ID",
+      "label": "部門主管",
+      "dataType": "CHAR",
+      "length": 11,
+      "required": "NO",
+      "default": {
+        "na": "無 Record 層預設值"
+      },
+      "valueDomain": {
+        "prompt": {
+          "entity": "@ENT/TW_DEMO_EMP",
+          "keyField": "@FLD/TW_DEMO_EMP.EMPLID"
+        }
+      },
+      "keyRoles": [],
+      "relations": [
+        {
+          "target": "@FLD/TW_DEMO_EMP.EMPLID",
+          "kind": "LOGICAL_FK"
+        }
+      ],
+      "sensitivity": "PERSONAL",
+      "usageEvidence": "CODE_REFERENCED"
+    },
+    {
+      "type": "DRV",
+      "key": "REQUESTER_DEPT_MANAGER",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E7",
+        "E2"
+      ],
+      "name": "申請人的部門主管",
+      "meaning": "申請人目前任職部門的主管；025（高額）由此人審核。",
+      "inputs": [
+        {
+          "name": "REQUESTER",
+          "from": {
+            "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+          }
+        }
+      ],
+      "resultType": "PERSON_ID",
+      "resolution": {
+        "sources": [
+          "@ENT/TW_DEMO_EMP",
+          "@ENT/TW_DEMO_DEPT"
+        ],
+        "joins": [
+          {
+            "left": "@FLD/TW_DEMO_EMP.EMPLID",
+            "right": {
+              "param": "REQUESTER"
+            }
+          },
+          {
+            "left": "@FLD/TW_DEMO_DEPT.DEPTID",
+            "right": {
+              "fld": "@FLD/TW_DEMO_EMP.DEPTID"
+            }
+          }
+        ],
+        "filter": "ALWAYS",
+        "effectiveDating": [
+          {
+            "entity": "@ENT/TW_DEMO_EMP",
+            "rule": "CURRENT_ROW",
+            "asOf": {
+              "ctx": "CURRENT_DATE"
+            },
+            "effStatusActiveOnly": true
+          },
+          {
+            "entity": "@ENT/TW_DEMO_DEPT",
+            "rule": "CURRENT_ROW",
+            "asOf": {
+              "ctx": "CURRENT_DATE"
+            },
+            "effStatusActiveOnly": true
+          }
+        ],
+        "pick": "@FLD/TW_DEMO_DEPT.MANAGER_ID",
+        "tieBreak": {
+          "na": "兩個實體都取目前有效列，結果唯一"
+        }
+      },
+      "whenNotFound": {
+        "result": "EMPTY",
+        "note": "部門沒有目前有效列或 MANAGER_ID 為空白時結果為空；原系統對此沒有檢查，案件會停在 025，審核清單中沒有人看得到。"
+      },
+      "whenMultiple": {
+        "rule": "UNIQUE_BY_KEY",
+        "note": "兩個實體的目前有效列各只有一列。"
+      },
+      "implementedAt": [
+        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
+        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange"
+      ]
+    },
+    {
+      "type": "DRV",
+      "key": "REQUESTER_SUPERVISOR",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E8",
+        "E3"
+      ],
+      "name": "申請人的直屬主管",
+      "meaning": "申請人目前任職資料上登記的直屬主管；送出時必須存在，020 由此人審核。",
+      "inputs": [
+        {
+          "name": "REQUESTER",
+          "from": {
+            "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+          }
+        }
+      ],
+      "resultType": "PERSON_ID",
+      "resolution": {
+        "sources": [
+          "@ENT/TW_DEMO_EMP"
+        ],
+        "joins": [
+          {
+            "left": "@FLD/TW_DEMO_EMP.EMPLID",
+            "right": {
+              "param": "REQUESTER"
+            }
+          }
+        ],
+        "filter": "ALWAYS",
+        "effectiveDating": [
+          {
+            "entity": "@ENT/TW_DEMO_EMP",
+            "rule": "CURRENT_ROW",
+            "asOf": {
+              "ctx": "CURRENT_DATE"
+            },
+            "effStatusActiveOnly": true
+          }
+        ],
+        "pick": "@FLD/TW_DEMO_EMP.SUPERVISOR_ID",
+        "tieBreak": {
+          "na": "鍵（EMPLID＋EFFDT）加目前有效列規則保證只有一列"
+        }
+      },
+      "whenNotFound": {
+        "result": "EMPTY",
+        "note": "查無目前有效的任職列，或 SUPERVISOR_ID 為空白時結果為空；送出時由 09 的規則擋下。"
+      },
+      "whenMultiple": {
+        "rule": "UNIQUE_BY_KEY",
+        "note": "目前有效列規則下每位員工只有一列。"
+      },
+      "implementedAt": [
+        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
+        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/records.json#fields",
+      "excerpt": "TW_DEMO_REQHDR 13 fields; TW_DEMO_EMP 5 used; TW_DEMO_DEPT 4 used"
+    },
+    {
+      "id": "E2",
+      "kind": "SQL",
+      "locator": "SELECT COUNT(*), SUM(CASE WHEN MANAGER_ID <> ' ' THEN 1 ELSE 0 END) FROM PS_TW_DEMO_DEPT",
+      "excerpt": "87|85"
+    },
+    {
+      "id": "E3",
+      "kind": "SQL",
+      "locator": "SELECT COUNT(*), SUM(CASE WHEN SUPERVISOR_ID <> ' ' THEN 1 ELSE 0 END) FROM PS_TW_DEMO_EMP",
+      "excerpt": "5210|5198"
+    },
+    {
+      "id": "E7",
+      "kind": "CHUNK",
+      "locator": "c4132e9c-d9b0-fb8d-ccac-22e4f83f199c",
+      "excerpt": "SQLExec(\"SELECT D.MANAGER_ID FROM PS_TW_DEMO_EMP E, PS_TW_DEMO_DEPT D WHERE ... current EFFDT rows ... AND D.DEPTID = E.DEPTID\", &emplid, &mgr);"
+    },
+    {
+      "id": "E8",
+      "kind": "CHUNK",
+      "locator": "06323a06-d258-ee9b-4140-2ae46d8d54f1",
+      "excerpt": "SQLExec(\"SELECT SUPERVISOR_ID FROM PS_TW_DEMO_EMP E WHERE EMPLID = :1 AND EFF_STATUS = 'A' AND EFFDT = (SELECT MAX(EFFDT) FROM PS_TW_DEMO_EMP WHERE EMPLID = E.EMPLID AND EFFDT <= %CurrentDateIn)\", &emplid, &sup);"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}

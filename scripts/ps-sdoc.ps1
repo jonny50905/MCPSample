@@ -1,7 +1,9 @@
-﻿# ps-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單一入口：00-index＋14 份文件＋90 問題清單。
+﻿# ps-sdoc.ps1 — Spec 文件流程的單一入口：00-index＋14 份文件＋90 問題清單。Claude Code 版照舊；OpenCode 版加 -Cli opencode。
 # 第 0 階段三位讀者解讀 STATUS 檔（不一致的逐項第 2 輪多數決）→ 研究單元依序（每頁研究與獨立覆核分開 session）→ 外環組裝、檢核、渲染。
 # 模型只寫研究包、解讀、覆核；ID、canonical、檢核、Markdown 都由本腳本確定性產生。PowerShell 5.1；公司機資料只留本機。
 # 輸入 .ps-private/sdoc/<job>/；執行狀態 .ps-runtime/sdoc/<job>/；產出 docs/ps-spec/<job>/。最後一行一律是結論碼（DOC1-…）。
+# OpenCode 版（-Cli opencode，或資料夾只有 .opencode/peoplesoft）：上面三個目錄與 log 目錄各加 -opencode（.ps-private/sdoc-opencode/<job>/…），
+#   與 Claude Code 版同一資料夾並存時各自一份工作、互不覆蓋；模型只在 .opencode/peoplesoft/sdoc/model.yaml 設定（-Model 可臨時覆寫）。
 # 只有 -Components 收位置引數；名稱用空白分開又沒包在同一個引號裡時（-Components A B C），多出來的名稱收進
 # $MoreComponents 併入清單，不會被依序塞給 -Root、-MaxSessions、-TimeoutMin 而報型別錯誤。
 [CmdletBinding(PositionalBinding = $false)]
@@ -13,6 +15,7 @@ param(
     [ValidateRange(1, 100)][int]$MaxSessions = 4,
     [ValidateRange(1, 180)][int]$TimeoutMin = 60,
     [string]$Model = '',
+    [string]$Cli = '',
     [switch]$Refresh,
     [switch]$Retry,
     [string]$FakeWorker = ''
@@ -70,9 +73,26 @@ function Get-SdHash($Value) { return (Get-PsSdTextHash (ConvertTo-PsKnJson -Valu
 function Get-SdRel([string]$Path) { return ($Path.Substring($J.Root.Length).TrimStart('\', '/') -replace '\\', '/') }
 
 # ---------------- 輸入檔骨架 ----------------
+function Copy-SdClaudeInputs {
+    # OpenCode 版第一次跑、同一資料夾已有 Claude Code 版同一組 Component 的狀態圖：複製 status.md（與已填的 project.md）。
+    # 之後兩版各自獨立；decisions.md、approvals.md 對應各版自己的問題與文件，不複製。
+    if ([System.IO.File]::Exists((Join-Path $J.InputRoot 'status.md'))) { return }
+    $src = Join-Path (Join-Path $J.Root '.ps-private/sdoc') $J.JobId
+    $st = Get-SdText (Join-Path $src 'status.md')
+    if ($null -eq $st -or $st.Contains($script:SdSkeletonMark) -or (Get-PsSdMermaidLines $st).Count -eq 0) { return }
+    [void][System.IO.Directory]::CreateDirectory($J.InputRoot)
+    $copied = @()
+    foreach ($n in @('status.md', 'project.md')) {
+        $t = Get-SdText (Join-Path $src $n)
+        if ($null -eq $t -or $t.Contains($script:SdSkeletonMark)) { continue }
+        if (Write-PsKnCreateOnlyText -LiteralPath (Join-Path $J.InputRoot $n) -Text $t) { $copied += $n }
+    }
+    if ($copied.Count -gt 0) { Write-Host ('已從 Claude Code 版同一組 Component 的輸入（' + (Get-SdRel $src) + '/）複製 ' + ($copied -join '、') + ' 到 ' + (Get-SdRel $J.InputRoot) + '/；之後兩版各自獨立，改一邊不會影響另一邊。') }
+}
 function Initialize-SdInputs {
     # 缺檔就建骨架（不覆寫既有檔）。回傳 STATUS 檔是否已提供。
     $dir = $J.InputRoot
+    if ($J.Cli -eq 'opencode') { Copy-SdClaudeInputs }
     [void][System.IO.Directory]::CreateDirectory($dir)
     $files = [ordered]@{
         'status.md' = @($script:SdSkeletonMark, '# STATUS 狀態流程（請以實際內容取代本檔）', '',
@@ -830,7 +850,7 @@ function Test-SdJudgeOutput($Out, $Work, [string]$Aid, [string]$InputHash) {
 # ---------------- 組裝、工作中文件、發布 ----------------
 function Build-SdModel($State, [object[]]$Extra) {
     $ai = Read-SdNode (Join-Path $J.SdocDir 'ai-instructions.json')
-    if ($null -eq $ai) { throw '缺少 .claude/peoplesoft/sdoc/ai-instructions.json（搬運不完整）。' }
+    if ($null -eq $ai) { throw ('缺少 ' + $J.SdocRel + '/ai-instructions.json（搬運不完整）。') }
     $xq = @(); foreach ($x in @($Extra)) { if ($null -ne $x) { $xq += , $x } }
     return (Build-PsSdModel @{ SchemaReg = $J.SchemaReg; Registry = $J.Registry; Skeleton = $J.Skeleton; Built = $J.Built; StageResult = $State.Stage0.Result
             StatusRef = 'status.md'; Receipts = @($State.Receipts); ProjectText = (Get-SdText (Join-Path $J.InputRoot 'project.md')); ProjectRef = 'project.md'
@@ -1090,21 +1110,21 @@ function Invoke-SdAttempt($Work, $State) {
     else { $m.Add('- 輸出：' + (Get-SdRel $outPath) + '（只准寫這一個檔）') }
     $m.Add('- STATUS 檔：' + $inp['statusPath'])
     if ($kind -eq 'READER') {
-        $m.Add('- 規則：.claude/peoplesoft/sdoc/reader-contract.md')
+        $m.Add('- 規則：' + $J.SdocRel + '/reader-contract.md')
         $m.Add('- 你的視角：' + $inp['perspective'])
         $m.Add('- 文件：' + $inp['docsDir'] + '/（只看這些 Markdown；從 00-index.md 開始）')
         $m.Add('- 題目：input.json 的 questions，共 ' + @($Work.Questions).Count + ' 題；每題都要回答')
         if ($Work.Retry) { $m.Add('- 重問：這些題目上次的答案沒有出處（引用不存在，或引用的段落裡找不到答案的 ID），重新作答') }
     }
     elseif ($kind -eq 'JUDGE') {
-        $m.Add('- 規則：.claude/peoplesoft/sdoc/judge-contract.md')
+        $m.Add('- 規則：' + $J.SdocRel + '/judge-contract.md')
         $m.Add('- 題目、標準答案與讀者答案：input.json 的 items，共 ' + @($Work.Items).Count + ' 題')
     }
     elseif ($isolated) {
-        $m.Add('- 規則：.claude/peoplesoft/sdoc/status-reading-contract.md')
+        $m.Add('- 規則：' + $J.SdocRel + '/status-reading-contract.md')
         if ($kind -eq 'STATUS_ROUND2') { $m.Add('- 第 2 輪：逐題回答工單 questions 的每一項（YES／NO／UNSURE）') }
     } else {
-        $m.Add('- 規則：.claude/peoplesoft/sdoc/research-contract.md（通用規則＋「' + $Work.Unit + '」一節）'); if ($kind -eq 'REVIEW') { $m.Add('- 覆核：.claude/peoplesoft/sdoc/review-contract.md；被覆核的研究包在工單的 packet') }
+        $m.Add('- 規則：' + $J.SdocRel + '/research-contract.md（通用規則＋「' + $Work.Unit + '」一節）'); if ($kind -eq 'REVIEW') { $m.Add('- 覆核：' + $J.SdocRel + '/review-contract.md；被覆核的研究包在工單的 packet') }
         $m.Add('- 欄位說明：' + $inp['fieldGuidePath']); $m.Add('- 可引用清單：' + $inp['citeablePath']); $m.Add('- 目前已驗收的文件：' + $inp['workDir'] + '/md/'); $m.Add('- 知識索引：docs/ps-research/knowledge/index.md')
         $ex = Join-Path $J.SdocDir ('examples/' + $Work.Unit + '.json')
         if ([System.IO.File]::Exists($ex)) { $m.Add('- 範例（合成資料，只看格式；jobId、attemptId、inputHash 照本工單，參照的項目不一定在範例裡）：' + (Get-SdRel $ex)) }
@@ -1147,7 +1167,7 @@ function Invoke-SdAttempt($Work, $State) {
             $null = (& $FakeWorker -AttemptDir $ad -InputPath (Join-Path $box 'input.json') -OutputPath $outPath -Kind $kind -Root $J.Root *>&1 | ForEach-Object { [string]$_ })
             $sr = @{ ExitCode = [int]$LASTEXITCODE; TimedOut = $false; SlotBusy = $false; FailureKind = 'NONE'; ApiKind = 'NONE' }
         }
-        else { $sr = Invoke-PsOcSession -OcPath $J.OcPath -Root $J.Root -LogRoot (Join-Path $J.Root '.ps-runtime/sdoc-logs') -Model $Model -ExtraArgs ('--agent ' + $agent) -PromptText ($J.JobId + '/' + $aid) -TimeoutMin $TimeoutMin -Tag ($J.JobId + '-' + $aid) -Log { param($msg) Write-Host $msg } -SlotWaitMin 0 -TimeoutParamName 'TimeoutMin' }
+        else { $sr = Invoke-PsOcSession -OcPath $J.OcPath -Root $J.Root -LogRoot $J.LogRoot -Model $J.Model -ExtraArgs ('--agent ' + $agent) -PromptText ($J.JobId + '/' + $aid) -TimeoutMin $TimeoutMin -Tag ($J.JobId + '-' + $aid) -Log { param($msg) Write-Host $msg } -SlotWaitMin 0 -TimeoutParamName 'TimeoutMin' }
     }
     catch { $sr = @{ ExitCode = -1; TimedOut = $false; SlotBusy = $false; FailureKind = 'DISPATCH_ERROR'; ApiKind = 'NONE' }; Write-Host ('session 未完成：' + $_.Exception.Message) }
     $allowed = @($outPath); foreach ($rp in $readingParts) { $allowed += $rp.Path }
@@ -1230,14 +1250,66 @@ function Invoke-SdAttempt($Work, $State) {
     return @{ Status = [string]$outcome['status']; Receipt = $accepted; ApiKind = [string]$sr.ApiKind }
 }
 
+# ---------------- OpenCode 版的模型（只在 sdoc/model.yaml 設定一次） ----------------
+function Get-SdOpencodeModel {
+    # model.yaml 的「model: <provider>/<model>」那一行；可加引號、行尾可有 # 註解。沒有這一行回空字串。
+    $t = Get-SdText (Join-Path $J.SdocDir 'model.yaml')
+    if ($null -eq $t) { return '' }
+    foreach ($ln in ($t -split "`n")) {
+        $m = [regex]::Match($ln, '^\s*model\s*:(.*)$')
+        if (-not $m.Success) { continue }
+        $v = ($m.Groups[1].Value -replace '\s+#.*$', '').Trim()
+        if ($v.Length -ge 2 -and (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'")))) { $v = $v.Substring(1, $v.Length - 2).Trim() }
+        return $v
+    }
+    return ''
+}
+function Test-SdOpencodeModelName([string]$Name) {
+    # OpenCode 的 --model 是 <provider>/<model>（照 opencode models 列出的原樣）；放在 cmd.exe 命令列的雙引號裡，不能有 " % 換行
+    if ($null -eq $Name -or -not (Test-PsOcPromptSafe -PromptText $Name)) { return $false }
+    if ($Name -match '(?i)FILL_ME') { return $false }
+    return ($Name -cmatch '^[A-Za-z0-9_][A-Za-z0-9_.@-]*/[A-Za-z0-9_][A-Za-z0-9_.:/@-]*$')
+}
+function Get-SdProfileConnection([string]$Path) {
+    # profile 的 oracle.connectionName（與 runtime guard 同一種讀法）；沒有檔或沒有這一行回空字串
+    $t = Get-SdText $Path
+    if ($null -eq $t) { return '' }
+    $inOracle = $false
+    foreach ($ln in ($t -split "`r?`n")) {
+        if ($ln -match '^oracle:\s*(#.*)?$') { $inOracle = $true; continue }
+        if (-not $inOracle) { continue }
+        if ($ln.Trim() -eq '' -or $ln.Trim().StartsWith('#')) { continue }
+        if ($ln -notmatch '^\s') { break }
+        $m = [regex]::Match($ln, '^\s+connectionName:\s*([^#]*?)\s*(#.*)?$')
+        if ($m.Success) { return ($m.Groups[1].Value -replace '^["'']|["'']$', '') }
+    }
+    return ''
+}
+function Assert-SdOpencodeModel {
+    # 開第一個 session 前先問 OpenCode 有沒有這個模型（opencode models <provider>）：名字或 provider 不對就停，不必等 session 失敗。
+    # 查不了（逾時、無法執行）只提醒，照常開 session。
+    $mc = Test-PsOcOpencodeModel -OcPath $J.OcPath -Model $J.Model -Root $J.Root -LogRoot $J.LogRoot
+    if ($mc.Result -eq 'OK') { return }
+    if ($mc.Result -eq 'UNKNOWN') { Write-Host ('提醒：無法先確認模型（' + $mc.Message + '）；照常開 session。'); return }
+    Write-Host ('模型不能用：' + $mc.Message + '。')
+    $where = '改 ' + $J.ModelFrom + ' 的 model 那一行'
+    if ($J.ModelFrom -eq '-Model') { $where = '改 -Model 的值' }
+    Write-Host ($where + '（照「opencode models <provider>」列出的原樣），或在 OpenCode 自己的設定檔補上 provider，再跑同一個命令：')
+    Write-Host $J.NextCommand
+    throw 'SDOC_MODEL_UNAVAILABLE'
+}
+
 # ---------------- 主程式 ----------------
 $exitCode = 0; $code = 'DOC1-9-02'; $mutex = $null; $held = $false
-$J = @{ ResolveCache = @{}; RegistryStamp = ''; LedgerCache = @{}; ReceiptCache = @{}; L5Cache = $null }
+$J = @{ ResolveCache = @{}; RegistryStamp = ''; LedgerCache = @{}; ReceiptCache = @{}; L5Cache = $null; Cli = ''; SdocRel = ''; EnvChanged = $false
+    EnvSaved = @{ Cli = $env:PS_CLI; NoClaude = $env:OPENCODE_DISABLE_CLAUDE_CODE } }
 try {
     if ($Root -eq '') { $Root = Split-Path $PSScriptRoot -Parent }
     $Root = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
     if (-not [System.IO.Directory]::Exists($Root) -or -not (Test-PsOcPromptSafe -PromptText $Root) -or ($Model -ne '' -and (-not (Test-PsOcPromptSafe -PromptText $Model) -or $Model -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$'))) { throw 'SDOC_ARGUMENT_INVALID' }
     if (($Status -and ($Refresh -or $Retry)) -or ($Refresh -and $Retry)) { throw 'SDOC_ARGUMENT_INVALID' }
+    $cliArg = ([string]$Cli).Trim().ToLowerInvariant()
+    if (@('', 'claude', 'opencode') -notcontains $cliArg) { throw 'SDOC_ARGUMENT_INVALID' }
     $set = @{}
     # cmd.exe 不會拿掉單引號：名稱本身不含單引號，一律當分隔處理
     $componentText = ((@($Components) + @($MoreComponents) | Where-Object { $null -ne $_ }) -join ' ').Replace("'", ' ').Trim()
@@ -1248,27 +1320,53 @@ try {
         $set[$upper] = $true
     }
     if ($set.Count -eq 0) { throw 'SDOC_ARGUMENT_INVALID' }
-    $cli = Get-PsCliVariant -Root $Root
-    if ($cli.Name -ne 'claude') { throw 'SDOC_VARIANT' }
+    # -Cli 指定前端：只在本行程內生效（外環開的 session 也照這一版），結束時還原呼叫端的環境變數
+    if ($cliArg -ne '') { $J.EnvChanged = $true; $env:PS_CLI = $cliArg }
+    $fe = Get-PsCliVariant -Root $Root
+    $J.Cli = $fe.Name
+    $J.SdocRel = $fe.PsDir + '/sdoc'
+    $J.SdocDir = Join-Path $Root $J.SdocRel
+    if ($fe.Name -ne 'claude' -and -not [System.IO.Directory]::Exists($J.SdocDir)) { throw 'SDOC_VARIANT' }
     $J.Root = $Root
     $J.Names = Sort-PsKnOrdinal -Items @($set.Keys)
     $J.JobId = 'clone-' + (Get-PsKnTextHash -Text ($J.Names -join "`n")).Substring(0, 16).ToLowerInvariant()
-    $J.SdocDir = Join-Path $Root ($cli.PsDir + '/sdoc')
     $J.SchemaDir = Join-Path $J.SdocDir 'schemas'
     $J.RuntimeSchemaDir = Join-Path $J.SdocDir 'schemas-runtime'
-    $J.InputRoot = Join-Path (Join-Path $Root '.ps-private/sdoc') $J.JobId
-    $J.RuntimeRoot = Join-Path $Root '.ps-runtime/sdoc'
+    # OpenCode 版的人工輸入、執行狀態、產出、log 各放 *-opencode：與 Claude Code 版同一資料夾並存時各自一份工作、互不覆蓋
+    $sfx = ''
+    if ($fe.Name -eq 'opencode') { $sfx = '-opencode' }
+    $J.InputRoot = Join-Path (Join-Path $Root ('.ps-private/sdoc' + $sfx)) $J.JobId
+    $J.RuntimeRoot = Join-Path $Root ('.ps-runtime/sdoc' + $sfx)
+    $J.LogRoot = Join-Path $Root ('.ps-runtime/sdoc' + $sfx + '-logs')
     $J.JobRoot = Join-Path $J.RuntimeRoot $J.JobId
     $J.AttemptRoot = Join-Path $J.JobRoot 'attempts'
     $J.InboxDir = Join-Path $J.JobRoot 'inbox'
     $J.RegistryPath = Join-Path $J.JobRoot 'registry.json'
-    $J.OutputRoot = Join-Path (Join-Path $Root 'docs/ps-spec') $J.JobId
+    $J.OutputRoot = Join-Path (Join-Path $Root ('docs/ps-spec' + $sfx)) $J.JobId
     $revisionRoot = Join-Path $J.JobRoot 'revisions'
     $J.NextCommand = "powershell -NoProfile -File '" + $PSCommandPath.Replace("'", "''") + "' -Root '" + $Root.Replace("'", "''") + "' -Components '" + ($J.Names -join ',') + "'"
+    if ($fe.Name -eq 'opencode') { $J.NextCommand += ' -Cli opencode' }
     if ($Model -ne '') { $J.NextCommand += " -Model '" + $Model + "'" }
     if ($PSBoundParameters.ContainsKey('TimeoutMin')) { $J.NextCommand += ' -TimeoutMin ' + $TimeoutMin }
+    # 模型：Claude Code 版照舊（-Model 透傳，空＝settings.json）；OpenCode 版沒給 -Model 就用 sdoc/model.yaml（唯一要填的地方）
+    $J.Model = $Model; $J.ModelFrom = '-Model'
+    if ($fe.Name -eq 'opencode') {
+        # OpenCode 版的 session 不載入 Claude Code 的 CLAUDE.md 與 .claude/skills（同一資料夾或家目錄有 Claude Code 設定時不混用）
+        $J.EnvChanged = $true; $env:OPENCODE_DISABLE_CLAUDE_CODE = '1'
+        if ($J.Model -eq '') { $J.Model = Get-SdOpencodeModel; $J.ModelFrom = $J.SdocRel + '/model.yaml' }
+        if (-not (Test-SdOpencodeModelName $J.Model)) { throw 'SDOC_MODEL_INVALID' }
+        Write-Host ('OpenCode 模型：' + $J.Model + '（' + $J.ModelFrom + '）')
+        # 研究要查資料庫：OpenCode 版的 profile 沒填連線名時提醒（只提醒、不擋）；同一資料夾的 Claude Code 版填好了就給複製方法
+        $profConn = Get-SdProfileConnection (Join-Path $Root ($fe.PsDir + '/customization-profile.yaml'))
+        if ($profConn -eq '' -or $profConn -eq 'FILL_ME') {
+            $profHint = ''
+            $claudeConn = Get-SdProfileConnection (Join-Path $Root '.claude/peoplesoft/customization-profile.yaml')
+            if ($claudeConn -ne '' -and $claudeConn -ne 'FILL_ME') { $profHint = '同一資料夾的 Claude Code 版已填好（兩版的 profile 鍵值相同），可以整份複製過來：copy .claude\peoplesoft\customization-profile.yaml .opencode\peoplesoft\customization-profile.yaml' }
+            Write-Host ('提醒：' + $fe.PsDir + '/customization-profile.yaml 的 oracle.connectionName 還沒填，研究查不了資料庫。' + $profHint)
+        }
+    }
     $rootLockId = (Get-PsKnTextHash -Text $Root.ToUpperInvariant()).Substring(0, 16)
-    $mutex = New-Object System.Threading.Mutex($false, ('Global\MCPSample-SpecDocs-' + $rootLockId + '-' + $J.JobId))
+    $mutex = New-Object System.Threading.Mutex($false, ('Global\MCPSample-SpecDocs-' + $rootLockId + '-' + $J.JobId + $sfx))
     try { $held = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $held = $true }
     if (-not $held) { Write-Host '同一組 Component 的文件工作正在執行；稍後用相同命令繼續。'; $code = 'DOC1-0-03'; $exitCode = 3 }
     else {
@@ -1311,6 +1409,7 @@ try {
                 if (-not $Status) {
                     if ($FakeWorker -eq '') { $oc = Get-PsOcPath -Root $Root; $J.OcPath = [string]$oc.Path; if ($J.OcPath -eq '' -and $state.Work.Count -gt 0) { throw ('無法啟動 ' + $oc.Exe + '：' + $oc.Error) } }
                     elseif (-not [System.IO.File]::Exists($FakeWorker)) { throw 'FakeWorker 不存在。' }
+                    if ($fe.Name -eq 'opencode' -and $FakeWorker -eq '' -and $state.Work.Count -gt 0) { Assert-SdOpencodeModel }
                     $failedSubjects = @{}
                     while ($sessions -lt $MaxSessions -and $state.Work.Count -gt 0) {
                         if ($state.Stage0.State -eq 'DONE' -and -not [System.IO.File]::Exists((Join-Path $J.WorkDir 'citeable.md'))) { [void](Update-SdWorkingSet $state) }
@@ -1356,6 +1455,7 @@ try {
                 if ($stopReason -eq 'SESSION_FAILED') {
                     $hint = Get-PsOcApiHint -Kinds $failedApi -TimeoutMin $TimeoutMin
                     if ($hint -ne '') { Write-Host ('session 失敗，未消耗失敗次數。' + $hint + '。') }
+                    elseif ($fe.Name -eq 'opencode') { Write-Host ('session 失敗，未消耗失敗次數；檢查 OpenCode 的模型與 provider（' + $J.Model + '，設定在 ' + $J.ModelFrom + '）與 MCP 後重跑；錯誤訊息在 ' + (Get-SdRel $J.LogRoot) + ' 最新的 .err.txt。') }
                     else { Write-Host 'session 失敗，未消耗失敗次數；檢查 Claude Code／MCP 後重跑。' }
                     $code = 'DOC1-3-04'; $exitCode = 1
                 }
@@ -1369,9 +1469,14 @@ catch {
     if ($msg -eq 'SDOC_WRITE_DEFERRED') { Write-Host '寫入暫時失敗，未假裝完成；解除檔案占用後用相同命令繼續。'; $code = 'DOC1-3-07' }
     elseif ($msg -eq 'SDOC_SOURCE_CHANGED') { Write-Host '來源在發布前改變，未換 current；用相同命令重建。'; $code = 'DOC1-4-04' }
     elseif ($msg -eq 'SDOC_ARGUMENT_INVALID') { Write-Host '參數錯誤：Components 只收 exact ASCII 物件名（逗號或空白分隔）；Status／Refresh／Retry 不可混用，Model／Root 不可含命令列控制字元。'; $code = 'DOC1-9-01'; $exitCode = 2 }
-    elseif ($msg -eq 'SDOC_VARIANT') { Write-Host '這個流程只有 Claude Code 版（.claude/peoplesoft 不存在）。'; $code = 'DOC1-9-01'; $exitCode = 2 }
+    elseif ($msg -eq 'SDOC_VARIANT') { Write-Host ('這個資料夾沒有 ' + $J.SdocRel + '（Spec 文件流程的契約與 schema）：Claude Code 版要有 .claude/peoplesoft；OpenCode 版請解開含 .opencode/peoplesoft/sdoc/ 的搬運包。'); $code = 'DOC1-9-01'; $exitCode = 2 }
+    elseif ($msg -eq 'SDOC_MODEL_INVALID') { Write-Host ('OpenCode 版的模型設定不對（' + $J.ModelFrom + '，目前讀到「' + $J.Model + '」）：要寫成 <provider>/<model>，照「opencode models」列出的原樣；只要改 ' + $J.SdocRel + '/model.yaml 的 model 那一行。'); $code = 'DOC1-9-01'; $exitCode = 2 }
+    elseif ($msg -eq 'SDOC_MODEL_UNAVAILABLE') { $code = 'DOC1-9-01'; $exitCode = 2 }
     else { Write-Host ('無法繼續：' + $msg); if ($env:PS_SDOC_TRACE) { Write-Host $_.ScriptStackTrace }; $code = 'DOC1-9-02'; $exitCode = 2 }
 }
-finally { if ($held -and $null -ne $mutex) { $mutex.ReleaseMutex() }; if ($null -ne $mutex) { $mutex.Dispose() } }
+finally {
+    if ($held -and $null -ne $mutex) { $mutex.ReleaseMutex() }; if ($null -ne $mutex) { $mutex.Dispose() }
+    if ($J.EnvChanged) { $env:PS_CLI = $J.EnvSaved.Cli; $env:OPENCODE_DISABLE_CLAUDE_CODE = $J.EnvSaved.NoClaude }
+}
 Write-Host $code
 exit $exitCode

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-sdoc:schema:l5-judge",
+  "title": "文字題的判定（L5）",
+  "description": "逐一判斷每位讀者的文字答案與標準答案是否一致：只回 MATCH 或 MISMATCH。",
+  "type": "object",
+  "required": ["schemaVersion", "jobId", "attemptId", "round", "batch", "inputHash", "verdicts"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "jobId": { "type": "string", "pattern": "^clone-[0-9a-f]{16}$" },
+    "attemptId": { "type": "string", "pattern": "^a[0-9]{4,8}$" },
+    "round": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "batch": { "type": "string", "pattern": "^b[0-9a-f]{12}$" },
+    "inputHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "reader", "verdict"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Z]+-\\d{3,}/[A-Z][0-9]$" },
+          "reader": { "type": "string", "pattern": "^R[1-3]$" },
+          "verdict": { "type": "string", "enum": ["MATCH", "MISMATCH"] },
+          "note": { "type": "string", "maxLength": 500 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,7 +1,7 @@
 ﻿# test-sdoc-assemble.ps1 — Spec 文件流程：研究包驗收、派號、組裝、計算文件、L2／L3 檢核、外殼與 docHash、渲染。
 # 以設計範例為預期結果：把範例 canonical 拆回研究包，再組裝回來比對；另跑 20 種刻意破壞。合成資料，不查 MCP、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-assemble.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
-#       加 -WriteExamples：重生部署給 worker 看格式的研究包範例（claude-code/.claude/peoplesoft/sdoc/examples/）。
+#       加 -WriteExamples：重生部署給 worker 看格式的研究包範例（claude-code/.claude/peoplesoft/sdoc/examples/ 與 .opencode/peoplesoft/sdoc/examples/，兩版逐字相同）。
 param([switch]$WriteExamples)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -309,7 +309,8 @@ function Get-SdEvRefs($Node, $Set) {
     if ($Node -is [System.Collections.IDictionary]) { foreach ($k in @($Node.get_Keys())) { Get-SdEvRefs $Node[$k] $Set }; return }
     if ($Node -is [System.Collections.IList]) { foreach ($x in $Node) { Get-SdEvRefs $x $Set } }
 }
-$exDir = Join-Path $sdocDir 'examples'
+$exDirs = @(Join-Path $sdocDir 'examples')
+if ($paths.OcSdocDir -ne '' -and $paths.OcSdocDir -ne $sdocDir) { $exDirs += (Join-Path $paths.OcSdocDir 'examples') }
 $exBad = @(); $exMade = 0
 foreach ($u in $script:PsSdUnits) {
     $src = $null; foreach ($r in $wk.Fixture.Receipts) { if ($null -eq $src -and [string]$r.Packet['unit'] -ceq $u.Id) { $src = $r.Packet } }
@@ -331,11 +332,13 @@ foreach ($u in $script:PsSdUnits) {
     $rr = Resolve-PsSdPacket $ctx $node
     if (@($se).Count -gt 0) { $exBad += ($u.Id + ' schema：' + @($se)[0]) }
     if ($rr.Errors.Count -gt 0) { $exBad += ($u.Id + ' 驗收：' + $rr.Errors[0]) }
-    $path = Join-Path $exDir ($u.Id + '.json')
-    if ($WriteExamples) { if (-not (Write-PsKnAtomicText -LiteralPath $path -Text $text -Bom $false)) { throw 'TEST_WRITE_FAILED' }; $exMade++ }
-    elseif (-not [System.IO.File]::Exists($path) -or [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8).Replace("`r", '') -cne $text) { $exBad += ($u.Id + '：部署的範例與重生結果不同（加 -WriteExamples 重生）') }
+    foreach ($exDir in $exDirs) {
+        $path = Join-Path $exDir ($u.Id + '.json')
+        if ($WriteExamples) { if (-not (Write-PsKnAtomicText -LiteralPath $path -Text $text -Bom $false)) { throw 'TEST_WRITE_FAILED' }; $exMade++ }
+        elseif (-not [System.IO.File]::Exists($path) -or [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8).Replace("`r", '') -cne $text) { $exBad += ($u.Id + '：部署的範例與重生結果不同（加 -WriteExamples 重生）：' + $exDir) }
+    }
 }
-if ($WriteExamples) { Write-Host ('已重生研究包範例 ' + $exMade + ' 份：' + $exDir) }
+if ($WriteExamples) { Write-Host ('已重生研究包範例 ' + $exMade + ' 份：' + ($exDirs -join '、')) }
 Assert-Sd ($exBad.Count -eq 0) '研究包範例：每個研究單元一份，通過研究包 schema 與驗收，且與重生結果相同' ($exBad -join '；')
 
 foreach ($rel in @('scripts/ps-sdoc-lib.ps1', 'scripts/ps-sdoc-check-lib.ps1', 'scripts/ps-sdoc-render-lib.ps1', 'scripts/tests/test-sdoc-assemble.ps1', 'scripts/tests/sdoc-test-fixtures.ps1')) {

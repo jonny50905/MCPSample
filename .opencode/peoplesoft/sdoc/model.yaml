@@ -1,0 +1,6 @@
+# Spec 文件流程（OpenCode 版，scripts/ps-sdoc.ps1 -Cli opencode）用的模型：只要改下面 model 這一行。
+# 寫法 <provider>/<model>，照「opencode models <provider>」列出的原樣（大小寫、冒號、斜線都照抄）。
+# provider 的連線（網址、金鑰）在 OpenCode 自己的設定檔（全域 opencode.json），不寫在這裡。
+# 狀態圖讀者、研究、覆核、乾淨讀者、判定的 session 都用這個模型；換了之後下一個 session 起生效，已驗收的頁不重做。
+# 預設先放小模型。
+model: anthropic/claude-haiku-4-5

@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "ui",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "UI",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG",
+      "component": "@OBJ/COMPONENT:TW_DEMO_APV",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "uiKind": "SCREEN",
+      "usedBy": [
+        "@FR/TW_DEMO_APV:APPROVE",
+        "@FR/TW_DEMO_APV:RETURN"
+      ],
+      "page": "@OBJ/PAGE:TW_DEMO_APVPG",
+      "title": "申請單審核",
+      "pageRole": "MAIN",
+      "modes": [
+        "UPDATE_DISPLAY"
+      ],
+      "searchKeys": [
+        "@FLD/TW_DEMO_REQHDR.REQ_ID"
+      ],
+      "regions": [
+        {
+          "key": "HEADER",
+          "label": "申請內容",
+          "scrollLevel": 0,
+          "repeating": false
+        },
+        {
+          "key": "ACTIONS",
+          "label": {
+            "na": "按鈕列沒有標題"
+          },
+          "scrollLevel": 0,
+          "repeating": false
+        }
+      ]
+    },
+    {
+      "type": "UI",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQHDR.AMOUNT",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "@FR/TW_DEMO_APV:APPROVE",
+        "@FR/TW_DEMO_APV:RETURN"
+      ],
+      "screen": "@UI/TW_DEMO_APV.TW_DEMO_APVPG",
+      "region": "HEADER",
+      "controlType": "EDIT_BOX",
+      "binding": {
+        "fld": "@FLD/TW_DEMO_REQHDR.AMOUNT"
+      },
+      "label": "金額",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": "NEVER",
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "type": "UI",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQHDR.COMMENTS",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "@FR/TW_DEMO_APV:APPROVE",
+        "@FR/TW_DEMO_APV:RETURN"
+      ],
+      "screen": "@UI/TW_DEMO_APV.TW_DEMO_APVPG",
+      "region": "HEADER",
+      "controlType": "LONG_EDIT",
+      "binding": {
+        "fld": "@FLD/TW_DEMO_REQHDR.COMMENTS"
+      },
+      "label": "審核意見",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:020"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:025"
+          }
+        ]
+      },
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    },
+    {
+      "type": "UI",
+      "key": "TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQHDR.REASON",
+      "basis": "METADATA",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1"
+      ],
+      "uiKind": "CONTROL",
+      "usedBy": [
+        "@FR/TW_DEMO_APV:APPROVE",
+        "@FR/TW_DEMO_APV:RETURN"
+      ],
+      "screen": "@UI/TW_DEMO_APV.TW_DEMO_APVPG",
+      "region": "HEADER",
+      "controlType": "LONG_EDIT",
+      "binding": {
+        "fld": "@FLD/TW_DEMO_REQHDR.REASON"
+      },
+      "label": "申請事由",
+      "presence": "VISIBLE",
+      "visibility": "ALWAYS",
+      "editability": "NEVER",
+      "valueSource": {
+        "kind": "FREE"
+      },
+      "displayDefault": {
+        "na": "顯示資料庫中的值"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_APV.json#pages",
+      "excerpt": "TW_DEMO_APV: TW_DEMO_APVPG (MAIN)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "a9b03b7a-db11-866d-8e94-ef8627556681",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" Or TW_DEMO_REQHDR.REQ_STATUS = \"025\" Then\n   TW_DEMO_REQWRK.APPROVE_PB.Visible = True; TW_DEMO_REQWRK.RETURN_PB.Visible = True;\nElse ... Visible = False; End-If;"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}

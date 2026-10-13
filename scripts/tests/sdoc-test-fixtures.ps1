@@ -7,8 +7,13 @@ function Get-SdTestPaths {
     param([string]$Repo)
     $sd = Join-Path $Repo 'claude-code/.claude/peoplesoft/sdoc'
     if (-not [System.IO.Directory]::Exists($sd)) { $sd = Join-Path $Repo '.claude/peoplesoft/sdoc' }
+    # OpenCode 版的 sdoc（repo 與 OpenCode 版部署版面都在 .opencode/peoplesoft/sdoc）；Claude Code 版部署版面沒有＝空字串
+    $oc = Join-Path $Repo '.opencode/peoplesoft/sdoc'
+    if (-not [System.IO.Directory]::Exists($oc)) { $oc = '' }
+    # OpenCode 版部署版面沒有 .claude：schema、範例等資料檔兩版逐字相同，改用 OpenCode 版的
+    if (-not [System.IO.Directory]::Exists($sd) -and $oc -ne '') { $sd = $oc }
     $design = Join-Path $Repo 'docs/design/spec-schema-framework'
-    return @{ SdocDir = $sd; Design = $design; HasDesign = [System.IO.Directory]::Exists((Join-Path $design 'examples')) }
+    return @{ SdocDir = $sd; OcSdocDir = $oc; Design = $design; HasDesign = [System.IO.Directory]::Exists((Join-Path $design 'examples')) }
 }
 
 function ConvertTo-SdPacketValue {

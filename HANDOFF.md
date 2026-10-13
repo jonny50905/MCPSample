@@ -5,6 +5,17 @@
 
 ## 0. 一句話現況
 
+**Spec 文件的 OpenCode 版備案（2026-10-13，L145，分支 `claude/jolly-tesla-3l8lp5`）**：管理者在公司機用 Claude Code＋Sonnet 跑 Spec 文件流程時
+遇到環境問題還在處理，要一個 OpenCode CLI＋另一個模型的版本當備案：模型先預設小模型、到公司只填一個地方；不能改到 Claude Code 版、兩版並行。
+- 做法：同一個外環 `scripts/ps-sdoc.ps1` 加 `-Cli opencode`；OpenCode 版的人工輸入、執行狀態、產出、log 各放 `*-opencode` 目錄（同資料夾兩版各自一份工作）；
+  模型只在 `.opencode/peoplesoft/sdoc/model.yaml`（預設 `anthropic/claude-haiku-4-5`），開第一個 session 前 `opencode models` 預檢；
+  `.opencode/agent/` 新增 ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge（permission 取代 hook），`.opencode/peoplesoft/sdoc/` 是契約與 schema 的一份
+  （資料檔逐字相同）；OpenCode 版 `/ps-spec`＋ps-spec-author 改走 DOC1（CLONE1 改成直接跑 ps-spec-build.ps1）。操作 SOP-29。
+- `claude-code/` 一個檔都沒動（含給人看的 claude-code/README.md——它的對照表仍寫 DOC1「本版獨有」，依管理者「不可以改到 Claude 版」刻意不改）。
+  共用的 `scripts/` 有改（ps-sdoc／ps-session-lib／ps-bundle／ps-agent-doc-lint 與測試），Claude Code 路徑的行為不變：既有測試原樣全過，
+  同一份合成 worker 輸出兩版發布的文件逐位元相同。公司機的 Claude Code 資料夾不必重搬；備案另搬 OpenCode 版搬運包（同資料夾或另開資料夾都可）。
+- 待公司機回報：model.yaml 填的 provider 能否被 `opencode models` 列出、小模型跑第 0 階段與研究的合格率（結論碼與兩行計數）。
+
 **目前優先入口（2026-09-20）**：管理者要的不是先手填私有 pack，而是輸入一個或多個 Component，
 產生供獨立 LLM 以現代架構重建核心功能的詳細 Spec。已在本分支直接新增 `/ps-spec`／`ps-spec-author`／
 `ps-spec-build.ps1`，10 個深度主題、分頁研究與獨立 session 覆核、使用鏈範圍控制、繁體中文與原技術名、

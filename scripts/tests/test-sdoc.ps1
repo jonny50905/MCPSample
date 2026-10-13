@@ -247,6 +247,17 @@ foreach ($f in $sdocFiles) {
             else { $seenV[$lk] = $nm }
         }
     }
+    # 腳本本身（param 區塊與主程式，不含函式內）也一樣：參數 $Cli 與主程式的 $cli 會是同一個變數
+    $seenS = @{}
+    foreach ($v in $ast.FindAll({ param($x) $x -is [System.Management.Automation.Language.VariableExpressionAst] }, $true)) {
+        $up = $v.Parent; $inFn = $false
+        while ($null -ne $up) { if ($up -is [System.Management.Automation.Language.FunctionDefinitionAst]) { $inFn = $true; break }; $up = $up.Parent }
+        if ($inFn) { continue }
+        $nm = [string]$v.VariablePath.UserPath
+        $lk = $nm.ToLowerInvariant()
+        if ($seenS.ContainsKey($lk) -and $seenS[$lk] -cne $nm) { $clash += ($f.Name + ':（主程式） $' + $seenS[$lk] + '／$' + $nm) }
+        else { $seenS[$lk] = $nm }
+    }
 }
 Assert-Sd ($clash.Count -eq 0) ('同一函式內沒有只差大小寫的變數（' + $sdocFiles.Count + ' 支）') (($clash | Select-Object -Unique) -join '；')
 # PowerShell 把 U+2018／U+2019／U+201C／U+201D 等彎引號當成引號：寫進字串會把字串提早結束

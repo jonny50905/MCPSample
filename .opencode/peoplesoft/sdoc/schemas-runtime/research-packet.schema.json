@@ -1,0 +1,562 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-sdoc:schema:research-packet",
+  "title": "研究包（研究單位一頁）",
+  "description": "模型寫的研究包。項目只有自然鍵；參照填既有 ID 或「@前綴/自然鍵」；證據用本包的 E1、E2…；查不清的欄位寫 {\"unresolved\":\"缺口說明\"}。外環把項目合成 canonical 項目後，再以各文件的 schema 驗證。",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "attemptId",
+    "unit",
+    "subject",
+    "page",
+    "inputHash",
+    "coverage",
+    "summary",
+    "items",
+    "evidence",
+    "questions",
+    "requests",
+    "nextCursor"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^clone-[0-9a-f]{16}$"
+    },
+    "attemptId": {
+      "type": "string",
+      "pattern": "^a[0-9]{4,8}$"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "scope",
+        "data",
+        "security",
+        "texts",
+        "workflow",
+        "interfaces",
+        "functions",
+        "ui",
+        "rules",
+        "operations",
+        "testing"
+      ]
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.$#-]{0,59}$"
+    },
+    "page": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "inputHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "coverage": {
+      "type": "string",
+      "enum": [
+        "COMPLETE",
+        "PARTIAL"
+      ],
+      "description": "COMPLETE＝本研究單位已全部列完；PARTIAL＝還有下一頁（nextCursor 必填）。缺口不靠 PARTIAL 表示，寫 unresolved 或 EVIDENCE_GAP 問題。"
+    },
+    "summary": {
+      "$ref": "urn:ps-spec:schema:common#/$defs/text"
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 60,
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "key"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "OBJ",
+              "XF",
+              "ENT",
+              "FLD",
+              "DRV",
+              "ROLE",
+              "PERM",
+              "ACT",
+              "STATE",
+              "TRN",
+              "FLOW",
+              "IF",
+              "FR",
+              "UI",
+              "MSG",
+              "BR",
+              "OP",
+              "TC"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^\\S(.*\\S)?$"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "locator",
+          "excerpt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^E[1-9][0-9]*$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CHUNK",
+              "SQL",
+              "NN",
+              "WIKI",
+              "STATUS_DOC",
+              "PROJECT_INPUT",
+              "METADATA_RECEIPT",
+              "HUMAN_DECISION"
+            ]
+          },
+          "locator": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+          },
+          "excerpt": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^\\n]*(\\n[^\\n]*){0,4}$",
+            "description": "關鍵摘錄，最多 5 行。"
+          },
+          "capturedOn": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/date"
+          }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "CHUNK"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "locator": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "SQL"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "locator": {
+                  "pattern": "^\\s*(SELECT|WITH)\\b(?![\\s\\S]*;\\s*\\S)"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "NN",
+                    "WIKI",
+                    "STATUS_DOC",
+                    "PROJECT_INPUT",
+                    "HUMAN_DECISION"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "locator": {
+                  "pattern": "#L\\d+(-L?\\d+)?$"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "category",
+          "key",
+          "question"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "OFF_DIAGRAM_STATE",
+              "OFF_DIAGRAM_TRANSITION",
+              "NATIVE_UNUSED_BRANCH",
+              "DIAGRAM_EDGE_UNIMPLEMENTED",
+              "DIAGRAM_CODE_CONFLICT",
+              "SCOPE_CANDIDATE",
+              "EVIDENCE_GAP"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^\\S+$",
+            "description": "問題的自然鍵（不含類別；外環組成「類別:鍵」）"
+          },
+          "question": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/text"
+          },
+          "affects": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 260
+            },
+            "uniqueItems": true
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "LOW"
+            ]
+          },
+          "observed": {
+            "type": "object"
+          },
+          "proof": {
+            "type": "object"
+          },
+          "proposedAnswer": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/text"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^E[1-9][0-9]*$"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "key",
+          "reason"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "OBJ",
+              "ENT",
+              "FLD",
+              "DRV",
+              "ROLE",
+              "IF",
+              "MSG"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^\\S(.*\\S)?$"
+          },
+          "reason": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/text"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "nextCursor": {
+      "type": "string",
+      "maxLength": 240,
+      "pattern": "^[^\\r\\n]*$"
+    },
+    "denominators": {
+      "type": "object",
+      "required": [
+        "pages",
+        "records"
+      ],
+      "properties": {
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "page",
+              "fields",
+              "evidence"
+            ],
+            "properties": {
+              "page": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_$#@][A-Za-z0-9_$#@.-]*$"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9_$#@]+\\.[A-Z0-9_$#@]+$"
+                },
+                "uniqueItems": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^E[1-9][0-9]*$"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "record",
+              "fields",
+              "evidence"
+            ],
+            "properties": {
+              "record": {
+                "type": "string",
+                "pattern": "^[A-Z0-9_$#@]+$"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9_$#@]+$"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^E[1-9][0-9]*$"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "分母清單：頁面欄位（C03）、Record 欄位（C04），附固定樣板查詢的證據"
+    },
+    "statusTexts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "line",
+          "disposition"
+        ],
+        "properties": {
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "MAPPED",
+              "NO_SPEC_CONTENT"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 260
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "note": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/text"
+          }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "disposition": {
+                  "const": "MAPPED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "items"
+              ]
+            },
+            "else": {
+              "required": [
+                "note"
+              ],
+              "not": {
+                "required": [
+                  "items"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "programDispositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "program",
+          "kinds",
+          "items"
+        ],
+        "properties": {
+          "program": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 260
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "BUSINESS_RULES",
+                "UI_BEHAVIOR",
+                "TRANSITION_IMPL",
+                "DERIVATION_IMPL",
+                "NO_BUSINESS_LOGIC",
+                "OFF_DIAGRAM_ONLY",
+                "NATIVE_UNUSED_BRANCH"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 260
+            },
+            "uniqueItems": true
+          },
+          "note": {
+            "$ref": "urn:ps-spec:schema:common#/$defs/text"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "definitionOnlyCodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{3}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "coverage": {
+            "const": "PARTIAL"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nextCursor": {
+            "minLength": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "nextCursor": {
+            "maxLength": 0
+          }
+        }
+      }
+    }
+  ]
+}

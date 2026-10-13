@@ -201,6 +201,55 @@ function Get-PsOcApiHint {
     return ''
 }
 
+# OpenCode 版：模型是否在「opencode models <provider>」的清單裡（opencode run --model 只認清單裡的 <provider>/<model>）。
+# 開 session 前先問，名字填錯或 provider 沒設定時不必等 session 失敗（那時 OpenCode 只回一句 Unexpected server error）。
+# 回 @{ Result; Message; Count }：Result＝OK｜NOT_LISTED（provider 有、清單沒有這個模型）｜NO_PROVIDER（OpenCode 沒有這個 provider）｜
+#   UNKNOWN（查不了：逾時、無法執行、沒有任何輸出；呼叫端不擋）。Windows 以 cmd.exe 檔案重導啟動（同 Invoke-PsOcSession），其他平台直接啟動。
+function Test-PsOcOpencodeModel {
+    param([string]$OcPath, [string]$Model, [string]$Root, [string]$LogRoot, [int]$TimeoutSec = 120)
+    $r = @{ Result = 'UNKNOWN'; Message = ''; Count = 0 }
+    $i = ([string]$Model).IndexOf('/')
+    if ($i -le 0) { $r.Result = 'NOT_LISTED'; $r.Message = ('「' + $Model + '」不是 <provider>/<model> 的形狀'); return $r }
+    $provider = $Model.Substring(0, $i)
+    if ($provider -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.@-]*$') { $r.Result = 'NOT_LISTED'; $r.Message = ('provider「' + $provider + '」含不允許的字元'); return $r }
+    if (-not (Test-Path -LiteralPath $LogRoot)) { New-Item -ItemType Directory -Path $LogRoot -Force | Out-Null }
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
+    $outFile = Join-Path $LogRoot ($stamp + '-models.out.txt')
+    $errFile = Join-Path $LogRoot ($stamp + '-models.err.txt')
+    $win = ([System.IO.Path]::DirectorySeparatorChar -eq [char]92)
+    $p = $null
+    try {
+        if ($win) {
+            $p = Start-Process -FilePath 'cmd.exe' -ArgumentList ('/d /s /c ""' + $OcPath + '" models ' + $provider + ' 1> "' + $outFile + '" 2> "' + $errFile + '""') -WorkingDirectory $Root -NoNewWindow -PassThru
+        }
+        else {
+            $p = Start-Process -FilePath $OcPath -ArgumentList @('models', $provider) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        }
+        try { $null = $p.Handle } catch { }
+        if (-not $p.WaitForExit($TimeoutSec * 1000)) {
+            if ($win) { & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null } else { try { $p.Kill() } catch { } }
+            $r.Message = ('opencode models ' + $provider + ' 超過 ' + $TimeoutSec + ' 秒沒有結束')
+            return $r
+        }
+        try { $p.WaitForExit() } catch { }
+    }
+    catch { $r.Message = ('opencode models 無法執行：' + $_.Exception.Message); return $r }
+    $txt = ''
+    foreach ($f in @($outFile, $errFile)) { if (Test-Path -LiteralPath $f) { $txt += [System.IO.File]::ReadAllText($f) + "`n" } }
+    $txt = [regex]::Replace($txt, '\x1B\[[0-9;]*[A-Za-z]', '')
+    $names = @()
+    foreach ($ln in ($txt -split "`n")) {
+        $t = $ln.Trim()
+        if ($t.StartsWith($provider + '/', [System.StringComparison]::Ordinal) -and $t -cmatch '^\S+$') { $names += $t }
+    }
+    $r.Count = $names.Count
+    if ($names -ccontains $Model) { $r.Result = 'OK'; $r.Message = ('「opencode models ' + $provider + '」有列出 ' + $Model); return $r }
+    if ($txt -match '(?i)provider not found') { $r.Result = 'NO_PROVIDER'; $r.Message = ('OpenCode 沒有 provider「' + $provider + '」（opencode models ' + $provider + '：Provider not found）'); return $r }
+    if ($names.Count -gt 0) { $r.Result = 'NOT_LISTED'; $r.Message = ('「opencode models ' + $provider + '」列出 ' + $names.Count + ' 個模型，沒有「' + $Model + '」'); return $r }
+    $r.Message = ('opencode models ' + $provider + ' 沒有列出任何模型（輸出在 ' + $outFile + '）')
+    return $r
+}
+
 # Claude Code 的權限模式（headless 預設 dontAsk：只執行 .claude/settings.json 允許清單內的工具，其餘自動拒絕、不會卡在詢問）
 function Get-PsOcClaudePermissionMode {
     $pm = ([string]$env:PS_CLAUDE_PERMISSION_MODE).Trim()

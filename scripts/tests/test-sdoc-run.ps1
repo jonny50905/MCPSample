@@ -1,8 +1,9 @@
 ﻿# test-sdoc-run.ps1 — Spec 文件流程外環（ps-sdoc.ps1）端到端：合成 worker 依工單回狀態圖解讀、研究包、覆核；不查 MCP、不呼叫模型。
 # 以設計範例（walkthrough、gate）為來源：從空目錄跑到發布，比對發布的 canonical 與範例，並驗結論碼、中斷、重試、重跑、裁決與核准。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-run.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
-#       -Only walk｜edge｜gate：只跑一組情境（CI 拆成幾個 job 平行跑；不給＝全部）
-param([ValidateSet('', 'walk', 'edge', 'gate')][string]$Only = '')
+#       -Only walk｜edge｜gate｜opencode：只跑一組情境（CI 拆成幾個 job 平行跑；不給＝全部）
+#       opencode 組：OpenCode 版（-Cli opencode）的目錄、模型設定、與 Claude Code 版同資料夾並存、產出與 Claude Code 版相同、模型預檢
+param([ValidateSet('', 'walk', 'edge', 'gate', 'opencode')][string]$Only = '')
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 foreach ($f in @('ps-knowledge-lib', 'ps-sdoc-schema-lib', 'ps-sdoc-status-lib', 'ps-sdoc-lib')) { . (Join-Path $repo ('scripts/' + $f + '.ps1')) }
@@ -254,6 +255,29 @@ function New-SdRunRoot([string]$Name) {
         Copy-Item -LiteralPath $f.FullName -Destination $dst
     }
     return $dir
+}
+function New-SdRunRootOc([string]$Name, [switch]$WithClaude) {
+    # OpenCode 版部署版面：.opencode/peoplesoft/sdoc；-WithClaude 另放 .claude/peoplesoft/sdoc（兩版同一資料夾）
+    $dir = Join-Path $base $Name
+    $pairs = @(, @($paths.OcSdocDir, '.opencode/peoplesoft/sdoc'))
+    if ($WithClaude) { $pairs += , @($paths.SdocDir, '.claude/peoplesoft/sdoc') }
+    foreach ($pr in $pairs) {
+        $src = $pr[0]
+        foreach ($f in @(Get-ChildItem -LiteralPath $src -File -Recurse)) {
+            $rel = $f.FullName.Substring($src.Length).TrimStart('\', '/')
+            $dst = Join-Path (Join-Path $dir $pr[1]) $rel
+            [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($dst))
+            Copy-Item -LiteralPath $f.FullName -Destination $dst
+        }
+    }
+    return $dir
+}
+function Get-SdTreeText([string]$Dir) {
+    # 目錄底下每個檔「相對路徑＋內容」（比對兩版產出用）
+    $sb = New-Object System.Text.StringBuilder
+    $files = @(Get-ChildItem -LiteralPath $Dir -File -Recurse | ForEach-Object { $_.FullName })
+    foreach ($f in (Sort-PsKnOrdinal -Items $files)) { [void]$sb.Append(($f.Substring($Dir.Length).TrimStart('\', '/') -replace '\\', '/')).Append("`n").Append([System.IO.File]::ReadAllText($f, [System.Text.Encoding]::UTF8)).Append("`n") }
+    return $sb.ToString()
 }
 function Get-SdRunJobId([string[]]$Names) {
     $sorted = Sort-PsKnOrdinal -Items $Names
@@ -558,6 +582,162 @@ try {
         Assert-Sd ($nParts -ge 5 -and $manP.Contains('分 ' + $nParts + ' 段寫') -and [System.IO.File]::Exists((Join-Path $r2Dir 'output-part-01.json')) -and [System.IO.File]::Exists((Join-Path $r2Dir ('output-part-' + $nParts.ToString('00') + '.json'))) -and [System.IO.File]::Exists((Join-Path $r2Dir 'output.json')) -and [string]$r2[0].Outcome['status'] -ceq 'ACCEPTED') ('分段寫：工單與 manifest 列出 ' + $nParts + ' 段；各段原樣留在 attempt、合併成 output.json 後驗收通過')
         Assert-Sd ($r1.Count -eq 2 -and [string]$r1[0].Outcome['status'] -ceq 'INVALID' -and $r1[0].Outcome['counted'] -eq $true -and (@($r1[0].Outcome['findings']) -join ' ') -like ('*第 ' + $nParts + ' 段沒有寫*') -and [string]$r1[1].Outcome['status'] -ceq 'ACCEPTED') '分段寫：少寫一段 → INVALID（指出第幾段），重派後通過' ((@($r1[0].Outcome['findings']) -join ' ') + ' / ' + $r.Code)
         Assert-Sd ($r3.Count -eq 1 -and [string]$r3[0].Outcome['status'] -ceq 'ACCEPTED') '分段寫：讀者一次寫完 output.json 也照收'
+    }
+
+    # ================= OpenCode 版（-Cli opencode）：獨立目錄、模型設定、與 Claude Code 版並存、產出相同、模型預檢 =================
+    if ($Only -eq '' -or $Only -eq 'opencode') {  # OpenCode 版
+        if ($paths.OcSdocDir -eq '') { Write-Host 'SKIP OpenCode 版情境：這個版面沒有 .opencode/peoplesoft/sdoc（Claude Code 版搬運包解開的資料夾）' }
+        else {
+            $hasClaudeSdoc = [System.IO.Directory]::Exists($paths.SdocDir) -and $paths.SdocDir -ne $paths.OcSdocDir
+            $gComps = 'TW_DEMO_CASE,TW_DEMO_DOCREV,TW_DEMO_PAYMNT'
+            $jobG = Get-SdRunJobId @('TW_DEMO_CASE', 'TW_DEMO_DOCREV', 'TW_DEMO_PAYMNT')
+            # 只有 .opencode 的資料夾（另開資料夾部署）：不帶 -Cli 也認成 OpenCode 版，目錄各加 -opencode
+            $fxO = New-SdRunFixtures 'gate' 'status-CASE_STATUS.md' @() @() $true 'oc'
+            $rootO = New-SdRunRootOc 'oc'
+            $inO = Join-Path $rootO ('.ps-private/sdoc-opencode/' + $jobG)
+            $r = Invoke-SdRun $rootO $gComps $fxO
+            Assert-Sd ($r.Code -eq 'DOC1-0-01' -and [System.IO.File]::Exists((Join-Path $inO 'status.md')) -and -not [System.IO.Directory]::Exists((Join-Path $rootO '.ps-private/sdoc'))) 'OpenCode 版：人工輸入骨架建在 .ps-private/sdoc-opencode/<job>/，不碰 .ps-private/sdoc/' $r.Output
+            Assert-Sd ($r.Output.Contains('OpenCode 模型：anthropic/claude-haiku-4-5（.opencode/peoplesoft/sdoc/model.yaml）') -and $r.Output.Contains("-Components 'TW_DEMO_CASE,TW_DEMO_DOCREV,TW_DEMO_PAYMNT' -Cli opencode")) 'OpenCode 版：印出模型與唯一設定檔；續跑命令帶 -Cli opencode' $r.Output
+            Assert-Sd ($r.Output.Contains('提醒：.opencode/peoplesoft/customization-profile.yaml 的 oracle.connectionName 還沒填') -and $r.Code -eq 'DOC1-0-01') 'OpenCode 版：profile 沒填連線名 → 只提醒、不擋' $r.Output
+            # 貫穿範例跑到 REVIEW_READY（含 L5 讀者與判定）：目錄、工單、與 Claude Code 版逐位元相同的產出
+            $fxOW = New-SdRunFixtures 'walkthrough' 'status-REQ_STATUS.md' $wkPages $wkRecords $false 'oc-walk'
+            $rootOW = New-SdRunRootOc 'oc-walk'
+            [void](Invoke-SdRun $rootOW $comps $fxOW)
+            $inOW = Join-Path $rootOW ('.ps-private/sdoc-opencode/' + $jobW)
+            Write-SdFx (Join-Path $inOW 'status.md') $fxOW.Text
+            Write-SdFx (Join-Path $inOW 'project.md') ([System.IO.File]::ReadAllText((Join-Path $fxOW.Example 'input/project.md'), [System.Text.Encoding]::UTF8))
+            $r = Invoke-SdRunUntilDone $rootOW $comps $fxOW
+            $jobRootO = Join-Path $rootOW ('.ps-runtime/sdoc-opencode/' + $jobW)
+            $outO = Join-Path $rootOW ('docs/ps-spec-opencode/' + $jobW)
+            $curO = Join-Path $outO 'current.json'
+            Assert-Sd ($r.Code -eq 'DOC1-7-01' -and [System.IO.File]::Exists($curO) -and [System.IO.Directory]::Exists((Join-Path $jobRootO 'attempts')) -and -not [System.IO.Directory]::Exists((Join-Path $rootOW '.ps-runtime/sdoc')) -and -not [System.IO.Directory]::Exists((Join-Path $rootOW 'docs/ps-spec'))) ('OpenCode 版：貫穿範例跑到 REVIEW_READY；執行狀態在 .ps-runtime/sdoc-opencode/、產出在 docs/ps-spec-opencode/（' + $r.Code + '）') ($r.Output -split "`n" | Select-Object -Last 12 | Out-String)
+            $ocO = Get-SdOutcomes $jobRootO
+            $man = @{}
+            foreach ($e in $ocO) {
+                $k = [string]$e.Input['kind']
+                if (-not $man.ContainsKey($k)) { $man[$k] = [System.IO.File]::ReadAllText((Join-Path (Join-Path $jobRootO ('attempts/' + $e.Id)) 'manifest.md'), [System.Text.Encoding]::UTF8) }
+            }
+            $allMan = ($man.Values | ForEach-Object { [string]$_ }) -join "`n"
+            Assert-Sd ([string]$man['STATUS_READ'] -like '*.opencode/peoplesoft/sdoc/status-reading-contract.md*' -and [string]$man['RESEARCH'] -like '*.opencode/peoplesoft/sdoc/research-contract.md*' -and [string]$man['RESEARCH'] -like '*.opencode/peoplesoft/sdoc/examples/*' -and [string]$man['REVIEW'] -like '*.opencode/peoplesoft/sdoc/review-contract.md*' -and [string]$man['READER'] -like '*.opencode/peoplesoft/sdoc/reader-contract.md*' -and [string]$man['JUDGE'] -like '*.opencode/peoplesoft/sdoc/judge-contract.md*' -and [string]$man['READER'] -like '*.ps-runtime/sdoc-opencode/*/inbox/*' -and -not $allMan.Contains('.claude/') -and ([string]$ocO[0].Input['statusPath']).StartsWith('.ps-private/sdoc-opencode/')) ('工單（解讀、研究、覆核、L5 讀者、判定）都指向 OpenCode 版的契約與 *-opencode 目錄，不出現 .claude/（種類 ' + (@($man.Keys | Sort-Object) -join ',') + '）')
+            if ($hasClaudeSdoc) {
+                # 同一份合成 worker 輸出：OpenCode 版發布的文件與 Claude Code 版逐位元相同（只有前端不同）
+                $fxKW = New-SdRunFixtures 'walkthrough' 'status-REQ_STATUS.md' $wkPages $wkRecords $false 'oc-walk-claude'
+                $rootKW = New-SdRunRoot 'oc-walk-claude'
+                [void](Invoke-SdRun $rootKW $comps $fxKW)
+                $inKW = Join-Path $rootKW ('.ps-private/sdoc/' + $jobW)
+                Write-SdFx (Join-Path $inKW 'status.md') $fxKW.Text
+                Write-SdFx (Join-Path $inKW 'project.md') ([System.IO.File]::ReadAllText((Join-Path $fxKW.Example 'input/project.md'), [System.Text.Encoding]::UTF8))
+                $rK = Invoke-SdRunUntilDone $rootKW $comps $fxKW
+                $curK = Read-SdFxJson (Join-Path $rootKW ('docs/ps-spec/' + $jobW + '/current.json'))
+                $curOn = Read-SdFxJson $curO
+                $genK = Join-Path $rootKW ('docs/ps-spec/' + $jobW + '/generated/' + [string]$curK['generation'])
+                $genO = Join-Path $outO ('generated/' + [string]$curOn['generation'])
+                Assert-Sd ($rK.Code -ceq $r.Code -and [string]$curK['generation'] -ceq [string]$curOn['generation'] -and (Get-SdTreeText $genK) -ceq (Get-SdTreeText $genO) -and ((Get-SdCalls $fxKW) -join '|') -ceq ((Get-SdCalls $fxOW) -join '|')) ('同一份 worker 輸出：OpenCode 版與 Claude Code 版的派工順序、結論碼、generated 世代與全部文件逐位元相同（' + $rK.Code + '／' + $r.Code + '）')
+            }
+            else { Write-Host 'SKIP 兩版產出比對：這個版面只有 OpenCode 版' }
+
+            # 同一資料夾兩版並存：Claude Code 版照舊；-Cli opencode 另一份工作，第一次從 Claude Code 版複製 status.md
+            if ($hasClaudeSdoc) {
+                $fxC = New-SdRunFixtures 'gate' 'status-CASE_STATUS.md' @() @() $true 'both-claude'
+                $fxB = New-SdRunFixtures 'gate' 'status-CASE_STATUS.md' @() @() $true 'both-oc'
+                $rootB = New-SdRunRootOc 'both' -WithClaude
+                [void](Invoke-SdRun $rootB $gComps $fxC)
+                Write-SdFx (Join-Path $rootB ('.ps-private/sdoc/' + $jobG + '/status.md')) $fxC.Text
+                $r = Invoke-SdRun $rootB $gComps $fxC '' @{ MaxSessions = 2 }
+                $jrC = Join-Path $rootB ('.ps-runtime/sdoc/' + $jobG)
+                $nC = (Get-SdOutcomes $jrC).Count
+                $revC = Get-SdTreeText (Join-Path $jrC 'revisions')
+                Assert-Sd ($r.Code -like 'DOC1-3-02-*' -and $nC -eq 2 -and -not $r.Output.Contains('OpenCode')) '兩版並存：不帶 -Cli＝Claude Code 版，照舊用 .ps-private/sdoc 與 .ps-runtime/sdoc' $r.Output
+                $cliBefore = [string]$env:PS_CLI; $noClaudeBefore = [string]$env:OPENCODE_DISABLE_CLAUDE_CODE
+                # Claude Code 版的 profile 已填、OpenCode 版還是 FILL_ME：提醒裡給複製方法
+                $pfSrc = Join-Path $repo '.opencode/peoplesoft/customization-profile.yaml'
+                $pfText = [System.IO.File]::ReadAllText($pfSrc, [System.Text.Encoding]::UTF8)
+                Write-SdFx (Join-Path $rootB '.claude/peoplesoft/customization-profile.yaml') ($pfText -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV')
+                Write-SdFx (Join-Path $rootB '.opencode/peoplesoft/customization-profile.yaml') $pfText
+                $r = Invoke-SdRun $rootB $gComps $fxB '' @{ Cli = 'opencode'; MaxSessions = 2 }
+                Assert-Sd ($r.Output.Contains('copy .claude\peoplesoft\customization-profile.yaml .opencode\peoplesoft\customization-profile.yaml')) '兩版並存：OpenCode 版 profile 沒填、Claude Code 版填好了 → 提醒裡給整份複製的命令' $r.Output
+                $inB = Join-Path $rootB ('.ps-private/sdoc-opencode/' + $jobG)
+                $jrB = Join-Path $rootB ('.ps-runtime/sdoc-opencode/' + $jobG)
+                $stB = [System.IO.File]::ReadAllText((Join-Path $inB 'status.md'), [System.Text.Encoding]::UTF8)
+                Assert-Sd ($r.Output.Contains('已從 Claude Code 版同一組 Component 的輸入') -and $stB -ceq $fxC.Text -and $r.Code -like 'DOC1-3-02-*' -and (Get-SdOutcomes $jrB).Count -eq 2) '兩版並存：-Cli opencode 第一次從 Claude Code 版複製 status.md，在 *-opencode 目錄另跑一份工作' $r.Output
+                Assert-Sd ((Get-SdOutcomes $jrC).Count -eq $nC -and (Get-SdTreeText (Join-Path $jrC 'revisions')) -ceq $revC -and [string]$env:PS_CLI -ceq $cliBefore -and [string]$env:OPENCODE_DISABLE_CLAUDE_CODE -ceq $noClaudeBefore) '兩版並存：OpenCode 版沒有動到 Claude Code 版的工作；PS_CLI／OPENCODE_DISABLE_CLAUDE_CODE 跑完還原'
+                $r = Invoke-SdRun $rootB $gComps $fxC '' @{ MaxSessions = 1 }
+                Assert-Sd ($r.Code -like 'DOC1-3-02-*' -and -not $r.Output.Contains('開始新研究版本') -and (Get-SdOutcomes $jrC).Count -eq ($nC + 1) -and (Get-SdTreeText (Join-Path $jrC 'revisions')) -ceq $revC) '兩版並存：之後再跑 Claude Code 版，接著原本的研究版本續跑（不因 OpenCode 版開新版本）' $r.Output
+            }
+            else { Write-Host 'SKIP 兩版並存：這個版面只有 OpenCode 版' }
+
+            # 模型設定：只有 model.yaml 一個地方；-Model 可臨時覆寫；寫錯就 DOC1-9-01、不建任何檔
+            $mY = Join-Path $rootO '.opencode/peoplesoft/sdoc/model.yaml'
+            $mOrig = [System.IO.File]::ReadAllText($mY, [System.Text.Encoding]::UTF8)
+            [System.IO.File]::WriteAllText($mY, ("# 測試`r`nmodel: 'company-gw/qwen3.6-35b-a3b:latest'   # 地端`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+            $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true }
+            Assert-Sd ($r.Output.Contains('OpenCode 模型：company-gw/qwen3.6-35b-a3b:latest（.opencode/peoplesoft/sdoc/model.yaml）')) 'model.yaml：引號、行尾註解、CRLF、BOM 都讀得懂' $r.Output
+            Write-SdFx (Join-Path $rootO '.opencode/peoplesoft/customization-profile.yaml') ("oracle:`n  connectionName: HR_DEV   # 已填`n")
+            $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true; Model = 'other/x-1' }
+            Assert-Sd (-not $r.Output.Contains('oracle.connectionName 還沒填')) 'profile 已填連線名 → 不提醒' $r.Output
+            Assert-Sd ($r.Output.Contains('OpenCode 模型：other/x-1（-Model）') -and $r.Output.Contains("-Cli opencode -Model 'other/x-1'")) '-Model 臨時覆寫 model.yaml，續跑命令帶著它' $r.Output
+            $plainO = New-SdRunRootOc 'oc-badmodel'
+            [System.IO.File]::WriteAllText((Join-Path $plainO '.opencode/peoplesoft/sdoc/model.yaml'), "model: FILL_ME`n", (New-Object System.Text.UTF8Encoding($false)))
+            $r = Invoke-SdRun $plainO $gComps $fxO
+            Assert-Sd ($r.Code -eq 'DOC1-9-01' -and $r.Exit -eq 2 -and $r.Output.Contains('model.yaml') -and -not [System.IO.Directory]::Exists((Join-Path $plainO '.ps-private'))) 'model.yaml 沒填好（FILL_ME）→ DOC1-9-01，指出要改 model.yaml，不建任何檔' $r.Output
+            [System.IO.File]::Delete((Join-Path $plainO '.opencode/peoplesoft/sdoc/model.yaml'))
+            $r = Invoke-SdRun $plainO $gComps $fxO
+            Assert-Sd ($r.Code -eq 'DOC1-9-01' -and $r.Output.Contains('model.yaml')) '沒有 model.yaml → DOC1-9-01' $r.Output
+            $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true; Model = 'noslash' }
+            Assert-Sd ($r.Code -eq 'DOC1-9-01') '-Model 不是 <provider>/<model> → DOC1-9-01' $r.Output
+            $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true; Cli = 'bogus' }
+            Assert-Sd ($r.Code -eq 'DOC1-9-01') '-Cli 只收 claude／opencode → 其他 DOC1-9-01' $r.Output
+            [System.IO.File]::WriteAllText($mY, $mOrig, (New-Object System.Text.UTF8Encoding($false)))
+            $oldOc = Join-Path $base 'oc-old'; [void][System.IO.Directory]::CreateDirectory((Join-Path $oldOc '.opencode/peoplesoft'))
+            $r = Invoke-SdRun $oldOc $gComps $fxO
+            Assert-Sd ($r.Code -eq 'DOC1-9-01' -and $r.Output.Contains('.opencode/peoplesoft/sdoc') -and -not [System.IO.Directory]::Exists((Join-Path $oldOc '.ps-private'))) '舊的 OpenCode 部署（沒有 .opencode/peoplesoft/sdoc）→ DOC1-9-01，不建任何檔' $r.Output
+
+            # 模型預檢（opencode models <provider>）：假 opencode 列出清單或回 Provider not found
+            . (Join-Path $tools 'ps-session-lib.ps1')
+            $fakeOc = Join-Path $base 'fake-opencode'
+            [void][System.IO.Directory]::CreateDirectory($fakeOc)
+            $isWin = ([System.IO.Path]::DirectorySeparatorChar -eq [char]92)
+            $callLog = Join-Path $fakeOc 'calls.txt'
+            if ($isWin) {
+                $ocExe = Join-Path $fakeOc 'opencode.cmd'
+                [System.IO.File]::WriteAllText($ocExe, ("@echo off`r`n" + 'echo %* >> "' + $callLog + '"' + "`r`n" + 'if "%1"=="run" exit /b 3' + "`r`n" + 'if "%2"=="mock" (echo mock/scripted& echo mock/other-1& exit /b 0)' + "`r`n" + 'if "%2"=="slow" (ping -n 8 127.0.0.1 > nul& exit /b 0)' + "`r`n" + 'echo Error: Provider not found: %2 1>&2' + "`r`n" + "exit /b 1`r`n"), (New-Object System.Text.ASCIIEncoding))
+            }
+            else {
+                $ocExe = Join-Path $fakeOc 'opencode'
+                [System.IO.File]::WriteAllText($ocExe, ("#!/bin/sh`n" + 'echo "$*" >> "' + $callLog + '"' + "`n" + 'if [ "$1" = "run" ]; then exit 3; fi' + "`n" + 'if [ "$2" = "mock" ]; then echo mock/scripted; echo mock/other-1; exit 0; fi' + "`n" + 'if [ "$2" = "slow" ]; then sleep 8; exit 0; fi' + "`n" + 'printf ''\033[91m\033[1mError: \033[0mProvider not found: %s\n'' "$2" >&2' + "`n" + "exit 1`n"), (New-Object System.Text.UTF8Encoding($false)))
+                & chmod +x $ocExe
+            }
+            $pfLog = Join-Path $base 'preflight-logs'
+            $m1 = Test-PsOcOpencodeModel -OcPath $ocExe -Model 'mock/scripted' -Root $rootO -LogRoot $pfLog
+            $m2 = Test-PsOcOpencodeModel -OcPath $ocExe -Model 'mock/other-2' -Root $rootO -LogRoot $pfLog
+            $m3 = Test-PsOcOpencodeModel -OcPath $ocExe -Model 'nosuch/x' -Root $rootO -LogRoot $pfLog
+            $m4 = Test-PsOcOpencodeModel -OcPath $ocExe -Model 'slow/x' -Root $rootO -LogRoot $pfLog -TimeoutSec 2
+            $m5 = Test-PsOcOpencodeModel -OcPath (Join-Path $fakeOc 'missing.cmd') -Model 'mock/scripted' -Root $rootO -LogRoot $pfLog
+            Assert-Sd ($m1.Result -eq 'OK' -and $m2.Result -eq 'NOT_LISTED' -and $m2.Count -eq 2 -and $m3.Result -eq 'NO_PROVIDER' -and $m4.Result -eq 'UNKNOWN' -and $m5.Result -eq 'UNKNOWN') ('模型預檢：清單有＝OK、provider 有但沒這個模型＝NOT_LISTED、Provider not found＝NO_PROVIDER、逾時與無法執行＝UNKNOWN（不擋）：' + $m1.Result + '/' + $m2.Result + '/' + $m3.Result + '/' + $m4.Result + '/' + $m5.Result)
+            if ($isWin) {
+                # 真的走外環：假 opencode.cmd 放在 PATH 最前面（ps-sdoc 以 cmd.exe 啟動）
+                $savedPath = $env:PATH
+                $env:PATH = $fakeOc + [System.IO.Path]::PathSeparator + $env:PATH
+                try {
+                    $rootW2 = New-SdRunRootOc 'oc-win'
+                    $inW2 = Join-Path $rootW2 ('.ps-private/sdoc-opencode/' + $jobG)
+                    [void][System.IO.Directory]::CreateDirectory($inW2)
+                    Write-SdFx (Join-Path $inW2 'status.md') $fxO.Text
+                    $h = @{ Root = $rootW2; Components = $gComps; MaxSessions = 1; TimeoutMin = 2; Model = 'mock/other-2' }
+                    $out1 = ((& $cli @h *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+                    $lines1 = @($out1 -split "`n" | Where-Object { $_.Trim() -ne '' })
+                    Assert-Sd ($lines1[-1].Trim() -eq 'DOC1-9-01' -and $out1.Contains('模型不能用') -and -not [System.IO.Directory]::Exists((Join-Path $rootW2 ('.ps-runtime/sdoc-opencode/' + $jobG + '/attempts')))) '外環（Windows）：模型不在 opencode models 清單 → 開 session 前就停在 DOC1-9-01' $out1
+                    [System.IO.File]::WriteAllText($callLog, '', (New-Object System.Text.ASCIIEncoding))
+                    $h['Model'] = 'mock/scripted'
+                    $out2 = ((& $cli @h *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+                    $lines2 = @($out2 -split "`n" | Where-Object { $_.Trim() -ne '' })
+                    $calls = [System.IO.File]::ReadAllText($callLog)
+                    Assert-Sd ($lines2[-1].Trim() -eq 'DOC1-3-04' -and $calls -match ('run --model "?mock/scripted"? --agent ps-status-reader --title "?auto-' + $jobG + '-a0001"? "?' + $jobG + '/a0001"?') -and $out2.Contains('檢查 OpenCode 的模型與 provider')) '外環（Windows）：opencode run --model <model.yaml 或 -Model> --agent ps-status-reader；session 失敗提示看模型與 provider' ($out2 + "`n" + $calls)
+                }
+                finally { $env:PATH = $savedPath }
+            }
+            else { Write-Host 'SKIP 外環真的啟動 opencode（需要 Windows cmd.exe）' }
+        }
     }
 }
 finally {

@@ -26,7 +26,10 @@
 │  ├─ knowledge-retrieval-contract.md  問答讀取 wiki＋NN 研究文件的契約（索引定位、片段讀取、來源表）
 │  ├─ supplemental-contract.md         補研究收據契約（事實類別→委派鏈、三張表、硬規則）
 │  ├─ spec/                            Spec 引擎公開部分：capabilities.json（能力目錄）、pack.schema.json、
-│  │                                   support-codes.md（KNOW1／SUPP1／SPEC1 結論碼＋CAP-REQ）、troubleshooting-matrix.md、examples/
+│  │                                   support-codes.md（KNOW1／SUPP1／SPEC1／CLONE1／DOC1 結論碼＋CAP-REQ）、troubleshooting-matrix.md、examples/
+│  ├─ sdoc/                            Spec 文件流程（/ps-spec → scripts/ps-sdoc.ps1 -Cli opencode）：狀態圖解讀、研究、覆核、
+│  │                                   乾淨讀者、判定的契約，schemas／schemas-runtime、每單元範例、ai-instructions.json；
+│  │                                   model.yaml＝外環 session 用的模型（唯一要填的地方）
 │  ├─ report-templates/
 │  │  ├─ overview-template.md          Deep research 總覽模板（階段一寫完即凍結）
 │  │  ├─ checklist-template.md         調查進度狀態檔模板（唯一反覆改寫的小檔）
@@ -48,7 +51,12 @@
 │  ├─ ps-ae-flow.md                    Subagent：Application Engine
 │  ├─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
 │  ├─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
-│  └─ ps-spec-worker.md                Primary（只由 ps-spec 外環以 --command ps-spec-batch 啟動）：Spec 片段組表，只讀 .ps-runtime/spec、只寫 fragment.md
+│  ├─ ps-spec-worker.md                Primary（只由 ps-spec 外環以 --command ps-spec-batch 啟動）：Spec 片段組表，只讀 .ps-runtime/spec、只寫 fragment.md
+│  ├─ ps-spec-author.md                All：/ps-spec 入口，只准執行 scripts/ps-sdoc.ps1 -Cli opencode …，回報文件位置與缺口
+│  ├─ ps-status-reader.md              Primary（只由 ps-sdoc 外環以 --agent 啟動）：狀態圖讀者，只讀 inbox 與 status.md、只寫 inbox 的解讀檔
+│  ├─ ps-sdoc-worker.md                Primary（同上）：一頁研究或獨立覆核，委派 flow subagent 查證，只寫該 attempt 的 output.json
+│  ├─ ps-spec-reader.md                Primary（同上）：L5 乾淨讀者，只讀 inbox 的渲染後文件
+│  └─ ps-spec-judge.md                 Primary（同上）：L5 文字題判定，只讀 inbox 工單
 ├─ plugin/
 │  └─ ps-runtime-guard.js             OpenCode 執行期無狀態 guard＋診斷：connect 的 connection_name 必須等於 profile 值
 │                                      （ORACLE_CONNECTION_MISMATCH／NOT_CONFIGURED）、task 的 subagent_type 不得是 skill 名
@@ -60,7 +68,8 @@
 │  ├─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓並本機立即生效（團隊走 PR）
 │  ├─ ps-correct.md                    /ps-correct <正確知識> — 人工指正的業務知識更新 wiki（human 來源＋verified）
 │  ├─ ps-supplement.md                 /ps-supplement <領域> — 補研究（auto-loop -SupplementalOnly 專用；依工單只寫收據）
-│  └─ ps-spec-batch.md                 /ps-spec-batch <jobId>-<attemptId> — Spec 片段（ps-spec -Run 專用；只寫 fragment.md）
+│  ├─ ps-spec-batch.md                 /ps-spec-batch <jobId>-<attemptId> — Spec 片段（ps-spec -Run 專用；只寫 fragment.md）
+│  └─ ps-spec.md                       /ps-spec <Component...> — Spec 文件（00-index＋14 份＋90；交 ps-spec-author）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -210,7 +219,10 @@ Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
           目標尚無 NN → checklist D 列（等研究相位）；ps-auto-all 在收據判定前自動先跑迷你圈
 Spec      scripts/ps-spec.ps1 -ValidatePack|-Plan|-Run|-Render|-Gate|-Doctor（需求包在 .ps-private/spec/<packId>/，
           狀態在 .ps-runtime/spec/<jobId>/，兩者 gitignore）；分母＝Component＋私有需求包，不是整個領域
-結論碼    KNOW1／SUPP1／SPEC1-<stage>-<code>[-<count>]（spec/support-codes.md）——維護端只看這一行
+Spec 文件 scripts/ps-sdoc.ps1 -Cli opencode -Components '<清單>'（/ps-spec 的外環；狀態圖在 .ps-private/sdoc-opencode/<jobId>/，
+          狀態在 .ps-runtime/sdoc-opencode/<jobId>/，產出 docs/ps-spec-opencode/<jobId>/，皆 gitignore）；
+          外環 session 的模型只讀 sdoc/model.yaml；Claude Code 版同一個外環（不帶 -Cli、目錄不加 -opencode）
+結論碼    KNOW1／SUPP1／SPEC1／CLONE1／DOC1-<stage>-<code>[-<count>]（spec/support-codes.md）——維護端只看這一行
 ```
 
 ## 稽核與教訓迴路

@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:17-tasks",
+  "title": "17 工作拆解與相依",
+  "description": "項目型別：TASK（工作項）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "17-tasks"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TASK"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "TASK": {
+      "type": "object",
+      "title": "TASK（工作項）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^TASK-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^(FOUNDATION:[A-Z][A-Z0-9_]*|SLICE:\\S+)$",
+              "description": "自然鍵：FOUNDATION:<代號>｜SLICE:<FR 鍵>"
+            },
+            "taskKind": {
+              "type": "string",
+              "enum": [
+                "SLICE",
+                "FOUNDATION"
+              ],
+              "description": "工作種類"
+            },
+            "fr": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/refFR"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "對應功能",
+              "x-ref": [
+                "FR"
+              ]
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "工作名稱"
+            },
+            "order": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "建議順序"
+            },
+            "dependsOn": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refTASK"
+              },
+              "uniqueItems": true,
+              "description": "前置工作",
+              "x-ref": [
+                "TASK"
+              ]
+            },
+            "members": {
+              "type": "object",
+              "properties": {
+                "entities": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refENT"
+                  },
+                  "uniqueItems": true
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                  },
+                  "uniqueItems": true
+                },
+                "derivations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refDRV"
+                  },
+                  "uniqueItems": true
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refROLE"
+                  },
+                  "uniqueItems": true
+                },
+                "transitions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+                  },
+                  "uniqueItems": true
+                },
+                "activities": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refACT"
+                  },
+                  "uniqueItems": true
+                },
+                "controls": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refUI"
+                  },
+                  "uniqueItems": true
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refBR"
+                  },
+                  "uniqueItems": true
+                },
+                "operations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refOP"
+                  },
+                  "uniqueItems": true
+                },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refTC"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [],
+              "additionalProperties": false,
+              "description": "本工作涵蓋的項目",
+              "x-ref": [
+                "ENT",
+                "FLD",
+                "DRV",
+                "ROLE",
+                "TRN",
+                "ACT",
+                "UI",
+                "BR",
+                "OP",
+                "TC"
+              ]
+            },
+            "deliverables": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "DATA_STRUCTURE",
+                  "OPERATIONS",
+                  "SCREENS",
+                  "RULES",
+                  "SECURITY",
+                  "TESTS"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "交付物"
+            }
+          },
+          "required": [
+            "taskKind",
+            "fr",
+            "name",
+            "order",
+            "dependsOn",
+            "members",
+            "deliverables"
+          ]
+        },
+        {
+          "properties": {
+            "basis": {
+              "enum": [
+                "COMPUTED"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

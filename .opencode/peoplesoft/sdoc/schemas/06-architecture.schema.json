@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ps-spec:schema:06-architecture",
+  "title": "06 系統架構（技術中立）",
+  "description": "項目型別：IF（介面／批次）",
+  "allOf": [
+    {
+      "$ref": "urn:ps-spec:schema:common#/$defs/envelope"
+    },
+    {
+      "properties": {
+        "docType": {
+          "const": "06-architecture"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/IF"
+              }
+            ]
+          }
+        }
+      },
+      "required": []
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "IF": {
+      "type": "object",
+      "title": "IF（介面／批次）",
+      "allOf": [
+        {
+          "$ref": "urn:ps-spec:schema:common#/$defs/itemBase"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^IF-\\d{3,}$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z_]+:[A-Za-z0-9_$#@.-]+$",
+              "description": "自然鍵：<物件型別>:<原名>"
+            },
+            "ifType": {
+              "type": "string",
+              "enum": [
+                "BATCH_AE",
+                "BATCH_SQR",
+                "IB_SERVICE",
+                "FILE_IN",
+                "FILE_OUT",
+                "EMAIL",
+                "NOTIFICATION",
+                "OTHER"
+              ],
+              "description": "介面型別"
+            },
+            "object": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/refOBJ",
+              "description": "原系統物件",
+              "x-ref": [
+                "OBJ"
+              ]
+            },
+            "name": {
+              "$ref": "urn:ps-spec:schema:common#/$defs/text",
+              "description": "業務名稱"
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "INBOUND",
+                "OUTBOUND",
+                "INTERNAL"
+              ],
+              "description": "方向"
+            },
+            "trigger": {
+              "type": "object",
+              "required": [
+                "kind",
+                "note"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "SCHEDULE",
+                    "ON_DEMAND",
+                    "ON_TRANSITION",
+                    "ON_SAVE",
+                    "EVENT"
+                  ]
+                },
+                "transitions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "note": {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                }
+              },
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "ON_TRANSITION"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "transitions"
+                    ]
+                  }
+                }
+              ],
+              "description": "觸發方式",
+              "x-ref": [
+                "TRN"
+              ]
+            },
+            "performs": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refTRN"
+              },
+              "uniqueItems": true,
+              "description": "本介面執行的狀態轉移",
+              "x-ref": [
+                "TRN"
+              ]
+            },
+            "reads": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+              },
+              "uniqueItems": true,
+              "description": "讀取欄位",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "writes": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+              },
+              "uniqueItems": true,
+              "description": "寫入欄位",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "parameters": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                      },
+                      "source": {
+                        "anyOf": [
+                          {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/dataOperand"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "expr": {
+                                "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                              }
+                            },
+                            "required": [
+                              "expr"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "參數／Run Control",
+              "x-ref": [
+                "FLD",
+                "DRV"
+              ]
+            },
+            "format": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "layout": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                    },
+                    "encoding": {
+                      "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "seq": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "name": {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                          },
+                          "field": {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/refFLD"
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "format": {
+                            "$ref": "urn:ps-spec:schema:common#/$defs/rawText"
+                          }
+                        },
+                        "required": [
+                          "seq",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "layout",
+                    "encoding",
+                    "fields"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                }
+              ],
+              "description": "格式、編碼、欄位順序",
+              "x-ref": [
+                "FLD"
+              ]
+            },
+            "errorHandling": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "錯誤處理"
+            },
+            "retry": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/notApplicable"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "重試"
+            },
+            "idempotency": {
+              "anyOf": [
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/text"
+                },
+                {
+                  "$ref": "urn:ps-spec:schema:common#/$defs/unresolved"
+                }
+              ],
+              "description": "重送／重複執行的結果"
+            }
+          },
+          "required": [
+            "ifType",
+            "object",
+            "name",
+            "direction",
+            "trigger",
+            "performs",
+            "reads",
+            "writes",
+            "parameters",
+            "format",
+            "errorHandling",
+            "retry",
+            "idempotency"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
