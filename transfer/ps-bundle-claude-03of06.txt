@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit f14c90b）第 3／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit cf42295）第 3／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|f14c90b|63349d9cba6a85dd|3|6|8035|91e0bb1630be844bbc90cab30ed1416e86ccaef5782a62fbf3879752e46c1edf
+@@@PSBUNDLE-PART|1|claude|cf42295|27e3dfebeb846a56|3|6|8035|91e0bb1630be844bbc90cab30ed1416e86ccaef5782a62fbf3879752e46c1edf
 @@@PSBUNDLE-FILE|scripts/ps-bundle.ps1|496|751e9b061b417d397d390578e94d78cb2ffee62c65bb6f27c7979a5c1e50f775|1
 # ps-bundle.ps1 — 搬運包：把一個版本要搬的檔收成幾份文字檔，公司機一個指令解回各檔
 # 用法（公司機）：
@@ -8036,4 +8036,4 @@ function Get-PsSdConflictFacts {
     return , $out.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-status-lib.ps1
-@@@PSBUNDLE-PART-END|63349d9cba6a85dd|3|6
+@@@PSBUNDLE-PART-END|27e3dfebeb846a56|3|6

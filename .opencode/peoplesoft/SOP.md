@@ -1011,8 +1011,12 @@ Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP
 □ 2. 把這組 Component 的狀態圖（Mermaid flowchart 或 stateDiagram-v2，畫法不限、可多張）與圖下的說明貼進 status.md，
      刪掉第一行的 `<!-- SDOC:SKELETON -->`；project.md 選填（目標、決策責任）。
 □ 3. 再輸入同一份清單：第 0 階段三位讀者解讀狀態圖 → 11 個研究單元（每頁研究與獨立覆核分開 session）→ L5 乾淨讀者。
-     ps-spec-author 在 DOC1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑。
+     ps-spec-author 每次呼叫只跑一個 session（每個 session 回報一次進度），DOC1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑。
+     每個 session 上限預設 60 分；要改就跟 ps-spec-author 說「每個 session 上限 N 分」（1～110，Bash 工具一次最多 2 小時），
+     直接在 PowerShell 跑 `scripts\ps-sdoc.ps1 -TimeoutMin N` 可到 180。
 □ 4. 依結論碼處理：
+     - DOC1-3-04（session 失敗，不扣失敗次數）：看輸出的 `SESSION(...) 判讀` 行（見下方「session 失敗的判讀」）——被模型端拖慢就用更大的
+       -TimeoutMin 續跑；卡在模型端（gateway）就把狀態碼、次數與時間交 IT；沒有模型端重試的照 SOP-12／Claude Code 設定排查。
      - DOC1-4-01：讀者對狀態圖仍無多數或圖與圖矛盾 → 看 90 的 STATUS_READING_CONFLICT／STATUS_SELF_CONFLICT，改 status.md 後重跑（開新研究版本）。
      - DOC1-4-03：某頁兩次未通過或預算用完 → 看輸出的「缺口」行，排除原因後說「重試被擋項」（-Retry）。
      - DOC1-5-01（DRAFT）：看 00-index「未通過的檢核」與 90 的 BLOCKING 問題，在 decisions.md 裁決（NO_CHANGE／DROP／ACCEPT_GAP／
@@ -1031,6 +1035,25 @@ Claude Code 版的 `/ps-spec` 走 `scripts/ps-sdoc.ps1`（OpenCode 版仍是 SOP
 
 - docs/ps-research 有更新時只提示「要以新知識重查請加 -Refresh」，不自動換版本；STATUS 檔、ADD_SCOPE 裁決或 schema 改了才自動開新版本。
 - generated 是可重建投影，不在裡面修稿；修改走 decisions.md、status.md 或重新研究。
+
+### session 失敗的判讀（模型端 504 等）
+
+Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應）會自己重試同一個請求，最多 10 次，每次重試前在 stream 寫一行
+`system/api_retry`（含 HTTP 狀態碼）。公司 gateway 回 504 時，每次重試都要等滿 gateway 的逾時。ps-session-lib 讀這些事件：
+
+| 在哪看 | 內容 |
+|---|---|
+| 執行中每 5 分鐘的「進行中」行 | `模型端重試 N 次（504×k…）`，之後接「目前這個請求已連續失敗 M 次」或「之後已恢復」 |
+| 強殺或結束時的 `SESSION(...) 判讀` 行 | **被模型端拖慢**（有重試、之後仍有進展）／**卡在模型端（gateway）**（最後同一個請求連續失敗 3 次以上，或 Claude Code 重試用完）／API 錯誤（沒有重試，不是逾時類） |
+| 最後的「session 失敗」行 | 依上面判讀給下一步；沒有模型端事件時維持「檢查 Claude Code／MCP」 |
+| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等） |
+
+- 「卡住」門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）。
+- 自己做實驗：直接在 PowerShell 跑 `scripts\ps-sdoc.ps1 -Components '<清單>' -MaxSessions 1 -TimeoutMin <分>`，看心跳行的
+  「連續失敗」數字是否一直上升（卡住）或歸零（恢復）。想讓 Claude Code 早點放棄、少等幾輪 gateway 逾時，可先在同一個視窗設
+  `$env:CLAUDE_CODE_MAX_RETRIES = '2'`（只影響這個視窗；預設 10）；重試用完時判讀行會帶 `api_error_status`。
+- 卡在模型端時要問 IT 的：gateway 對這個端點的逾時秒數、能否拉到 10 分以上（Claude Code 單次請求最多等 10 分）、是否串流直通、
+  尖峰時段的容量或排隊限制。只給狀態碼、次數與時間，不給內容。
 
 ### 維護驗證
 

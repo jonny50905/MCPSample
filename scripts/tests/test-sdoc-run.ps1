@@ -303,8 +303,9 @@ try {
     Write-SdFx (Join-Path $inW 'project.md') ([System.IO.File]::ReadAllText((Join-Path $fxW.Example 'input/project.md'), [System.Text.Encoding]::UTF8))
     $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
     Assert-Sd ($r.Code -eq 'DOC1-0-02' -and -not [System.IO.Directory]::Exists((Join-Path $jobRootW 'attempts'))) '-Status：STATUS 檔已放、尚未開始 → DOC1-0-02，不派工' $r.Output
-    $r = Invoke-SdRun $rootW $comps $fxW '' @{ MaxSessions = 2 }
+    $r = Invoke-SdRun $rootW $comps $fxW '' @{ MaxSessions = 2; TimeoutMin = 45 }
     Assert-Sd ($r.Code -eq 'DOC1-3-02-1') '第 0 階段：兩個 session 後還差一位讀者 → DOC1-3-02-1' $r.Code
+    Assert-Sd ($r.Output -match "-Components '[^']+' -TimeoutMin 45") '續跑命令帶上自訂的 -TimeoutMin' ($r.Output -split "`n" | Select-Object -Last 4 | Out-String)
     $r = Invoke-SdRunUntilDone $rootW $comps $fxW
     Assert-Sd ($r.Code -eq 'DOC1-7-01') '貫穿範例跑完研究與 L5：五層檢核全過 → DOC1-7-01（REVIEW_READY）' ($r.Output -split "`n" | Select-Object -Last 15 | Out-String)
     $calls = Get-SdCalls $fxW
@@ -439,6 +440,7 @@ try {
     $oc = Get-SdOutcomes $jobRootE
     $last = $oc[$oc.Length - 1]
     Assert-Sd ($r.Code -eq 'DOC1-3-04' -and [System.IO.File]::Exists((Join-Path $jobRootE 'budgets/r0002/b0002.json')) -and [string]$last.Outcome['status'] -ceq 'SESSION_FAILED' -and $last.Outcome['counted'] -eq $false) '-Retry 開新預算；session 失敗不計次 → DOC1-3-04'
+    Assert-Sd ((@($last.Outcome['findings']) -join ',') -match '^EXIT_[1-9][0-9]*$' -and $r.Output -match 'session 失敗，未消耗失敗次數；檢查 Claude Code／MCP') 'session 失敗的 findings 記結束碼 enum（EXIT_<n>）；沒有模型端重試時沿用「檢查 Claude Code／MCP」' (@($last.Outcome['findings']) -join ',')
     $r = Invoke-SdRunUntilDone $rootE $comps $fxE 'stray-once,review-fail-once-data,partial-ui-TW_DEMO_APV,dup-scope-TW_DEMO_REQ,l5-nis-DRV-002/D1,l5-nis-always-DRV-001/D3,l5-badcite-R2'
     $oc = Get-SdOutcomes $jobRootE
     $stray = @($oc | Where-Object { [string]$_.Outcome['status'] -ceq 'INVALID' -and (@($_.Outcome['findings']) -join ' ') -like '*stray.txt*' }).Count

@@ -114,9 +114,15 @@ SOP 編號照用；有差異的只有：
    - `approvals.md`：之後核准文件用（填 00-index 上的 docHash 前 12 碼）。
 2. 再下同一個 `/ps-spec`：三位讀者各自解讀狀態圖（不一致的逐項再問一次、多數決），之後依序研究範圍、資料、權限、說明區域、流程、介面、功能、畫面、規則、操作、測試；每頁研究與獨立覆核是兩個 session。
    研究完成後，三位只看渲染後文件的乾淨讀者回答外環出的題目（L5）；第 1 輪沒讀懂的項目交原研究單元改寫，再由新讀者重問一次。
-   一次跑 `-MaxSessions` 個 session，結論碼 `DOC1-3-02-<n>` 時 ps-spec-author 會自動續跑。
+   ps-spec-author 每次呼叫只跑一個 session（`-MaxSessions 1`），結論碼 `DOC1-3-02-<n>` 時自動續跑，每個 session 回報一次進度。
+   每個 session 上限預設 60 分（`-TimeoutMin`）；要改就跟 ps-spec-author 說「每個 session 上限 N 分」（1～110，Bash 工具一次最多 2 小時），
+   直接在 PowerShell 跑 `scripts\ps-sdoc.ps1` 則可到 180。
 3. 產出在 `docs\ps-spec\<jobId>\README.md`（入口）與 `generated\<代號>\`；結論碼與下一步見 `.claude\peoplesoft\spec\support-codes.md` 的 DOC1。
 4. 執行狀態在 `.ps-runtime\sdoc\<jobId>\`（attempt、收據、ID 對照、工作中文件），log 在 `.ps-runtime\sdoc-logs\`。
+5. session 失敗（`DOC1-3-04`）時看輸出的 `SESSION(...) 判讀` 行：模型端（例如公司 gateway 的 504）重試後仍有進展＝**被拖慢**，用更大的
+   `-TimeoutMin` 續跑；同一個請求連續失敗 3 次以上或重試用完＝**卡在模型端**，把狀態碼、次數與時間交 IT。執行中每 5 分鐘的「進行中」
+   行也會列出重試次數與目前連續失敗幾次。attempt 的 `outcome.json` 的 findings 記失敗種類（`TIMED_OUT`、`EXIT_<n>`、
+   `API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`）。
 
 ## 回報維護端
 

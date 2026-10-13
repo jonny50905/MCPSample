@@ -8,7 +8,7 @@ param(
     [string]$Root = '',
     [switch]$Status,
     [ValidateRange(1, 100)][int]$MaxSessions = 4,
-    [ValidateRange(1, 180)][int]$TimeoutMin = 30,
+    [ValidateRange(1, 180)][int]$TimeoutMin = 60,
     [string]$Model = '',
     [switch]$Refresh,
     [switch]$Retry,
@@ -984,6 +984,16 @@ function Get-SdSkeletonForEntity([string]$Entity) {
     }
     return , $out
 }
+# SESSION_FAILED 的 findings：逾時、結束碼、容量事件、模型端重試判讀的 enum；都沒有時為 NONE
+function Get-SdSessionFindings($Sr) {
+    $f = @()
+    if ([bool]$Sr.TimedOut) { $f += 'TIMED_OUT' }
+    elseif ([int]$Sr.ExitCode -ne 0 -and [string]$Sr.FailureKind -cne 'DISPATCH_ERROR') { $f += ('EXIT_' + [int]$Sr.ExitCode) }
+    foreach ($k in @([string]$Sr.FailureKind, [string]$Sr.ApiKind)) { if (@('', 'NONE') -notcontains $k) { $f += $k } }
+    if ($f.Count -eq 0) { $f = @('NONE') }
+    return , $f
+}
+
 function Invoke-SdAttempt($Work, $State) {
     $n = 1 + (Get-SdNumber $J.AttemptRoot '^a([0-9]{4,8})$')
     $aid = 'a' + $n.ToString('0000', [System.Globalization.CultureInfo]::InvariantCulture)
@@ -1105,11 +1115,11 @@ function Invoke-SdAttempt($Work, $State) {
         if ($FakeWorker -ne '') {
             $global:LASTEXITCODE = 0
             $null = (& $FakeWorker -AttemptDir $ad -InputPath (Join-Path $box 'input.json') -OutputPath $outPath -Kind $kind -Root $J.Root *>&1 | ForEach-Object { [string]$_ })
-            $sr = @{ ExitCode = [int]$LASTEXITCODE; TimedOut = $false; SlotBusy = $false; FailureKind = 'NONE' }
+            $sr = @{ ExitCode = [int]$LASTEXITCODE; TimedOut = $false; SlotBusy = $false; FailureKind = 'NONE'; ApiKind = 'NONE' }
         }
         else { $sr = Invoke-PsOcSession -OcPath $J.OcPath -Root $J.Root -LogRoot (Join-Path $J.Root '.ps-runtime/sdoc-logs') -Model $Model -ExtraArgs ('--agent ' + $agent) -PromptText ($J.JobId + '/' + $aid) -TimeoutMin $TimeoutMin -Tag ($J.JobId + '-' + $aid) -Log { param($msg) Write-Host $msg } -SlotWaitMin 0 -TimeoutParamName 'TimeoutMin' }
     }
-    catch { $sr = @{ ExitCode = -1; TimedOut = $false; SlotBusy = $false; FailureKind = 'DISPATCH_ERROR' }; Write-Host ('session 未完成：' + $_.Exception.Message) }
+    catch { $sr = @{ ExitCode = -1; TimedOut = $false; SlotBusy = $false; FailureKind = 'DISPATCH_ERROR'; ApiKind = 'NONE' }; Write-Host ('session 未完成：' + $_.Exception.Message) }
     $violations = Restore-SdFence $fence $outPath
     $outText = $null
     if ([System.IO.File]::Exists($outPath)) { $outText = [System.IO.File]::ReadAllText($outPath, [System.Text.Encoding]::UTF8) }
@@ -1122,7 +1132,7 @@ function Invoke-SdAttempt($Work, $State) {
     if ((Get-SdSource).Hash -cne $J.Revision['sourceHash']) { $outcome['status'] = 'SOURCE_CHANGED' }
     elseif ([bool]$sr.SlotBusy) { $outcome['status'] = 'SLOT_BUSY' }
     elseif ($violations.Count -gt 0) { $outcome['status'] = 'INVALID'; $outcome['counted'] = $true; $outcome['findings'] = @('改了不准改的檔案，已還原／隔離：' + (@($violations | Select-Object -First 5) -join '、')) }
-    elseif ([bool]$sr.TimedOut -or [int]$sr.ExitCode -ne 0 -or (@('', 'NONE') -notcontains [string]$sr.FailureKind)) { $outcome['status'] = 'SESSION_FAILED'; $outcome['findings'] = @([string]$sr.FailureKind) }
+    elseif ([bool]$sr.TimedOut -or [int]$sr.ExitCode -ne 0 -or (@('', 'NONE') -notcontains [string]$sr.FailureKind)) { $outcome['status'] = 'SESSION_FAILED'; $outcome['findings'] = Get-SdSessionFindings $sr }
     else {
         $out = $null
         if ($null -ne $outText) { try { $out = ConvertTo-PsSdNode (ConvertFrom-PsSdJson $outText) } catch { $out = $null } }
@@ -1165,7 +1175,7 @@ function Invoke-SdAttempt($Work, $State) {
     Write-SdJson (Join-Path $ad 'outcome.json') $outcome -Create
     Write-Host ('本次結果：' + $outcome['status'])
     foreach ($f in @($outcome['findings'] | Select-Object -First 8)) { Write-Host ('  ' + $f) }
-    return @{ Status = [string]$outcome['status']; Receipt = $accepted }
+    return @{ Status = [string]$outcome['status']; Receipt = $accepted; ApiKind = [string]$sr.ApiKind }
 }
 
 # ---------------- 主程式 ----------------
@@ -1204,6 +1214,7 @@ try {
     $revisionRoot = Join-Path $J.JobRoot 'revisions'
     $J.NextCommand = "powershell -NoProfile -File '" + $PSCommandPath.Replace("'", "''") + "' -Root '" + $Root.Replace("'", "''") + "' -Components '" + ($J.Names -join ',') + "'"
     if ($Model -ne '') { $J.NextCommand += " -Model '" + $Model + "'" }
+    if ($PSBoundParameters.ContainsKey('TimeoutMin')) { $J.NextCommand += ' -TimeoutMin ' + $TimeoutMin }
     $rootLockId = (Get-PsKnTextHash -Text $Root.ToUpperInvariant()).Substring(0, 16)
     $mutex = New-Object System.Threading.Mutex($false, ('Global\MCPSample-SpecDocs-' + $rootLockId + '-' + $J.JobId))
     try { $held = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $held = $true }
@@ -1244,7 +1255,7 @@ try {
                 $J.Registry = Read-PsSdIdRegistry $J.RegistryPath
                 $J.RegistryStamp = Get-SdHash $J.Registry
                 $state = Get-SdState
-                $stopReason = ''; $sessions = 0; $published = $null
+                $stopReason = ''; $sessions = 0; $published = $null; $failedApi = @()
                 if (-not $Status) {
                     if ($FakeWorker -eq '') { $oc = Get-PsOcPath -Root $Root; $J.OcPath = [string]$oc.Path; if ($J.OcPath -eq '' -and $state.Work.Count -gt 0) { throw ('無法啟動 ' + $oc.Exe + '：' + $oc.Error) } }
                     elseif (-not [System.IO.File]::Exists($FakeWorker)) { throw 'FakeWorker 不存在。' }
@@ -1260,7 +1271,7 @@ try {
                         $r = Invoke-SdAttempt $work $state
                         if ($r.Status -ne 'SLOT_BUSY') { $sessions++ }
                         if (@('SOURCE_CHANGED', 'SLOT_BUSY') -contains $r.Status) { $stopReason = $r.Status; break }
-                        if ($r.Status -eq 'SESSION_FAILED') { $stopReason = $r.Status; $failedSubjects[$work.Unit + '|' + $work.Subject] = $true }
+                        if ($r.Status -eq 'SESSION_FAILED') { $stopReason = $r.Status; $failedSubjects[$work.Unit + '|' + $work.Subject] = $true; $failedApi += [string]$r.ApiKind }
                         $state = Get-SdState
                         if ($r.Receipt -or ($work.Kind -like 'STATUS_*' -and $state.Stage0.State -eq 'DONE')) { [void](Update-SdWorkingSet $state) }
                     }
@@ -1290,7 +1301,12 @@ try {
                 elseif ($phase -eq 'STALE') { Write-Host '下一步：來源已變，用相同命令建立新版本。'; Write-Host $J.NextCommand; $code = 'DOC1-4-04'; $exitCode = 1 }
                 else { Write-Host '下一步：用相同命令繼續：'; Write-Host $J.NextCommand; $code = 'DOC1-3-02-' + $state.Work.Count }
                 if ($stopReason -eq 'SLOT_BUSY') { Write-Host '模型服務被其他 session 使用，未消耗失敗次數；稍後重跑。'; $code = 'DOC1-3-03'; $exitCode = 1 }
-                if ($stopReason -eq 'SESSION_FAILED') { Write-Host 'session 失敗，未消耗失敗次數；檢查 Claude Code／MCP 後重跑。'; $code = 'DOC1-3-04'; $exitCode = 1 }
+                if ($stopReason -eq 'SESSION_FAILED') {
+                    $hint = Get-PsOcApiHint -Kinds $failedApi -TimeoutMin $TimeoutMin
+                    if ($hint -ne '') { Write-Host ('session 失敗，未消耗失敗次數。' + $hint + '。') }
+                    else { Write-Host 'session 失敗，未消耗失敗次數；檢查 Claude Code／MCP 後重跑。' }
+                    $code = 'DOC1-3-04'; $exitCode = 1
+                }
             }
         }
     }

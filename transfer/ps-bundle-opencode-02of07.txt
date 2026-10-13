@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit f14c90b）第 2／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit cf42295）第 2／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|f14c90b|2bb0a5a870769052|2|7|5806|336edcc9d9301fe77e6d268684c0943d8e85b4dc40efe4e996057847d69e1d42
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3780|fbe3112cc2aa31bad0129701e23e7bb4b4f3d5f5880e3c61f6d2e70ba1438878|0
+@@@PSBUNDLE-PART|1|opencode|cf42295|b9c0139367a827df|2|7|5836|74737c538f3ce82cd59807f3e7f057a08878a4fe21483e3e96fa96ea98b27262
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3810|cc9c10a36d6caa6a70f4a9ca691f14b5dcbe50b4ab44d4f2f5cca4883aaf9cf2|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -3782,6 +3782,36 @@
   舊式單一檔照樣能解、OpenCode 版 G）；舊版 ps-bundle.ps1 對單一份停在 T、對接成一檔的各份解開為 G。
 - 教訓：給人工搬運的檔要有大小上限，切點選在不破壞內容單位的地方，每一段自帶「屬於哪一組、第幾段、完整與否」的驗證資訊，
   缺段或混組時說得出是哪一段。
+
+### L140 模型端 504 被判成「上限太短」——讀 stream 的重試事件，分出被拖慢與卡住（2026-10-13）
+
+- 症狀：公司機第一次真跑 Spec 文件流程，第 0 階段 DOC1-3-04。管理者請公司內部模型讀 log 回報：三個讀者 session 都撞公司 gateway 的
+  HTTP 504，兩個重試後有進展（被拖慢），一個最後同一個請求連續失敗，直到被 30 分逾時強殺；每輪要等 30 分才看得到結果。
+- 根因：
+  - Claude Code 對 5xx、429／529、沒有回應會自己重試同一個請求（預設 10 次），每次重試前在 stream-json 寫 `system/api_retry`
+    （`error_status`），重試用完時 result 帶 `api_error_status`。gateway 回 504 時每次重試都要等滿 gateway 的逾時，一個請求就能吃掉
+    大半個 session 上限。外環看不到這些事件：只看結束碼與輸出檔靜止時間，而重試事件讓 stream 一直變大，強殺時被判成
+    「輸出仍在增加＝上限太短」——對卡住的情況給了錯的建議；outcome findings 只記 `NONE`。
+  - ps-sdoc 的 session 上限 30 分沿用其他外環，沒算進 gateway 重試；ps-spec-author 以 `-MaxSessions 4` 呼叫，4 個 session 都跑滿 30 分
+    就超過 Bash 工具 2 小時上限，加大上限只會更早撞到。
+- 落點：
+  - `scripts/ps-session-lib.ps1`：`Get-PsOcClaudeApiRetry` 讀 stream（共用讀寫開檔，session 進行中也能讀）回 Kind
+    （NONE／API_RETRY_SLOW／API_RETRY_STUCK／API_ERROR）、重試次數、狀態碼分布、最後一個請求連續失敗次數；門檻
+    `$script:PsOcApiStuckAfter`＝3。心跳行加「模型端重試 N 次（504×k），目前這個請求已連續失敗 M 次／之後已恢復」；強殺判讀先看卡在模型端，
+    再看靜止 ≥20 分（工具呼叫），再看被拖慢，最後才是「上限太短」；正常結束也印模型端判讀。`Invoke-PsOcSession` 回傳加 `ApiKind`，
+    只供說明、不改成敗判定。`Get-PsOcApiHint` 給下一步。
+  - `scripts/ps-sdoc.ps1`：`-TimeoutMin` 預設 60；SESSION_FAILED 的 findings 改成 enum 清單（TIMED_OUT、EXIT_<n>、容量事件、
+    模型端判讀；都沒有才 NONE）；DOC1-3-04 的說明依失敗 session 的模型端判讀分流（結論碼不變）；印出的續跑命令帶上自訂的 `-TimeoutMin`。
+  - `claude-code/.claude/agents/ps-spec-author.md`：每次呼叫 `-MaxSessions 1`（每個 session 回報一次進度、一次呼叫不超過 2 小時）；
+    使用者明確給每個 session 上限（1～110）才帶 `-TimeoutMin`，續跑沿用；DOC1-3-04 轉述判讀行。hook 的命令形狀原本就放行數字參數。
+  - support-codes DOC1-3-04、claude-code/README、SOP-28（新增「session 失敗的判讀」）、HANDOFF。
+- 驗證：test-claude-variant 新增模型端判讀 11 項（沒有重試、拖慢、未達門檻、卡住、門檻可調、第一個請求就卡、重試用完、API 錯誤、
+  沒有 stream、提示優先序、ps-spec-author 命令形狀）與 hook 放行 `-MaxSessions 1 -TimeoutMin 90`；Windows 上另以 cmd.exe＋假 claude.cmd
+  真的走一次 Invoke-PsOcSession（重試用完 → API_RETRY_STUCK、判讀行說卡在模型端），CI 的 5.1 runner 會跑到。test-sdoc-run 加兩項：
+  續跑命令帶 `-TimeoutMin 45`、session 失敗的 findings 為 `EXIT_1` 且沒有模型端重試時沿用「檢查 Claude Code／MCP」。
+  其餘 test-sdoc、test-sdoc-assemble、test-auto-loop、test-spec、test-spec-build、test-bundle、5.1 靜態守衛照舊全過。
+- 教訓：外環判讀「卡死還是跑得久」不能只看輸出檔有沒有變大——CLI 自己的重試也會寫輸出。要讀 CLI 明確寫出的事件
+  （重試、狀態碼、是否恢復），並把分類記進 outcome，讓人不用等下一輪逾時就能決定調上限還是找 IT。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -5807,4 +5837,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-PART-END|2bb0a5a870769052|2|7
+@@@PSBUNDLE-PART-END|b9c0139367a827df|2|7

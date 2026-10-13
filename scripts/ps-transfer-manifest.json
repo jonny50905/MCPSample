@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "f14c90b",
+  "commit": "cf42295",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -178,8 +178,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3780,
-      "sha256": "fbe3112cc2aa31bad0129701e23e7bb4b4f3d5f5880e3c61f6d2e70ba1438878",
+      "lines": 3810,
+      "sha256": "cc9c10a36d6caa6a70f4a9ca691f14b5dcbe50b4ab44d4f2f5cca4883aaf9cf2",
       "bom": false
     },
     {
@@ -250,8 +250,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1049,
-      "sha256": "7ed8317eab8b24d429cf08cc69599f43f2b3da60096021cb7a46fe7ca7ff6c75",
+      "lines": 1072,
+      "sha256": "0b0a610ba2681cebb56d9fe04afc1bea7a08fb083ef1baebefcb6190b551af36",
       "bom": false
     },
     {
@@ -532,14 +532,14 @@
     },
     {
       "path": "scripts/ps-sdoc.ps1",
-      "lines": 1309,
-      "sha256": "69dc7056794b2ea5efb1a9f47c1a45fd9adcc861a3ee18f146b353c898d8d2bc",
+      "lines": 1325,
+      "sha256": "65daf74200f12761e3679ec6959043972dda63c76bf23aedaa9c234b9084cc5a",
       "bom": true
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 312,
-      "sha256": "f614cba595c0a0c21a164302f42a7e3b964cec83b23969871da6f2bdb3b701dd",
+      "lines": 418,
+      "sha256": "e4b9f4b4ddd78595cbd1ec8068a185dbd5d36d1252132c011a23040fe9fadfd0",
       "bom": true
     },
     {
@@ -598,8 +598,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 419,
-      "sha256": "f26aaae5dd8483d35e51f5e6b1a3612d9e07abdc0e7ac64dc3b1c7a263adc37b",
+      "lines": 463,
+      "sha256": "e18de109635f7d38a4e9adcd5c30884c61a5094cbccfe3e1b2b24e0bcf851b93",
       "bom": true
     },
     {
@@ -628,8 +628,8 @@
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 509,
-      "sha256": "2659da64f8dec54c28df153653ec9526aa31595d016096d2444bc36de11df489",
+      "lines": 511,
+      "sha256": "eb2521aa700aeb0fe7d310b14a37a5114ad0c0b3f5fcd804e69b5b41147dd6e8",
       "bom": true
     },
     {

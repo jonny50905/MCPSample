@@ -12,6 +12,8 @@
 $script:PsSessionLibRoot = Split-Path $PSScriptRoot -Parent
 $script:PsSessionLibVersion = 1
 $script:PsOcSessionSlotName = 'Global\MCPSample-OpencodeSession'
+# 模型端重試判讀（Claude Code 版）：最後一個成功的模型回應之後，同一個請求連續失敗幾次以上算「卡在模型端」，未達算「被拖慢」
+$script:PsOcApiStuckAfter = 3
 
 # npm 同時裝 opencode / opencode.cmd / opencode.ps1；Get-Command 會優先回 .ps1——把 .ps1 丟給 cmd.exe
 # 不會執行，Windows 會用檔案關聯開啟它（記事本）並阻塞，關掉後 cmd 回 exit 0，外環誤判 session 正常結束。
@@ -127,6 +129,78 @@ function Convert-PsOcClaudeStream {
     return $r
 }
 
+# Claude Code 的 stream-json：模型端可重試的錯誤（5xx、429／529、沒有回應）每次重試前寫一行 system/api_retry
+# （error_status＝HTTP 狀態碼，沒有回應為 null）；重試用完仍失敗時 result 帶 api_error_status。session 進行中也可讀（共用讀寫開檔）。
+# 回 @{ Kind; Count; Trailing; Recovered; Progress; Statuses; ApiErrorStatus }：
+#   Count＝重試事件總數；Trailing＝最後一個成功的 assistant 事件之後連續的重試數（目前這個請求已失敗幾次）；
+#   Recovered＝重試之後又成功過；Progress＝成功的 assistant 事件數；Statuses＝狀態碼分布（例 504×5、無回應×1）
+#   Kind：NONE｜API_RETRY_SLOW（有重試、之後仍有進展＝被拖慢）｜
+#         API_RETRY_STUCK（同一個請求連續失敗達 $script:PsOcApiStuckAfter 次，或重試用完仍失敗）｜API_ERROR（沒有重試就以 API 錯誤收場）
+function Get-PsOcClaudeApiRetry {
+    param([string]$StreamFile)
+    $r = @{ Kind = 'NONE'; Count = 0; Trailing = 0; Recovered = $false; Progress = 0; Statuses = ''; ApiErrorStatus = '' }
+    if (-not $StreamFile -or -not [System.IO.File]::Exists($StreamFile)) { return $r }
+    $st = [ordered]@{}
+    $fs = $null
+    $rd = $null
+    try {
+        $fs = New-Object System.IO.FileStream($StreamFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $rd = New-Object System.IO.StreamReader($fs, (New-Object System.Text.UTF8Encoding($false)))
+        while ($true) {
+            $ln = $rd.ReadLine()
+            if ($null -eq $ln) { break }
+            $k = $ln.IndexOf('"subtype":"api_retry"')
+            if ($k -ge 0 -and $k -lt 80) {
+                $r.Count++
+                $r.Trailing++
+                $s = '無回應'
+                $m = [regex]::Match($ln, '"error_status":(\d+)')
+                if ($m.Success) { $s = $m.Groups[1].Value }
+                if ($st.Contains($s)) { $st[$s] = [int]$st[$s] + 1 } else { $st[$s] = 1 }
+                continue
+            }
+            $k = $ln.IndexOf('"type":"assistant"')
+            if ($k -ge 0 -and $k -lt 20) {
+                # API 錯誤訊息（error 欄位或「API Error」文字）不算進展
+                if ($ln.Contains('"error":"') -or $ln.Contains('"text":"API Error')) { continue }
+                $r.Progress++
+                if ($r.Trailing -gt 0) { $r.Recovered = $true }
+                $r.Trailing = 0
+                continue
+            }
+            $k = $ln.IndexOf('"type":"result"')
+            if ($k -ge 0 -and $k -lt 40) {
+                $m = [regex]::Match($ln, '"api_error_status":(\d+)')
+                if ($m.Success) { $r.ApiErrorStatus = $m.Groups[1].Value }
+            }
+        }
+    }
+    catch { }
+    finally {
+        if ($null -ne $rd) { $rd.Dispose() }
+        elseif ($null -ne $fs) { $fs.Dispose() }
+    }
+    $parts = @()
+    foreach ($key in $st.Keys) { $parts += ([string]$key + '×' + [string]$st[$key]) }
+    $r.Statuses = $parts -join '、'
+    if ($r.ApiErrorStatus -ne '') {
+        if ($r.Trailing -gt 0) { $r.Kind = 'API_RETRY_STUCK' } else { $r.Kind = 'API_ERROR' }
+    }
+    elseif ($r.Trailing -ge $script:PsOcApiStuckAfter) { $r.Kind = 'API_RETRY_STUCK' }
+    elseif ($r.Count -gt 0) { $r.Kind = 'API_RETRY_SLOW' }
+    return $r
+}
+
+# 失敗 session 的模型端判讀（Get-PsOcClaudeApiRetry 的 Kind）→ 下一步；沒有模型端事件回空字串（呼叫端沿用原本的說法）
+function Get-PsOcApiHint {
+    param([string[]]$Kinds, [int]$TimeoutMin, [string]$ParamName = 'TimeoutMin')
+    $ks = @($Kinds)
+    if ($ks -contains 'API_RETRY_STUCK') { return '卡在模型端（gateway）：同一個請求連續失敗，調高逾時多半沒用；把畫面上 SESSION 判讀行的狀態碼、次數與時間交 IT 查 gateway 逾時，恢復後同命令續跑' }
+    if ($ks -contains 'API_ERROR') { return '模型 API 錯誤（沒有重試，不是逾時類）：檢查 Claude Code 登入、權限與模型名稱後同命令續跑' }
+    if ($ks -contains 'API_RETRY_SLOW') { return ('被模型端重試拖慢到逾時（每個 session 上限 ' + $TimeoutMin + ' 分）：用更大的 -' + $ParamName + ' 續跑') }
+    return ''
+}
+
 # Claude Code 的權限模式（headless 預設 dontAsk：只執行 .claude/settings.json 允許清單內的工具，其餘自動拒絕、不會卡在詢問）
 function Get-PsOcClaudePermissionMode {
     $pm = ([string]$env:PS_CLAUDE_PERMISSION_MODE).Trim()
@@ -168,7 +242,8 @@ function New-PsOcCommandLine {
     return @{ Inner = $inner; LogArgs = ($ExtraArgs + ' ｜ ' + $PromptText); Agent = ''; Prompt = $PromptText }
 }
 
-# 開一個新鮮 headless session（逾時整樹強殺）。回傳 @{ TimedOut; ExitCode; ErrFile; OutFile; FailureKind; SlotBusy; SlotWaitedSec }
+# 開一個新鮮 headless session（逾時整樹強殺）。回傳 @{ TimedOut; ExitCode; ErrFile; OutFile; FailureKind; SlotBusy; SlotWaitedSec; ApiKind }
+#   ApiKind：Claude Code 版 stream 的模型端重試判讀（Get-PsOcClaudeApiRetry 的 Kind）；只供說明，不改變成敗判定
 #   -ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'（OpenCode 原樣傳；Claude Code 轉成
 #     --agent <該指令的主代理>＋prompt「/ps-research <PromptText>」，輸出 stream-json 落 .stream.jsonl、最終回覆抽進 OutFile）
 #   -SlotWaitMin：取不到 session slot 最多等幾分（0＝不等）；等不到＝不啟動，回 SlotBusy=$true、TimedOut=$true、FailureKind=SLOT_BUSY
@@ -187,12 +262,12 @@ function Invoke-PsOcSession {
     $errFile = Join-Path $LogRoot ('{0}-{1}.err.txt' -f $stamp, $Tag)
     if (-not (Test-PsOcPromptSafe -PromptText $PromptText)) {
         L "SESSION($Tag) 拒啟動：prompt 含換行、半形雙引號或 %（cmd 在雙引號內也會展開 %VAR%）——外環組 prompt 的錯，不是模型"
-        return @{ TimedOut = $false; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'PROMPT_UNSAFE'; SlotBusy = $false; SlotWaitedSec = 0 }
+        return @{ TimedOut = $false; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'PROMPT_UNSAFE'; SlotBusy = $false; SlotWaitedSec = 0; ApiKind = 'NONE' }
     }
     $slot = Enter-PsOcSessionSlot -WaitMin $SlotWaitMin -Log $Log
     if (-not $slot.Held) {
         L "SESSION($Tag) 未啟動：$($slot.Reason)（等了 $($slot.WaitedSec) 秒）——另一個 ps-auto-loop／ps-spec／補研究 session 正在用模型服務，錯開時間再跑"
-        return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'SLOT_BUSY'; SlotBusy = $true; SlotWaitedSec = $slot.WaitedSec }
+        return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'SLOT_BUSY'; SlotBusy = $true; SlotWaitedSec = $slot.WaitedSec; ApiKind = 'NONE' }
     }
     try {
         # 結束碼落檔：不相信 Process 物件的 .ExitCode（-PassThru 物件在只用 WaitForExit(ms) 等待時常為 $null，
@@ -243,7 +318,16 @@ function Invoke-PsOcSession {
                 $silent = [int]((Get-Date) - $lastOut).TotalMinutes
                 $note = ''
                 if ($silent -ge 20) { $note = "；輸出已靜止 $silent 分（委派期間長時間無輸出屬常態，實測健康可達 30 分；接近逾時上限仍無輸出才需依 SOP-12 查 oracleMCP 通道）" }
-                L "SESSION($Tag) 進行中…已 $mins 分（逾時上限 $TimeoutMin 分）$note"
+                # 模型端重試（Claude Code 版）：重試事件也會讓 stream 變大，靜止時間看不出來——直接數
+                $apiNote = ''
+                if ($streamFile -ne '') {
+                    $hb = Get-PsOcClaudeApiRetry -StreamFile $streamFile
+                    if ($hb.Count -gt 0) {
+                        $apiNote = "；模型端重試 $($hb.Count) 次（$($hb.Statuses)）"
+                        if ($hb.Trailing -gt 0) { $apiNote += "，目前這個請求已連續失敗 $($hb.Trailing) 次" } else { $apiNote += '，之後已恢復' }
+                    }
+                }
+                L "SESSION($Tag) 進行中…已 $mins 分（逾時上限 $TimeoutMin 分）$apiNote$note"
                 $lastBeat = Get-Date
             }
         }
@@ -265,18 +349,29 @@ function Invoke-PsOcSession {
             $killSilent = [int]((Get-Date) - $lastOutK).TotalMinutes
             L "SESSION($Tag) 逾時 $TimeoutMin 分，已整樹強制結束（狀態在檔案，無損）"
             if ($streamFile -ne '') { $null = Convert-PsOcClaudeStream -StreamFile $streamFile -OutFile $outFile }
-            if ($killSilent -le 5) {
-                L "SESSION($Tag) 判讀：強殺當下輸出仍在增加（靜止僅 $killSilent 分）＝**上限太短，不是卡死**——把 -$tpn 調高後重跑，不要去查 MCP 通道"
+            # 模型端重試先判：重試事件會讓 stream 一直變大，只看靜止時間會把「卡在模型端」誤判成「上限太短」
+            $api = Get-PsOcClaudeApiRetry -StreamFile $streamFile
+            $apiTxt = "模型端重試共 $($api.Count) 次（$($api.Statuses)）"
+            if ($api.Kind -eq 'API_RETRY_STUCK') {
+                $first = ''
+                if ($api.Progress -eq 0) { $first = '；第一個請求就沒成功過＝gateway 或模型服務不通、過載' }
+                L "SESSION($Tag) 判讀：強殺前同一個請求已連續失敗 $($api.Trailing) 次（$apiTxt）＝**卡在模型端（gateway）**$first——調高 -$tpn 多半沒用；把狀態碼、次數與時間交 IT 查 gateway 逾時"
             }
             elseif ($killSilent -ge 20) {
                 L "SESSION($Tag) 判讀：輸出已靜止 $killSilent 分才被強殺＝**疑似卡在工具呼叫**——依 SOP-12 查 oracleMCP／模型服務通道，調高上限沒有用"
+            }
+            elseif ($api.Kind -eq 'API_RETRY_SLOW') {
+                L "SESSION($Tag) 判讀：$apiTxt，重試後仍有進展＝**被模型端拖慢，不是卡死**——把 -$tpn 調高後重跑"
+            }
+            elseif ($killSilent -le 5) {
+                L "SESSION($Tag) 判讀：強殺當下輸出仍在增加（靜止僅 $killSilent 分）＝**上限太短，不是卡死**——把 -$tpn 調高後重跑，不要去查 MCP 通道"
             }
             else {
                 L "SESSION($Tag) 判讀：強殺當下靜止 $killSilent 分（介於兩者之間）——先看 out 檔尾端停在哪個步驟再決定調上限或查通道"
             }
             $fkT = Get-PsOcFailureKind -OutFile $outFile -ErrFile $errFile
             if ($fkT -ne 'NONE') { L "SESSION($Tag) 容量事件：$fkT（out/err 含 context 溢出字樣）——逾時前已撞 context 上限，調時間無用；見 SOP-10" }
-            return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fkT; SlotBusy = $false; SlotWaitedSec = $slot.WaitedSec }
+            return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fkT; SlotBusy = $false; SlotWaitedSec = $slot.WaitedSec; ApiKind = $api.Kind }
         }
         # 優先讀落檔的結束碼（可觀測事實），讀不到才退回 Process 物件
         $code = $null
@@ -301,10 +396,21 @@ function Invoke-PsOcSession {
             if (-not $cr.Found) { L "SESSION($Tag) stream 沒有 result 事件（session 可能在啟動階段就死——看 err 檔與 $streamFile）" }
             elseif ($cr.IsError) { L "SESSION($Tag) Claude Code 回報錯誤收場：subtype=$($cr.Subtype) turns=$($cr.Turns)" }
         }
+        $api = Get-PsOcClaudeApiRetry -StreamFile $streamFile
+        $apiTxt = "模型端重試共 $($api.Count) 次（$($api.Statuses)）"
+        if ($api.Kind -eq 'API_RETRY_STUCK') {
+            $first = ''
+            if ($api.Progress -eq 0) { $first = '；第一個請求就沒成功過＝gateway 或模型服務不通、過載' }
+            $aes = ''
+            if ($api.ApiErrorStatus -ne '') { $aes = "（api_error_status=$($api.ApiErrorStatus)）" }
+            L "SESSION($Tag) 判讀：Claude Code 重試用完仍失敗$aes，同一個請求連續失敗 $($api.Trailing) 次（$apiTxt）＝**卡在模型端（gateway）**$first——把狀態碼、次數與時間交 IT 查 gateway 逾時"
+        }
+        elseif ($api.Kind -eq 'API_ERROR') { L "SESSION($Tag) 判讀：API 錯誤 api_error_status=$($api.ApiErrorStatus)，沒有重試＝不是逾時類——檢查 Claude Code 登入、權限與模型名稱" }
+        elseif ($api.Kind -eq 'API_RETRY_SLOW') { L "SESSION($Tag) $apiTxt，重試後已恢復（被拖慢，沒有卡住）" }
         L "SESSION($Tag) 結束 exit=$code 耗時 $([int]((Get-Date) - $sessStart).TotalMinutes) 分，輸出：$outFile"
         $fk = Get-PsOcFailureKind -OutFile $outFile -ErrFile $errFile
         if ($fk -ne 'NONE') { L "SESSION($Tag) 容量事件：$fk（out/err 含 context 溢出字樣；exit=$code 不代表沒事——子代理溢出多半 exit 0）——處置見 SOP-10，不要只調 timeout" }
-        return @{ TimedOut = $false; ExitCode = $code; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fk; SlotBusy = $false; SlotWaitedSec = $slot.WaitedSec }
+        return @{ TimedOut = $false; ExitCode = $code; ErrFile = $errFile; OutFile = $outFile; FailureKind = $fk; SlotBusy = $false; SlotWaitedSec = $slot.WaitedSec; ApiKind = $api.Kind }
     }
     finally {
         Exit-PsOcSessionSlot -Slot $slot

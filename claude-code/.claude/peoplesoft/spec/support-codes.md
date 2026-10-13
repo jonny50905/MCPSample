@@ -67,7 +67,7 @@ CLONE1 不使用 drill tuple。請勿將本機錯誤文字、generated 文件或
 | 0 | 03 | 同一組 Component 的文件工作正在執行 | 3 |
 | 3 | 02-`<n>` | RUNNABLE，n 個工作可續跑；同命令繼續 | 0 |
 | 3 | 03 | SLOT_BUSY；模型服務被其他 session 使用，稍後續跑 | 1 |
-| 3 | 04 | SESSION_FAILED；檢查 Claude Code／MCP 後續跑，不消耗失敗次數 | 1 |
+| 3 | 04 | SESSION_FAILED；不消耗失敗次數。看輸出的 SESSION 判讀：被模型端拖慢 → 用更大的 -TimeoutMin 續跑；卡在模型端（gateway）→ 狀態碼、次數與時間交 IT；其他 → 檢查 Claude Code／MCP 後續跑 | 1 |
 | 3 | 07 | WRITE_DEFERRED；解除檔案占用後續跑，不假裝已發布 | 1 |
 | 4 | 01 | 狀態圖解讀待人處理：三位讀者仍無多數或圖與圖矛盾（90 的 STATUS_READING_CONFLICT／STATUS_SELF_CONFLICT）；改好 status.md 後同命令重跑 | 1 |
 | 4 | 03 | BLOCKED；同一頁兩次未通過或預算用完，處理原因後加 -Retry，必要時 -Refresh | 1 |

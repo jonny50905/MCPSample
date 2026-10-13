@@ -295,6 +295,9 @@ try {
     Assert (Test-PathHook 'clone-worker' 'Write' 'file_path' (Join-Path $dep '.ps-runtime/clone-spec/clone-0123456789abcdef/attempts/a1/packet.json')) "path clone-worker：寫 packet.json → 放行"
     Assert (-not (Test-PathHook 'clone-worker' 'Write' 'file_path' (Join-Path $dep 'docs/ps-research/x/01-A.md'))) "path clone-worker：寫 NN → 擋"
     Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A,TW_B' -MaxSessions 4") "path spec-author：ps-sdoc 命令 → 放行"
+    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A,TW_B' -MaxSessions 1 -TimeoutMin 90") "path spec-author：ps-sdoc 帶 -MaxSessions 1 -TimeoutMin <n> → 放行"
+    $saTxt = Read-Norm (Join-Path $cc '.claude/agents/ps-spec-author.md')
+    Assert ($saTxt -match 'ps-sdoc\.ps1 -Components ''TW_DEMO_A,TW_DEMO_B'' -MaxSessions 1\D' -and $saTxt -notmatch '-MaxSessions [2-9]' -and $saTxt -match '1～110' -and $saTxt -match 'DOC1-3-04') "ps-spec-author：每次呼叫只跑一個 session、-TimeoutMin 上限 110（Bash 工具 2 小時內）、DOC1-3-04 轉述判讀"
     Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A'; del x")) "path spec-author：串接命令 → 擋"
     Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A`$X,TW#B' -Status") "path spec-author：Component 名含 `$／#（單引號內）→ 放行"
     Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components `$(whoami)")) "path spec-author：未加引號的變數／子命令 → 擋"
@@ -369,6 +372,47 @@ try {
     Assert ($r.Found -and $r.IsError -and (Get-PsOcFailureKind -OutFile $of -ErrFile '') -eq 'CONTEXT_OVERFLOW') "stream-json：錯誤收場與 context 溢出字樣（Prompt is too long）可辨識"
     [System.IO.File]::WriteAllText($sf, '{"type":"system","subtype":"init"}', (New-Object System.Text.UTF8Encoding($false)))
     Assert (-not (Convert-PsOcClaudeStream -StreamFile $sf -OutFile (Join-Path $dep 'none.txt')).Found) "stream-json：沒有 result 事件 → Found=false"
+    # 模型端重試判讀：system/api_retry 事件與 result 的 api_error_status
+    function New-ApiRetryLine([int]$A, [string]$S) { return ('{"type":"system","subtype":"api_retry","attempt":' + $A + ',"max_retries":10,"retry_delay_ms":500,"error_status":' + $S + ',"error":"server_error","session_id":"s"}') }
+    function Test-ApiStream([string[]]$Lines) { [System.IO.File]::WriteAllText($sf, (($Lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false))); return (Get-PsOcClaudeApiRetry -StreamFile $sf) }
+    $inA = '{"type":"system","subtype":"init"}'
+    $okA = '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"x"}}]}}'
+    $usrA = '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"{\"error\":\"x\"}"}]}}'
+    $errA = '{"type":"assistant","message":{"content":[{"type":"text","text":"API Error: 504 Gateway Timeout"}]},"error":"server_error"}'
+    $a = Test-ApiStream @($inA, $okA, $usrA, $okA, '{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"ok"}')
+    Assert ($a.Kind -eq 'NONE' -and $a.Count -eq 0 -and $a.Progress -eq 2) "模型端判讀：沒有重試 → NONE（工具結果內容裡的 error 字樣不算）"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), $okA, $usrA, (New-ApiRetryLine 1 'null'), $okA)
+    Assert ($a.Kind -eq 'API_RETRY_SLOW' -and $a.Count -eq 3 -and $a.Trailing -eq 0 -and $a.Recovered -and $a.Statuses -eq '504×2、無回應×1') "模型端判讀：重試後有進展 → API_RETRY_SLOW（被拖慢），狀態碼分布含無回應"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'))
+    Assert ($a.Kind -eq 'API_RETRY_SLOW' -and $a.Trailing -eq 2) "模型端判讀：結尾連續失敗未達門檻（2＜3）→ 仍算被拖慢"
+    $a = Test-ApiStream @($inA, $okA, $usrA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), (New-ApiRetryLine 4 '504'))
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.Trailing -eq 4 -and $a.Progress -eq 2 -and -not $a.Recovered) "模型端判讀：最後同一個請求連續失敗 4 次 → API_RETRY_STUCK（卡住）"
+    $script:PsOcApiStuckAfter = 5
+    $a5 = Get-PsOcClaudeApiRetry -StreamFile $sf
+    $script:PsOcApiStuckAfter = 3
+    Assert ($a5.Kind -eq 'API_RETRY_SLOW') "模型端判讀：門檻 PsOcApiStuckAfter 可調（改 5 → 同一份 stream 改判被拖慢）"
+    $a = Test-ApiStream @($inA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '502'))
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.Progress -eq 0 -and $a.Statuses -eq '504×2、502×1') "模型端判讀：第一個請求就連續失敗 → 卡住且 Progress=0"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), $errA, '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":1,"result":"API Error: 504"}')
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.ApiErrorStatus -eq '504' -and $a.Trailing -eq 2) "模型端判讀：重試用完（result 帶 api_error_status）→ 卡住；API Error 訊息不算進展"
+    $a = Test-ApiStream @($inA, '{"type":"assistant","message":{"content":[{"type":"text","text":"API Error: 401 x"}]}}', '{"type":"result","subtype":"success","is_error":true,"api_error_status":401,"num_turns":0,"result":"API Error: 401"}')
+    Assert ($a.Kind -eq 'API_ERROR' -and $a.ApiErrorStatus -eq '401' -and $a.Progress -eq 0) "模型端判讀：沒有重試就以 API 錯誤收場 → API_ERROR"
+    Assert ((Get-PsOcClaudeApiRetry -StreamFile (Join-Path $dep 'no-such.jsonl')).Kind -eq 'NONE' -and (Get-PsOcClaudeApiRetry -StreamFile '').Kind -eq 'NONE') "模型端判讀：沒有 stream 檔（OpenCode 版）→ NONE"
+    Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_SLOW', 'API_RETRY_STUCK') -TimeoutMin 60) -like '卡在模型端*' -and (Get-PsOcApiHint -Kinds @('NONE', 'API_RETRY_SLOW') -TimeoutMin 45) -like '*上限 45 分*-TimeoutMin*' -and (Get-PsOcApiHint -Kinds @('NONE', '') -TimeoutMin 60) -eq '') "模型端判讀：下一步提示——卡住優先、拖慢帶目前上限、沒有模型端事件回空"
+    if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+        # 真的經 cmd.exe 啟動：假 claude.cmd 吐出重試用完的 stream、exit 1
+        $fakeDir = Join-Path $dep 'fakecli'
+        New-Item -ItemType Directory -Path $fakeDir -Force | Out-Null
+        $fakeStream = Join-Path $fakeDir 'stream.jsonl'
+        [System.IO.File]::WriteAllText($fakeStream, ((@($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), $errA, '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":1,"result":"API Error: 504"}') -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $fakeCmd = Join-Path $fakeDir 'claude.cmd'
+        [System.IO.File]::WriteAllText($fakeCmd, ("@echo off`r`ntype " + '"' + $fakeStream + '"' + "`r`nexit /b 1`r`n"), (New-Object System.Text.ASCIIEncoding))
+        $script:sessLog = @()
+        $sr504 = Invoke-PsOcSession -OcPath $fakeCmd -Root $dep -LogRoot (Join-Path $dep 'logs504') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0001' -TimeoutMin 2 -Tag 't504' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin'
+        $logTxt = $script:sessLog -join "`n"
+        Assert (-not $sr504.TimedOut -and [int]$sr504.ExitCode -ne 0 -and $sr504.ApiKind -eq 'API_RETRY_STUCK' -and $logTxt -match '重試用完仍失敗（api_error_status=504）' -and $logTxt -match '卡在模型端') "真 session（cmd.exe＋假 claude.cmd）：重試用完 → ApiKind=API_RETRY_STUCK，判讀行說卡在模型端"
+    }
+    else { Write-Host '  SKIP：真 session 判讀（需要 Windows cmd.exe）' }
     Assert ((Get-PsSuppDirs -Root $dep).Capabilities -like '*.claude*peoplesoft*spec*capabilities.json' -and (Test-Path -LiteralPath (Get-PsSuppDirs -Root $dep).Capabilities)) "補研究：能力目錄取 .claude/peoplesoft/spec"
     $pub = Publish-PsKnowledgeIndex -Root $dep
     $imd = [System.IO.File]::ReadAllText((Join-Path $dep 'docs/ps-research/knowledge/index.md'))

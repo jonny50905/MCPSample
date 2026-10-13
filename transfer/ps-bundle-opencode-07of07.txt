@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit f14c90b）第 7／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit cf42295）第 7／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|f14c90b|2bb0a5a870769052|7|7|5077|537d143320d9cc55a8cddf2395af34a3b353d76f0ea97440efbe1ad1b43ead29
+@@@PSBUNDLE-PART|1|opencode|cf42295|b9c0139367a827df|7|7|5079|a6c5d06224e75dfa8cf7c49de82672a377c3b9dbb3d70bf4a763410e306f2533
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|338|dc18bdc60f9607362f1b474ceb11c3b35974bd142221ac361b132e056f3cee76|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1289,7 +1289,7 @@ Write-Host ('sdoc assemble tests: PASS=' + $script:passed + ' FAIL=' + $script:f
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-assemble.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|509|2659da64f8dec54c28df153653ec9526aa31595d016096d2444bc36de11df489|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|511|eb2521aa700aeb0fe7d310b14a37a5114ad0c0b3f5fcd804e69b5b41147dd6e8|1
 # test-sdoc-run.ps1 — Spec 文件流程外環（ps-sdoc.ps1）端到端：合成 worker 依工單回狀態圖解讀、研究包、覆核；不查 MCP、不呼叫模型。
 # 以設計範例（walkthrough、gate）為來源：從空目錄跑到發布，比對發布的 canonical 與範例，並驗結論碼、中斷、重試、重跑、裁決與核准。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-run.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -1595,8 +1595,9 @@ try {
     Write-SdFx (Join-Path $inW 'project.md') ([System.IO.File]::ReadAllText((Join-Path $fxW.Example 'input/project.md'), [System.Text.Encoding]::UTF8))
     $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
     Assert-Sd ($r.Code -eq 'DOC1-0-02' -and -not [System.IO.Directory]::Exists((Join-Path $jobRootW 'attempts'))) '-Status：STATUS 檔已放、尚未開始 → DOC1-0-02，不派工' $r.Output
-    $r = Invoke-SdRun $rootW $comps $fxW '' @{ MaxSessions = 2 }
+    $r = Invoke-SdRun $rootW $comps $fxW '' @{ MaxSessions = 2; TimeoutMin = 45 }
     Assert-Sd ($r.Code -eq 'DOC1-3-02-1') '第 0 階段：兩個 session 後還差一位讀者 → DOC1-3-02-1' $r.Code
+    Assert-Sd ($r.Output -match "-Components '[^']+' -TimeoutMin 45") '續跑命令帶上自訂的 -TimeoutMin' ($r.Output -split "`n" | Select-Object -Last 4 | Out-String)
     $r = Invoke-SdRunUntilDone $rootW $comps $fxW
     Assert-Sd ($r.Code -eq 'DOC1-7-01') '貫穿範例跑完研究與 L5：五層檢核全過 → DOC1-7-01（REVIEW_READY）' ($r.Output -split "`n" | Select-Object -Last 15 | Out-String)
     $calls = Get-SdCalls $fxW
@@ -1731,6 +1732,7 @@ try {
     $oc = Get-SdOutcomes $jobRootE
     $last = $oc[$oc.Length - 1]
     Assert-Sd ($r.Code -eq 'DOC1-3-04' -and [System.IO.File]::Exists((Join-Path $jobRootE 'budgets/r0002/b0002.json')) -and [string]$last.Outcome['status'] -ceq 'SESSION_FAILED' -and $last.Outcome['counted'] -eq $false) '-Retry 開新預算；session 失敗不計次 → DOC1-3-04'
+    Assert-Sd ((@($last.Outcome['findings']) -join ',') -match '^EXIT_[1-9][0-9]*$' -and $r.Output -match 'session 失敗，未消耗失敗次數；檢查 Claude Code／MCP') 'session 失敗的 findings 記結束碼 enum（EXIT_<n>）；沒有模型端重試時沿用「檢查 Claude Code／MCP」' (@($last.Outcome['findings']) -join ',')
     $r = Invoke-SdRunUntilDone $rootE $comps $fxE 'stray-once,review-fail-once-data,partial-ui-TW_DEMO_APV,dup-scope-TW_DEMO_REQ,l5-nis-DRV-002/D1,l5-nis-always-DRV-001/D3,l5-badcite-R2'
     $oc = Get-SdOutcomes $jobRootE
     $stray = @($oc | Where-Object { [string]$_.Outcome['status'] -ceq 'INVALID' -and (@($_.Outcome['findings']) -join ' ') -like '*stray.txt*' }).Count
@@ -4262,10 +4264,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|8415a3b636ac7db637e7e26eab7b9ab0bcd70d83364e4a37e19afe2e9aa9fd6e|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|cfb4db6d92c6a6fa8e0843018aa1558bad97a8e47600bf3bdfb274388c706c66|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "f14c90b",
+  "commit": "cf42295",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -4443,8 +4445,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3780,
-      "sha256": "fbe3112cc2aa31bad0129701e23e7bb4b4f3d5f5880e3c61f6d2e70ba1438878",
+      "lines": 3810,
+      "sha256": "cc9c10a36d6caa6a70f4a9ca691f14b5dcbe50b4ab44d4f2f5cca4883aaf9cf2",
       "bom": false
     },
     {
@@ -4515,8 +4517,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1049,
-      "sha256": "7ed8317eab8b24d429cf08cc69599f43f2b3da60096021cb7a46fe7ca7ff6c75",
+      "lines": 1072,
+      "sha256": "0b0a610ba2681cebb56d9fe04afc1bea7a08fb083ef1baebefcb6190b551af36",
       "bom": false
     },
     {
@@ -4797,14 +4799,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc.ps1",
-      "lines": 1309,
-      "sha256": "69dc7056794b2ea5efb1a9f47c1a45fd9adcc861a3ee18f146b353c898d8d2bc",
+      "lines": 1325,
+      "sha256": "65daf74200f12761e3679ec6959043972dda63c76bf23aedaa9c234b9084cc5a",
       "bom": true
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 312,
-      "sha256": "f614cba595c0a0c21a164302f42a7e3b964cec83b23969871da6f2bdb3b701dd",
+      "lines": 418,
+      "sha256": "e4b9f4b4ddd78595cbd1ec8068a185dbd5d36d1252132c011a23040fe9fadfd0",
       "bom": true
     },
     {
@@ -4863,8 +4865,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 419,
-      "sha256": "f26aaae5dd8483d35e51f5e6b1a3612d9e07abdc0e7ac64dc3b1c7a263adc37b",
+      "lines": 463,
+      "sha256": "e18de109635f7d38a4e9adcd5c30884c61a5094cbccfe3e1b2b24e0bcf851b93",
       "bom": true
     },
     {
@@ -4893,8 +4895,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 509,
-      "sha256": "2659da64f8dec54c28df153653ec9526aa31595d016096d2444bc36de11df489",
+      "lines": 511,
+      "sha256": "eb2521aa700aeb0fe7d310b14a37a5114ad0c0b3f5fcd804e69b5b41147dd6e8",
       "bom": true
     },
     {
@@ -5077,5 +5079,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|112|8ac4e49dbb6af6302b4179b3de500b7d5b76b20d02586457fa335b821367d7cd
-@@@PSBUNDLE-PART-END|2bb0a5a870769052|7|7
+@@@PSBUNDLE-EOF|112|27341b054f3bf3e9cfd5e406a4e2a17bd265e47f208e5797a962269a10fb63c3
+@@@PSBUNDLE-PART-END|b9c0139367a827df|7|7

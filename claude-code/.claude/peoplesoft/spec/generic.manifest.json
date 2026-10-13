@@ -9,8 +9,8 @@
     },
     {
       "path": ".claude/agents/ps-spec-author.md",
-      "sha256": "80B8B2CFDA967E37AC573C395878A65FD83AC0C92214362FC5CF92378077D846",
-      "lines": 51
+      "sha256": "5E6E7E62E37696A24418B4B2551F6FEEBD5070FDC8BD8433ABEFE802E20562A0",
+      "lines": 52
     },
     {
       "path": ".claude/agents/ps-spec-worker.md",
@@ -84,7 +84,7 @@
     },
     {
       "path": ".claude/peoplesoft/spec/support-codes.md",
-      "sha256": "A929D38CFD8C575E826FB4C36B98CDA9D5E77CF86A1CD735E6795F4F228DC1FB",
+      "sha256": "BCD4067CDB99D2EED659F9413112DB6141B69ADBF283DE059797912B9B627B25",
       "lines": 211
     },
     {
