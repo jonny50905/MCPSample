@@ -1,14 +1,17 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 13db7b9）第 4／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 48578f1）第 4／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|13db7b9|650dd11f8d21b0ef|4|6|7398|3504cc2d4d0d5ef25488c306ef77a952352e75e32dcd28d558244954496f3eff
-@@@PSBUNDLE-FILE|scripts/ps-sdoc.ps1|1374|1bc531c7770d1307505532d62016877e049b31328da1539cded3fff66609a8fe|1
+@@@PSBUNDLE-PART|1|claude|48578f1|a13719dd27b9b0e2|4|6|7401|711ec16988c9ccef7a481f35d75ecfcb8c856ee59a73c0c4a0dedcb291df7d0c
+@@@PSBUNDLE-FILE|scripts/ps-sdoc.ps1|1377|b5583e4e849380ad714175dc2c1936637e065e7a7d07fdba2459a1faa8cc27a4|1
 # ps-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單一入口：00-index＋14 份文件＋90 問題清單。
 # 第 0 階段三位讀者解讀 STATUS 檔（不一致的逐項第 2 輪多數決）→ 研究單元依序（每頁研究與獨立覆核分開 session）→ 外環組裝、檢核、渲染。
 # 模型只寫研究包、解讀、覆核；ID、canonical、檢核、Markdown 都由本腳本確定性產生。PowerShell 5.1；公司機資料只留本機。
 # 輸入 .ps-private/sdoc/<job>/；執行狀態 .ps-runtime/sdoc/<job>/；產出 docs/ps-spec/<job>/。最後一行一律是結論碼（DOC1-…）。
-[CmdletBinding()]
+# 只有 -Components 收位置引數；名稱用空白分開又沒包在同一個引號裡時（-Components A B C），多出來的名稱收進
+# $MoreComponents 併入清單，不會被依序塞給 -Root、-MaxSessions、-TimeoutMin 而報型別錯誤。
+[CmdletBinding(PositionalBinding = $false)]
 param(
-    [Parameter(Mandatory = $true)][string]$Components,
+    [Parameter(Mandatory = $true, Position = 0)][string]$Components,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$MoreComponents = @(),
     [string]$Root = '',
     [switch]$Status,
     [ValidateRange(1, 100)][int]$MaxSessions = 4,
@@ -1240,8 +1243,8 @@ try {
     if (-not [System.IO.Directory]::Exists($Root) -or -not (Test-PsOcPromptSafe -PromptText $Root) -or ($Model -ne '' -and (-not (Test-PsOcPromptSafe -PromptText $Model) -or $Model -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$'))) { throw 'SDOC_ARGUMENT_INVALID' }
     if (($Status -and ($Refresh -or $Retry)) -or ($Refresh -and $Retry)) { throw 'SDOC_ARGUMENT_INVALID' }
     $set = @{}
-    $componentText = $Components.Trim()
-    if ($componentText.Length -ge 2 -and $componentText.StartsWith("'") -and $componentText.EndsWith("'")) { $componentText = $componentText.Substring(1, $componentText.Length - 2) }
+    # cmd.exe 不會拿掉單引號：名稱本身不含單引號，一律當分隔處理
+    $componentText = ((@($Components) + @($MoreComponents) | Where-Object { $null -ne $_ }) -join ' ').Replace("'", ' ').Trim()
     foreach ($name in @($componentText -split '[,\s]+' | Where-Object { $_ -ne '' })) {
         if ($name -match '[^\x00-\x7F]') { throw 'SDOC_ARGUMENT_INVALID' }
         $upper = $name.ToUpperInvariant()
@@ -7399,4 +7402,4 @@ function ConvertTo-SdComparable {
     return $Value
 }
 @@@PSBUNDLE-END|scripts/tests/sdoc-test-fixtures.ps1
-@@@PSBUNDLE-PART-END|650dd11f8d21b0ef|4|6
+@@@PSBUNDLE-PART-END|a13719dd27b9b0e2|4|6

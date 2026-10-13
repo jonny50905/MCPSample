@@ -2,9 +2,12 @@
 # 第 0 階段三位讀者解讀 STATUS 檔（不一致的逐項第 2 輪多數決）→ 研究單元依序（每頁研究與獨立覆核分開 session）→ 外環組裝、檢核、渲染。
 # 模型只寫研究包、解讀、覆核；ID、canonical、檢核、Markdown 都由本腳本確定性產生。PowerShell 5.1；公司機資料只留本機。
 # 輸入 .ps-private/sdoc/<job>/；執行狀態 .ps-runtime/sdoc/<job>/；產出 docs/ps-spec/<job>/。最後一行一律是結論碼（DOC1-…）。
-[CmdletBinding()]
+# 只有 -Components 收位置引數；名稱用空白分開又沒包在同一個引號裡時（-Components A B C），多出來的名稱收進
+# $MoreComponents 併入清單，不會被依序塞給 -Root、-MaxSessions、-TimeoutMin 而報型別錯誤。
+[CmdletBinding(PositionalBinding = $false)]
 param(
-    [Parameter(Mandatory = $true)][string]$Components,
+    [Parameter(Mandatory = $true, Position = 0)][string]$Components,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$MoreComponents = @(),
     [string]$Root = '',
     [switch]$Status,
     [ValidateRange(1, 100)][int]$MaxSessions = 4,
@@ -1236,8 +1239,8 @@ try {
     if (-not [System.IO.Directory]::Exists($Root) -or -not (Test-PsOcPromptSafe -PromptText $Root) -or ($Model -ne '' -and (-not (Test-PsOcPromptSafe -PromptText $Model) -or $Model -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$'))) { throw 'SDOC_ARGUMENT_INVALID' }
     if (($Status -and ($Refresh -or $Retry)) -or ($Refresh -and $Retry)) { throw 'SDOC_ARGUMENT_INVALID' }
     $set = @{}
-    $componentText = $Components.Trim()
-    if ($componentText.Length -ge 2 -and $componentText.StartsWith("'") -and $componentText.EndsWith("'")) { $componentText = $componentText.Substring(1, $componentText.Length - 2) }
+    # cmd.exe 不會拿掉單引號：名稱本身不含單引號，一律當分隔處理
+    $componentText = ((@($Components) + @($MoreComponents) | Where-Object { $null -ne $_ }) -join ' ').Replace("'", ' ').Trim()
     foreach ($name in @($componentText -split '[,\s]+' | Where-Object { $_ -ne '' })) {
         if ($name -match '[^\x00-\x7F]') { throw 'SDOC_ARGUMENT_INVALID' }
         $upper = $name.ToUpperInvariant()

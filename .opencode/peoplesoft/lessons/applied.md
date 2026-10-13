@@ -3834,3 +3834,15 @@
   一次寫完 output.json 照收；test-claude-variant 加 hook 放行分段檔、擋其他檔名。
 - 教訓：模型一次產出的長度要跟傳輸路徑的可靠度一起設計：長輸出拆成幾次短回應，失敗只重來一小段；拆法由外環決定、
   合併與檢查也在外環，模型只照工單逐段寫。
+
+### L142 ps-sdoc 的 Component 用空白分開就報「cannot process argument transformation on parameter TimeoutMin」（2026-10-13）
+
+- 症狀：管理者直接在 PowerShell 跑 ps-sdoc.ps1（不經 ps-spec-author）就出現這個錯誤。
+- 根因：param 區塊沒有指定位置，PowerShell 依宣告順序讓 Root、MaxSessions、TimeoutMin… 都能收位置引數；名稱用空白分開又沒包在
+  同一個引號裡（`-Components A B C`，或 cmd.exe 下 `'A B'` 被拆開）時，多出來的名稱依序被塞給 -Root 與 -TimeoutMin，轉 int 失敗。
+- 落點：`scripts/ps-sdoc.ps1` 改 `[CmdletBinding(PositionalBinding = $false)]`，只有 -Components 收位置引數，多出來的引數收進
+  `$MoreComponents`（ValueFromRemainingArguments）併入清單；清單裡的單引號一律當分隔（cmd.exe 不會拿掉單引號）。拼錯的參數名也會
+  進到清單、被名稱檢查擋成 DOC1-9-01。
+- 驗證：test-sdoc-run 加一項：另開 powershell -File，`-Components tw_demo_req TW_DEMO_APV -Root … -Status -MaxSessions 1 -TimeoutMin 5`
+  與留著單引號的 `"'tw_demo_req," "TW_DEMO_APV'"` 都停在 DOC1-0-01、認成同一個工作。
+- 教訓：給人直接打的腳本，除了主要清單以外的參數一律具名；多出來的引數要有去處並經過驗證，不要讓它落到型別不同的參數上。

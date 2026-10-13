@@ -326,6 +326,12 @@ try {
     Assert-Sd ($sk.Contains('<!-- SDOC:SKELETON -->') -and [System.IO.File]::Exists((Join-Path $inW 'project.md')) -and [System.IO.File]::Exists((Join-Path $inW 'decisions.md')) -and [System.IO.File]::Exists((Join-Path $inW 'approvals.md'))) '首跑建好四個人工輸入檔骨架'
     $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
     Assert-Sd ($r.Code -eq 'DOC1-0-01') '-Status：STATUS 檔還是骨架 → DOC1-0-01'
+    # 公司機的叫法：另開 powershell -File；名稱用空白分開、沒包在同一個引號裡，或像 cmd.exe 一樣留著單引號
+    $self = (Get-Process -Id $PID).Path
+    $o1 = @(& $self -NoProfile -File $cli -Components tw_demo_req TW_DEMO_APV -Root $rootW -Status -MaxSessions 1 -TimeoutMin 5 2>&1 | ForEach-Object { [string]$_ })
+    $o2 = @(& $self -NoProfile -File $cli -Components "'tw_demo_req," "TW_DEMO_APV'" -Root $rootW -Status 2>&1 | ForEach-Object { [string]$_ })
+    $l1 = @($o1 | Where-Object { $_.Trim() -ne '' }); $l2 = @($o2 | Where-Object { $_.Trim() -ne '' })
+    Assert-Sd ($l1.Count -gt 0 -and $l1[-1].Trim() -eq 'DOC1-0-01' -and ($o1 -join "`n").Contains($jobW) -and $l2.Count -gt 0 -and $l2[-1].Trim() -eq 'DOC1-0-01' -and ($o2 -join "`n").Contains($jobW)) '-Components 名稱用空白分開或留著單引號（cmd）：同一個工作，不把多出來的名稱塞給 -TimeoutMin' (($o1 + $o2) -join ' | ')
     Write-SdFx (Join-Path $inW 'status.md') $fxW.Text
     Write-SdFx (Join-Path $inW 'project.md') ([System.IO.File]::ReadAllText((Join-Path $fxW.Example 'input/project.md'), [System.Text.Encoding]::UTF8))
     $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }

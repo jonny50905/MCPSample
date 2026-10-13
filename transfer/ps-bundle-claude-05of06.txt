@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 13db7b9）第 5／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 48578f1）第 5／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|13db7b9|650dd11f8d21b0ef|5|6|4450|1c90be568b8518fa1a3da904574b1021418c4676a1ca38f96b18c59bab2f0342
+@@@PSBUNDLE-PART|1|claude|48578f1|a13719dd27b9b0e2|5|6|4456|47541e071641c864a4b753bfcff10630a05384df8f22d885671d3d35e0df92b6
 @@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1024|eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e|1
 # scripts/tests/test-auto-loop.ps1 — 外環函式的功能測試（AST 抽真實函式，跑 fixture 情境）
 # 用法：pwsh -NoProfile -File scripts/tests/test-auto-loop.ps1   （PowerShell 7 或 5.1 皆可）
@@ -3036,7 +3036,7 @@ Write-Host ('sdoc assemble tests: PASS=' + $script:passed + ' FAIL=' + $script:f
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-assemble.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|554|ab622fdcff29beb576ca252f5a9eccbef6b8084cdc45a79ecc726aeb073b5d59|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|560|f3b423a55cda429bb24fcabab22b407100c9612e601c0b085de75859bc9590be|1
 # test-sdoc-run.ps1 — Spec 文件流程外環（ps-sdoc.ps1）端到端：合成 worker 依工單回狀態圖解讀、研究包、覆核；不查 MCP、不呼叫模型。
 # 以設計範例（walkthrough、gate）為來源：從空目錄跑到發布，比對發布的 canonical 與範例，並驗結論碼、中斷、重試、重跑、裁決與核准。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-run.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -3365,6 +3365,12 @@ try {
     Assert-Sd ($sk.Contains('<!-- SDOC:SKELETON -->') -and [System.IO.File]::Exists((Join-Path $inW 'project.md')) -and [System.IO.File]::Exists((Join-Path $inW 'decisions.md')) -and [System.IO.File]::Exists((Join-Path $inW 'approvals.md'))) '首跑建好四個人工輸入檔骨架'
     $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
     Assert-Sd ($r.Code -eq 'DOC1-0-01') '-Status：STATUS 檔還是骨架 → DOC1-0-01'
+    # 公司機的叫法：另開 powershell -File；名稱用空白分開、沒包在同一個引號裡，或像 cmd.exe 一樣留著單引號
+    $self = (Get-Process -Id $PID).Path
+    $o1 = @(& $self -NoProfile -File $cli -Components tw_demo_req TW_DEMO_APV -Root $rootW -Status -MaxSessions 1 -TimeoutMin 5 2>&1 | ForEach-Object { [string]$_ })
+    $o2 = @(& $self -NoProfile -File $cli -Components "'tw_demo_req," "TW_DEMO_APV'" -Root $rootW -Status 2>&1 | ForEach-Object { [string]$_ })
+    $l1 = @($o1 | Where-Object { $_.Trim() -ne '' }); $l2 = @($o2 | Where-Object { $_.Trim() -ne '' })
+    Assert-Sd ($l1.Count -gt 0 -and $l1[-1].Trim() -eq 'DOC1-0-01' -and ($o1 -join "`n").Contains($jobW) -and $l2.Count -gt 0 -and $l2[-1].Trim() -eq 'DOC1-0-01' -and ($o2 -join "`n").Contains($jobW)) '-Components 名稱用空白分開或留著單引號（cmd）：同一個工作，不把多出來的名稱塞給 -TimeoutMin' (($o1 + $o2) -join ' | ')
     Write-SdFx (Join-Path $inW 'status.md') $fxW.Text
     Write-SdFx (Join-Path $inW 'project.md') ([System.IO.File]::ReadAllText((Join-Path $fxW.Example 'input/project.md'), [System.Text.Encoding]::UTF8))
     $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
@@ -4451,4 +4457,4 @@ Write-Host ('clone tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-spec-clone.ps1
-@@@PSBUNDLE-PART-END|650dd11f8d21b0ef|5|6
+@@@PSBUNDLE-PART-END|a13719dd27b9b0e2|5|6
