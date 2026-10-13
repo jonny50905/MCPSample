@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit e906726）第 7／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 65ef9f0）第 7／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|e906726|32a2fb76d7da8ac9|7|7|5180|0d734a30b9d911af93cea762d13b01e0e575e1f39ade2bb2ebaa26473e2a6b2d
+@@@PSBUNDLE-PART|1|opencode|65ef9f0|a69fdb52bfa72f85|7|7|5180|605292e0c1c1057af8d6ef73355ca28a6f1bb26234adca1010018e971a6b4d1b
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|338|dc18bdc60f9607362f1b474ceb11c3b35974bd142221ac361b132e056f3cee76|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4364,10 +4364,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|4fd05e49b97acedc2104f8e51bcaa18d012474aa9bf5e9660d082650ea0aaa7c|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|684|035bc54bcd038ccd474fcb246a589892f9eb3041be585702001aab2499dd2601|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "e906726",
+  "commit": "65ef9f0",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -4546,7 +4546,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
       "lines": 3836,
-      "sha256": "2fad64911dfb505c8debe120ce661a532d01214ea99a4a9a21a39465d79ec720",
+      "sha256": "d0c4839acfaa6ea7541625923cc0a2d2f0e61d783fa0e2a73e9406a51e15a786",
       "bom": false
     },
     {
@@ -4618,7 +4618,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/peoplesoft/SOP.md",
       "lines": 1087,
-      "sha256": "c952b608ce78485b02c9b6fd555e60387dccdf9e12d82e0ab06febc5595d73d4",
+      "sha256": "018258723759da0680b2a1a8d6eb507af8cc7c1cd531301301679630f3dce4d6",
       "bom": false
     },
     {
@@ -5180,5 +5180,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|112|e2c494ff436b1d7034fe7031d33fc1e193937a0aacc1925be5136e843b581c6d
-@@@PSBUNDLE-PART-END|32a2fb76d7da8ac9|7|7
+@@@PSBUNDLE-EOF|112|7143b19680fc3485d5badc640d331b0ee6be308c35cb183eb849d8010251ed23
+@@@PSBUNDLE-PART-END|a69fdb52bfa72f85|7|7

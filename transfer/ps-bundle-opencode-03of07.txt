@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit e906726）第 3／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 65ef9f0）第 3／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|e906726|32a2fb76d7da8ac9|3|7|5581|73c754b8d1170a8820d941e7b98cb48ee5b766765a008542b68b96ae463a0622
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1087|c952b608ce78485b02c9b6fd555e60387dccdf9e12d82e0ab06febc5595d73d4|0
+@@@PSBUNDLE-PART|1|opencode|65ef9f0|a69fdb52bfa72f85|3|7|5581|5b37ff4c8b10cd9524e701022ad9a264348d1844bb27df6be0cb1d1a724533eb
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1087|018258723759da0680b2a1a8d6eb507af8cc7c1cd531301301679630f3dce4d6|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -1083,7 +1083,7 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
   再把 `docs/design/spec-schema-framework` 複製進去，跑三支 sdoc 測試與第一次 `ps-sdoc.ps1`；測試比對檔案內容一律不比換行。
 - 真 Windows PowerShell 5.1：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`）在 Windows runner 以 `powershell.exe`
   跑上述測試與部署版面演練，一輪約 20 分鐘，所以不是每次推都跑（只限動到 scripts、claude-code、設計範例、搬運包或工作流程本身）：
-  推到 `main` 一定跑（公司機拿的版本）；推到 `claude/**` 只有 head commit 訊息含 `[ps51]` 才跑（PS 7 本機測試證明不了 5.1 行為的改動才加：
+  推到 `main` 一定跑（公司機拿的版本）；推到 `claude/**` 只有 head commit 的標題以 `[ps51]` 開頭才跑（說明裡提到不算）（PS 7 本機測試證明不了 5.1 行為的改動才加：
   編碼、檔案共用、cmd.exe／Start-Process、JSON 解析、文化設定、腳本新用到的 .NET API）；也可在 Actions 頁手動觸發。
   其他推送會開一筆 run，但兩個 job 立刻略過。平常以本機 PS 7 測試與 5.1 靜態守衛為準，不等 CI。
   新增測試要加進工作流程的清單；`test-oracle-runtime.ps1` 需要真 OpenCode session，不放進去。
@@ -5582,4 +5582,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|32a2fb76d7da8ac9|3|7
+@@@PSBUNDLE-PART-END|a69fdb52bfa72f85|3|7

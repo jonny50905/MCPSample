@@ -8,7 +8,7 @@ name: ps51-tests
 #     real run of scripts/ps-sdoc.ps1 (stops at DOC1-0-01 before any model call).
 # When it runs (it takes about 20 minutes, so not on every push):
 #   - every push to main that touches the paths below (the version the company machine takes);
-#   - a push to a claude/** branch only when the head commit message contains [ps51]
+#   - a push to a claude/** branch only when the head commit message starts with [ps51]
 #     (use it for changes whose Windows PowerShell 5.1 behaviour the local PS 7 tests cannot prove:
 #     encoding, file sharing, cmd.exe / Start-Process, JSON parsing, culture, .NET APIs new to the scripts);
 #   - by hand: Actions > ps51-tests > Run workflow (any branch).
@@ -31,7 +31,7 @@ concurrency:
 jobs:
   repo-layout:
     name: ${{ matrix.test }}
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || contains(github.event.head_commit.message, '[ps51]')
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.event.head_commit.message, '[ps51]')
     runs-on: windows-latest
     timeout-minutes: 60
     strategy:
@@ -68,7 +68,7 @@ jobs:
 
   deployed-layout:
     name: deployed layout (transfer bundle)
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || contains(github.event.head_commit.message, '[ps51]')
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.event.head_commit.message, '[ps51]')
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:

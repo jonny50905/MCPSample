@@ -3826,7 +3826,7 @@
     `PS_SDOC_READING_PART_LINES`（5～1000）可覆寫上限。
   - `claude-code/.claude/peoplesoft/sdoc/status-reading-contract.md` 加「分段寫出」；`ps-status-reader` 改成依 outputParts 寫、每寫完一個
     檔就讀回確認；hook 的 status-reader 寫入白名單加 `inbox/output-part-[0-9][0-9].json`。
-  - `.github/workflows/ps51-tests.yml`：一輪約 20 分鐘，改成推到 main、分支 head commit 訊息含 `[ps51]` 或手動觸發才跑兩個 job，
+  - `.github/workflows/ps51-tests.yml`：一輪約 20 分鐘，改成推到 main、分支 head commit 標題以 `[ps51]` 開頭或手動觸發才跑兩個 job（起初寫成「訊息含」，結果本筆 commit 的說明提到這個字樣就觸發了，改成只看開頭），
     其他推送立刻略過（管理者要求：不要每次都等）。SOP-28、HANDOFF、claude-code/README 同步。
 - 驗證：test-sdoc 加 12 項（分段上限、每行恰落一段、大區塊切法、沒有圖、三份範例解讀切成 7 段再合回來逐行交代照樣通過且筆數不變、
   同一狀態 lines 聯集、單段原樣、缺段、表頭不一致、非陣列、final／scenario 不一致）；test-sdoc-run 的假讀者改成照 outputParts 分段寫

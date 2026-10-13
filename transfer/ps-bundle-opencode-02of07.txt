@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit e906726）第 2／7 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 65ef9f0）第 2／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|e906726|32a2fb76d7da8ac9|2|7|5862|04a9e60ddb73442c30c46e74ebeed12a15e2ed8167f5c302555e148b2cec1829
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3836|2fad64911dfb505c8debe120ce661a532d01214ea99a4a9a21a39465d79ec720|0
+@@@PSBUNDLE-PART|1|opencode|65ef9f0|a69fdb52bfa72f85|2|7|5862|d3b38cac8bb21351b893ec048fd23381be9ee64b46c08d0aee3e89713c4ce8e9
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3836|d0c4839acfaa6ea7541625923cc0a2d2f0e61d783fa0e2a73e9406a51e15a786|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -3830,7 +3830,7 @@
     `PS_SDOC_READING_PART_LINES`（5～1000）可覆寫上限。
   - `claude-code/.claude/peoplesoft/sdoc/status-reading-contract.md` 加「分段寫出」；`ps-status-reader` 改成依 outputParts 寫、每寫完一個
     檔就讀回確認；hook 的 status-reader 寫入白名單加 `inbox/output-part-[0-9][0-9].json`。
-  - `.github/workflows/ps51-tests.yml`：一輪約 20 分鐘，改成推到 main、分支 head commit 訊息含 `[ps51]` 或手動觸發才跑兩個 job，
+  - `.github/workflows/ps51-tests.yml`：一輪約 20 分鐘，改成推到 main、分支 head commit 標題以 `[ps51]` 開頭或手動觸發才跑兩個 job（起初寫成「訊息含」，結果本筆 commit 的說明提到這個字樣就觸發了，改成只看開頭），
     其他推送立刻略過（管理者要求：不要每次都等）。SOP-28、HANDOFF、claude-code/README 同步。
 - 驗證：test-sdoc 加 12 項（分段上限、每行恰落一段、大區塊切法、沒有圖、三份範例解讀切成 7 段再合回來逐行交代照樣通過且筆數不變、
   同一狀態 lines 聯集、單段原樣、缺段、表頭不一致、非陣列、final／scenario 不一致）；test-sdoc-run 的假讀者改成照 outputParts 分段寫
@@ -5863,4 +5863,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 # 績效
 # 離職
 @@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-PART-END|32a2fb76d7da8ac9|2|7
+@@@PSBUNDLE-PART-END|a69fdb52bfa72f85|2|7
