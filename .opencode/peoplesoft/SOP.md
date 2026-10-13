@@ -836,8 +836,8 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
    Invalidated 追加一行請人工覆核。合併後收據無效＝下一輪稽核重驗、畢業重驗（ps-auto-all 會自動 RUN）。
 5. **排錯**：`auto-loop-logs\<領域>\supplemental-done\<requestId>.a<n>.outcome.json`（timedOut／exitCode／failureKind／
    receiptValid／receiptErrors／merged／lintRegression／destructionRestored／integrityFail）；未發布的 parts 在
-   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占＝另一個 headless session（ps-spec -Run／另一個迷你圈／
-   auto-loop）在跑：外環會等最多一天（每 5 分鐘印一行心跳），等滿才回 SLOT_BUSY 停機且不計 attempts——看 log 是誰占著、錯開即可。
+   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占＝同一版另一個 headless session（ps-spec -Run／另一個迷你圈／
+   auto-loop／ps-sdoc；slot 兩版各一把，另一版不算）在跑：外環會等最多一天（每 5 分鐘印一行心跳），等滿才回 SLOT_BUSY 停機且不計 attempts——看 log 是誰占著、錯開即可。
    迷你圈遇未預期例外 → `SUPP1-3-03`（exit 2）：已合併的不回退、未發布的留在 parts 下次續跑；request 檔寫不進（`SUPP1-1-06`）
    稍後重送同一 need 即可。auto-loop 只認通過 intake 驗證的 request（id／workKey／need 對不上的列在 log 的「intake 拒收」，
    不會被派工）；迷你圈期間的圍籬盯著 `supplemental/requests|results/` 與 `wiki/`：既有檔被改寫或刪除一律還原，
@@ -866,7 +866,7 @@ generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worke
    然後 `ps-spec.ps1 -ValidatePack -Pack <packId>`（骨架填完前本來就回 `SPEC1-1-03`）；`scripts\tests\test-spec.ps1` 全綠；
    對一個已研究的 Component 跑 `-Plan／-Run／-Render／-Gate`；內部覆核後填 `reviewedVersion`（≠ `packVersion` 時 `SPEC1-8-01`，不出貨）。
 2. **跑 job**：`-Plan -JobId <小寫id> -Component <名> -Pack <packId> [-DomainHint]` → `-Run`（每個 unit 一個 worker session，
-   共用 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
+   共用同一版的 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
    的迷你圈與下一輪稽核後重跑 `-Run`）→ `-Render` → `-Gate`（verdict SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED）。
    產出 `.ps-runtime\spec\<jobId>\outputs\<generation>\{spec.md,trace.md,gate.json}`；重 render 位元組相同；來源 NN 改了就
    `SOURCE_CHANGED`，要重 plan。`.ps-runtime\spec` 固定在 repo 根（worker 的 command 與 permission 以此路徑為準；`-RuntimeRoot`
@@ -946,7 +946,7 @@ powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_
 
 純分頁用 PARTIAL＋nextCursor、gaps 空；未知條件用 gaps 明列，不能用續頁結束把未知抹掉。
 缺口頁即使覆核認為如實描述，也不發完成收據；只補查該頁，重試額度用完才停。
-同一 job 有鎖；模型 session 沿用全域 session slot。slot 被占、檔案暫時鎖定時不假裝工作已完成。
+同一 job 有鎖；模型 session 沿用同一版的 session slot（兩版各一把）。slot 被占、檔案暫時鎖定時不假裝工作已完成。
 
 本機來源／agent 契約 fingerprint 改變會失效；目前採保守策略，其他領域 NN 改動也可能觸發新版本。
 搬入新版契約或 cookbook 後，既有 job 會顯示 STALE；同清單重跑即建新版本，舊成果保留。
@@ -1134,11 +1134,15 @@ Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的�
 | 人工輸入 | `.ps-private\sdoc\<jobId>\` | `.ps-private\sdoc-opencode\<jobId>\` |
 | 產出入口 | `docs\ps-spec\<jobId>\README.md` | `docs\ps-spec-opencode\<jobId>\README.md` |
 | 執行狀態／log | `.ps-runtime\sdoc\`／`.ps-runtime\sdoc-logs\` | `.ps-runtime\sdoc-opencode\`／`.ps-runtime\sdoc-opencode-logs\` |
+| session slot（同一版一次一個 session） | `Global\MCPSample-OpencodeSession` | `Global\MCPSample-OpencodeSession-opencode`（兩版可以同時跑） |
 | 契約、schema、範例 | `.claude/peoplesoft/sdoc/` | `.opencode/peoplesoft/sdoc/`（資料檔逐字相同，契約只換工具用語） |
 | agent 讀寫範圍 | hook（PowerShell） | agent 檔的 permission（read／edit／task） |
 
 - 兩版同一資料夾並存：jobId 相同，但目錄分開、各有自己的研究版本，互不覆蓋；換來換去不會讓另一版重開研究版本。
-  同一台機器同一時間只跑一個 headless session（session slot）：另一版正在跑時會停在 DOC1-3-03，錯開時間再跑。
+  兩版可以同時跑：session slot 兩版各一把（Claude Code 版沿用原本那把、OpenCode 版另一把），各自一次一個 headless session；
+  同一版另一個外環（ps-auto-loop／ps-spec -Run／補研究迷你圈／另一個 ps-sdoc）正在跑時才停在 DOC1-3-03（不扣失敗次數），錯開再跑。
+  還沒換新 scripts 的資料夾只認原本那把（與 Claude Code 版排隊）。
+- 兩版同時跑時兩邊的研究都會查 DB：照 SOP-12，輕量查詢可並行、重載（稽核 SQL 風暴）會排隊逾時；出現成批逾時或 UNVERIFIABLE 就錯開時間。
 - 同一資料夾有 `CLAUDE.md` 時，Claude Code 只讀 `CLAUDE.md`、不讀 OpenCode 版帶進來的 `AGENTS.md`（沒有 `CLAUDE.md` 時才讀 `AGENTS.md`）：
   Claude Code 版的指引不變。Claude Code 的 `/config` 把 Project instructions 改成 `claude-md-and-agents-md` 才會兩個都讀——公司機保持預設。
 - 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：不載入家目錄 `~/.claude/CLAUDE.md` 與 `.claude/skills`
@@ -1154,7 +1158,8 @@ Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的�
 ### 維護驗證
 
 `test-sdoc-run.ps1 -Only opencode`（OpenCode 版的目錄、model.yaml、`-Model`／`-Cli` 檢查、與 Claude Code 版同資料夾並存、
-同一份合成 worker 輸出兩版發布的文件逐位元相同、模型預檢；Windows 另以假 `opencode.cmd` 真的經 cmd.exe 走一次預檢與 session 命令列）、
+同一份合成 worker 輸出兩版發布的文件逐位元相同、模型預檢、session slot 兩版各一把（另一版占著照樣取得、同一版占著 SLOT_BUSY）；
+Windows 另以假 `opencode.cmd`／`claude.cmd` 真的經 cmd.exe 走預檢、session 命令列與兩版同時開 session）、
 `node tests/runtime-guard/run-sdoc-smoke.mjs`（真 OpenCode：四個外環 agent 以 `--agent`＋`--model` 啟動、read／write 權限邊界、
 不載入 `~/.claude/CLAUDE.md`）、`node tests/runtime-guard/run-clone-smoke.mjs`（`/ps-spec` 只准 `ps-sdoc.ps1 -Cli opencode …`）、
 `test-claude-variant.ps1`（兩版 sdoc 一一對應、資料檔逐字相同、契約標題相同）、`test-bundle.ps1`（model.yaml 保留本機）。

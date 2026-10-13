@@ -297,7 +297,7 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-spec.ps1`（＋`ps-spec-lib.ps1`） | Spec 引擎：私有需求包驗證、規劃、外環、render、gate、doctor | `.ps-runtime/spec/`（gitignore） |
 | `ps-spec-build.ps1`（＋`ps-spec-clone-lib.ps1`） | Component 直接產核心重建 Spec：範圍、分段研究、獨立覆核、自動組文／續跑 | `.ps-runtime/clone-spec/`、`docs/ps-spec/`（皆 gitignore） |
 | `ps-sdoc.ps1 -Cli opencode`（＋`ps-sdoc-*-lib.ps1`） | Spec 文件（`/ps-spec` 的外環）：狀態圖解讀、依序研究與獨立覆核、乾淨讀者、組裝發布；模型讀 `.opencode/peoplesoft/sdoc/model.yaml` | `.ps-private/sdoc-opencode/`、`.ps-runtime/sdoc-opencode/`、`docs/ps-spec-opencode/`（皆 gitignore） |
-| `ps-session-lib.ps1` | headless session 啟動（`opencode run`／`claude -p --agent`）＋session slot 互斥鎖（函式庫） | log |
+| `ps-session-lib.ps1` | headless session 啟動（`opencode run`／`claude -p --agent`）＋session slot 互斥鎖（兩版各一把；函式庫） | log |
 | `ps-cli-lib.ps1` | 前端版本描述：`.claude/peoplesoft` 存在＝Claude Code 版（`PS_CLI` 可強制），決定框架目錄、CLI 與搬運 manifest（函式庫） | — |
 | `ps-claude-doctor.ps1` | Claude Code 版安裝健檢（hook 自測、MCP 註冊、`-Live` 第 0 步開線） | 唯讀（`-Live` 寫 log） |
 | `ps-bundle.ps1` | 搬運包：維護端 `-Pack`（由 `ps-fs-doctor -WriteManifest` 呼叫，切成每份約 500 KB 的幾份）、公司機 `-Bundle <資料夾>` 解開（逐份與整包驗證、三方比對、衝突另存 .incoming） | 解開時寫框架檔、備份 |

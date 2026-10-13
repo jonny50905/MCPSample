@@ -5,6 +5,12 @@
 
 ## 0. 一句話現況
 
+**session slot 兩版分開（2026-10-13，L146，分支 `claude/jolly-tesla-3l8lp5`）**：管理者要 Claude Code 版與 OpenCode 版的 Spec 文件流程能同時跑。
+session slot 改成兩版各一把（ps-session-lib `Get-PsOcSessionSlotName`）：Claude Code 版沿用原本的 `Global\MCPSample-OpencodeSession`
+（還沒換新 scripts 的資料夾也只認這把，所以舊的 Claude Code 資料夾不重搬也能和新的 OpenCode 版同時跑），OpenCode 版 `Global\MCPSample-OpencodeSession-opencode`。
+同一版仍一次一個 session、結論碼不變。test-sdoc-run `-Only opencode` 加 4 項（Windows 另 3 項真的經 cmd.exe 開 session）；反證：兩把改同名時 3 項失敗。
+SOP-29（並存注意事項、對照表）、SOP-23／24／25 用語、README、test-scenarios D1 同步。兩版同時跑時都會查 DB：照 SOP-12 重載期間錯開。
+
 **Spec 文件的 OpenCode 版備案（2026-10-13，L145，分支 `claude/jolly-tesla-3l8lp5`）**：管理者在公司機用 Claude Code＋Sonnet 跑 Spec 文件流程時
 遇到環境問題還在處理，要一個 OpenCode CLI＋另一個模型的版本當備案：模型先預設小模型、到公司只填一個地方；不能改到 Claude Code 版、兩版並行。
 - 做法：同一個外環 `scripts/ps-sdoc.ps1` 加 `-Cli opencode`；OpenCode 版的人工輸入、執行狀態、產出、log 各放 `*-opencode` 目錄（同資料夾兩版各自一份工作）；

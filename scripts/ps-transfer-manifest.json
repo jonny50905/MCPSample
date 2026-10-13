@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "98c21f6",
+  "commit": "beadc2b",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -202,8 +202,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3917,
-      "sha256": "fc877e747178ff4e1fef226073237ba43053ad37b5d5f9c11e34115bf463f873",
+      "lines": 3938,
+      "sha256": "b4dc26e7585a176e0ec76af4e0bcaa45a7b349af68a49f4940769f3b4bf39aaa",
       "bom": false
     },
     {
@@ -520,8 +520,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1160,
-      "sha256": "646e3e9115c38708c1e5eff865775532ea276374b63e711f4a183c11da647d22",
+      "lines": 1165,
+      "sha256": "7e9f59e61581e1a5ab850525e295ee2555ce24fdb1933cb7f0eb9cb645bd0476",
       "bom": false
     },
     {
@@ -622,8 +622,8 @@
     },
     {
       "path": ".opencode/peoplesoft/test-scenarios.md",
-      "lines": 731,
-      "sha256": "64ec7731cb32e746ae46190535b1dd6c1e6f4ecfba2e71662cebb616757f6dc9",
+      "lines": 732,
+      "sha256": "d80454c713ec97d2d966c25288a37ca28685f21b24bd312383c24ffe047aae52",
       "bom": false
     },
     {
@@ -712,8 +712,8 @@
     },
     {
       "path": "scripts/ps-auto-loop.ps1",
-      "lines": 2645,
-      "sha256": "e32c9c7d8323cb9a0b203df981cb716f81949dd44d13d78cd082e0ede1321f0a",
+      "lines": 2646,
+      "sha256": "25c96910e201b2e467c5ece3a1522e6e7c39303f54e5fa890b135a384b22fd7d",
       "bom": true
     },
     {
@@ -808,14 +808,14 @@
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 467,
-      "sha256": "101c2f37175c5111016878004d617e888262841e6e2c54c5ebb16841ba36e0ad",
+      "lines": 481,
+      "sha256": "d6f5f94fb675a04cc54cf618b48ec0e37cf12a60dea5700f37f154f0a5bd27fe",
       "bom": true
     },
     {
       "path": "scripts/ps-spec-build.ps1",
       "lines": 455,
-      "sha256": "40a57f84050ae399e03871d9eb799f908defb3999eedabc4c2ba4dea5b6d7b2c",
+      "sha256": "8c478efa7961e73e636ac7a2adab554a5ab1f07812f5595125780083cce1a51e",
       "bom": true
     },
     {
@@ -898,8 +898,8 @@
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 749,
-      "sha256": "66d2a6a2c29200b155da10a427cf1380b3bb5e873d995422bbc516505d6f995c",
+      "lines": 836,
+      "sha256": "6428fc487269f055e8f9376de2f0a0d03eb4f5e9e89680d06885390e6e1ba46a",
       "bom": true
     },
     {

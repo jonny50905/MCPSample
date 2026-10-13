@@ -1,6 +1,641 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 98c21f6）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit beadc2b）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|98c21f6|1122203caeb3094c|3|8|13256|e42eb985170e91c1321f1946c1c041928a2928231de33ced1bd288adb2d12580
+@@@PSBUNDLE-PART|1|opencode|beadc2b|25511e256f145339|3|8|13691|5e7392912ca19c67a785ea967c248e8c9c9961c6a2808fb59009348c131d66bd
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/operations.json|633|f8243d8a0e4bd14a4cb1bf5235a04837ef9c56fd51c99f8798c6e722178f6a21|0
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "operations",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "OP",
+      "key": "TW_DEMO_APV:APPROVE:APPROVE",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:APPROVE"
+      ],
+      "fr": "@FR/TW_DEMO_APV:APPROVE",
+      "name": "核准申請",
+      "opKind": "TRANSITION",
+      "invokedFrom": [
+        "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.APPROVE_PB"
+      ],
+      "authorization": {
+        "any": [
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:020"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_SUPERVISOR"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:025"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "inputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID",
+          "required": true
+        },
+        {
+          "name": "COMMENTS",
+          "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:020"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:025"
+          }
+        ]
+      },
+      "validations": [],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:020>030",
+          "@TRN/REQ_STATUS:020>025",
+          "@TRN/REQ_STATUS:025>030"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+            "value": {
+              "param": "COMMENTS"
+            }
+          }
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "單一列更新（TW_DEMO_REQHDR）；通知在交易提交後才排入。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "STALE_DATA_CHECK",
+          "legacyBehavior": "開啟後到存檔之間若資料已被他人更新，存檔被拒絕並顯示訊息，該筆維持先存檔者的結果，本次輸入不寫入。",
+          "message": "@MSG/27000,4"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "核准後按鈕隱藏；同一狀態不能重複核准。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
+        "events": [
+          "FieldChange",
+          "SaveEdit"
+        ]
+      }
+    },
+    {
+      "type": "OP",
+      "key": "TW_DEMO_APV:RETURN:RETURN",
+      "component": "TW_DEMO_APV",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E3",
+        "E2"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_APV:RETURN"
+      ],
+      "fr": "@FR/TW_DEMO_APV:RETURN",
+      "name": "退回申請",
+      "opKind": "TRANSITION",
+      "invokedFrom": [
+        "@UI/TW_DEMO_APV.TW_DEMO_APVPG.TW_DEMO_REQWRK.RETURN_PB"
+      ],
+      "authorization": {
+        "any": [
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:020"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_SUPERVISOR"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "all": [
+              {
+                "left": {
+                  "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+                },
+                "op": "EQ",
+                "right": {
+                  "state": "@STATE/REQ_STATUS:025"
+                }
+              },
+              {
+                "all": [
+                  {
+                    "left": {
+                      "ctx": "CURRENT_USER_OPRID"
+                    },
+                    "op": "HAS_ROLE",
+                    "right": {
+                      "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
+                    }
+                  },
+                  {
+                    "left": {
+                      "drv": "@DRV/REQUESTER_DEPT_MANAGER"
+                    },
+                    "op": "EQ",
+                    "right": {
+                      "ctx": "CURRENT_USER_EMPLID"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "inputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID",
+          "required": true
+        },
+        {
+          "name": "COMMENTS",
+          "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:020"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:025"
+          }
+        ]
+      },
+      "validations": [
+        "@BR/TW_DEMO_REQWRK.RETURN_PB.FieldChange:RETURN_COMMENT_REQUIRED"
+      ],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:020>015",
+          "@TRN/REQ_STATUS:025>015"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.COMMENTS",
+            "value": {
+              "param": "COMMENTS"
+            }
+          }
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "單一列更新（TW_DEMO_REQHDR）；通知在交易提交後才排入。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "STALE_DATA_CHECK",
+          "legacyBehavior": "開啟後到存檔之間若資料已被他人更新，存檔被拒絕並顯示訊息，該筆維持先存檔者的結果，本次輸入不寫入。",
+          "message": "@MSG/27000,4"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "退回後按鈕隱藏；同一狀態不能重複退回。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange",
+        "events": [
+          "FieldChange",
+          "SaveEdit"
+        ]
+      }
+    },
+    {
+      "type": "OP",
+      "key": "TW_DEMO_REQ:CREATE:SAVE_NEW",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E4"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_REQ:CREATE"
+      ],
+      "fr": "@FR/TW_DEMO_REQ:CREATE",
+      "name": "儲存新申請單",
+      "opKind": "CREATE",
+      "invokedFrom": {
+        "na": "新增模式的工具列儲存，不是頁面上的元件"
+      },
+      "authorization": {
+        "left": {
+          "ctx": "CURRENT_USER_OPRID"
+        },
+        "op": "HAS_ROLE",
+        "right": {
+          "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+        }
+      },
+      "inputs": [
+        {
+          "name": "AMOUNT",
+          "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+          "required": true
+        },
+        {
+          "name": "REASON",
+          "field": "@FLD/TW_DEMO_REQHDR.REASON",
+          "required": true
+        },
+        {
+          "name": "REQ_TYPE",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID"
+        },
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "na": "新建沒有前置狀態"
+      },
+      "validations": [
+        "@BR/TW_DEMO_REQHDR.AMOUNT.SaveEdit:AMOUNT_POSITIVE"
+      ],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:*>010"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": {
+              "param": "AMOUNT"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REASON",
+            "value": {
+              "param": "REASON"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+            "value": {
+              "param": "REQ_TYPE"
+            }
+          }
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "新增一列（TW_DEMO_REQHDR）。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "NOT_APPLICABLE",
+          "legacyBehavior": "新單不存在併發更新；取號的併發行為見 09 的取號規則。"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "存檔後畫面轉為修改模式，再按儲存不會建立第二張單。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
+        "events": [
+          "FieldDefault",
+          "SaveEdit",
+          "SavePreChange"
+        ]
+      }
+    },
+    {
+      "type": "OP",
+      "key": "TW_DEMO_REQ:SUBMIT:SUBMIT",
+      "component": "TW_DEMO_REQ",
+      "basis": "DERIVED",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E5",
+        "E2"
+      ],
+      "derivedFrom": [
+        "@FR/TW_DEMO_REQ:SUBMIT"
+      ],
+      "fr": "@FR/TW_DEMO_REQ:SUBMIT",
+      "name": "送出申請",
+      "opKind": "TRANSITION",
+      "invokedFrom": [
+        "@UI/TW_DEMO_REQ.TW_DEMO_REQPG.TW_DEMO_REQWRK.SUBMIT_PB"
+      ],
+      "authorization": {
+        "all": [
+          {
+            "left": {
+              "ctx": "CURRENT_USER_OPRID"
+            },
+            "op": "HAS_ROLE",
+            "right": {
+              "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
+            }
+          },
+          {
+            "left": {
+              "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
+            },
+            "op": "EQ",
+            "right": {
+              "ctx": "CURRENT_USER_EMPLID"
+            }
+          }
+        ]
+      },
+      "inputs": [
+        {
+          "name": "REQ_ID",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_ID",
+          "required": true
+        },
+        {
+          "name": "AMOUNT",
+          "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+          "required": true
+        },
+        {
+          "name": "REASON",
+          "field": "@FLD/TW_DEMO_REQHDR.REASON",
+          "required": true
+        },
+        {
+          "name": "REQ_TYPE",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "REQ_STATUS",
+          "field": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        }
+      ],
+      "preconditions": {
+        "left": {
+          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
+        },
+        "op": "IN",
+        "right": [
+          {
+            "state": "@STATE/REQ_STATUS:010"
+          },
+          {
+            "state": "@STATE/REQ_STATUS:015"
+          }
+        ]
+      },
+      "validations": [
+        "@BR/TW_DEMO_REQWRK.SUBMIT_PB.FieldChange:SUPERVISOR_REQUIRED",
+        "@BR/TW_DEMO_REQHDR.AMOUNT.SaveEdit:AMOUNT_POSITIVE"
+      ],
+      "effects": {
+        "transitions": [
+          "@TRN/REQ_STATUS:010>020",
+          "@TRN/REQ_STATUS:015>020"
+        ],
+        "writes": [
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.AMOUNT",
+            "value": {
+              "param": "AMOUNT"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REASON",
+            "value": {
+              "param": "REASON"
+            }
+          },
+          {
+            "field": "@FLD/TW_DEMO_REQHDR.REQ_TYPE",
+            "value": {
+              "param": "REQ_TYPE"
+            }
+          }
+        ],
+        "interfaces": [
+          "@IF/AE:TW_DEMO_NTFY"
+        ]
+      },
+      "transaction": {
+        "boundary": "SINGLE_UNIT",
+        "writeOrder": "單一列更新（TW_DEMO_REQHDR）；通知在交易提交後才排入。",
+        "onFailure": {
+          "kind": "ROLLBACK_ALL",
+          "note": "任何檢核失敗或存檔錯誤時整筆不寫入，狀態不變。"
+        },
+        "concurrency": {
+          "strategy": "STALE_DATA_CHECK",
+          "legacyBehavior": "開啟後到存檔之間若資料已被他人更新，存檔被拒絕並顯示訊息，該筆維持先存檔者的結果，本次輸入不寫入。",
+          "message": "@MSG/27000,4"
+        },
+        "idempotency": {
+          "repeatable": false,
+          "behavior": "送出後按鈕隱藏；同一張單不能重複送出。"
+        }
+      },
+      "legacyOrigin": {
+        "object": "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
+        "events": [
+          "FieldChange",
+          "SaveEdit",
+          "SavePostChange"
+        ]
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "CHUNK",
+      "locator": "0d43ec68-7e00-e634-4cc7-e1dfde4ad337",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" And TW_DEMO_REQHDR.AMOUNT > 50000 Then\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"025\";\nElse\n   TW_DEMO_REQHDR.REQ_STATUS.Value = \"030\"; TW_DEMO_REQHDR.APPROVER_EMPLID.Value = %EmployeeId; TW_DEMO_REQHDR.APPROVE_DT.Value = %Date;\nEnd-If;"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "888c4b84-6157-afd1-f62b-fe6c3b98e804",
+      "excerpt": "If TW_DEMO_REQHDR.LASTUPDDTTM <> &loadedDttm Then Error MsgGet(27000, 4, \"此申請單已被其他使用者更新，請重新查詢。\"); End-If;"
+    },
+    {
+      "id": "E3",
+      "kind": "CHUNK",
+      "locator": "22c168df-3068-e7c2-caa4-a8529a7e6f79",
+      "excerpt": "If None(TW_DEMO_REQHDR.COMMENTS) Then Error MsgGet(27000, 2, \"退回時必須填寫審核意見。\"); End-If;\nTW_DEMO_REQHDR.REQ_STATUS.Value = \"015\";"
+    },
+    {
+      "id": "E4",
+      "kind": "METADATA_RECEIPT",
+      "locator": "inventory/component-TW_DEMO_REQ.json#pages",
+      "excerpt": "TW_DEMO_REQ: TW_DEMO_REQPG (MAIN), TW_DEMO_REQSEC (SECONDARY)\nrecords: TW_DEMO_REQHDR, TW_DEMO_REQWRK"
+    },
+    {
+      "id": "E5",
+      "kind": "CHUNK",
+      "locator": "9749aec1-b169-4a6e-0a4f-f9bb9edd1ae8",
+      "excerpt": "&sup = TW_DEMO_GETSUPERVISOR(TW_DEMO_REQHDR.REQUESTER_EMPLID);\nIf None(&sup) Then Error MsgGet(27000, 3, \"找不到直屬主管，無法送出。\"); End-If;\nTW_DEMO_REQHDR.REQ_STATUS.Value = \"020\";\nTW_DEMO_REQHDR.SUBMIT_DT.Value = %Date;"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/operations.json
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/rules.json|440|e4d547d5ff0d2ba50ba76ccfbce6bdd3219534321b0275bc7252efaf7f84b62d|0
 {
   "schemaVersion": "1.0",
@@ -11505,7 +12140,7 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1160|646e3e9115c38708c1e5eff865775532ea276374b63e711f4a183c11da647d22|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1165|7e9f59e61581e1a5ab850525e295ee2555ce24fdb1933cb7f0eb9cb645bd0476|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -12344,8 +12979,8 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
    Invalidated 追加一行請人工覆核。合併後收據無效＝下一輪稽核重驗、畢業重驗（ps-auto-all 會自動 RUN）。
 5. **排錯**：`auto-loop-logs\<領域>\supplemental-done\<requestId>.a<n>.outcome.json`（timedOut／exitCode／failureKind／
    receiptValid／receiptErrors／merged／lintRegression／destructionRestored／integrityFail）；未發布的 parts 在
-   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占＝另一個 headless session（ps-spec -Run／另一個迷你圈／
-   auto-loop）在跑：外環會等最多一天（每 5 分鐘印一行心跳），等滿才回 SLOT_BUSY 停機且不計 attempts——看 log 是誰占著、錯開即可。
+   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占＝同一版另一個 headless session（ps-spec -Run／另一個迷你圈／
+   auto-loop／ps-sdoc；slot 兩版各一把，另一版不算）在跑：外環會等最多一天（每 5 分鐘印一行心跳），等滿才回 SLOT_BUSY 停機且不計 attempts——看 log 是誰占著、錯開即可。
    迷你圈遇未預期例外 → `SUPP1-3-03`（exit 2）：已合併的不回退、未發布的留在 parts 下次續跑；request 檔寫不進（`SUPP1-1-06`）
    稍後重送同一 need 即可。auto-loop 只認通過 intake 驗證的 request（id／workKey／need 對不上的列在 log 的「intake 拒收」，
    不會被派工）；迷你圈期間的圍籬盯著 `supplemental/requests|results/` 與 `wiki/`：既有檔被改寫或刪除一律還原，
@@ -12374,7 +13009,7 @@ generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worke
    然後 `ps-spec.ps1 -ValidatePack -Pack <packId>`（骨架填完前本來就回 `SPEC1-1-03`）；`scripts\tests\test-spec.ps1` 全綠；
    對一個已研究的 Component 跑 `-Plan／-Run／-Render／-Gate`；內部覆核後填 `reviewedVersion`（≠ `packVersion` 時 `SPEC1-8-01`，不出貨）。
 2. **跑 job**：`-Plan -JobId <小寫id> -Component <名> -Pack <packId> [-DomainHint]` → `-Run`（每個 unit 一個 worker session，
-   共用 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
+   共用同一版的 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
    的迷你圈與下一輪稽核後重跑 `-Run`）→ `-Render` → `-Gate`（verdict SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED）。
    產出 `.ps-runtime\spec\<jobId>\outputs\<generation>\{spec.md,trace.md,gate.json}`；重 render 位元組相同；來源 NN 改了就
    `SOURCE_CHANGED`，要重 plan。`.ps-runtime\spec` 固定在 repo 根（worker 的 command 與 permission 以此路徑為準；`-RuntimeRoot`
@@ -12454,7 +13089,7 @@ powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_
 
 純分頁用 PARTIAL＋nextCursor、gaps 空；未知條件用 gaps 明列，不能用續頁結束把未知抹掉。
 缺口頁即使覆核認為如實描述，也不發完成收據；只補查該頁，重試額度用完才停。
-同一 job 有鎖；模型 session 沿用全域 session slot。slot 被占、檔案暫時鎖定時不假裝工作已完成。
+同一 job 有鎖；模型 session 沿用同一版的 session slot（兩版各一把）。slot 被占、檔案暫時鎖定時不假裝工作已完成。
 
 本機來源／agent 契約 fingerprint 改變會失效；目前採保守策略，其他領域 NN 改動也可能觸發新版本。
 搬入新版契約或 cookbook 後，既有 job 會顯示 STALE；同清單重跑即建新版本，舊成果保留。
@@ -12642,11 +13277,15 @@ Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的�
 | 人工輸入 | `.ps-private\sdoc\<jobId>\` | `.ps-private\sdoc-opencode\<jobId>\` |
 | 產出入口 | `docs\ps-spec\<jobId>\README.md` | `docs\ps-spec-opencode\<jobId>\README.md` |
 | 執行狀態／log | `.ps-runtime\sdoc\`／`.ps-runtime\sdoc-logs\` | `.ps-runtime\sdoc-opencode\`／`.ps-runtime\sdoc-opencode-logs\` |
+| session slot（同一版一次一個 session） | `Global\MCPSample-OpencodeSession` | `Global\MCPSample-OpencodeSession-opencode`（兩版可以同時跑） |
 | 契約、schema、範例 | `.claude/peoplesoft/sdoc/` | `.opencode/peoplesoft/sdoc/`（資料檔逐字相同，契約只換工具用語） |
 | agent 讀寫範圍 | hook（PowerShell） | agent 檔的 permission（read／edit／task） |
 
 - 兩版同一資料夾並存：jobId 相同，但目錄分開、各有自己的研究版本，互不覆蓋；換來換去不會讓另一版重開研究版本。
-  同一台機器同一時間只跑一個 headless session（session slot）：另一版正在跑時會停在 DOC1-3-03，錯開時間再跑。
+  兩版可以同時跑：session slot 兩版各一把（Claude Code 版沿用原本那把、OpenCode 版另一把），各自一次一個 headless session；
+  同一版另一個外環（ps-auto-loop／ps-spec -Run／補研究迷你圈／另一個 ps-sdoc）正在跑時才停在 DOC1-3-03（不扣失敗次數），錯開再跑。
+  還沒換新 scripts 的資料夾只認原本那把（與 Claude Code 版排隊）。
+- 兩版同時跑時兩邊的研究都會查 DB：照 SOP-12，輕量查詢可並行、重載（稽核 SQL 風暴）會排隊逾時；出現成批逾時或 UNVERIFIABLE 就錯開時間。
 - 同一資料夾有 `CLAUDE.md` 時，Claude Code 只讀 `CLAUDE.md`、不讀 OpenCode 版帶進來的 `AGENTS.md`（沒有 `CLAUDE.md` 時才讀 `AGENTS.md`）：
   Claude Code 版的指引不變。Claude Code 的 `/config` 把 Project instructions 改成 `claude-md-and-agents-md` 才會兩個都讀——公司機保持預設。
 - 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：不載入家目錄 `~/.claude/CLAUDE.md` 與 `.claude/skills`
@@ -12662,7 +13301,8 @@ Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的�
 ### 維護驗證
 
 `test-sdoc-run.ps1 -Only opencode`（OpenCode 版的目錄、model.yaml、`-Model`／`-Cli` 檢查、與 Claude Code 版同資料夾並存、
-同一份合成 worker 輸出兩版發布的文件逐位元相同、模型預檢；Windows 另以假 `opencode.cmd` 真的經 cmd.exe 走一次預檢與 session 命令列）、
+同一份合成 worker 輸出兩版發布的文件逐位元相同、模型預檢、session slot 兩版各一把（另一版占著照樣取得、同一版占著 SLOT_BUSY）；
+Windows 另以假 `opencode.cmd`／`claude.cmd` 真的經 cmd.exe 走預檢、session 命令列與兩版同時開 session）、
 `node tests/runtime-guard/run-sdoc-smoke.mjs`（真 OpenCode：四個外環 agent 以 `--agent`＋`--model` 啟動、read／write 權限邊界、
 不載入 `~/.claude/CLAUDE.md`）、`node tests/runtime-guard/run-clone-smoke.mjs`（`/ps-spec` 只准 `ps-sdoc.ps1 -Cli opencode …`）、
 `test-claude-variant.ps1`（兩版 sdoc 一一對應、資料檔逐字相同、契約標題相同）、`test-bundle.ps1`（model.yaml 保留本機）。
@@ -13052,209 +13692,4 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 （無）
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|1c868fb77273b9abc9f465cd111448ed5628056a78df44ab96bdef4fdeda3032|0
-{
-  "schemaVersion": 1,
-  "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
-  "files": [
-    {
-      "path": ".opencode/agent/ps-clone-worker.md",
-      "sha256": "A1BE7DCE95ABC62E2E422AF3BCF0E267E8CA233027CE72A2B586A7290EF1065A",
-      "lines": 73
-    },
-    {
-      "path": ".opencode/agent/ps-spec-author.md",
-      "sha256": "87A27FD99C8D647192991B139FF72138EBE320DA01287AE1BAC539D81F238868",
-      "lines": 85
-    },
-    {
-      "path": ".opencode/agent/ps-spec-worker.md",
-      "sha256": "2C881C2D9D47EF7BFF7D15595A4940B0550D26BB791984A3DFAF2BC736D0DEB8",
-      "lines": 79
-    },
-    {
-      "path": ".opencode/command/ps-clone-batch.md",
-      "sha256": "F4E805CB87978683DDBBF8813A4ACAA3007BEA529A45320F46D4CA7FCD0321A9",
-      "lines": 12
-    },
-    {
-      "path": ".opencode/command/ps-spec-batch.md",
-      "sha256": "111B300B5EB1CB765480A85513B99522B9C7418A2793238751F1EB87AF7B1736",
-      "lines": 19
-    },
-    {
-      "path": ".opencode/command/ps-spec.md",
-      "sha256": "D15DFF3A59990F7069DC6858AEAC242E6093DB98AB147B370E8B32241BF6F24E",
-      "lines": 14
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/capabilities.json",
-      "sha256": "67E7A913080F50A6E268F245744D730F147DB683AFF100BDBCA87ED7BFE01573",
-      "lines": 38
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/clone-contract.md",
-      "sha256": "7206C4672C8348AEC36B97DBC84872C7F1343D415FCD8F453887890B7C2F7594",
-      "lines": 98
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/clone-profile.json",
-      "sha256": "93FF3D0FB58660C4AAAD238F6FAE89DAB85952CF78647E5AE167AB262AD6FA08",
-      "lines": 60
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-a/pack.json",
-      "sha256": "A54BDA5D2278A1CB1471C42C1CA5077703DD57AF0DAC5D3DD4915B5C7EA1D8E1",
-      "lines": 34
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-a/template-bound.md",
-      "sha256": "475B5714806F963A2E5A3A67B2A529994BEA606F7D779FE2863F2A1872ECD518",
-      "lines": 32
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-b/pack.json",
-      "sha256": "0AD1597D1C7D7C3AC4BF5049B4B0391D7FD035C5B022B228A13E4137B8F6EB2E",
-      "lines": 31
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-b/template-bound.md",
-      "sha256": "5FD342F4B44049C596094C1DD80C8CAE7F108F8204B5DE89BA8C3EFD8A863715",
-      "lines": 20
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-c/pack.json",
-      "sha256": "DCD712C256ECC6C8F4159409223ECDA01A684583CBD78D3673E06A54124B26A2",
-      "lines": 34
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-c/template-bound.md",
-      "sha256": "AF81A07C807C9FCB4BCA26AB977C2541C57E778157ED41FA2F17CF680C520C25",
-      "lines": 29
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/pack.schema.json",
-      "sha256": "2624BDBF8A89747A712881B11E99E35F13340E1E9F90AFD7C09521878516A878",
-      "lines": 86
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "sha256": "BD1636DB6BFA690F805D231AE9E45B871061E71AF90C30868237033DE2C0FAF3",
-      "lines": 211
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
-      "sha256": "9B5AE710CFB61EB17DFAE83103FEA2409837260D50AA2A4C99501CFC144F16B0",
-      "lines": 34
-    },
-    {
-      "path": "scripts/ps-spec-build.ps1",
-      "sha256": "40A57F84050AE399E03871D9EB799F908DEFB3999EEDABC4C2BA4DEA5B6D7B2C",
-      "lines": 456
-    },
-    {
-      "path": "scripts/ps-spec-clone-lib.ps1",
-      "sha256": "BEEB5C7E07779F5EB7F9B7C71A045F37DAD61C9D196BD3087401747366F092B9",
-      "lines": 545
-    },
-    {
-      "path": "scripts/ps-spec-lib.ps1",
-      "sha256": "D8460EC0599C9B21CBFF47A32E295F91D3710B431384912AEE8BCC905C47AD67",
-      "lines": 2730
-    },
-    {
-      "path": "scripts/ps-spec.ps1",
-      "sha256": "DE5F42B04D56D3DE59673C2B67C12BA6FED92E7B07725173EB6DD31644B061B0",
-      "lines": 308
-    }
-  ]
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/generic.manifest.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/pack.schema.json|85|2624bdbf8a89747a712881b11e99e35f13340e1e9f90afd7c09521878516a878|0
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Spec Definition Pack（私有需求包 pack.json）",
-  "description": "文件級 schema：描述 .ps-private/spec/<packId>/pack.json 的形狀。實際驗證由 scripts/ps-spec-lib.ps1 的 Test-PsSpPack（PowerShell 5.1 手寫 validator）執行；本檔只供閱讀與編輯器提示。pack 只含 opaque ID、capability 代碼、slot 綁定、條件、基數與證據政策——公司 Template／Checklist 原文只在模板副本（template-bound.md）與內部人員手上，不進本 repo。骨架用 ps-spec.ps1 -InitPack 產。validator 另外保證：ID 唯一、每個 checklist id 至少被一個 requirement 引用、markers 模式每個 slot 在模板出現且模板每個 {{slot:Sxx}} 標記都在 slots、headings 模式每個 slot 的 heading 在模板恰好命中一個標題（placeholder 若給則在該章節恰好出現一次、模板不得再有 {{slot:}} 標記）、placeholders 的 text 在模板出現且 fact 的 factKind 由本 pack 某個 requirement 產出、factKind／properties／context 在 capabilities.json 目錄內、applicability 依賴無環（自我引用允許＝驗收後再判）、reviewedVersion≠packVersion 時 gate 標 8-01。",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schemaVersion", "packId", "packVersion", "reviewedVersion", "template", "slots", "checklist", "requirements"],
-  "properties": {
-    "schemaVersion": { "const": 1 },
-    "packId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$", "description": "與目錄名相同；小寫英數與連字號" },
-    "packVersion": { "type": "integer", "minimum": 1, "description": "每次改 requirements／slots／模板都遞增" },
-    "reviewedVersion": { "type": "integer", "minimum": 0, "description": "內部人員核可的 packVersion；不等於 packVersion → SPEC1-8-01 MAPPING_UNSIGNED" },
-    "template": { "type": "string", "description": "pack 目錄內的模板副本檔名；headings 模式是公司 Template 的原樣副本（不改一個字），markers 模式才插 {{slot:Sxx}} 標記。不得含路徑分隔符" },
-    "bindingMode": { "type": "string", "enum": ["markers", "headings"], "description": "可選，預設 markers。markers＝模板插 {{slot:Sxx}} 標記；headings＝slot 綁模板既有的章節標題與（可選）該章節內的原生佔位符，模板副本原樣不動" },
-    "slots": {
-      "type": "array",
-      "uniqueItems": true,
-      "description": "markers 模式：slot id 字串陣列。headings 模式：物件陣列（同一個 id 不得重複）",
-      "items": {
-        "oneOf": [
-          { "type": "string", "pattern": "^S[0-9]{2,4}$" },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "heading"],
-            "properties": {
-              "id": { "type": "string", "pattern": "^S[0-9]{2,4}$" },
-              "heading": { "type": "string", "description": "模板裡的章節標題原文（不含 # 記號）；比對前 trim 並把內部連續空白壓成一個空白；須恰好命中一個標題（任何層級）" },
-              "placeholder": { "type": "string", "description": "可選；該章節直屬內文的原生佔位符（{{…}}），須在標題行後到下一個任意層級標題前恰好出現一次，不包含子章節。同一佔位符位置不得由兩個 slot 共用。有＝置換該佔位符（獨佔一行就整行換掉，行內就原地換字）；沒有＝補在直屬內文最後一個非空行之後；不搬動子章節" }
-            }
-          }
-        ]
-      }
-    },
-    "placeholders": {
-      "type": "array",
-      "description": "可選（兩種模式都可用）：模板既有的文件參數 {{…}} → 事實屬性。render 時該事實有值就把每一處都換掉（多值以、串接、保持單行），沒有值就原樣留著並在 trace 記『待人工』。沒列進來的 {{…}}（例如要人補的圖）永遠不動",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["text", "fact"],
-        "properties": {
-          "text": { "type": "string", "description": "模板裡的佔位符原文，形如 {{…}}；至少出現一次" },
-          "fact": { "type": "string", "pattern": "^[A-Z][A-Z_.]*\\.[A-Za-z]+$", "description": "<factKind>.<property>；factKind 須由本 pack 某個 requirement 產出、property 須在 capabilities.json 內" }
-        }
-      }
-    },
-    "checklist": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" }, "description": "公司 Checklist 逐項的 opaque id；每項須被 ≥1 requirement 的 checklistRefs 引用" },
-    "requirements": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "slot", "checklistRefs", "factKind", "required", "applicability", "cardinality", "evidencePolicy"],
-        "properties": {
-          "id": { "type": "string", "pattern": "^R[0-9]{2,4}$" },
-          "slot": { "type": "string", "pattern": "^S[0-9]{2,4}$", "description": "必須在 slots 內（兩種 bindingMode 都是引用 slot id）；同 slot 的 requirements 依 pack 順序串接成該 slot 的內容" },
-          "checklistRefs": { "type": "array", "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" } },
-          "factKind": { "type": "string", "description": "capabilities.json factKinds 的鍵，或字面值 UNSUPPORTED（目錄挑不到；gate 列 7-17）" },
-          "required": { "type": "boolean" },
-          "applicability": { "$ref": "#/definitions/applicability" },
-          "cardinality": { "type": "string", "enum": ["ONE", "ANY", "ALL_DISCOVERED"], "description": "ALL_DISCOVERED：COMPOSE 需 closure COMPLETE、EXTRACT 需來源表存在" },
-          "evidencePolicy": { "type": "string", "enum": ["AUDITED", "STATIC", "ANY"], "description": "AUDITED＝來源 NN 等級 AUDITED_CLEAN；STATIC＝AUDITED_CLEAN／AUDITED_ISSUES／UNAUDITED；ANY＝含 PARTIAL／BLOCKED" },
-          "properties": { "type": "array", "items": { "type": "string" }, "description": "可選；限縮該 factKind 的 properties（缺＝目錄全部）；也用於 KnowledgeNeed" },
-          "context": { "type": "object", "additionalProperties": { "type": "string" }, "description": "可選；鍵限 capabilities.json contextKeys（operation／mode／page／record／field／process）；DATA.RECORD_USAGE 與 ENTITY.DETAIL 以 record 限縮到單一 Record" }
-        }
-      }
-    }
-  },
-  "definitions": {
-    "applicability": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["op"],
-      "description": "三值邏輯（TRUE／FALSE／UNKNOWN）；FALSE＝不適用（N/A），UNKNOWN 永不變 N/A（gate 列 7-15 debt）。fact 寫 <factKind>.<property>；COMPOSE 事實的 present 由驗收後的片段決定（有列＝TRUE、無列且 closure COMPLETE＝FALSE、否則 UNKNOWN）",
-      "properties": {
-        "op": { "type": "string", "enum": ["ALWAYS", "FACT_TRUE", "FACT_FALSE", "ALL", "ANY", "NOT"] },
-        "fact": { "type": "string", "pattern": "^[A-Z][A-Z_.]*\\.[A-Za-z]+$", "description": "FACT_TRUE／FACT_FALSE 用；factKind 須由本 pack 某個 requirement 產出" },
-        "args": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/applicability" }, "description": "ALL／ANY 用" },
-        "arg": { "$ref": "#/definitions/applicability", "description": "NOT 用" }
-      }
-    }
-  }
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/pack.schema.json
-@@@PSBUNDLE-PART-END|1122203caeb3094c|3|8
+@@@PSBUNDLE-PART-END|25511e256f145339|3|8

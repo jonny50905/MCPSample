@@ -729,4 +729,5 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | P4 | 產出 | `-Render` 兩次、`-Gate` | 兩次 spec.md 位元組相同；gate verdict ∈ SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED；改 NN 後 `-Render` → SOURCE_CHANGED 類碼、current.json 不變 |
 | P5 | generic 完整性 | 改 `scripts\ps-spec-lib.ps1` 一個字後 `-Doctor -JobId demo1` | SPEC1-0-01；還原後回 SPEC1-0-xx OK |
 | P6 | 機密邊界 | 任何回報 | 只回報結論碼與 drill tuple（opaque id、factKind、模式、計數、enum）；不貼 spec.md、不貼 pack.json、不貼 NN 內容 |
+| D1 | 兩版同時跑 | 同一資料夾：Claude Code 版 `ps-sdoc.ps1 -Components …` 跑著時，另一個視窗跑 `ps-sdoc.ps1 -Cli opencode -Components …` | 兩邊都開得了 session（OpenCode 版沒有 DOC1-3-03）；同一版再開第二個外環才 DOC1-3-03 |
 

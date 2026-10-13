@@ -883,7 +883,8 @@ function Get-SessionFailureKind {
 # taskkill 整樹強殺、容量事件標籤、session slot 互斥鎖）；本函式只是薄包裝——呼叫點與回傳形狀不變。
 # $ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'
 # 注意：prompt 走 cmd.exe 命令列——內容禁用半形雙引號與 cmd 特殊字元（> < & | % ^），中文引號「」不受限；多行內容一律壓成單行。
-# session slot：同機同時只跑一個 headless session（ps-spec／補研究迷你圈取同一把鎖）。持研究鎖的本迴圈是主要使用者，
+# session slot：同一台機器同一版同時只跑一個 headless session（同一版的 ps-spec／ps-sdoc／補研究迷你圈取同一把鎖；
+# 另一版用自己的那把，不互相等）。持研究鎖的本迴圈是主要使用者，
 # 別人（ps-spec -Run、另一個迷你圈）用完就會讓出——所以最多等一天（每 5 分鐘印一行心跳），session 逾時從取得 slot 起算；
 # 等不到才回 SlotBusy（TimedOut=$true、FailureKind=SLOT_BUSY），沿用既有逾時熔絲——不會把別人正常的一小時 session 算成本迴圈逾時。
 function Invoke-Opencode {

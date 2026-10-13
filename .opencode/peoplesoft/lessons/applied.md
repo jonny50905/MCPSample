@@ -3915,3 +3915,24 @@
   所以同資料夾時兩版搬運包都要解、交接清單兩包都列（SOP-29 第 1 步、AGENTS.md）。
 - 待公司機驗：model.yaml 填的 provider／model 能否被 `opencode models` 列出；小模型照契約寫出合格解讀與研究包的比例（不合格兩次就 BLOCKED）。
 - 教訓：做備案時把「換什麼」收斂到最少——同一個外環與契約、獨立的狀態目錄、一個設定檔；用「同一份輸入兩版產出逐位元相同」證明只換了前端。
+
+### L146 兩版要能同時跑——session slot 依前端分開，Claude Code 版沿用原本那把（2026-10-13）
+
+- 起因：管理者要 Claude Code 版與 OpenCode 版的 Spec 文件流程能同時跑。L145 讓兩版的狀態目錄、job 鎖分開，但 session slot
+  （`Global\MCPSample-OpencodeSession`，同一台機器一次一個 headless session）照舊共用——一版在跑，另一版開 session 就停在 DOC1-3-03。
+- 設計：
+  - slot 依前端分開（ps-session-lib 的 `Get-PsOcSessionSlotName`）：Claude Code 版沿用原本的名字，OpenCode 版 `Global\MCPSample-OpencodeSession-opencode`。
+    `Invoke-PsOcSession` 先以 `Get-PsCliVariant`（PS_CLI 優先，否則看 `.claude/peoplesoft`）判定版本再取那一把——同資料夾的 `ps-sdoc -Cli opencode`
+    在行程內設 PS_CLI，取的是 OpenCode 版那把。
+  - Claude Code 版沿用舊名的理由：還沒換新 scripts 的資料夾只認那把。沿用舊名＝舊的 Claude Code 資料夾不用重搬，也能與新的 OpenCode 版同時跑
+    （反過來就得連 Claude Code 資料夾一起更新）。代價：舊 scripts 的 OpenCode 資料夾（若還在用）也只認那把，會與 Claude Code 版排隊、不與新版 OpenCode
+    排隊——同一台機器的資料夾都換新 scripts 後才完全照新規則。
+  - 同一版仍一次一個 session（同一個模型服務）：ps-auto-loop／ps-spec -Run／補研究迷你圈／ps-sdoc／ps-spec-build 在同一版內照舊排隊，各自的等待上限不變
+    （auto-loop 一天、ps-spec 10 分、ps-sdoc 與 ps-spec-build 不等＝DOC1-3-03／CLONE1-3-03）。
+  - 兩版同時跑時兩邊都查 oracleMCP（各自的 MCP 註冊；跨行程是否共用連線仍未證實，R42 topology 實驗待做）：照 SOP-12，重載期間錯開。
+  - 訊息：slot 被占的 log 帶版本（「session slot 被占用（OpenCode 版）」「同一版另一個…（另一版不受影響）」），保留「session slot 被占用」字樣
+    （test-scenarios S6 照樣找得到）；結論碼不變。
+- 驗證：test-sdoc-run `-Only opencode` 加 4 項（slot 名對照；Claude Code 版那把被占時 OpenCode 版取得、Claude Code 版的 session 回 SLOT_BUSY 不啟動；
+  反過來同理，含同資料夾 PS_CLI=opencode；放開後兩把都取得到）；Windows 另 3 項（Claude Code 版那把被占時 OpenCode 版外環真的經 cmd.exe 開 session；
+  OpenCode 版那把被占時外環 DOC1-3-03、沒有 opencode run；這時 Claude Code 版的 session 經 cmd.exe 照樣啟動）。反證：兩把改成同名，3 項跨版本測試失敗。
+- 教訓：把共用的互斥鎖拆開時，沿用舊名的那一邊決定「沒更新的資料夾」跟誰排隊——讓不想動的那一版沿用舊名，新的一版用新名。

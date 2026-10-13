@@ -1,9 +1,11 @@
 ﻿# ps-session-lib.ps1 — headless session 啟動共用邏輯（OpenCode：`opencode run`；Claude Code：`claude -p --agent`）
 # 由 ps-auto-loop.ps1（薄包裝 Invoke-Opencode）、ps-spec.ps1（-Run）、ps-spec-build.ps1、ps-supplemental 迷你圈 dot-source。
 # 責任：挑 .cmd/.exe/.bat 型 shim；以 cmd.exe 啟動 CLI（rc 檔取真實結束碼、.Handle 快取、
-#       逾時整樹強殺、心跳與沉默判讀、容量事件標籤）；session slot 互斥鎖 Global\MCPSample-OpencodeSession
-#       ——同一台機器同一時間只跑一個 headless session（各外環各持自己的鎖：research 全域鎖／spec 逐 job 鎖，
-#       但都用同一個模型服務與 oracleMCP 單通道）。前端版本由 ps-cli-lib.ps1 判定（.claude/peoplesoft 存在＝Claude Code）。
+#       逾時整樹強殺、心跳與沉默判讀、容量事件標籤）；session slot 互斥鎖依前端分開（Get-PsOcSessionSlotName：
+#       Claude Code 版 Global\MCPSample-OpencodeSession、OpenCode 版 Global\MCPSample-OpencodeSession-opencode）
+#       ——同一台機器同一版同一時間只跑一個 headless session（各外環各持自己的鎖：research 全域鎖／spec 逐 job 鎖，
+#       但同一版用同一個模型服務）；兩版各用自己的模型服務，可以同時各跑一個。兩版同時跑時兩邊都會查 oracleMCP，
+#       重載期間照 SOP-12 錯開。前端版本由 ps-cli-lib.ps1 判定（.claude/peoplesoft 存在＝Claude Code）。
 # 純函式庫：dot-source 無副作用。PowerShell 5.1 紀律：無三元／??／&&；Join-Path 兩參數；-LiteralPath。
 # prompt 走 cmd.exe 命令列、放在半形雙引號裡：真正會壞的是半形雙引號（結束引號）、% （即使在引號內 cmd 也展開 %VAR%）與換行；
 # > < & | ^ 在雙引號內是普通字元（不當重導向、不當中繼字元），照舊可用；中文引號「」不受限。
@@ -12,6 +14,7 @@
 $script:PsSessionLibRoot = Split-Path $PSScriptRoot -Parent
 $script:PsSessionLibVersion = 1
 $script:PsOcSessionSlotName = 'Global\MCPSample-OpencodeSession'
+$script:PsOcSessionSlotNameOpencode = 'Global\MCPSample-OpencodeSession-opencode'
 # 模型端重試判讀（Claude Code 版）：最後一個成功的模型回應之後，同一個請求連續失敗幾次以上算「卡在模型端」，未達算「被拖慢」
 $script:PsOcApiStuckAfter = 3
 
@@ -64,24 +67,34 @@ function Test-PsOcPromptSafe {
     return $true
 }
 
-# 取 session slot（有界等待；前任行程死亡＝AbandonedMutexException＝視為取得）。
+# session slot 的互斥鎖名：依前端分開，兩版可以同時各跑一個 headless session，同一版一次一個。
+# Claude Code 版沿用原本唯一的那把：還沒換新 scripts 的資料夾只認那把，照樣與 Claude Code 版排隊。
+function Get-PsOcSessionSlotName {
+    param([string]$Cli = '')
+    if (([string]$Cli).Trim().ToLowerInvariant() -eq 'opencode') { return $script:PsOcSessionSlotNameOpencode }
+    return $script:PsOcSessionSlotName
+}
+
+# 取 session slot（有界等待；前任行程死亡＝AbandonedMutexException＝視為取得）。-Cli＝claude｜opencode（取哪一版的那把）。
 # 回 @{ Held; Mutex; WaitedSec; Reason }；Held=$false 時呼叫端自行決定（外環一律不啟動 session）。
 function Enter-PsOcSessionSlot {
-    param([int]$WaitMin = 0, [scriptblock]$Log = $null)
+    param([int]$WaitMin = 0, [scriptblock]$Log = $null, [string]$Cli = '')
     $slot = @{ Held = $false; Mutex = $null; WaitedSec = 0; Reason = '' }
+    $disp = 'Claude Code'
+    if (([string]$Cli).Trim().ToLowerInvariant() -eq 'opencode') { $disp = 'OpenCode' }
     $m = $null
-    try { $m = New-Object System.Threading.Mutex($false, $script:PsOcSessionSlotName) }
+    try { $m = New-Object System.Threading.Mutex($false, (Get-PsOcSessionSlotName -Cli $Cli)) }
     catch { $slot.Reason = ('session slot 互斥鎖無法建立：' + $_.Exception.Message); return $slot }
     $held = $false
     try { $held = $m.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $held = $true }
     $started = Get-Date
     if (-not $held -and $WaitMin -gt 0) {
-        if ($null -ne $Log) { & $Log ('session slot 被占用（另一個 headless session 正在跑：ps-auto-loop／ps-spec -Run／補研究迷你圈）——最多等 ' + $WaitMin + ' 分，取得後逾時才起算') }
+        if ($null -ne $Log) { & $Log ('session slot 被占用（' + $disp + ' 版；同一版另一個 headless session 正在跑：ps-auto-loop／ps-spec -Run／ps-sdoc／補研究迷你圈）——最多等 ' + $WaitMin + ' 分，取得後逾時才起算') }
         $lastBeat = Get-Date
         while (-not $held -and ((Get-Date) - $started).TotalMinutes -lt $WaitMin) {
             try { $held = $m.WaitOne(30000) } catch [System.Threading.AbandonedMutexException] { $held = $true }
             if (-not $held -and $null -ne $Log -and ((Get-Date) - $lastBeat).TotalMinutes -ge 5) {
-                & $Log ('session slot 仍被占用…已等 ' + [int]((Get-Date) - $started).TotalMinutes + ' 分（上限 ' + $WaitMin + ' 分）')
+                & $Log ('session slot 仍被占用（' + $disp + ' 版）…已等 ' + [int]((Get-Date) - $started).TotalMinutes + ' 分（上限 ' + $WaitMin + ' 分）')
                 $lastBeat = Get-Date
             }
         }
@@ -89,7 +102,7 @@ function Enter-PsOcSessionSlot {
     $slot.WaitedSec = [int]((Get-Date) - $started).TotalSeconds
     if (-not $held) {
         try { $m.Dispose() } catch { }
-        $slot.Reason = 'session slot 被占用'
+        $slot.Reason = ('session slot 被占用（' + $disp + ' 版）')
         return $slot
     }
     $slot.Held = $true
@@ -295,7 +308,8 @@ function New-PsOcCommandLine {
 #   ApiKind：Claude Code 版 stream 的模型端重試判讀（Get-PsOcClaudeApiRetry 的 Kind）；只供說明，不改變成敗判定
 #   -ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'（OpenCode 原樣傳；Claude Code 轉成
 #     --agent <該指令的主代理>＋prompt「/ps-research <PromptText>」，輸出 stream-json 落 .stream.jsonl、最終回覆抽進 OutFile）
-#   -SlotWaitMin：取不到 session slot 最多等幾分（0＝不等）；等不到＝不啟動，回 SlotBusy=$true、TimedOut=$true、FailureKind=SLOT_BUSY
+#   -SlotWaitMin：取不到 session slot（前端版本的那把，見 Get-PsOcSessionSlotName）最多等幾分（0＝不等）；
+#     等不到＝不啟動，回 SlotBusy=$true、TimedOut=$true、FailureKind=SLOT_BUSY
 #   -Log：一行一則的記錄函式（外環傳 ${function:Write-Log}）；未給＝Write-Host
 #   逾時從取得 slot 起算（等待 slot 的時間不吃 session 的 TimeoutMin）
 function Invoke-PsOcSession {
@@ -313,16 +327,16 @@ function Invoke-PsOcSession {
         L "SESSION($Tag) 拒啟動：prompt 含換行、半形雙引號或 %（cmd 在雙引號內也會展開 %VAR%）——外環組 prompt 的錯，不是模型"
         return @{ TimedOut = $false; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'PROMPT_UNSAFE'; SlotBusy = $false; SlotWaitedSec = 0; ApiKind = 'NONE' }
     }
-    $slot = Enter-PsOcSessionSlot -WaitMin $SlotWaitMin -Log $Log
+    $variant = Get-PsCliVariant -Root $Root
+    $slot = Enter-PsOcSessionSlot -WaitMin $SlotWaitMin -Log $Log -Cli $variant.Name
     if (-not $slot.Held) {
-        L "SESSION($Tag) 未啟動：$($slot.Reason)（等了 $($slot.WaitedSec) 秒）——另一個 ps-auto-loop／ps-spec／補研究 session 正在用模型服務，錯開時間再跑"
+        L "SESSION($Tag) 未啟動：$($slot.Reason)（等了 $($slot.WaitedSec) 秒）——同一版另一個 ps-auto-loop／ps-spec／ps-sdoc／補研究 session 正在用模型服務，錯開時間再跑（另一版不受影響）"
         return @{ TimedOut = $true; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'SLOT_BUSY'; SlotBusy = $true; SlotWaitedSec = $slot.WaitedSec; ApiKind = 'NONE' }
     }
     try {
         # 結束碼落檔：不相信 Process 物件的 .ExitCode（-PassThru 物件在只用 WaitForExit(ms) 等待時常為 $null，
         # 而 $null -eq 0 為 false＝每個正常 session 都被判成錯誤）。改讓 cmd 把 ERRORLEVEL 寫進檔案——要可觀測的事實。
         $rcFile = Join-Path $LogRoot ('{0}-{1}.rc.txt' -f $stamp, $Tag)
-        $variant = Get-PsCliVariant -Root $Root
         $streamFile = ''
         if ($variant.Name -eq 'claude') { $streamFile = Join-Path $LogRoot ('{0}-{1}.stream.jsonl' -f $stamp, $Tag) }
         $watch = @($outFile, $errFile)

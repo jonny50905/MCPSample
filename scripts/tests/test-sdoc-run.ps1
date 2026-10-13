@@ -2,7 +2,8 @@
 # 以設計範例（walkthrough、gate）為來源：從空目錄跑到發布，比對發布的 canonical 與範例，並驗結論碼、中斷、重試、重跑、裁決與核准。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-run.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
 #       -Only walk｜edge｜gate｜opencode：只跑一組情境（CI 拆成幾個 job 平行跑；不給＝全部）
-#       opencode 組：OpenCode 版（-Cli opencode）的目錄、模型設定、與 Claude Code 版同資料夾並存、產出與 Claude Code 版相同、模型預檢
+#       opencode 組：OpenCode 版（-Cli opencode）的目錄、模型設定、與 Claude Code 版同資料夾並存、產出與 Claude Code 版相同、模型預檢、
+#       session slot 兩版各一把（兩版可以同時跑，同一版一次一個）
 param([ValidateSet('', 'walk', 'edge', 'gate', 'opencode')][string]$Only = '')
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -330,6 +331,28 @@ function Get-SdKeySet($Items) {
     foreach ($it in @($Items)) { if ($null -ne $it) { $l.Add([string]$it['key']) } }
     $l.Sort([System.StringComparer]::Ordinal)
     return ($l.ToArray() -join '|')
+}
+function Start-SdMutexHold([string]$Name, [string]$Tag) {
+    # 另一個執行緒持有具名互斥鎖（同行程另一個 runspace；互斥鎖屬於執行緒，本執行緒的 WaitOne 會拿不到）。回 @{ Held; … }
+    $ready = Join-Path $base ($Tag + '.ready'); $release = Join-Path $base ($Tag + '.release')
+    $ps = [powershell]::Create()
+    [void]$ps.AddScript({ param($N, $Ready, $Release)
+            $m = New-Object System.Threading.Mutex($false, $N); $held = $false
+            try {
+                try { $held = $m.WaitOne(5000) } catch [System.Threading.AbandonedMutexException] { $held = $true }
+                [System.IO.File]::WriteAllText($Ready, [string]$held)
+                $w = [System.Diagnostics.Stopwatch]::StartNew()
+                while (-not [System.IO.File]::Exists($Release) -and $w.Elapsed.TotalSeconds -lt 180) { Start-Sleep -Milliseconds 50 }
+            }
+            finally { if ($held) { $m.ReleaseMutex() }; $m.Dispose() } }).AddArgument($Name).AddArgument($ready).AddArgument($release)
+    $handle = $ps.BeginInvoke()
+    for ($i = 0; $i -lt 200 -and -not [System.IO.File]::Exists($ready); $i++) { Start-Sleep -Milliseconds 50 }
+    $ok = $false
+    if ([System.IO.File]::Exists($ready)) { $ok = ([System.IO.File]::ReadAllText($ready) -eq 'True') }
+    return @{ Ps = $ps; Handle = $handle; Release = $release; Held = $ok }
+}
+function Stop-SdMutexHold($H) {
+    [System.IO.File]::WriteAllText($H.Release, 'x'); [void]$H.Ps.EndInvoke($H.Handle); $H.Ps.Dispose()
 }
 
 try {
@@ -714,6 +737,36 @@ try {
             $m4 = Test-PsOcOpencodeModel -OcPath $ocExe -Model 'slow/x' -Root $rootO -LogRoot $pfLog -TimeoutSec 2
             $m5 = Test-PsOcOpencodeModel -OcPath (Join-Path $fakeOc 'missing.cmd') -Model 'mock/scripted' -Root $rootO -LogRoot $pfLog
             Assert-Sd ($m1.Result -eq 'OK' -and $m2.Result -eq 'NOT_LISTED' -and $m2.Count -eq 2 -and $m3.Result -eq 'NO_PROVIDER' -and $m4.Result -eq 'UNKNOWN' -and $m5.Result -eq 'UNKNOWN') ('模型預檢：清單有＝OK、provider 有但沒這個模型＝NOT_LISTED、Provider not found＝NO_PROVIDER、逾時與無法執行＝UNKNOWN（不擋）：' + $m1.Result + '/' + $m2.Result + '/' + $m3.Result + '/' + $m4.Result + '/' + $m5.Result)
+
+            # session slot 兩版各一把：另一版占著不影響，同一版占著才 SLOT_BUSY（session 不啟動，外環 DOC1-3-03）
+            $slotC = Get-PsOcSessionSlotName -Cli 'claude'; $slotO = Get-PsOcSessionSlotName -Cli 'opencode'
+            Assert-Sd ($slotC -ceq 'Global\MCPSample-OpencodeSession' -and $slotO -ceq 'Global\MCPSample-OpencodeSession-opencode' -and (Get-PsOcSessionSlotName) -ceq $slotC) 'session slot：Claude Code 版沿用原本的名字（還沒換新 scripts 的資料夾也用它），OpenCode 版另一把'
+            $slotLog = Join-Path $base 'slot-logs'
+            $rootSC = Join-Path $base 'slot-claude'; [void][System.IO.Directory]::CreateDirectory((Join-Path $rootSC '.claude/peoplesoft'))
+            $rootSO = Join-Path $base 'slot-oc'; [void][System.IO.Directory]::CreateDirectory((Join-Path $rootSO '.opencode/peoplesoft'))
+            $script:slotMsgs = @()
+            $hold = Start-SdMutexHold $slotC 'hold-claude'
+            try {
+                $eo = Enter-PsOcSessionSlot -Cli 'opencode'; $okO = [bool]$eo.Held; Exit-PsOcSessionSlot -Slot $eo
+                $ec = Enter-PsOcSessionSlot -Cli 'claude'
+                $sc = Invoke-PsOcSession -OcPath 'unused.cmd' -Root $rootSC -LogRoot $slotLog -PromptText 'x/a0001' -TimeoutMin 1 -Tag 'slot-c' -SlotWaitMin 0 -Log { param($m) $script:slotMsgs += $m }
+                Assert-Sd ($hold.Held -and $okO -and -not $ec.Held -and [string]$ec.Reason -ceq 'session slot 被占用（Claude Code 版）' -and [bool]$sc.SlotBusy -and [string]$sc.FailureKind -ceq 'SLOT_BUSY' -and (($script:slotMsgs -join ' ') -like '*同一版另一個*另一版不受影響*')) 'session slot：Claude Code 版的那把被占時，OpenCode 版照樣取得；Claude Code 版的 session 回 SLOT_BUSY、不啟動' ($script:slotMsgs -join ' ')
+            }
+            finally { Stop-SdMutexHold $hold }
+            $hold = Start-SdMutexHold $slotO 'hold-oc'
+            try {
+                $ec = Enter-PsOcSessionSlot -Cli 'claude'; $okC = [bool]$ec.Held; Exit-PsOcSessionSlot -Slot $ec
+                $eo = Enter-PsOcSessionSlot -Cli 'opencode'
+                $so = Invoke-PsOcSession -OcPath 'unused.cmd' -Root $rootSO -LogRoot $slotLog -PromptText 'x/a0001' -TimeoutMin 1 -Tag 'slot-o' -SlotWaitMin 0 -Log { param($m) }
+                $cliSaved = $env:PS_CLI
+                try { $env:PS_CLI = 'opencode'; $sb = Invoke-PsOcSession -OcPath 'unused.cmd' -Root $rootSC -LogRoot $slotLog -PromptText 'x/a0001' -TimeoutMin 1 -Tag 'slot-b' -SlotWaitMin 0 -Log { param($m) } }
+                finally { $env:PS_CLI = $cliSaved }
+                Assert-Sd ($hold.Held -and $okC -and -not $eo.Held -and [string]$eo.Reason -ceq 'session slot 被占用（OpenCode 版）' -and [bool]$so.SlotBusy -and [bool]$sb.SlotBusy) 'session slot：OpenCode 版的那把被占時，Claude Code 版照樣取得；OpenCode 版的 session（含同資料夾 PS_CLI=opencode，也就是 ps-sdoc -Cli opencode）回 SLOT_BUSY'
+            }
+            finally { Stop-SdMutexHold $hold }
+            $e2 = Enter-PsOcSessionSlot -Cli 'opencode'; $e3 = Enter-PsOcSessionSlot -Cli 'claude'
+            Assert-Sd ([bool]$e2.Held -and [bool]$e3.Held) 'session slot：放開之後兩版都取得到（沒有殘留占用）'
+            Exit-PsOcSessionSlot -Slot $e2; Exit-PsOcSessionSlot -Slot $e3
             if ($isWin) {
                 # 真的走外環：假 opencode.cmd 放在 PATH 最前面（ps-sdoc 以 cmd.exe 啟動）
                 $savedPath = $env:PATH
@@ -733,6 +786,40 @@ try {
                     $lines2 = @($out2 -split "`n" | Where-Object { $_.Trim() -ne '' })
                     $calls = [System.IO.File]::ReadAllText($callLog)
                     Assert-Sd ($lines2[-1].Trim() -eq 'DOC1-3-04' -and $calls -match ('run --model "?mock/scripted"? --agent ps-status-reader --title "?auto-' + $jobG + '-a0001"? "?' + $jobG + '/a0001"?') -and $out2.Contains('檢查 OpenCode 的模型與 provider')) '外環（Windows）：opencode run --model <model.yaml 或 -Model> --agent ps-status-reader；session 失敗提示看模型與 provider' ($out2 + "`n" + $calls)
+                    # 兩版同時跑：Claude Code 版的 session slot 被占時，OpenCode 版外環照樣開 session；OpenCode 版自己的被占才 DOC1-3-03
+                    $hold = Start-SdMutexHold $slotC 'hold-claude-win'
+                    try {
+                        $rootW3 = New-SdRunRootOc 'oc-win-par'
+                        $inW3 = Join-Path $rootW3 ('.ps-private/sdoc-opencode/' + $jobG)
+                        [void][System.IO.Directory]::CreateDirectory($inW3)
+                        Write-SdFx (Join-Path $inW3 'status.md') $fxO.Text
+                        [System.IO.File]::WriteAllText($callLog, '', (New-Object System.Text.ASCIIEncoding))
+                        $h3 = @{ Root = $rootW3; Components = $gComps; MaxSessions = 1; TimeoutMin = 2; Model = 'mock/scripted' }
+                        $out3 = ((& $cli @h3 *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+                        $lines3 = @($out3 -split "`n" | Where-Object { $_.Trim() -ne '' })
+                        $calls3 = [System.IO.File]::ReadAllText($callLog)
+                        Assert-Sd ($hold.Held -and $lines3[-1].Trim() -eq 'DOC1-3-04' -and $calls3 -match '(?m)^run ') '兩版同時跑（Windows）：Claude Code 版的 session slot 被占時，OpenCode 版外環照樣開 session（假 opencode 回失敗＝DOC1-3-04，不是 DOC1-3-03）' ($out3 + "`n" + $calls3)
+                    }
+                    finally { Stop-SdMutexHold $hold }
+                    $hold = Start-SdMutexHold $slotO 'hold-oc-win'
+                    try {
+                        $rootW4 = New-SdRunRootOc 'oc-win-busy'
+                        $inW4 = Join-Path $rootW4 ('.ps-private/sdoc-opencode/' + $jobG)
+                        [void][System.IO.Directory]::CreateDirectory($inW4)
+                        Write-SdFx (Join-Path $inW4 'status.md') $fxO.Text
+                        [System.IO.File]::WriteAllText($callLog, '', (New-Object System.Text.ASCIIEncoding))
+                        $h4 = @{ Root = $rootW4; Components = $gComps; MaxSessions = 1; TimeoutMin = 2; Model = 'mock/scripted' }
+                        $out4 = ((& $cli @h4 *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+                        $lines4 = @($out4 -split "`n" | Where-Object { $_.Trim() -ne '' })
+                        $calls4 = [System.IO.File]::ReadAllText($callLog)
+                        Assert-Sd ($hold.Held -and $lines4[-1].Trim() -eq 'DOC1-3-03' -and -not ($calls4 -match '(?m)^run ') -and $out4.Contains('另一版不受影響')) 'OpenCode 版自己的 session slot 被占（同一版另一個外環在跑）→ DOC1-3-03，不啟動 opencode run' ($out4 + "`n" + $calls4)
+                        $ccExe = Join-Path $fakeOc 'claude.cmd'
+                        [System.IO.File]::WriteAllText($ccExe, ("@echo off`r`n" + 'echo claude %* >> "' + $callLog + '"' + "`r`n" + "exit /b 3`r`n"), (New-Object System.Text.ASCIIEncoding))
+                        $scw = Invoke-PsOcSession -OcPath $ccExe -Root $rootSC -LogRoot $slotLog -ExtraArgs '--agent ps-status-reader' -PromptText 'x/a0001' -TimeoutMin 1 -Tag 'slot-cw' -SlotWaitMin 0 -Log { param($m) }
+                        $calls5 = [System.IO.File]::ReadAllText($callLog)
+                        Assert-Sd (-not [bool]$scw.SlotBusy -and [int]$scw.ExitCode -eq 3 -and $calls5 -match '(?m)^claude -p --agent ps-status-reader') '兩版同時跑（Windows）：OpenCode 版的 session slot 被占時，Claude Code 版的 session 照樣啟動（假 claude 回 3）' ($calls5 + ' exit=' + $scw.ExitCode + ' kind=' + $scw.FailureKind)
+                    }
+                    finally { Stop-SdMutexHold $hold }
                 }
                 finally { $env:PATH = $savedPath }
             }

@@ -1,6 +1,211 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 98c21f6）第 4／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit beadc2b）第 4／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|98c21f6|1122203caeb3094c|4|8|7292|e09adbe957badda2a00b58b57a25de78228224793c609ac86046a696b0539234
+@@@PSBUNDLE-PART|1|opencode|beadc2b|25511e256f145339|4|8|7499|eb469587221a58b099d3791c42cb7323d30f0b07b7953790e317424058533bd8
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|1c868fb77273b9abc9f465cd111448ed5628056a78df44ab96bdef4fdeda3032|0
+{
+  "schemaVersion": 1,
+  "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
+  "files": [
+    {
+      "path": ".opencode/agent/ps-clone-worker.md",
+      "sha256": "A1BE7DCE95ABC62E2E422AF3BCF0E267E8CA233027CE72A2B586A7290EF1065A",
+      "lines": 73
+    },
+    {
+      "path": ".opencode/agent/ps-spec-author.md",
+      "sha256": "87A27FD99C8D647192991B139FF72138EBE320DA01287AE1BAC539D81F238868",
+      "lines": 85
+    },
+    {
+      "path": ".opencode/agent/ps-spec-worker.md",
+      "sha256": "2C881C2D9D47EF7BFF7D15595A4940B0550D26BB791984A3DFAF2BC736D0DEB8",
+      "lines": 79
+    },
+    {
+      "path": ".opencode/command/ps-clone-batch.md",
+      "sha256": "F4E805CB87978683DDBBF8813A4ACAA3007BEA529A45320F46D4CA7FCD0321A9",
+      "lines": 12
+    },
+    {
+      "path": ".opencode/command/ps-spec-batch.md",
+      "sha256": "111B300B5EB1CB765480A85513B99522B9C7418A2793238751F1EB87AF7B1736",
+      "lines": 19
+    },
+    {
+      "path": ".opencode/command/ps-spec.md",
+      "sha256": "D15DFF3A59990F7069DC6858AEAC242E6093DB98AB147B370E8B32241BF6F24E",
+      "lines": 14
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/capabilities.json",
+      "sha256": "67E7A913080F50A6E268F245744D730F147DB683AFF100BDBCA87ED7BFE01573",
+      "lines": 38
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/clone-contract.md",
+      "sha256": "7206C4672C8348AEC36B97DBC84872C7F1343D415FCD8F453887890B7C2F7594",
+      "lines": 98
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/clone-profile.json",
+      "sha256": "93FF3D0FB58660C4AAAD238F6FAE89DAB85952CF78647E5AE167AB262AD6FA08",
+      "lines": 60
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-a/pack.json",
+      "sha256": "A54BDA5D2278A1CB1471C42C1CA5077703DD57AF0DAC5D3DD4915B5C7EA1D8E1",
+      "lines": 34
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-a/template-bound.md",
+      "sha256": "475B5714806F963A2E5A3A67B2A529994BEA606F7D779FE2863F2A1872ECD518",
+      "lines": 32
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-b/pack.json",
+      "sha256": "0AD1597D1C7D7C3AC4BF5049B4B0391D7FD035C5B022B228A13E4137B8F6EB2E",
+      "lines": 31
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-b/template-bound.md",
+      "sha256": "5FD342F4B44049C596094C1DD80C8CAE7F108F8204B5DE89BA8C3EFD8A863715",
+      "lines": 20
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-c/pack.json",
+      "sha256": "DCD712C256ECC6C8F4159409223ECDA01A684583CBD78D3673E06A54124B26A2",
+      "lines": 34
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/examples/pack-c/template-bound.md",
+      "sha256": "AF81A07C807C9FCB4BCA26AB977C2541C57E778157ED41FA2F17CF680C520C25",
+      "lines": 29
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/pack.schema.json",
+      "sha256": "2624BDBF8A89747A712881B11E99E35F13340E1E9F90AFD7C09521878516A878",
+      "lines": 86
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/support-codes.md",
+      "sha256": "BD1636DB6BFA690F805D231AE9E45B871061E71AF90C30868237033DE2C0FAF3",
+      "lines": 211
+    },
+    {
+      "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
+      "sha256": "9B5AE710CFB61EB17DFAE83103FEA2409837260D50AA2A4C99501CFC144F16B0",
+      "lines": 34
+    },
+    {
+      "path": "scripts/ps-spec-build.ps1",
+      "sha256": "40A57F84050AE399E03871D9EB799F908DEFB3999EEDABC4C2BA4DEA5B6D7B2C",
+      "lines": 456
+    },
+    {
+      "path": "scripts/ps-spec-clone-lib.ps1",
+      "sha256": "BEEB5C7E07779F5EB7F9B7C71A045F37DAD61C9D196BD3087401747366F092B9",
+      "lines": 545
+    },
+    {
+      "path": "scripts/ps-spec-lib.ps1",
+      "sha256": "D8460EC0599C9B21CBFF47A32E295F91D3710B431384912AEE8BCC905C47AD67",
+      "lines": 2730
+    },
+    {
+      "path": "scripts/ps-spec.ps1",
+      "sha256": "DE5F42B04D56D3DE59673C2B67C12BA6FED92E7B07725173EB6DD31644B061B0",
+      "lines": 308
+    }
+  ]
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/spec/generic.manifest.json
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/pack.schema.json|85|2624bdbf8a89747a712881b11e99e35f13340e1e9f90afd7c09521878516a878|0
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Spec Definition Pack（私有需求包 pack.json）",
+  "description": "文件級 schema：描述 .ps-private/spec/<packId>/pack.json 的形狀。實際驗證由 scripts/ps-spec-lib.ps1 的 Test-PsSpPack（PowerShell 5.1 手寫 validator）執行；本檔只供閱讀與編輯器提示。pack 只含 opaque ID、capability 代碼、slot 綁定、條件、基數與證據政策——公司 Template／Checklist 原文只在模板副本（template-bound.md）與內部人員手上，不進本 repo。骨架用 ps-spec.ps1 -InitPack 產。validator 另外保證：ID 唯一、每個 checklist id 至少被一個 requirement 引用、markers 模式每個 slot 在模板出現且模板每個 {{slot:Sxx}} 標記都在 slots、headings 模式每個 slot 的 heading 在模板恰好命中一個標題（placeholder 若給則在該章節恰好出現一次、模板不得再有 {{slot:}} 標記）、placeholders 的 text 在模板出現且 fact 的 factKind 由本 pack 某個 requirement 產出、factKind／properties／context 在 capabilities.json 目錄內、applicability 依賴無環（自我引用允許＝驗收後再判）、reviewedVersion≠packVersion 時 gate 標 8-01。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "packId", "packVersion", "reviewedVersion", "template", "slots", "checklist", "requirements"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "packId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$", "description": "與目錄名相同；小寫英數與連字號" },
+    "packVersion": { "type": "integer", "minimum": 1, "description": "每次改 requirements／slots／模板都遞增" },
+    "reviewedVersion": { "type": "integer", "minimum": 0, "description": "內部人員核可的 packVersion；不等於 packVersion → SPEC1-8-01 MAPPING_UNSIGNED" },
+    "template": { "type": "string", "description": "pack 目錄內的模板副本檔名；headings 模式是公司 Template 的原樣副本（不改一個字），markers 模式才插 {{slot:Sxx}} 標記。不得含路徑分隔符" },
+    "bindingMode": { "type": "string", "enum": ["markers", "headings"], "description": "可選，預設 markers。markers＝模板插 {{slot:Sxx}} 標記；headings＝slot 綁模板既有的章節標題與（可選）該章節內的原生佔位符，模板副本原樣不動" },
+    "slots": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "markers 模式：slot id 字串陣列。headings 模式：物件陣列（同一個 id 不得重複）",
+      "items": {
+        "oneOf": [
+          { "type": "string", "pattern": "^S[0-9]{2,4}$" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "heading"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^S[0-9]{2,4}$" },
+              "heading": { "type": "string", "description": "模板裡的章節標題原文（不含 # 記號）；比對前 trim 並把內部連續空白壓成一個空白；須恰好命中一個標題（任何層級）" },
+              "placeholder": { "type": "string", "description": "可選；該章節直屬內文的原生佔位符（{{…}}），須在標題行後到下一個任意層級標題前恰好出現一次，不包含子章節。同一佔位符位置不得由兩個 slot 共用。有＝置換該佔位符（獨佔一行就整行換掉，行內就原地換字）；沒有＝補在直屬內文最後一個非空行之後；不搬動子章節" }
+            }
+          }
+        ]
+      }
+    },
+    "placeholders": {
+      "type": "array",
+      "description": "可選（兩種模式都可用）：模板既有的文件參數 {{…}} → 事實屬性。render 時該事實有值就把每一處都換掉（多值以、串接、保持單行），沒有值就原樣留著並在 trace 記『待人工』。沒列進來的 {{…}}（例如要人補的圖）永遠不動",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "fact"],
+        "properties": {
+          "text": { "type": "string", "description": "模板裡的佔位符原文，形如 {{…}}；至少出現一次" },
+          "fact": { "type": "string", "pattern": "^[A-Z][A-Z_.]*\\.[A-Za-z]+$", "description": "<factKind>.<property>；factKind 須由本 pack 某個 requirement 產出、property 須在 capabilities.json 內" }
+        }
+      }
+    },
+    "checklist": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" }, "description": "公司 Checklist 逐項的 opaque id；每項須被 ≥1 requirement 的 checklistRefs 引用" },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "slot", "checklistRefs", "factKind", "required", "applicability", "cardinality", "evidencePolicy"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^R[0-9]{2,4}$" },
+          "slot": { "type": "string", "pattern": "^S[0-9]{2,4}$", "description": "必須在 slots 內（兩種 bindingMode 都是引用 slot id）；同 slot 的 requirements 依 pack 順序串接成該 slot 的內容" },
+          "checklistRefs": { "type": "array", "items": { "type": "string", "pattern": "^C[0-9]{2,4}$" } },
+          "factKind": { "type": "string", "description": "capabilities.json factKinds 的鍵，或字面值 UNSUPPORTED（目錄挑不到；gate 列 7-17）" },
+          "required": { "type": "boolean" },
+          "applicability": { "$ref": "#/definitions/applicability" },
+          "cardinality": { "type": "string", "enum": ["ONE", "ANY", "ALL_DISCOVERED"], "description": "ALL_DISCOVERED：COMPOSE 需 closure COMPLETE、EXTRACT 需來源表存在" },
+          "evidencePolicy": { "type": "string", "enum": ["AUDITED", "STATIC", "ANY"], "description": "AUDITED＝來源 NN 等級 AUDITED_CLEAN；STATIC＝AUDITED_CLEAN／AUDITED_ISSUES／UNAUDITED；ANY＝含 PARTIAL／BLOCKED" },
+          "properties": { "type": "array", "items": { "type": "string" }, "description": "可選；限縮該 factKind 的 properties（缺＝目錄全部）；也用於 KnowledgeNeed" },
+          "context": { "type": "object", "additionalProperties": { "type": "string" }, "description": "可選；鍵限 capabilities.json contextKeys（operation／mode／page／record／field／process）；DATA.RECORD_USAGE 與 ENTITY.DETAIL 以 record 限縮到單一 Record" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "description": "三值邏輯（TRUE／FALSE／UNKNOWN）；FALSE＝不適用（N/A），UNKNOWN 永不變 N/A（gate 列 7-15 debt）。fact 寫 <factKind>.<property>；COMPOSE 事實的 present 由驗收後的片段決定（有列＝TRUE、無列且 closure COMPLETE＝FALSE、否則 UNKNOWN）",
+      "properties": {
+        "op": { "type": "string", "enum": ["ALWAYS", "FACT_TRUE", "FACT_FALSE", "ALL", "ANY", "NOT"] },
+        "fact": { "type": "string", "pattern": "^[A-Z][A-Z_.]*\\.[A-Za-z]+$", "description": "FACT_TRUE／FACT_FALSE 用；factKind 須由本 pack 某個 requirement 產出" },
+        "args": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/applicability" }, "description": "ALL／ANY 用" },
+        "arg": { "$ref": "#/definitions/applicability", "description": "NOT 用" }
+      }
+    }
+  }
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/spec/pack.schema.json
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/support-codes.md|210|bd1636db6bfa690f805d231ae9e45b871061e71af90c30868237033de2c0faf3|0
 # 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1）
 
@@ -884,7 +1089,7 @@ employeeNameSync:
     客製證據只涵蓋同步觸發與寫入 HR_NAME_SYNC；
     姓名原始欄位定義需查 PERSONAL_DATA（delivered fallback，使用時必須回報）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/test-fixtures.yaml
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/test-scenarios.md|731|64ec7731cb32e746ae46190535b1dd6c1e6f4ecfba2e71662cebb616757f6dc9|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/test-scenarios.md|732|d80454c713ec97d2d966c25288a37ca28685f21b24bd312383c24ffe047aae52|0
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
@@ -1616,6 +1821,7 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | P4 | 產出 | `-Render` 兩次、`-Gate` | 兩次 spec.md 位元組相同；gate verdict ∈ SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED；改 NN 後 `-Render` → SOURCE_CHANGED 類碼、current.json 不變 |
 | P5 | generic 完整性 | 改 `scripts\ps-spec-lib.ps1` 一個字後 `-Doctor -JobId demo1` | SPEC1-0-01；還原後回 SPEC1-0-xx OK |
 | P6 | 機密邊界 | 任何回報 | 只回報結論碼與 drill tuple（opaque id、factKind、模式、計數、enum）；不貼 spec.md、不貼 pack.json、不貼 NN 內容 |
+| D1 | 兩版同時跑 | 同一資料夾：Claude Code 版 `ps-sdoc.ps1 -Components …` 跑著時，另一個視窗跑 `ps-sdoc.ps1 -Cli opencode -Components …` | 兩邊都開得了 session（OpenCode 版沒有 DOC1-3-03）；同一版再開第二個外環才 DOC1-3-03 |
 @@@PSBUNDLE-END|.opencode/peoplesoft/test-scenarios.md
 @@@PSBUNDLE-FILE|.opencode/plugin/ps-runtime-guard.js|813|c128f486f3b5077b94483438dd7e4f95944953344fb2cbda8fb42d7327550be4|0
 // ps-runtime-guard.js — OpenCode plugin：三件小事，沒有派工閘門、沒有 READY／todo 狀態機
@@ -3925,7 +4131,7 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2645|e32c9c7d8323cb9a0b203df981cb716f81949dd44d13d78cd082e0ede1321f0a|1
+@@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2646|25c96910e201b2e467c5ece3a1522e6e7c39303f54e5fa890b135a384b22fd7d|1
 # ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
 # 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
 # 用法：.\scripts\ps-auto-loop.ps1 -Domain 轉職
@@ -4811,7 +5017,8 @@ function Get-SessionFailureKind {
 # taskkill 整樹強殺、容量事件標籤、session slot 互斥鎖）；本函式只是薄包裝——呼叫點與回傳形狀不變。
 # $ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'
 # 注意：prompt 走 cmd.exe 命令列——內容禁用半形雙引號與 cmd 特殊字元（> < & | % ^），中文引號「」不受限；多行內容一律壓成單行。
-# session slot：同機同時只跑一個 headless session（ps-spec／補研究迷你圈取同一把鎖）。持研究鎖的本迴圈是主要使用者，
+# session slot：同一台機器同一版同時只跑一個 headless session（同一版的 ps-spec／ps-sdoc／補研究迷你圈取同一把鎖；
+# 另一版用自己的那把，不互相等）。持研究鎖的本迴圈是主要使用者，
 # 別人（ps-spec -Run、另一個迷你圈）用完就會讓出——所以最多等一天（每 5 分鐘印一行心跳），session 逾時從取得 slot 起算；
 # 等不到才回 SlotBusy（TimedOut=$true、FailureKind=SLOT_BUSY），沿用既有逾時熔絲——不會把別人正常的一小時 session 算成本迴圈逾時。
 function Invoke-Opencode {
@@ -7293,4 +7500,4 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-PART-END|1122203caeb3094c|4|8
+@@@PSBUNDLE-PART-END|25511e256f145339|4|8
