@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0c79d43）第 6／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 2bd3a62）第 6／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|0c79d43|f963595bc2056ccb|6|8|6237|94993223ddd8f1478b23997387fb4c0937911c6dd910449bc2693b0c36c64a96
+@@@PSBUNDLE-PART|1|opencode|2bd3a62|840cedf62a2fcd2c|6|8|6237|94993223ddd8f1478b23997387fb4c0937911c6dd910449bc2693b0c36c64a96
 @@@PSBUNDLE-FILE|scripts/ps-sdoc.ps1|1501|f15b7d2e24675462854fe77239109e097064d275d792194a644626c48a9256ae|1
 # ps-sdoc.ps1 — Spec 文件流程的單一入口：00-index＋14 份文件＋90 問題清單。Claude Code 版照舊；OpenCode 版加 -Cli opencode。
 # 第 0 階段三位讀者解讀 STATUS 檔（不一致的逐項第 2 輪多數決）→ 研究單元依序（每頁研究與獨立覆核分開 session）→ 外環組裝、檢核、渲染。
@@ -6238,4 +6238,4 @@ finally {
 }
 Finish $code $exitCode
 @@@PSBUNDLE-END|scripts/ps-spec.ps1
-@@@PSBUNDLE-PART-END|f963595bc2056ccb|6|8
+@@@PSBUNDLE-PART-END|840cedf62a2fcd2c|6|8

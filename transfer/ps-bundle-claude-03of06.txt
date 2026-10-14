@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0c79d43）第 3／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 2bd3a62）第 3／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|0c79d43|fc78dc8fc2386fd3|3|6|8199|e3fdeb39dba520c8fc15f4ec93024e5698d91019768508d1e724ae4c333d8a20
+@@@PSBUNDLE-PART|1|claude|2bd3a62|8c810d54d6e80f25|3|6|7759|c8996aa587aa21634920dc8dcf5d80e3a825c874488703c19682b97f7f32147f
 @@@PSBUNDLE-FILE|scripts/ps-bundle.ps1|496|ee17daeaf5a5b9ff531a4f6b577ca0a71ff6dd4f29806d45a7198f3af079afe5|1
 # ps-bundle.ps1 — 搬運包：把一個版本要搬的檔收成幾份文字檔，公司機一個指令解回各檔
 # 用法（公司機）：
@@ -4727,6 +4727,200 @@ function Get-PsSdSpeculationWarnings {
     return , $v.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-check-lib.ps1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc-diag.ps1|192|a677d8ba846302204938be487190d71b0f12c2bc47ede983c54bfdcb86330d74|1
+# ps-sdoc-diag.ps1 — Spec 文件流程的診斷報告：只印代號與數字（不印路徑、物件名、jobId、hash），可以用唸的回報給維護端。
+# 用法：powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 [-Last 12] [-Cli claude|opencode]
+#   讀 .ps-runtime\sdoc[-opencode]\<job>\attempts\aNNNN\{input.json,outcome.json} 與 .ps-runtime\sdoc[-opencode]-logs\*-<job>-aNNNN.{stream.jsonl,err.txt}，
+#   每個 attempt 一行、最後一行 SUM 彙總；Claude Code 版另以 ps-session-lib 的 Get-PsOcClaudeApiRetry 算每個 session 的模型端數據。
+# 代號：
+#   V   N＝新版 scripts（有環境預設與每頁上限）、O＝舊版
+#   K   工單種類 R=STATUS_READ 2=STATUS_ROUND2 S=RESEARCH V=REVIEW L=READER J=JUDGE
+#   U   研究單元 S0=stage0 SC=scope DA=data SE=security TX=texts WF=workflow IF=interfaces FN=functions UI=ui RU=rules OP=operations TE=testing L5=乾淨讀者
+#   S   outcome 狀態 OK=ACCEPTED CA=CANDIDATE IN=INVALID SF=SESSION_FAILED RF=REVIEW_FAIL RB=REVIEW_BLOCKED SB=SLOT_BUSY SC=SOURCE_CHANGED
+#   F   findings／sessionFindings T=TIMED_OUT Xn=EXIT_n A=API_ABORTED W=API_RETRY_SLOW K=API_RETRY_STUCK E=API_ERROR C=CONTEXT_OVERFLOW -=NONE ?=其他（驗收錯誤）
+#   Q   成功請求數  P   成功的 assistant 事件數（0＝第一個請求就沒成功過）  C   快取命中次數／成功請求數
+#   M   主代理最大輸入（k token）  L   主代理最後一次輸入（k token）  O   單次最多輸出（token）
+#   RT  模型端重試的狀態碼分布（504x6、NRx2＝無回應）  AE  result 的 api_error_status
+#   ERR err 檔分類 E0=空或沒有 E504=含 504 ECONN=連線中斷／重置 E400=含 400 EOTH=其他
+#   MD  模型家族 S45/S46/S5/S55=Sonnet 4.5/4.6/5/5.5 O=Opus H=Haiku X=看不出  PT=解讀分段數  CAP=本頁上限  DUR=session 分鐘（檔名時間到 stream 最後寫入）
+#   SUM KF=失敗工單種類分布 RT=全部狀態碼分布 CACHE=C0（從沒命中）/C1（部分）/C2（都有） MAXM/MAXO=最大輸入／輸出 P0=第一個請求就失敗的 session 數 AFTEROK=session 失敗但產出照收的 attempt 數
+#   ENVNOW 跑本腳本的視窗目前設了哪些覆寫變數：D=PS_SESSION_CLAUDE_ENV_DEFAULTS K=PS_SESSION_CLAUDE_ENV_SKIP I=PS_SDOC_RESEARCH_PAGE_ITEMS L=PS_SDOC_READING_PART_LINES
+#          T=MAX_THINKING_TOKENS R=CLAUDE_CODE_MAX_RETRIES A=PS_SESSION_API_ABORT_AFTER N=CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK
+param([string]$Root = '', [ValidateRange(1, 500)][int]$Last = 12, [ValidateSet('', 'claude', 'opencode')][string]$Cli = '')
+$ErrorActionPreference = 'Stop'
+if ($Root -eq '') { $Root = Split-Path $PSScriptRoot -Parent }
+. (Join-Path $PSScriptRoot 'ps-session-lib.ps1')
+
+function Get-DgText([string]$Path, [int]$MaxBytes = 65536) {
+    if (-not [System.IO.File]::Exists($Path)) { return '' }
+    $fs = $null
+    try {
+        $fs = New-Object System.IO.FileStream($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $n = [int][Math]::Min([long]$MaxBytes, $fs.Length)
+        $buf = New-Object byte[] $n
+        $read = $fs.Read($buf, 0, $n)
+        return [System.Text.Encoding]::UTF8.GetString($buf, 0, $read)
+    }
+    catch { return '' }
+    finally { if ($null -ne $fs) { $fs.Dispose() } }
+}
+function Get-DgJson([string]$Path) {
+    if (-not [System.IO.File]::Exists($Path)) { return $null }
+    try { return ([System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json) } catch { return $null }
+}
+function Get-DgKind([string]$K) {
+    switch ($K) { 'STATUS_READ' { return 'R' } 'STATUS_ROUND2' { return '2' } 'RESEARCH' { return 'S' } 'REVIEW' { return 'V' } 'READER' { return 'L' } 'JUDGE' { return 'J' } }
+    return '?'
+}
+function Get-DgUnit([string]$U) {
+    $map = @{ 'stage0' = 'S0'; 'scope' = 'SC'; 'data' = 'DA'; 'security' = 'SE'; 'texts' = 'TX'; 'workflow' = 'WF'; 'interfaces' = 'IF'; 'functions' = 'FN'; 'ui' = 'UI'; 'rules' = 'RU'; 'operations' = 'OP'; 'testing' = 'TE'; 'l5' = 'L5' }
+    if ($map.ContainsKey($U)) { return [string]$map[$U] }
+    if ($U -eq '') { return '-' }
+    return '?'
+}
+function Get-DgStatus([string]$S) {
+    $map = @{ 'ACCEPTED' = 'OK'; 'CANDIDATE' = 'CA'; 'INVALID' = 'IN'; 'SESSION_FAILED' = 'SF'; 'REVIEW_FAIL' = 'RF'; 'REVIEW_BLOCKED' = 'RB'; 'SLOT_BUSY' = 'SB'; 'SOURCE_CHANGED' = 'SC' }
+    if ($map.ContainsKey($S)) { return [string]$map[$S] }
+    return '?'
+}
+function Get-DgFindings($List) {
+    $out = @()
+    foreach ($f in @($List)) {
+        $t = [string]$f
+        if ($t -eq 'TIMED_OUT') { $out += 'T' }
+        elseif ($t -match '^EXIT_(-?\d+)$') { $out += ('X' + $Matches[1]) }
+        elseif ($t -eq 'API_ABORTED') { $out += 'A' }
+        elseif ($t -eq 'API_RETRY_SLOW') { $out += 'W' }
+        elseif ($t -eq 'API_RETRY_STUCK') { $out += 'K' }
+        elseif ($t -eq 'API_ERROR') { $out += 'E' }
+        elseif ($t -eq 'CONTEXT_OVERFLOW') { $out += 'C' }
+        elseif ($t -eq 'NONE' -or $t -eq '') { $out += '-' }
+        else { $out += '?' }
+    }
+    if ($out.Count -eq 0) { return '-' }
+    return (($out | Select-Object -Unique) -join ',')
+}
+function Get-DgModel([string]$Head) {
+    $m = [regex]::Match($Head, '"model":"([^"]*)"')
+    if (-not $m.Success) { return 'X' }
+    $id = $m.Groups[1].Value.ToLowerInvariant()
+    if ($id -match 'sonnet-?5-?5|sonnet-5\.5') { return 'S55' }
+    if ($id -match 'sonnet-?5(?![\d.])|sonnet-5-') { return 'S5' }
+    if ($id -match 'sonnet-?4-?6') { return 'S46' }
+    if ($id -match 'sonnet-?4-?5') { return 'S45' }
+    if ($id -match 'sonnet') { return 'S?' }
+    if ($id -match 'opus') { return 'O' }
+    if ($id -match 'haiku') { return 'H' }
+    return 'X'
+}
+function Get-DgErrClass([string]$Err) {
+    if ($Err.Trim() -eq '') { return 'E0' }
+    if ($Err -match '\b504\b|Gateway Time-?out') { return 'E504' }
+    if ($Err -match '(?i)connection (lost|reset)|ECONNRESET|socket hang up|fetch failed|terminated|stalled') { return 'ECONN' }
+    if ($Err -match '\b400\b') { return 'E400' }
+    return 'EOTH'
+}
+function Format-DgK([int]$N) { return ([string][int][Math]::Round($N / 1000.0) + 'k') }
+
+$roots = @()
+if ($Cli -eq '' -or $Cli -eq 'claude') { $roots += , @{ Dir = (Join-Path $Root '.ps-runtime/sdoc'); Logs = (Join-Path $Root '.ps-runtime/sdoc-logs'); Cli = 'claude' } }
+if ($Cli -eq '' -or $Cli -eq 'opencode') { $roots += , @{ Dir = (Join-Path $Root '.ps-runtime/sdoc-opencode'); Logs = (Join-Path $Root '.ps-runtime/sdoc-opencode-logs'); Cli = 'opencode' } }
+
+# 版本：新版 scripts 有環境預設與每頁上限
+$v = 'O'
+$libTxt = Get-DgText (Join-Path $PSScriptRoot 'ps-session-lib.ps1') 400000
+$sdlTxt = Get-DgText (Join-Path $PSScriptRoot 'ps-sdoc-lib.ps1') 400000
+if ($libTxt.Contains('PsOcClaudeEnvCommon') -and $sdlTxt.Contains('PsSdResearchPageItems')) { $v = 'N' }
+$envNow = @()
+foreach ($pair in @(@('D', 'PS_SESSION_CLAUDE_ENV_DEFAULTS'), @('K', 'PS_SESSION_CLAUDE_ENV_SKIP'), @('I', 'PS_SDOC_RESEARCH_PAGE_ITEMS'), @('L', 'PS_SDOC_READING_PART_LINES'), @('T', 'MAX_THINKING_TOKENS'), @('R', 'CLAUDE_CODE_MAX_RETRIES'), @('A', 'PS_SESSION_API_ABORT_AFTER'), @('N', 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK'))) {
+    $val = [string][System.Environment]::GetEnvironmentVariable($pair[1])
+    if ($val -ne '') { $envNow += ($pair[0] + '=' + $val) }
+}
+$envTxt = '-'
+if ($envNow.Count -gt 0) { $envTxt = ($envNow -join ',') }
+
+$rows = @()
+$jobs = 0
+foreach ($r in $roots) {
+    if (-not [System.IO.Directory]::Exists($r.Dir)) { continue }
+    foreach ($jd in @(Get-ChildItem -LiteralPath $r.Dir -Directory | Sort-Object Name)) {
+        $att = Join-Path $jd.FullName 'attempts'
+        if (-not [System.IO.Directory]::Exists($att)) { continue }
+        $jobs++
+        $jid = $jd.Name
+        foreach ($ad in @(Get-ChildItem -LiteralPath $att -Directory | Where-Object { $_.Name -match '^a\d{4,8}$' } | Sort-Object Name)) {
+            $oc = Get-DgJson (Join-Path $ad.FullName 'outcome.json')
+            $inp = Get-DgJson (Join-Path $ad.FullName 'input.json')
+            if ($null -eq $oc -or $null -eq $inp) { continue }
+            $row = @{ Job = $jobs; Aid = $ad.Name; Cli = $r.Cli; Kind = (Get-DgKind ([string]$inp.kind)); Unit = (Get-DgUnit ([string]$inp.unit)); Status = (Get-DgStatus ([string]$oc.status))
+                Findings = (Get-DgFindings $oc.findings); SessionFindings = ''; Parts = 0; Cap = ''; Api = $null; Model = '-'; Err = 'E0'; Dur = '' }
+            if ($null -ne $oc.PSObject.Properties['sessionFindings']) { $row.SessionFindings = Get-DgFindings $oc.sessionFindings }
+            if ($null -ne $inp.PSObject.Properties['outputParts']) { $row.Parts = @($inp.outputParts).Count }
+            if ($null -ne $inp.PSObject.Properties['pageItemCap']) { $row.Cap = [string]$inp.pageItemCap }
+            if ([System.IO.Directory]::Exists($r.Logs)) {
+                $sf = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.stream.jsonl') | Sort-Object Name | Select-Object -Last 1)
+                $ef = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.err.txt') | Sort-Object Name | Select-Object -Last 1)
+                if ($sf.Count -gt 0) {
+                    $row.Api = Get-PsOcClaudeApiRetry -StreamFile $sf[0].FullName
+                    $row.Model = Get-DgModel (Get-DgText $sf[0].FullName 200000)
+                    $m = [regex]::Match($sf[0].Name, '^(\d{8})-(\d{6})-')
+                    if ($m.Success) {
+                        $t0 = $null
+                        try { $t0 = [datetime]::ParseExact($m.Groups[1].Value + $m.Groups[2].Value, 'yyyyMMddHHmmss', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $t0 = $null }
+                        if ($null -ne $t0) { $row.Dur = [string][int]([Math]::Max(0, ($sf[0].LastWriteTime - $t0).TotalMinutes)) }
+                    }
+                }
+                if ($ef.Count -gt 0) { $row.Err = Get-DgErrClass (Get-DgText $ef[0].FullName 65536) }
+            }
+            $rows += , $row
+        }
+    }
+}
+
+$failed = @($rows | Where-Object { $_.Status -eq 'SF' })
+$afterOk = @($rows | Where-Object { $_.SessionFindings -ne '' })
+Write-Host ('DIAG v1 | V=' + $v + ' | JOBS=' + $jobs + ' | ATT=' + $rows.Count + ' | SF=' + $failed.Count + ' | AFTEROK=' + $afterOk.Count + ' | ENVNOW=' + $envTxt)
+$show = @($rows | Select-Object -Last $Last)
+$kf = @{}; $rt = @{}; $maxM = 0; $maxO = 0; $p0 = 0; $cacheHit = 0; $cacheReq = 0; $models = @{}
+foreach ($row in $rows) {
+    if ($row.Status -eq 'SF') { $k = $row.Kind; if ($kf.ContainsKey($k)) { $kf[$k] = [int]$kf[$k] + 1 } else { $kf[$k] = 1 } }
+    $a = $row.Api
+    if ($null -ne $a) {
+        if ([int]$a.MaxContextMain -gt $maxM) { $maxM = [int]$a.MaxContextMain }
+        if ([int]$a.MaxOutput -gt $maxO) { $maxO = [int]$a.MaxOutput }
+        if ([int]$a.Progress -eq 0 -and $row.Status -eq 'SF') { $p0++ }
+        $cacheHit += [int]$a.CacheRequests; $cacheReq += [int]$a.Requests
+        foreach ($part in ([string]$a.Statuses -split '、')) { $pm = [regex]::Match($part, '^(.+)×(\d+)$'); if ($pm.Success) { $code = $pm.Groups[1].Value; if ($code -eq '無回應') { $code = 'NR' }; if ($rt.ContainsKey($code)) { $rt[$code] = [int]$rt[$code] + [int]$pm.Groups[2].Value } else { $rt[$code] = [int]$pm.Groups[2].Value } } }
+        if ($row.Model -ne '-') { $models[$row.Model] = $true }
+    }
+}
+foreach ($row in $show) {
+    $line = 'J' + $row.Job + ' A' + $row.Aid.Substring(1) + ' K=' + $row.Kind + ' U=' + $row.Unit + ' S=' + $row.Status + ' F=' + $row.Findings
+    if ($row.SessionFindings -ne '') { $line += ' SF=' + $row.SessionFindings }
+    $a = $row.Api
+    if ($null -ne $a) {
+        $sts = [string]$a.Statuses; if ($sts -eq '') { $sts = '-' } else { $sts = $sts.Replace('無回應', 'NR').Replace('×', 'x').Replace('、', ',') }
+        $line += ' Q=' + [int]$a.Requests + ' P=' + [int]$a.Progress + ' C=' + [int]$a.CacheRequests + '/' + [int]$a.Requests + ' M=' + (Format-DgK ([int]$a.MaxContextMain)) + ' L=' + (Format-DgK ([int]$a.LastContextMain)) + ' O=' + [int]$a.MaxOutput + ' RT=' + $sts
+        if ([string]$a.ApiErrorStatus -ne '') { $line += ' AE=' + [string]$a.ApiErrorStatus }
+        if ([int]$a.MaxContextSub -gt 0) { $line += ' MS=' + (Format-DgK ([int]$a.MaxContextSub)) }
+    }
+    $line += ' ERR=' + $row.Err + ' MD=' + $row.Model
+    if ($row.Parts -gt 0) { $line += ' PT=' + $row.Parts }
+    if ($row.Cap -ne '') { $line += ' CAP=' + $row.Cap }
+    if ($row.Dur -ne '') { $line += ' DUR=' + $row.Dur }
+    Write-Host $line
+}
+$kfTxt = '-'; if ($kf.Count -gt 0) { $kfTxt = (@($kf.Keys | Sort-Object | ForEach-Object { $_ + ':' + $kf[$_] }) -join ',') }
+$rtTxt = '-'; if ($rt.Count -gt 0) { $rtTxt = (@($rt.Keys | Sort-Object | ForEach-Object { $_ + ':' + $rt[$_] }) -join ',') }
+$cache = '-'
+if ($cacheReq -gt 0) { if ($cacheHit -eq 0) { $cache = 'C0' } elseif ($cacheHit -lt $cacheReq) { $cache = 'C1' } else { $cache = 'C2' } }
+# 模型家族彙總：看得出家族的 session 存在時不列 X（合成或看不出 id 的 session）
+$mdKeys = @($models.Keys | Sort-Object)
+if ($mdKeys.Count -gt 1) { $mdKeys = @($mdKeys | Where-Object { $_ -ne 'X' }) }
+$mdTxt = '-'; if ($mdKeys.Count -gt 0) { $mdTxt = ($mdKeys -join ',') }
+Write-Host ('SUM | KF=' + $kfTxt + ' | RT=' + $rtTxt + ' | CACHE=' + $cache + ' | MAXM=' + (Format-DgK $maxM) + ' | MAXO=' + $maxO + ' | P0=' + $p0 + ' | MD=' + $mdTxt + ' | AFTEROK=' + $afterOk.Count)
+exit 0
+@@@PSBUNDLE-END|scripts/ps-sdoc-diag.ps1
 @@@PSBUNDLE-FILE|scripts/ps-sdoc-lib.ps1|1448|901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c|1
 # ps-sdoc-lib.ps1 — Spec 文件流程（Claude Code 版）的核心：常數、項目工具、ID registry、研究包驗收與合成、canonical 組裝、計算文件。
 # 依賴（呼叫端先載入）：ps-knowledge-lib.ps1（JSON 輸出、hash、原子寫入）、ps-sdoc-schema-lib.ps1、ps-sdoc-status-lib.ps1。
@@ -7566,638 +7760,4 @@ function Format-PsSdAlternatives {
     return ($head + '；最接近的寫法：' + [string]::Join('；', $shown))
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-schema-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-status-lib.ps1|632|14948b56f8556e3cce12e59091ab3656503efe84793c950b08d7a220f715f711|1
-# ps-sdoc-status-lib.ps1 — 第 0 階段：STATUS 檔的三份狀態圖解讀（設計 §8.2、§8.3）。
-# 外環不解讀 Mermaid：只認得 Mermaid 區塊的範圍與每一行的行號。
-#   1. 檢查每份解讀：Mermaid 區塊內每一個非空行恰好交代一次、引用的行在圖內、轉移起訖與子業務的實體存在。
-#   2. 以引用的行對齊三份的實體（Jaccard ≥ 0.5；代號取多數讀者用的那個）。
-#   3. 拆成事實（STATE、FINAL、REGION、TRN、LABEL、SCENARIO、TEXT、CONFLICT）比對：三份都有的直接採用；
-#      其餘第 2 輪逐項問三位讀者（YES／NO／UNSURE），過半採用或否定，仍無多數交人。名稱與 via 取多數讀者的寫法。
-#   4. 採用的事實＝04 的分母（Get-PsSdBuiltModel）；04 外殼的 statusReading 由 Get-PsSdStatusReadingSummary 產生。
-# 讀者的解讀以 ConvertTo-PsSdNode 轉成 Hashtable 後傳入。依賴 ps-sdoc-schema-lib.ps1。
-
-$script:PsSdStatusLibVersion = '1'
-
-function ConvertTo-PsSdLines {
-    # 行號從 1 起算；CRLF／CR 一律視為換行，行號與 LF 版相同。
-    param([string]$Text)
-    if ($null -eq $Text) { $Text = '' }
-    if ($Text.Length -gt 0 -and [int][char]$Text[0] -eq 0xFEFF) { $Text = $Text.Substring(1) }
-    $t = $Text.Replace("`r`n", "`n").Replace("`r", "`n")
-    return , $t.Split([char]10)
-}
-
-function Get-PsSdStatusFingerprint {
-    # STATUS 檔的指紋：去 BOM、CR 後的 UTF-8 SHA-256（小寫）。
-    param([string]$Text)
-    if ($null -eq $Text) { $Text = '' }
-    $t = $Text.Replace("`r", '')
-    if ($t.Length -gt 0 -and [int][char]$t[0] -eq 0xFEFF) { $t = $t.Substring(1) }
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try { $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($t)) } finally { $sha.Dispose() }
-    return ([System.BitConverter]::ToString($bytes) -replace '-', '').ToLowerInvariant()
-}
-
-function Get-PsSdMermaidLines {
-    # Mermaid 區塊內（不含 ``` 那兩行）每一個非空行：SortedDictionary[行號 → 去頭尾空白的文字]。
-    param([string]$Text)
-    $out = [System.Collections.Generic.SortedDictionary[int, string]]::new()
-    $inside = $false
-    $lines = ConvertTo-PsSdLines $Text
-    for ($i = 0; $i -lt $lines.Length; $i++) {
-        $t = $lines[$i].Trim()
-        if (-not $inside -and $t.StartsWith('```mermaid')) { $inside = $true; continue }
-        if ($inside -and $t.StartsWith('```')) { $inside = $false; continue }
-        if ($inside -and $t.Length -gt 0) { $out[$i + 1] = $t }
-    }
-    return , $out
-}
-
-function Get-PsSdProseLines {
-    # STATUS 檔圖外的每一行說明：程式碼區塊、標題、空行、表格表頭與分隔線、水平線除外。去掉引言符號與清單符號。
-    param([string]$Text)
-    $lines = ConvertTo-PsSdLines $Text
-    $skip = [System.Collections.Generic.HashSet[int]]::new()
-    $start = 0
-    for ($i = 0; $i -lt $lines.Length; $i++) {
-        $t = $lines[$i].Trim()
-        if ($start -eq 0 -and $t.StartsWith('```')) { $start = $i + 1; continue }
-        if ($start -ne 0 -and $t.StartsWith('```')) { for ($k = $start; $k -le $i + 1; $k++) { [void]$skip.Add($k) }; $start = 0 }
-    }
-    if ($start -ne 0) { for ($k = $start; $k -le $lines.Length; $k++) { [void]$skip.Add($k) } }
-    $sep = '^\|?\s*:?-{3,}'
-    $out = [System.Collections.Generic.List[object]]::new()
-    for ($i = 0; $i -lt $lines.Length; $i++) {
-        $ln = $i + 1
-        if ($skip.Contains($ln)) { continue }
-        $t = $lines[$i].Trim()
-        if ($t.Length -eq 0 -or $t.StartsWith('#')) { continue }
-        if ([regex]::IsMatch($t, $sep) -or [regex]::IsMatch($t, '^(-{3,}|\*{3,}|_{3,})$')) { continue }
-        if ($t.StartsWith('|') -and $i + 1 -lt $lines.Length -and [regex]::IsMatch($lines[$i + 1].Trim(), $sep)) { continue }
-        $clean = [regex]::Replace($t, '^>\s*', '')
-        $clean = [regex]::Replace($clean, '^([-*+]|[0-9]+[.)])\s+', '')
-        $out.Add(@{ Line = $ln; Kind = 'prose'; Text = $clean; EntityKey = $null; Code = $null })
-    }
-    return , $out.ToArray()
-}
-
-# ---------------- 分段寫出 ----------------
-# 讀者一段寫一個檔：一次回應太長時，經公司 gateway 會逾時或被切斷。數字是每段要交代的 Mermaid 非空行上限。
-# 換算：每個 Mermaid 行的解讀 JSON 約 105 B；40 行 ≈ 4.2 KB ≈ 1,300～1,700 token ≈ 35～50 秒（每秒 36 token）。分段演算法會把連續的小區塊
-# 塞滿到上限，所以這個數字就是每次回應的實際上限、不是「多半更小」。
-$script:PsSdReadingPartLines = 40
-
-function Get-PsSdReadingParts {
-    # Mermaid 行分段：只在區塊與區塊之間切，單一區塊超過上限才在行與行之間切。
-    # 回傳 @{ Part; From; To; Count } 陣列（From／To 是 STATUS 檔行號，含頭尾；Count＝這段要交代的非空行數）。沒有 Mermaid 行時回一段。
-    param([string]$Text, [int]$MaxLines = 0)
-    if ($MaxLines -le 0) { $MaxLines = $script:PsSdReadingPartLines }
-    $lines = ConvertTo-PsSdLines $Text
-    $blocks = [System.Collections.Generic.List[object]]::new()
-    $cur = $null
-    for ($i = 0; $i -lt $lines.Length; $i++) {
-        $t = $lines[$i].Trim()
-        if ($null -eq $cur -and $t.StartsWith('```mermaid')) { $cur = [System.Collections.Generic.List[int]]::new(); continue }
-        if ($null -ne $cur -and $t.StartsWith('```')) { if ($cur.Count -gt 0) { $blocks.Add($cur) }; $cur = $null; continue }
-        if ($null -ne $cur -and $t.Length -gt 0) { $cur.Add($i + 1) }
-    }
-    if ($null -ne $cur -and $cur.Count -gt 0) { $blocks.Add($cur) }
-    $groups = [System.Collections.Generic.List[object]]::new()
-    $acc = [System.Collections.Generic.List[int]]::new()
-    foreach ($b in $blocks) {
-        if ($acc.Count -gt 0 -and $acc.Count + $b.Count -gt $MaxLines) { $groups.Add($acc); $acc = [System.Collections.Generic.List[int]]::new() }
-        if ($b.Count -le $MaxLines) { $acc.AddRange($b); continue }
-        # 單一區塊超過上限：切成幾塊，最後一塊留給後面的區塊接著放
-        $s = 0
-        while ($b.Count - $s -gt $MaxLines) { $groups.Add($b.GetRange($s, $MaxLines)); $s += $MaxLines }
-        $acc = $b.GetRange($s, $b.Count - $s)
-    }
-    if ($acc.Count -gt 0) { $groups.Add($acc) }
-    if ($groups.Count -eq 0) { return , @(@{ Part = 1; From = 1; To = [Math]::Max(1, $lines.Length); Count = 0 }) }
-    $out = @()
-    $k = 0
-    foreach ($g in $groups) { $k++; $out += , @{ Part = $k; From = $g[0]; To = $g[$g.Count - 1]; Count = $g.Count } }
-    return , $out
-}
-
-function Join-PsSdLineSet($A, $B) {
-    # 行號聯集（由小到大）；不是整數的值原樣留在後面，交給 schema 檢查報錯。
-    $set = [System.Collections.Generic.SortedSet[int]]::new()
-    $odd = @()
-    foreach ($x in @(@($A) + @($B))) {
-        if ($null -eq $x) { continue }
-        if ((Test-PsSdIsInteger $x) -and [double]$x -ge [int]::MinValue -and [double]$x -le [int]::MaxValue) { [void]$set.Add([int]$x) } else { $odd += , $x }
-    }
-    $out = @(); foreach ($n in $set) { $out += $n }
-    return , @($out + $odd)
-}
-
-function Join-PsSdTextSet($A, $B) {
-    # 字串聯集（保留先出現的順序，區分大小寫）。
-    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    $out = @()
-    foreach ($x in @(@($A) + @($B))) { if ($null -ne $x -and $seen.Add([string]$x)) { $out += , $x } }
-    return , $out
-}
-
-function Copy-PsSdNodeShallow($Node) {
-    $c = New-PsSdObject
-    foreach ($k in @($Node.Keys)) { $c[[string]$k] = $Node[$k] }
-    return , $c
-}
-
-function Merge-PsSdReadingParts {
-    # 分段寫的解讀合成一份（與一次寫完的格式相同）。$Parts：依段序的各段（ConvertTo-PsSdNode 的結果；沒寫或不是合法 JSON 為 $null）。
-    # 同一狀態（實體＋狀態碼）、同一轉移（實體＋起訖）在多段出現就合併：lines、regions、via、labels 取聯集；name 取最早那段；
-    # final 要一致；scenario 要一致（寫 null 的段不算）。otherLines、conflicts 依段序串接。
-    # 回 @{ Reading; Errors }：缺段、不是物件、欄位不是陣列、jobId／reader／指紋與第 1 段不同、final 或 scenario 不一致 → Errors（Reading 為 $null）。
-    param([object[]]$Parts)
-    $errs = @()
-    $head = $null
-    $states = [System.Collections.Generic.List[object]]::new(); $stateIdx = New-PsSdMap
-    $trans = [System.Collections.Generic.List[object]]::new(); $transIdx = New-PsSdMap
-    $others = @(); $conflicts = @()
-    $k = 0
-    foreach ($p in @($Parts)) {
-        $k++
-        $tag = '第 ' + $k + ' 段'
-        if (-not ($p -is [System.Collections.IDictionary])) { $errs += ($tag + '沒有寫，或不是合法 JSON 物件'); continue }
-        if ($null -eq $head) { $head = $p }
-        else {
-            $hf = ''; $pf = ''
-            if ($head['source'] -is [System.Collections.IDictionary]) { $hf = [string]$head['source']['fingerprint'] }
-            if ($p['source'] -is [System.Collections.IDictionary]) { $pf = [string]$p['source']['fingerprint'] }
-            if ([string]$p['jobId'] -cne [string]$head['jobId'] -or [string]$p['reader'] -cne [string]$head['reader'] -or $pf -cne $hf) { $errs += ($tag + '的 jobId／reader／source.fingerprint 與第一段不同') }
-        }
-        $bad = $false
-        foreach ($f in @('states', 'transitions', 'otherLines', 'conflicts')) {
-            if ($null -ne $p[$f] -and -not ($p[$f] -is [System.Collections.IList])) { $errs += ($tag + '的 ' + $f + ' 不是陣列'); $bad = $true }
-        }
-        if ($bad) { continue }
-        foreach ($s in @($p['states'])) {
-            if (-not ($s -is [System.Collections.IDictionary])) { if ($null -ne $s) { $errs += ($tag + '的 states 有一項不是物件') }; continue }
-            $key = [string]$s['entity'] + [char]0 + [string]$s['code']
-            $regs = @(); foreach ($g in @($s['regions'])) { if ($g -is [System.Collections.IDictionary]) { $regs += , (Copy-PsSdNodeShallow $g) } elseif ($null -ne $g) { $regs += , $g } }
-            if (-not $stateIdx.ContainsKey($key)) {
-                $m = Copy-PsSdNodeShallow $s
-                if ($s.Contains('regions')) { $m['regions'] = $regs }
-                $stateIdx[$key] = $m; $states.Add($m); continue
-            }
-            $m = $stateIdx[$key]
-            if ([string]$m['final'] -cne [string]$s['final']) { $errs += ($tag + '的狀態 ' + [string]$s['entity'] + ' ' + [string]$s['code'] + ' 的 final 與前面的段不同') }
-            $m['lines'] = Join-PsSdLineSet $m['lines'] $s['lines']
-            $mr = @($m['regions'] | Where-Object { $null -ne $_ })
-            foreach ($g in $regs) {
-                $hit = $null
-                foreach ($x in $mr) { if ($x -is [System.Collections.IDictionary] -and $g -is [System.Collections.IDictionary] -and [string]$x['entity'] -ceq [string]$g['entity']) { $hit = $x; break } }
-                if ($null -ne $hit) { $hit['lines'] = Join-PsSdLineSet $hit['lines'] $g['lines'] } else { $mr += , $g }
-            }
-            if ($m.Contains('regions') -or $mr.Count -gt 0) { $m['regions'] = $mr }
-        }
-        foreach ($t in @($p['transitions'])) {
-            if (-not ($t -is [System.Collections.IDictionary])) { if ($null -ne $t) { $errs += ($tag + '的 transitions 有一項不是物件') }; continue }
-            $key = [string]$t['entity'] + [char]0 + [string]$t['from'] + [char]0 + [string]$t['to']
-            if (-not $transIdx.ContainsKey($key)) { $m = Copy-PsSdNodeShallow $t; $transIdx[$key] = $m; $trans.Add($m); continue }
-            $m = $transIdx[$key]
-            if ($null -ne $t['scenario']) {
-                if ($null -eq $m['scenario']) { $m['scenario'] = $t['scenario'] }
-                elseif ([string]$m['scenario'] -cne [string]$t['scenario']) { $errs += ($tag + '的轉移 ' + [string]$t['entity'] + ' ' + [string]$t['from'] + '>' + [string]$t['to'] + ' 的 scenario 與前面的段不同') }
-            }
-            $m['lines'] = Join-PsSdLineSet $m['lines'] $t['lines']
-            $m['via'] = Join-PsSdTextSet $m['via'] $t['via']
-            $m['labels'] = Join-PsSdTextSet $m['labels'] $t['labels']
-        }
-        foreach ($o in @($p['otherLines'])) { if ($null -ne $o) { $others += , $o } }
-        foreach ($c in @($p['conflicts'])) { if ($null -ne $c) { $conflicts += , $c } }
-    }
-    if ($errs.Count -gt 0) { return @{ Reading = $null; Errors = $errs } }
-    $r = New-PsSdObject
-    foreach ($f in @('schemaVersion', 'jobId', 'reader', 'round', 'source')) { if ($head.Contains($f)) { $r[$f] = $head[$f] } }
-    $r['states'] = $states.ToArray(); $r['transitions'] = $trans.ToArray(); $r['otherLines'] = $others; $r['conflicts'] = $conflicts
-    return @{ Reading = $r; Errors = @() }
-}
-
-# ---------------- 每份解讀的檢查 ----------------
-function Test-PsSdReading {
-    # 回傳 @{ Code; Message } 陣列：BAD_CODE、DUPLICATE、BAD_REF、NO_LINES、CITE_OUTSIDE、LINE_TWICE、LINE_UNACCOUNTED。
-    param([string]$Text, $Reading)
-    $lines = Get-PsSdMermaidLines $Text
-    $out = [System.Collections.Generic.List[object]]::new()
-    $use = @{}
-    $cited = [System.Collections.Generic.HashSet[int]]::new()
-    $keys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    $ents = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($s in @($Reading['states'])) {
-        $e = [string]$s['entity']; $c = [string]$s['code']
-        if (-not [regex]::IsMatch($c, '^[0-9]{3}$')) { $out.Add(@{ Code = 'BAD_CODE'; Message = ($e + ' 的狀態碼 ' + $c + ' 不是三位數字') }) }
-        if (-not $keys.Add($e + [char]0 + $c)) { $out.Add(@{ Code = 'DUPLICATE'; Message = ($e + ' ' + $c + ' 重複') }) }
-        [void]$ents.Add($e)
-        foreach ($ln in @($s['lines'])) { [void]$cited.Add([int]$ln) }
-        foreach ($g in @($s['regions'])) { foreach ($ln in @($g['lines'])) { [void]$cited.Add([int]$ln) } }
-    }
-    foreach ($s in @($Reading['states'])) {
-        foreach ($g in @($s['regions'])) {
-            if (-not $ents.Contains([string]$g['entity'])) { $out.Add(@{ Code = 'BAD_REF'; Message = ([string]$s['entity'] + ' ' + [string]$s['code'] + ' 的子業務 ' + [string]$g['entity'] + ' 沒有任何狀態') }) }
-        }
-    }
-    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($t in @($Reading['transitions'])) {
-        $e = [string]$t['entity']; $a = [string]$t['from']; $b = [string]$t['to']
-        $name = '轉移 ' + $e + ' ' + $a + '>' + $b
-        if (-not $seen.Add($e + [char]0 + $a + [char]0 + $b)) { $out.Add(@{ Code = 'DUPLICATE'; Message = ($name + ' 重複') }) }
-        foreach ($c in @($a, $b)) {
-            if ($c -ne '*' -and -not $keys.Contains($e + [char]0 + $c)) { $out.Add(@{ Code = 'BAD_REF'; Message = ($name + ' 的 ' + $c + ' 不是這個實體的狀態') }) }
-        }
-        if (@($t['lines']).Count -eq 0) { $out.Add(@{ Code = 'NO_LINES'; Message = ($name + ' 沒有引用任何一行') }) }
-        foreach ($ln in @($t['lines'])) { [void]$cited.Add([int]$ln) }
-    }
-    foreach ($o in @($Reading['otherLines'])) {
-        foreach ($ln in @($o['lines'])) { $n = [int]$ln; if ($use.ContainsKey($n)) { $use[$n]++ } else { $use[$n] = 1 } }
-    }
-    $citedSorted = [System.Collections.Generic.List[int]]::new($cited); $citedSorted.Sort()
-    foreach ($ln in $citedSorted) {
-        if (-not $lines.ContainsKey($ln)) { $out.Add(@{ Code = 'CITE_OUTSIDE'; Message = ('第 ' + $ln + ' 行不在 Mermaid 區塊內，卻被引用') }) }
-        if ($use.ContainsKey($ln)) { $out.Add(@{ Code = 'LINE_TWICE'; Message = ('第 ' + $ln + ' 行既被引用，又列在其他行') }) }
-    }
-    $useSorted = [System.Collections.Generic.List[int]]::new(); foreach ($k in $use.Keys) { $useSorted.Add([int]$k) }; $useSorted.Sort()
-    foreach ($ln in $useSorted) {
-        if (-not $lines.ContainsKey($ln)) { $out.Add(@{ Code = 'CITE_OUTSIDE'; Message = ('第 ' + $ln + ' 行不在 Mermaid 區塊內，卻列在其他行') }) }
-        if ($use[$ln] -gt 1) { $out.Add(@{ Code = 'LINE_TWICE'; Message = ('第 ' + $ln + ' 行在其他行列了 ' + $use[$ln] + ' 次') }) }
-    }
-    foreach ($ln in $lines.Keys) {
-        if (-not $cited.Contains($ln) -and -not $use.ContainsKey($ln)) { $out.Add(@{ Code = 'LINE_UNACCOUNTED'; Message = ('第 ' + $ln + ' 行沒有交代：' + $lines[$ln]) }) }
-    }
-    return , $out.ToArray()
-}
-
-# ---------------- 對齊、事實、比對 ----------------
-function Get-PsSdEntityLines {
-    # 實體 → 引用的行（HashSet[int]）。
-    param($Reading)
-    $out = New-PsSdMap
-    foreach ($s in @($Reading['states'])) {
-        $e = [string]$s['entity']
-        if (-not $out.ContainsKey($e)) { $out[$e] = [System.Collections.Generic.HashSet[int]]::new() }
-        foreach ($ln in @($s['lines'])) { [void]$out[$e].Add([int]$ln) }
-    }
-    foreach ($t in @($Reading['transitions'])) {
-        $e = [string]$t['entity']
-        if (-not $out.ContainsKey($e)) { $out[$e] = [System.Collections.Generic.HashSet[int]]::new() }
-        foreach ($ln in @($t['lines'])) { [void]$out[$e].Add([int]$ln) }
-    }
-    return $out
-}
-
-function Get-PsSdSortedKeys {
-    param($Map)
-    $keys = [System.Collections.Generic.List[string]]::new()
-    foreach ($k in $Map.Keys) { $keys.Add([string]$k) }
-    $keys.Sort([System.StringComparer]::Ordinal)
-    return , $keys.ToArray()
-}
-
-function Get-PsSdAlignment {
-    # 回傳每份解讀的對照表（讀者用的代號 → 共同代號）。共同代號取多數讀者用的那個（同票取字元碼最小）。
-    param([object[]]$Readings)
-    $lineSets = @()
-    foreach ($r in $Readings) { $lineSets += , (Get-PsSdEntityLines $r) }
-    $clusters = [System.Collections.Generic.List[object]]::new()
-    for ($i = 0; $i -lt $Readings.Length; $i++) {
-        $mine = $lineSets[$i]
-        foreach ($key in (Get-PsSdSortedKeys $mine)) {
-            $ls = $mine[$key]
-            $best = $null; $score = 0.0
-            foreach ($c in $clusters) {
-                if ($c.Members.ContainsKey($i)) { continue }
-                $other = $lineSets[$c.FirstReader][$c.FirstKey]
-                $inter = 0
-                foreach ($x in $ls) { if ($other.Contains($x)) { $inter++ } }
-                $union = $ls.Count + $other.Count - $inter
-                $jac = 0.0
-                if ($union -gt 0) { $jac = [double]$inter / [double]$union }
-                if ($jac -gt $score) { $best = $c; $score = $jac }
-            }
-            if ($null -ne $best -and $score -ge 0.5) { $best.Members[$i] = $key }
-            else {
-                $m = @{}; $m[$i] = $key
-                $clusters.Add(@{ Members = $m; FirstReader = $i; FirstKey = $key })
-            }
-        }
-    }
-    $maps = @()
-    for ($i = 0; $i -lt $Readings.Length; $i++) { $maps += , (New-PsSdMap) }
-    foreach ($c in $clusters) {
-        $votes = New-PsSdMap
-        foreach ($k in $c.Members.Values) { if ($votes.ContainsKey($k)) { $votes[$k]++ } else { $votes[$k] = 1 } }
-        $top = 0
-        foreach ($n in $votes.Values) { if ($n -gt $top) { $top = $n } }
-        $canon = $null
-        foreach ($k in (Get-PsSdSortedKeys $votes)) { if ($votes[$k] -eq $top) { $canon = $k; break } }
-        foreach ($i in $c.Members.Keys) { $maps[$i][$c.Members[$i]] = $canon }
-    }
-    return , $maps
-}
-
-function ConvertTo-PsSdFactPart {
-    # 與原型相同的排序字串：整數照十進位、null 寫 None、行號 tuple 寫 (a, b)。
-    param($V)
-    if ($null -eq $V) { return 'None' }
-    if ($V -is [object[]]) {
-        $parts = @(); foreach ($x in $V) { $parts += [string]$x }
-        if ($parts.Count -eq 1) { return ('(' + $parts[0] + ',)') }
-        return ('(' + ($parts -join ', ') + ')')
-    }
-    return [string]$V
-}
-
-function New-PsSdFact {
-    param([object[]]$Parts)
-    $strs = @(); foreach ($p in $Parts) { $strs += (ConvertTo-PsSdFactPart $p) }
-    return @{ Kind = [string]$Parts[0]; Parts = $Parts; Key = ($strs -join [string][char]0) }
-}
-
-function Get-PsSdReadingFacts {
-    # 拆成可比的事實與各事實引用的行；名稱、via 另外回傳（取多數讀者的寫法，不單獨表決）。
-    param($Reading, $KeyMap)
-    $facts = New-PsSdMap; $cite = New-PsSdMap; $names = New-PsSdMap; $via = New-PsSdMap
-    $add = {
-        param($Fact, $Lines)
-        if (-not $facts.ContainsKey($Fact.Key)) { $facts[$Fact.Key] = $Fact; $cite[$Fact.Key] = [System.Collections.Generic.HashSet[int]]::new() }
-        foreach ($ln in @($Lines)) { if ($null -ne $ln) { [void]$cite[$Fact.Key].Add([int]$ln) } }
-    }
-    foreach ($s in @($Reading['states'])) {
-        $e = $KeyMap[[string]$s['entity']]; $c = [string]$s['code']
-        & $add (New-PsSdFact @('STATE', $e, $c)) $s['lines']
-        $names[$e + [char]0 + $c] = [string]$s['name']
-        if ($s['final'] -eq $true) { & $add (New-PsSdFact @('FINAL', $e, $c)) $s['lines'] }
-        foreach ($g in @($s['regions'])) { & $add (New-PsSdFact @('REGION', $e, $c, $KeyMap[[string]$g['entity']])) $g['lines'] }
-    }
-    foreach ($t in @($Reading['transitions'])) {
-        $e = $KeyMap[[string]$t['entity']]; $a = [string]$t['from']; $b = [string]$t['to']
-        & $add (New-PsSdFact @('TRN', $e, $a, $b)) $t['lines']
-        $vv = @(); foreach ($x in @($t['via'])) { if ($null -ne $x) { $vv += [string]$x } }
-        $via[$e + [char]0 + $a + [char]0 + $b] = $vv
-        foreach ($lab in @($t['labels'])) { if ($null -ne $lab) { & $add (New-PsSdFact @('LABEL', $e, $a, $b, [string]$lab)) $t['lines'] } }
-        if ($null -ne $t['scenario'] -and [string]$t['scenario'] -ne '') { & $add (New-PsSdFact @('SCENARIO', $e, $a, $b, [string]$t['scenario'])) $t['lines'] }
-    }
-    foreach ($o in @($Reading['otherLines'])) {
-        if ([string]$o['disposition'] -ne 'TEXT') { continue }
-        $e = $null
-        if ($o.Contains('entity')) { $e = [string]$o['entity']; if ($KeyMap.ContainsKey($e)) { $e = $KeyMap[$e] } }
-        $c = $null
-        if ($o.Contains('code')) { $c = [string]$o['code'] }
-        foreach ($ln in @($o['lines'])) { & $add (New-PsSdFact @('TEXT', [int]$ln, $e, $c)) @([int]$ln) }
-    }
-    foreach ($cf in @($Reading['conflicts'])) {
-        if ($null -eq $cf) { continue }
-        $ls = [System.Collections.Generic.List[int]]::new(); foreach ($x in @($cf['lines'])) { $ls.Add([int]$x) }; $ls.Sort()
-        $arr = New-Object object[] $ls.Count
-        for ($k = 0; $k -lt $ls.Count; $k++) { $arr[$k] = $ls[$k] }
-        & $add (New-PsSdFact @('CONFLICT', $arr)) $cf['lines']
-    }
-    return @{ Facts = $facts; Cite = $cite; Names = $names; Via = $via }
-}
-
-function Get-PsSdFactText {
-    param($Fact)
-    $p = $Fact.Parts
-    $tr = {
-        param($a, $b)
-        $x = $a; if ($a -eq '*') { $x = '新建' }
-        return ($x + '→' + $b)
-    }
-    switch ($Fact.Kind) {
-        'STATE' { return ('狀態 ' + $p[1] + ' ' + $p[2]) }
-        'FINAL' { return ($p[1] + ' 的 ' + $p[2] + ' 是終點') }
-        'REGION' { return ($p[1] + ' 的 ' + $p[2] + ' 裡進行子業務 ' + $p[3]) }
-        'TRN' { return ('轉移 ' + $p[1] + ' ' + (& $tr $p[2] $p[3])) }
-        'LABEL' { return ($p[1] + ' ' + (& $tr $p[2] $p[3]) + ' 的線上文字「' + $p[4] + '」') }
-        'SCENARIO' { return ($p[1] + ' ' + (& $tr $p[2] $p[3]) + ' 屬於情境「' + $p[4] + '」') }
-        'TEXT' {
-            if ($null -ne $p[2] -and $null -ne $p[3]) { return ('第 ' + $p[1] + ' 行是 ' + $p[2] + ' ' + $p[3] + ' 的業務文字') }
-            if ($null -ne $p[2]) { return ('第 ' + $p[1] + ' 行是 ' + $p[2] + ' 的業務文字') }
-            return ('第 ' + $p[1] + ' 行是業務文字')
-        }
-    }
-    $ls = @(); foreach ($x in $p[1]) { $ls += [string]$x }
-    return ('第 ' + ($ls -join '、') + ' 行互相矛盾')
-}
-
-function Get-PsSdMajority {
-    # 各讀者的對照表合併：同一鍵取多數讀者的寫法（同票取讀者順序在前的）。值是字串或字串陣列。
-    param([object[]]$Maps)
-    $vals = New-PsSdMap
-    $order = [System.Collections.Generic.List[string]]::new()
-    foreach ($m in $Maps) {
-        foreach ($k in (Get-PsSdSortedKeys $m)) {
-            if (-not $vals.ContainsKey($k)) { $vals[$k] = [System.Collections.Generic.List[object]]::new(); $order.Add($k) }
-            $vals[$k].Add($m[$k])
-        }
-    }
-    $out = New-PsSdMap
-    foreach ($k in $order) {
-        $vs = $vals[$k]
-        $counts = New-PsSdMap
-        foreach ($v in $vs) { $ck = ConvertTo-PsSdCanonical $v; if ($counts.ContainsKey($ck)) { $counts[$ck]++ } else { $counts[$ck] = 1 } }
-        $top = 0; foreach ($n in $counts.Values) { if ($n -gt $top) { $top = $n } }
-        foreach ($v in $vs) { if ($counts[(ConvertTo-PsSdCanonical $v)] -eq $top) { $out[$k] = $v; break } }
-    }
-    return $out
-}
-
-function Compare-PsSdReadings {
-    # $Readings：三份第 1 輪解讀（Hashtable）。$Round2：$null，或 Hashtable「讀者序|事實鍵」→ YES／NO／UNSURE。
-    param([string]$Text, [object[]]$Readings, $Round2)
-    $n = $Readings.Length
-    $maps = Get-PsSdAlignment $Readings
-    $per = @()
-    for ($i = 0; $i -lt $n; $i++) { $per += , (Get-PsSdReadingFacts $Readings[$i] $maps[$i]) }
-    $all = New-PsSdMap; $cite = New-PsSdMap
-    foreach ($p in $per) {
-        foreach ($k in $p.Facts.Keys) {
-            if (-not $all.ContainsKey($k)) { $all[$k] = $p.Facts[$k]; $cite[$k] = [System.Collections.Generic.HashSet[int]]::new() }
-            $cite[$k].UnionWith($p.Cite[$k])
-        }
-    }
-    $accepted = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    $contested = [System.Collections.Generic.List[object]]::new()
-    $unresolved = [System.Collections.Generic.List[object]]::new()
-    foreach ($k in (Get-PsSdSortedKeys $all)) {
-        $have = 0
-        foreach ($p in $per) { if ($p.Facts.ContainsKey($k)) { $have++ } }
-        if ($have -eq $n) { [void]$accepted.Add($k); continue }
-        $yes = 0; $no = 0; $unsure = 0
-        if ($null -ne $Round2) {
-            for ($i = 0; $i -lt $n; $i++) {
-                $ak = [string]$i + '|' + $k
-                $ans = ''
-                if ($Round2.ContainsKey($ak)) { $ans = [string]$Round2[$ak] }
-                if ($ans -eq 'YES') { $yes++ } elseif ($ans -eq 'NO') { $no++ } elseif ($ans -eq 'UNSURE') { $unsure++ }
-            }
-        }
-        $result = 'UNRESOLVED'
-        if ($yes * 2 -gt $n) { $result = 'ACCEPTED' } elseif ($no * 2 -gt $n) { $result = 'REJECTED' }
-        if ($result -eq 'ACCEPTED') { [void]$accepted.Add($k) }
-        if ($result -eq 'UNRESOLVED') { $unresolved.Add($all[$k]) }
-        $ls = [System.Collections.Generic.List[int]]::new($cite[$k]); $ls.Sort()
-        $r2 = [string]$yes + ':' + [string]$no
-        if ($unsure -gt 0) { $r2 += ':' + [string]$unsure }
-        $contested.Add(@{ Key = $k; Fact = $all[$k]; Lines = $ls.ToArray(); Round1 = ([string]$have + ':' + [string]($n - $have)); Round2 = $r2; Result = $result })
-    }
-    $nameMaps = @(); $viaMaps = @()
-    foreach ($p in $per) { $nameMaps += , $p.Names; $viaMaps += , $p.Via }
-    $mermaid = Get-PsSdMermaidLines $Text
-    return @{
-        Maps = $maps; Facts = $all; Accepted = $accepted; Contested = $contested.ToArray(); Unresolved = $unresolved.ToArray(); Cite = $cite
-        Names = (Get-PsSdMajority $nameMaps); Via = (Get-PsSdMajority $viaMaps)
-        MermaidLines = $mermaid.Count; FactCount = $all.Count; Unanimous = ($all.Count - $contested.Count); Readers = $n
-    }
-}
-
-function Get-PsSdRound2Questions {
-    # 第 2 輪工單：不一致的事實逐項附引用的行（行號與原文）。題號 F01…。
-    param([string]$Text, $Result)
-    $lines = ConvertTo-PsSdLines $Text
-    $out = [System.Collections.Generic.List[object]]::new()
-    $i = 0
-    foreach ($c in $Result.Contested) {
-        $i++
-        $cited = [System.Collections.Generic.List[object]]::new()
-        foreach ($ln in $c.Lines) { $tx = ''; if ($ln -ge 1 -and $ln -le $lines.Length) { $tx = $lines[$ln - 1].Trim() }; $cited.Add([ordered]@{ line = $ln; text = $tx }) }
-        $out.Add([ordered]@{ id = ('F' + $i.ToString('00', [System.Globalization.CultureInfo]::InvariantCulture)); fact = (Get-PsSdFactText $c.Fact); lines = $cited.ToArray(); factKey = $c.Key })
-    }
-    return , $out.ToArray()
-}
-
-# ---------------- 採用的事實 → 04 的分母 ----------------
-function Get-PsSdBuiltModel {
-    # 回傳 @{ Entities; Composites; Texts; Names }：
-    #   Entities[實體] = @{ Codes; Pairs（'起>迄'，新建寫 *）; Via[pair]; Labels[pair]（依原文首次出現的行排序）; Finals; Initials; Scenarios[情境]=pairs; Main }
-    #   Composites['實體|狀態碼'] = @{ Entity; Code; Regions（子業務實體，依圖上順序）; Exits }
-    #   Texts：圖外每一行說明＋多數讀者列為業務文字的圖內行，依行號排序（@{ Line; Kind; Text; EntityKey; Code }）
-    param([string]$Text, $Result)
-    $lines = ConvertTo-PsSdLines $Text
-    $acc = [System.Collections.Generic.List[object]]::new()
-    foreach ($k in (Get-PsSdSortedKeys $Result.Facts)) { if ($Result.Accepted.Contains($k)) { $acc.Add($Result.Facts[$k]) } }
-    $first = New-PsSdMap
-    for ($i = 0; $i -lt $lines.Length; $i++) {
-        foreach ($f in $acc) {
-            if ($f.Kind -eq 'LABEL' -and -not $first.ContainsKey($f.Parts[4]) -and $lines[$i].Contains([string]$f.Parts[4])) { $first[$f.Parts[4]] = $i + 1 }
-        }
-    }
-    $ents = New-PsSdMap
-    $getE = {
-        param($e)
-        if (-not $ents.ContainsKey($e)) {
-            $ents[$e] = @{
-                Codes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-                Pairs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-                Via = (New-PsSdMap); Labels = (New-PsSdMap)
-                Finals = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-                Initials = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-                Scenarios = (New-PsSdMap); Main = $true
-            }
-        }
-        return $ents[$e]
-    }
-    $subs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    $regions = New-PsSdMap
-    foreach ($f in $acc) {
-        $p = $f.Parts
-        switch ($f.Kind) {
-            'STATE' { [void](& $getE $p[1]).Codes.Add($p[2]) }
-            'FINAL' { [void](& $getE $p[1]).Finals.Add($p[2]) }
-            'TRN' {
-                $ent = & $getE $p[1]
-                $pair = $p[2] + '>' + $p[3]
-                [void]$ent.Pairs.Add($pair)
-                if ($p[2] -eq '*') { [void]$ent.Initials.Add($p[3]) }
-                $vk = $p[1] + [char]0 + $p[2] + [char]0 + $p[3]
-                if ($Result.Via.ContainsKey($vk) -and @($Result.Via[$vk]).Count -gt 0) { $ent.Via[$pair] = @($Result.Via[$vk]) }
-            }
-            'REGION' {
-                [void]$subs.Add($p[3])
-                $rk = $p[1] + '|' + $p[2]
-                if (-not $regions.ContainsKey($rk)) { $regions[$rk] = [System.Collections.Generic.List[object]]::new() }
-                $min = [int]::MaxValue; foreach ($x in $Result.Cite[$f.Key]) { if ($x -lt $min) { $min = $x } }
-                $regions[$rk].Add(@{ Line = $min; Entity = $p[3] })
-            }
-        }
-    }
-    foreach ($f in $acc) {
-        $p = $f.Parts
-        if ($f.Kind -eq 'LABEL') {
-            $ent = & $getE $p[1]; $pair = $p[2] + '>' + $p[3]
-            if (-not $ent.Labels.ContainsKey($pair)) { $ent.Labels[$pair] = [System.Collections.Generic.List[string]]::new() }
-            $ent.Labels[$pair].Add($p[4])
-        }
-        if ($f.Kind -eq 'SCENARIO') {
-            $ent = & $getE $p[1]; $pair = $p[2] + '>' + $p[3]
-            if (-not $ent.Scenarios.ContainsKey($p[4])) { $ent.Scenarios[$p[4]] = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal) }
-            [void]$ent.Scenarios[$p[4]].Add($pair)
-        }
-    }
-    foreach ($e in @($ents.Keys)) {
-        $ent = $ents[$e]
-        $ent.Main = -not $subs.Contains($e)
-        foreach ($pair in @($ent.Labels.Keys)) {
-            $keyed = [System.Collections.Generic.List[string]]::new()
-            foreach ($t in $ent.Labels[$pair]) { $fl = 0; if ($first.ContainsKey($t)) { $fl = $first[$t] }; $keyed.Add($fl.ToString('D8', [System.Globalization.CultureInfo]::InvariantCulture) + [char]0 + $t) }
-            $keyed.Sort([System.StringComparer]::Ordinal)
-            $labs = @(); foreach ($x in $keyed) { $labs += $x.Substring(9) }
-            $ent.Labels[$pair] = $labs
-        }
-    }
-    $comps = [ordered]@{}
-    foreach ($rk in (Get-PsSdSortedKeys $regions)) {
-        $parts = $rk.Split('|')
-        $e = $parts[0]; $code = $parts[1]
-        $keyed = [System.Collections.Generic.List[string]]::new()
-        foreach ($g in $regions[$rk]) { $keyed.Add(([int]$g.Line).ToString('D8', [System.Globalization.CultureInfo]::InvariantCulture) + [char]0 + $g.Entity) }
-        $keyed.Sort([System.StringComparer]::Ordinal)
-        $regEnts = @(); foreach ($x in $keyed) { $regEnts += $x.Substring(9) }
-        $exits = [System.Collections.Generic.List[string]]::new()
-        if ($ents.ContainsKey($e)) { foreach ($pair in $ents[$e].Pairs) { $ab = $pair.Split('>'); if ($ab[0] -eq $code) { $exits.Add($ab[1]) } } }
-        $exits.Sort([System.StringComparer]::Ordinal)
-        $comps[$rk] = @{ Entity = $e; Code = $code; Regions = $regEnts; Exits = $exits.ToArray() }
-    }
-    $texts = [System.Collections.Generic.List[object]]::new()
-    foreach ($t in (Get-PsSdProseLines $Text)) { $texts.Add($t) }
-    foreach ($f in $acc) {
-        if ($f.Kind -ne 'TEXT') { continue }
-        $ln = [int]$f.Parts[1]
-        $tx = ''; if ($ln -ge 1 -and $ln -le $lines.Length) { $tx = $lines[$ln - 1].Trim() }
-        $texts.Add(@{ Line = $ln; Kind = 'text'; Text = $tx; EntityKey = $f.Parts[2]; Code = $f.Parts[3] })
-    }
-    $textsSorted = @($texts | Sort-Object -Property @{ Expression = { $_.Line } })
-    return @{ Entities = $ents; Composites = $comps; Texts = $textsSorted; Names = $Result.Names }
-}
-
-function Get-PsSdStatusReadingSummary {
-    # 04 外殼的 statusReading（schema 欄位順序）。
-    param($Result, [string]$StatusRef, [string]$Fingerprint)
-    $contested = [System.Collections.Generic.List[object]]::new()
-    foreach ($c in $Result.Contested) {
-        $locs = @(); foreach ($ln in $c.Lines) { $locs += ($StatusRef + '#L' + $ln) }
-        $contested.Add([ordered]@{ fact = (Get-PsSdFactText $c.Fact); lines = $locs; round1 = $c.Round1; round2 = $c.Round2; result = $c.Result })
-    }
-    $rounds = 1
-    if ($Result.Contested.Length -gt 0) { $rounds = 2 }
-    return [ordered]@{
-        readers = $Result.Readers; rounds = $rounds; mermaidLines = $Result.MermaidLines; facts = $Result.FactCount
-        unanimous = $Result.Unanimous; contested = $contested.ToArray(); unresolved = $Result.Unresolved.Length; fingerprint = $Fingerprint
-    }
-}
-
-function Get-PsSdConflictFacts {
-    # 多數讀者列出的圖與圖矛盾（採用的 CONFLICT 事實）：每項開 STATUS_SELF_CONFLICT。
-    param($Result)
-    $out = [System.Collections.Generic.List[object]]::new()
-    foreach ($k in (Get-PsSdSortedKeys $Result.Facts)) {
-        $f = $Result.Facts[$k]
-        if ($f.Kind -eq 'CONFLICT' -and $Result.Accepted.Contains($k)) { $out.Add($f) }
-    }
-    return , $out.ToArray()
-}
-@@@PSBUNDLE-END|scripts/ps-sdoc-status-lib.ps1
-@@@PSBUNDLE-PART-END|fc78dc8fc2386fd3|3|6
+@@@PSBUNDLE-PART-END|8c810d54d6e80f25|3|6

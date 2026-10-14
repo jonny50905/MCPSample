@@ -476,6 +476,23 @@ try {
         if ($null -ne $envSaved.S) { $env:PS_SESSION_CLAUDE_ENV_SKIP = $envSaved.S } else { Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_SKIP -ErrorAction SilentlyContinue }
     }
     Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '模型端數據' -and (Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '另一版 CLI') "模型端判讀：卡住的提示要人交「判讀」與「模型端數據」兩行、提到另一版 CLI"
+    # 診斷報告 ps-sdoc-diag：合成一個 job（兩個 attempt：成功的解讀、卡住的研究頁）→ 只印代號與數字
+    $dgRoot = Join-Path $dep 'diag-root'
+    $dgJob = 'clone-0123456789abcdef'
+    $dgAtt = Join-Path $dgRoot ('.ps-runtime/sdoc/' + $dgJob + '/attempts')
+    $dgLogs = Join-Path $dgRoot '.ps-runtime/sdoc-logs'
+    foreach ($d in @((Join-Path $dgAtt 'a0001'), (Join-Path $dgAtt 'a0002'), $dgLogs)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0001') 'input.json'), '{"kind":"STATUS_READ","unit":"stage0","subject":"R1","outputParts":[{"part":1},{"part":2},{"part":3}]}', (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0001') 'outcome.json'), '{"status":"ACCEPTED","counted":false,"findings":[],"sessionFindings":["EXIT_1"]}', (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0002') 'input.json'), '{"kind":"RESEARCH","unit":"data","subject":"TW_X","pageItemCap":8}', (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0002') 'outcome.json'), '{"status":"SESSION_FAILED","counted":false,"findings":["API_ABORTED","API_RETRY_STUCK"],"diagnostics":["x"]}', (New-Object System.Text.UTF8Encoding($false)))
+    $dgModel = '{"type":"assistant","message":{"id":"msg_m","type":"message","role":"assistant","model":"claude-sonnet-4-5-20250929","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1000,"cache_read_input_tokens":0,"cache_creation_input_tokens":35000,"output_tokens":1500}},"parent_tool_use_id":null,"session_id":"s"}'
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-010203-' + $dgJob + '-a0001.stream.jsonl')), (($inA, $dgModel, $usrA, '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"duration_api_ms":90000,"result":"ok"}') -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.stream.jsonl')), (($inA, (New-UsageLine 'msg_1' 2000 0 90000 700), $usrA, (New-SubLine 'msg_s1' 8000 50), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 'null'), (New-ApiRetryLine 4 '504'), (New-ApiRetryLine 5 '504')) -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.err.txt')), "API Error: 504 Gateway Timeout`n", (New-Object System.Text.UTF8Encoding($false)))
+    $dgOut = ((& (Join-Path $repoRoot 'scripts/ps-sdoc-diag.ps1') -Root $dgRoot -Cli claude *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    Assert ($dgOut -match '(?m)^DIAG v1 \| V=N \| JOBS=1 \| ATT=2 \| SF=1 \| AFTEROK=1 \|' -and $dgOut -match '(?m)^J1 A0001 K=R U=S0 S=OK F=- SF=X1 Q=1 P=1 C=0/1 M=36k L=36k O=1500 RT=- ERR=E0 MD=S45 PT=3 DUR=\d+$' -and $dgOut -match '(?m)^J1 A0002 K=S U=DA S=SF F=A,K Q=2 P=2 C=0/2 M=92k L=92k O=700 RT=504x4,NRx1 MS=8k ERR=E504 MD=X CAP=8 DUR=\d+$' -and $dgOut -match '(?m)^SUM \| KF=S:1 \| RT=504:4,NR:1 \| CACHE=C0 \| MAXM=92k \| MAXO=1500 \| P0=0 \| MD=S45 \| AFTEROK=1$') "診斷報告：每個 attempt 一行代號（種類、單元、狀態、findings、請求數、快取、主／子代理輸入、輸出、狀態碼分布、err 分類、模型家族、分段數、上限、分鐘）與 SUM 彙總" $dgOut
+    Assert ($dgOut -notmatch $dgJob -and $dgOut -notmatch 'TW_X' -and $dgOut -notmatch [regex]::Escape($dgRoot)) "診斷報告：不印 jobId、物件名、路徑"
     if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
         # 真的經 cmd.exe 啟動：假 claude.cmd 吐出重試用完的 stream、exit 1
         $fakeDir = Join-Path $dep 'fakecli'
