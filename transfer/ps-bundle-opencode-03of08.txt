@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 2bd3a62）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a0cf65）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|2bd3a62|840cedf62a2fcd2c|3|8|13632|69436c8e6f72271380571dafb9c77af8e8d783e59e8bff790bd42c2cefd26d64
+@@@PSBUNDLE-PART|1|opencode|7a0cf65|5a6b97d021d74e2e|3|8|13602|af8a86377aeb504dd7df7b89e2b683dc5f5e6149a7fc6dee6ea8f7824e9d0191
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/operations.json|633|f8243d8a0e4bd14a4cb1bf5235a04837ef9c56fd51c99f8798c6e722178f6a21|0
 {
   "schemaVersion": "1.0",
@@ -12141,7 +12141,7 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1223|a750094abedb8b57a5d11a59f6d6cb1a339b90197cff267d6515f748590073b5|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1226|2a88aaa34803a7e837efbca6146d76dfc35deca90b7ce1af19c969b610054302|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -13247,6 +13247,9 @@ OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些�
   5. 仍卡：SOP-29 的 `-Cli opencode`，`.opencode/peoplesoft/sdoc/model.yaml` 填公司 Sonnet 的 `<provider>/<model>`——同一個外環、同一套契約，只換 CLI。
 - 卡在模型端時要問 IT 的：gateway 對 `/v1/messages` 的上游逾時與閒置逾時（能否 ≥ 600 秒）、是否串流直通（SSE 不緩衝、保留 `ping`）、
   `cache_control` 是否直通、非串流請求的整體逾時、尖峰時段的容量或排隊限制。只給狀態碼、次數、間隔與 token 數，不給內容。
+- log 不能複製出來時，跑 `powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 -Last 15`：每個 attempt 一行、最後一行 SUM，全部是代號與數字
+  （工單種類、狀態、findings、成功請求數、快取命中、thinking 區塊數、卡住前最後一個工具與結果大小、usage 欄、狀態碼分布、err 分類、模型家族、分段數、每頁上限、分鐘），
+  代號對照在腳本開頭；用唸的回報維護端即可。`MD=S5`（Sonnet 5 家族）時 `MAX_THINKING_TOKENS=0` 無效，要用 `CLAUDE_CODE_EFFORT_LEVEL=low`。
 
 ### 研究包每頁上限
 
@@ -13600,37 +13603,4 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
   ]
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-a/pack.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-a/template-bound.md|31|475b5714806f963a2e5a3a67b2a529994bea606f7d779fe2863f2a1872ecd518|0
-# 功能規格書（範例模板 A）
-
-本模板為合成範例：公司機複製本目錄為 .ps-private/spec/<packId>/ 後，只改標記位置與文字，不改 generic 檔。
-
-## 1. 功能識別
-
-{{slot:S01}}
-
-## 2. 畫面欄位
-
-{{slot:S02}}
-
-## 3. 行為與驗證
-
-{{slot:S03}}
-
-## 4. 資料
-
-{{slot:S04}}
-
-## 5. 執行與權限
-
-{{slot:S05}}
-
-## 6. 相關物件
-
-{{slot:S06}}
-
-## 7. 檔案輸入
-
-{{slot:S07}}
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-a/template-bound.md
-@@@PSBUNDLE-PART-END|840cedf62a2fcd2c|3|8
+@@@PSBUNDLE-PART-END|5a6b97d021d74e2e|3|8

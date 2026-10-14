@@ -1103,6 +1103,9 @@ OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些�
   5. 仍卡：SOP-29 的 `-Cli opencode`，`.opencode/peoplesoft/sdoc/model.yaml` 填公司 Sonnet 的 `<provider>/<model>`——同一個外環、同一套契約，只換 CLI。
 - 卡在模型端時要問 IT 的：gateway 對 `/v1/messages` 的上游逾時與閒置逾時（能否 ≥ 600 秒）、是否串流直通（SSE 不緩衝、保留 `ping`）、
   `cache_control` 是否直通、非串流請求的整體逾時、尖峰時段的容量或排隊限制。只給狀態碼、次數、間隔與 token 數，不給內容。
+- log 不能複製出來時，跑 `powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 -Last 15`：每個 attempt 一行、最後一行 SUM，全部是代號與數字
+  （工單種類、狀態、findings、成功請求數、快取命中、thinking 區塊數、卡住前最後一個工具與結果大小、usage 欄、狀態碼分布、err 分類、模型家族、分段數、每頁上限、分鐘），
+  代號對照在腳本開頭；用唸的回報維護端即可。`MD=S5`（Sonnet 5 家族）時 `MAX_THINKING_TOKENS=0` 無效，要用 `CLAUDE_CODE_EFFORT_LEVEL=low`。
 
 ### 研究包每頁上限
 

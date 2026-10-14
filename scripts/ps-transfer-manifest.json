@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "2bd3a62",
+  "commit": "7a0cf65",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -520,8 +520,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1223,
-      "sha256": "a750094abedb8b57a5d11a59f6d6cb1a339b90197cff267d6515f748590073b5",
+      "lines": 1226,
+      "sha256": "2a88aaa34803a7e837efbca6146d76dfc35deca90b7ce1af19c969b610054302",
       "bom": false
     },
     {
@@ -772,8 +772,8 @@
     },
     {
       "path": "scripts/ps-sdoc-diag.ps1",
-      "lines": 192,
-      "sha256": "a677d8ba846302204938be487190d71b0f12c2bc47ede983c54bfdcb86330d74",
+      "lines": 305,
+      "sha256": "0924f636b6b8729cf028acf7d79037ed287bfd868104edf0527c94551f94d342",
       "bom": true
     },
     {
@@ -874,8 +874,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 588,
-      "sha256": "1f4f07da5b9eceda758532c220abfc4483ec46f6f16cbc95552daefab12e3529",
+      "lines": 589,
+      "sha256": "041408624e153968b089022da771d2fb925016e83e00ee0b9685783f8cc25b4c",
       "bom": true
     },
     {

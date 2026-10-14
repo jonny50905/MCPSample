@@ -13,9 +13,16 @@
 #   RT  模型端重試的狀態碼分布（504x6、NRx2＝無回應）  AE  result 的 api_error_status
 #   ERR err 檔分類 E0=空或沒有 E504=含 504 ECONN=連線中斷／重置 E400=含 400 EOTH=其他
 #   MD  模型家族 S45/S46/S5/S55=Sonnet 4.5/4.6/5/5.5 O=Opus H=Haiku X=看不出  PT=解讀分段數  CAP=本頁上限  DUR=session 分鐘（檔名時間到 stream 最後寫入）
+#   TH  含 thinking 區塊的 assistant 事件數（0＝這個 session 沒開 thinking）  UZ=最後一個成功回應的 usage 數值欄（欄名:值；全 0＝gateway 沒回 usage）
+#   LT/LR 卡住的那個請求之前最後一個工具呼叫的名稱／其結果的位元組數（Read 大結果＝卡在輸入側；Write＝卡在寫完之後）  RU=result 事件的 usage 總計 in/cc/cr/out
+#   F 另有 INVALID 的驗收錯誤代號 NJ=不是合法 JSON NW=少寫一段 FP=指紋不同 OV=超過每頁上限 SC=schema／欄位錯 LN=逐行交代錯 ?=其他
 #   SUM KF=失敗工單種類分布 RT=全部狀態碼分布 CACHE=C0（從沒命中）/C1（部分）/C2（都有） MAXM/MAXO=最大輸入／輸出 P0=第一個請求就失敗的 session 數 AFTEROK=session 失敗但產出照收的 attempt 數
 #   ENVNOW 跑本腳本的視窗目前設了哪些覆寫變數：D=PS_SESSION_CLAUDE_ENV_DEFAULTS K=PS_SESSION_CLAUDE_ENV_SKIP I=PS_SDOC_RESEARCH_PAGE_ITEMS L=PS_SDOC_READING_PART_LINES
-#          T=MAX_THINKING_TOKENS R=CLAUDE_CODE_MAX_RETRIES A=PS_SESSION_API_ABORT_AFTER N=CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK
+#          T=MAX_THINKING_TOKENS R=CLAUDE_CODE_MAX_RETRIES A=PS_SESSION_API_ABORT_AFTER N=CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK E=CLAUDE_CODE_EFFORT_LEVEL
+#   SUM2（只要回報這一行）：版本 模型家族 種類-findings 狀態碼 TH LT G NEXT——以最近一個失敗的 attempt 為準；G~秒＝估的 gateway 逾時（session 分鐘扣掉成功請求後除以重試數）
+#   NEXT 腳本判斷的下一步：0=先解新搬運包 1=設 CLAUDE_CODE_EFFORT_LEVEL=low（adaptive 模型關不掉 thinking，只能壓低）
+#        2=縮每次回應（讀者 PS_SDOC_READING_PART_LINES=20；研究 PS_SDOC_RESEARCH_PAGE_ITEMS=4） 3=縮輸入（CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT=1）
+#        4=gateway 不吃 effort（RT 有 400）：拿掉 CLAUDE_CODE_EFFORT_LEVEL 5=改走 OpenCode 版（-Cli opencode） 6=沒有失敗、不用改
 param([string]$Root = '', [ValidateRange(1, 500)][int]$Last = 12, [ValidateSet('', 'claude', 'opencode')][string]$Cli = '')
 $ErrorActionPreference = 'Stop'
 if ($Root -eq '') { $Root = Split-Path $PSScriptRoot -Parent }
@@ -65,6 +72,12 @@ function Get-DgFindings($List) {
         elseif ($t -eq 'API_ERROR') { $out += 'E' }
         elseif ($t -eq 'CONTEXT_OVERFLOW') { $out += 'C' }
         elseif ($t -eq 'NONE' -or $t -eq '') { $out += '-' }
+        elseif ($t.Contains('不是合法 JSON')) { $out += 'NJ' }
+        elseif ($t.Contains('沒有寫')) { $out += 'NW' }
+        elseif ($t.Contains('指紋')) { $out += 'FP' }
+        elseif ($t.Contains('超過上限')) { $out += 'OV' }
+        elseif ($t.Contains('schema') -or $t.Contains('應為') -or $t.Contains('欄位')) { $out += 'SC' }
+        elseif ($t.Contains('交代')) { $out += 'LN' }
         else { $out += '?' }
     }
     if ($out.Count -eq 0) { return '-' }
@@ -91,6 +104,56 @@ function Get-DgErrClass([string]$Err) {
     return 'EOTH'
 }
 function Format-DgK([int]$N) { return ([string][int][Math]::Round($N / 1000.0) + 'k') }
+# stream 的補充數據：thinking 區塊數、最後一個成功回應的 usage 欄位、卡住請求之前的最後一個工具與結果大小、result 的 usage 總計
+function Get-DgStreamExtra([string]$Path) {
+    $r = @{ Think = 0; Usage = ''; LastTool = ''; LastResultLen = 0; ResultUsage = '' }
+    if (-not [System.IO.File]::Exists($Path)) { return $r }
+    $ord = [System.StringComparison]::Ordinal
+    $tool = ''; $resLen = 0; $frozen = $false; $afterProgress = $false
+    $fs = $null; $rd = $null
+    try {
+        $fs = New-Object System.IO.FileStream($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $rd = New-Object System.IO.StreamReader($fs, (New-Object System.Text.UTF8Encoding($false)))
+        while ($true) {
+            $ln = $rd.ReadLine()
+            if ($null -eq $ln) { break }
+            if ($ln.IndexOf('"subtype":"api_retry"', $ord) -ge 0 -and $ln.IndexOf('"subtype":"api_retry"', $ord) -lt 80) {
+                # 一串重試的第一個：凍結「卡住的請求之前」的工具與結果大小（之後恢復又失敗會重新凍結）
+                if ($afterProgress) { $r.LastTool = $tool; $r.LastResultLen = $resLen; $afterProgress = $false }
+                continue
+            }
+            $k = $ln.IndexOf('"type":"assistant"', $ord)
+            if ($k -ge 0 -and $k -lt 20) {
+                if ($ln.IndexOf('"text":"API Error', $ord) -ge 0) { continue }
+                $afterProgress = $true
+                if ($ln.IndexOf('"type":"thinking"', $ord) -ge 0) { $r.Think++ }
+                $m = [regex]::Match($ln, '"type":"tool_use","id":"[^"]*","name":"([^"]+)"')
+                if ($m.Success) { $tool = $m.Groups[1].Value }
+                $u = $ln.LastIndexOf('"usage":{', $ord)
+                if ($u -ge 0) {
+                    $win = $ln.Substring($u + 9, [Math]::Min(400, $ln.Length - $u - 9))
+                    $pairs = @()
+                    foreach ($pm in [regex]::Matches($win, '"([a-z0-9_]+)":(\d+)')) { if ($pairs.Count -lt 8) { $pairs += ($pm.Groups[1].Value.Replace('_input_tokens', '').Replace('_tokens', '') + ':' + $pm.Groups[2].Value) } }
+                    if ($pairs.Count -gt 0) { $r.Usage = ($pairs -join ',') }
+                }
+                continue
+            }
+            $k = $ln.IndexOf('"type":"user"', $ord)
+            if ($k -ge 0 -and $k -lt 20) { if ($ln.IndexOf('"tool_result"', $ord) -ge 0) { $resLen = $ln.Length } ; continue }
+            $k = $ln.IndexOf('"type":"result"', $ord)
+            if ($k -ge 0 -and $k -lt 40) {
+                $u = $ln.IndexOf('"usage":{', $ord)
+                if ($u -ge 0) {
+                    $uf = Get-PsOcUsageFields ($ln.Substring($u, [Math]::Min(600, $ln.Length - $u)))
+                    if ($null -ne $uf) { $r.ResultUsage = ([string]([int]$uf.Context - [int]$uf.CacheRead) + '/' + [int]$uf.CacheRead + '/' + [int]$uf.Output) }
+                }
+            }
+        }
+    }
+    catch { }
+    finally { if ($null -ne $rd) { $rd.Dispose() } elseif ($null -ne $fs) { $fs.Dispose() } }
+    return $r
+}
 
 $roots = @()
 if ($Cli -eq '' -or $Cli -eq 'claude') { $roots += , @{ Dir = (Join-Path $Root '.ps-runtime/sdoc'); Logs = (Join-Path $Root '.ps-runtime/sdoc-logs'); Cli = 'claude' } }
@@ -102,7 +165,7 @@ $libTxt = Get-DgText (Join-Path $PSScriptRoot 'ps-session-lib.ps1') 400000
 $sdlTxt = Get-DgText (Join-Path $PSScriptRoot 'ps-sdoc-lib.ps1') 400000
 if ($libTxt.Contains('PsOcClaudeEnvCommon') -and $sdlTxt.Contains('PsSdResearchPageItems')) { $v = 'N' }
 $envNow = @()
-foreach ($pair in @(@('D', 'PS_SESSION_CLAUDE_ENV_DEFAULTS'), @('K', 'PS_SESSION_CLAUDE_ENV_SKIP'), @('I', 'PS_SDOC_RESEARCH_PAGE_ITEMS'), @('L', 'PS_SDOC_READING_PART_LINES'), @('T', 'MAX_THINKING_TOKENS'), @('R', 'CLAUDE_CODE_MAX_RETRIES'), @('A', 'PS_SESSION_API_ABORT_AFTER'), @('N', 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK'))) {
+foreach ($pair in @(@('D', 'PS_SESSION_CLAUDE_ENV_DEFAULTS'), @('K', 'PS_SESSION_CLAUDE_ENV_SKIP'), @('I', 'PS_SDOC_RESEARCH_PAGE_ITEMS'), @('L', 'PS_SDOC_READING_PART_LINES'), @('T', 'MAX_THINKING_TOKENS'), @('R', 'CLAUDE_CODE_MAX_RETRIES'), @('A', 'PS_SESSION_API_ABORT_AFTER'), @('N', 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK'), @('E', 'CLAUDE_CODE_EFFORT_LEVEL'))) {
     $val = [string][System.Environment]::GetEnvironmentVariable($pair[1])
     if ($val -ne '') { $envNow += ($pair[0] + '=' + $val) }
 }
@@ -123,7 +186,7 @@ foreach ($r in $roots) {
             $inp = Get-DgJson (Join-Path $ad.FullName 'input.json')
             if ($null -eq $oc -or $null -eq $inp) { continue }
             $row = @{ Job = $jobs; Aid = $ad.Name; Cli = $r.Cli; Kind = (Get-DgKind ([string]$inp.kind)); Unit = (Get-DgUnit ([string]$inp.unit)); Status = (Get-DgStatus ([string]$oc.status))
-                Findings = (Get-DgFindings $oc.findings); SessionFindings = ''; Parts = 0; Cap = ''; Api = $null; Model = '-'; Err = 'E0'; Dur = '' }
+                Findings = (Get-DgFindings $oc.findings); SessionFindings = ''; Parts = 0; Cap = ''; Api = $null; Model = '-'; Err = 'E0'; Dur = ''; Extra = $null }
             if ($null -ne $oc.PSObject.Properties['sessionFindings']) { $row.SessionFindings = Get-DgFindings $oc.sessionFindings }
             if ($null -ne $inp.PSObject.Properties['outputParts']) { $row.Parts = @($inp.outputParts).Count }
             if ($null -ne $inp.PSObject.Properties['pageItemCap']) { $row.Cap = [string]$inp.pageItemCap }
@@ -132,6 +195,7 @@ foreach ($r in $roots) {
                 $ef = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.err.txt') | Sort-Object Name | Select-Object -Last 1)
                 if ($sf.Count -gt 0) {
                     $row.Api = Get-PsOcClaudeApiRetry -StreamFile $sf[0].FullName
+                    $row.Extra = Get-DgStreamExtra $sf[0].FullName
                     $row.Model = Get-DgModel (Get-DgText $sf[0].FullName 200000)
                     $m = [regex]::Match($sf[0].Name, '^(\d{8})-(\d{6})-')
                     if ($m.Success) {
@@ -149,7 +213,7 @@ foreach ($r in $roots) {
 
 $failed = @($rows | Where-Object { $_.Status -eq 'SF' })
 $afterOk = @($rows | Where-Object { $_.SessionFindings -ne '' })
-Write-Host ('DIAG v1 | V=' + $v + ' | JOBS=' + $jobs + ' | ATT=' + $rows.Count + ' | SF=' + $failed.Count + ' | AFTEROK=' + $afterOk.Count + ' | ENVNOW=' + $envTxt)
+Write-Host ('DIAG v2 | V=' + $v + ' | JOBS=' + $jobs + ' | ATT=' + $rows.Count + ' | SF=' + $failed.Count + ' | AFTEROK=' + $afterOk.Count + ' | ENVNOW=' + $envTxt)
 $show = @($rows | Select-Object -Last $Last)
 $kf = @{}; $rt = @{}; $maxM = 0; $maxO = 0; $p0 = 0; $cacheHit = 0; $cacheReq = 0; $models = @{}
 foreach ($row in $rows) {
@@ -173,6 +237,13 @@ foreach ($row in $show) {
         $line += ' Q=' + [int]$a.Requests + ' P=' + [int]$a.Progress + ' C=' + [int]$a.CacheRequests + '/' + [int]$a.Requests + ' M=' + (Format-DgK ([int]$a.MaxContextMain)) + ' L=' + (Format-DgK ([int]$a.LastContextMain)) + ' O=' + [int]$a.MaxOutput + ' RT=' + $sts
         if ([string]$a.ApiErrorStatus -ne '') { $line += ' AE=' + [string]$a.ApiErrorStatus }
         if ([int]$a.MaxContextSub -gt 0) { $line += ' MS=' + (Format-DgK ([int]$a.MaxContextSub)) }
+        $x = $row.Extra
+        if ($null -ne $x) {
+            $line += ' TH=' + [int]$x.Think
+            if ([string]$x.LastTool -ne '' -or [int]$x.LastResultLen -gt 0) { $lt = [string]$x.LastTool; if ($lt -eq '') { $lt = '-' }; $line += ' LT=' + $lt + ' LR=' + [int]$x.LastResultLen }
+            if ([string]$x.Usage -ne '') { $line += ' UZ=' + [string]$x.Usage }
+            if ([string]$x.ResultUsage -ne '') { $line += ' RU=' + [string]$x.ResultUsage }
+        }
     }
     $line += ' ERR=' + $row.Err + ' MD=' + $row.Model
     if ($row.Parts -gt 0) { $line += ' PT=' + $row.Parts }
@@ -189,4 +260,46 @@ $mdKeys = @($models.Keys | Sort-Object)
 if ($mdKeys.Count -gt 1) { $mdKeys = @($mdKeys | Where-Object { $_ -ne 'X' }) }
 $mdTxt = '-'; if ($mdKeys.Count -gt 0) { $mdTxt = ($mdKeys -join ',') }
 Write-Host ('SUM | KF=' + $kfTxt + ' | RT=' + $rtTxt + ' | CACHE=' + $cache + ' | MAXM=' + (Format-DgK $maxM) + ' | MAXO=' + $maxO + ' | P0=' + $p0 + ' | MD=' + $mdTxt + ' | AFTEROK=' + $afterOk.Count)
+
+# ---------------- SUM2：一行就夠的回報，與腳本自己判斷的下一步 ----------------
+$focus = $null
+foreach ($row in $rows) { if ($row.Status -eq 'SF' -and $null -ne $row.Api) { $focus = $row } }
+if ($null -eq $focus) { foreach ($row in $rows) { if ($row.Status -eq 'SF') { $focus = $row } } }
+$next = 6; $why = '最近沒有 session 失敗；照常續跑'
+$sum2 = 'SUM2 ' + $v + ' ' + $mdTxt + ' -'
+if ($v -eq 'O') { $next = 0; $why = '跑的是舊版 scripts：先解新搬運包再跑' }
+elseif ($null -ne $focus) {
+    $a = $focus.Api; $x = $focus.Extra
+    $rtF = '-'; $th = 0; $ltTxt = '-'; $gTxt = '-'; $p0f = $false; $has400 = $false
+    if ($null -ne $a) {
+        $rtF = [string]$a.Statuses; if ($rtF -eq '') { $rtF = '-' } else { $rtF = $rtF.Replace('無回應', 'NR').Replace('×', 'x').Replace('、', ',') }
+        if ($rtF -match '(^|,)400x') { $has400 = $true }
+        if ([int]$a.Progress -eq 0) { $p0f = $true }
+        if ([int]$a.Count -ge 3 -and $focus.Dur -ne '') {
+            $g = [int](([int]$focus.Dur * 60 - [int]$a.Requests * 30) / [int]$a.Count)
+            if ($g -gt 0) { $gTxt = 'G~' + [string]([int][Math]::Round($g / 10.0) * 10) }
+        }
+    }
+    if ($null -ne $x) {
+        $th = [int]$x.Think
+        $lt = [string]$x.LastTool
+        if ($lt -ne '' -or [int]$x.LastResultLen -gt 0) {
+            $code = 'M'
+            if ($lt -eq 'Read') { $code = 'R' } elseif ($lt -eq 'Write') { $code = 'W' } elseif ($lt -eq '') { $code = '-' }
+            $ltTxt = $code + (Format-DgK ([int]$x.LastResultLen))
+        }
+    }
+    $focusMd = $focus.Model; if ($focusMd -eq '-' -or $focusMd -eq 'X') { $focusMd = $mdTxt }
+    $sum2 = 'SUM2 ' + $v + ' ' + $focusMd + ' ' + $focus.Kind + '-' + $focus.Findings + ' ' + $rtF + ' TH' + $th + ' LT=' + $ltTxt + ' ' + $gTxt
+    $adaptive = ($focusMd -match '^S(46|5|55)$' -or $focusMd -eq 'O')
+    if ($has400) { $next = 4; $why = 'gateway 不吃 effort 參數（狀態碼有 400）：拿掉 CLAUDE_CODE_EFFORT_LEVEL（Remove-Item Env:CLAUDE_CODE_EFFORT_LEVEL）' }
+    elseif ($p0f) { $next = 5; $why = '第一個請求就沒成功過：這條線本身過不了，改走 OpenCode 版（scripts\ps-sdoc.ps1 -Cli opencode）' }
+    elseif ($th -gt 0 -and $adaptive -and ([string]$env:CLAUDE_CODE_EFFORT_LEVEL).Trim() -eq '') { $next = 1; $why = 'thinking 開著（TH>0）而這個模型關不掉：$env:CLAUDE_CODE_EFFORT_LEVEL = ''low'' 後重跑' }
+    elseif ($ltTxt.StartsWith('R') -and [int]$x.LastResultLen -ge 40000) { $next = 3; $why = '卡在讀完大檔之後的請求（輸入側）：$env:CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT = ''1'' 後重跑' }
+    elseif ($focus.Kind -eq 'S' -or $focus.Kind -eq 'V') { $next = 2; $why = '縮每次回應：$env:PS_SDOC_RESEARCH_PAGE_ITEMS = ''4'' 後重跑' }
+    elseif ($focus.Kind -eq 'R' -or $focus.Kind -eq '2') { $next = 2; $why = '縮每次回應：$env:PS_SDOC_READING_PART_LINES = ''20'' 後重跑' }
+    else { $next = 5; $why = '槓桿都試過仍卡：改走 OpenCode 版（scripts\ps-sdoc.ps1 -Cli opencode）' }
+}
+Write-Host ($sum2 + ' NEXT=' + $next)
+Write-Host ('NEXT' + $next + '：' + $why)
 exit 0

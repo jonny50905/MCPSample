@@ -131,6 +131,7 @@ SOP 編號照用；有差異的只有：
    `$env:CLAUDE_CODE_MAX_RETRIES='3'` → 仍卡就走 OpenCode 版備案（SOP-29，`-Cli opencode`）。
    執行中每 5 分鐘的「進行中」行也會列出重試次數、目前連續失敗幾次與數據。attempt 的 `outcome.json` 的 findings 記失敗種類（`TIMED_OUT`、`EXIT_<n>`、
    `API_ABORTED`、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`；產出照收時另記 `sessionFindings`）。細節見 SOP-28「session 失敗的判讀」。
+   log 不能複製出來時跑 `powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 -Last 15`：只印代號與數字（對照在腳本開頭），用唸的回報維護端。
 6. 一次回應不要太長：第 0 階段的讀者把解讀分段寫（每段一個檔，外環合併後驗收），每段的 Mermaid 行上限預設 40（`$env:PS_SDOC_READING_PART_LINES`，5～1000）；
    研究頁每頁的項目上限由外環驗收（預設 8；texts 40、operations 3、testing 4；`$env:PS_SDOC_RESEARCH_PAGE_ITEMS` 1～60 一律覆寫，60＝舊行為），
    工單印出本頁上限，超過＝INVALID 計次，模型達上限就 PARTIAL 分頁；上游需求頁與改寫頁不受此上限。各段原樣留在 attempt 的 `output-part-NN.json`。

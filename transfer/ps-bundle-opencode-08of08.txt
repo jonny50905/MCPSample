@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 2bd3a62）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a0cf65）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|2bd3a62|840cedf62a2fcd2c|8|8|3644|a1589495e8601c136d65c161a6490063aa98b6207a6a4da8d69b56d65450d5da
+@@@PSBUNDLE-PART|1|opencode|7a0cf65|5a6b97d021d74e2e|8|8|3644|ccb8526e310f9bfd18a9b856619c02bbeac1a0080d2066960d6b2a31244fb7a1
 @@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|8f7d55463db3aca7c5b6887f02268f47d90467f9940ba16fdfb0825d1f989181|1
 # test-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單元測試；合成資料，不查 MCP、不讀企業產物、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -2534,10 +2534,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|7127ab311ed15ae27831353fa8e897dcea9181ddd2519d09dc9268a5bf2418d9|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|41a19782ceb6f758e4fa401639c52587c008642facc185bcad0a70fd97b8b45e|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "2bd3a62",
+  "commit": "7a0cf65",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -3057,8 +3057,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1223,
-      "sha256": "a750094abedb8b57a5d11a59f6d6cb1a339b90197cff267d6515f748590073b5",
+      "lines": 1226,
+      "sha256": "2a88aaa34803a7e837efbca6146d76dfc35deca90b7ce1af19c969b610054302",
       "bom": false
     },
     {
@@ -3309,8 +3309,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc-diag.ps1",
-      "lines": 192,
-      "sha256": "a677d8ba846302204938be487190d71b0f12c2bc47ede983c54bfdcb86330d74",
+      "lines": 305,
+      "sha256": "0924f636b6b8729cf028acf7d79037ed287bfd868104edf0527c94551f94d342",
       "bom": true
     },
     {
@@ -3411,8 +3411,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 588,
-      "sha256": "1f4f07da5b9eceda758532c220abfc4483ec46f6f16cbc95552daefab12e3529",
+      "lines": 589,
+      "sha256": "041408624e153968b089022da771d2fb925016e83e00ee0b9685783f8cc25b4c",
       "bom": true
     },
     {
@@ -3644,5 +3644,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|29a7a1797f4abfe23c450ecb3e7f4de7c5cec3c24afaf4d210dd03e6fe9d8d4a
-@@@PSBUNDLE-PART-END|840cedf62a2fcd2c|8|8
+@@@PSBUNDLE-EOF|158|4d0c8b738cd5b3e3cd87a17c77f53cde1efff63d685247f93071901f3a7d1584
+@@@PSBUNDLE-PART-END|5a6b97d021d74e2e|8|8

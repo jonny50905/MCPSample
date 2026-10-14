@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 2bd3a62）第 4／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 7a0cf65）第 4／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|2bd3a62|8c810d54d6e80f25|4|6|6871|c989bef62078edc0690ecb8f1d0cef04f7cec0ff5db84a00ff79f2cf3bdbfa95
+@@@PSBUNDLE-PART|1|claude|7a0cf65|969cc6e4335258c9|4|6|6871|c989bef62078edc0690ecb8f1d0cef04f7cec0ff5db84a00ff79f2cf3bdbfa95
 @@@PSBUNDLE-FILE|scripts/ps-sdoc-status-lib.ps1|632|14948b56f8556e3cce12e59091ab3656503efe84793c950b08d7a220f715f711|1
 # ps-sdoc-status-lib.ps1 — 第 0 階段：STATUS 檔的三份狀態圖解讀（設計 §8.2、§8.3）。
 # 外環不解讀 Mermaid：只認得 Mermaid 區塊的範圍與每一行的行號。
@@ -6872,4 +6872,4 @@ finally {
 }
 Finish $code $exitCode
 @@@PSBUNDLE-END|scripts/ps-spec.ps1
-@@@PSBUNDLE-PART-END|8c810d54d6e80f25|4|6
+@@@PSBUNDLE-PART-END|969cc6e4335258c9|4|6
