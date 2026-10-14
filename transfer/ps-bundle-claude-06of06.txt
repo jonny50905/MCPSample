@@ -1,6 +1,597 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit da14021）第 6／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0c79d43）第 6／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|da14021|5a3b86e7a6ccc3c2|6|6|2660|62233a1a98e27695e891bfb03c1bb8a5af2d8e372f918e3b313a75657e6cfbe8
+@@@PSBUNDLE-PART|1|claude|0c79d43|fc78dc8fc2386fd3|6|6|3251|e2f4d4a8ca57d889650682c21a072b0767faf555bbcb5fca3c65b0e8f3eec6c6
+@@@PSBUNDLE-FILE|scripts/tests/test-spec-build.ps1|299|e85d28fa30a5b57a992d783ed7d3284d1230536165b18c8d66e51580f0faaa2b|1
+# test-spec-build.ps1 — 真 PS5.1 CLI＋合成 worker；不查企業資料／MCP，不執行模型。
+$ErrorActionPreference = 'Stop'
+$testRepo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+. (Join-Path $testRepo 'scripts/ps-knowledge-lib.ps1')
+$testBase = Join-Path ([System.IO.Path]::GetTempPath()) ('ps-clone-build-' + [guid]::NewGuid().ToString('N'))
+# 凍結這次待測 production bytes，避免並行維護同一 checkout 被誤判成 fixture 的來源改變。
+$testTools = Join-Path $testBase 'framework'
+[void][System.IO.Directory]::CreateDirectory($testTools)
+foreach($name in @('ps-spec-build.ps1','ps-spec-clone-lib.ps1','ps-knowledge-lib.ps1','ps-session-lib.ps1','ps-cli-lib.ps1')){Copy-Item -LiteralPath (Join-Path (Join-Path $testRepo 'scripts') $name) -Destination (Join-Path $testTools $name)}
+$testCli = Join-Path $testTools 'ps-spec-build.ps1'
+$script:testPass = 0; $script:testFail = 0
+function Assert-Build([bool]$Condition, [string]$Name) {
+    if ($Condition) { $script:testPass++; Write-Host ('PASS ' + $Name) }
+    else { $script:testFail++; Write-Host ('FAIL ' + $Name) }
+}
+function Write-BuildFixture([string]$Path, [string]$Text, [bool]$Bom = $false) {
+    if (-not (Write-PsKnAtomicText -LiteralPath $Path -Text $Text -Bom $Bom)) { throw 'TEST_WRITE_FAILED' }
+}
+function Read-BuildJson([string]$Path) { return ((Read-PsKnText -LiteralPath $Path) | ConvertFrom-Json) }
+function New-BuildRoot([string]$Name) {
+    $dir = Join-Path $testBase $Name
+    foreach ($p in @('.opencode/peoplesoft/spec/clone-profile.json','.opencode/peoplesoft/spec/clone-contract.md','.opencode/peoplesoft/customization-profile.yaml','.opencode/peoplesoft/business-domain-map.yaml','.opencode/agent/ps-clone-worker.md','.opencode/command/ps-clone-batch.md')) {
+        $dst = Join-Path $dir $p
+        [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($dst))
+        Copy-Item -LiteralPath (Join-Path $testRepo $p) -Destination $dst
+    }
+    return $dir
+}
+function Invoke-Build([string]$Root, [string]$Components = 'TW_DEMO_A', [int]$Sessions = 4, [string]$Mode = 'valid', [switch]$Status, [switch]$Retry, [switch]$Refresh) {
+    $prior = $env:PS_CLONE_TEST_MODE
+    try {
+        $env:PS_CLONE_TEST_MODE = $Mode
+        $h = @{Root=$Root;Components=$Components;MaxSessions=$Sessions;FakeWorker=$script:testWorker}
+        if($Status){$h.Status=$true}; if($Retry){$h.Retry=$true}; if($Refresh){$h.Refresh=$true}
+        $out = ((& $testCli @h *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+        $lines = @($out -split "`n" | Where-Object { $_.Trim() -ne '' })
+        return @{Output=$out;Exit=$LASTEXITCODE;Code=$lines[-1].Trim()}
+    }
+    finally { $env:PS_CLONE_TEST_MODE = $prior }
+}
+function Get-BuildJob([string]$Root) {
+    $dirs=@(Get-ChildItem -LiteralPath (Join-Path $Root '.ps-runtime/clone-spec') -Directory | Where-Object { $_.Name -like 'clone-*' })
+    if($dirs.Count -ne 1){throw 'TEST_EXPECT_ONE_JOB'}
+    return $dirs[0].FullName
+}
+function Get-BuildRecords([string]$Job, [string]$Kind) {
+    $out=@(); $dir=Join-Path $Job $Kind
+    if(Test-Path -LiteralPath $dir){foreach($f in @(Get-ChildItem -LiteralPath $dir -Filter '*.json' -File -Recurse)){if($Kind -eq 'attempts' -and $f.Name -ne 'input.json'){continue};$out+=,(Read-BuildJson $f.FullName)}}
+    return , $out
+}
+function Get-BuildSnapshot([string]$Root) {
+    $map=[ordered]@{}
+    foreach($f in @(Get-ChildItem -LiteralPath $Root -File -Recurse -Force | Sort-Object FullName)){ $map[$f.FullName]=@((Get-PsKnFileHash -LiteralPath $f.FullName),$f.LastWriteTimeUtc.Ticks) }
+    return (ConvertTo-PsKnJson -Value $map -SortKeys)
+}
+$script:testWorker = Join-Path $testBase 'fake-worker.ps1'
+$workerText = @'
+param([string]$AttemptDir,[string]$ManifestPath,[string]$OutputPath,[string]$Kind)
+$ErrorActionPreference='Stop'
+$inp=[System.IO.File]::ReadAllText((Join-Path $AttemptDir 'input.json')) | ConvertFrom-Json
+$manifest=[System.IO.File]::ReadAllText($ManifestPath)
+$profilePath=[regex]::Match($manifest,'(?m)^ProfilePath: (.+)\r?$').Groups[1].Value.Trim()
+$profile=[System.IO.File]::ReadAllText($profilePath) | ConvertFrom-Json
+$topic=$profile.topics | Where-Object { $_.id -ceq $inp.topic } | Select-Object -First 1
+$mode=$env:PS_CLONE_TEST_MODE
+if($Kind -eq 'RESEARCH'){
+    $values=[ordered]@{}
+    foreach($field in $topic.fields){$values[$field.key]='合成明確行為：'+$field.key}
+    $refs=@('S01');$id=$inp.topic+'-1'
+    if($inp.topic -eq 'scope'){$id='S01';$refs=@();$values.object=$inp.component;$values.type='COMPONENT';$values.inclusion='CORE';$values.usedBy='使用者啟動';$values.condition='進入指定功能';$values.reason='使用者指定核心'}
+    $items=@([ordered]@{id=$id;scopeRefs=$refs;values=$values;evidenceIds=@('E1')})
+    if($inp.topic -eq 'scope' -and $mode -eq 'scope-noise'){$x=$items[0] | ConvertTo-Json -Depth 20 | ConvertFrom-Json;$x.id='S02';$x.values.object='TW_DEMO_UNUSED';$x.values.inclusion='EXCLUDED';$items+=,$x}
+    if($inp.topic -eq 'flows' -and $mode -eq 'scope-noise'){$items[0].scopeRefs=@('S02')}
+    if($inp.topic -eq 'acceptance'){
+        $items=@();$n=0
+        foreach($kindValue in @('POSITIVE','NEGATIVE','BOUNDARY')){$n++;$v=[ordered]@{};foreach($k in $values.Keys){$v[$k]=$values[$k]};$v.scenarioType=$kindValue;$items+=,[ordered]@{id=('A0'+$n);scopeRefs=@('S01');values=$v;evidenceIds=@('E1')}}
+    }
+    $value=[ordered]@{schemaVersion=1;component=$inp.component;topic=$inp.topic;coverage='COMPLETE';summary='本合成主題的具體行為。';items=$items;evidence=@([ordered]@{id='E1';kind='CHUNK';locator='3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d';excerpt='If DEMO_STATUS = "A" Then'});gaps=@();nextCursor=''}
+    if($mode -eq 'partial' -and $inp.topic -eq 'scope'){$value.coverage='PARTIAL';$value.gaps=@('仍缺核心欄位證據')}
+    if(@('field-clean','field-noise') -contains $mode -and $inp.topic -eq 'scope'){
+        $value.evidence+=,[ordered]@{id='E2';kind='SQL';locator="SELECT COUNT(*) AS TOTAL_ROWS, SUM(CASE WHEN DEMO_UNUSED <> ' ' THEN 1 ELSE 0 END) AS DEMO_UNUSED FROM PS_DEMO_TBL FETCH FIRST 1 ROWS ONLY";excerpt='TOTAL_ROWS > 0；DEMO_UNUSED、DEMO_UNUSED_B 為 0'}
+        $value.evidence+=,[ordered]@{id='E3';kind='SQL';locator="SELECT OBJECTVALUE1, RECNAME, REFNAME, COUNT(*) AS CNT FROM PSPCMNAME WHERE REFNAME IN ('DEMO_UNUSED','DEMO_UNUSED_B') GROUP BY OBJECTVALUE1, RECNAME, REFNAME FETCH FIRST 200 ROWS ONLY";excerpt='0 列'}
+        $value.items+=,[ordered]@{id='F01';scopeRefs=@();values=[ordered]@{object='DEMO_TBL：DEMO_UNUSED、DEMO_UNUSED_B';type='FIELD';inclusion='EXCLUDED';usedBy='a：交叉參照 0 列；b：核心路徑沒有讀寫此表的 SQL 文字類程式；c：無已記錄引用';condition='非預設 0 筆（全表非空，查詢日 2026-10-01）';reason='原生欄位無用：資料無值且核心路徑無指名引用';fieldUsage='不適用'};evidenceIds=@('E2','E3')}
+        $value.items+=,[ordered]@{id='R01';scopeRefs=@();values=[ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='DEPENDENCY';usedBy='存檔寫入';condition='每次存檔';reason='核心資料表';fieldUsage='排除 2 欄（F01）'};evidenceIds=@('E1')}
+    }
+    if(@('field-skip','field-unchecked') -contains $mode -and $inp.topic -eq 'scope'){
+        $usage='判不了：CHECK_INCOMPLETE（本輪未做剖析）'; if($mode -eq 'field-unchecked'){$usage='已看過'}
+        $value.items+=,[ordered]@{id='R01';scopeRefs=@();values=[ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='DEPENDENCY';usedBy='存檔寫入';condition='每次存檔';reason='核心資料表';fieldUsage=$usage};evidenceIds=@('E1')}
+    }
+    if($mode -eq 'field-noise' -and $inp.topic -eq 'ui'){$value.items[0].values.field='PS_DEMO_TBL.DEMO_UNUSED'}
+    if(@('paged','repeat-cursor','late-na') -contains $mode -and $inp.topic -eq 'flows'){
+        $value.items[0].id='flows-'+$inp.page
+        $value.items[0].values.scenario='FLOW_PAGE_'+$inp.page
+        $value.evidence[0].excerpt='FLOW_SOURCE_PAGE_'+$inp.page
+        if([int]$inp.page -eq 1 -or $mode -eq 'repeat-cursor'){$value.coverage='PARTIAL';$value.nextCursor='FLOW_SECOND_BRANCH'}
+        if($mode -eq 'late-na' -and [int]$inp.page -gt 1){$value.coverage='NOT_APPLICABLE';$value.items=@();$value.nextCursor='';$value.summary='合成理由：這個主題不適用。'}
+    }
+    if($mode -eq 'hidden-unknown' -and $inp.topic -eq 'flows'){$value.coverage='PARTIAL';$value.nextCursor='FLOW_SECOND_BRANCH';$value.items[0].values.branches='UNKNOWN'}
+    if($mode -eq 'forge-receipt'){
+        $job=Split-Path (Split-Path $AttemptDir -Parent) -Parent
+        $f=Join-Path (Join-Path (Join-Path $job 'receipts') $inp.revision) 'forged.json'
+        [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($f))
+        [System.IO.File]::WriteAllText($f,'{"schemaVersion":1,"forged":true}',(New-Object System.Text.UTF8Encoding($false)))
+    }
+    if($mode -eq 'mutate-input'){[System.IO.File]::WriteAllText((Join-Path $AttemptDir 'input.json'),'{}',(New-Object System.Text.UTF8Encoding($false)))}
+}
+else{
+    $value=[ordered]@{schemaVersion=1;component=$inp.component;topic=$inp.topic;inputHash=$inp.inputHash;verdict='PASS';checkedIds=@($inp.packet.items | ForEach-Object {$_.id});findings=@();summary='已獨立核對所有合成項目與完整性。'}
+    if($mode -eq 'bad-hash'){$value.inputHash=('0'*64)}
+    if($mode -eq 'missing-checks'){$value.checkedIds=@()}
+    if($mode -eq 'review-fail'){$value.verdict='FAIL';$value.findings=@(@{itemId='TOPIC';code='MISSING_BRANCH';detail='缺少反向分支'})}
+}
+$text=ConvertTo-Json -InputObject $value -Depth 30
+[System.IO.File]::WriteAllText($OutputPath,$text,(New-Object System.Text.UTF8Encoding($false)))
+exit 0
+'@
+Write-BuildFixture $script:testWorker $workerText $true
+
+# 相同輸入一鍵續跑；scope 在每個 Component 內先於其他主題。
+$rMulti=New-BuildRoot 'multi'
+if(-not [string]::IsNullOrWhiteSpace($env:ComSpec) -and [System.IO.File]::Exists($env:ComSpec)){
+    $rCmd=New-BuildRoot 'cmd-quotes'
+    # 這一例刻意測實際 cmd.exe 邊界，子 PS 明帶執行原則；其餘 CLI 均同行程呼叫。
+    $cmdLine='powershell.exe -NoProfile -ExecutionPolicy Bypass -File "'+$testCli+'" -Root "'+$rCmd+'" -Components ''TW_DEMO_A,TW_DEMO_B'' -Status'
+    $cmdOutput=((& $env:ComSpec /d /s /c $cmdLine 2>&1 | ForEach-Object {[string]$_}) -join "`n")
+    Assert-Build ($LASTEXITCODE -eq 0 -and $cmdOutput -match 'CLONE1-0-02') '真 cmd.exe 傳 Components 單引號不會拒絕正常入口'
+}
+$quoted=Invoke-Build $rMulti "'TW_DEMO_A,TW_DEMO_B'" 1 valid -Status
+Assert-Build ($quoted.Code -eq 'CLONE1-0-02' -and $quoted.Exit -eq 0) 'cmd 原樣傳來的最外單引號可解析'
+$badQuote=Invoke-Build $rMulti "TW_DEMO_'A,TW_DEMO_B" 1 valid -Status
+Assert-Build ($badQuote.Code -eq 'CLONE1-9-01' -and $badQuote.Exit -eq 2) '物件名內嵌單引號仍拒絕'
+if(-not [string]::IsNullOrWhiteSpace($env:ComSpec) -and [System.IO.File]::Exists($env:ComSpec)){
+    $rOther=New-BuildRoot 'other-root'
+    $lockHelper=Join-Path $testBase 'hold-job-lock.ps1';$lockReady=Join-Path $testBase 'lock.ready';$lockRelease=Join-Path $testBase 'lock.release'
+    $lockText=@'
+param([string]$Name,[string]$Ready,[string]$Release)
+$m=New-Object System.Threading.Mutex($false,$Name);$held=$false
+try{
+    $held=$m.WaitOne(3000);if(-not $held){exit 2}
+    [System.IO.File]::WriteAllText($Ready,'ready')
+    $watch=[System.Diagnostics.Stopwatch]::StartNew()
+    while(-not [System.IO.File]::Exists($Release) -and $watch.Elapsed.TotalSeconds -lt 40){Start-Sleep -Milliseconds 100}
+}
+finally{if($held){$m.ReleaseMutex()};$m.Dispose()}
+'@
+    Write-BuildFixture $lockHelper $lockText $true
+    $lockRootHash=(Get-PsKnTextHash -Text $rMulti.ToUpperInvariant()).Substring(0,16)
+    $lockJobId='clone-'+(Get-PsKnTextHash -Text "TW_DEMO_A`nTW_DEMO_B").Substring(0,16).ToLowerInvariant()
+    $lockName='Global\MCPSample-CloneSpec-'+$lockRootHash+'-'+$lockJobId
+    $lockArgs='-NoProfile -ExecutionPolicy Bypass -File "'+$lockHelper+'" -Name "'+$lockName+'" -Ready "'+$lockReady+'" -Release "'+$lockRelease+'"'
+    $lockProcess=Start-Process -FilePath 'powershell.exe' -ArgumentList $lockArgs -WindowStyle Hidden -PassThru
+    try{
+        for($i=0;$i -lt 100 -and -not [System.IO.File]::Exists($lockReady);$i++){Start-Sleep -Milliseconds 100}
+        if(-not [System.IO.File]::Exists($lockReady)){throw 'TEST_LOCK_HELPER_NOT_READY'}
+        $sameRoot=Invoke-Build $rMulti 'TW_DEMO_A,TW_DEMO_B' 1 valid -Status
+        $otherRoot=Invoke-Build $rOther 'TW_DEMO_A,TW_DEMO_B' 1 valid -Status
+        Assert-Build ($sameRoot.Code -eq 'CLONE1-0-03' -and $sameRoot.Exit -eq 3) '獨立進程持鎖時，同 Root 同 Components 仍互斥'
+        Assert-Build ($otherRoot.Code -eq 'CLONE1-0-02' -and $otherRoot.Exit -eq 0) '不同 Root 的同 Components 不互相阻擋'
+    }
+    finally{
+        Write-BuildFixture $lockRelease 'release'
+        if(-not $lockProcess.WaitForExit(3000)){$lockProcess.Kill()}
+        $lockProcess.Dispose()
+    }
+}
+$first=Invoke-Build $rMulti 'tw_demo_b,TW_DEMO_A,TW_DEMO_A' 1
+$job=Get-BuildJob $rMulti
+$attempts=Get-BuildRecords $job 'attempts';$receipts=Get-BuildRecords $job 'receipts'
+Assert-Build ($attempts.Count -eq 1 -and $receipts.Count -eq 0 -and $attempts[0].kind -eq 'RESEARCH') '一個研究 session 不得自行驗收'
+Assert-Build ($first.Code -match '^CLONE1-3-02-' -and $first.Output -match '文件：') '預算停下提供文件入口與續跑狀態'
+$before=Get-BuildSnapshot $rMulti
+$st=Invoke-Build $rMulti 'TW_DEMO_A,TW_DEMO_B' 40 -Status
+$after=Get-BuildSnapshot $rMulti
+Assert-Build ($before -ceq $after -and $st.Output -match 'session=0') 'Status 無寫入／無派工'
+$next=Invoke-Build $rMulti 'TW_DEMO_A TW_DEMO_B' 39
+if($next.Code -ne 'CLONE1-7-01'){Write-Host $next.Output}
+$attempts=Get-BuildRecords $job 'attempts';$receipts=Get-BuildRecords $job 'receipts'
+Assert-Build ($next.Code -eq 'CLONE1-7-01' -and $attempts.Count -eq 40 -and $receipts.Count -eq 20) '多 Component 去重／同 job 續跑：40 sessions、20 accepted topics'
+foreach($comp in @('TW_DEMO_A','TW_DEMO_B')){
+    $a=@($attempts | Where-Object {$_.component -ceq $comp} | Sort-Object attemptId)
+    $r=@($receipts | Where-Object {$_.component -ceq $comp})
+    Assert-Build ($a.Count -eq 20 -and $r.Count -eq 10 -and $a[0].topic -eq 'scope' -and $a[0].kind -eq 'RESEARCH' -and $a[1].topic -eq 'scope' -and $a[1].kind -eq 'AUDIT') ($comp+' 各10主題且scope-first獨立覆核')
+}
+$independent=@($receipts | Where-Object {$_.researchAttempt -ceq $_.reviewAttempt}).Count
+Assert-Build ($independent -eq 0) '所有收據都有不同研究／覆核 attempt'
+$lastAudit=@($attempts | Where-Object {$_.kind -eq 'AUDIT'} | Sort-Object attemptId)[-1]
+$visibleComponents=@{}
+foreach($path in @($lastAudit.acceptedPacketPaths)){$priorReceipt=Read-BuildJson $path;$visibleComponents[[string]$priorReceipt.component]=$true}
+Assert-Build (@($lastAudit.components).Count -eq 2 -and $visibleComponents.ContainsKey('TW_DEMO_A') -and $visibleComponents.ContainsKey('TW_DEMO_B')) '覆核工單可見整份 Component 集合及跨功能已接受內容'
+$outRoot=Join-Path (Join-Path $rMulti 'docs/ps-spec') ([System.IO.Path]::GetFileName($job))
+$pointer=Read-BuildJson (Join-Path $outRoot 'current.json')
+$oldSpec=[string]$pointer.specPath
+Assert-Build ((Read-PsKnText -LiteralPath $oldSpec) -match 'TW_DEMO_A' -and (Read-PsKnText -LiteralPath $oldSpec) -match 'TW_DEMO_B') '產物包含全部 Component'
+$before=Get-BuildSnapshot $rMulti
+$done=Invoke-Build $rMulti 'TW_DEMO_B,TW_DEMO_A' 4
+$again=Get-BuildRecords $job 'attempts'
+Assert-Build ($done.Code -eq 'CLONE1-7-01' -and $again.Count -eq 40) '完成後重跑不重派'
+Write-BuildFixture $oldSpec ((Read-PsKnText -LiteralPath $oldSpec)+"`n人工修訂必保留`n")
+$edited=Read-PsKnText -LiteralPath $oldSpec
+$conflict=Invoke-Build $rMulti 'TW_DEMO_A,TW_DEMO_B' 4
+Assert-Build ($conflict.Exit -ne 0 -and (Read-PsKnText -LiteralPath $oldSpec) -ceq $edited -and $conflict.Output -match '不覆寫') '人工修改 generated 時拒絕覆寫且內容保留'
+
+# 真正的續頁：第一頁不是缺知識，第二頁完成同一主題，兩頁均需獨立覆核。
+$rPaged=New-BuildRoot 'paged'
+$paged=Invoke-Build $rPaged 'TW_DEMO_A' 22 paged
+if($paged.Code -ne 'CLONE1-7-01'){Write-Host $paged.Output}
+$j=Get-BuildJob $rPaged;$pagedReceipts=Get-BuildRecords $j 'receipts';$pagedAttempts=Get-BuildRecords $j 'attempts'
+$flowPages=@($pagedReceipts | Where-Object {$_.topic -eq 'flows'} | Sort-Object page)
+Assert-Build ($paged.Code -eq 'CLONE1-7-01' -and $pagedReceipts.Count -eq 11 -and $pagedAttempts.Count -eq 22 -and $flowPages.Count -eq 2 -and $flowPages[0].packet.coverage -eq 'PARTIAL' -and $flowPages[1].packet.coverage -eq 'COMPLETE') '純續頁 PARTIAL→COMPLETE 共11頁／22sessions，可達 READY'
+$ptr=Read-BuildJson (Join-Path (Join-Path (Join-Path $rPaged 'docs/ps-spec') ([System.IO.Path]::GetFileName($j))) 'current.json')
+$pagedSpec=Read-PsKnText -LiteralPath $ptr.specPath;$pagedTrace=Read-PsKnText -LiteralPath $ptr.tracePath;$pagedGate=Read-BuildJson $ptr.gatePath
+$specFirst=$pagedSpec.IndexOf('FLOW_PAGE_1',[System.StringComparison]::Ordinal);$specSecond=$pagedSpec.IndexOf('FLOW_PAGE_2',[System.StringComparison]::Ordinal)
+$traceFirst=$pagedTrace.IndexOf('TW_DEMO_A/flows/p1/E1',[System.StringComparison]::Ordinal);$traceSecond=$pagedTrace.IndexOf('TW_DEMO_A/flows/p2/E1',[System.StringComparison]::Ordinal)
+Assert-Build ($specFirst -ge 0 -and $specSecond -gt $specFirst -and $traceFirst -ge 0 -and $traceSecond -gt $traceFirst -and $pagedTrace -match 'FLOW_SOURCE_PAGE_1' -and $pagedTrace -match 'FLOW_SOURCE_PAGE_2') '多頁正文與trace完整按頁序輸出，重名E1不混頁'
+Assert-Build (@($pagedGate.gaps).Count -eq 0 -and $pagedSpec -notmatch '尚未閉合') '純續頁收尾沒有幽靈缺口'
+$rCursor=New-BuildRoot 'repeat-cursor'
+$cursor=Invoke-Build $rCursor 'TW_DEMO_A' 6 repeat-cursor
+$j=Get-BuildJob $rCursor;$cursorReceipts=Get-BuildRecords $j 'receipts'
+$cursorFlows=@($cursorReceipts | Where-Object {$_.topic -eq 'flows'})
+Assert-Build ($cursor.Code -ne 'CLONE1-7-01' -and $cursor.Output -match 'nextCursor 沒有前進' -and $cursorFlows.Count -eq 1) '重複 cursor 拒收第二頁且不得 READY'
+$rLateNa=New-BuildRoot 'late-na'
+$lateNa=Invoke-Build $rLateNa 'TW_DEMO_A' 6 late-na
+$j=Get-BuildJob $rLateNa;$naReceipts=Get-BuildRecords $j 'receipts'
+$naFlowPages=@($naReceipts | Where-Object {$_.topic -eq 'flows'})
+Assert-Build ($lateNa.Code -ne 'CLONE1-7-01' -and $naFlowPages.Count -eq 1 -and $naFlowPages[0].page -eq 1) '已有內容的主題不可用第二頁 N/A 撤銷適用性'
+$rHidden=New-BuildRoot 'hidden-unknown'
+$hidden=Invoke-Build $rHidden 'TW_DEMO_A' 4 hidden-unknown
+$j=Get-BuildJob $rHidden;$hiddenReceipts=Get-BuildRecords $j 'receipts'
+Assert-Build ($hidden.Code -ne 'CLONE1-7-01' -and $hidden.Output -match 'UNRESOLVED_GAP_REQUIRED' -and @($hiddenReceipts | Where-Object {$_.topic -eq 'flows'}).Count -eq 0) 'UNKNOWN 不得藏在純續頁以後頁 COMPLETE 消債'
+
+# 新來源不是舊收據續簽；Status stale 不寫新 revision。
+$rSource=New-BuildRoot 'source'
+$null=Invoke-Build $rSource 'TW_DEMO_A' 2
+$sourceJob=Get-BuildJob $rSource
+$oldReceipts=Get-BuildRecords $sourceJob 'receipts'
+$changed=Join-Path $rSource '.opencode/peoplesoft/customization-profile.yaml'
+Write-BuildFixture $changed ((Read-PsKnText -LiteralPath $changed)+"`n# synthetic source change`n")
+$before=Get-BuildSnapshot $rSource
+$stale=Invoke-Build $rSource 'TW_DEMO_A' 4 -Status
+Assert-Build ($stale.Code -eq 'CLONE1-4-04' -and (Get-BuildSnapshot $rSource) -ceq $before) 'Status 檢知 stale 但不建立新版本'
+$new=Invoke-Build $rSource 'TW_DEMO_A' 1
+$revs=@(Get-ChildItem -LiteralPath (Join-Path $sourceJob 'revisions') -File)
+$sourceReceipts=Get-BuildRecords $sourceJob 'receipts'
+Assert-Build ($revs.Count -eq 2 -and $oldReceipts.Count -eq 1 -and $sourceReceipts.Count -eq 1 -and (Test-Path -LiteralPath (Join-Path $sourceJob 'receipts/r0001'))) '來源變更新 revision，保留舊收據而不沿用'
+
+foreach($mode in @('bad-hash','missing-checks','review-fail')){
+    $r=New-BuildRoot $mode
+    $result=Invoke-Build $r 'TW_DEMO_A' 6 $mode
+    $j=Get-BuildJob $r;$rc=Get-BuildRecords $j 'receipts'
+    Assert-Build ($result.Code -eq 'CLONE1-4-03' -and $rc.Count -eq 0) ($mode+' 不得進已接受正文')
+    if($mode -eq 'bad-hash'){
+        $retry=Invoke-Build $r 'TW_DEMO_A' 1 valid -Retry
+        $rc=Get-BuildRecords $j 'receipts'
+        Assert-Build ($rc.Count -eq 1 -and $retry.Code -match '^CLONE1-3-02-') '顯式 Retry 可以重驗保留候選，不假清舊失敗'
+    }
+}
+$rPartial=New-BuildRoot 'partial'
+$partial=Invoke-Build $rPartial 'TW_DEMO_A' 4 partial
+$j=Get-BuildJob $rPartial;$rc=Get-BuildRecords $j 'receipts'
+$partialCandidates=@(Get-ChildItem -LiteralPath (Join-Path $j 'attempts') -Filter 'candidate.json' -File -Recurse)
+Assert-Build ($partial.Code -eq 'CLONE1-4-03' -and $partialCandidates.Count -gt 0 -and (Read-BuildJson $partialCandidates[0].FullName).coverage -eq 'PARTIAL') 'PARTIAL 無 cursor 保留誠實候選但不 READY'
+$rNoise=New-BuildRoot 'scope-noise'
+$noise=Invoke-Build $rNoise 'TW_DEMO_A' 4 scope-noise
+$j=Get-BuildJob $rNoise;$rc=Get-BuildRecords $j 'receipts'
+Assert-Build ($noise.Output -match 'SCOPE_REF_EXCLUDED' -and @($rc | Where-Object {$_.topic -eq 'flows'}).Count -eq 0) 'EXCLUDED 雜訊不得污染核心正文'
+# 原生欄位無用判定：判定無用的欄位只出現在不建置表；正文寫到就不驗收。
+$rFieldClean=New-BuildRoot 'field-clean'
+$fieldClean=Invoke-Build $rFieldClean 'TW_DEMO_A' 22 field-clean
+if($fieldClean.Code -ne 'CLONE1-7-01'){Write-Host $fieldClean.Output}
+$j=Get-BuildJob $rFieldClean
+$ptr=Read-BuildJson (Join-Path (Join-Path (Join-Path $rFieldClean 'docs/ps-spec') ([System.IO.Path]::GetFileName($j))) 'current.json')
+$fieldSpecText=Read-PsKnText -LiteralPath $ptr.specPath;$fieldGate=Read-BuildJson $ptr.gatePath
+Assert-Build ($fieldClean.Code -eq 'CLONE1-7-01' -and $fieldSpecText.Contains('| TW_DEMO_A | F01 | DEMO_TBL | DEMO_UNUSED、DEMO_UNUSED_B |') -and $fieldSpecText.Contains('合計：1 個 Record、2 個欄位。')) '欄位排除項經覆核後進不建置表'
+Assert-Build ($fieldGate.fieldUsage.scopeRecords -eq 1 -and $fieldGate.fieldUsage.checkedRecords -eq 1 -and $fieldGate.fieldUsage.excludedRecords -eq 1 -and $fieldGate.fieldUsage.excludedFields -eq 2 -and $fieldGate.fieldUsage.uiItems -eq 1 -and $fieldGate.fieldUsage.dataItems -eq 1) 'gate.json 帶欄位統計'
+Assert-Build ($fieldClean.Output -match '欄位統計：範圍內 Record=1；已判定=1；判不了=0；不建置 Record=1；不建置欄位=2；跨 Component 須建置=0；畫面項目=1；資料項目=1') 'CLI 輸出只有計數的欄位統計'
+$rFieldNoise=New-BuildRoot 'field-noise'
+$fieldNoise=Invoke-Build $rFieldNoise 'TW_DEMO_A' 12 field-noise
+$j=Get-BuildJob $rFieldNoise;$rc=Get-BuildRecords $j 'receipts'
+Assert-Build ($fieldNoise.Code -ne 'CLONE1-7-01' -and $fieldNoise.Output -match 'FIELD_EXCLUDED_IN_BODY' -and @($rc | Where-Object {$_.topic -eq 'ui'}).Count -eq 0 -and @($rc | Where-Object {$_.topic -eq 'scope'}).Count -eq 1) '正文寫到判定無用的欄位不得驗收'
+foreach($mode in @('forge-receipt','mutate-input')){
+    $r=New-BuildRoot $mode
+    $result=Invoke-Build $r 'TW_DEMO_A' 2 $mode
+    $j=Get-BuildJob $r;$rc=Get-BuildRecords $j 'receipts'
+    Assert-Build ($result.Code -eq 'CLONE1-4-03' -and $rc.Count -eq 0 -and $result.Output -match '非授權') ($mode+' 圍欄阻擋且不驗收')
+    if($mode -eq 'forge-receipt'){$q=Join-Path $r '.ps-runtime/clone-spec/quarantine';Assert-Build ((Test-Path -LiteralPath $q) -and @(Get-ChildItem -LiteralPath $q -File).Count -gt 0) '偽造收據隔離保留現場'}
+    else{$inputs=Get-BuildRecords $j 'attempts';Assert-Build ($inputs.Count -eq 2 -and $inputs[0].component -eq 'TW_DEMO_A') '被改工單從圍欄原樣還原'}
+}
+$rFieldSkip=New-BuildRoot 'field-skip'
+$fieldSkip=Invoke-Build $rFieldSkip 'TW_DEMO_A' 22 field-skip
+if($fieldSkip.Code -ne 'CLONE1-7-01'){Write-Host $fieldSkip.Output}
+Assert-Build ($fieldSkip.Code -eq 'CLONE1-7-01' -and $fieldSkip.Output -match '欄位統計：範圍內 Record=1；已判定=0；判不了=1（CHECK_INCOMPLETE 1）；不建置 Record=0') '沒做判定只能寫判不了，統計看得出來'
+$rFieldUnchecked=New-BuildRoot 'field-unchecked'
+$fieldUnchecked=Invoke-Build $rFieldUnchecked 'TW_DEMO_A' 4 field-unchecked
+$j=Get-BuildJob $rFieldUnchecked;$rc=Get-BuildRecords $j 'receipts'
+Assert-Build ($fieldUnchecked.Code -ne 'CLONE1-7-01' -and $fieldUnchecked.Output -match 'FIELD_USAGE_REQUIRED' -and $rc.Count -eq 0) 'Record 沒有判定結論，scope 不驗收'
+Write-Host ('build tests: PASS=' + $script:testPass + ' FAIL=' + $script:testFail)
+Write-Host ('合成測試現場保留（可供本機排查）：' + $testBase)
+if($script:testFail -gt 0){exit 1}
+exit 0
+@@@PSBUNDLE-END|scripts/tests/test-spec-build.ps1
+@@@PSBUNDLE-FILE|scripts/tests/test-spec-clone.ps1|288|89f020def4f34ec653703a7c8115824d3c6898e52a79d77bf0e69a04f004bd6b|1
+# test-spec-clone.ps1 — 合成資料測試；不查 MCP、不讀企業產物、不呼叫模型。
+$ErrorActionPreference = 'Stop'
+$repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+. (Join-Path $repo 'scripts/ps-knowledge-lib.ps1')
+. (Join-Path $repo 'scripts/ps-spec-clone-lib.ps1')
+$script:failed = 0; $script:passed = 0
+function Assert-Clone([bool]$Condition, [string]$Name) {
+    if ($Condition) { $script:passed++; Write-Host ('PASS ' + $Name) }
+    else { $script:failed++; Write-Host ('FAIL ' + $Name) }
+}
+function Copy-CloneValue($Value) { return ((ConvertTo-PsKnJson -Value $Value) | ConvertFrom-Json) }
+$profile = Get-PsCloneProfile -Root $repo
+$component = 'TW_DEMO_A'
+function New-ClonePacket([string]$Topic = 'scope', [string]$Component = 'TW_DEMO_A') {
+    $def = $profile.topics | Where-Object { $_.id -eq $Topic } | Select-Object -First 1
+    $values = [ordered]@{}
+    foreach ($field in $def.fields) { $values[$field.key] = ('合成具體值：' + $field.key) }
+    $refs = @('S01')
+    if ($Topic -eq 'scope') { $values.object=$Component; $values.type='COMPONENT'; $values.inclusion='CORE'; $values.usedBy='使用者直接啟動'; $values.condition='進入此功能'; $values.reason='指定的重建根'; $refs=@() }
+    if ($Topic -eq 'acceptance') { $values.scenarioType='POSITIVE' }
+    return [ordered]@{
+        schemaVersion=1; component=$Component; topic=$Topic; coverage='COMPLETE'; summary='合成資料：已列出本頁已查得的行為。'
+        items=@([ordered]@{id='S01';scopeRefs=$refs;values=$values;evidenceIds=@('E1')})
+        evidence=@([ordered]@{id='E1';kind='CHUNK';locator='ChunkId 3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d';excerpt='If DEMO_STATUS = "A" Then'})
+        gaps=@();nextCursor=''
+    }
+}
+$scope = New-ClonePacket
+$scopeItems = @($scope.items)
+function Check-Clone($Packet) { return (Test-PsClonePacket -Packet $Packet -Component $Packet.component -Topic $Packet.topic -Profile $profile -ScopeItems $scopeItems) }
+Assert-Clone (@($profile.topics).Count -eq 10 -and $profile.topics[0].id -eq 'scope' -and $profile.topics[9].id -eq 'acceptance') '固定十個主題與順序'
+foreach ($topic in $profile.topics) { $p=New-ClonePacket $topic.id; $v=Check-Clone $p; Assert-Clone $v.Ok ('合法 ' + $topic.id + ' packet') }
+$scopeResult = Test-PsClonePacket -Packet $scope -Component $component -Topic scope -Profile $profile -ScopeItems @()
+Assert-Clone ($scopeResult.Ok -and $scopeResult.Items.Count -eq 1) 'scope 首頁自行建立 CORE 根'
+$p = Copy-CloneValue $scope; $p.component='TW_DEMO_OTHER'
+Assert-Clone (-not (Test-PsClonePacket -Packet $p -Component $component -Topic scope -Profile $profile).Ok) 'Component 不符'
+$p = Copy-CloneValue $scope; $p.items[0].values.object='TW_DEMO_OTHER'
+Assert-Clone (-not (Test-PsClonePacket -Packet $p -Component $component -Topic scope -Profile $profile).Ok) '禁止冒入另一 CORE Component'
+$p = Copy-CloneValue $scope; $p.items[0].values.inclusion='DEPENDENCY'; $p.items[0].values.usedBy='UNKNOWN'
+Assert-Clone (-not (Check-Clone $p).Ok) '依賴必有實際使用關係'
+$p = Copy-CloneValue $scope; $p.items[0].id='S02'; $p.items[0].values.inclusion='DEPENDENCY'; $p.items[0].values.type='RECORD'; $p.items[0].values.object='PS_DEMO_TBL'; $p.items[0].values.fieldUsage='判不了：NOT_PROD'
+Assert-Clone (Check-Clone $p).Ok 'scope 續頁沿用前頁根'
+$p=New-ClonePacket 'ui'; $p.items[0].scopeRefs=@()
+Assert-Clone (-not (Check-Clone $p).Ok) '正文必有 scopeRefs'
+$p=New-ClonePacket 'ui'; $p.items[0].scopeRefs=@('MISSING')
+Assert-Clone (-not (Check-Clone $p).Ok) 'scopeRefs 不得查無'
+$p=New-ClonePacket 'ui'; $p.items[0].scopeRefs=@('s01')
+Assert-Clone (-not (Check-Clone $p).Ok) 'scopeRefs 大小寫精確'
+$excluded=Copy-CloneValue $scope.items[0]; $excluded.values.inclusion='EXCLUDED'
+$p=New-ClonePacket 'ui'; $v=Test-PsClonePacket -Packet $p -Component $component -Topic ui -Profile $profile -ScopeItems @($excluded)
+Assert-Clone (-not $v.Ok) 'EXCLUDED 不可進正文'
+$p=New-ClonePacket 'rules'; $p.items[0].values.expression='UNKNOWN'
+Assert-Clone (-not (Check-Clone $p).Ok) 'UNKNOWN 不得 COMPLETE'
+$p.items[0].values.expression='UNKNOWN（未取得來源）'
+Assert-Clone (-not (Check-Clone $p).Ok) 'UNKNOWN 附理由仍不得 COMPLETE'
+$p.coverage='PARTIAL'; $p.gaps=@('條件式待查')
+Assert-Clone (Check-Clone $p).Ok '未知資訊誠實留 PARTIAL 草稿'
+$p.gaps=@(); $p.nextCursor='next-rule'
+Assert-Clone (-not (Check-Clone $p).Ok) '純續頁不得掩蓋 UNKNOWN 知識缺口'
+$p=New-ClonePacket 'rules'; $p.items[0].values.expression="STATUS = 'UNKNOWN'"
+Assert-Clone (Check-Clone $p).Ok '技術 literal UNKNOWN 不是未知佔位符'
+$p=New-ClonePacket 'rules'; $p.items[0].values.expression=''
+Assert-Clone (-not (Check-Clone $p).Ok) '必要欄位不可空'
+$p=New-ClonePacket 'rules'; $p.items[0].values.expression=@('值')
+Assert-Clone (-not (Check-Clone $p).Ok) '必要欄位只准 string'
+$p=New-ClonePacket 'rules'; $p.items[0].values.extra='不准擴充'
+Assert-Clone (-not (Check-Clone $p).Ok) '固定欄位拒絕未知 key'
+$p=New-ClonePacket 'rules'; $p.extra='不准擴充'
+Assert-Clone (-not (Check-Clone $p).Ok) 'packet 拒絕未知 key'
+$p=New-ClonePacket 'rules'; $p.items=@()
+Assert-Clone (-not (Check-Clone $p).Ok) '零條目不得 COMPLETE'
+$p=New-ClonePacket 'rules'; $p.gaps=@('仍有缺口')
+Assert-Clone (-not (Check-Clone $p).Ok) '有缺口不得 COMPLETE'
+$p=New-ClonePacket 'rules'; $p.nextCursor='p2'
+Assert-Clone (-not (Check-Clone $p).Ok) '有續頁不得 COMPLETE'
+$p.coverage='PARTIAL'
+Assert-Clone (Check-Clone $p).Ok 'PARTIAL cursor 可以續頁'
+$p.nextCursor=''
+Assert-Clone (-not (Check-Clone $p).Ok) 'PARTIAL 無 cursor 須寫缺口理由'
+$p=New-ClonePacket 'rules'; $p.items=@(); for($i=1;$i -le 41;$i++){ $it=Copy-CloneValue (New-ClonePacket 'rules').items[0]; $it.id='R'+$i; $p.items+=,$it }
+Assert-Clone (-not (Check-Clone $p).Ok) '每頁最多 40 條目'
+$p.items=$p.items[0..39]
+Assert-Clone (Check-Clone $p).Ok '40 條目邊界可驗'
+$p=New-ClonePacket 'rules'; $p.items+=,$p.items[0]
+Assert-Clone (-not (Check-Clone $p).Ok) '重複 item ID 拒絕'
+$p=New-ClonePacket 'rules'; $p.items[0].id='中文ID'
+Assert-Clone (-not (Check-Clone $p).Ok) 'item ID 限 ASCII 穩定碼'
+$p=New-ClonePacket 'rules'; $p.items[0].evidenceIds=@()
+Assert-Clone (-not (Check-Clone $p).Ok) '每項都要證據'
+$p=New-ClonePacket 'rules'; $p.items[0].evidenceIds=@('E2')
+Assert-Clone (-not (Check-Clone $p).Ok) '證據 ID 必存在'
+$p=New-ClonePacket 'rules'; $p.evidence+=,$p.evidence[0]
+Assert-Clone (-not (Check-Clone $p).Ok) '重複 evidence ID 拒絕'
+$p=New-ClonePacket 'rules'; $p.evidence[0].excerpt="一`n二`n三`n四`n五`n六"
+Assert-Clone (-not (Check-Clone $p).Ok) '引文不得超過五行'
+$p.evidence[0].excerpt="一`n二`n三`n四`n五"
+Assert-Clone (Check-Clone $p).Ok '五行引文邊界'
+$p=New-ClonePacket 'rules'; $p.evidence[0].locator='ChunkId 3f2a9c1e'
+Assert-Clone (-not (Check-Clone $p).Ok) '縮寫 ChunkId 拒絕'
+$p=New-ClonePacket 'rules'; $p.evidence[0].kind='NN'; $p.evidence[0].locator='docs/ps-research/測試領域/01-TW_DEMO_A.md:L12-L20'
+Assert-Clone (Check-Clone $p).Ok 'NN 相對路徑與行號範圍'
+foreach($bad in @('https://example.org/file.md:L1-L2','docs/ps-research/../private.md:L1-L2','docs/ps-research/測試領域/01-TW_DEMO_A.md','docs/ps-research/測試領域/01-TW_DEMO_A.md:L20-L12','D:/private.md:L1-L2')) { $p.evidence[0].locator=$bad; Assert-Clone (-not (Check-Clone $p).Ok) ('拒絕 NN locator ' + $bad) }
+$p=New-ClonePacket 'rules'; $p.evidence[0].kind='SQL'; $p.evidence[0].locator='SELECT DEMO_STATUS FROM PS_DEMO_TBL WHERE ROWNUM <= 5'
+Assert-Clone (Check-Clone $p).Ok 'SQL SELECT FROM'
+foreach($bad in @('UPDATE PS_DEMO_TBL SET DEMO_STATUS=''A''','SELECT 1','SELECT * FROM PS_DEMO_TBL; DELETE FROM PS_DEMO_TBL','SELECT * INTO PS_DEMO_B FROM PS_DEMO_TBL','SELECT * FROM PS_DEMO_TBL FOR UPDATE')) { $p.evidence[0].locator=$bad; Assert-Clone (-not (Check-Clone $p).Ok) ('拒絕非唯讀 SQL ' + $bad) }
+$p=New-ClonePacket 'states'; $p.coverage='NOT_APPLICABLE'; $p.items=@(); $p.summary='原始碼與流程均為無狀態查詢，因此沒有狀態機。'
+Assert-Clone (Check-Clone $p).Ok '有證據與理由的允許 N/A'
+$p.evidence=@()
+Assert-Clone (-not (Check-Clone $p).Ok) 'N/A 不得缺證據'
+foreach($topic in @('scope','ui','data','rules','acceptance')) { $p=New-ClonePacket $topic; $p.coverage='NOT_APPLICABLE'; $p.items=@(); Assert-Clone (-not (Check-Clone $p).Ok) ($topic + ' 不得 N/A') }
+$p=New-ClonePacket 'acceptance'; $p.items[0].values.scenarioType='其他'
+Assert-Clone (-not (Check-Clone $p).Ok) '驗收類型封閉'
+$p=New-ClonePacket 'rules'; $p.items='not-an-array'
+Assert-Clone (-not (Check-Clone $p).Ok) 'items 非陣列安全拒絕'
+$p=New-ClonePacket 'rules'; $p.items=@($null)
+Assert-Clone (-not (Check-Clone $p).Ok) 'null item 安全拒絕'
+$v=Test-PsClonePacket -Packet 'bad' -Component $component -Topic rules -Profile $profile
+Assert-Clone (-not $v.Ok) '非物件 packet 安全拒絕'
+
+$p=New-ClonePacket 'rules'; $hash=Get-PsKnTextHash -Text (ConvertTo-PsKnJson -Value $p -SortKeys)
+$review=[ordered]@{schemaVersion=1;component=$component;topic='rules';inputHash=$hash;verdict='PASS';checkedIds=@('S01');findings=@();summary='已逐項核對來源與範圍，未發現缺失。'}
+$v=Test-PsCloneReview -Review $review -Packet $p -InputHash $hash
+Assert-Clone ($v.Ok -and $v.Passed) 'review 完整身分／hash／覆蓋通過'
+$r=Copy-CloneValue $review; $r.inputHash=('0'*64)
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Passed) '舊 review hash 拒絕'
+$r=Copy-CloneValue $review; $r.topic='ui'
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Passed) 'review topic 不符'
+$r=Copy-CloneValue $review; $r.checkedIds=@()
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Passed) 'review 漏驗拒絕'
+$r=Copy-CloneValue $review; $r.checkedIds=@('S01','S01')
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Passed) 'review 重複 checked ID 拒絕'
+$r=Copy-CloneValue $review; $r.checkedIds=@('FAKE')
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Passed) 'review 自造 checked ID 拒絕'
+$r=Copy-CloneValue $review; $r.findings=@(@{itemId='S01';code='MISSING_DETAIL';detail='少了邊界'})
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Passed) 'review PASS 仍有 finding 拒絕'
+$r.verdict='FAIL'; $v=Test-PsCloneReview -Review $r -Packet $p -InputHash $hash
+Assert-Clone ($v.Ok -and -not $v.Passed) '合法 FAIL 不被當 PASS'
+$r.findings=@(@{itemId='TOPIC';code='MISSING_BRANCH';detail='整體缺一條流程'})
+Assert-Clone (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Ok 'packet 層級 finding'
+$r=Copy-CloneValue $review; $r.verdict='BLOCKED'
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Passed) 'BLOCKED 不可通過'
+$r.checkedIds=@(); $r.findings=@(@{itemId='TOPIC';code='TOOL_BLOCKED';detail='工具目前不可用，未能逐筆查證'})
+$v=Test-PsCloneReview -Review $r -Packet $p -InputHash $hash
+Assert-Clone ($v.Ok -and -not $v.Passed) '工具阻斷可零 checkedIds 但不通過'
+$r.findings[0].code='MY_CODE'
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Ok) 'finding code 封閉'
+$r.findings=@()
+Assert-Clone (-not (Test-PsCloneReview -Review $r -Packet $p -InputHash $hash).Ok) 'FAIL／BLOCKED 必須附原因'
+
+$packets=@($scope,(New-ClonePacket 'rules'))
+$p2=New-ClonePacket 'rules'; $p2.items[0].id='R02'; $p2.items[0].values.expression='SECOND_PAGE'; $packets+=,$p2
+$s2=New-ClonePacket 'scope' 'TW_DEMO_B'; $packets+=,$s2
+$u2=New-ClonePacket 'ui' 'TW_DEMO_B'; $u2.items[0].values.field='DEMO_FIELD_B'; $packets+=,$u2
+$spec=ConvertTo-PsCloneSpec -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $packets -Profile $profile -Status DRAFT -Gaps @('人工確認界面差異')
+$trace=ConvertTo-PsCloneTrace -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $packets -Profile $profile -Status DRAFT -Gaps @('人工確認界面差異')
+Assert-Clone ($spec -match 'SECOND_PAGE' -and $spec -match 'DEMO_FIELD_B') '多 Component 與多頁正文完整保留'
+Assert-Clone ($trace -match 'TW_DEMO_A/rules/p1/E1' -and $trace -match 'TW_DEMO_A/rules/p2/E1') '跨頁 E1 有獨立追溯命名空間'
+Assert-Clone ($spec -match '未解缺口' -and $spec -match '尚無已驗收資料' -and $spec -match '人工確認界面差異') '缺 topic 與人工缺口可見'
+Assert-Clone ($spec -match '不等於企業 E2E' -and $trace -match '不是企業 E2E') '結構／LLM review 與真 E2E 分開'
+$again=ConvertTo-PsCloneSpec -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $packets -Profile $profile -Status DRAFT -Gaps @('人工確認界面差異')
+Assert-Clone ($spec -ceq $again) '相同輸入 render 位元組確定'
+Assert-Clone ((ConvertTo-PsCloneCell "[x]|<script>`n下一行") -eq '&#91;x&#93;&#124;&lt;script&gt;<br>下一行') 'Markdown 格線／HTML／換行轉義'
+Assert-Clone ($spec -match '## 不建置的原生欄位' -and $spec -match '無判定無用的原生欄位') '沒有排除項時明示無不建置欄位'
+
+# 原生欄位無用判定：scope 只記判定無用者，正文不得再寫；render 另列不建置表。
+function New-FieldScope {
+    $p = New-ClonePacket
+    $p.evidence += ,[ordered]@{id='E2';kind='SQL';locator="SELECT COUNT(*) AS TOTAL_ROWS, SUM(CASE WHEN DEMO_UNUSED <> ' ' THEN 1 ELSE 0 END) AS DEMO_UNUSED FROM PS_DEMO_TBL FETCH FIRST 1 ROWS ONLY";excerpt='TOTAL_ROWS > 0；DEMO_UNUSED、DEMO_UNUSED_B 為 0'}
+    $p.evidence += ,[ordered]@{id='E3';kind='SQL';locator="SELECT OBJECTVALUE1, RECNAME, REFNAME, COUNT(*) AS CNT FROM PSPCMNAME WHERE REFNAME IN ('DEMO_UNUSED','DEMO_UNUSED_B') GROUP BY OBJECTVALUE1, RECNAME, REFNAME FETCH FIRST 200 ROWS ONLY";excerpt='0 列'}
+    $values = [ordered]@{object='DEMO_TBL：DEMO_UNUSED、DEMO_UNUSED_B';type='FIELD';inclusion='EXCLUDED';usedBy='a：交叉參照 0 列；b：核心路徑沒有讀寫此表的 SQL 文字類程式；c：無已記錄引用';condition='非預設 0 筆（全表非空，查詢日 2026-10-01）';reason='原生欄位無用：資料無值且核心路徑無指名引用';fieldUsage='不適用'}
+    $p.items += ,[ordered]@{id='F01';scopeRefs=@();values=$values;evidenceIds=@('E2','E3')}
+    $rec = [ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='DEPENDENCY';usedBy='TW_DEMO_A 存檔寫入';condition='每次存檔';reason='核心資料表';fieldUsage='排除 2 欄（F01）'}
+    $p.items += ,[ordered]@{id='R01';scopeRefs=@();values=$rec;evidenceIds=@('E1')}
+    return $p
+}
+function Check-FieldScope($Packet) { return (Test-PsClonePacket -Packet $Packet -Component $component -Topic scope -Profile $profile -ScopeItems @()) }
+$fs = New-FieldScope
+$v = Check-FieldScope $fs
+Assert-Clone $v.Ok '合法原生欄位排除項'
+$p = New-FieldScope; $p.items[1].values.type = 'Field'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_TYPE_CASE:F01') 'type 大小寫不同不能繞過欄位檢查'
+$p = New-FieldScope; $p.items[1].values.inclusion = 'CORE'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_SCOPE_EXCLUDED_ONLY:F01') '欄位只記判定無用者，不逐欄列保留欄位'
+foreach ($bad in @('DEMO_TBL DEMO_UNUSED', 'DEMO_TBL：', 'demo_tbl：DEMO_UNUSED', 'DEMO_TBL：DEMO_UNUSED、demo_unused_b', 'DEMO_TBL：DEMO.UNUSED')) {
+    $p = New-FieldScope; $p.items[1].values.object = $bad
+    Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_OBJECT_INVALID:F01') ('欄位排除 object 格式拒絕 ' + $bad)
+}
+$p = New-FieldScope; $p.items[1].values.object = 'DEMO_TBL:DEMO_UNUSED, DEMO_UNUSED_B，DEMO_UNUSED'
+$x = ConvertFrom-PsCloneFieldExclusion $p.items[1].values.object
+Assert-Clone ((Check-FieldScope $p).Ok -and $x.Ok -and $x.Record -ceq 'DEMO_TBL' -and ($x.Fields -join ',') -ceq 'DEMO_UNUSED,DEMO_UNUSED_B') '半形冒號、逗號分隔可解析且去重'
+foreach ($bad in @('非預設 3 筆（全表非空，查詢日 2026-10-01）', '非預設 0 筆（全表非空，查詢日 2026-13-40）', '非預設 0 筆（查詢日 2026-10-01）', '資料無值')) {
+    $p = New-FieldScope; $p.items[1].values.condition = $bad
+    Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_CONDITION_INVALID:F01') ('資料剖析斷言拒絕 ' + $bad)
+}
+$p = New-FieldScope; $p.items[1].values.condition = '非預設 0 筆(全表非空,查詢日：2026-10-01)'
+Assert-Clone (Check-FieldScope $p).Ok '資料剖析斷言接受半形標點'
+$p = New-FieldScope; $p.items[1].values.usedBy = 'a：交叉參照 0 列；b：無 SQL 文字類程式'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_CHECKS_REQUIRED:F01.c') '程式面三種查法缺一拒絕'
+$p = New-FieldScope; $p.items[1].values.usedBy = 'metadata：a、b、c 都查了'
+Assert-Clone (-not (Check-FieldScope $p).Ok) '查法標記不能只出現在單字中間'
+$p = New-FieldScope; $p.items[1].evidenceIds = @('E2')
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_XREF_SQL_REQUIRED:F01') '缺交叉參照 SQL 拒絕'
+$p = New-FieldScope; $p.items[1].evidenceIds = @('E3')
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_DATA_SQL_REQUIRED:F01') '缺資料彙總 SQL 拒絕'
+$p = New-FieldScope; $p.evidence[1].kind = 'CHUNK'; $p.evidence[1].locator = 'ChunkId 3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_DATA_SQL_REQUIRED:F01') '資料證據必須是 SQL'
+
+$fieldScopeItems = @($fs.items)
+function Check-FieldBody($Packet) { return (Test-PsClonePacket -Packet $Packet -Component $component -Topic $Packet.topic -Profile $profile -ScopeItems $fieldScopeItems) }
+Assert-Clone (Check-FieldBody (New-ClonePacket 'ui')).Ok '有排除項時，沒提到排除欄位的正文照常通過'
+foreach ($text in @('DEMO_TBL.DEMO_UNUSED', 'PS_DEMO_TBL.DEMO_UNUSED', 'ps_demo_tbl.demo_unused', '畫面上的 DEMO_TBL.DEMO_UNUSED（唯讀）')) {
+    $p = New-ClonePacket 'ui'; $p.items[0].values.field = $text
+    Assert-Clone ((Check-FieldBody $p).Errors -contains 'FIELD_EXCLUDED_IN_BODY:S01:DEMO_TBL.DEMO_UNUSED') ('正文不得寫排除欄位 ' + $text)
+}
+foreach ($text in @('DEMO_TBL.DEMO_UNUSED_C', 'DEMO_TBL.DEMO_UNUSEDX', 'X_DEMO_TBL.DEMO_UNUSED', 'OTHER_TBL.DEMO_UNUSED')) {
+    $p = New-ClonePacket 'ui'; $p.items[0].values.field = $text
+    Assert-Clone (Check-FieldBody $p).Ok ('相近名稱不誤判 ' + $text)
+}
+$p = New-ClonePacket 'rules'; $p.items[0].values.expression = "DEMO_TBL.DEMO_UNUSED_B = 'Y' AND DEMO_TBL.DEMO_KEEP = 'N'"
+$v = Check-FieldBody $p
+Assert-Clone ($v.Errors -contains 'FIELD_EXCLUDED_IN_BODY:S01:DEMO_TBL.DEMO_UNUSED_B' -and @($v.Errors).Count -eq 1) '規則條件式寫排除欄位拒絕，保留欄位不受影響'
+$p = New-ClonePacket 'data'; $p.items[0].values.record = 'PS_DEMO_TBL'; $p.items[0].values.field = 'DEMO_UNUSED'
+Assert-Clone ((Check-FieldBody $p).Errors -contains 'FIELD_EXCLUDED_IN_BODY:S01:DEMO_TBL.DEMO_UNUSED') 'data 以 record＋field 欄寫排除欄位拒絕'
+$p = New-ClonePacket 'data'; $p.items[0].values.record = 'OTHER_TBL'; $p.items[0].values.field = 'DEMO_UNUSED'
+Assert-Clone (Check-FieldBody $p).Ok '別的 Record 的同名欄位不受影響'
+$p = New-ClonePacket 'ui'; $p.items[0].scopeRefs = @('F01')
+Assert-Clone ((Check-FieldBody $p).Errors -contains 'SCOPE_REF_EXCLUDED:S01') '正文不得引用欄位排除項 ID'
+
+# 每個範圍內 Record 都要有原生欄位判定；沒做只能寫判不了＋代碼，統計看得到。
+$p = New-FieldScope; $p.items[2].values.fieldUsage = '已檢查'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_REQUIRED:R01') 'Record 缺原生欄位判定結論拒絕'
+foreach ($bad in @('判不了：LAZY', '判不了：timeout', '判不了', '無可排除', '無可排除（查詢日 2026-02-30）', '不適用')) {
+    $p = New-FieldScope; $p.items[2].values.fieldUsage = $bad
+    Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_REQUIRED:R01') ('判定結論格式拒絕 ' + $bad)
+}
+$p = New-ClonePacket; $p.items += ,[ordered]@{id='R02';scopeRefs=@();values=[ordered]@{object='PS_DEMO_TBL';type='RECORD';inclusion='CORE';usedBy='主檔';condition='進入功能';reason='核心資料表';fieldUsage='判不了：TIMEOUT（全表彙總逾時）'};evidenceIds=@('E1')}
+Assert-Clone (Check-FieldScope $p).Ok '判不了加封閉代碼可通過'
+$p.items[1].values.fieldUsage = '無可排除（查詢日 2026-10-01）'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_EVIDENCE_REQUIRED:R02') '無可排除必須附資料剖析 SQL'
+$p.evidence += ,[ordered]@{id='E2';kind='SQL';locator='SELECT OWNER, COLUMN_NAME, DATA_TYPE, NUM_DISTINCT FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = ''PS_DEMO_TBL'' FETCH FIRST 200 ROWS ONLY';excerpt='每欄 NUM_DISTINCT ≥ 3'}
+$p.items[1].evidenceIds = @('E1','E2')
+Assert-Clone (Check-FieldScope $p).Ok '無可排除附統計資訊 SQL 可通過'
+$p = New-FieldScope; $p.items[2].values.fieldUsage = '排除 3 欄（F01）'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_USAGE_REF_INVALID:R01') '排除欄數與 FIELD 項不符拒絕'
+$p = New-FieldScope; $p.items[2].values.fieldUsage = '排除 2 欄（F99）'
+$v = Check-FieldScope $p
+Assert-Clone ($v.Errors -contains 'FIELD_USAGE_REF_INVALID:R01' -and $v.Errors -contains 'FIELD_EXCLUSION_ORPHAN:F01') '指到不存在的 FIELD 項拒絕，FIELD 項成孤兒'
+$p = New-FieldScope; $p.items[2].values.object = 'PS_OTHER_TBL'
+$v = Check-FieldScope $p
+Assert-Clone ($v.Errors -contains 'FIELD_USAGE_REF_INVALID:R01' -and $v.Errors -contains 'FIELD_EXCLUSION_ORPHAN:F01') 'Record 與 FIELD 項不同表拒絕'
+$p = New-FieldScope; $p.items = @($p.items[0], $p.items[1])
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'FIELD_EXCLUSION_ORPHAN:F01') 'FIELD 項必須有同頁 Record 項指到'
+$p = New-FieldScope; $p.items[2].values.type = 'Record'
+Assert-Clone ((Check-FieldScope $p).Errors -contains 'RECORD_TYPE_CASE:R01') 'Record type 大小寫不同不能繞過判定'
+$p = New-FieldScope; $p.items[2].values.object = 'DEMO_TBL'
+Assert-Clone (Check-FieldScope $p).Ok 'Record 寫不帶 PS_ 的名稱也對得上 FIELD 項'
+$p = New-ClonePacket; $p.items += ,[ordered]@{id='X01';scopeRefs=@();values=[ordered]@{object='PS_DEMO_OLD';type='RECORD';inclusion='EXCLUDED';usedBy='無';condition='無';reason='其他功能分支';fieldUsage='不適用'};evidenceIds=@('E1')}
+Assert-Clone (Check-FieldScope $p).Ok '排除的 Record 不需要原生欄位判定'
+$covScope = New-FieldScope
+foreach ($n in 2..3) { $covScope.items += ,[ordered]@{id=('R0' + $n);scopeRefs=@();values=[ordered]@{object=('PS_DEMO_T' + $n);type='RECORD';inclusion='DEPENDENCY';usedBy='讀取';condition='查值';reason='依賴';fieldUsage='判不了：TIMEOUT'};evidenceIds=@('E1')} }
+$covScope.items += ,[ordered]@{id='R04';scopeRefs=@();values=[ordered]@{object='PS_DEMO_T4';type='RECORD';inclusion='DEPENDENCY';usedBy='讀取';condition='查值';reason='依賴';fieldUsage='判不了：NO_TABLE（View）'};evidenceIds=@('E1')}
+Assert-Clone (Check-FieldScope $covScope).Ok '多 Record 混合結論可通過'
+$covStats = Get-PsCloneFieldStats -Components @('TW_DEMO_A') -Packets @($covScope)
+Assert-Clone ($covStats.scopeRecords -eq 4 -and $covStats.checkedRecords -eq 1 -and $covStats.undeterminedRecords -eq 3 -and $covStats.undeterminedByCode['TIMEOUT'] -eq 2 -and $covStats.undeterminedByCode['NO_TABLE'] -eq 1 -and (Format-PsCloneUndeterminedCodes $covStats.undeterminedByCode) -ceq 'NO_TABLE 1、TIMEOUT 2') '判定覆蓋統計依代碼計數且排序確定'
+$covSpec = ConvertTo-PsCloneSpec -Components @('TW_DEMO_A') -Packets @($covScope) -Profile $profile -Status DRAFT
+Assert-Clone ($covSpec.Contains('範圍內 Record 的原生欄位判定：已判定 1／4；判不了 3（NO_TABLE 1、TIMEOUT 2）') -and $covSpec.Contains('| 排除 2 欄（F01） |')) 'spec 顯示判定覆蓋與每個 Record 的結論'
+
+$fieldPackets = @($fs, (New-ClonePacket 'ui'), (New-ClonePacket 'data'))
+$fieldSpec = ConvertTo-PsCloneSpec -Components @('TW_DEMO_A') -Packets $fieldPackets -Profile $profile -Status DRAFT
+Assert-Clone ($fieldSpec.Contains('| TW_DEMO_A | F01 | DEMO_TBL | DEMO_UNUSED、DEMO_UNUSED_B |') -and $fieldSpec.Contains('合計：1 個 Record、2 個欄位。')) 'render 產出不建置欄位表與合計'
+Assert-Clone (-not $fieldSpec.Contains('| TW_DEMO_A | F01 | DEMO_TBL：')) '欄位排除項不重複列在一般範圍表'
+$fieldStats = Get-PsCloneFieldStats -Components @('TW_DEMO_A') -Packets $fieldPackets
+Assert-Clone ($fieldStats.scopeRecords -eq 1 -and $fieldStats.checkedRecords -eq 1 -and $fieldStats.undeterminedRecords -eq 0 -and $fieldStats.excludedRecords -eq 1 -and $fieldStats.excludedFields -eq 2 -and $fieldStats.crossComponentKept -eq 0 -and $fieldStats.uiItems -eq 1 -and $fieldStats.dataItems -eq 1) '欄位統計只有計數'
+$uB = New-ClonePacket 'ui' 'TW_DEMO_B'; $uB.items[0].values.field = 'PS_DEMO_TBL.DEMO_UNUSED'
+$crossPackets = @($fs, (New-ClonePacket 'scope' 'TW_DEMO_B'), $uB)
+$crossPlan = Get-PsCloneFieldExclusionPlan -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $crossPackets
+$crossSpec = ConvertTo-PsCloneSpec -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $crossPackets -Profile $profile -Status DRAFT
+Assert-Clone (@($crossPlan.Rows).Count -eq 1 -and ($crossPlan.Rows[0].Fields -join ',') -ceq 'DEMO_UNUSED_B' -and @($crossPlan.Conflicts).Count -eq 1 -and $crossPlan.Conflicts[0] -match 'TW_DEMO_B 正文引用') '其他 Component 正文引用的欄位移出不建置表'
+Assert-Clone ($crossSpec.Contains('整體重建須建置') -and $crossSpec.Contains('合計：1 個 Record、1 個欄位。')) '跨 Component 須建置的欄位明列'
+$crossStats = Get-PsCloneFieldStats -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $crossPackets
+Assert-Clone ($crossStats.excludedFields -eq 1 -and $crossStats.crossComponentKept -eq 1) '跨 Component 統計'
+$again = ConvertTo-PsCloneSpec -Components @('TW_DEMO_A','TW_DEMO_B') -Packets $crossPackets -Profile $profile -Status DRAFT
+Assert-Clone ($crossSpec -ceq $again) '不建置欄位表 render 位元組確定'
+
+foreach($file in @('scripts/ps-spec-clone-lib.ps1','scripts/tests/test-spec-clone.ps1')) { $bytes=[System.IO.File]::ReadAllBytes((Join-Path $repo $file)); Assert-Clone ($bytes[0]-eq239 -and $bytes[1]-eq187 -and $bytes[2]-eq191) ($file+' UTF-8 BOM') }
+Write-Host ('clone tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
+if ($script:failed -gt 0) { exit 1 }
+exit 0
+@@@PSBUNDLE-END|scripts/tests/test-spec-clone.ps1
 @@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1661,10 +2252,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|e0026951a5aa760a5d50429ae764517b1e11c0dd2e1dec0329e004fc3e304ea9|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|c75c84de2035239648f2dcb968210cff0718acb92a85ddadd153b0f6aa99e9a0|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "da14021",
+  "commit": "0c79d43",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -2046,8 +2637,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/peoplesoft/sdoc/research-contract.md",
-      "lines": 278,
-      "sha256": "3bb4d0e7f0ca5dcc42df7fc6f1408767f2746f6cf818b96cbebc48cfe9761465",
+      "lines": 279,
+      "sha256": "c83fadc09faafdee2944ee598f5231de7560928693a83622528a2a61e9f78a85",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/research-contract.md"
     },
@@ -2496,8 +3087,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc-lib.ps1",
-      "lines": 1420,
-      "sha256": "a8fb7d1c2344448c9984495321f233174c11cf40bfdf7a88b3ea713d50f39456",
+      "lines": 1448,
+      "sha256": "901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c",
       "bom": true
     },
     {
@@ -2520,20 +3111,20 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc-status-lib.ps1",
-      "lines": 630,
-      "sha256": "2fa4f8b1e95a126bd529463810ff266947e44d25dbc3e385be72524d01774bdd",
+      "lines": 632,
+      "sha256": "14948b56f8556e3cce12e59091ab3656503efe84793c950b08d7a220f715f711",
       "bom": true
     },
     {
       "path": "scripts/ps-sdoc.ps1",
-      "lines": 1482,
-      "sha256": "e8365863fc2eab5bdbd93e1cc1e2d9751936bb4a1fc7e8be7ffc5c449672bf1a",
+      "lines": 1501,
+      "sha256": "f15b7d2e24675462854fe77239109e097064d275d792194a644626c48a9256ae",
       "bom": true
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 611,
-      "sha256": "6c1466ec2f6ec311803db46902941e15d5ffb10aa5944291315ec02889549d58",
+      "lines": 689,
+      "sha256": "071ed8d9a8533efd98abe9b3ed51eee6da6c7514d7e07589fbcd1718c25da088",
       "bom": true
     },
     {
@@ -2592,8 +3183,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 528,
-      "sha256": "35a8314bf43ce7bfa522a6ac921463b4f7a4792a89b11d1d1e44daa2ce2edf8c",
+      "lines": 571,
+      "sha256": "0e8739be012d916c4a4b1b8e2c9014a86453ee4b82bffc36c6a0a16c18917449",
       "bom": true
     },
     {
@@ -2616,20 +3207,20 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-sdoc-assemble.ps1",
-      "lines": 350,
-      "sha256": "0cb3b921e6c90f60b5d5882b045d38101170b53dd5f4e4aa76f3a2f16ba7bc76",
+      "lines": 380,
+      "sha256": "f59f6fc10c7e08dc4d7436958cb15bf735d48c6eee4d0568192e28f8eec40a12",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 836,
-      "sha256": "6428fc487269f055e8f9376de2f0a0d03eb4f5e9e89680d06885390e6e1ba46a",
+      "lines": 869,
+      "sha256": "6c44ef048951c7743f8e131090314ef7228a2d877d90db0c13180433bb8721ee",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc.ps1",
-      "lines": 277,
-      "sha256": "ee0f28b1c4937e57ba87c7ee61622d2a83efe1f65c93f4d5d6532f64d92f76e7",
+      "lines": 280,
+      "sha256": "8f7d55463db3aca7c5b6887f02268f47d90467f9940ba16fdfb0825d1f989181",
       "bom": true
     },
     {
@@ -2660,5 +3251,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|148|55bcbe10a190cfbfd466a008fbf42b20f0760624507bfb82e814ca42ec78e7d6
-@@@PSBUNDLE-PART-END|5a3b86e7a6ccc3c2|6|6
+@@@PSBUNDLE-EOF|148|224e2fb4fdee8bf4f9fa5b0d497ab14e6ef2758b2c91ee46903730dc3735a0fd
+@@@PSBUNDLE-PART-END|fc78dc8fc2386fd3|6|6

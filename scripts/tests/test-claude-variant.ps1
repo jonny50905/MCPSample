@@ -432,7 +432,13 @@ try {
     Assert ($a.Requests -eq 0 -and $a.LastContext -eq 0 -and (Get-PsOcApiMetricsLine $a 0) -eq '') "模型端數據：assistant 事件沒有 usage（舊版或合成 stream）→ 不算請求、數據行為空"
     $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1200 0 18000 900), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'))
     $ml = Get-PsOcApiMetricsLine $a 95
-    Assert ($ml -match '^成功請求 1 次、最後一次輸入 19200 token（最大 19200；快取命中 0／1 次）、單次最多輸出 900 token、模型端重試 2 次（504×2）、重試間隔約 95 秒' -and (Get-PsOcApiMetricsLine $a 0) -notmatch '重試間隔') "模型端數據行：成功請求、輸入／快取／輸出、重試次數與量到的重試間隔；量不到就不寫間隔"
+    Assert ($ml -match '^成功請求 1 次、主代理最後一次輸入 19200 token（最大 19200）、快取命中 0／1 次、單次最多輸出 900 token、模型端重試 2 次（504×2）、重試間隔約 95 秒' -and (Get-PsOcApiMetricsLine $a 0) -notmatch '重試間隔') "模型端數據行：成功請求、主代理輸入／快取／輸出、重試次數與量到的重試間隔；量不到就不寫間隔"
+    # 主代理與子代理分開：子代理的事件帶 parent_tool_use_id；message 物件的 id 不在第一個鍵也認得；工具輸入裡的 error 參數不算 API 錯誤
+    function New-SubLine([string]$Id, [int]$In, [int]$Out) { return ('{"type":"assistant","message":{"type":"message","id":"' + $Id + '","role":"assistant","content":[{"type":"tool_use","id":"t9","name":"mcp__x__q","input":{"error":"none"}}],"usage":{"input_tokens":' + $In + ',"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":' + $Out + '}},"parent_tool_use_id":"toolu_parent","session_id":"s"}') }
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1000 0 119000 300), $usrA, (New-SubLine 'msg_s1' 8000 50), (New-SubLine 'msg_s1' 8500 90), $usrA, (New-ApiRetryLine 1 '504'))
+    Assert ($a.Requests -eq 2 -and $a.LastContextMain -eq 120000 -and $a.MaxContextMain -eq 120000 -and $a.MaxContextSub -eq 8500 -and $a.LastContext -eq 8500 -and $a.Progress -eq 3 -and $a.Trailing -eq 1 -and -not $a.IdFallback -and (Get-PsOcApiMetricsLine $a 0) -match '主代理最後一次輸入 120000 token（最大 120000）、子代理最大輸入 8500 token') "模型端數據：主代理與子代理分開記（數據行報主代理最後一次與子代理最大）；id 不在第一個鍵也去重；有 usage 的 error 參數算進展"
+    $a = Test-ApiStream @($inA, '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"x"}],"usage":{"input_tokens":10,"output_tokens":5}}}', '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"y"}],"usage":{"input_tokens":10,"output_tokens":9}}}')
+    Assert ($a.Requests -eq 2 -and $a.IdFallback -and (Get-PsOcApiMetricsLine $a 0) -match '^成功請求 2 次（依事件計）') "模型端數據：沒有 message id 時依事件計、數據行標示（依事件計）"
     Assert ((Get-PsOcRetryGapSec @()) -eq 0 -and (Get-PsOcRetryGapSec @(60, 90, 120)) -eq 90 -and (Get-PsOcRetryGapSec @(61)) -eq 61) "重試間隔：沒量到回 0、多筆取平均"
     $script:ps51AbortSaved = $env:PS_SESSION_API_ABORT_AFTER
     Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
@@ -441,9 +447,34 @@ try {
     $env:PS_SESSION_API_ABORT_AFTER = '3'; $ab2 = Get-PsOcApiAbortAfter
     $env:PS_SESSION_API_ABORT_AFTER = '99'; $ab3 = Get-PsOcApiAbortAfter
     $env:PS_SESSION_API_ABORT_AFTER = 'x'; $ab4 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '2'; $ab5 = Get-PsOcApiAbortAfter
     Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
     if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved }
-    Assert ($ab0 -eq 5 -and $ab1 -eq 0 -and $ab2 -eq 3 -and $ab3 -eq 5 -and $ab4 -eq 5) "卡住提前結束門檻：預設 5；PS_SESSION_API_ABORT_AFTER 0＝關、1～20 可調、超出範圍或非數字用預設"
+    Assert ($ab0 -eq 5 -and $ab1 -eq 0 -and $ab2 -eq 3 -and $ab3 -eq 5 -and $ab4 -eq 5 -and $ab5 -eq 3) "卡住提前結束門檻：預設 5；PS_SESSION_API_ABORT_AFTER 0＝關、1～20 可調、小於判讀門檻 3 提高到 3、超出範圍或非數字用預設"
+    # 外環替 Claude Code 子行程設的環境預設
+    $envSaved = @{ D = $env:PS_SESSION_CLAUDE_ENV_DEFAULTS; S = $env:PS_SESSION_CLAUDE_ENV_SKIP }
+    try {
+        Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue; Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_SKIP -ErrorAction SilentlyContinue
+        function Get-EnvNames($Pairs) { return , @(@($Pairs) | ForEach-Object { [string]$_[0] }) }
+        $dR = Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader'; $nR = Get-EnvNames $dR
+        $dW = Get-PsOcClaudeEnvDefaults -Agent 'ps-sdoc-worker'; $nW = Get-EnvNames $dW
+        $dU = Get-PsOcClaudeEnvDefaults -Agent 'ps-deep-research'; $nU = Get-EnvNames $dU
+        $mtt = @(@($dR) | Where-Object { [string]$_[0] -eq 'MAX_THINKING_TOKENS' })
+        Assert (@($dR).Count -eq 4 -and $nR -contains 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK' -and $nR -contains 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC' -and $nR -contains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION' -and $mtt.Count -eq 1 -and [string]$mtt[0][1] -eq '0') "環境預設：狀態圖讀者＝共同三個＋MAX_THINKING_TOKENS=0"
+        Assert (@($dW).Count -eq 3 -and $nW -notcontains 'MAX_THINKING_TOKENS' -and @($dU).Count -eq 3 -and $nU -notcontains 'MAX_THINKING_TOKENS') "環境預設：研究 worker 與其他代理只有共同三個（不關 thinking）"
+        Assert ((Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-reader')) -contains 'MAX_THINKING_TOKENS' -and (Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-judge')) -contains 'MAX_THINKING_TOKENS') "環境預設：乾淨讀者與判定也關 thinking"
+        $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'
+        $dOff = Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader'
+        Assert (@($dOff).Count -eq 0) "環境預設：PS_SESSION_CLAUDE_ENV_DEFAULTS=0 → 整組不套"
+        Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue
+        $env:PS_SESSION_CLAUDE_ENV_SKIP = 'max_thinking_tokens, CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION'
+        $nS = Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader')
+        Assert (@($nS).Count -eq 2 -and $nS -notcontains 'MAX_THINKING_TOKENS' -and $nS -notcontains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION') "環境預設：PS_SESSION_CLAUDE_ENV_SKIP 剔除指定項（不分大小寫、可多個）"
+    }
+    finally {
+        if ($null -ne $envSaved.D) { $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = $envSaved.D } else { Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue }
+        if ($null -ne $envSaved.S) { $env:PS_SESSION_CLAUDE_ENV_SKIP = $envSaved.S } else { Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_SKIP -ErrorAction SilentlyContinue }
+    }
     Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '模型端數據' -and (Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '另一版 CLI') "模型端判讀：卡住的提示要人交「判讀」與「模型端數據」兩行、提到另一版 CLI"
     if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
         # 真的經 cmd.exe 啟動：假 claude.cmd 吐出重試用完的 stream、exit 1
@@ -452,10 +483,22 @@ try {
         $fakeStream = Join-Path $fakeDir 'stream.jsonl'
         [System.IO.File]::WriteAllText($fakeStream, ((@($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), $errA, '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":1,"result":"API Error: 504"}') -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
         $fakeCmd = Join-Path $fakeDir 'claude.cmd'
-        [System.IO.File]::WriteAllText($fakeCmd, ("@echo off`r`ntype " + '"' + $fakeStream + '"' + "`r`nexit /b 1`r`n"), (New-Object System.Text.ASCIIEncoding))
+        [System.IO.File]::WriteAllText($fakeCmd, ("@echo off`r`necho NSF=%CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK% MTT=%MAX_THINKING_TOKENS% 1>&2`r`ntype " + '"' + $fakeStream + '"' + "`r`nexit /b 1`r`n"), (New-Object System.Text.ASCIIEncoding))
         $script:sessLog = @()
-        $sr504 = Invoke-PsOcSession -OcPath $fakeCmd -Root $dep -LogRoot (Join-Path $dep 'logs504') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0001' -TimeoutMin 2 -Tag 't504' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin'
+        $mttSaved = $env:MAX_THINKING_TOKENS; $nsfSaved = $env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK
+        try {
+            Remove-Item -Path Env:\CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK -ErrorAction SilentlyContinue
+            $env:MAX_THINKING_TOKENS = '999'
+            $sr504 = Invoke-PsOcSession -OcPath $fakeCmd -Root $dep -LogRoot (Join-Path $dep 'logs504') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0001' -TimeoutMin 2 -Tag 't504' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin' -EnvDefaults (Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader')
+            $nsfAfter = $env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK; $mttAfter = $env:MAX_THINKING_TOKENS
+        }
+        finally {
+            if ($null -ne $mttSaved) { $env:MAX_THINKING_TOKENS = $mttSaved } else { Remove-Item -Path Env:\MAX_THINKING_TOKENS -ErrorAction SilentlyContinue }
+            if ($null -ne $nsfSaved) { $env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK = $nsfSaved } else { Remove-Item -Path Env:\CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK -ErrorAction SilentlyContinue }
+        }
         $logTxt = $script:sessLog -join "`n"
+        $errTxt = ''; if (Test-Path -LiteralPath $sr504.ErrFile) { $errTxt = [System.IO.File]::ReadAllText($sr504.ErrFile) }
+        Assert ($errTxt -match 'NSF=1 MTT=999' -and $logTxt -match '環境預設：.*CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK=1' -and $logTxt -match '沿用視窗已設：MAX_THINKING_TOKENS' -and $null -eq $nsfAfter -and $mttAfter -eq '999') "真 session：子行程看得到環境預設（NSF=1）、視窗已設的 MAX_THINKING_TOKENS=999 沿用、啟動後父行程還原（NSF 消失、MTT 仍 999）"
         Assert (-not $sr504.TimedOut -and [int]$sr504.ExitCode -ne 0 -and $sr504.ApiKind -eq 'API_RETRY_STUCK' -and $logTxt -match '重試用完仍失敗（api_error_status=504）' -and $logTxt -match '卡在模型端') "真 session（cmd.exe＋假 claude.cmd）：重試用完 → ApiKind=API_RETRY_STUCK，判讀行說卡在模型端"
         Assert ($logTxt -match '模型端數據：' -and $logTxt -match '模型端重試 3 次（504×3）') "真 session：結束時印模型端數據行（重試次數與狀態碼分布）"
         # 卡住提前結束：假 claude.cmd 先吐一個成功請求，再每 2 秒吐一個 api_retry、共 8 個，然後停 10 分；門檻 2 → 外環在 TimeoutMin（5 分）之前就強殺
@@ -475,7 +518,7 @@ try {
         finally { Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue; if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved } }
         $swA.Stop()
         $logAb = $script:sessLog -join "`n"
-        Assert ([bool]$srAb.Aborted -and -not $srAb.TimedOut -and [int]$srAb.ExitCode -eq -1 -and $srAb.FailureKind -eq 'API_ABORTED' -and $srAb.ApiKind -eq 'API_RETRY_STUCK' -and $swA.Elapsed.TotalMinutes -lt 4 -and $logAb -match '提前結束' -and $logAb -match 'PS_SESSION_API_ABORT_AFTER=2' -and $logAb -match '模型端數據：成功請求 1 次、最後一次輸入 21000 token') "真 session：同一個請求連續失敗達門檻 → 未到 TimeoutMin 就強殺（Aborted、FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK），數據行有成功請求的輸入量"
+        Assert ([bool]$srAb.Aborted -and -not $srAb.TimedOut -and [int]$srAb.ExitCode -eq -1 -and $srAb.FailureKind -eq 'API_ABORTED' -and $srAb.ApiKind -eq 'API_RETRY_STUCK' -and $swA.Elapsed.TotalSeconds -ge 60 -and $swA.Elapsed.TotalMinutes -lt 4 -and $logAb -match '提前結束' -and $logAb -match 'PS_SESSION_API_ABORT_AFTER=3' -and $logAb -match '模型端數據：成功請求 1 次、主代理最後一次輸入 21000 token') "真 session：同一個請求連續失敗達門檻且持續 60 秒以上 → 未到 TimeoutMin 就強殺（Aborted、FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK；門檻 2 提高到 3），數據行有主代理的輸入量"
     }
     else { Write-Host '  SKIP：真 session 判讀（需要 Windows cmd.exe）' }
     Assert ((Get-PsSuppDirs -Root $dep).Capabilities -like '*.claude*peoplesoft*spec*capabilities.json' -and (Test-Path -LiteralPath (Get-PsSuppDirs -Root $dep).Capabilities)) "補研究：能力目錄取 .claude/peoplesoft/spec"

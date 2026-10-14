@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit da14021）第 1／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0c79d43）第 1／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|da14021|5a3b86e7a6ccc3c2|1|6|11457|264d1f98738caf89d2a0e79b67f5e18656baf2b41bde4d2342defa2d07dd46b0
-@@@PSBUNDLE|1|claude|da14021|148
+@@@PSBUNDLE-PART|1|claude|0c79d43|fc78dc8fc2386fd3|1|6|11458|ed354df219493e3172491a7da771553550b8ae5e7d37a77b0fb64e727467f0e9
+@@@PSBUNDLE|1|claude|0c79d43|148
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44|0
 ---
 name: ps-ae-flow
@@ -8084,7 +8084,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 - 文件沒寫就答 `NOT_IN_SPEC`（`text` 可寫你找了哪裡，`ids` 空陣列）。文件明確寫了「沒有」（例如「不適用：…」）是 `ANSWERED`，`ids` 空陣列，`text` 寫文件的說法。
 - 寫完 Read 回 output.json 確認是合法 JSON；回覆只說「已寫工單指定產物」。
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/reader-contract.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/research-contract.md|278|3bb4d0e7f0ca5dcc42df7fc6f1408767f2746f6cf818b96cbebc48cfe9761465|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/research-contract.md|279|c83fadc09faafdee2944ee598f5231de7560928693a83622528a2a61e9f78a85|0
 # Spec 文件研究契約
 
 讀者是看不到原 PeopleSoft 程式、但能用現代語言與架構開發的獨立 LLM。它要能只讀 00-index 與 14 份文件，就實作指定 Component 的可觀測核心行為，並以保留的原始識別字回查 PeopleSoft。文件描述行為契約，不替讀者選框架，不要求照搬 Component Processor。
@@ -8110,7 +8110,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 | `jobId`、`attemptId`、`unit`、`subject`、`page`、`inputHash` | 照工單 |
 | `coverage` | `COMPLETE`：本單元本主題已全部列完；`PARTIAL`：還有下一頁 |
 | `summary` | 本頁做了什麼、查了什麼、還缺什麼（繁體中文） |
-| `items` | 項目（一頁最多 60 個） |
+| `items` | 項目（schema 一頁最多 60 個；本頁的項目上限在工單與 input.json 的 `pageItemCap`，達上限就 `PARTIAL`） |
 | `evidence` | 本包的證據 |
 | `questions` | 本頁提出的問題 |
 | `requests` | 本頁需要、但上游還沒有的項目 |
@@ -8207,6 +8207,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 
 - `COMPLETE`：本單元本主題全部列完。外環收件前檢查：本頁「必須處置的分母鍵」與「上游需求」每個都寫成項目，或開了同鍵的 EVIDENCE_GAP；前頁與本頁引用的同單元後寫項目都已寫出。
 - `PARTIAL`：一頁放不下時用；`nextCursor` 寫可重定位的範圍（例如「Record TW_X 的 PRIORITY_CD 之後的欄位」），不能空白、不能與前一頁相同。
+- 工單寫了本頁的項目上限（`pageItemCap`；texts 單元 items 與 `statusTexts` 合計）：達上限就 `PARTIAL`，照工單「必須處置的分母鍵」的順序處理，`nextCursor` 寫下一個還沒處置的鍵；上游需求頁與改寫頁不受此上限（仍最多 60 個）。
 - 缺口不靠 `PARTIAL` 表示：查不到的事實寫 unresolved 或 EVIDENCE_GAP，查完了就 `COMPLETE`。
 - 不為塞進一頁而刪掉條件或例外；寧可分頁。
 - 工單游標是 `REQUESTS` 時，本頁只處理「上游需求」那幾個鍵，一頁寫完（`COMPLETE`）。
@@ -11458,4 +11459,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   }
 }
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/schemas/04-workflow.schema.json
-@@@PSBUNDLE-PART-END|5a3b86e7a6ccc3c2|1|6
+@@@PSBUNDLE-PART-END|fc78dc8fc2386fd3|1|6

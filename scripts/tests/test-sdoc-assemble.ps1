@@ -345,6 +345,36 @@ foreach ($rel in @('scripts/ps-sdoc-lib.ps1', 'scripts/ps-sdoc-check-lib.ps1', '
     $b = [System.IO.File]::ReadAllBytes((Join-Path $repo $rel))
     Assert-Sd ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) ('UTF-8 BOM：' + $rel)
 }
+# ---------------- 研究頁每頁上限（一次回應不要太長） ----------------
+function New-CapPacket([string]$Unit, [int]$Items, [int]$StatusTexts = -1) {
+    $pk = New-PsSdObject; $pk['unit'] = $Unit; $arr = @()
+    for ($i = 0; $i -lt $Items; $i++) { $o = New-PsSdObject; $o['type'] = 'FLD'; $o['key'] = ('TW_X.F' + $i); $arr += , $o }
+    $pk['items'] = $arr
+    if ($StatusTexts -ge 0) { $st = @(); for ($i = 0; $i -lt $StatusTexts; $i++) { $st += ('t' + $i) }; $pk['statusTexts'] = $st }
+    return , $pk
+}
+$capSaved = $env:PS_SDOC_RESEARCH_PAGE_ITEMS
+try {
+    Remove-Item -Path Env:\PS_SDOC_RESEARCH_PAGE_ITEMS -ErrorAction SilentlyContinue
+    Assert-Sd ((Get-PsSdResearchPageCap 'data') -eq 8 -and (Get-PsSdResearchPageCap 'texts') -eq 40 -and (Get-PsSdResearchPageCap 'operations') -eq 3 -and (Get-PsSdResearchPageCap 'testing') -eq 4 -and (Get-PsSdResearchPageCap 'nosuch') -eq 8) '每頁上限：預設 8；texts 40、operations 3、testing 4；查不到的單元用預設'
+    $env:PS_SDOC_RESEARCH_PAGE_ITEMS = '60'
+    Assert-Sd ((Get-PsSdResearchPageCap 'data') -eq 60 -and (Get-PsSdResearchPageCap 'operations') -eq 60) '每頁上限：PS_SDOC_RESEARCH_PAGE_ITEMS=60 → 所有單元一律 60（舊行為）'
+    $env:PS_SDOC_RESEARCH_PAGE_ITEMS = 'x'; $c1 = Get-PsSdResearchPageCap 'data'
+    $env:PS_SDOC_RESEARCH_PAGE_ITEMS = '0'; $c2 = Get-PsSdResearchPageCap 'data'
+    $env:PS_SDOC_RESEARCH_PAGE_ITEMS = '61'; $c3 = Get-PsSdResearchPageCap 'data'
+    Remove-Item -Path Env:\PS_SDOC_RESEARCH_PAGE_ITEMS -ErrorAction SilentlyContinue
+    Assert-Sd ($c1 -eq 8 -and $c2 -eq 8 -and $c3 -eq 8) '每頁上限：env 不是 1～60 的整數 → 用表'
+    $e9 = Test-PsSdResearchPageCap (New-CapPacket 'data' 9) 'data' ''
+    Assert-Sd (@($e9).Count -eq 1 -and ([string]$e9[0]).Contains('超過上限 8') -and ([string]$e9[0]).Contains('PARTIAL')) '每頁上限：data 包 9 項 → 1 條錯誤（含上限 8、要改 PARTIAL）'
+    $e8 = Test-PsSdResearchPageCap (New-CapPacket 'data' 8) 'data' ''
+    Assert-Sd (@($e8).Count -eq 0) '每頁上限：剛好 8 項 → 通過'
+    $eq = Test-PsSdResearchPageCap (New-CapPacket 'data' 9) 'data' 'REQUESTS'; $ea = Test-PsSdResearchPageCap (New-CapPacket 'data' 9) 'data' 'L5-AMEND-1'
+    Assert-Sd (@($eq).Count -eq 0 -and @($ea).Count -eq 0) '每頁上限：上游需求頁與改寫頁不受上限'
+    $t39 = Test-PsSdResearchPageCap (New-CapPacket 'texts' 2 39) 'texts' ''; $t38 = Test-PsSdResearchPageCap (New-CapPacket 'texts' 2 38) 'texts' ''
+    Assert-Sd (@($t39).Count -eq 1 -and @($t38).Count -eq 0) '每頁上限：texts 以 items＋statusTexts 合計（2＋39 超過 40、2＋38 通過）'
+}
+finally { if ($null -ne $capSaved) { $env:PS_SDOC_RESEARCH_PAGE_ITEMS = $capSaved } else { Remove-Item -Path Env:\PS_SDOC_RESEARCH_PAGE_ITEMS -ErrorAction SilentlyContinue } }
+
 Write-Host ('sdoc assemble tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
 if ($script:failed -gt 0) { exit 1 }
 exit 0

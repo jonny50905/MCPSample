@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit da14021）第 3／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0c79d43）第 3／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|da14021|5a3b86e7a6ccc3c2|3|6|8169|ec5264f0ccf8b9cd5b3280a18b833305e8c0f04ae1bc0ebce5df5e413af24e7e
+@@@PSBUNDLE-PART|1|claude|0c79d43|fc78dc8fc2386fd3|3|6|8199|e3fdeb39dba520c8fc15f4ec93024e5698d91019768508d1e724ae4c333d8a20
 @@@PSBUNDLE-FILE|scripts/ps-bundle.ps1|496|ee17daeaf5a5b9ff531a4f6b577ca0a71ff6dd4f29806d45a7198f3af079afe5|1
 # ps-bundle.ps1 — 搬運包：把一個版本要搬的檔收成幾份文字檔，公司機一個指令解回各檔
 # 用法（公司機）：
@@ -4727,7 +4727,7 @@ function Get-PsSdSpeculationWarnings {
     return , $v.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-check-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-lib.ps1|1420|a8fb7d1c2344448c9984495321f233174c11cf40bfdf7a88b3ea713d50f39456|1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc-lib.ps1|1448|901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c|1
 # ps-sdoc-lib.ps1 — Spec 文件流程（Claude Code 版）的核心：常數、項目工具、ID registry、研究包驗收與合成、canonical 組裝、計算文件。
 # 依賴（呼叫端先載入）：ps-knowledge-lib.ps1（JSON 輸出、hash、原子寫入）、ps-sdoc-schema-lib.ps1、ps-sdoc-status-lib.ps1。
 # 記憶體形狀：JSON 物件一律是區分大小寫、保留順序的 OrderedDictionary（New-PsSdObject）；陣列是 object[]。
@@ -4799,6 +4799,34 @@ $script:PsSdUnits = @(
 )
 # 研究包可以提出的上游需求（型別 → 研究單位）
 $script:PsSdRequestUnit = @{ 'OBJ' = 'scope'; 'ENT' = 'data'; 'FLD' = 'data'; 'DRV' = 'data'; 'ROLE' = 'security'; 'IF' = 'interfaces'; 'MSG' = 'rules' }
+# 研究頁每頁的項目上限（外環驗收；超過＝INVALID 計次）：一次回應（一個 Write）不要太長，經公司 gateway 幾分鐘的回應會逾時。
+# 依範例量到的每項位元組（ui 1.1 KB、data 1.2 KB、rules 1.6 KB、testing 2.5 KB、operations 4.5 KB；statusTexts 約 100 B/筆）：
+# 預設 8 項 ≈ 9～13 KB ≈ 2,700～5,000 token ≈ 75～140 秒（每秒 36 token）。texts 單元以 items＋statusTexts 合計。
+# 環境變數 PS_SDOC_RESEARCH_PAGE_ITEMS（1～60）設了就所有單元一律用它（60＝schema 上限＝舊行為）。上游需求頁（REQUESTS）與改寫頁（L5-AMEND）不受此上限。
+$script:PsSdResearchPageItems = @{ 'default' = 8; 'texts' = 40; 'operations' = 3; 'testing' = 4 }
+
+function Get-PsSdResearchPageCap {
+    param([string]$Unit)
+    $v = 0
+    $raw = ([string]$env:PS_SDOC_RESEARCH_PAGE_ITEMS).Trim()
+    if ($raw -ne '' -and [int]::TryParse($raw, [ref]$v) -and $v -ge 1 -and $v -le 60) { return $v }
+    if ($script:PsSdResearchPageItems.ContainsKey($Unit)) { return [int]$script:PsSdResearchPageItems[$Unit] }
+    return [int]$script:PsSdResearchPageItems['default']
+}
+
+# 研究包是否超過本頁上限：回錯誤字串陣列（空＝通過）。Cursor 為 REQUESTS 或 L5-AMEND* 的頁不檢查。
+function Test-PsSdResearchPageCap {
+    param($Packet, [string]$Unit, [string]$Cursor = '')
+    $errs = @()
+    if ($null -eq $Packet) { return , $errs }
+    if ($Cursor -ceq 'REQUESTS' -or $Cursor.StartsWith('L5-AMEND')) { return , $errs }
+    $cap = Get-PsSdResearchPageCap $Unit
+    $n = @($Packet['items']).Count
+    $what = 'items'
+    if ($Unit -eq 'texts' -and $Packet.Contains('statusTexts')) { $n += @($Packet['statusTexts']).Count; $what = 'items＋statusTexts' }
+    if ($n -gt $cap) { $errs += ('本頁 ' + $n + ' 筆超過上限 ' + $cap + ' 筆（' + $what + '）：改為 PARTIAL 分頁，nextCursor 寫下一個還沒處置的鍵') }
+    return , $errs
+}
 # 工作流程骨架欄位（由第 0 階段帶入，研究包不得寫）
 $script:PsSdSkeletonFields = @{
     'STATE' = @('entityKey', 'stateKind', 'code', 'name', 'parent', 'regions', 'isInitialTarget', 'isFinal')
@@ -7538,7 +7566,7 @@ function Format-PsSdAlternatives {
     return ($head + '；最接近的寫法：' + [string]::Join('；', $shown))
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-schema-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-status-lib.ps1|630|2fa4f8b1e95a126bd529463810ff266947e44d25dbc3e385be72524d01774bdd|1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc-status-lib.ps1|632|14948b56f8556e3cce12e59091ab3656503efe84793c950b08d7a220f715f711|1
 # ps-sdoc-status-lib.ps1 — 第 0 階段：STATUS 檔的三份狀態圖解讀（設計 §8.2、§8.3）。
 # 外環不解讀 Mermaid：只認得 Mermaid 區塊的範圍與每一行的行號。
 #   1. 檢查每份解讀：Mermaid 區塊內每一個非空行恰好交代一次、引用的行在圖內、轉移起訖與子業務的實體存在。
@@ -7615,7 +7643,9 @@ function Get-PsSdProseLines {
 
 # ---------------- 分段寫出 ----------------
 # 讀者一段寫一個檔：一次回應太長時，經公司 gateway 會逾時或被切斷。數字是每段要交代的 Mermaid 非空行上限。
-$script:PsSdReadingPartLines = 60
+# 換算：每個 Mermaid 行的解讀 JSON 約 105 B；40 行 ≈ 4.2 KB ≈ 1,300～1,700 token ≈ 35～50 秒（每秒 36 token）。分段演算法會把連續的小區塊
+# 塞滿到上限，所以這個數字就是每次回應的實際上限、不是「多半更小」。
+$script:PsSdReadingPartLines = 40
 
 function Get-PsSdReadingParts {
     # Mermaid 行分段：只在區塊與區塊之間切，單一區塊超過上限才在行與行之間切。
@@ -8170,4 +8200,4 @@ function Get-PsSdConflictFacts {
     return , $out.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-status-lib.ps1
-@@@PSBUNDLE-PART-END|5a3b86e7a6ccc3c2|3|6
+@@@PSBUNDLE-PART-END|fc78dc8fc2386fd3|3|6

@@ -17,9 +17,25 @@ $script:PsOcSessionSlotName = 'Global\MCPSample-OpencodeSession'
 $script:PsOcSessionSlotNameOpencode = 'Global\MCPSample-OpencodeSession-opencode'
 # 模型端重試判讀（Claude Code 版）：最後一個成功的模型回應之後，同一個請求連續失敗幾次以上算「卡在模型端」，未達算「被拖慢」
 $script:PsOcApiStuckAfter = 3
-# 卡住就提前結束（Claude Code 版）：同一個請求連續失敗達這個次數，外環不再等到 TimeoutMin，直接整樹強殺——同一個請求每次重試都要等滿
-# gateway 的逾時，再等也只是把上限耗光。環境變數 PS_SESSION_API_ABORT_AFTER（1～20）可覆寫，0＝不提前結束（只等 TimeoutMin）。
+# 卡住就提前結束（Claude Code 版）：同一個請求連續失敗達這個次數、而且這一串失敗已經持續 $script:PsOcApiAbortMinSec 秒以上，外環不再等到
+# TimeoutMin，直接整樹強殺——同一個請求每次重試都要等滿 gateway 的逾時，再等也只是把上限耗光。幾秒內的連續快速重試（連線抖動、退避 0.5→32 秒）
+# 不算：要等它持續夠久。環境變數 PS_SESSION_API_ABORT_AFTER（1～20，小於判讀門檻 PsOcApiStuckAfter 時提高到它）可覆寫，0＝不提前結束（只等 TimeoutMin）。
 $script:PsOcApiAbortAfter = 5
+$script:PsOcApiAbortMinSec = 60
+# 外環替 Claude Code headless 子行程設的環境預設（只在啟動子行程那一刻設、視窗已設同名變數的一律沿用、啟動後還原；OpenCode 版不套）：
+#   共同：串流中途斷線後不改用非串流重送（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時）、關掉背景流量與提示建議。
+#   機械代理（狀態圖讀者、乾淨讀者、判定）：關 thinking（MAX_THINKING_TOKENS=0；thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）。
+#   研究 worker 不關 thinking。環境變數 PS_SESSION_CLAUDE_ENV_DEFAULTS=0 整組不套；PS_SESSION_CLAUDE_ENV_SKIP=名稱,名稱 剔除指定項。
+$script:PsOcClaudeEnvCommon = @(
+    , @('CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK', '1')
+    , @('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', '1')
+    , @('CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION', 'false')
+)
+$script:PsOcClaudeEnvByAgent = @{
+    'ps-status-reader' = @(, @('MAX_THINKING_TOKENS', '0'))
+    'ps-spec-reader' = @(, @('MAX_THINKING_TOKENS', '0'))
+    'ps-spec-judge' = @(, @('MAX_THINKING_TOKENS', '0'))
+}
 
 # npm 同時裝 opencode / opencode.cmd / opencode.ps1；Get-Command 會優先回 .ps1——把 .ps1 丟給 cmd.exe
 # 不會執行，Windows 會用檔案關聯開啟它（記事本）並阻塞，關掉後 cmd 回 exit 0，外環誤判 session 正常結束。
@@ -159,11 +175,14 @@ function Convert-PsOcClaudeStream {
 function Get-PsOcClaudeApiRetry {
     param([string]$StreamFile)
     $r = @{ Kind = 'NONE'; Count = 0; Trailing = 0; Recovered = $false; Progress = 0; Statuses = ''; ApiErrorStatus = '';
-        Requests = 0; LastContext = 0; MaxContext = 0; CacheRequests = 0; MaxOutput = 0; DurationApiSec = 0 }
+        Requests = 0; LastContext = 0; MaxContext = 0; CacheRequests = 0; MaxOutput = 0; DurationApiSec = 0;
+        LastContextMain = 0; MaxContextMain = 0; MaxContextSub = 0; IdFallback = $false }
     if (-not $StreamFile -or -not [System.IO.File]::Exists($StreamFile)) { return $r }
     $st = [ordered]@{}
     $msgs = [ordered]@{}
     $lastId = ''
+    $lastMainId = ''
+    $ord = [System.StringComparison]::Ordinal
     $fs = $null
     $rd = $null
     try {
@@ -172,7 +191,7 @@ function Get-PsOcClaudeApiRetry {
         while ($true) {
             $ln = $rd.ReadLine()
             if ($null -eq $ln) { break }
-            $k = $ln.IndexOf('"subtype":"api_retry"')
+            $k = $ln.IndexOf('"subtype":"api_retry"', $ord)
             if ($k -ge 0 -and $k -lt 80) {
                 $r.Count++
                 $r.Trailing++
@@ -182,33 +201,38 @@ function Get-PsOcClaudeApiRetry {
                 if ($st.Contains($s)) { $st[$s] = [int]$st[$s] + 1 } else { $st[$s] = 1 }
                 continue
             }
-            $k = $ln.IndexOf('"type":"assistant"')
+            $k = $ln.IndexOf('"type":"assistant"', $ord)
             if ($k -ge 0 -and $k -lt 20) {
-                # API 錯誤訊息（error 欄位或「API Error」文字）不算進展
-                if ($ln.Contains('"error":"') -or $ln.Contains('"text":"API Error')) { continue }
+                # usage 在 message 物件的尾端（內容區塊之後）：從後面找，工具輸入裡的字樣是跳脫過的、不會誤抓
+                $u = $ln.LastIndexOf('"usage":{', $ord)
+                # API 錯誤訊息（「API Error」文字，或沒有 usage 又帶 error 欄位）不算進展；工具輸入裡的 error 參數（有 usage）照算
+                if ($ln.IndexOf('"text":"API Error', $ord) -ge 0 -or ($u -lt 0 -and $ln.IndexOf('"error":"', $ord) -ge 0)) { continue }
                 $r.Progress++
                 if ($r.Trailing -gt 0) { $r.Recovered = $true }
                 $r.Trailing = 0
-                # usage 在 message 物件的尾端（內容區塊之後）：從後面找，工具輸入裡的字樣是跳脫過的、不會誤抓
-                $u = $ln.LastIndexOf('"usage":{')
                 if ($u -lt 0) { continue }
                 $win = $ln.Substring($u, [Math]::Min(600, $ln.Length - $u))
                 $usage = Get-PsOcUsageFields $win
                 if ($null -eq $usage) { continue }
+                # 主代理還是子代理：子代理的事件帶 parent_tool_use_id（主代理為 null；沒有這個欄位的舊版或合成 stream 當主代理）
+                $isMain = $true
+                $pm = [regex]::Match($ln, '"parent_tool_use_id":("[^"]*"|null)')
+                if ($pm.Success -and $pm.Groups[1].Value -ne 'null') { $isMain = $false }
                 $id = ''
-                $mi = [regex]::Match($ln, '"message":\{"id":"([^"]+)"')
-                if ($mi.Success) { $id = $mi.Groups[1].Value } else { $id = ('line' + [string]$r.Progress) }
+                $mi = [regex]::Match($ln, '"message":\{[^{}]{0,200}?"id":"([^"]+)"')
+                if ($mi.Success) { $id = $mi.Groups[1].Value } else { $id = ('line' + [string]$r.Progress); $r.IdFallback = $true }
                 if ($msgs.Contains($id)) {
                     $cur = $msgs[$id]
                     if ($usage.Output -gt [int]$cur.Output) { $cur.Output = $usage.Output }
                     if ($usage.Context -gt [int]$cur.Context) { $cur.Context = $usage.Context }
                     if ($usage.CacheRead -gt [int]$cur.CacheRead) { $cur.CacheRead = $usage.CacheRead }
                 }
-                else { $msgs[$id] = @{ Context = $usage.Context; CacheRead = $usage.CacheRead; Output = $usage.Output } }
+                else { $msgs[$id] = @{ Context = $usage.Context; CacheRead = $usage.CacheRead; Output = $usage.Output; Main = $isMain } }
                 $lastId = $id
+                if ($isMain) { $lastMainId = $id }
                 continue
             }
-            $k = $ln.IndexOf('"type":"result"')
+            $k = $ln.IndexOf('"type":"result"', $ord)
             if ($k -ge 0 -and $k -lt 40) {
                 $m = [regex]::Match($ln, '"api_error_status":(\d+)')
                 if ($m.Success) { $r.ApiErrorStatus = $m.Groups[1].Value }
@@ -229,10 +253,13 @@ function Get-PsOcClaudeApiRetry {
         $mm = $msgs[$id]
         $r.Requests++
         if ([int]$mm.Context -gt $r.MaxContext) { $r.MaxContext = [int]$mm.Context }
+        if ([bool]$mm.Main) { if ([int]$mm.Context -gt $r.MaxContextMain) { $r.MaxContextMain = [int]$mm.Context } }
+        elseif ([int]$mm.Context -gt $r.MaxContextSub) { $r.MaxContextSub = [int]$mm.Context }
         if ([int]$mm.CacheRead -gt 0) { $r.CacheRequests++ }
         if ([int]$mm.Output -gt $r.MaxOutput) { $r.MaxOutput = [int]$mm.Output }
     }
     if ($lastId -ne '' -and $msgs.Contains($lastId)) { $r.LastContext = [int]$msgs[$lastId].Context }
+    if ($lastMainId -ne '' -and $msgs.Contains($lastMainId)) { $r.LastContextMain = [int]$msgs[$lastMainId].Context }
     if ($r.ApiErrorStatus -ne '') {
         if ($r.Trailing -gt 0) { $r.Kind = 'API_RETRY_STUCK' } else { $r.Kind = 'API_ERROR' }
     }
@@ -260,8 +287,11 @@ function Get-PsOcApiMetricsLine {
     if ($null -eq $Api) { return '' }
     if ([int]$Api.Requests -eq 0 -and [int]$Api.Count -eq 0) { return '' }
     $t = '成功請求 ' + [int]$Api.Requests + ' 次'
+    if ([bool]$Api.IdFallback) { $t += '（依事件計）' }
     if ([int]$Api.Requests -gt 0) {
-        $t += '、最後一次輸入 ' + [int]$Api.LastContext + ' token（最大 ' + [int]$Api.MaxContext + '；快取命中 ' + [int]$Api.CacheRequests + '／' + [int]$Api.Requests + ' 次）、單次最多輸出 ' + [int]$Api.MaxOutput + ' token'
+        $t += '、主代理最後一次輸入 ' + [int]$Api.LastContextMain + ' token（最大 ' + [int]$Api.MaxContextMain + '）'
+        if ([int]$Api.MaxContextSub -gt 0) { $t += '、子代理最大輸入 ' + [int]$Api.MaxContextSub + ' token' }
+        $t += '、快取命中 ' + [int]$Api.CacheRequests + '／' + [int]$Api.Requests + ' 次、單次最多輸出 ' + [int]$Api.MaxOutput + ' token'
     }
     if ([int]$Api.DurationApiSec -gt 0) { $t += '、API 累計 ' + [int]$Api.DurationApiSec + ' 秒' }
     if ([int]$Api.Count -gt 0) {
@@ -285,8 +315,29 @@ function Get-PsOcRetryGapSec {
 function Get-PsOcApiAbortAfter {
     $v = 0
     $raw = ([string]$env:PS_SESSION_API_ABORT_AFTER).Trim()
-    if ($raw -ne '' -and [int]::TryParse($raw, [ref]$v) -and $v -ge 0 -and $v -le 20) { return $v }
+    if ($raw -ne '' -and [int]::TryParse($raw, [ref]$v) -and $v -ge 0 -and $v -le 20) {
+        if ($v -gt 0 -and $v -lt $script:PsOcApiStuckAfter) { return $script:PsOcApiStuckAfter }
+        return $v
+    }
     return $script:PsOcApiAbortAfter
+}
+
+# 外環替 Claude Code 子行程設的環境預設：回 @(@(名稱, 值), …)（共同組＋該代理那組）。
+# PS_SESSION_CLAUDE_ENV_DEFAULTS=0 → 空陣列（整組不套）；PS_SESSION_CLAUDE_ENV_SKIP（逗號分隔的名稱）剔除指定項。
+function Get-PsOcClaudeEnvDefaults {
+    param([string]$Agent = '')
+    if (([string]$env:PS_SESSION_CLAUDE_ENV_DEFAULTS).Trim() -eq '0') { return , @() }
+    $skip = @{}
+    foreach ($n in (([string]$env:PS_SESSION_CLAUDE_ENV_SKIP) -split ',')) { $t = $n.Trim(); if ($t -ne '') { $skip[$t.ToUpperInvariant()] = $true } }
+    $out = @()
+    $all = @($script:PsOcClaudeEnvCommon)
+    if ($Agent -ne '' -and $script:PsOcClaudeEnvByAgent.ContainsKey($Agent)) { $all += @($script:PsOcClaudeEnvByAgent[$Agent]) }
+    foreach ($pair in $all) {
+        $name = [string]$pair[0]
+        if ($skip.ContainsKey($name.ToUpperInvariant())) { continue }
+        $out += , @($name, [string]$pair[1])
+    }
+    return , $out
 }
 
 # 失敗 session 的模型端判讀（Get-PsOcClaudeApiRetry 的 Kind）→ 下一步；沒有模型端事件回空字串（呼叫端沿用原本的說法）
@@ -391,8 +442,10 @@ function New-PsOcCommandLine {
 
 # 開一個新鮮 headless session（逾時整樹強殺）。回傳 @{ TimedOut; ExitCode; ErrFile; OutFile; FailureKind; SlotBusy; SlotWaitedSec; ApiKind; Aborted }
 #   ApiKind：Claude Code 版 stream 的模型端重試判讀（Get-PsOcClaudeApiRetry 的 Kind）；只供說明，不改變成敗判定
-#   Aborted：Claude Code 版同一個請求連續失敗達 Get-PsOcApiAbortAfter 的門檻、外環在 TimeoutMin 之前就強殺（FailureKind=API_ABORTED、
-#     TimedOut=$false、ExitCode=-1）；結束與強殺時都印一行「模型端數據」（成功請求數、輸入／輸出 token、快取命中、重試間隔）
+#   Aborted：Claude Code 版同一個請求連續失敗達 Get-PsOcApiAbortAfter 的門檻且持續 PsOcApiAbortMinSec 秒以上、外環在 TimeoutMin 之前就強殺
+#     （FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK、TimedOut=$false、ExitCode=-1）；結束與強殺時都印一行「模型端數據」
+#     （成功請求數、主代理／子代理輸入 token、快取命中、單次最多輸出、重試間隔）
+#   -EnvDefaults：@(@(名稱, 值), …)（Get-PsOcClaudeEnvDefaults -Agent）——Claude Code 版啟動子行程時設、視窗已設者沿用、啟動後還原；OpenCode 版忽略
 #   -ExtraArgs 例：'--command ps-research' 或 '--agent ps-deep-research'（OpenCode 原樣傳；Claude Code 轉成
 #     --agent <該指令的主代理>＋prompt「/ps-research <PromptText>」，輸出 stream-json 落 .stream.jsonl、最終回覆抽進 OutFile）
 #   -SlotWaitMin：取不到 session slot（前端版本的那把，見 Get-PsOcSessionSlotName）最多等幾分（0＝不等）；
@@ -403,7 +456,7 @@ function Invoke-PsOcSession {
     param(
         [string]$OcPath, [string]$Root, [string]$LogRoot, [string]$Model = '',
         [string]$ExtraArgs = '', [string]$PromptText, [int]$TimeoutMin, [string]$Tag,
-        [scriptblock]$Log = $null, [int]$SlotWaitMin = 0, [string]$TimeoutParamName = ''
+        [scriptblock]$Log = $null, [int]$SlotWaitMin = 0, [string]$TimeoutParamName = '', [object[]]$EnvDefaults = @()
     )
     function L([string]$m) { if ($null -ne $Log) { & $Log $m } else { Write-Host $m } }
     if (-not (Test-Path -LiteralPath $LogRoot)) { New-Item -ItemType Directory -Path $LogRoot -Force | Out-Null }
@@ -438,12 +491,30 @@ function Invoke-PsOcSession {
         # Claude Code 在自己的 session 內會設 CLAUDECODE；子行程繼承它會被當成巢狀 session——啟動當下拿掉、啟動後還原
         $ccSaved = $null
         if ($variant.Name -eq 'claude' -and $null -ne $env:CLAUDECODE) { $ccSaved = $env:CLAUDECODE; Remove-Item -Path Env:\CLAUDECODE -ErrorAction SilentlyContinue }
+        # 環境預設（Claude Code 版）：只在子行程繼承的那一刻設，視窗已設的同名變數沿用，啟動後拿掉
+        $applied = @(); $kept = @()
+        if ($variant.Name -eq 'claude') {
+            foreach ($pair in @($EnvDefaults)) {
+                if ($null -eq $pair -or @($pair).Count -lt 2) { continue }
+                $name = [string]$pair[0]
+                if ([string][System.Environment]::GetEnvironmentVariable($name) -ne '') { $kept += $name; continue }
+                [System.Environment]::SetEnvironmentVariable($name, [string]$pair[1])
+                $applied += ($name + '=' + [string]$pair[1])
+            }
+        }
         try {
             $p = Start-Process -FilePath 'cmd.exe' -ArgumentList ('/d /s /c "' + $inner + '"') `
                 -WorkingDirectory $Root -NoNewWindow -PassThru
         }
         finally {
             if ($null -ne $ccSaved) { $env:CLAUDECODE = $ccSaved }
+            foreach ($a in $applied) { [System.Environment]::SetEnvironmentVariable(($a -split '=', 2)[0], $null) }
+        }
+        if ($applied.Count -gt 0 -or $kept.Count -gt 0) {
+            $envNote = '環境預設：' + ($applied -join '、')
+            if ($applied.Count -eq 0) { $envNote = '環境預設：（無）' }
+            if ($kept.Count -gt 0) { $envNote += '（沿用視窗已設：' + ($kept -join '、') + '）' }
+            L "SESSION($Tag) $envNote"
         }
         # 必須先取用 .Handle 把行程 handle 快取住，否則 -PassThru 物件在只用 WaitForExit(ms) 等待時 .ExitCode 會是 $null
         try { $null = $p.Handle } catch { }
@@ -459,11 +530,14 @@ function Invoke-PsOcSession {
         if ($streamFile -ne '') { $abortAfter = Get-PsOcApiAbortAfter }
         $aborted = $false
         $hb = $null
-        $rtPrevCount = 0; $rtPrevTrailing = 0; $rtLastAt = $null; $rtGaps = @()
+        $rtPrevCount = 0; $rtPrevTrailing = 0; $rtLastAt = $null; $rtGaps = @(); $rtTrailSince = $null; $rtLastLen = -1
         while (((Get-Date) - $sessStart).TotalMinutes -lt $TimeoutMin) {
             if ($p.WaitForExit(30000)) { $done = $true; break }
             if ($streamFile -ne '') {
-                $hb = Get-PsOcClaudeApiRetry -StreamFile $streamFile
+                # stream 沒長大就不重讀（長 session 的 stream 可達數十 MB）
+                $curLen = -1
+                try { if ([System.IO.File]::Exists($streamFile)) { $curLen = (Get-Item -LiteralPath $streamFile).Length } } catch { $curLen = -1 }
+                if ($null -eq $hb -or $curLen -ne $rtLastLen) { $hb = Get-PsOcClaudeApiRetry -StreamFile $streamFile; $rtLastLen = $curLen }
                 $dc = [int]$hb.Count - $rtPrevCount
                 if ($dc -gt 0) {
                     $now = Get-Date
@@ -476,7 +550,10 @@ function Invoke-PsOcSession {
                     $rtPrevCount = [int]$hb.Count
                 }
                 $rtPrevTrailing = [int]$hb.Trailing
-                if ($abortAfter -gt 0 -and [int]$hb.Trailing -ge $abortAfter) { $aborted = $true; break }
+                # 同一個請求的連續失敗從第一次被看到算起要持續 PsOcApiAbortMinSec 秒以上才算卡住；幾秒內的快速重試（抖動）會自己恢復
+                if ([int]$hb.Trailing -le 0) { $rtTrailSince = $null }
+                elseif ($null -eq $rtTrailSince) { $rtTrailSince = Get-Date }
+                if ($abortAfter -gt 0 -and [int]$hb.Trailing -ge $abortAfter -and $null -ne $rtTrailSince -and ((Get-Date) - $rtTrailSince).TotalSeconds -ge $script:PsOcApiAbortMinSec) { $aborted = $true; break }
             }
             if (((Get-Date) - $lastBeat).TotalMinutes -ge 5) {
                 $mins = [int]((Get-Date) - $sessStart).TotalMinutes
@@ -523,7 +600,8 @@ function Invoke-PsOcSession {
             L "SESSION($Tag) 模型端數據：$(Get-PsOcApiMetricsLine $api $gap)"
             $fkA = Get-PsOcFailureKind -OutFile $outFile -ErrFile $errFile
             if ($fkA -ne 'NONE') { L "SESSION($Tag) 容量事件：$fkA（out/err 含 context 溢出字樣）" }
-            return @{ TimedOut = $false; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'API_ABORTED'; SlotBusy = $false; SlotWaitedSec = $slot.WaitedSec; ApiKind = $api.Kind; Aborted = $true }
+            # 提前結束本身就是「卡住」的判定（門檻可能等於判讀門檻以下的值被提高，仍一律 STUCK）
+            return @{ TimedOut = $false; ExitCode = -1; ErrFile = $errFile; OutFile = $outFile; FailureKind = 'API_ABORTED'; SlotBusy = $false; SlotWaitedSec = $slot.WaitedSec; ApiKind = 'API_RETRY_STUCK'; Aborted = $true }
         }
         if (-not $done) {
             & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null

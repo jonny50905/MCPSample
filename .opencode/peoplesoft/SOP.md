@@ -1051,15 +1051,17 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 
 | 在哪看 | 內容 |
 |---|---|
+| `SESSION(...) 環境預設` 行 | 外環替這個 Claude Code 子行程設了哪些環境變數（見下方「外環的 Claude Code 環境預設」）；括號列「沿用視窗已設」的 |
 | 執行中每 5 分鐘的「進行中」行 | `模型端重試 N 次（504×k…）`，之後接「目前這個請求已連續失敗 M 次」或「之後已恢復」，量得到時加「重試間隔約 G 秒」；另有「成功請求 N 次、最後一次輸入 X token、快取命中 Y 次」 |
 | 強殺或結束時的 `SESSION(...) 判讀` 行 | **被模型端拖慢**（有重試、之後仍有進展）／**卡在模型端（gateway）**（最後同一個請求連續失敗 3 次以上，或 Claude Code 重試用完）／API 錯誤（沒有重試，不是逾時類） |
-| `SESSION(...) 提前結束` 行 | 同一個請求連續失敗達門檻（預設 5），外環在 TimeoutMin 之前就強殺——每次重試都要等滿 gateway 逾時，再等只是把上限耗光 |
-| `SESSION(...) 模型端數據` 行 | 成功請求 N 次、最後一次輸入 X token（最大；快取命中 Y／N 次）、單次最多輸出 Z token、API 累計秒數、模型端重試次數與狀態碼、重試間隔約 G 秒（≈ gateway 逾時＋退避） |
+| `SESSION(...) 提前結束` 行 | 同一個請求連續失敗達門檻（預設 5）**且這一串失敗已持續 60 秒以上**，外環在 TimeoutMin 之前就強殺——每次重試都要等滿 gateway 逾時，再等只是把上限耗光；幾秒內的快速重試（抖動）不算 |
+| `SESSION(...) 模型端數據` 行 | 成功請求 N 次、主代理最後一次輸入 X token（最大）、子代理最大輸入、快取命中 Y／N 次、單次最多輸出 Z token、API 累計秒數、模型端重試次數與狀態碼、重試間隔約 G 秒（≈ gateway 逾時＋退避） |
 | 最後的「session 失敗」行 | 依上面判讀給下一步；沒有模型端事件時維持「檢查 Claude Code／MCP」 |
-| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_ABORTED`（提前結束）、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等） |
+| 「session 失敗（…）但產出已驗收通過，照收」 | session 逾時、結束碼不是 0 或提前結束，但工單指定的產出已寫完且驗收通過（例如寫完後 Read 回確認的那個請求才卡住）：照收、不是 DOC1-3-04；outcome.json 另記 `sessionFindings` |
+| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_ABORTED`（提前結束）、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等）；驗收錯誤另放 `diagnostics` |
 
-- 「卡住」判讀門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）；提前結束門檻 `$script:PsOcApiAbortAfter`（預設 5），
-  跑外環的視窗設 `$env:PS_SESSION_API_ABORT_AFTER`（0＝不提前結束、1～20）可改。
+- 「卡住」判讀門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）；提前結束門檻 `$script:PsOcApiAbortAfter`（預設 5；最少持續
+  `$script:PsOcApiAbortMinSec`＝60 秒），跑外環的視窗設 `$env:PS_SESSION_API_ABORT_AFTER`（0＝不提前結束、1～20，小於 3 提高到 3）可改。
 - 為什麼 TimeoutMin 不是槓桿：504 是 gateway 等上游逾時的回覆；Claude Code 對 5xx 重試**同一個請求**（預設 10 次），每次都等滿 gateway 逾時。
   那個請求在 gateway 逾時內完成不了，10 次都一樣；TimeoutMin 只決定外環等多久才放棄。
 - 為什麼同一個 Sonnet 走 Claude Code 比走 OpenCode 容易撞（請求的形狀不同，都是 Claude Code 文件寫的行為）：
@@ -1069,19 +1071,54 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
   重送整份 context；背景請求（標題、分類、摘要）經 gateway 也用主模型。
 - 怎麼讀「模型端數據」行：
   - 快取命中 0／N（每個請求都沒命中）：gateway 沒把 `cache_control` 傳到上游（Claude Code 文件列的判別特徵）→ 交 IT：cache_control 直通、system 陣列不要轉成字串。
-  - 重試間隔約 G 秒：G 就是 gateway 對 `/v1/messages` 的逾時（加幾秒退避）。Claude Code 自己單次請求等 10 分（`API_TIMEOUT_MS`），G 遠小於 600 秒＝gateway 先放棄。
+  - 重試間隔約 G 秒：G 就是 gateway 對 `/v1/messages` 的逾時（加幾秒退避）。Claude Code 自己單次請求等 10 分（`API_TIMEOUT_MS`），G 遠小於 600 秒＝gateway 先放棄；
+    只有幾秒＝連線抖動的快速重試，不是逾時。
   - 狀態碼「無回應」：不是 gateway 回的——連線中途斷，或 Claude Code 的串流看門狗放棄；配合 thinking／ping 那一項看。
-  - 最後一次輸入 X、單次最多輸出 Z：卡住的那個請求比 X 更大、要寫的比 Z 更長；對照每段要交代的行數決定縮多少。
-- 實驗階梯（照順序、一次改一項、每項看「模型端數據」行；環境變數設在跑 `ps-sdoc.ps1` 或啟動 `claude --agent ps-spec-author` 的**同一個視窗**，
-  子行程繼承，關掉視窗就沒了；要固定就寫進 `.claude/settings.json` 的 `env`，但會影響互動 session）：
-  0. 先用新 scripts 原樣跑一次，拿到數據行與提前結束行。
-  1. `$env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK = '1'`（串流斷了也用串流重送，不改非串流）＋ `$env:CLAUDE_CODE_MAX_RETRIES = '3'`（早點失敗；預設 10）。
-  2. 關 thinking／降 effort：`$env:MAX_THINKING_TOKENS = '0'`（固定預算的模型）或 `$env:CLAUDE_CODE_EFFORT_LEVEL = 'low'`（adaptive 的模型，Sonnet 4.6 起）。
-     讀者與判定是機械工作；研究 worker 的合格率要看數字。
-  3. 縮小每段輸出：`$env:PS_SDOC_READING_PART_LINES = '20'`。
-  4. 仍卡：SOP-29 的 `-Cli opencode`，`.opencode/peoplesoft/sdoc/model.yaml` 填公司 Sonnet 的 `<provider>/<model>`——同一個外環、同一套契約，只換 CLI。
+  - 主代理最後一次輸入 X（最大 Y）、單次最多輸出 Z：卡住的那個請求比 Y 更大、要寫的比 Z 更長（看「最大」不看「最後一次」：最後一次可能是子代理的小 context）；
+    對照每段要交代的行數、每頁的項目上限決定縮多少。
+
+### 外環的 Claude Code 環境預設
+
+外環開 Claude Code 的 headless 子行程時，只在那一刻替子行程設下面的環境變數，啟動後拿掉；**視窗已設的同名變數一律沿用**（所以 SOP 的實驗仍可逐項做）；
+OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些、沿用了哪些。
+
+| 變數 | 值 | 哪些代理 | 作用 |
+|---|---|---|---|
+| `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK` | `1` | 全部 | 串流中途斷線後仍用串流重送，不改非串流（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時） |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 全部 | 不做更新檢查、遙測、錯誤回報、功能旗標抓取 |
+| `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | `false` | 全部 | 不產提示建議（背景請求經 gateway 也用主模型） |
+| `MAX_THINKING_TOKENS` | `0` | ps-status-reader、ps-spec-reader、ps-spec-judge | 機械工作不開 thinking（thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）；研究 worker 不關 |
+
+- 整組不套：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'`；剔除單項：`$env:PS_SESSION_CLAUDE_ENV_SKIP = 'MAX_THINKING_TOKENS'`（逗號分隔、不分大小寫）。
+- 若公司的 Sonnet 版本拒絕關 thinking，數據行會出現 `400×N`：用 `PS_SESSION_CLAUDE_ENV_SKIP=MAX_THINKING_TOKENS` 剔除。
+- 不進預設、留在實驗階梯的：`CLAUDE_CODE_MAX_RETRIES`（與提前結束重疊，會把幾秒的抖動變成硬失敗）、`CLAUDE_CODE_EFFORT_LEVEL`（Sonnet 4.6 起才有，舊模型回 400）、
+  worker 的 `MAX_THINKING_TOKENS`（非 0 值在新模型回 400）。
+- 實驗階梯（照順序、一次改一項、每項看「模型端數據」行與各種工單的 SESSION_FAILED 次數；環境變數設在跑 `ps-sdoc.ps1` 或啟動 `claude --agent ps-spec-author`
+  的**同一個視窗**，子行程繼承，關掉視窗就沒了；要固定就寫進 `.claude/settings.json` 的 `env`，但會影響互動 session）：
+  0. 用新 scripts 原樣跑一次（環境預設、分段 40 行、每頁上限都已生效），拿到數據行、狀態碼分布、提前結束行。
+  1. 對照：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'` 再跑一次——差異＝請求形狀的影響。
+  2. 再縮小每次回應：`$env:PS_SDOC_RESEARCH_PAGE_ITEMS = '4'`、`$env:PS_SDOC_READING_PART_LINES = '20'`。
+  3. 研究 worker 也關 thinking：`$env:MAX_THINKING_TOKENS = '0'`（固定預算的模型）；adaptive 的模型（Sonnet 4.6 起）改 `$env:CLAUDE_CODE_EFFORT_LEVEL = 'low'`。
+  4. 早點失敗：`$env:CLAUDE_CODE_MAX_RETRIES = '3'`（預設 10）。
+  5. 仍卡：SOP-29 的 `-Cli opencode`，`.opencode/peoplesoft/sdoc/model.yaml` 填公司 Sonnet 的 `<provider>/<model>`——同一個外環、同一套契約，只換 CLI。
 - 卡在模型端時要問 IT 的：gateway 對 `/v1/messages` 的上游逾時與閒置逾時（能否 ≥ 600 秒）、是否串流直通（SSE 不緩衝、保留 `ping`）、
   `cache_control` 是否直通、非串流請求的整體逾時、尖峰時段的容量或排隊限制。只給狀態碼、次數、間隔與 token 數，不給內容。
+
+### 研究包每頁上限
+
+一次回應（一個 Write）不要太長：研究頁的項目數由外環驗收，超過＝INVALID（計次；findings 進下一張工單的「前次未通過的原因」），工單與 input.json 的
+`pageItemCap` 印出本頁上限，模型達上限就 `PARTIAL`＋`nextCursor`。
+
+| 單元 | 每頁上限 | 依範例量到的每項大小 |
+|---|---|---|
+| 預設 | 8 | 1.1～1.6 KB（ui、data、scope、workflow、rules）→ 8 項 ≈ 9～13 KB ≈ 75～140 秒 |
+| texts | 40（items＋statusTexts 合計） | statusTexts 約 100 B/筆 |
+| operations | 3 | 4.5 KB |
+| testing | 4 | 2.5 KB |
+
+- `$env:PS_SDOC_RESEARCH_PAGE_ITEMS`（1～60）設了就所有單元一律用它；`60`＝schema 上限＝舊行為。上游需求頁（REQUESTS）與改寫頁（L5-AMEND）不受此上限。
+- 每個主題最多 60 頁（原 30）。連兩次超量會 BLOCKED（DOC1-4-03）：用 -Retry 並把 `PS_SDOC_RESEARCH_PAGE_ITEMS` 調大。
+- 研究 session 數會比以前多（每頁項目少），ps-spec-author 每次呼叫一個 session，回合數等比增加。
 
 ### 狀態圖解讀分段寫出
 
@@ -1089,8 +1126,8 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 工單 input.json 的 `outputParts` 與 manifest 列出每段的行號範圍與檔名（inbox 的 `output-part-NN.json`），讀者一段寫一個檔，
 外環合併後照原本的規則驗收。目的：一次回應不要太長（公司 gateway 下約每秒 30～40 token，整份解讀一次寫完要好幾分鐘，中途斷一次就整段重來）。
 
-- 每段的 Mermaid 行上限預設 60；要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '40'`（5～1000），
-  只影響這個視窗。
+- 每段的 Mermaid 行上限預設 40（每行解讀約 105 B，40 行 ≈ 4.2 KB ≈ 35～50 秒；分段演算法會把連續小區塊塞滿到上限，所以這就是每次回應的實際上限）；
+  要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '20'`（5～1000），只影響這個視窗。
 - 各段原樣留在 attempt 目錄（`output-part-NN.json`），合併後的整份是同目錄的 `output.json`。
 - 少寫一段、某段不是合法 JSON、某段的 reader／指紋和第一段不同、同一狀態的 final 或同一轉移的 scenario 各段不一致：整份 INVALID，
   findings 指出第幾段；讀者若一次寫完 `output.json`（沒有分段）也照收。
@@ -1120,6 +1157,7 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的問題時，用 OpenCode CLI＋另一個模型跑同一個 Spec 文件流程。
 研究規則、檢核、產出格式與 Claude Code 版相同（同一個外環 `scripts/ps-sdoc.ps1`；同一份 worker 輸出兩版發布的文件逐位元相同），
 只換 CLI 與模型。Claude Code 版的檔（`CLAUDE.md`、`.claude/**`）不必動（同一個資料夾時仍要解同一次交接的 Claude Code 版搬運包，見第 1 步）。
+SOP-28 的「研究包每頁上限」「狀態圖解讀分段寫出」「session 失敗但產出已驗收照收」兩版相同；「外環的 Claude Code 環境預設」只套 Claude Code 版。
 
 □ 1. 搬運：OpenCode 版搬運包（`transfer/ps-bundle-opencode-01ofNN.txt`…，SOP-27）。可以解在 Claude Code 版的同一個資料夾
      （`scripts/**` 兩版共用、`.claude/` 不受影響；研究知識 `docs/ps-research`、狀態圖都在原地），也可以另開資料夾。

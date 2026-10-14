@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit da14021）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0c79d43）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|da14021|7d1f5c9dadac3453|2|8|6754|10cbdc9bbe2e3b3d90434eb9bce3ead71b9d26fc93f11c49edd639c99bbc5831
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|3979|6a7b039912c56e2da85d18f2ef7da08176a53add46633ad0785b3dee69e91c18|0
+@@@PSBUNDLE-PART|1|opencode|0c79d43|f963595bc2056ccb|2|8|6800|335f1e075282f773f51a3faa0ee4f39f1b76f1aae141fd48eb26dc3ca7e4dc67
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4025|e1f4e5bf59834c407c60da15d1848c34ae839450893e6b4236ec470f35885f3f|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -3981,6 +3981,52 @@
 - 未驗（要公司機數字）：哪一項槓桿讓那個請求過；thinking 關掉後讀者解讀的合格率；gateway 實際的逾時秒數與是否直通 ping／cache_control。
 - 教訓：外環要量「每個請求多大、失敗之間隔多久」，不只數失敗幾次；CLI 的預設（非串流重送、thinking、快取、背景請求）要跟 gateway 的能力一起看，
   同一個模型換 CLI 就是換請求形狀，逾時上限不是槓桿。
+
+### L148 公司 IT 不動也要寫得出來——每次回應綁小（分段 40 行、研究頁加外環上限）、外環替 Claude Code 子行程設 gateway 友善預設、session 失敗但產出合格照收（2026-10-14）
+
+- 症狀：L147 之後管理者補充：公司 IT 不可能改 gateway；以前走 OpenCode CLI 寫單一 spec（CLONE1）就算整份 2,500 行／184,037 字元，也是分段寫完、PowerShell 合併，
+  沒遇到 504。所以槓桿只能在客戶端：每個 session 一次寫多大、CLI 的請求形狀。
+- 根因（本課用 7 個 agent 的工作流量化；數字依 repo 範例）：
+  - 舊 CLONE1 流程一個 session＝一頁，一頁最多 40 個扁平 item（clone-profile 強制、驗證器擋、工單印出），每次回應約 9～18 KB。
+  - 新 DOC1 流程研究頁「一頁最多 60 個」只在契約文字（schema maxItems 60，外環不驗）：每項 1.1～4.5 KB（ui 1.1、data 1.2、rules 1.6、testing 2.5、operations 4.5），
+    60 項 ≈ 49～218 KB ≈ 20,000～90,000 output token ≈ 9～41 分鐘（每秒 36 token）——一次回應就是公司 gateway 撐不住的長度；狀態圖解讀每段 60 行 ≈ 6.3 KB ≈ 55～70 秒，
+    貼近 L141 量到的失敗點（50 秒斷過一次）。
+  - Claude Code 的請求形狀（官方文件）：串流斷線後改非串流重送、thinking 期間只有 ping、背景請求經 gateway 用主模型（L147）。
+  - 外環把「session 失敗」看得比「產出合格」優先：契約要求 Write 之後 Read 回確認，Write 成功後至少還有兩個請求（整個 session context 最大的兩個），這兩個卡住，
+    已寫好且合格的產出被丟掉、下一次用同樣形狀重來、無限重複。
+- 落點：
+  - `scripts/ps-sdoc-status-lib.ps1`：`PsSdReadingPartLines` 60→40（每行解讀約 105 B；守門範例 46 行切成 40＋6——分段演算法會把連續小區塊塞滿到上限，40 就是每次回應的實際上限）。
+  - `scripts/ps-sdoc-lib.ps1`：`PsSdResearchPageItems`＝@{ default 8；texts 40（items＋statusTexts 合計）；operations 3；testing 4 }、`Get-PsSdResearchPageCap`（env
+    `PS_SDOC_RESEARCH_PAGE_ITEMS` 1～60 一律覆寫，60＝舊行為）、`Test-PsSdResearchPageCap`（REQUESTS／L5-AMEND 頁豁免）。
+  - `scripts/ps-sdoc.ps1`：Test-SdResearchOutput 加每頁上限（超過＝INVALID 計次，findings 進下一張工單的「前次未通過的原因」——Get-SdSlotState 只帶計次列的 findings，
+    不計次模型就看不到原因）；工單 manifest 印「本頁上限」、input.json 加 `pageItemCap`（RESEARCH 與 REVIEW）；每主題 30 頁→60 頁；outcome 鏈改成先驗收產出再看 session：
+    session 失敗（逾時、結束碼、提前結束）但 ACCEPTED／CANDIDATE 照收並記 `sessionFindings`，不合格才 SESSION_FAILED（不計次、驗收錯誤放 `diagnostics`）；
+    圍欄違規仍 INVALID 計次。派工時 `-EnvDefaults (Get-PsOcClaudeEnvDefaults -Agent)`。
+  - `scripts/ps-session-lib.ps1`：環境預設表 `PsOcClaudeEnvCommon`（CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK=1、CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1、
+    CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false）＋`PsOcClaudeEnvByAgent`（ps-status-reader／ps-spec-reader／ps-spec-judge：MAX_THINKING_TOKENS=0；研究 worker 不關）；
+    `Get-PsOcClaudeEnvDefaults`（PS_SESSION_CLAUDE_ENV_DEFAULTS=0 整組不套、PS_SESSION_CLAUDE_ENV_SKIP 剔除）；`Invoke-PsOcSession -EnvDefaults` 只在啟動子行程那一刻設、
+    視窗已設者沿用、啟動後還原、印「環境預設」行；OpenCode 版不套。不進預設的：CLAUDE_CODE_MAX_RETRIES（與提前結束重疊、把幾秒抖動變硬失敗）、CLAUDE_CODE_EFFORT_LEVEL
+    （Sonnet 4.6 起才有，舊模型 400）、worker 的 MAX_THINKING_TOKENS 非 0 值（新模型 400）。
+  - 同檔修 L147 審查發現：提前結束要同一串失敗持續 `PsOcApiAbortMinSec`＝60 秒以上（幾秒內的快速退避重試會自己恢復）、門檻小於判讀門檻 3 提高到 3、提前結束一律 ApiKind=API_RETRY_STUCK；
+    模型端數據分主代理／子代理（`parent_tool_use_id`；數據行報主代理最後一次與最大、子代理最大——卡住的請求「比它大」要看主代理最大值）；message id 不在第一個鍵也認得、
+    沒有 id 時數據行標「依事件計」；有 usage 的 error 工具參數算進展；IndexOf 用 Ordinal、stream 沒長大不重讀。
+  - 契約（兩版 research-contract.md 逐字同句）：`items` 列改「schema 一頁最多 60 個；本頁的項目上限在工單與 input.json 的 pageItemCap，達上限就 PARTIAL」；
+    「coverage 與分頁」加一條達上限的游標寫法。
+  - SOP-28：表加「環境預設」「session 失敗但產出已驗收」兩列；新節「外環的 Claude Code 環境預設」（表、覆寫方式、實驗階梯改 0～5）與「研究包每頁上限」；
+    分段 40。SOP-29 註明兩版共用／只套 Claude Code 版。claude-code/README 第 5、6 步同步。
+- 被拒的方案與理由：STATUS_READ 只補缺段、REQUESTS／L5-AMEND 由外環切鍵（跨 attempt 續跑的狀態與測試面太大；各段本來就複製進 attempt 目錄——公司機先回報
+  SESSION_FAILED 的 attempt 裡有幾段合法再決定）；schema maxItems 改小（兩版 schemas 與 examples 逐位元相同、REQUESTS 頁要餘裕）；READER 批次 20 題改小（未量到撞）；
+  settings.json 的 env（會影響互動 session、與公司機改過的 .claude/** 衝突另存 .incoming）；CLAUDE_CODE_MAX_RETRIES=5 當預設（與提前結束同時觸發，只把抖動變硬失敗）。
+- 驗證（PS 7.4 本機）：test-sdoc 加 2（預設 40、守門範例切 40＋6）；test-sdoc-assemble 加 7（表、env 60／不合法、9 項擋、8 項過、REQUESTS／L5-AMEND 豁免、texts 合計）；
+  test-sdoc-run：env 釘 PS_SDOC_RESEARCH_PAGE_ITEMS=60（設計範例一頁本來就超過 8）、walk 工單含「本頁上限：items 最多 60 個」、edge 新 root cap=2 → 超量 INVALID 計次≥2、
+  重派工單帶「前次未通過的原因」、兩次後 DOC1-4-03、gate 新 root read-fail-after-all（各段寫完才 exit 1）→ ACCEPTED、sessionFindings=EXIT_1、不是 DOC1-3-04；
+  test-claude-variant 加 8（主／子代理分開、id 不在第一個鍵、依事件計、門檻 2→3、環境預設 5 項）與 Windows 2 項改（假 claude.cmd 回報子行程看到的 NSF=1／沿用 MTT=999／
+  父行程還原；提前結束要 ≥60 秒、門檻印 3、數據行報主代理）；test-ps51-static 抓到 3 處 `@(回傳 , 陣列的函式)`、已改先指派；全部測試與 5.1 靜態守衛全過。
+- 未驗（要公司機數字）：第一次原樣跑的「模型端數據」行與各種工單的狀態碼分布；哪一階讓請求過（本課同時改了回應大小與請求形狀，第一次只知道整體過不過）；
+  公司 Sonnet 是否接受 MAX_THINKING_TOKENS=0（數據行出現 400 就 SKIP）；讀者／判定關 thinking 後的合格率；SESSION_FAILED 的 attempt 裡有幾段合法（決定要不要做只補缺段）；
+  REQUESTS 頁與改寫頁（不受上限）在公司 Component 的實際項目數；READER 輸入側（渲染文件 ≈65k token）在快取沒直通時是否單靠輸入就撞。
+- 教訓：外環要把「一次回應多大」當成可驗收的規則（表、env、檢查、工單印數字），不是契約裡的一句話；session 的成敗看產出不看行程——寫完才死的請求不該讓合格產出重做；
+  客戶端的預設（非串流重送、背景流量、thinking）由外環在啟動子行程那一刻設、視窗設定永遠優先，才能同時「預設就好」與「逐項實驗」。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -6755,4 +6801,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   "nextCursor": ""
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/interfaces.json
-@@@PSBUNDLE-PART-END|7d1f5c9dadac3453|2|8
+@@@PSBUNDLE-PART-END|f963595bc2056ccb|2|8

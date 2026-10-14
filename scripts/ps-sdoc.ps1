@@ -358,7 +358,7 @@ function Get-SdPageState($Unit, [string]$Subject, [object[]]$Receipts, [object[]
         if ([string]$rc['cursor'] -cne $cursor) { throw ('頁次不連續：' + $r.Ref) }
         if ([string]$r.Packet['coverage'] -ceq 'COMPLETE') { $mainDone = $true; $page++; $cursor = 'REQUESTS'; continue }
         $next = [string]$r.Packet['nextCursor']
-        if ($next -eq '' -or $seen.Contains($next) -or $page -ge 30) { return @{ State = 'BLOCKED'; Findings = @('續頁游標重複、空白或已達 30 頁；請縮小範圍後 -Refresh。') } }
+        if ($next -eq '' -or $seen.Contains($next) -or $page -ge 60) { return @{ State = 'BLOCKED'; Findings = @('續頁游標重複、空白或已達 60 頁；請縮小範圍後 -Refresh。') } }
         [void]$seen.Add($next); $cursor = $next; $page++
     }
     $requested = @(); $amendKeys = @(); $amendQs = @(); $l5Find = @()
@@ -757,6 +757,8 @@ function Test-SdResearchOutput($Out, $Work, $State, [string]$Aid, [string]$Input
         elseif ($Out.Contains($x) -and $extraPage) { $errs += ('上游需求頁與改寫頁不寫 ' + $x + '（第一輪已處置）') }
     }
     if ($extraPage -and [string]$Out['coverage'] -cne 'COMPLETE') { $errs += '上游需求頁與改寫頁要一頁寫完（COMPLETE）' }
+    # 每頁上限（一次回應不要太長）：超過＝INVALID 計次，findings 進下一張工單的「前次未通過的原因」
+    foreach ($e in (Test-PsSdResearchPageCap $Out $Work.Unit ([string]$Work.Cursor))) { $errs += $e }
     if ([string]$Out['nextCursor'] -ne '' -and [string]$Out['nextCursor'] -ceq [string]$Work.Cursor) { $errs += 'nextCursor 沒有前進' }
     $ctx = New-PsSdResolveContext $J.SchemaReg $J.Registry $J.Skeleton 'status.md' $J.Built 'Check'
     $res = Resolve-PsSdPacket $ctx $Out
@@ -1088,6 +1090,7 @@ function Invoke-SdAttempt($Work, $State) {
         $inp['workDir'] = Get-SdRel $J.WorkDir
         $inp['citeablePath'] = Get-SdRel (Join-Path $J.WorkDir 'citeable.md')
         $inp['fieldGuidePath'] = Get-SdRel (Join-Path $ad 'fields.md')
+        $inp['pageItemCap'] = Get-PsSdResearchPageCap $Work.Unit
         if ($Work.Unit -eq 'workflow') { $inp['skeletonPath'] = Get-SdRel (Join-Path $ad 'skeleton.json') }
         if ($kind -eq 'REVIEW') { $inp['candidateId'] = $candidateId; $inp['candidateHash'] = $candidateHash; $inp['packet'] = $packet }
         if (@($Work.Amend).Count -gt 0) { $inp['amendKeys'] = @($Work.Amend); $inp['amendQuestions'] = @($Work.AmendQuestions); $inp['readerFindings'] = @($Work.L5Findings) }
@@ -1125,6 +1128,7 @@ function Invoke-SdAttempt($Work, $State) {
         if ($kind -eq 'STATUS_ROUND2') { $m.Add('- 第 2 輪：逐題回答工單 questions 的每一項（YES／NO／UNSURE）') }
     } else {
         $m.Add('- 規則：' + $J.SdocRel + '/research-contract.md（通用規則＋「' + $Work.Unit + '」一節）'); if ($kind -eq 'REVIEW') { $m.Add('- 覆核：' + $J.SdocRel + '/review-contract.md；被覆核的研究包在工單的 packet') }
+        $m.Add('- 本頁上限：items 最多 ' + [string]$inp['pageItemCap'] + ' 個（texts 單元 items＋statusTexts 合計）；達上限就 PARTIAL＋nextCursor（上游需求頁、改寫頁除外）')
         $m.Add('- 欄位說明：' + $inp['fieldGuidePath']); $m.Add('- 可引用清單：' + $inp['citeablePath']); $m.Add('- 目前已驗收的文件：' + $inp['workDir'] + '/md/'); $m.Add('- 知識索引：docs/ps-research/knowledge/index.md')
         $ex = Join-Path $J.SdocDir ('examples/' + $Work.Unit + '.json')
         if ([System.IO.File]::Exists($ex)) { $m.Add('- 範例（合成資料，只看格式；jobId、attemptId、inputHash 照本工單，參照的項目不一定在範例裡）：' + (Get-SdRel $ex)) }
@@ -1167,7 +1171,7 @@ function Invoke-SdAttempt($Work, $State) {
             $null = (& $FakeWorker -AttemptDir $ad -InputPath (Join-Path $box 'input.json') -OutputPath $outPath -Kind $kind -Root $J.Root *>&1 | ForEach-Object { [string]$_ })
             $sr = @{ ExitCode = [int]$LASTEXITCODE; TimedOut = $false; SlotBusy = $false; FailureKind = 'NONE'; ApiKind = 'NONE' }
         }
-        else { $sr = Invoke-PsOcSession -OcPath $J.OcPath -Root $J.Root -LogRoot $J.LogRoot -Model $J.Model -ExtraArgs ('--agent ' + $agent) -PromptText ($J.JobId + '/' + $aid) -TimeoutMin $TimeoutMin -Tag ($J.JobId + '-' + $aid) -Log { param($msg) Write-Host $msg } -SlotWaitMin 0 -TimeoutParamName 'TimeoutMin' }
+        else { $sr = Invoke-PsOcSession -OcPath $J.OcPath -Root $J.Root -LogRoot $J.LogRoot -Model $J.Model -ExtraArgs ('--agent ' + $agent) -PromptText ($J.JobId + '/' + $aid) -TimeoutMin $TimeoutMin -Tag ($J.JobId + '-' + $aid) -Log { param($msg) Write-Host $msg } -SlotWaitMin 0 -TimeoutParamName 'TimeoutMin' -EnvDefaults (Get-PsOcClaudeEnvDefaults -Agent $agent) }
     }
     catch { $sr = @{ ExitCode = -1; TimedOut = $false; SlotBusy = $false; FailureKind = 'DISPATCH_ERROR'; ApiKind = 'NONE' }; Write-Host ('session 未完成：' + $_.Exception.Message) }
     $allowed = @($outPath); foreach ($rp in $readingParts) { $allowed += $rp.Path }
@@ -1200,10 +1204,13 @@ function Invoke-SdAttempt($Work, $State) {
     }
     $outcome = New-PsSdOrderedFrom @('status', '', 'counted', $false, 'findings', @(), 'packetHash', '', 'at', (Get-PsKnUtcStamp))
     $accepted = $false
+    # session 失敗（逾時、結束碼、提前結束）仍先驗收產出：寫完才失敗（例如寫完後 Read 回確認那個請求卡在 gateway）的合格產出照收，
+    # 不合格才算 SESSION_FAILED（不計次）；驗收錯誤留在 diagnostics 供查
+    $sessFailed = ([bool]$sr.TimedOut -or [int]$sr.ExitCode -ne 0 -or (@('', 'NONE') -notcontains [string]$sr.FailureKind))
     if ((Get-SdSource).Hash -cne $J.Revision['sourceHash']) { $outcome['status'] = 'SOURCE_CHANGED' }
     elseif ([bool]$sr.SlotBusy) { $outcome['status'] = 'SLOT_BUSY' }
     elseif ($violations.Count -gt 0) { $outcome['status'] = 'INVALID'; $outcome['counted'] = $true; $outcome['findings'] = @('改了不准改的檔案，已還原／隔離：' + (@($violations | Select-Object -First 5) -join '、')) }
-    elseif ([bool]$sr.TimedOut -or [int]$sr.ExitCode -ne 0 -or (@('', 'NONE') -notcontains [string]$sr.FailureKind)) { $outcome['status'] = 'SESSION_FAILED'; $outcome['findings'] = Get-SdSessionFindings $sr }
+    elseif ($sessFailed -and $null -eq $outText) { $outcome['status'] = 'SESSION_FAILED'; $outcome['findings'] = Get-SdSessionFindings $sr }
     else {
         $out = $null
         if ($null -ne $outText) { try { $out = ConvertTo-PsSdNode (ConvertFrom-PsSdJson $outText) } catch { $out = $null } }
@@ -1242,6 +1249,18 @@ function Invoke-SdAttempt($Work, $State) {
                 Write-SdJson (Join-Path $J.ReceiptRoot ($rk + '.json')) $rc -Create
                 $outcome['status'] = 'ACCEPTED'; $accepted = $true
             }
+        }
+    }
+    if ($sessFailed -and @('SOURCE_CHANGED', 'SLOT_BUSY', 'SESSION_FAILED') -notcontains [string]$outcome['status'] -and $violations.Count -eq 0) {
+        if (@('ACCEPTED', 'CANDIDATE') -contains [string]$outcome['status']) {
+            $outcome['sessionFindings'] = Get-SdSessionFindings $sr
+            Write-Host ('session 失敗（' + (@($outcome['sessionFindings']) -join '、') + '）但產出已驗收通過，照收。')
+        }
+        else {
+            $diag = @($outcome['findings'] | Select-Object -First 5)
+            $outcome['status'] = 'SESSION_FAILED'; $outcome['counted'] = $false; $outcome['findings'] = Get-SdSessionFindings $sr
+            if ($diag.Count -gt 0) { $outcome['diagnostics'] = $diag }
+            $accepted = $false
         }
     }
     Write-SdJson (Join-Path $ad 'outcome.json') $outcome -Create

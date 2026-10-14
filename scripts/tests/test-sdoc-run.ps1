@@ -25,11 +25,13 @@ foreach ($n in @('ps-sdoc.ps1', 'ps-sdoc-schema-lib.ps1', 'ps-sdoc-status-lib.ps
     Copy-Item -LiteralPath (Join-Path $repo ('scripts/' + $n)) -Destination (Join-Path $tools $n)
 }
 $cli = Join-Path $tools 'ps-sdoc.ps1'
-$priorEnv = @{ Cli = $env:PS_CLI; Lib = $env:PS_SDOC_TEST_LIB; Fx = $env:PS_SDOC_TEST_FIXTURES; Mode = $env:PS_SDOC_TEST_MODE; Part = $env:PS_SDOC_READING_PART_LINES }
+$priorEnv = @{ Cli = $env:PS_CLI; Lib = $env:PS_SDOC_TEST_LIB; Fx = $env:PS_SDOC_TEST_FIXTURES; Mode = $env:PS_SDOC_TEST_MODE; Part = $env:PS_SDOC_READING_PART_LINES; PageItems = $env:PS_SDOC_RESEARCH_PAGE_ITEMS }
 $env:PS_CLI = ''
 $env:PS_SDOC_TEST_LIB = $tools
 # 範例的狀態圖不大：每段 8 行，讓解讀一定分成好幾段（走合併）
 $env:PS_SDOC_READING_PART_LINES = '8'
+# 設計範例一頁本來就超過預設的每頁上限（data 19 項）：釘回 schema 上限 60，上限本身另有專門情境測
+$env:PS_SDOC_RESEARCH_PAGE_ITEMS = '60'
 
 function Write-SdFx([string]$Path, [string]$Text, [bool]$Bom = $false) {
     if (-not (Write-PsKnAtomicText -LiteralPath $Path -Text $Text -Bom $Bom)) { throw 'TEST_WRITE_FAILED' }
@@ -90,6 +92,8 @@ if ($Kind -eq 'STATUS_READ') {
         if ($pi -eq $parts.Count - 1) { $o['conflicts'] = @($r['conflicts']) }
         [System.IO.File]::WriteAllText((Join-Path $Root ([string]$pt['path'])), ((ConvertTo-PsKnJson -Value $o) + "`n"), (New-Object System.Text.UTF8Encoding($false)))
     }
+    # 全部段都寫完才失敗（例如寫完後 Read 回確認的那個請求卡在 gateway）：外環要照收已驗收的產出
+    if (Test-FwOnce 'read-fail-after-all') { exit 1 }
     exit 0
 }
 if ($Kind -eq 'STATUS_ROUND2') {
@@ -411,6 +415,7 @@ try {
             if ($null -eq $dataAtt -and [string]$i['unit'] -ceq 'data' -and [string]$i['kind'] -ceq 'RESEARCH') { $dataAtt = $d.FullName }
         }
         $fg = [System.IO.File]::ReadAllText((Join-Path $dataAtt 'fields.md')); $mf = [System.IO.File]::ReadAllText((Join-Path $dataAtt 'manifest.md'))
+        Assert-Sd ($mf.Contains('本頁上限：items 最多 60 個')) '工單：manifest 印出本頁的項目上限（測試釘 60）'
         Assert-Sd ($fg.Contains('| `keys` |') -and $fg.Contains('## FLD ') -and $mf.Contains('.claude/peoplesoft/sdoc/examples/data.json') -and $mf.Contains('research-contract.md')) '工單：欄位說明列出每個欄位（含名為 keys 的欄位），並指向契約與本單元範例'
         $pub = Get-SdPublished $rootW $jobW
         $files = @('00-index.md', '90-questions.md', 'gate.json', 'canonical/evidence.json')
@@ -527,6 +532,26 @@ try {
         $last = $oc[$oc.Length - 1]
         Assert-Sd ($r.Code -eq 'DOC1-3-04' -and [System.IO.File]::Exists((Join-Path $jobRootE 'budgets/r0002/b0002.json')) -and [string]$last.Outcome['status'] -ceq 'SESSION_FAILED' -and $last.Outcome['counted'] -eq $false) '-Retry 開新預算；session 失敗不計次 → DOC1-3-04'
         Assert-Sd ((@($last.Outcome['findings']) -join ',') -match '^EXIT_[1-9][0-9]*$' -and $r.Output -match 'session 失敗，未消耗失敗次數；檢查 Claude Code／MCP') 'session 失敗的 findings 記結束碼 enum（EXIT_<n>）；沒有模型端重試時沿用「檢查 Claude Code／MCP」' (@($last.Outcome['findings']) -join ',')
+        # ================= 研究頁每頁上限：超量 → INVALID 計次、下一張工單帶原因；兩次 → BLOCKED =================
+        $fxC = New-SdRunFixtures 'walkthrough' 'status-REQ_STATUS.md' $wkPages $wkRecords $false 'cap'
+        $rootC = New-SdRunRoot 'cap'
+        $inC = Join-Path $rootC ('.ps-private/sdoc/' + $jobW)
+        $jobRootC = Join-Path $rootC ('.ps-runtime/sdoc/' + $jobW)
+        [void](Invoke-SdRun $rootC $comps $fxC)
+        Write-SdFx (Join-Path $inC 'status.md') $fxC.Text
+        Write-SdFx (Join-Path $inC 'project.md') ([System.IO.File]::ReadAllText((Join-Path $fxC.Example 'input/project.md'), [System.Text.Encoding]::UTF8))
+        $env:PS_SDOC_RESEARCH_PAGE_ITEMS = '2'
+        try { $rC = Invoke-SdRunUntilDone $rootC $comps $fxC '' 8 } finally { $env:PS_SDOC_RESEARCH_PAGE_ITEMS = '60' }
+        $ocC = Get-SdOutcomes $jobRootC
+        $capInv = @($ocC | Where-Object { [string]$_.Outcome['status'] -ceq 'INVALID' -and $_.Outcome['counted'] -eq $true -and (@($_.Outcome['findings']) -join ' ') -like '*超過上限 2 筆*' })
+        $capMan = $false; $capInp = $false
+        foreach ($e in $ocC) {
+            if ([string]$e.Input['kind'] -cne 'RESEARCH') { continue }
+            $mC = [System.IO.File]::ReadAllText((Join-Path (Join-Path $jobRootC ('attempts/' + $e.Id)) 'manifest.md'), [System.Text.Encoding]::UTF8)
+            if ($mC.Contains('本頁上限：items 最多 2 個')) { $capInp = $true }
+            if ($mC.Contains('前次未通過的原因') -and $mC.Contains('超過上限 2 筆')) { $capMan = $true }
+        }
+        Assert-Sd ($capInv.Count -ge 2 -and $capMan -and $capInp -and $rC.Code -eq 'DOC1-4-03') ('每頁上限：PS_SDOC_RESEARCH_PAGE_ITEMS=2 → 超量研究包 INVALID 計次（' + $capInv.Count + ' 次）、工單印上限 2、重派的工單帶「前次未通過的原因」、兩次後 BLOCKED（DOC1-4-03）') $rC.Code
         $r = Invoke-SdRunUntilDone $rootE $comps $fxE 'stray-once,review-fail-once-data,partial-ui-TW_DEMO_APV,dup-scope-TW_DEMO_REQ,l5-nis-DRV-002/D1,l5-nis-always-DRV-001/D3,l5-badcite-R2'
         $oc = Get-SdOutcomes $jobRootE
         $stray = @($oc | Where-Object { [string]$_.Outcome['status'] -ceq 'INVALID' -and (@($_.Outcome['findings']) -join ' ') -like '*stray.txt*' }).Count
@@ -605,6 +630,14 @@ try {
         Assert-Sd ($nParts -ge 5 -and $manP.Contains('分 ' + $nParts + ' 段寫') -and [System.IO.File]::Exists((Join-Path $r2Dir 'output-part-01.json')) -and [System.IO.File]::Exists((Join-Path $r2Dir ('output-part-' + $nParts.ToString('00') + '.json'))) -and [System.IO.File]::Exists((Join-Path $r2Dir 'output.json')) -and [string]$r2[0].Outcome['status'] -ceq 'ACCEPTED') ('分段寫：工單與 manifest 列出 ' + $nParts + ' 段；各段原樣留在 attempt、合併成 output.json 後驗收通過')
         Assert-Sd ($r1.Count -eq 2 -and [string]$r1[0].Outcome['status'] -ceq 'INVALID' -and $r1[0].Outcome['counted'] -eq $true -and (@($r1[0].Outcome['findings']) -join ' ') -like ('*第 ' + $nParts + ' 段沒有寫*') -and [string]$r1[1].Outcome['status'] -ceq 'ACCEPTED') '分段寫：少寫一段 → INVALID（指出第幾段），重派後通過' ((@($r1[0].Outcome['findings']) -join ' ') + ' / ' + $r.Code)
         Assert-Sd ($r3.Count -eq 1 -and [string]$r3[0].Outcome['status'] -ceq 'ACCEPTED') '分段寫：讀者一次寫完 output.json 也照收'
+        # ================= session 失敗但產出已驗收：照收（寫完後才失敗的那個請求） =================
+        $fxF = New-SdRunFixtures 'gate' 'status-CASE_STATUS.md' @() @() $true 'partsfail'
+        $rootF = New-SdRunRoot 'partsfail'
+        [void](Invoke-SdRun $rootF $gComps $fxF)
+        Write-SdFx (Join-Path $rootF ('.ps-private/sdoc/' + $jobG + '/status.md')) $fxF.Text
+        $rF = Invoke-SdRun $rootF $gComps $fxF 'read-fail-after-all' @{ MaxSessions = 1 }
+        $ocF = Get-SdOutcomes (Join-Path $rootF ('.ps-runtime/sdoc/' + $jobG)); $ocF = @($ocF)
+        Assert-Sd ($ocF.Count -eq 1 -and [string]$ocF[0].Outcome['status'] -ceq 'ACCEPTED' -and (@($ocF[0].Outcome['sessionFindings']) -join ',') -match '^EXIT_[1-9][0-9]*$' -and $rF.Code -like 'DOC1-3-02-*' -and $rF.Output.Contains('但產出已驗收通過，照收')) ('session 失敗但各段都寫完且合格 → ACCEPTED、outcome 記 sessionFindings=EXIT_1、不是 DOC1-3-04（' + $rF.Code + '）') ($rF.Output)
     }
 
     # ================= OpenCode 版（-Cli opencode）：獨立目錄、模型設定、與 Claude Code 版並存、產出相同、模型預檢 =================
@@ -828,7 +861,7 @@ try {
     }
 }
 finally {
-    $env:PS_CLI = $priorEnv.Cli; $env:PS_SDOC_TEST_LIB = $priorEnv.Lib; $env:PS_SDOC_TEST_FIXTURES = $priorEnv.Fx; $env:PS_SDOC_TEST_MODE = $priorEnv.Mode; $env:PS_SDOC_READING_PART_LINES = $priorEnv.Part
+    $env:PS_CLI = $priorEnv.Cli; $env:PS_SDOC_TEST_LIB = $priorEnv.Lib; $env:PS_SDOC_TEST_FIXTURES = $priorEnv.Fx; $env:PS_SDOC_TEST_MODE = $priorEnv.Mode; $env:PS_SDOC_READING_PART_LINES = $priorEnv.Part; $env:PS_SDOC_RESEARCH_PAGE_ITEMS = $priorEnv.PageItems
     if ($env:PS_SDOC_TEST_KEEP) { Write-Host ('保留測試目錄：' + $base) } else { try { Remove-Item -LiteralPath $base -Recurse -Force } catch { Write-Host ('無法刪除測試目錄：' + $base) } }
 }
 Write-Host ('sdoc run tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)

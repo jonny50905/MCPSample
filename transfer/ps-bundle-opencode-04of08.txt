@@ -1,6 +1,59 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit da14021）第 4／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0c79d43）第 4／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|da14021|7d1f5c9dadac3453|4|8|7564|b02f9244667841d80631c501ac589a847d8e16feaeaf4ef6f329db574d64a66b
+@@@PSBUNDLE-PART|1|opencode|0c79d43|f963595bc2056ccb|4|8|7617|b98f39cb46ccbb7cd09994f6070c9162ea3d738e65a1722ecbf8f46c95979803
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-b/pack.json|30|0ad1597d1c7d7c3ac4bf5049b4b0391d7fd035c5b022b228a13e4137b8f6eb2e|0
+{
+  "schemaVersion": 1,
+  "packId": "pack-b",
+  "packVersion": 2,
+  "reviewedVersion": 2,
+  "template": "template-bound.md",
+  "slots": ["S01", "S02", "S03", "S04"],
+  "checklist": ["C01", "C02", "C03", "C04", "C05"],
+  "requirements": [
+    { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "STATIC", "properties": ["primaryObject", "origin"] },
+    { "id": "R03", "slot": "S01", "checklistRefs": ["C01", "C02"], "factKind": "RELATED.OBJECTS", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R06", "slot": "S02", "checklistRefs": ["C02"], "factKind": "DATA.FLOW", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R07", "slot": "S02", "checklistRefs": ["C02"], "factKind": "ENTITY.DETAIL", "required": false,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FLOW.writes" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R09", "slot": "S02", "checklistRefs": ["C02"], "factKind": "DATA.RECORD_USAGE", "required": true,
+      "applicability": { "op": "ALL", "args": [ { "op": "FACT_TRUE", "fact": "DATA.FLOW.tables" }, { "op": "NOT", "arg": { "op": "FACT_FALSE", "fact": "DATA.FLOW.writes" } } ] },
+      "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC", "context": { "record": "PS_DEMO_TBL" } },
+    { "id": "R11", "slot": "S03", "checklistRefs": ["C03"], "factKind": "GAPS", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "ANY" },
+    { "id": "R13", "slot": "S03", "checklistRefs": ["C03"], "factKind": "EVIDENCE.APPENDIX", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "ANY" },
+    { "id": "R16", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FILE_OUTPUT", "required": false,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FILE_OUTPUT.present" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R19", "slot": "S04", "checklistRefs": ["C05"], "factKind": "UNSUPPORTED", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "ANY" }
+  ]
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-b/pack.json
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-b/template-bound.md|19|5fd342f4b44049c596094c1dd80c8cae7f108f8204b5de89ba8c3efd8a863715|0
+# 系統文件（範例模板 B）
+
+> 合成範例：與模板 A 章節不同，證明 spec.md 由 pack 決定、facts 共用。
+
+## 甲、物件與依賴
+
+{{slot:S01}}
+
+## 乙、資料與實體
+
+{{slot:S02}}
+
+## 丙、缺口與證據
+
+{{slot:S03}}
+
+## 丁、輸出檔與未支援項
+
+{{slot:S04}}
+@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-b/template-bound.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-c/pack.json|33|dcd712c256ecc6c8f4159409223ecda01a684583cbd78d3673e06a54124b26a2|0
 {
   "schemaVersion": 1,
@@ -7565,4 +7618,4 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-PART-END|7d1f5c9dadac3453|4|8
+@@@PSBUNDLE-PART-END|f963595bc2056ccb|4|8

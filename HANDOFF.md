@@ -5,6 +5,14 @@
 
 ## 0. 一句話現況
 
+**IT 不動也要寫得出來：每次回應綁小、外環設 Claude Code 環境預設、session 失敗但產出合格照收（2026-10-14，L148，分支 `claude/magical-hawking-txsbn2`）**：
+管理者補充公司 IT 不可能動、以前 OpenCode 分段寫 184K 字元的 spec 沒遇過 504。7 個 agent 的工作流量化：舊 CLONE1 一頁最多 40 個扁平 item（外環強制），
+新 DOC1 研究頁 60 項只在契約文字、一頁 ≈ 49～218 KB ≈ 9～41 分鐘的單次回應。已改：狀態圖解讀每段 40 行；研究頁每頁上限由外環驗收（預設 8；texts 40、operations 3、
+testing 4；`PS_SDOC_RESEARCH_PAGE_ITEMS` 1～60 覆寫，工單印上限，超過 INVALID 計次，每主題 60 頁）；外環替 Claude Code 子行程設預設（串流斷線不改非串流重送、關背景流量與
+提示建議、讀者／判定 MAX_THINKING_TOKENS=0；視窗已設沿用；`PS_SESSION_CLAUDE_ENV_DEFAULTS=0`／`PS_SESSION_CLAUDE_ENV_SKIP`）；session 失敗但產出驗收通過照收
+（`sessionFindings`）；L147 審查修正（提前結束要持續 60 秒、主／子代理分開計、Ordinal、stream 沒長大不重讀）。SOP-28 新節與階梯 0～5、README 第 5／6 步、兩版契約同句。
+待公司機回報：原樣跑一次的數據行與狀態碼分布、哪一階過、關 thinking 後讀者合格率、SESSION_FAILED attempt 裡有幾段合法。
+
 **Claude Code 版撞 gateway 504 的根因與處置（2026-10-14，L147，分支 `claude/magical-hawking-txsbn2`）**：管理者回報 Claude Code＋公司 Sonnet 寫 Spec 仍 504、
 `-TimeoutMin 120` 也過不去，以前走 OpenCode 幾乎沒遇過。根因：504 是 gateway 等上游逾時；Claude Code 對 5xx 重試**同一個請求**（預設 10 次）、每次等滿 gateway 逾時，
 那個請求在逾時內完成不了就 10 次都一樣，TimeoutMin 只決定外環等多久。走 Claude Code 容易撞是請求形狀不同（官方文件可查）：串流斷線後改**非串流**重送

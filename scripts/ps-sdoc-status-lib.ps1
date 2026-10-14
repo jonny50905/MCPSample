@@ -74,7 +74,9 @@ function Get-PsSdProseLines {
 
 # ---------------- 分段寫出 ----------------
 # 讀者一段寫一個檔：一次回應太長時，經公司 gateway 會逾時或被切斷。數字是每段要交代的 Mermaid 非空行上限。
-$script:PsSdReadingPartLines = 60
+# 換算：每個 Mermaid 行的解讀 JSON 約 105 B；40 行 ≈ 4.2 KB ≈ 1,300～1,700 token ≈ 35～50 秒（每秒 36 token）。分段演算法會把連續的小區塊
+# 塞滿到上限，所以這個數字就是每次回應的實際上限、不是「多半更小」。
+$script:PsSdReadingPartLines = 40
 
 function Get-PsSdReadingParts {
     # Mermaid 行分段：只在區塊與區塊之間切，單一區塊超過上限才在行與行之間切。

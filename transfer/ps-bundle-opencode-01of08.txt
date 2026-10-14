@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit da14021）第 1／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0c79d43）第 1／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|da14021|7d1f5c9dadac3453|1|8|3086|cbe73dd1b20c8639d297ae87658e7644ec0f1c4493ef6df52ac0ba1b92ecbb29
-@@@PSBUNDLE|1|opencode|da14021|157
+@@@PSBUNDLE-PART|1|opencode|0c79d43|f963595bc2056ccb|1|8|3086|d62730df352ab730564a2ead169c04c0fd27c2638de7642c4766dd509cbc8747
+@@@PSBUNDLE|1|opencode|0c79d43|157
 @@@PSBUNDLE-REMOVED|.opencode/plugin/ps-oracle-preflight-gate.js
 @@@PSBUNDLE-REMOVED|scripts/test-elasticsearch-mcp-tools-list.ps1
 @@@PSBUNDLE-REMOVED|scripts/test-mcp-tools-list.ps1
@@ -3087,4 +3087,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 
 能力目錄代號與屬性見 `.opencode/peoplesoft/spec/capabilities.json`（例：`DATA.FILE_INPUT` 的 `present,layout,fields`）。
 該領域尚無研究 → 建議 `/ps-research <領域>`；答錯的事實 → 建議 `/ps-correct <正確知識>`。
 @@@PSBUNDLE-END|.opencode/peoplesoft/knowledge-retrieval-contract.md
-@@@PSBUNDLE-PART-END|7d1f5c9dadac3453|1|8
+@@@PSBUNDLE-PART-END|f963595bc2056ccb|1|8

@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "da14021",
+  "commit": "0c79d43",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -202,8 +202,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3979,
-      "sha256": "6a7b039912c56e2da85d18f2ef7da08176a53add46633ad0785b3dee69e91c18",
+      "lines": 4025,
+      "sha256": "e1f4e5bf59834c407c60da15d1848c34ae839450893e6b4236ec470f35885f3f",
       "bom": false
     },
     {
@@ -364,8 +364,8 @@
     },
     {
       "path": ".opencode/peoplesoft/sdoc/research-contract.md",
-      "lines": 278,
-      "sha256": "f6219c18b103ec6456e150ec9b37deb9ef263f01cd26cfc11a8a7e9be725aa31",
+      "lines": 279,
+      "sha256": "35d5e034fbce9b115701d79748f9217dfe7d415ce19d8c91d172e52eab86fe1c",
       "bom": false
     },
     {
@@ -520,8 +520,8 @@
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1185,
-      "sha256": "2ad6e4f9543ab472329b4c0ffedfd169c9b46e97ccc866e686db5f62481af8d6",
+      "lines": 1223,
+      "sha256": "a750094abedb8b57a5d11a59f6d6cb1a339b90197cff267d6515f748590073b5",
       "bom": false
     },
     {
@@ -772,8 +772,8 @@
     },
     {
       "path": "scripts/ps-sdoc-lib.ps1",
-      "lines": 1420,
-      "sha256": "a8fb7d1c2344448c9984495321f233174c11cf40bfdf7a88b3ea713d50f39456",
+      "lines": 1448,
+      "sha256": "901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c",
       "bom": true
     },
     {
@@ -796,20 +796,20 @@
     },
     {
       "path": "scripts/ps-sdoc-status-lib.ps1",
-      "lines": 630,
-      "sha256": "2fa4f8b1e95a126bd529463810ff266947e44d25dbc3e385be72524d01774bdd",
+      "lines": 632,
+      "sha256": "14948b56f8556e3cce12e59091ab3656503efe84793c950b08d7a220f715f711",
       "bom": true
     },
     {
       "path": "scripts/ps-sdoc.ps1",
-      "lines": 1482,
-      "sha256": "e8365863fc2eab5bdbd93e1cc1e2d9751936bb4a1fc7e8be7ffc5c449672bf1a",
+      "lines": 1501,
+      "sha256": "f15b7d2e24675462854fe77239109e097064d275d792194a644626c48a9256ae",
       "bom": true
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 611,
-      "sha256": "6c1466ec2f6ec311803db46902941e15d5ffb10aa5944291315ec02889549d58",
+      "lines": 689,
+      "sha256": "071ed8d9a8533efd98abe9b3ed51eee6da6c7514d7e07589fbcd1718c25da088",
       "bom": true
     },
     {
@@ -868,8 +868,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 528,
-      "sha256": "35a8314bf43ce7bfa522a6ac921463b4f7a4792a89b11d1d1e44daa2ce2edf8c",
+      "lines": 571,
+      "sha256": "0e8739be012d916c4a4b1b8e2c9014a86453ee4b82bffc36c6a0a16c18917449",
       "bom": true
     },
     {
@@ -892,20 +892,20 @@
     },
     {
       "path": "scripts/tests/test-sdoc-assemble.ps1",
-      "lines": 350,
-      "sha256": "0cb3b921e6c90f60b5d5882b045d38101170b53dd5f4e4aa76f3a2f16ba7bc76",
+      "lines": 380,
+      "sha256": "f59f6fc10c7e08dc4d7436958cb15bf735d48c6eee4d0568192e28f8eec40a12",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 836,
-      "sha256": "6428fc487269f055e8f9376de2f0a0d03eb4f5e9e89680d06885390e6e1ba46a",
+      "lines": 869,
+      "sha256": "6c44ef048951c7743f8e131090314ef7228a2d877d90db0c13180433bb8721ee",
       "bom": true
     },
     {
       "path": "scripts/tests/test-sdoc.ps1",
-      "lines": 277,
-      "sha256": "ee0f28b1c4937e57ba87c7ee61622d2a83efe1f65c93f4d5d6532f64d92f76e7",
+      "lines": 280,
+      "sha256": "8f7d55463db3aca7c5b6887f02268f47d90467f9940ba16fdfb0825d1f989181",
       "bom": true
     },
     {

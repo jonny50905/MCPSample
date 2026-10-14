@@ -69,6 +69,34 @@ $script:PsSdUnits = @(
 )
 # 研究包可以提出的上游需求（型別 → 研究單位）
 $script:PsSdRequestUnit = @{ 'OBJ' = 'scope'; 'ENT' = 'data'; 'FLD' = 'data'; 'DRV' = 'data'; 'ROLE' = 'security'; 'IF' = 'interfaces'; 'MSG' = 'rules' }
+# 研究頁每頁的項目上限（外環驗收；超過＝INVALID 計次）：一次回應（一個 Write）不要太長，經公司 gateway 幾分鐘的回應會逾時。
+# 依範例量到的每項位元組（ui 1.1 KB、data 1.2 KB、rules 1.6 KB、testing 2.5 KB、operations 4.5 KB；statusTexts 約 100 B/筆）：
+# 預設 8 項 ≈ 9～13 KB ≈ 2,700～5,000 token ≈ 75～140 秒（每秒 36 token）。texts 單元以 items＋statusTexts 合計。
+# 環境變數 PS_SDOC_RESEARCH_PAGE_ITEMS（1～60）設了就所有單元一律用它（60＝schema 上限＝舊行為）。上游需求頁（REQUESTS）與改寫頁（L5-AMEND）不受此上限。
+$script:PsSdResearchPageItems = @{ 'default' = 8; 'texts' = 40; 'operations' = 3; 'testing' = 4 }
+
+function Get-PsSdResearchPageCap {
+    param([string]$Unit)
+    $v = 0
+    $raw = ([string]$env:PS_SDOC_RESEARCH_PAGE_ITEMS).Trim()
+    if ($raw -ne '' -and [int]::TryParse($raw, [ref]$v) -and $v -ge 1 -and $v -le 60) { return $v }
+    if ($script:PsSdResearchPageItems.ContainsKey($Unit)) { return [int]$script:PsSdResearchPageItems[$Unit] }
+    return [int]$script:PsSdResearchPageItems['default']
+}
+
+# 研究包是否超過本頁上限：回錯誤字串陣列（空＝通過）。Cursor 為 REQUESTS 或 L5-AMEND* 的頁不檢查。
+function Test-PsSdResearchPageCap {
+    param($Packet, [string]$Unit, [string]$Cursor = '')
+    $errs = @()
+    if ($null -eq $Packet) { return , $errs }
+    if ($Cursor -ceq 'REQUESTS' -or $Cursor.StartsWith('L5-AMEND')) { return , $errs }
+    $cap = Get-PsSdResearchPageCap $Unit
+    $n = @($Packet['items']).Count
+    $what = 'items'
+    if ($Unit -eq 'texts' -and $Packet.Contains('statusTexts')) { $n += @($Packet['statusTexts']).Count; $what = 'items＋statusTexts' }
+    if ($n -gt $cap) { $errs += ('本頁 ' + $n + ' 筆超過上限 ' + $cap + ' 筆（' + $what + '）：改為 PARTIAL 分頁，nextCursor 寫下一個還沒處置的鍵') }
+    return , $errs
+}
 # 工作流程骨架欄位（由第 0 階段帶入，研究包不得寫）
 $script:PsSdSkeletonFields = @{
     'STATE' = @('entityKey', 'stateKind', 'code', 'name', 'parent', 'regions', 'isInitialTarget', 'isFinal')

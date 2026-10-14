@@ -23,7 +23,7 @@
 | `jobId`、`attemptId`、`unit`、`subject`、`page`、`inputHash` | 照工單 |
 | `coverage` | `COMPLETE`：本單元本主題已全部列完；`PARTIAL`：還有下一頁 |
 | `summary` | 本頁做了什麼、查了什麼、還缺什麼（繁體中文） |
-| `items` | 項目（一頁最多 60 個） |
+| `items` | 項目（schema 一頁最多 60 個；本頁的項目上限在工單與 input.json 的 `pageItemCap`，達上限就 `PARTIAL`） |
 | `evidence` | 本包的證據 |
 | `questions` | 本頁提出的問題 |
 | `requests` | 本頁需要、但上游還沒有的項目 |
@@ -120,6 +120,7 @@
 
 - `COMPLETE`：本單元本主題全部列完。外環收件前檢查：本頁「必須處置的分母鍵」與「上游需求」每個都寫成項目，或開了同鍵的 EVIDENCE_GAP；前頁與本頁引用的同單元後寫項目都已寫出。
 - `PARTIAL`：一頁放不下時用；`nextCursor` 寫可重定位的範圍（例如「Record TW_X 的 PRIORITY_CD 之後的欄位」），不能空白、不能與前一頁相同。
+- 工單寫了本頁的項目上限（`pageItemCap`；texts 單元 items 與 `statusTexts` 合計）：達上限就 `PARTIAL`，照工單「必須處置的分母鍵」的順序處理，`nextCursor` 寫下一個還沒處置的鍵；上游需求頁與改寫頁不受此上限（仍最多 60 個）。
 - 缺口不靠 `PARTIAL` 表示：查不到的事實寫 unresolved 或 EVIDENCE_GAP，查完了就 `COMPLETE`。
 - 不為塞進一頁而刪掉條件或例外；寧可分頁。
 - 工單游標是 `REQUESTS` 時，本頁只處理「上游需求」那幾個鍵，一頁寫完（`COMPLETE`）。
