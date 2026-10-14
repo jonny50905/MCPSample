@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5e41696）第 2／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit da14021）第 2／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|5e41696|c39f1691415e3f02|2|6|11379|2cfed5027742cf8220f09a9768eb1e3ffb97af52c00e715be52cda72a302f2e9
+@@@PSBUNDLE-PART|1|claude|da14021|5a3b86e7a6ccc3c2|2|6|11379|63c407532eb2d254319c871983512334878727017870eb8f819ec1aa371fb139
 @@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/schemas/05-ui.schema.json|519|c15b5fc0970d536bea5f29f5adbfe4b90100696ebc1b9a41c37744c3d09924ff|0
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -6364,7 +6364,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 （無）
 @@@PSBUNDLE-END|.claude/peoplesoft/spec/examples/pack-c/template-bound.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/spec/generic.manifest.json|116|400d34aaa684ea55902c52d855bc00a6fcc86c3feb413e48d469e730df829813|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/spec/generic.manifest.json|116|cc7aeab56789269e49facecf322cb531b6ec356b65789fdb46fe59cf8bac19b1|0
 {
   "schemaVersion": 1,
   "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
@@ -6376,7 +6376,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".claude/agents/ps-spec-author.md",
-      "sha256": "5E6E7E62E37696A24418B4B2551F6FEEBD5070FDC8BD8433ABEFE802E20562A0",
+      "sha256": "872602BAFEC10EC27724F0801AD3130E7B4420D442D59CD49029472D0A0793B0",
       "lines": 52
     },
     {
@@ -11380,4 +11380,4 @@ if ($graduated) {
 $mutex.ReleaseMutex(); $mutex.Dispose()
 if ($graduated) { exit 0 } else { exit 1 }
 @@@PSBUNDLE-END|scripts/ps-auto-loop.ps1
-@@@PSBUNDLE-PART-END|c39f1691415e3f02|2|6
+@@@PSBUNDLE-PART-END|5a3b86e7a6ccc3c2|2|6

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5e41696）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit da14021）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|5e41696|798512946ea8e3ea|8|8|2763|c9868d25d473efb1f99a2a4a5c648b9a7c63d3b1e0162607ccfbc4386b8c3a9b
+@@@PSBUNDLE-PART|1|opencode|da14021|7d1f5c9dadac3453|8|8|2764|1fe31620faaac49ef09b764ffa65c6953221fc24635e288368b3518932ce17ac
 @@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1661,10 +1661,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|954|d16ea06d890a02a60e7605b2bf4ee6c7596fbc56f91ce657410d367c820778c3|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|954|929c71c95588a0947782626b9bcea9d7ebbfae97b2115a429db5c78462feda37|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "5e41696",
+  "commit": "da14021",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -1866,8 +1866,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 3941,
-      "sha256": "29fb6d5efbe91afd9e7c423f79a2633f28cd684fdb284a4de5c9fa8a24d31583",
+      "lines": 3979,
+      "sha256": "6a7b039912c56e2da85d18f2ef7da08176a53add46633ad0785b3dee69e91c18",
       "bom": false
     },
     {
@@ -2184,8 +2184,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1165,
-      "sha256": "7e9f59e61581e1a5ab850525e295ee2555ce24fdb1933cb7f0eb9cb645bd0476",
+      "lines": 1185,
+      "sha256": "2ad6e4f9543ab472329b4c0ffedfd169c9b46e97ccc866e686db5f62481af8d6",
       "bom": false
     },
     {
@@ -2467,13 +2467,13 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-sdoc.ps1",
       "lines": 1482,
-      "sha256": "981fd8c32bc9f178cad48cffc33a7f46db4d8680b2a20259c83964a663a4fd91",
+      "sha256": "e8365863fc2eab5bdbd93e1cc1e2d9751936bb4a1fc7e8be7ffc5c449672bf1a",
       "bom": true
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 481,
-      "sha256": "d6f5f94fb675a04cc54cf618b48ec0e37cf12a60dea5700f37f154f0a5bd27fe",
+      "lines": 611,
+      "sha256": "6c1466ec2f6ec311803db46902941e15d5ffb10aa5944291315ec02889549d58",
       "bom": true
     },
     {
@@ -2532,8 +2532,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 486,
-      "sha256": "420ab3eaa8d2c7c6ef957465853693b7d90eaf3761f3907a3666e98a6a825d30",
+      "lines": 528,
+      "sha256": "35a8314bf43ce7bfa522a6ac921463b4f7a4792a89b11d1d1e44daa2ce2edf8c",
       "bom": true
     },
     {
@@ -2617,7 +2617,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|144|c0554106268e338e21524b9d3a6d4cddb6effe8b7c5809eff5790a45f08e50ab|0
+@@@PSBUNDLE-FILE|AGENTS.md|145|4902e4a97d99cd7158c255db20943103f4bd0417d448d2c839f857313b4da18d|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -2699,8 +2699,9 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-10-13 再由 `claude/jolly-tesla-3l8lp5` 快轉併入
-   ——session slot 依前端分開、兩版可以同時跑（L146），併入前 `main` 頭 `beadc2b`；
+4. **維護版線**：`main` 是正式版線（最近一次：2026-10-14 由 `claude/magical-hawking-txsbn2` 快轉併入
+   ——Claude Code 版撞 gateway 504 的根因、模型端數據行、卡住提前結束（L147），併入前 `main` 頭 `da14021`；
+   2026-10-13 由 `claude/jolly-tesla-3l8lp5` 快轉併入 session slot 依前端分開、兩版可以同時跑（L146），併入前 `main` 頭 `beadc2b`；
    同日稍早同一分支併入 Spec 文件流程的 OpenCode 版備案（`ps-sdoc.ps1 -Cli opencode`、模型只在 `.opencode/peoplesoft/sdoc/model.yaml`、與 Claude Code 版並行，
    `claude-code/` 未動；L145），併入前 `main` 頭 `df83c1b`；
    同日稍早由 `claude/brave-dirac-4q469u` 快轉併入 Windows 5.1 CI 的端到端測試拆三組平行、部署版面不重跑長測試（L143），併入前 `main` 頭 `3457765`；
@@ -2763,5 +2764,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|157|52778d38cdea8019acb88d047fbdf81cc8911bf0727d28dbbf78b833a6c71906
-@@@PSBUNDLE-PART-END|798512946ea8e3ea|8|8
+@@@PSBUNDLE-EOF|157|91c770f046a5e6257cdda7f3416aaf68a71cc712bbde0775f0e24717fffe8966
+@@@PSBUNDLE-PART-END|7d1f5c9dadac3453|8|8

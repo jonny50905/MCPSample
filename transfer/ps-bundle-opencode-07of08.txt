@@ -1,6 +1,139 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5e41696）第 7／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit da14021）第 7／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|5e41696|798512946ea8e3ea|7|8|5014|526060a0ec87eab76f3dee585cc0b289904bf88c6900978bcc879f7e23eca7b4
+@@@PSBUNDLE-PART|1|opencode|da14021|7d1f5c9dadac3453|7|8|5189|ab7bc763d28991411a1c7cd5abbbe89f14a41a372373f964b2b16aa8e0fb6862
+@@@PSBUNDLE-FILE|scripts/ps-supplemental.ps1|131|751f35d4df5ae2d797cfc90db865ec93be1ac3eb1b4e5c9203d6a9b01f51532c|1
+# ps-supplemental.ps1 — 補研究協定 CLI：提交 request／看狀態／看結果（Research 端執行在 ps-auto-loop -SupplementalOnly）
+# 用法（公司機）：
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 -New -Target COMPONENT:TW_XXX -FactKind DATA.FILE_INPUT -Properties present,layout,fields [-Context "operation=IMPORT"] [-EvidencePolicy AUDITED] [-Freshness CURRENT] [-DomainHint <領域>] [-ConsumerKind QA] [-Resubmit] [-GitCommit]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 -Submit -NeedFile <need.json> [-DomainHint <領域>] [-ConsumerKind SPEC -JobId <id> -RequirementRef R17] [-Resubmit] [-GitCommit]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 -Status [-Domain <領域>]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 -Result -RequestId S-…-g1
+#   （執行補研究：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]）
+# 責任：只寫 docs/ps-research/supplemental/requests/<requestId>.json（create-only）；-GitCommit 時只 commit 該檔（永不 push）。
+# 不呼叫模型、不查 DB、不寫 NN／wiki／checklist、不寫 result（result 只由 auto-loop 迷你圈寫）。
+# exit：0＝完成／1＝（保留）／2＝參數、驗證、路由錯誤
+# 結論碼（唯一可回報給維護端的一行；其餘只在本機看）：SUPP1-<stage>-<code>[-<count>]
+#   stage 1 submit：01 CREATED／02 PENDING（既有、未終局）／03 TERMINAL-<1 RESOLVED|2 PARTIAL|3 UNRESOLVED|4 OUT_OF_SCOPE|5 SUPERSEDED>／04 INVALID-<錯誤數>／05 ROUTING_REQUIRED／06 WRITE_FAILED
+#   stage 2 status：01 OK-<筆數>；stage 4 result：01 FOUND-<完成層 1 RESEARCHED|2 AUDITED|3 GRADUATED|4 PROJECTED>／02 NONE／03 NOT_RESEARCHED
+#   stage 3 run（auto-loop 迷你圈印）：01 DONE-<results>／02 NOTHING；stage 9 usage：01 BAD_ARGS
+param(
+    [switch]$New,
+    [switch]$Submit,
+    [switch]$Status,
+    [switch]$Result,
+    [string]$Target = '',
+    [string]$FactKind = '',
+    [string]$Properties = '',
+    [string]$Context = '',
+    [string]$EvidencePolicy = 'STATIC',
+    [string]$Freshness = 'CURRENT',
+    [string]$NeedFile = '',
+    [string]$DomainHint = '',
+    [string]$Domain = '',
+    [string]$ConsumerKind = 'MANUAL',
+    [string]$JobId = '',
+    [string]$RequirementRef = '',
+    [string]$RequestId = '',
+    [switch]$Resubmit,
+    [switch]$GitCommit,
+    [string]$Root = ''
+)
+$ErrorActionPreference = 'Stop'
+if ($Root -eq '') { $Root = Split-Path $PSScriptRoot -Parent }
+$Root = [System.IO.Path]::GetFullPath($Root)
+. (Join-Path $PSScriptRoot 'ps-knowledge-lib.ps1')
+. (Join-Path $PSScriptRoot 'ps-supplemental-lib.ps1')
+if ($PsKnowledgeLibVersion -ne 1 -or $PsSupplementalLibVersion -ne 1) { Write-Host "SYSTEM ERROR：lib 版本不符（knowledge=$PsKnowledgeLibVersion supplemental=$PsSupplementalLibVersion）"; exit 2 }
+$dirs = Get-PsSuppDirs -Root $Root
+if (-not (Test-Path -LiteralPath $dirs.Research)) { Write-Host "SYSTEM ERROR：找不到 $($dirs.Research)（-Root 給錯？）"; exit 2 }
+
+$modes = 0
+foreach ($m in @($New, $Submit, $Status, $Result)) { if ($m) { $modes++ } }
+if ($modes -ne 1) { Write-Host "用法：-New … | -Submit -NeedFile <json> | -Status [-Domain] | -Result -RequestId <id>（擇一）"; Write-Host "結論代號：SUPP1-9-01"; exit 2 }
+
+function Invoke-SuppGitCommit {
+    param([string]$RelPath, [string]$Message)
+    try {
+        & git -C $Root add -- $RelPath 2>&1 | Out-Null
+        $out = (& git -C $Root commit -m $Message -- $RelPath 2>&1 | Out-String)
+        if ($LASTEXITCODE -eq 0) { Write-Host ("git：已 commit " + $RelPath) } else { Write-Host ("git commit 失敗（不中斷）：" + $out.Trim()) }
+    }
+    catch { Write-Host ("git 例外（不中斷）：" + $_.Exception.Message) }
+}
+
+function Write-SubmitOutcome {
+    param($R)
+    Write-Host ("SUPPLEMENTAL：requestId=" + $R.requestId + " state=" + $R.state + " domain=" + $R.domain + " reason=" + $R.reason)
+    foreach ($e in @($R.errors)) { Write-Host ("  " + $e) }
+    switch ($R.state) {
+        'CREATED' {
+            Write-Host ("已寫 " + $R.path)
+            if ($GitCommit) { Invoke-SuppGitCommit -RelPath ('docs/ps-research/supplemental/requests/' + $R.requestId + '.json') -Message ('kb(supplemental): request ' + $R.requestId) }
+            Write-Host "→ 執行：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly（或等 ps-auto-all 下一批）"
+            Write-Host "結論代號：SUPP1-1-01"; exit 0
+        }
+        'PENDING' { Write-Host "→ 同 need 的 request 已存在且尚未終局；等迷你圈處理（-Status 看進度）"; Write-Host "結論代號：SUPP1-1-02"; exit 0 }
+        'INVALID' { Write-Host ("結論代號：SUPP1-1-04-" + @($R.errors).Count); exit 2 }
+        'ROUTING_REQUIRED' { Write-Host "→ 加 -DomainHint <領域>（該領域必須已有 00-overview.md）"; Write-Host "結論代號：SUPP1-1-05"; exit 2 }
+        'WRITE_FAILED' { Write-Host "→ request 檔寫不進去（目標被別的行程開著？）；沒有任何 request 在等，稍後重新提交"; Write-Host "結論代號：SUPP1-1-06"; exit 2 }
+        default {
+            $idx = @('RESOLVED', 'PARTIAL', 'UNRESOLVED', 'OUT_OF_SCOPE', 'SUPERSEDED').IndexOf([string]$R.state) + 1
+            if ($idx -le 0) { $idx = 0 }
+            Write-Host "→ 既有結果為終局；要重跑加 -Resubmit（建新世代，舊世代由迷你圈標 SUPERSEDED）"
+            Write-Host ("結論代號：SUPP1-1-03-" + $idx); exit 0
+        }
+    }
+}
+
+if ($New -or $Submit) {
+    $need = $null
+    if ($New) {
+        if ($Target -eq '' -or $FactKind -eq '' -or $Properties -eq '') { Write-Host "用法：-New -Target <型別:物件名> -FactKind <碼> -Properties <a,b> …"; Write-Host "結論代號：SUPP1-9-01"; exit 2 }
+        $need = ConvertTo-PsSuppNeed -Target $Target -FactKind $FactKind -Properties $Properties -Context $Context -EvidencePolicy $EvidencePolicy -Freshness $Freshness
+    }
+    else {
+        if ($NeedFile -eq '') { Write-Host "用法：-Submit -NeedFile <need.json>"; Write-Host "結論代號：SUPP1-9-01"; exit 2 }
+        $nf = $NeedFile
+        if (-not [System.IO.Path]::IsPathRooted($nf)) { $nf = Join-Path $Root $nf }
+        $obj = Read-PsSuppJsonFile -LiteralPath $nf
+        if ($null -eq $obj) { Write-Host "SYSTEM ERROR：need 檔不存在或不是 JSON：$nf"; Write-Host "結論代號：SUPP1-9-01"; exit 2 }
+        if ($null -ne $obj.need) { $obj = $obj.need }
+        $need = ConvertFrom-PsSuppNeedObject -Obj $obj
+    }
+    $consumer = @{ kind = $ConsumerKind; jobId = $JobId; requirementRef = $RequirementRef }
+    $r = Submit-PsSupplementalRequest -Root $Root -Need $need -Consumer $consumer -DomainHint $DomainHint -Resubmit:$Resubmit
+    Write-SubmitOutcome -R $r
+}
+
+if ($Status) {
+    $rows = Get-PsSuppStatus -Root $Root -Domain $Domain
+    Write-Host ("STATUS：" + $rows.Count + " 筆" + $(if ($Domain -ne '') { "（領域 " + $Domain + "）" } else { '' }))
+    foreach ($s in $rows) {
+        Write-Host ("  " + $s.RequestId + "｜" + $s.Domain + "｜g" + $s.Generation + "｜" + $s.State + "｜attempts=" + $s.Attempts + "｜" + $s.FactKind + "｜" + $s.Target)
+    }
+    Write-Host "狀態語意：PENDING＝等迷你圈；WAITING_RESEARCH＝目標尚無 NN（迷你圈會在 checklist 寫 D 列，等研究相位建檔）；EXHAUSTED＝兩次嘗試未果（下次迷你圈發 UNRESOLVED）；SUPERSEDED_PENDING＝已被新世代取代；DOMAIN_MISSING＝request 的領域目錄已不存在（改名？）——只能重新提交"
+    foreach ($rj in @($PsSuppIntakeRejected)) { Write-Host ("  intake 拒收（不列入）：" + $rj) }
+    Write-Host ("結論代號：SUPP1-2-01-" + $rows.Count)
+    exit 0
+}
+
+if ($Result) {
+    if ($RequestId -eq '' -or $RequestId -notmatch $PsSuppRequestIdRx) { Write-Host "用法：-Result -RequestId S-<24hex>-g<n>"; Write-Host "結論代號：SUPP1-9-01"; exit 2 }
+    $res = Get-PsSupplementalResult -Root $Root -RequestId $RequestId
+    if ($null -eq $res) { Write-Host "RESULT：無（尚未發布；-Status 看進度）"; Write-Host "結論代號：SUPP1-4-02"; exit 0 }
+    Write-Host ("RESULT：" + $RequestId + "｜outcome=" + $res.outcome + "｜disposition=" + $res.dispositionCode + "｜auditRoundAtCompletion=" + $res.auditRoundAtCompletion + "｜attempts=" + $res.attempts + "｜completedAt=" + $res.completedAt)
+    foreach ($a in @($res.affected)) { Write-Host ("  受影響：" + $a.file + "｜節 " + (@($a.sections) -join '、') + "｜附錄列 " + (@($a.evidenceRows) -join '、')) }
+    $c = Get-PsSuppCompletion -Root $Root -RequestId $RequestId
+    Write-Host ("完成層：RESEARCHED=" + $c.Researched + " AUDITED=" + $c.Audited + " GRADUATED=" + $c.Graduated + " PROJECTED=" + $c.Projected + $(if ($c.Reason -ne '') { "（" + $c.Reason + "）" } else { '' }))
+    if (-not $c.Researched) { Write-Host "結論代號：SUPP1-4-03"; exit 0 }
+    $layer = 1
+    if ($c.Audited) { $layer = 2 }
+    if ($c.Graduated) { $layer = 3 }
+    if ($c.Projected) { $layer = 4 }
+    Write-Host ("結論代號：SUPP1-4-01-" + $layer)
+    exit 0
+}
+@@@PSBUNDLE-END|scripts/ps-supplemental.ps1
 @@@PSBUNDLE-FILE|scripts/tests/sdoc-test-fixtures.ps1|234|44438f4f087f56687a7c640d69c3fe4f01f81c8ae2f53fed6f01e19b978ff632|1
 # sdoc-test-fixtures.ps1 — 測試用：把設計範例的 canonical 文件拆回研究包（模擬各研究單位已驗收的收據）。
 # 只給 scripts/tests/test-sdoc*.ps1 dot-source；合成資料，不含公司內容。
@@ -1528,7 +1661,7 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-bundle.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|486|420ab3eaa8d2c7c6ef957465853693b7d90eaf3761f3907a3666e98a6a825d30|1
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|528|35a8314bf43ce7bfa522a6ac921463b4f7a4792a89b11d1d1e44daa2ce2edf8c|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
 #       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
@@ -1953,6 +2086,29 @@ try {
     Assert ($a.Kind -eq 'API_ERROR' -and $a.ApiErrorStatus -eq '401' -and $a.Progress -eq 0) "模型端判讀：沒有重試就以 API 錯誤收場 → API_ERROR"
     Assert ((Get-PsOcClaudeApiRetry -StreamFile (Join-Path $dep 'no-such.jsonl')).Kind -eq 'NONE' -and (Get-PsOcClaudeApiRetry -StreamFile '').Kind -eq 'NONE') "模型端判讀：沒有 stream 檔（OpenCode 版）→ NONE"
     Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_SLOW', 'API_RETRY_STUCK') -TimeoutMin 60) -like '卡在模型端*' -and (Get-PsOcApiHint -Kinds @('NONE', 'API_RETRY_SLOW') -TimeoutMin 45) -like '*上限 45 分*-TimeoutMin*' -and (Get-PsOcApiHint -Kinds @('NONE', '') -TimeoutMin 60) -eq '') "模型端判讀：下一步提示——卡住優先、拖慢帶目前上限、沒有模型端事件回空"
+    # 模型端數據：assistant 事件的 message.usage（同一個 message id 的幾個區塊算一個請求；usage 裡可能有巢狀物件）、result 的 duration_api_ms
+    function New-UsageLine([string]$Id, [int]$In, [int]$Cr, [int]$Cc, [int]$Out) { return ('{"type":"assistant","message":{"id":"' + $Id + '","type":"message","role":"assistant","model":"m","content":[{"type":"text","text":"usage: {\"usage\":{\"input_tokens\":9}}"}],"stop_reason":null,"usage":{"input_tokens":' + $In + ',"cache_creation_input_tokens":' + $Cc + ',"cache_read_input_tokens":' + $Cr + ',"cache_creation":{"ephemeral_5m_input_tokens":' + $Cc + ',"ephemeral_1h_input_tokens":0},"output_tokens":' + $Out + ',"service_tier":"standard"}},"session_id":"s"}') }
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1200 0 18000 5), (New-UsageLine 'msg_1' 1200 0 18000 900), $usrA, (New-UsageLine 'msg_2' 300 18000 2100 40), $usrA, (New-UsageLine 'msg_3' 50 20100 9000 3200), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":3,"duration_api_ms":412345,"result":"API Error: 504"}')
+    Assert ($a.Requests -eq 3 -and $a.LastContext -eq 29150 -and $a.MaxContext -eq 29150 -and $a.CacheRequests -eq 2 -and $a.MaxOutput -eq 3200 -and $a.DurationApiSec -eq 412 -and $a.Kind -eq 'API_RETRY_STUCK') "模型端數據：請求數依 message id 去重、輸入＝input＋cache_read＋cache_creation、快取命中次數、單次最多輸出取同一訊息最大值、API 累計秒數"
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 30000 0 0 700), $usrA, (New-UsageLine 'msg_2' 31000 0 0 900), $usrA, (New-ApiRetryLine 1 '504'))
+    Assert ($a.Requests -eq 2 -and $a.CacheRequests -eq 0 -and $a.LastContext -eq 31000 -and $a.MaxOutput -eq 900) "模型端數據：每個請求都沒有快取命中（cache_read=0）→ 快取命中 0 次（gateway 沒傳 prompt cache 的特徵）"
+    $a = Test-ApiStream @($inA, $okA, $usrA, $okA)
+    Assert ($a.Requests -eq 0 -and $a.LastContext -eq 0 -and (Get-PsOcApiMetricsLine $a 0) -eq '') "模型端數據：assistant 事件沒有 usage（舊版或合成 stream）→ 不算請求、數據行為空"
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1200 0 18000 900), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'))
+    $ml = Get-PsOcApiMetricsLine $a 95
+    Assert ($ml -match '^成功請求 1 次、最後一次輸入 19200 token（最大 19200；快取命中 0／1 次）、單次最多輸出 900 token、模型端重試 2 次（504×2）、重試間隔約 95 秒' -and (Get-PsOcApiMetricsLine $a 0) -notmatch '重試間隔') "模型端數據行：成功請求、輸入／快取／輸出、重試次數與量到的重試間隔；量不到就不寫間隔"
+    Assert ((Get-PsOcRetryGapSec @()) -eq 0 -and (Get-PsOcRetryGapSec @(60, 90, 120)) -eq 90 -and (Get-PsOcRetryGapSec @(61)) -eq 61) "重試間隔：沒量到回 0、多筆取平均"
+    $script:ps51AbortSaved = $env:PS_SESSION_API_ABORT_AFTER
+    Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
+    $ab0 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '0'; $ab1 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '3'; $ab2 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '99'; $ab3 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = 'x'; $ab4 = Get-PsOcApiAbortAfter
+    Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
+    if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved }
+    Assert ($ab0 -eq 5 -and $ab1 -eq 0 -and $ab2 -eq 3 -and $ab3 -eq 5 -and $ab4 -eq 5) "卡住提前結束門檻：預設 5；PS_SESSION_API_ABORT_AFTER 0＝關、1～20 可調、超出範圍或非數字用預設"
+    Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '模型端數據' -and (Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '另一版 CLI') "模型端判讀：卡住的提示要人交「判讀」與「模型端數據」兩行、提到另一版 CLI"
     if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
         # 真的經 cmd.exe 啟動：假 claude.cmd 吐出重試用完的 stream、exit 1
         $fakeDir = Join-Path $dep 'fakecli'
@@ -1965,6 +2121,25 @@ try {
         $sr504 = Invoke-PsOcSession -OcPath $fakeCmd -Root $dep -LogRoot (Join-Path $dep 'logs504') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0001' -TimeoutMin 2 -Tag 't504' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin'
         $logTxt = $script:sessLog -join "`n"
         Assert (-not $sr504.TimedOut -and [int]$sr504.ExitCode -ne 0 -and $sr504.ApiKind -eq 'API_RETRY_STUCK' -and $logTxt -match '重試用完仍失敗（api_error_status=504）' -and $logTxt -match '卡在模型端') "真 session（cmd.exe＋假 claude.cmd）：重試用完 → ApiKind=API_RETRY_STUCK，判讀行說卡在模型端"
+        Assert ($logTxt -match '模型端數據：' -and $logTxt -match '模型端重試 3 次（504×3）') "真 session：結束時印模型端數據行（重試次數與狀態碼分布）"
+        # 卡住提前結束：假 claude.cmd 先吐一個成功請求，再每 2 秒吐一個 api_retry、共 8 個，然後停 10 分；門檻 2 → 外環在 TimeoutMin（5 分）之前就強殺
+        $fakeDir2 = Join-Path $dep 'fakecli2'
+        New-Item -ItemType Directory -Path $fakeDir2 -Force | Out-Null
+        $hdr2 = Join-Path $fakeDir2 'head.jsonl'
+        [System.IO.File]::WriteAllText($hdr2, ((@($inA, (New-UsageLine 'msg_1' 1000 0 20000 300), $usrA) -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $retry2 = Join-Path $fakeDir2 'retry.jsonl'
+        [System.IO.File]::WriteAllText($retry2, ((New-ApiRetryLine 1 '504') + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $fakeCmd2 = Join-Path $fakeDir2 'claude.cmd'
+        $cmdTxt2 = "@echo off`r`ntype " + '"' + $hdr2 + '"' + "`r`nfor /L %%i in (1,1,8) do (`r`n  type " + '"' + $retry2 + '"' + "`r`n  ping -n 3 127.0.0.1 >nul`r`n)`r`nping -n 601 127.0.0.1 >nul`r`nexit /b 1`r`n"
+        [System.IO.File]::WriteAllText($fakeCmd2, $cmdTxt2, (New-Object System.Text.ASCIIEncoding))
+        $env:PS_SESSION_API_ABORT_AFTER = '2'
+        $script:sessLog = @()
+        $swA = [System.Diagnostics.Stopwatch]::StartNew()
+        try { $srAb = Invoke-PsOcSession -OcPath $fakeCmd2 -Root $dep -LogRoot (Join-Path $dep 'logsAbort') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0002' -TimeoutMin 5 -Tag 'tabort' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin' }
+        finally { Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue; if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved } }
+        $swA.Stop()
+        $logAb = $script:sessLog -join "`n"
+        Assert ([bool]$srAb.Aborted -and -not $srAb.TimedOut -and [int]$srAb.ExitCode -eq -1 -and $srAb.FailureKind -eq 'API_ABORTED' -and $srAb.ApiKind -eq 'API_RETRY_STUCK' -and $swA.Elapsed.TotalMinutes -lt 4 -and $logAb -match '提前結束' -and $logAb -match 'PS_SESSION_API_ABORT_AFTER=2' -and $logAb -match '模型端數據：成功請求 1 次、最後一次輸入 21000 token') "真 session：同一個請求連續失敗達門檻 → 未到 TimeoutMin 就強殺（Aborted、FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK），數據行有成功請求的輸入量"
     }
     else { Write-Host '  SKIP：真 session 判讀（需要 Windows cmd.exe）' }
     Assert ((Get-PsSuppDirs -Root $dep).Capabilities -like '*.claude*peoplesoft*spec*capabilities.json' -and (Test-Path -LiteralPath (Get-PsSuppDirs -Root $dep).Capabilities)) "補研究：能力目錄取 .claude/peoplesoft/spec"
@@ -5015,4 +5190,4 @@ Write-Host ('clone tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-spec-clone.ps1
-@@@PSBUNDLE-PART-END|798512946ea8e3ea|7|8
+@@@PSBUNDLE-PART-END|7d1f5c9dadac3453|7|8

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5e41696）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit da14021）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|5e41696|798512946ea8e3ea|3|8|13691|5e7392912ca19c67a785ea967c248e8c9c9961c6a2808fb59009348c131d66bd
+@@@PSBUNDLE-PART|1|opencode|da14021|7d1f5c9dadac3453|3|8|13646|d00835da9ac95834e27d76149066e7c20552294726827ef50141467bbddde6b8
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/operations.json|633|f8243d8a0e4bd14a4cb1bf5235a04837ef9c56fd51c99f8798c6e722178f6a21|0
 {
   "schemaVersion": "1.0",
@@ -12140,7 +12140,7 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1165|7e9f59e61581e1a5ab850525e295ee2555ce24fdb1933cb7f0eb9cb645bd0476|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1185|2ad6e4f9543ab472329b4c0ffedfd169c9b46e97ccc866e686db5f62481af8d6|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -13194,17 +13194,37 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 
 | 在哪看 | 內容 |
 |---|---|
-| 執行中每 5 分鐘的「進行中」行 | `模型端重試 N 次（504×k…）`，之後接「目前這個請求已連續失敗 M 次」或「之後已恢復」 |
+| 執行中每 5 分鐘的「進行中」行 | `模型端重試 N 次（504×k…）`，之後接「目前這個請求已連續失敗 M 次」或「之後已恢復」，量得到時加「重試間隔約 G 秒」；另有「成功請求 N 次、最後一次輸入 X token、快取命中 Y 次」 |
 | 強殺或結束時的 `SESSION(...) 判讀` 行 | **被模型端拖慢**（有重試、之後仍有進展）／**卡在模型端（gateway）**（最後同一個請求連續失敗 3 次以上，或 Claude Code 重試用完）／API 錯誤（沒有重試，不是逾時類） |
+| `SESSION(...) 提前結束` 行 | 同一個請求連續失敗達門檻（預設 5），外環在 TimeoutMin 之前就強殺——每次重試都要等滿 gateway 逾時，再等只是把上限耗光 |
+| `SESSION(...) 模型端數據` 行 | 成功請求 N 次、最後一次輸入 X token（最大；快取命中 Y／N 次）、單次最多輸出 Z token、API 累計秒數、模型端重試次數與狀態碼、重試間隔約 G 秒（≈ gateway 逾時＋退避） |
 | 最後的「session 失敗」行 | 依上面判讀給下一步；沒有模型端事件時維持「檢查 Claude Code／MCP」 |
-| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等） |
+| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_ABORTED`（提前結束）、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等） |
 
-- 「卡住」門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）。
-- 自己做實驗：直接在 PowerShell 跑 `scripts\ps-sdoc.ps1 -Components '<清單>' -MaxSessions 1 -TimeoutMin <分>`，看心跳行的
-  「連續失敗」數字是否一直上升（卡住）或歸零（恢復）。想讓 Claude Code 早點放棄、少等幾輪 gateway 逾時，可先在同一個視窗設
-  `$env:CLAUDE_CODE_MAX_RETRIES = '2'`（只影響這個視窗；預設 10）；重試用完時判讀行會帶 `api_error_status`。
-- 卡在模型端時要問 IT 的：gateway 對這個端點的逾時秒數、能否拉到 10 分以上（Claude Code 單次請求最多等 10 分）、是否串流直通、
-  尖峰時段的容量或排隊限制。只給狀態碼、次數與時間，不給內容。
+- 「卡住」判讀門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）；提前結束門檻 `$script:PsOcApiAbortAfter`（預設 5），
+  跑外環的視窗設 `$env:PS_SESSION_API_ABORT_AFTER`（0＝不提前結束、1～20）可改。
+- 為什麼 TimeoutMin 不是槓桿：504 是 gateway 等上游逾時的回覆；Claude Code 對 5xx 重試**同一個請求**（預設 10 次），每次都等滿 gateway 逾時。
+  那個請求在 gateway 逾時內完成不了，10 次都一樣；TimeoutMin 只決定外環等多久才放棄。
+- 為什麼同一個 Sonnet 走 Claude Code 比走 OpenCode 容易撞（請求的形狀不同，都是 Claude Code 文件寫的行為）：
+  串流中途斷線後 Claude Code 改用**非串流**重送同一個請求（gateway 要把整段回應憋完才回，幾分鐘的回應一定逾時，之後每次重試都一樣）；
+  thinking 期間串流上只有 SSE `ping`，gateway 不直通或濾掉 ping 就把連線當閒置切掉（狀態碼「無回應」多半是這種：連線中途斷，或 Claude Code 自己的
+  串流看門狗在 180 秒沒收到任何位元組時放棄）；系統提示＋工具清單＋CLAUDE.md 讓每個請求的輸入大數倍，gateway 沒把 `cache_control` 傳到上游就每個請求
+  重送整份 context；背景請求（標題、分類、摘要）經 gateway 也用主模型。
+- 怎麼讀「模型端數據」行：
+  - 快取命中 0／N（每個請求都沒命中）：gateway 沒把 `cache_control` 傳到上游（Claude Code 文件列的判別特徵）→ 交 IT：cache_control 直通、system 陣列不要轉成字串。
+  - 重試間隔約 G 秒：G 就是 gateway 對 `/v1/messages` 的逾時（加幾秒退避）。Claude Code 自己單次請求等 10 分（`API_TIMEOUT_MS`），G 遠小於 600 秒＝gateway 先放棄。
+  - 狀態碼「無回應」：不是 gateway 回的——連線中途斷，或 Claude Code 的串流看門狗放棄；配合 thinking／ping 那一項看。
+  - 最後一次輸入 X、單次最多輸出 Z：卡住的那個請求比 X 更大、要寫的比 Z 更長；對照每段要交代的行數決定縮多少。
+- 實驗階梯（照順序、一次改一項、每項看「模型端數據」行；環境變數設在跑 `ps-sdoc.ps1` 或啟動 `claude --agent ps-spec-author` 的**同一個視窗**，
+  子行程繼承，關掉視窗就沒了；要固定就寫進 `.claude/settings.json` 的 `env`，但會影響互動 session）：
+  0. 先用新 scripts 原樣跑一次，拿到數據行與提前結束行。
+  1. `$env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK = '1'`（串流斷了也用串流重送，不改非串流）＋ `$env:CLAUDE_CODE_MAX_RETRIES = '3'`（早點失敗；預設 10）。
+  2. 關 thinking／降 effort：`$env:MAX_THINKING_TOKENS = '0'`（固定預算的模型）或 `$env:CLAUDE_CODE_EFFORT_LEVEL = 'low'`（adaptive 的模型，Sonnet 4.6 起）。
+     讀者與判定是機械工作；研究 worker 的合格率要看數字。
+  3. 縮小每段輸出：`$env:PS_SDOC_READING_PART_LINES = '20'`。
+  4. 仍卡：SOP-29 的 `-Cli opencode`，`.opencode/peoplesoft/sdoc/model.yaml` 填公司 Sonnet 的 `<provider>/<model>`——同一個外環、同一套契約，只換 CLI。
+- 卡在模型端時要問 IT 的：gateway 對 `/v1/messages` 的上游逾時與閒置逾時（能否 ≥ 600 秒）、是否串流直通（SSE 不緩衝、保留 `ping`）、
+  `cache_control` 是否直通、非串流請求的整體逾時、尖峰時段的容量或排隊限制。只給狀態碼、次數、間隔與 token 數，不給內容。
 
 ### 狀態圖解讀分段寫出
 
@@ -13627,69 +13647,4 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 {{slot:S04}}
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-b/template-bound.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-c/pack.json|33|dcd712c256ecc6c8f4159409223ecda01a684583cbd78d3673e06a54124b26a2|0
-{
-  "schemaVersion": 1,
-  "packId": "pack-c",
-  "packVersion": 1,
-  "reviewedVersion": 1,
-  "template": "template-bound.md",
-  "bindingMode": "headings",
-  "slots": [
-    { "id": "S01", "heading": "一、功能概述", "placeholder": "{{寫入功能概述}}" },
-    { "id": "S02", "heading": "二、作業流程", "placeholder": "{{寫入流程說明}}" },
-    { "id": "S03", "heading": "三、畫面與欄位", "placeholder": "{{列出畫面欄位}}" },
-    { "id": "S04", "heading": "四、資料與檔案" }
-  ],
-  "placeholders": [
-    { "text": "{{PRODUCT_NAME}}", "fact": "UI.COMPONENT_IDENTITY.functionName" },
-    { "text": "{{DOC_ID}}", "fact": "DATA.FILE_INPUT.layout" }
-  ],
-  "checklist": ["C01", "C02", "C03", "C04"],
-  "requirements": [
-    { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "STATIC" },
-    { "id": "R02", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.NAVIGATION", "required": false,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
-    { "id": "R12", "slot": "S02", "checklistRefs": ["C02"], "factKind": "PROCESS.EXECUTION", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
-    { "id": "R05", "slot": "S03", "checklistRefs": ["C03"], "factKind": "UI.FIELD_INVENTORY", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
-    { "id": "R10", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FLOW", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
-    { "id": "R17", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FILE_INPUT", "required": true,
-      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FILE_INPUT.present" }, "cardinality": "ANY", "evidencePolicy": "STATIC" }
-  ]
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/pack.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md|28|af81a07c807c9fcb4bca26ab977c2541c57e778157ed41fa2f17cf680c520c25|0
-# {{PRODUCT_NAME}} 功能規格書（範例模板 C）
-
-> 合成範例：模擬公司 Template——章節固定、佔位符是模板自己的，pack 以章節標題綁定，模板副本一字不改。
-> 文件編號：{{DOC_ID}}　版本：{{DOC_VERSION}}
-
-## 一、功能概述
-
-{{寫入功能概述}}
-
-## 二、作業流程
-
-{{寫入流程說明}}
-
-### 2.1 流程圖
-
-{{插入流程圖與說明}}
-
-## 三、畫面與欄位
-
-{{列出畫面欄位}}
-
-## 四、資料與檔案
-
-（本章沒有原生佔位符：引擎把內容補在章節末。）
-
-## 五、附註
-
-（無）
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md
-@@@PSBUNDLE-PART-END|798512946ea8e3ea|3|8
+@@@PSBUNDLE-PART-END|7d1f5c9dadac3453|3|8

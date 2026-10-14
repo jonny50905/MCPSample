@@ -1016,11 +1016,11 @@ function Get-SdReadingPartLines {
     return 0
 }
 
-# SESSION_FAILED 的 findings：逾時、結束碼、容量事件、模型端重試判讀的 enum；都沒有時為 NONE
+# SESSION_FAILED 的 findings：逾時、結束碼、容量事件、模型端重試判讀的 enum；都沒有時為 NONE（外環因卡在模型端提前強殺＝API_ABORTED＋API_RETRY_STUCK，不另記結束碼）
 function Get-SdSessionFindings($Sr) {
     $f = @()
     if ([bool]$Sr.TimedOut) { $f += 'TIMED_OUT' }
-    elseif ([int]$Sr.ExitCode -ne 0 -and [string]$Sr.FailureKind -cne 'DISPATCH_ERROR') { $f += ('EXIT_' + [int]$Sr.ExitCode) }
+    elseif ([int]$Sr.ExitCode -ne 0 -and @('DISPATCH_ERROR', 'API_ABORTED') -notcontains [string]$Sr.FailureKind) { $f += ('EXIT_' + [int]$Sr.ExitCode) }
     foreach ($k in @([string]$Sr.FailureKind, [string]$Sr.ApiKind)) { if (@('', 'NONE') -notcontains $k) { $f += $k } }
     if ($f.Count -eq 0) { $f = @('NONE') }
     return , $f

@@ -422,6 +422,29 @@ try {
     Assert ($a.Kind -eq 'API_ERROR' -and $a.ApiErrorStatus -eq '401' -and $a.Progress -eq 0) "模型端判讀：沒有重試就以 API 錯誤收場 → API_ERROR"
     Assert ((Get-PsOcClaudeApiRetry -StreamFile (Join-Path $dep 'no-such.jsonl')).Kind -eq 'NONE' -and (Get-PsOcClaudeApiRetry -StreamFile '').Kind -eq 'NONE') "模型端判讀：沒有 stream 檔（OpenCode 版）→ NONE"
     Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_SLOW', 'API_RETRY_STUCK') -TimeoutMin 60) -like '卡在模型端*' -and (Get-PsOcApiHint -Kinds @('NONE', 'API_RETRY_SLOW') -TimeoutMin 45) -like '*上限 45 分*-TimeoutMin*' -and (Get-PsOcApiHint -Kinds @('NONE', '') -TimeoutMin 60) -eq '') "模型端判讀：下一步提示——卡住優先、拖慢帶目前上限、沒有模型端事件回空"
+    # 模型端數據：assistant 事件的 message.usage（同一個 message id 的幾個區塊算一個請求；usage 裡可能有巢狀物件）、result 的 duration_api_ms
+    function New-UsageLine([string]$Id, [int]$In, [int]$Cr, [int]$Cc, [int]$Out) { return ('{"type":"assistant","message":{"id":"' + $Id + '","type":"message","role":"assistant","model":"m","content":[{"type":"text","text":"usage: {\"usage\":{\"input_tokens\":9}}"}],"stop_reason":null,"usage":{"input_tokens":' + $In + ',"cache_creation_input_tokens":' + $Cc + ',"cache_read_input_tokens":' + $Cr + ',"cache_creation":{"ephemeral_5m_input_tokens":' + $Cc + ',"ephemeral_1h_input_tokens":0},"output_tokens":' + $Out + ',"service_tier":"standard"}},"session_id":"s"}') }
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1200 0 18000 5), (New-UsageLine 'msg_1' 1200 0 18000 900), $usrA, (New-UsageLine 'msg_2' 300 18000 2100 40), $usrA, (New-UsageLine 'msg_3' 50 20100 9000 3200), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":3,"duration_api_ms":412345,"result":"API Error: 504"}')
+    Assert ($a.Requests -eq 3 -and $a.LastContext -eq 29150 -and $a.MaxContext -eq 29150 -and $a.CacheRequests -eq 2 -and $a.MaxOutput -eq 3200 -and $a.DurationApiSec -eq 412 -and $a.Kind -eq 'API_RETRY_STUCK') "模型端數據：請求數依 message id 去重、輸入＝input＋cache_read＋cache_creation、快取命中次數、單次最多輸出取同一訊息最大值、API 累計秒數"
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 30000 0 0 700), $usrA, (New-UsageLine 'msg_2' 31000 0 0 900), $usrA, (New-ApiRetryLine 1 '504'))
+    Assert ($a.Requests -eq 2 -and $a.CacheRequests -eq 0 -and $a.LastContext -eq 31000 -and $a.MaxOutput -eq 900) "模型端數據：每個請求都沒有快取命中（cache_read=0）→ 快取命中 0 次（gateway 沒傳 prompt cache 的特徵）"
+    $a = Test-ApiStream @($inA, $okA, $usrA, $okA)
+    Assert ($a.Requests -eq 0 -and $a.LastContext -eq 0 -and (Get-PsOcApiMetricsLine $a 0) -eq '') "模型端數據：assistant 事件沒有 usage（舊版或合成 stream）→ 不算請求、數據行為空"
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1200 0 18000 900), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'))
+    $ml = Get-PsOcApiMetricsLine $a 95
+    Assert ($ml -match '^成功請求 1 次、最後一次輸入 19200 token（最大 19200；快取命中 0／1 次）、單次最多輸出 900 token、模型端重試 2 次（504×2）、重試間隔約 95 秒' -and (Get-PsOcApiMetricsLine $a 0) -notmatch '重試間隔') "模型端數據行：成功請求、輸入／快取／輸出、重試次數與量到的重試間隔；量不到就不寫間隔"
+    Assert ((Get-PsOcRetryGapSec @()) -eq 0 -and (Get-PsOcRetryGapSec @(60, 90, 120)) -eq 90 -and (Get-PsOcRetryGapSec @(61)) -eq 61) "重試間隔：沒量到回 0、多筆取平均"
+    $script:ps51AbortSaved = $env:PS_SESSION_API_ABORT_AFTER
+    Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
+    $ab0 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '0'; $ab1 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '3'; $ab2 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '99'; $ab3 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = 'x'; $ab4 = Get-PsOcApiAbortAfter
+    Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
+    if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved }
+    Assert ($ab0 -eq 5 -and $ab1 -eq 0 -and $ab2 -eq 3 -and $ab3 -eq 5 -and $ab4 -eq 5) "卡住提前結束門檻：預設 5；PS_SESSION_API_ABORT_AFTER 0＝關、1～20 可調、超出範圍或非數字用預設"
+    Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '模型端數據' -and (Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '另一版 CLI') "模型端判讀：卡住的提示要人交「判讀」與「模型端數據」兩行、提到另一版 CLI"
     if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
         # 真的經 cmd.exe 啟動：假 claude.cmd 吐出重試用完的 stream、exit 1
         $fakeDir = Join-Path $dep 'fakecli'
@@ -434,6 +457,25 @@ try {
         $sr504 = Invoke-PsOcSession -OcPath $fakeCmd -Root $dep -LogRoot (Join-Path $dep 'logs504') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0001' -TimeoutMin 2 -Tag 't504' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin'
         $logTxt = $script:sessLog -join "`n"
         Assert (-not $sr504.TimedOut -and [int]$sr504.ExitCode -ne 0 -and $sr504.ApiKind -eq 'API_RETRY_STUCK' -and $logTxt -match '重試用完仍失敗（api_error_status=504）' -and $logTxt -match '卡在模型端') "真 session（cmd.exe＋假 claude.cmd）：重試用完 → ApiKind=API_RETRY_STUCK，判讀行說卡在模型端"
+        Assert ($logTxt -match '模型端數據：' -and $logTxt -match '模型端重試 3 次（504×3）') "真 session：結束時印模型端數據行（重試次數與狀態碼分布）"
+        # 卡住提前結束：假 claude.cmd 先吐一個成功請求，再每 2 秒吐一個 api_retry、共 8 個，然後停 10 分；門檻 2 → 外環在 TimeoutMin（5 分）之前就強殺
+        $fakeDir2 = Join-Path $dep 'fakecli2'
+        New-Item -ItemType Directory -Path $fakeDir2 -Force | Out-Null
+        $hdr2 = Join-Path $fakeDir2 'head.jsonl'
+        [System.IO.File]::WriteAllText($hdr2, ((@($inA, (New-UsageLine 'msg_1' 1000 0 20000 300), $usrA) -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $retry2 = Join-Path $fakeDir2 'retry.jsonl'
+        [System.IO.File]::WriteAllText($retry2, ((New-ApiRetryLine 1 '504') + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $fakeCmd2 = Join-Path $fakeDir2 'claude.cmd'
+        $cmdTxt2 = "@echo off`r`ntype " + '"' + $hdr2 + '"' + "`r`nfor /L %%i in (1,1,8) do (`r`n  type " + '"' + $retry2 + '"' + "`r`n  ping -n 3 127.0.0.1 >nul`r`n)`r`nping -n 601 127.0.0.1 >nul`r`nexit /b 1`r`n"
+        [System.IO.File]::WriteAllText($fakeCmd2, $cmdTxt2, (New-Object System.Text.ASCIIEncoding))
+        $env:PS_SESSION_API_ABORT_AFTER = '2'
+        $script:sessLog = @()
+        $swA = [System.Diagnostics.Stopwatch]::StartNew()
+        try { $srAb = Invoke-PsOcSession -OcPath $fakeCmd2 -Root $dep -LogRoot (Join-Path $dep 'logsAbort') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0002' -TimeoutMin 5 -Tag 'tabort' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin' }
+        finally { Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue; if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved } }
+        $swA.Stop()
+        $logAb = $script:sessLog -join "`n"
+        Assert ([bool]$srAb.Aborted -and -not $srAb.TimedOut -and [int]$srAb.ExitCode -eq -1 -and $srAb.FailureKind -eq 'API_ABORTED' -and $srAb.ApiKind -eq 'API_RETRY_STUCK' -and $swA.Elapsed.TotalMinutes -lt 4 -and $logAb -match '提前結束' -and $logAb -match 'PS_SESSION_API_ABORT_AFTER=2' -and $logAb -match '模型端數據：成功請求 1 次、最後一次輸入 21000 token') "真 session：同一個請求連續失敗達門檻 → 未到 TimeoutMin 就強殺（Aborted、FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK），數據行有成功請求的輸入量"
     }
     else { Write-Host '  SKIP：真 session 判讀（需要 Windows cmd.exe）' }
     Assert ((Get-PsSuppDirs -Root $dep).Capabilities -like '*.claude*peoplesoft*spec*capabilities.json' -and (Test-Path -LiteralPath (Get-PsSuppDirs -Root $dep).Capabilities)) "補研究：能力目錄取 .claude/peoplesoft/spec"

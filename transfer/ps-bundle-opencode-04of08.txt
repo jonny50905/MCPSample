@@ -1,6 +1,71 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5e41696）第 4／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit da14021）第 4／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|5e41696|798512946ea8e3ea|4|8|7499|eb469587221a58b099d3791c42cb7323d30f0b07b7953790e317424058533bd8
+@@@PSBUNDLE-PART|1|opencode|da14021|7d1f5c9dadac3453|4|8|7564|b02f9244667841d80631c501ac589a847d8e16feaeaf4ef6f329db574d64a66b
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-c/pack.json|33|dcd712c256ecc6c8f4159409223ecda01a684583cbd78d3673e06a54124b26a2|0
+{
+  "schemaVersion": 1,
+  "packId": "pack-c",
+  "packVersion": 1,
+  "reviewedVersion": 1,
+  "template": "template-bound.md",
+  "bindingMode": "headings",
+  "slots": [
+    { "id": "S01", "heading": "一、功能概述", "placeholder": "{{寫入功能概述}}" },
+    { "id": "S02", "heading": "二、作業流程", "placeholder": "{{寫入流程說明}}" },
+    { "id": "S03", "heading": "三、畫面與欄位", "placeholder": "{{列出畫面欄位}}" },
+    { "id": "S04", "heading": "四、資料與檔案" }
+  ],
+  "placeholders": [
+    { "text": "{{PRODUCT_NAME}}", "fact": "UI.COMPONENT_IDENTITY.functionName" },
+    { "text": "{{DOC_ID}}", "fact": "DATA.FILE_INPUT.layout" }
+  ],
+  "checklist": ["C01", "C02", "C03", "C04"],
+  "requirements": [
+    { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "STATIC" },
+    { "id": "R02", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.NAVIGATION", "required": false,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R12", "slot": "S02", "checklistRefs": ["C02"], "factKind": "PROCESS.EXECUTION", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
+    { "id": "R05", "slot": "S03", "checklistRefs": ["C03"], "factKind": "UI.FIELD_INVENTORY", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R10", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FLOW", "required": true,
+      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
+    { "id": "R17", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FILE_INPUT", "required": true,
+      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FILE_INPUT.present" }, "cardinality": "ANY", "evidencePolicy": "STATIC" }
+  ]
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/pack.json
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md|28|af81a07c807c9fcb4bca26ab977c2541c57e778157ed41fa2f17cf680c520c25|0
+# {{PRODUCT_NAME}} 功能規格書（範例模板 C）
+
+> 合成範例：模擬公司 Template——章節固定、佔位符是模板自己的，pack 以章節標題綁定，模板副本一字不改。
+> 文件編號：{{DOC_ID}}　版本：{{DOC_VERSION}}
+
+## 一、功能概述
+
+{{寫入功能概述}}
+
+## 二、作業流程
+
+{{寫入流程說明}}
+
+### 2.1 流程圖
+
+{{插入流程圖與說明}}
+
+## 三、畫面與欄位
+
+{{列出畫面欄位}}
+
+## 四、資料與檔案
+
+（本章沒有原生佔位符：引擎把內容補在章節末。）
+
+## 五、附註
+
+（無）
+@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|1c868fb77273b9abc9f465cd111448ed5628056a78df44ab96bdef4fdeda3032|0
 {
   "schemaVersion": 1,
@@ -7500,4 +7565,4 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-PART-END|798512946ea8e3ea|4|8
+@@@PSBUNDLE-PART-END|7d1f5c9dadac3453|4|8

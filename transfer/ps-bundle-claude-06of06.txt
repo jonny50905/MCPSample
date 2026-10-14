@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5e41696）第 6／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit da14021）第 6／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|5e41696|c39f1691415e3f02|6|6|2660|876402290b446645a833ba333812125152d0c3e96a6f06654f90edc98fe11bb5
+@@@PSBUNDLE-PART|1|claude|da14021|5a3b86e7a6ccc3c2|6|6|2660|62233a1a98e27695e891bfb03c1bb8a5af2d8e372f918e3b313a75657e6cfbe8
 @@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1661,10 +1661,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|c79abcebc7bb318e166fe83ce2f5d5b9949dc66cafe2dc9dec3163dc12c1ea13|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|997|e0026951a5aa760a5d50429ae764517b1e11c0dd2e1dec0329e004fc3e304ea9|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "5e41696",
+  "commit": "da14021",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -1725,7 +1725,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/agents/ps-spec-author.md",
       "lines": 51,
-      "sha256": "5e6e7e62e37696a24418b4b2551f6feebd5070fdc8bd8433abefe802e20562a0",
+      "sha256": "872602bafec10ec27724f0801ad3130e7b4420d442d59cd49029472d0a0793b0",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-spec-author.md"
     },
@@ -2292,7 +2292,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "400d34aaa684ea55902c52d855bc00a6fcc86c3feb413e48d469e730df829813",
+      "sha256": "cc7aeab56789269e49facecf322cb531b6ec356b65789fdb46fe59cf8bac19b1",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
     },
@@ -2527,13 +2527,13 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-sdoc.ps1",
       "lines": 1482,
-      "sha256": "981fd8c32bc9f178cad48cffc33a7f46db4d8680b2a20259c83964a663a4fd91",
+      "sha256": "e8365863fc2eab5bdbd93e1cc1e2d9751936bb4a1fc7e8be7ffc5c449672bf1a",
       "bom": true
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 481,
-      "sha256": "d6f5f94fb675a04cc54cf618b48ec0e37cf12a60dea5700f37f154f0a5bd27fe",
+      "lines": 611,
+      "sha256": "6c1466ec2f6ec311803db46902941e15d5ffb10aa5944291315ec02889549d58",
       "bom": true
     },
     {
@@ -2592,8 +2592,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 486,
-      "sha256": "420ab3eaa8d2c7c6ef957465853693b7d90eaf3761f3907a3666e98a6a825d30",
+      "lines": 528,
+      "sha256": "35a8314bf43ce7bfa522a6ac921463b4f7a4792a89b11d1d1e44daa2ce2edf8c",
       "bom": true
     },
     {
@@ -2660,5 +2660,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|148|97b5951dc79acb641e309f1c05cc47163fe4d80370038ca07e3eb818ffa77b79
-@@@PSBUNDLE-PART-END|c39f1691415e3f02|6|6
+@@@PSBUNDLE-EOF|148|55bcbe10a190cfbfd466a008fbf42b20f0760624507bfb82e814ca42ec78e7d6
+@@@PSBUNDLE-PART-END|5a3b86e7a6ccc3c2|6|6

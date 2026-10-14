@@ -39,7 +39,7 @@ hooks:
 
 1. 以 Bash 工具呼叫 `powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_DEMO_A,TW_DEMO_B' -MaxSessions 1`（每次呼叫只跑一個 session），使用者已指定的合法清單取代範例（session 沒有 Bash 工具而有 PowerShell 工具時，改用 PowerShell 工具、命令列相同）。工具的 timeout 參數設為 7200000 毫秒；不要另外設定 execution policy、不修改系統權限。
 2. 每次只跑一個命令，等上一個結束。只有最後結論碼為 `DOC1-3-02-<n>` 才自動用相同清單（與相同的 `-TimeoutMin`）繼續，毋須問使用者要不要做下一個內部階段；每輪（一個 session）只簡短報已驗收頁數與待處理數。`-Refresh`／`-Retry` 只加在使用者要求的第一輪，後續呼叫移除它。`-Status` 是只看進度：呼叫一次、回報後結束，即使可續跑也不能自行開始研究。
-3. 其他結論碼結束本次操作，依結論碼告訴使用者下一步：DOC1-0-01 放 STATUS 檔；DOC1-3-04 轉述輸出中 SESSION 的「判讀」行與「session 失敗」那行——被模型端拖慢由使用者決定是否給更大的每 session 上限再續跑，卡在模型端（gateway）請使用者把狀態碼、次數與時間交 IT，其他檢查 Claude Code／MCP 後同命令續跑；DOC1-4-01 依 90 的問題改 status.md；DOC1-4-03 檢查缺口後由使用者決定 -Retry；DOC1-4-04 同命令建立新版本；DOC1-5-01 看 00-index 的未通過檢核與 90，裁決寫進 decisions.md 後同命令重新組裝；DOC1-7-01 可人工審閱並寫 approvals.md。不要自動加 Refresh／Retry，不要修改人工輸入檔、收據或 generated 來消除錯誤。
+3. 其他結論碼結束本次操作，依結論碼告訴使用者下一步：DOC1-0-01 放 STATUS 檔；DOC1-3-04 原樣轉述輸出中 SESSION 的「判讀」「模型端數據」「提前結束」各行（有哪行轉哪行）與「session 失敗」那行——被模型端拖慢由使用者決定是否給更大的每 session 上限再續跑，卡在模型端（gateway）請使用者把這幾行交 IT、並依「session 失敗」行的提示縮小每個請求的工作量或改走另一版 CLI，其他檢查 Claude Code／MCP 後同命令續跑；DOC1-4-01 依 90 的問題改 status.md；DOC1-4-03 檢查缺口後由使用者決定 -Retry；DOC1-4-04 同命令建立新版本；DOC1-5-01 看 00-index 的未通過檢核與 90，裁決寫進 decisions.md 後同命令重新組裝；DOC1-7-01 可人工審閱並寫 approvals.md。不要自動加 Refresh／Retry，不要修改人工輸入檔、收據或 generated 來消除錯誤。
 4. 工具因時間上限中止或失聯時，不假設子行程已停止：先以相同清單 `-Status` 看狀態；鎖被占用（DOC1-0-03）時不重複啟動。把停止原因與安全續跑方式告訴使用者。
 5. 回覆必須含：中文狀態、README 與 00-index 的完整本機位置、尚缺的內容、要人做的下一步、同一份工作如何續跑。輸出有「欄位統計」行就原樣附上。長文件不要整份貼回對話。
 

@@ -5,6 +5,15 @@
 
 ## 0. 一句話現況
 
+**Claude Code 版撞 gateway 504 的根因與處置（2026-10-14，L147，分支 `claude/magical-hawking-txsbn2`）**：管理者回報 Claude Code＋公司 Sonnet 寫 Spec 仍 504、
+`-TimeoutMin 120` 也過不去，以前走 OpenCode 幾乎沒遇過。根因：504 是 gateway 等上游逾時；Claude Code 對 5xx 重試**同一個請求**（預設 10 次）、每次等滿 gateway 逾時，
+那個請求在逾時內完成不了就 10 次都一樣，TimeoutMin 只決定外環等多久。走 Claude Code 容易撞是請求形狀不同（官方文件可查）：串流斷線後改**非串流**重送
+（整段回應要憋完才回）、thinking 期間串流只有 SSE ping（gateway 不直通就當閒置切掉）、輸入大數倍且 gateway 可能沒傳 cache_control、背景請求也用主模型。
+已改：ps-session-lib 讀 assistant 事件的 usage 印「模型端數據」行（成功請求數、輸入／輸出 token、快取命中、重試間隔≈gateway 逾時）；同一個請求連續失敗達
+`PS_SESSION_API_ABORT_AFTER`（預設 5）就提前強殺（FailureKind=API_ABORTED）；SOP-28 加數據行怎麼讀與實驗階梯（`CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK=1`＋
+`CLAUDE_CODE_MAX_RETRIES=3` → 關 thinking／降 effort → `PS_SDOC_READING_PART_LINES=20` → `-Cli opencode`）；claude-code/README 第 5 步同步。
+待公司機回報：第一次跑的「模型端數據」行（快取命中、重試間隔、輸入／輸出 token）與哪一階讓請求過。
+
 **session slot 兩版分開（2026-10-13，L146，分支 `claude/jolly-tesla-3l8lp5`）**：管理者要 Claude Code 版與 OpenCode 版的 Spec 文件流程能同時跑。
 session slot 改成兩版各一把（ps-session-lib `Get-PsOcSessionSlotName`）：Claude Code 版沿用原本的 `Global\MCPSample-OpencodeSession`
 （還沒換新 scripts 的資料夾也只認這把，所以舊的 Claude Code 資料夾不重搬也能和新的 OpenCode 版同時跑），OpenCode 版 `Global\MCPSample-OpencodeSession-opencode`。

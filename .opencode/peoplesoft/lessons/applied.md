@@ -3939,3 +3939,41 @@
   反過來同理，含同資料夾 PS_CLI=opencode；放開後兩把都取得到）；Windows 另 3 項（Claude Code 版那把被占時 OpenCode 版外環真的經 cmd.exe 開 session；
   OpenCode 版那把被占時外環 DOC1-3-03、沒有 opencode run；這時 Claude Code 版的 session 經 cmd.exe 照樣啟動）。反證：兩把改成同名，3 項跨版本測試失敗。
 - 教訓：把共用的互斥鎖拆開時，沿用舊名的那一邊決定「沒更新的資料夾」跟誰排隊——讓不想動的那一版沿用舊名，新的一版用新名。
+
+### L147 Claude Code 版 Spec 文件卡在 gateway 504——TimeoutMin 不是槓桿；量出每個請求的大小與重試間隔，卡住就提前結束（2026-10-14）
+
+- 症狀：管理者在公司機以 Claude Code＋公司 Sonnet 跑 Spec 文件流程仍撞 504，`-TimeoutMin 120` 也過不去；同一個 gateway、同一個 Sonnet，
+  以前走 OpenCode 的流程幾乎沒遇過。
+- 根因（從 L140／L141 的事實與 Claude Code 官方文件能確定的部分）：
+  1. 504 是 gateway 等上游逾時的回覆，不是 Claude Code 的錯誤碼。Claude Code 對 5xx 重試**同一個請求**（`CLAUDE_CODE_MAX_RETRIES` 預設 10），
+     每次都等滿 gateway 逾時；只要那個請求在 gateway 逾時內完成不了，10 次都一樣。`-TimeoutMin` 只決定外環等多久才放棄，不會讓請求變短——
+     120 分只是把等待拉長，這就是「timeoutMin=120 仍然無法進行」。
+  2. 同一個 Sonnet 走 Claude Code 比走 OpenCode 容易撞，是請求的形狀不同（文件可查的部分）：
+     - 串流中途斷線（L141 的 Connection lost mid-response）後，Claude Code 會改用**非串流**重送同一個請求（non-streaming fallback，
+       `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK` 可關）；非串流要 gateway 把整段回應憋完才回，幾分鐘的回應（thinking＋上萬 token 的 Write）
+       一定超過 gateway 逾時→504，之後每次重試都一樣——正是「同一個請求連續失敗」的形狀。
+     - thinking 期間串流上只有 SSE `ping`；gateway 不直通或濾掉 ping，就把連線當閒置切掉（文件明寫）。狀態碼「無回應」多半是這種：
+       不是 gateway 回的，是連線中途斷或 Claude Code 自己的串流閒置看門狗（gateway 串流 180 秒沒有任何位元組）。
+     - 系統提示＋工具清單＋CLAUDE.md＋代理定義，每個請求的輸入比 OpenCode 大數倍；gateway 若沒把 `cache_control` 傳到上游，每個請求都重送整份
+       context（文件列的判別特徵：usage 的 input_tokens 高、cache 幾乎為 0）。背景請求（標題、分類、摘要）經 gateway 時也用主模型 Sonnet。
+     - thinking 兩個 CLI 都可能開（OpenCode 內建 Anthropic variant 預設 high），不當差異寫，當槓桿試。
+  3. 外環看不出以上哪一項：L140 只數重試次數與狀態碼，不知道每個請求多大、重試之間隔多久、快取有沒有命中——人沒有數字可以交 IT 或選槓桿。
+- 落點：
+  - `scripts/ps-session-lib.ps1`：`Get-PsOcClaudeApiRetry` 讀 assistant 事件的 `message.usage`（同一個 message id 的幾個區塊算一個請求；usage 從行尾找，
+    工具輸入裡的字樣是跳脫過的不會誤抓）→ 成功請求數、最後一次／最大輸入 token（input＋cache_read＋cache_creation）、快取命中次數、單次最多輸出 token、
+    result 的 `duration_api_ms`；`Get-PsOcApiMetricsLine` 組成一行「模型端數據」，心跳、強殺、提前結束、正常結束都印。心跳改成每 30 秒讀一次 stream，
+    同一個請求兩次重試之間的秒數取平均（≈ gateway 逾時＋退避；中間有成功過的不算）。
+  - 卡住提前結束：同一個請求連續失敗達 `PS_SESSION_API_ABORT_AFTER`（預設 `$script:PsOcApiAbortAfter`＝5；0＝關、1～20）就整樹強殺，
+    回 `FailureKind=API_ABORTED`、`Aborted=$true`、`ExitCode=-1`、`TimedOut=$false`（所有外環都照失敗處理；ps-auto-loop 的 healthy 判定看 ExitCode）；
+    `scripts/ps-sdoc.ps1` 的 findings 記 `API_ABORTED`＋`API_RETRY_STUCK`、不另記 EXIT_-1。判讀門檻 `PsOcApiStuckAfter`＝3 不變。
+  - `Get-PsOcApiHint` 卡住的提示：交「判讀」與「模型端數據」兩行、縮小每個請求的工作量或改走另一版 CLI；`ps-spec-author` 原樣轉述判讀、數據、提前結束各行。
+  - SOP-28「session 失敗的判讀」：數據行怎麼讀、實驗階梯（環境變數→縮小工作量→改走 OpenCode 版）、要問 IT 的清單；claude-code/README 第 5 步同步。
+- 公司機實驗階梯（照順序、一次改一項，每項以「模型端數據」行判定）：先用新 scripts 原樣跑一次拿數據行 → 同一個視窗
+  `$env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK='1'`＋`$env:CLAUDE_CODE_MAX_RETRIES='3'` → 關 thinking／降 effort（`MAX_THINKING_TOKENS=0`、
+  `CLAUDE_CODE_EFFORT_LEVEL=low`）→ `PS_SDOC_READING_PART_LINES=20` → 仍卡就 SOP-29 的 `-Cli opencode`、model.yaml 填公司 Sonnet。
+- 驗證：test-claude-variant 加 7 項（usage 依 message id 去重與巢狀 cache_creation 物件、無快取特徵、沒有 usage、數據行格式、重試間隔平均、門檻 env、
+  提示文字），Windows 另 2 項（結束印數據行；假 claude.cmd 先一個成功請求再每 2 秒吐一個 api_retry、門檻 2 → 未到 TimeoutMin 5 分就提前結束，
+  FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK、數據行有輸入量）；test-sdoc-run -Only gate、test-ps51-static 照舊全過。真 claude CLI 與 gateway 未在沙箱驗。
+- 未驗（要公司機數字）：哪一項槓桿讓那個請求過；thinking 關掉後讀者解讀的合格率；gateway 實際的逾時秒數與是否直通 ping／cache_control。
+- 教訓：外環要量「每個請求多大、失敗之間隔多久」，不只數失敗幾次；CLI 的預設（非串流重送、thinking、快取、背景請求）要跟 gateway 的能力一起看，
+  同一個模型換 CLI 就是換請求形狀，逾時上限不是槓桿。

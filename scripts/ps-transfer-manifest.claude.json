@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "5e41696",
+  "commit": "da14021",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -61,7 +61,7 @@
     {
       "path": ".claude/agents/ps-spec-author.md",
       "lines": 51,
-      "sha256": "5e6e7e62e37696a24418b4b2551f6feebd5070fdc8bd8433abefe802e20562a0",
+      "sha256": "872602bafec10ec27724f0801ad3130e7b4420d442d59cd49029472d0a0793b0",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-spec-author.md"
     },
@@ -628,7 +628,7 @@
     {
       "path": ".claude/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "400d34aaa684ea55902c52d855bc00a6fcc86c3feb413e48d469e730df829813",
+      "sha256": "cc7aeab56789269e49facecf322cb531b6ec356b65789fdb46fe59cf8bac19b1",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
     },
@@ -863,13 +863,13 @@
     {
       "path": "scripts/ps-sdoc.ps1",
       "lines": 1482,
-      "sha256": "981fd8c32bc9f178cad48cffc33a7f46db4d8680b2a20259c83964a663a4fd91",
+      "sha256": "e8365863fc2eab5bdbd93e1cc1e2d9751936bb4a1fc7e8be7ffc5c449672bf1a",
       "bom": true
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 481,
-      "sha256": "d6f5f94fb675a04cc54cf618b48ec0e37cf12a60dea5700f37f154f0a5bd27fe",
+      "lines": 611,
+      "sha256": "6c1466ec2f6ec311803db46902941e15d5ffb10aa5944291315ec02889549d58",
       "bom": true
     },
     {
@@ -928,8 +928,8 @@
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 486,
-      "sha256": "420ab3eaa8d2c7c6ef957465853693b7d90eaf3761f3907a3666e98a6a825d30",
+      "lines": 528,
+      "sha256": "35a8314bf43ce7bfa522a6ac921463b4f7a4792a89b11d1d1e44daa2ce2edf8c",
       "bom": true
     },
     {

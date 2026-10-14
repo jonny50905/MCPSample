@@ -1051,17 +1051,37 @@ Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應�
 
 | 在哪看 | 內容 |
 |---|---|
-| 執行中每 5 分鐘的「進行中」行 | `模型端重試 N 次（504×k…）`，之後接「目前這個請求已連續失敗 M 次」或「之後已恢復」 |
+| 執行中每 5 分鐘的「進行中」行 | `模型端重試 N 次（504×k…）`，之後接「目前這個請求已連續失敗 M 次」或「之後已恢復」，量得到時加「重試間隔約 G 秒」；另有「成功請求 N 次、最後一次輸入 X token、快取命中 Y 次」 |
 | 強殺或結束時的 `SESSION(...) 判讀` 行 | **被模型端拖慢**（有重試、之後仍有進展）／**卡在模型端（gateway）**（最後同一個請求連續失敗 3 次以上，或 Claude Code 重試用完）／API 錯誤（沒有重試，不是逾時類） |
+| `SESSION(...) 提前結束` 行 | 同一個請求連續失敗達門檻（預設 5），外環在 TimeoutMin 之前就強殺——每次重試都要等滿 gateway 逾時，再等只是把上限耗光 |
+| `SESSION(...) 模型端數據` 行 | 成功請求 N 次、最後一次輸入 X token（最大；快取命中 Y／N 次）、單次最多輸出 Z token、API 累計秒數、模型端重試次數與狀態碼、重試間隔約 G 秒（≈ gateway 逾時＋退避） |
 | 最後的「session 失敗」行 | 依上面判讀給下一步；沒有模型端事件時維持「檢查 Claude Code／MCP」 |
-| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等） |
+| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_ABORTED`（提前結束）、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等） |
 
-- 「卡住」門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）。
-- 自己做實驗：直接在 PowerShell 跑 `scripts\ps-sdoc.ps1 -Components '<清單>' -MaxSessions 1 -TimeoutMin <分>`，看心跳行的
-  「連續失敗」數字是否一直上升（卡住）或歸零（恢復）。想讓 Claude Code 早點放棄、少等幾輪 gateway 逾時，可先在同一個視窗設
-  `$env:CLAUDE_CODE_MAX_RETRIES = '2'`（只影響這個視窗；預設 10）；重試用完時判讀行會帶 `api_error_status`。
-- 卡在模型端時要問 IT 的：gateway 對這個端點的逾時秒數、能否拉到 10 分以上（Claude Code 單次請求最多等 10 分）、是否串流直通、
-  尖峰時段的容量或排隊限制。只給狀態碼、次數與時間，不給內容。
+- 「卡住」判讀門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）；提前結束門檻 `$script:PsOcApiAbortAfter`（預設 5），
+  跑外環的視窗設 `$env:PS_SESSION_API_ABORT_AFTER`（0＝不提前結束、1～20）可改。
+- 為什麼 TimeoutMin 不是槓桿：504 是 gateway 等上游逾時的回覆；Claude Code 對 5xx 重試**同一個請求**（預設 10 次），每次都等滿 gateway 逾時。
+  那個請求在 gateway 逾時內完成不了，10 次都一樣；TimeoutMin 只決定外環等多久才放棄。
+- 為什麼同一個 Sonnet 走 Claude Code 比走 OpenCode 容易撞（請求的形狀不同，都是 Claude Code 文件寫的行為）：
+  串流中途斷線後 Claude Code 改用**非串流**重送同一個請求（gateway 要把整段回應憋完才回，幾分鐘的回應一定逾時，之後每次重試都一樣）；
+  thinking 期間串流上只有 SSE `ping`，gateway 不直通或濾掉 ping 就把連線當閒置切掉（狀態碼「無回應」多半是這種：連線中途斷，或 Claude Code 自己的
+  串流看門狗在 180 秒沒收到任何位元組時放棄）；系統提示＋工具清單＋CLAUDE.md 讓每個請求的輸入大數倍，gateway 沒把 `cache_control` 傳到上游就每個請求
+  重送整份 context；背景請求（標題、分類、摘要）經 gateway 也用主模型。
+- 怎麼讀「模型端數據」行：
+  - 快取命中 0／N（每個請求都沒命中）：gateway 沒把 `cache_control` 傳到上游（Claude Code 文件列的判別特徵）→ 交 IT：cache_control 直通、system 陣列不要轉成字串。
+  - 重試間隔約 G 秒：G 就是 gateway 對 `/v1/messages` 的逾時（加幾秒退避）。Claude Code 自己單次請求等 10 分（`API_TIMEOUT_MS`），G 遠小於 600 秒＝gateway 先放棄。
+  - 狀態碼「無回應」：不是 gateway 回的——連線中途斷，或 Claude Code 的串流看門狗放棄；配合 thinking／ping 那一項看。
+  - 最後一次輸入 X、單次最多輸出 Z：卡住的那個請求比 X 更大、要寫的比 Z 更長；對照每段要交代的行數決定縮多少。
+- 實驗階梯（照順序、一次改一項、每項看「模型端數據」行；環境變數設在跑 `ps-sdoc.ps1` 或啟動 `claude --agent ps-spec-author` 的**同一個視窗**，
+  子行程繼承，關掉視窗就沒了；要固定就寫進 `.claude/settings.json` 的 `env`，但會影響互動 session）：
+  0. 先用新 scripts 原樣跑一次，拿到數據行與提前結束行。
+  1. `$env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK = '1'`（串流斷了也用串流重送，不改非串流）＋ `$env:CLAUDE_CODE_MAX_RETRIES = '3'`（早點失敗；預設 10）。
+  2. 關 thinking／降 effort：`$env:MAX_THINKING_TOKENS = '0'`（固定預算的模型）或 `$env:CLAUDE_CODE_EFFORT_LEVEL = 'low'`（adaptive 的模型，Sonnet 4.6 起）。
+     讀者與判定是機械工作；研究 worker 的合格率要看數字。
+  3. 縮小每段輸出：`$env:PS_SDOC_READING_PART_LINES = '20'`。
+  4. 仍卡：SOP-29 的 `-Cli opencode`，`.opencode/peoplesoft/sdoc/model.yaml` 填公司 Sonnet 的 `<provider>/<model>`——同一個外環、同一套契約，只換 CLI。
+- 卡在模型端時要問 IT 的：gateway 對 `/v1/messages` 的上游逾時與閒置逾時（能否 ≥ 600 秒）、是否串流直通（SSE 不緩衝、保留 `ping`）、
+  `cache_control` 是否直通、非串流請求的整體逾時、尖峰時段的容量或排隊限制。只給狀態碼、次數、間隔與 token 數，不給內容。
 
 ### 狀態圖解讀分段寫出
 

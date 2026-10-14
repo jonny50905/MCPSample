@@ -120,9 +120,13 @@ SOP 編號照用；有差異的只有：
 3. 產出在 `docs\ps-spec\<jobId>\README.md`（入口）與 `generated\<代號>\`；結論碼與下一步見 `.claude\peoplesoft\spec\support-codes.md` 的 DOC1。
 4. 執行狀態在 `.ps-runtime\sdoc\<jobId>\`（attempt、收據、ID 對照、工作中文件），log 在 `.ps-runtime\sdoc-logs\`。
 5. session 失敗（`DOC1-3-04`）時看輸出的 `SESSION(...) 判讀` 行：模型端（例如公司 gateway 的 504）重試後仍有進展＝**被拖慢**，用更大的
-   `-TimeoutMin` 續跑；同一個請求連續失敗 3 次以上或重試用完＝**卡在模型端**，把狀態碼、次數與時間交 IT。執行中每 5 分鐘的「進行中」
-   行也會列出重試次數與目前連續失敗幾次。attempt 的 `outcome.json` 的 findings 記失敗種類（`TIMED_OUT`、`EXIT_<n>`、
-   `API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`）。
+   `-TimeoutMin` 續跑；同一個請求連續失敗 3 次以上或重試用完＝**卡在模型端**——這時調高 `-TimeoutMin` 沒有用（Claude Code 對 5xx 重試同一個
+   請求、每次等滿 gateway 逾時），外環在連續失敗 5 次時會**提前結束**（`PS_SESSION_API_ABORT_AFTER` 可改，0＝關）。把「判讀」與「模型端數據」兩行
+   （成功請求數、輸入／輸出 token、快取命中、重試間隔≈gateway 逾時）交 IT；等 IT 期間照順序試、一次一項（設在跑外環或啟動 claude 的同一個視窗）：
+   `$env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK='1'`＋`$env:CLAUDE_CODE_MAX_RETRIES='3'` → `$env:MAX_THINKING_TOKENS='0'`（或 adaptive 模型
+   `$env:CLAUDE_CODE_EFFORT_LEVEL='low'`）→ `$env:PS_SDOC_READING_PART_LINES='20'` → 仍卡就走 OpenCode 版備案（SOP-29，`-Cli opencode`）。
+   執行中每 5 分鐘的「進行中」行也會列出重試次數、目前連續失敗幾次與數據。attempt 的 `outcome.json` 的 findings 記失敗種類（`TIMED_OUT`、`EXIT_<n>`、
+   `API_ABORTED`、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`）。細節見 SOP-28「session 失敗的判讀」。
 6. 第 0 階段的讀者把解讀分段寫（每段一個檔，外環合併後驗收），一次回應不會太長。每段的 Mermaid 行上限預設 60；
    要調就在跑 ps-sdoc 的 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '40'`（5～1000）。各段原樣留在 attempt 的 `output-part-NN.json`。
 
