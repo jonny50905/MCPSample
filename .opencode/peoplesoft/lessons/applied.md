@@ -4023,3 +4023,32 @@
   REQUESTS 頁與改寫頁（不受上限）在公司 Component 的實際項目數；READER 輸入側（渲染文件 ≈65k token）在快取沒直通時是否單靠輸入就撞。
 - 教訓：外環要把「一次回應多大」當成可驗收的規則（表、env、檢查、工單印數字），不是契約裡的一句話；session 的成敗看產出不看行程——寫完才死的請求不該讓合格產出重做；
   客戶端的預設（非串流重送、背景流量、thinking）由外環在啟動子行程那一刻設、視窗設定永遠優先，才能同時「預設就好」與「逐項實驗」。
+
+### L149 跟 deep-research 比：沒撞 504 是因為每個回合都小——拿掉「寫完 Read 回」、讀者／判定壓 effort、分段 20 行、時間軸檔量真實逾時、診斷只回一行（2026-10-14）
+
+- 症狀：L148 之後公司機第一份代號回報（ps-sdoc-diag）：`MD=S5`（Sonnet 5 家族）、狀態圖讀者 5 個請求成功後第 6 個 504×8、約 48 分、提前結束；
+  gateway 回的 usage 全 0（輸入／輸出量測看不到）。管理者問：deep-research 怎麼做的、為什麼那裡沒遇過 504；又反映回報要輸入的狀態太多。
+- 根因（3 個 agent 的工作流對照，證據在 ps-deep-research.md 與 ps-auto-loop.ps1）：
+  - 比較基準不對等：公司機的研究流程全是 OpenCode CLI 跑的（L114／L115／L147），Spec 文件流程是第一個以 Claude Code 跑的流程（L145）；換 CLI 就換了請求形狀（L147）。
+  - 流程設計上 deep-research 每個回合都小：單次 Write 約 150 行上限、超過拆續篇（原本是防地端模型工具呼叫 JSON 截斷，L53／SOP-9，剛好把回應綁小）；一次只處理一項、
+    每 run 最多 6 項；重活全委派子代理（回報 ≤600 token、quote ≤5 行）；第一次 Write 前只讀 profile＋domain map 或 checklist＋模板（約 11 KB）；輸出 Markdown、
+    禁圍欄、寫完不 Read 回、合法性交外環 lint；進度＝checklist 的勾，session 死最多損失一項。
+  - sdoc 的狀態圖讀者相反：契約要它先讀完整份 STATUS 檔、以整份檔判斷（實體對齊、摘要線、矛盾、final 跨段一致）後才寫第 1 段，不能委派、輸出嚴格 JSON、
+    每段寫完還要 Read 回（多一個整個 session context 最大的請求）。在 Sonnet 5（adaptive thinking；`MAX_THINKING_TOKENS=0` 無效）上，第一次 Write 那個回應
+    ＝整檔 thinking＋JSON，超過 gateway 約 300 秒就 504，之後 8 次重送形狀相同。L148 把輸出壓到與研究流程同量級後仍撞，剩下的槓桿就是「第一段前的 thinking」與
+    「每段後的 Read 回」。
+- 落點：
+  - 四個 sdoc 代理（兩版）與兩版 research-contract：拿掉「寫完 Read 回確認是合法 JSON」，改「不要再 Read 回；合法性由外環檢查，不合格連原因退回」。
+  - `scripts/ps-session-lib.ps1`：讀者／判定的環境預設加 `CLAUDE_CODE_EFFORT_LEVEL=low`（adaptive 模型只能這樣壓 thinking；模型不吃 effort 時 Claude Code 收到 400
+    會自動拿掉重送，數據行看得到 400，`PS_SESSION_CLAUDE_ENV_SKIP` 可剔除）；新增時間軸檔 `<時間>-<tag>.timeline.txt`（START、每 30 秒 P／R／T／S 有變就記一行、
+    END=ABORT／TIMEOUT／EXIT n；只有數字與狀態碼）。`scripts/ps-auto-loop.ps1` 的 Invoke-Opencode 也傳 `-EnvDefaults`（Claude Code 版 /ps-research 才不會以原生預設撞 gateway）。
+  - `scripts/ps-sdoc-status-lib.ps1`：分段 40→20 行（守門範例切 20＋20＋6）。
+  - `scripts/ps-sdoc-diag.ps1`（L148 後新增，本課升到 v2）：每個 attempt 一行代號＋`SUM2` 一行＋腳本自判 `NEXT`（0 解新包／1 effort low／2 縮回應／3 縮輸入／
+    4 拿掉 effort／5 走 OpenCode／6 沒失敗）；加 TH（thinking 區塊數）、LT／LR（卡住前最後一個工具與結果大小）、UZ（usage 欄原樣）、RU（result usage）、
+    INVALID 代號；讀時間軸檔算 `G=`（兩次重試的平均間隔＝真實 gateway 逾時）、`D1=`（卡住的請求跑幾秒才第一次失敗）、`LP=`（最長成功回應）。管理者只要回報 SUM2 一行。
+  - SOP-28、claude-code/README 同步。
+- 沒做（留待公司機數字）：讀者改「每段只做本段局部解讀、final／矛盾由外環合併後算」（契約與合併測試面大，是壓掉第一段前 thinking 的根本做法）；
+  STATUS_READ 一段一個 session；失敗 attempt 的合法段重用；研究 worker 分段寫；工單只附本段 Mermaid 行不讀整份 status.md。
+- 驗證：test-sdoc（20 與 20＋20＋6）、test-claude-variant（環境預設 5 項、SKIP 剩 3、診斷 G=310／D1=300／LP=90 與 SUM2、Windows 時間軸檔 START／P=1 R=8／END=ABORT）、
+  test-sdoc-run 四組、test-auto-loop、test-spec、test-bundle、test-ps51-static 全過。
+- 教訓：「哪條流程沒撞」要先問它跑在哪個 CLI、每個回合多大、第一次寫之前要想多少；一次回應＝thinking＋輸出，縮輸出之後還撞就是 thinking 與多餘的回合。

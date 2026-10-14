@@ -140,9 +140,9 @@ $big = "# 大圖`n" + '```mermaid' + "`n" + ((1..25 | ForEach-Object { 'A' + $_ 
 $bp = Get-PsSdReadingParts $big 10
 Assert-Sd ($bp.Count -eq 3 -and $bp[0].Count -eq 10 -and $bp[1].Count -eq 10 -and $bp[2].Count -eq 6 -and $bp[2].To -eq 30) ('分段：單一區塊超過上限才在行與行之間切，剩下的行和後面的小區塊同一段（' + (($bp | ForEach-Object { '' + $_.From + '-' + $_.To }) -join ',') + '）')
 $none = Get-PsSdReadingParts ("# 沒有圖`n說明`n") 8
-Assert-Sd ($script:PsSdReadingPartLines -eq 40) '分段：每段 Mermaid 行上限預設 40（一次回應不要太長）'
+Assert-Sd ($script:PsSdReadingPartLines -eq 20) '分段：每段 Mermaid 行上限預設 20（一次回應不要太長）'
 $dp = Get-PsSdReadingParts $gateText 0
-Assert-Sd (@($dp).Count -eq 2 -and [int]$dp[0].Count -eq 40 -and [int]$dp[1].Count -eq 6) ('分段：守門範例用預設上限切成 2 段（40＋6；連續小區塊塞滿到上限）' + '（實得 ' + (@($dp | ForEach-Object { $_.Count }) -join '+') + '）')
+Assert-Sd (@($dp).Count -eq 3 -and [int]$dp[0].Count -eq 20 -and [int]$dp[1].Count -eq 20 -and [int]$dp[2].Count -eq 6) ('分段：守門範例用預設上限切成 3 段（20＋20＋6；連續小區塊塞滿到上限）' + '（實得 ' + (@($dp | ForEach-Object { $_.Count }) -join '+') + '）')
 Assert-Sd ($none.Count -eq 1 -and $none[0].Count -eq 0) '分段：沒有 Mermaid 區塊 → 一段'
 function Split-SdReading($R, $Parts) {
     # 照讀者的寫法切：每段只放這段範圍內的行，同一狀態、轉移在多段都出現就各段都寫；conflicts 放最後一段

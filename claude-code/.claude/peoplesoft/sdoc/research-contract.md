@@ -31,7 +31,7 @@
 
 本單元另有的附加資料（`denominators`、`statusTexts`、`definitionOnlyCodes`、`programDispositions`）見各單元；其他單元不得寫。
 
-寫完 Read 回 output.json 確認是合法 JSON。回覆只說「已寫工單指定產物」，不把內容貼回對話。
+寫完不要再 Read 回 output.json：合法性由外環檢查，不合格會連原因退回。回覆只說「已寫工單指定產物」，不把內容貼回對話。
 
 ### 項目
 

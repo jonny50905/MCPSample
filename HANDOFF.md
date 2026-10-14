@@ -5,6 +5,13 @@
 
 ## 0. 一句話現況
 
+**跟 deep-research 比、拿掉寫完 Read 回、effort low、分段 20、時間軸檔、診斷一行回報（2026-10-14，L149，分支 `claude/magical-hawking-txsbn2`）**：
+公司機第一份代號回報 `MD=S5`、讀者第 6 個請求 504×8、usage 全 0。對照 deep-research（公司機只在 OpenCode 跑過；每回合小、Write ≤150 行、重活委派、
+寫完不 Read 回）後：四個 sdoc 代理與兩版 research-contract 拿掉「寫完 Read 回」；讀者／判定預設加 `CLAUDE_CODE_EFFORT_LEVEL=low`（Sonnet 5 不吃
+`MAX_THINKING_TOKENS=0`）；分段 40→20；ps-session-lib 記時間軸檔（每 30 秒 P／R／T／S）；ps-auto-loop 也傳 -EnvDefaults；`scripts/ps-sdoc-diag.ps1`
+v2：TH／LT／LR／UZ／RU／G／D1／LP 與 `SUM2`＋`NEXT`，管理者只回一行。待公司機回報：SUM2 一行（尤其 TH、LT、G、D1）。
+下一步若仍撞：讀者改每段局部解讀（final／矛盾交外環）、一段一 session、合法段重用（L149 未做清單）。
+
 **IT 不動也要寫得出來：每次回應綁小、外環設 Claude Code 環境預設、session 失敗但產出合格照收（2026-10-14，L148，分支 `claude/magical-hawking-txsbn2`）**：
 管理者補充公司 IT 不可能動、以前 OpenCode 分段寫 184K 字元的 spec 沒遇過 504。7 個 agent 的工作流量化：舊 CLONE1 一頁最多 40 個扁平 item（外環強制），
 新 DOC1 研究頁 60 項只在契約文字、一頁 ≈ 49～218 KB ≈ 9～41 分鐘的單次回應。已改：狀態圖解讀每段 40 行；研究頁每頁上限由外環驗收（預設 8；texts 40、operations 3、

@@ -1087,15 +1087,18 @@ OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些�
 | `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK` | `1` | 全部 | 串流中途斷線後仍用串流重送，不改非串流（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時） |
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 全部 | 不做更新檢查、遙測、錯誤回報、功能旗標抓取 |
 | `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | `false` | 全部 | 不產提示建議（背景請求經 gateway 也用主模型） |
-| `MAX_THINKING_TOKENS` | `0` | ps-status-reader、ps-spec-reader、ps-spec-judge | 機械工作不開 thinking（thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）；研究 worker 不關 |
+| `MAX_THINKING_TOKENS` | `0` | ps-status-reader、ps-spec-reader、ps-spec-judge | 機械工作不開 thinking（thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）；只對固定預算的模型有效；研究 worker 不關 |
+| `CLAUDE_CODE_EFFORT_LEVEL` | `low` | ps-status-reader、ps-spec-reader、ps-spec-judge | adaptive 的模型（Sonnet 4.6／5 起）不吃 `MAX_THINKING_TOKENS=0`，只能用 effort 壓低 thinking；模型不吃 effort 時 Claude Code 收到 400 會自動拿掉重送（數據行會看到 400） |
 
 - 整組不套：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'`；剔除單項：`$env:PS_SESSION_CLAUDE_ENV_SKIP = 'MAX_THINKING_TOKENS'`（逗號分隔、不分大小寫）。
-- 若公司的 Sonnet 版本拒絕關 thinking，數據行會出現 `400×N`：用 `PS_SESSION_CLAUDE_ENV_SKIP=MAX_THINKING_TOKENS` 剔除。
-- 不進預設、留在實驗階梯的：`CLAUDE_CODE_MAX_RETRIES`（與提前結束重疊，會把幾秒的抖動變成硬失敗）、`CLAUDE_CODE_EFFORT_LEVEL`（Sonnet 4.6 起才有，舊模型回 400）、
-  worker 的 `MAX_THINKING_TOKENS`（非 0 值在新模型回 400）。
+- 若公司的模型拒絕這些值，數據行會出現 `400×N`：用 `PS_SESSION_CLAUDE_ENV_SKIP=CLAUDE_CODE_EFFORT_LEVEL`（或 `MAX_THINKING_TOKENS`）剔除。
+- 不進預設、留在實驗階梯的：`CLAUDE_CODE_MAX_RETRIES`（與提前結束重疊，會把幾秒的抖動變成硬失敗）、worker 的 `MAX_THINKING_TOKENS`（非 0 值在新模型回 400）。
+- 外環每 30 秒把成功回應數、重試數、連續失敗數、狀態碼分布記進 `.ps-runtime\sdoc-logs\<時間>-<job>-<attempt>.timeline.txt`（只有數字與狀態碼）；
+  `ps-sdoc-diag` 用它算出真實的 gateway 逾時（`G=` 兩次重試的間隔）、卡住的請求跑了幾秒才第一次失敗（`D1=`）、最長的成功回應（`LP=`）。
 - 實驗階梯（照順序、一次改一項、每項看「模型端數據」行與各種工單的 SESSION_FAILED 次數；環境變數設在跑 `ps-sdoc.ps1` 或啟動 `claude --agent ps-spec-author`
   的**同一個視窗**，子行程繼承，關掉視窗就沒了；要固定就寫進 `.claude/settings.json` 的 `env`，但會影響互動 session）：
-  0. 用新 scripts 原樣跑一次（環境預設、分段 40 行、每頁上限都已生效），拿到數據行、狀態碼分布、提前結束行。
+  0. 用新 scripts 原樣跑一次（環境預設、分段 20 行、每頁上限、寫完不 Read 回都已生效），拿到數據行、狀態碼分布、提前結束行；
+     或直接跑 `scripts\ps-sdoc-diag.ps1`，照它最後兩行（SUM2 與 NEXT）做。
   1. 對照：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'` 再跑一次——差異＝請求形狀的影響。
   2. 再縮小每次回應：`$env:PS_SDOC_RESEARCH_PAGE_ITEMS = '4'`、`$env:PS_SDOC_READING_PART_LINES = '20'`。
   3. 研究 worker 也關 thinking：`$env:MAX_THINKING_TOKENS = '0'`（固定預算的模型）；adaptive 的模型（Sonnet 4.6 起）改 `$env:CLAUDE_CODE_EFFORT_LEVEL = 'low'`。
@@ -1129,8 +1132,9 @@ OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些�
 工單 input.json 的 `outputParts` 與 manifest 列出每段的行號範圍與檔名（inbox 的 `output-part-NN.json`），讀者一段寫一個檔，
 外環合併後照原本的規則驗收。目的：一次回應不要太長（公司 gateway 下約每秒 30～40 token，整份解讀一次寫完要好幾分鐘，中途斷一次就整段重來）。
 
-- 每段的 Mermaid 行上限預設 40（每行解讀約 105 B，40 行 ≈ 4.2 KB ≈ 35～50 秒；分段演算法會把連續小區塊塞滿到上限，所以這就是每次回應的實際上限）；
-  要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '20'`（5～1000），只影響這個視窗。
+- 每段的 Mermaid 行上限預設 20（每行解讀約 105 B，20 行 ≈ 2.1 KB ≈ 20～25 秒；分段演算法會把連續小區塊塞滿到上限，所以這就是每次回應的實際上限；
+  回應前的 thinking 不在內）；要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '40'`（5～1000），只影響這個視窗。
+- 四個 sdoc 代理寫完都不再 Read 回確認（合法性本來就由外環檢查、不合格連原因退回）：每段少一個整個 session context 最大的請求。
 - 各段原樣留在 attempt 目錄（`output-part-NN.json`），合併後的整份是同目錄的 `output.json`。
 - 少寫一段、某段不是合法 JSON、某段的 reader／指紋和第一段不同、同一狀態的 final 或同一轉移的 scenario 各段不一致：整份 INVALID，
   findings 指出第幾段；讀者若一次寫完 `output.json`（沒有分段）也照收。

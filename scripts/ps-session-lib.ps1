@@ -24,7 +24,8 @@ $script:PsOcApiAbortAfter = 5
 $script:PsOcApiAbortMinSec = 60
 # 外環替 Claude Code headless 子行程設的環境預設（只在啟動子行程那一刻設、視窗已設同名變數的一律沿用、啟動後還原；OpenCode 版不套）：
 #   共同：串流中途斷線後不改用非串流重送（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時）、關掉背景流量與提示建議。
-#   機械代理（狀態圖讀者、乾淨讀者、判定）：關 thinking（MAX_THINKING_TOKENS=0；thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）。
+#   機械代理（狀態圖讀者、乾淨讀者、判定）：關 thinking（固定預算的模型 MAX_THINKING_TOKENS=0；adaptive 的模型（Sonnet 4.6／5 起）不吃 0、
+#   只能用 CLAUDE_CODE_EFFORT_LEVEL=low 壓低；模型不吃 effort 時 Claude Code 會收到 400 後自動拿掉重送，數據行會看到 400）。
 #   研究 worker 不關 thinking。環境變數 PS_SESSION_CLAUDE_ENV_DEFAULTS=0 整組不套；PS_SESSION_CLAUDE_ENV_SKIP=名稱,名稱 剔除指定項。
 $script:PsOcClaudeEnvCommon = @(
     , @('CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK', '1')
@@ -32,9 +33,9 @@ $script:PsOcClaudeEnvCommon = @(
     , @('CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION', 'false')
 )
 $script:PsOcClaudeEnvByAgent = @{
-    'ps-status-reader' = @(, @('MAX_THINKING_TOKENS', '0'))
-    'ps-spec-reader' = @(, @('MAX_THINKING_TOKENS', '0'))
-    'ps-spec-judge' = @(, @('MAX_THINKING_TOKENS', '0'))
+    'ps-status-reader' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
+    'ps-spec-reader' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
+    'ps-spec-judge' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
 }
 
 # npm 同時裝 opencode / opencode.cmd / opencode.ps1；Get-Command 會優先回 .ps1——把 .ps1 丟給 cmd.exe
@@ -301,6 +302,15 @@ function Get-PsOcApiMetricsLine {
     return $t
 }
 
+# 時間軸檔（Claude Code 版）：stream 的事件沒有時間戳，外環每 30 秒看一次，成功回應數或重試數有變就記一行
+# 「yyyy-MM-dd HH:mm:ss|P=成功事件數|R=重試數|T=目前連續失敗|S=狀態碼分布」；開頭 START、結尾 END=<原因>。ps-sdoc-diag 用它算真實的
+# gateway 逾時（兩次重試的間隔）、卡住的請求跑了多久才第一次失敗、最長的成功回應。只有數字與狀態碼。
+function Add-PsOcTimeline {
+    param([string]$Path, [string]$Text)
+    if ($Path -eq '') { return }
+    try { [System.IO.File]::AppendAllText($Path, ((Get-Date).ToString('yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) + '|' + $Text + "`n"), (New-Object System.Text.UTF8Encoding($false))) } catch { }
+}
+
 # 心跳量到的同一個請求兩次重試之間的秒數（陣列）→ 平均（整數秒）；沒有量到回 0
 function Get-PsOcRetryGapSec {
     param($Gaps)
@@ -478,7 +488,8 @@ function Invoke-PsOcSession {
         # 而 $null -eq 0 為 false＝每個正常 session 都被判成錯誤）。改讓 cmd 把 ERRORLEVEL 寫進檔案——要可觀測的事實。
         $rcFile = Join-Path $LogRoot ('{0}-{1}.rc.txt' -f $stamp, $Tag)
         $streamFile = ''
-        if ($variant.Name -eq 'claude') { $streamFile = Join-Path $LogRoot ('{0}-{1}.stream.jsonl' -f $stamp, $Tag) }
+        $timelineFile = ''
+        if ($variant.Name -eq 'claude') { $streamFile = Join-Path $LogRoot ('{0}-{1}.stream.jsonl' -f $stamp, $Tag); $timelineFile = Join-Path $LogRoot ('{0}-{1}.timeline.txt' -f $stamp, $Tag) }
         $watch = @($outFile, $errFile)
         if ($streamFile -ne '') { $watch += $streamFile }
         $cl = New-PsOcCommandLine -Variant $variant.Name -OcPath $OcPath -Model $Model -ExtraArgs $ExtraArgs -PromptText $PromptText `
@@ -530,7 +541,8 @@ function Invoke-PsOcSession {
         if ($streamFile -ne '') { $abortAfter = Get-PsOcApiAbortAfter }
         $aborted = $false
         $hb = $null
-        $rtPrevCount = 0; $rtPrevTrailing = 0; $rtLastAt = $null; $rtGaps = @(); $rtTrailSince = $null; $rtLastLen = -1
+        $rtPrevCount = 0; $rtPrevTrailing = 0; $rtLastAt = $null; $rtGaps = @(); $rtTrailSince = $null; $rtLastLen = -1; $rtPrevProgress = 0
+        Add-PsOcTimeline $timelineFile 'START'
         while (((Get-Date) - $sessStart).TotalMinutes -lt $TimeoutMin) {
             if ($p.WaitForExit(30000)) { $done = $true; break }
             if ($streamFile -ne '') {
@@ -550,6 +562,11 @@ function Invoke-PsOcSession {
                     $rtPrevCount = [int]$hb.Count
                 }
                 $rtPrevTrailing = [int]$hb.Trailing
+                if ([int]$hb.Progress -ne $rtPrevProgress -or $dc -gt 0) {
+                    $stTxt = [string]$hb.Statuses; if ($stTxt -eq '') { $stTxt = '-' }
+                    Add-PsOcTimeline $timelineFile ('P=' + [int]$hb.Progress + '|R=' + [int]$hb.Count + '|T=' + [int]$hb.Trailing + '|S=' + $stTxt.Replace('無回應', 'NR').Replace('×', 'x').Replace('、', ','))
+                    $rtPrevProgress = [int]$hb.Progress
+                }
                 # 同一個請求的連續失敗從第一次被看到算起要持續 PsOcApiAbortMinSec 秒以上才算卡住；幾秒內的快速重試（抖動）會自己恢復
                 if ([int]$hb.Trailing -le 0) { $rtTrailSince = $null }
                 elseif ($null -eq $rtTrailSince) { $rtTrailSince = Get-Date }
@@ -590,6 +607,7 @@ function Invoke-PsOcSession {
         }
         if (-not $done -and $aborted) {
             & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
+            Add-PsOcTimeline $timelineFile 'END=ABORT'
             if ($streamFile -ne '') { $null = Convert-PsOcClaudeStream -StreamFile $streamFile -OutFile $outFile }
             $api = Get-PsOcClaudeApiRetry -StreamFile $streamFile
             $gap = Get-PsOcRetryGapSec $rtGaps
@@ -605,6 +623,7 @@ function Invoke-PsOcSession {
         }
         if (-not $done) {
             & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null
+            Add-PsOcTimeline $timelineFile 'END=TIMEOUT'
             # 強殺當下就下判讀：「卡死 vs 跑得久」的處置完全相反（一個查通道、一個調上限）
             $lastOutK = $sessStart
             foreach ($lf in $watch) {
@@ -659,6 +678,11 @@ function Invoke-PsOcSession {
             # 仍讀不到＝環境層面拿不到結束碼；視為 0（正常）並大聲記錄——反向（視為錯誤）已實證會把健康的 run 誤停
             L "SESSION($Tag) 警告：ExitCode 讀不到，視為 0（正常結束）——若後續行為異常請回報此行"
             $code = 0
+        }
+        if ($streamFile -ne '') {
+            $hbEnd = Get-PsOcClaudeApiRetry -StreamFile $streamFile
+            $stEnd = [string]$hbEnd.Statuses; if ($stEnd -eq '') { $stEnd = '-' }
+            Add-PsOcTimeline $timelineFile ('P=' + [int]$hbEnd.Progress + '|R=' + [int]$hbEnd.Count + '|T=' + [int]$hbEnd.Trailing + '|S=' + $stEnd.Replace('無回應', 'NR').Replace('×', 'x').Replace('、', ',') + '|END=EXIT ' + $code)
         }
         if ($streamFile -ne '') {
             $cr = Convert-PsOcClaudeStream -StreamFile $streamFile -OutFile $outFile

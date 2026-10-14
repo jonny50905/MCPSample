@@ -70,4 +70,4 @@ prompt 是 `<jobId>/<attemptId>`。工單在 `.ps-runtime/sdoc-opencode/<jobId>/
 
 敘述、問題與覆核說明一律繁體中文；Component／Page／Record.Field／SQL／PeopleCode 事件與函式／儲存值／原始訊息文字保留原文。沒有證據就寫 unresolved 或開問題，不用模糊語句、UNKNOWN 或不適用填滿後稱 COMPLETE。
 
-寫完 read 回 output.json 確認是合法 JSON；回覆只說「已寫工單指定產物」，不把機敏內容貼回 stdout，不自行宣布 job 完成。
+寫完不要再 read 回 output.json（合法性由外環檢查，不合格會連原因退回）；回覆只說「已寫工單指定產物」，不把機敏內容貼回 stdout，不自行宣布 job 完成。

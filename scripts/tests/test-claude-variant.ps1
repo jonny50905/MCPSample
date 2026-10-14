@@ -460,16 +460,17 @@ try {
         $dW = Get-PsOcClaudeEnvDefaults -Agent 'ps-sdoc-worker'; $nW = Get-EnvNames $dW
         $dU = Get-PsOcClaudeEnvDefaults -Agent 'ps-deep-research'; $nU = Get-EnvNames $dU
         $mtt = @(@($dR) | Where-Object { [string]$_[0] -eq 'MAX_THINKING_TOKENS' })
-        Assert (@($dR).Count -eq 4 -and $nR -contains 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK' -and $nR -contains 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC' -and $nR -contains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION' -and $mtt.Count -eq 1 -and [string]$mtt[0][1] -eq '0') "環境預設：狀態圖讀者＝共同三個＋MAX_THINKING_TOKENS=0"
-        Assert (@($dW).Count -eq 3 -and $nW -notcontains 'MAX_THINKING_TOKENS' -and @($dU).Count -eq 3 -and $nU -notcontains 'MAX_THINKING_TOKENS') "環境預設：研究 worker 與其他代理只有共同三個（不關 thinking）"
-        Assert ((Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-reader')) -contains 'MAX_THINKING_TOKENS' -and (Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-judge')) -contains 'MAX_THINKING_TOKENS') "環境預設：乾淨讀者與判定也關 thinking"
+        $eff = @(@($dR) | Where-Object { [string]$_[0] -eq 'CLAUDE_CODE_EFFORT_LEVEL' })
+        Assert (@($dR).Count -eq 5 -and $nR -contains 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK' -and $nR -contains 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC' -and $nR -contains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION' -and $mtt.Count -eq 1 -and [string]$mtt[0][1] -eq '0' -and $eff.Count -eq 1 -and [string]$eff[0][1] -eq 'low') "環境預設：狀態圖讀者＝共同三個＋MAX_THINKING_TOKENS=0＋CLAUDE_CODE_EFFORT_LEVEL=low"
+        Assert (@($dW).Count -eq 3 -and $nW -notcontains 'MAX_THINKING_TOKENS' -and $nW -notcontains 'CLAUDE_CODE_EFFORT_LEVEL' -and @($dU).Count -eq 3 -and $nU -notcontains 'MAX_THINKING_TOKENS') "環境預設：研究 worker 與其他代理只有共同三個（不關 thinking、不壓 effort）"
+        Assert ((Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-reader')) -contains 'CLAUDE_CODE_EFFORT_LEVEL' -and (Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-judge')) -contains 'CLAUDE_CODE_EFFORT_LEVEL') "環境預設：乾淨讀者與判定也關 thinking、壓 effort"
         $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'
         $dOff = Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader'
         Assert (@($dOff).Count -eq 0) "環境預設：PS_SESSION_CLAUDE_ENV_DEFAULTS=0 → 整組不套"
         Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue
         $env:PS_SESSION_CLAUDE_ENV_SKIP = 'max_thinking_tokens, CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION'
         $nS = Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader')
-        Assert (@($nS).Count -eq 2 -and $nS -notcontains 'MAX_THINKING_TOKENS' -and $nS -notcontains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION') "環境預設：PS_SESSION_CLAUDE_ENV_SKIP 剔除指定項（不分大小寫、可多個）"
+        Assert (@($nS).Count -eq 3 -and $nS -notcontains 'MAX_THINKING_TOKENS' -and $nS -notcontains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION') "環境預設：PS_SESSION_CLAUDE_ENV_SKIP 剔除指定項（不分大小寫、可多個）"
     }
     finally {
         if ($null -ne $envSaved.D) { $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = $envSaved.D } else { Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue }
@@ -490,10 +491,12 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-010203-' + $dgJob + '-a0001.stream.jsonl')), (($inA, $dgModel, $usrA, '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"duration_api_ms":90000,"usage":{"input_tokens":1000,"cache_creation_input_tokens":35000,"cache_read_input_tokens":0,"output_tokens":1500},"result":"ok"}') -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
     [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.stream.jsonl')), (($inA, (New-UsageLine 'msg_1' 2000 0 90000 700), $usrA, (New-SubLine 'msg_s1' 8000 50), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 'null'), (New-ApiRetryLine 4 '504'), (New-ApiRetryLine 5 '504')) -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
     [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.err.txt')), "API Error: 504 Gateway Timeout`n", (New-Object System.Text.UTF8Encoding($false)))
+    # 時間軸（外環每 30 秒記一行）：兩個成功回應（相隔 90 秒）→ 卡住 300 秒後第一次 504 → 之後每 310 秒一次，共 5 次 → 提前結束
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.timeline.txt')), (@('2026-10-14 02:03:04|START', '2026-10-14 02:03:34|P=1|R=0|T=0|S=-', '2026-10-14 02:05:04|P=2|R=0|T=0|S=-', '2026-10-14 02:10:04|P=2|R=1|T=1|S=504x1', '2026-10-14 02:15:14|P=2|R=2|T=2|S=504x2', '2026-10-14 02:20:24|P=2|R=3|T=3|S=504x2,NRx1', '2026-10-14 02:25:34|P=2|R=4|T=4|S=504x3,NRx1', '2026-10-14 02:30:44|P=2|R=5|T=5|S=504x4,NRx1', '2026-10-14 02:31:14|END=ABORT') -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
     $dgOut = ((& (Join-Path $repoRoot 'scripts/ps-sdoc-diag.ps1') -Root $dgRoot -Cli claude *>&1 | ForEach-Object { [string]$_ }) -join "`n")
-    Assert ($dgOut -match '(?m)^DIAG v2 \| V=N \| JOBS=1 \| ATT=2 \| SF=1 \| AFTEROK=1 \|' -and $dgOut -match '(?m)^J1 A0001 K=R U=S0 S=OK F=- SF=X1 Q=1 P=1 C=0/1 M=36k L=36k O=1500 RT=- TH=0 UZ=input:1000,cache_read:0,cache_creation:35000,output:1500 RU=36000/0/1500 ERR=E0 MD=S45 PT=3 DUR=\d+$' -and $dgOut -match '(?m)^J1 A0002 K=S U=DA S=SF F=A,K Q=2 P=2 C=0/2 M=92k L=92k O=700 RT=504x4,NRx1 MS=8k TH=0 LT=mcp__x__q LR=\d+ UZ=input:8000,cache_read:0,cache_creation:0,output:50 ERR=E504 MD=X CAP=8 DUR=\d+$' -and $dgOut -match '(?m)^SUM \| KF=S:1 \| RT=504:4,NR:1 \| CACHE=C0 \| MAXM=92k \| MAXO=1500 \| P0=0 \| MD=S45 \| AFTEROK=1$') "診斷報告：每個 attempt 一行代號（種類、單元、狀態、findings、請求數、快取、主／子代理輸入、輸出、狀態碼分布、thinking 數、卡住前的工具與結果大小、usage 欄、result usage、err 分類、模型家族、分段數、上限、分鐘）與 SUM 彙總" $dgOut
+    Assert ($dgOut -match '(?m)^DIAG v2 \| V=N \| JOBS=1 \| ATT=2 \| SF=1 \| AFTEROK=1 \|' -and $dgOut -match '(?m)^J1 A0001 K=R U=S0 S=OK F=- SF=X1 Q=1 P=1 C=0/1 M=36k L=36k O=1500 RT=- TH=0 UZ=input:1000,cache_read:0,cache_creation:35000,output:1500 RU=36000/0/1500 ERR=E0 MD=S45 PT=3 DUR=\d+$' -and $dgOut -match '(?m)^J1 A0002 K=S U=DA S=SF F=A,K Q=2 P=2 C=0/2 M=92k L=92k O=700 RT=504x4,NRx1 MS=8k TH=0 LT=mcp__x__q LR=\d+ UZ=input:8000,cache_read:0,cache_creation:0,output:50 G=310 D1=300 LP=90 ERR=E504 MD=X CAP=8 DUR=\d+$' -and $dgOut -match '(?m)^SUM \| KF=S:1 \| RT=504:4,NR:1 \| CACHE=C0 \| MAXM=92k \| MAXO=1500 \| P0=0 \| MD=S45 \| AFTEROK=1$') "診斷報告：每個 attempt 一行代號（種類、單元、狀態、findings、請求數、快取、主／子代理輸入、輸出、狀態碼分布、thinking 數、卡住前的工具與結果大小、usage 欄、result usage、err 分類、模型家族、分段數、上限、分鐘）與 SUM 彙總" $dgOut
     Assert ($dgOut -notmatch $dgJob -and $dgOut -notmatch 'TW_X' -and $dgOut -notmatch [regex]::Escape($dgRoot)) "診斷報告：不印 jobId、物件名、路徑"
-    Assert ($dgOut -match '(?m)^SUM2 N S45 S-A,K 504x4,NRx1 TH0 LT=M0k (G~\d+|-) NEXT=2$' -and $dgOut -match '(?m)^NEXT2：縮每次回應：\$env:PS_SDOC_RESEARCH_PAGE_ITEMS') "診斷報告：SUM2 一行（版本 模型 種類-findings 狀態碼 TH LT G NEXT）與腳本自己判斷的下一步（研究頁卡住、沒 thinking → 縮每頁）"
+    Assert ($dgOut -match '(?m)^SUM2 N S45 S-A,K 504x4,NRx1 TH0 LT=M0k G=310 D1=300 NEXT=2$' -and $dgOut -match '(?m)^NEXT2：縮每次回應：\$env:PS_SDOC_RESEARCH_PAGE_ITEMS') "診斷報告：SUM2 一行（版本 模型 種類-findings 狀態碼 TH LT 量到的 G 與 D1 NEXT）與腳本自己判斷的下一步（研究頁卡住、沒 thinking → 縮每頁）"
     if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
         # 真的經 cmd.exe 啟動：假 claude.cmd 吐出重試用完的 stream、exit 1
         $fakeDir = Join-Path $dep 'fakecli'
@@ -536,6 +539,9 @@ try {
         finally { Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue; if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved } }
         $swA.Stop()
         $logAb = $script:sessLog -join "`n"
+        $tlAb = @(Get-ChildItem -LiteralPath (Join-Path $dep 'logsAbort') -File -Filter '*-tabort.timeline.txt')
+        $tlTxt = ''; if ($tlAb.Count -gt 0) { $tlTxt = [System.IO.File]::ReadAllText($tlAb[0].FullName) }
+        Assert ($tlAb.Count -eq 1 -and $tlTxt -match '(?m)^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\|START$' -and $tlTxt -match '(?m)\|P=1\|R=8\|T=8\|S=504x8$' -and $tlTxt -match '(?m)\|END=ABORT$') "真 session：時間軸檔記 START、P／R／T／S 的變化與 END=ABORT（只有數字與狀態碼）"
         Assert ([bool]$srAb.Aborted -and -not $srAb.TimedOut -and [int]$srAb.ExitCode -eq -1 -and $srAb.FailureKind -eq 'API_ABORTED' -and $srAb.ApiKind -eq 'API_RETRY_STUCK' -and $swA.Elapsed.TotalSeconds -ge 60 -and $swA.Elapsed.TotalMinutes -lt 4 -and $logAb -match '提前結束' -and $logAb -match 'PS_SESSION_API_ABORT_AFTER=3' -and $logAb -match '模型端數據：成功請求 1 次、主代理最後一次輸入 21000 token') "真 session：同一個請求連續失敗達門檻且持續 60 秒以上 → 未到 TimeoutMin 就強殺（Aborted、FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK；門檻 2 提高到 3），數據行有主代理的輸入量"
     }
     else { Write-Host '  SKIP：真 session 判讀（需要 Windows cmd.exe）' }

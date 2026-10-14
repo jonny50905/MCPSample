@@ -124,7 +124,7 @@ SOP 編號照用；有差異的只有：
    請求、每次等滿 gateway 逾時），外環在連續失敗 5 次且持續 60 秒以上時會**提前結束**（`PS_SESSION_API_ABORT_AFTER` 可改，0＝關）。
    session 失敗但工單指定的產出已寫完且驗收通過（例如寫完後 Read 回確認那個請求才卡住）照收、不算失敗。
    外環開每個 headless session 時自動替子行程設 gateway 友善的環境預設（log 的「環境預設」行）：串流斷線不改非串流重送、關背景流量與提示建議、
-   讀者與判定不開 thinking；視窗已設的同名變數沿用；`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS='0'` 整組不套、`$env:PS_SESSION_CLAUDE_ENV_SKIP='MAX_THINKING_TOKENS'` 剔除單項。
+   讀者與判定不開 thinking（固定預算模型 `MAX_THINKING_TOKENS=0`；adaptive 模型只能 `CLAUDE_CODE_EFFORT_LEVEL=low`，兩個都設）；視窗已設的同名變數沿用；`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS='0'` 整組不套、`$env:PS_SESSION_CLAUDE_ENV_SKIP='MAX_THINKING_TOKENS'` 剔除單項。
    把「判讀」與「模型端數據」兩行（成功請求數、主代理輸入 token、快取命中、單次最多輸出、重試間隔≈gateway 逾時）交 IT；等 IT 期間照順序試、一次一項
    （設在跑外環或啟動 claude 的同一個視窗）：原樣跑一次拿數據 → `PS_SESSION_CLAUDE_ENV_DEFAULTS='0'` 對照 → `$env:PS_SDOC_RESEARCH_PAGE_ITEMS='4'`＋
    `$env:PS_SDOC_READING_PART_LINES='20'` → 研究 worker 也關 thinking（`$env:MAX_THINKING_TOKENS='0'`；adaptive 模型改 `$env:CLAUDE_CODE_EFFORT_LEVEL='low'`）→
@@ -132,7 +132,8 @@ SOP 編號照用；有差異的只有：
    執行中每 5 分鐘的「進行中」行也會列出重試次數、目前連續失敗幾次與數據。attempt 的 `outcome.json` 的 findings 記失敗種類（`TIMED_OUT`、`EXIT_<n>`、
    `API_ABORTED`、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`；產出照收時另記 `sessionFindings`）。細節見 SOP-28「session 失敗的判讀」。
    log 不能複製出來時跑 `powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 -Last 15`：只印代號與數字（對照在腳本開頭），用唸的回報維護端。
-6. 一次回應不要太長：第 0 階段的讀者把解讀分段寫（每段一個檔，外環合併後驗收），每段的 Mermaid 行上限預設 40（`$env:PS_SDOC_READING_PART_LINES`，5～1000）；
+6. 一次回應不要太長：第 0 階段的讀者把解讀分段寫（每段一個檔，外環合併後驗收），每段的 Mermaid 行上限預設 20（`$env:PS_SDOC_READING_PART_LINES`，5～1000）；
+   四個 sdoc 代理寫完不再 Read 回確認（合法性由外環檢查）；
    研究頁每頁的項目上限由外環驗收（預設 8；texts 40、operations 3、testing 4；`$env:PS_SDOC_RESEARCH_PAGE_ITEMS` 1～60 一律覆寫，60＝舊行為），
    工單印出本頁上限，超過＝INVALID 計次，模型達上限就 PARTIAL 分頁；上游需求頁與改寫頁不受此上限。各段原樣留在 attempt 的 `output-part-NN.json`。
 

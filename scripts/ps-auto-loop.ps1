@@ -891,8 +891,9 @@ function Invoke-Opencode {
     param([string]$ExtraArgs, [string]$PromptText, [int]$TimeoutMin, [string]$Tag)
     $tpn = 'ResearchTimeoutMin'
     if ($Tag -like 'audit*') { $tpn = 'AuditTimeoutMin' }
+    # Claude Code 版：研究／稽核 session 也套 gateway 友善的共同環境預設（OpenCode 版在 lib 內忽略）
     return (Invoke-PsOcSession -OcPath $ocPath -Root $root -LogRoot $logRoot -Model $Model -ExtraArgs $ExtraArgs `
-        -PromptText $PromptText -TimeoutMin $TimeoutMin -Tag $Tag -Log ${function:Write-Log} -SlotWaitMin 1440 -TimeoutParamName $tpn)
+        -PromptText $PromptText -TimeoutMin $TimeoutMin -Tag $Tag -Log ${function:Write-Log} -SlotWaitMin 1440 -TimeoutParamName $tpn -EnvDefaults (Get-PsOcClaudeEnvDefaults))
 }
 
 # ── lint（在本 PowerShell 行程內呼叫，繼承現行執行環境）──
