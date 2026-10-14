@@ -592,3 +592,6 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   原生 permission.task 白名單（SOP-21 步驟 9）只在公司機驗過語法後才啟用。
 - 舊掛起：已畢業領域貼 U 項工單；PENDING_MANUAL 人工 SQL（SOP-2 第 4 階）；`-GitCommit` 觀察期
   結束後恢復；畢業後端到端測試；opencode.json 的 doom_loop ask→deny。
+- Spec 文件的畫面元件、Prompt／Lookup、欄位間規則缺口（2026-10-14 管理者提出）：盤點與分期補法在
+  `docs/design/ui-control-lookup-dependency-memo.md`（提案、未實作）；P0（cookbook 查法＋profile `pageMetadata:` 校準＋PeopleCode 偵測清單）
+  等管理者同意，P1／P2 等公司機校準結果。
