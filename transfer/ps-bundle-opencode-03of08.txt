@@ -1,6 +1,84 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a0cf65）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit b540051）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|7a0cf65|5a6b97d021d74e2e|3|8|13602|af8a86377aeb504dd7df7b89e2b683dc5f5e6149a7fc6dee6ea8f7824e9d0191
+@@@PSBUNDLE-PART|1|opencode|b540051|a4645a94518ffafc|3|8|13588|a7070873acd73a9589ed1705cd3f13d8d80fe86987c19134888d6a507501efb3
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/interfaces.json|76|cde8875d457a8e2fd7f6604eca0f4b831e706616330319467115d471aa7bbcb7|0
+{
+  "schemaVersion": "1.0",
+  "jobId": "clone-0123456789abcdef",
+  "attemptId": "a0001",
+  "unit": "interfaces",
+  "subject": "TW_DEMO_APV",
+  "page": 1,
+  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "coverage": "COMPLETE",
+  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
+  "items": [
+    {
+      "type": "IF",
+      "key": "AE:TW_DEMO_NTFY",
+      "basis": "CODE",
+      "certainty": "CONFIRMED",
+      "evidence": [
+        "E1",
+        "E2"
+      ],
+      "ifType": "NOTIFICATION",
+      "object": "@OBJ/AE:TW_DEMO_NTFY",
+      "name": "送審通知",
+      "direction": "OUTBOUND",
+      "trigger": {
+        "kind": "ON_TRANSITION",
+        "transitions": [
+          "@TRN/REQ_STATUS:010>020",
+          "@TRN/REQ_STATUS:015>020"
+        ],
+        "note": "送出成功後由 SavePostChange 排入程序，非同步執行。"
+      },
+      "performs": [],
+      "reads": [
+        "@FLD/TW_DEMO_REQHDR.REQ_ID",
+        "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID",
+        "@FLD/TW_DEMO_REQHDR.AMOUNT",
+        "@FLD/TW_DEMO_EMP.SUPERVISOR_ID"
+      ],
+      "writes": [],
+      "parameters": [
+        {
+          "name": "REQ_ID",
+          "source": {
+            "fld": "@FLD/TW_DEMO_REQHDR.REQ_ID"
+          }
+        }
+      ],
+      "format": {
+        "na": "不是檔案介面"
+      },
+      "errorHandling": "寄送失敗只寫入程序紀錄，不影響申請單狀態。",
+      "retry": {
+        "na": "原系統不重試"
+      },
+      "idempotency": "同一張單重複排入會重複寄送通知。"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "CHUNK",
+      "locator": "a52c73e0-f63e-c571-569c-1d0c03234e97",
+      "excerpt": "If TW_DEMO_REQHDR.REQ_STATUS = \"020\" Then\n   TW_DEMO_SCHEDNOTIFY(TW_DEMO_REQHDR.REQ_ID);\nEnd-If;"
+    },
+    {
+      "id": "E2",
+      "kind": "CHUNK",
+      "locator": "aba1b504-3b10-cb68-5c9b-95ef6d7a49fc",
+      "excerpt": "SELECT REQ_ID, REQUESTER_EMPLID, AMOUNT FROM PS_TW_DEMO_REQHDR WHERE REQ_ID = %Bind(REQ_ID)\n-- send mail to supervisor; on failure write process log only"
+    }
+  ],
+  "questions": [],
+  "requests": [],
+  "nextCursor": ""
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/interfaces.json
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/operations.json|633|f8243d8a0e4bd14a4cb1bf5235a04837ef9c56fd51c99f8798c6e722178f6a21|0
 {
   "schemaVersion": "1.0",
@@ -2788,7 +2866,7 @@ model: anthropic/claude-haiku-4-5
 - 文件沒寫就答 `NOT_IN_SPEC`（`text` 可寫你找了哪裡，`ids` 空陣列）。文件明確寫了「沒有」（例如「不適用：…」）是 `ANSWERED`，`ids` 空陣列，`text` 寫文件的說法。
 - 寫完 read 回 output.json 確認是合法 JSON；回覆只說「已寫工單指定產物」。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/reader-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/research-contract.md|279|35d5e034fbce9b115701d79748f9217dfe7d415ce19d8c91d172e52eab86fe1c|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/research-contract.md|279|83d510c2aee54d96ff24c26dce142c72a491e0afb583f351731b3dca866614d6|0
 # Spec 文件研究契約
 
 讀者是看不到原 PeopleSoft 程式、但能用現代語言與架構開發的獨立 LLM。它要能只讀 00-index 與 14 份文件，就實作指定 Component 的可觀測核心行為，並以保留的原始識別字回查 PeopleSoft。文件描述行為契約，不替讀者選框架，不要求照搬 Component Processor。
@@ -2822,7 +2900,7 @@ model: anthropic/claude-haiku-4-5
 
 本單元另有的附加資料（`denominators`、`statusTexts`、`definitionOnlyCodes`、`programDispositions`）見各單元；其他單元不得寫。
 
-寫完 read 回 output.json 確認是合法 JSON。回覆只說「已寫工單指定產物」，不把內容貼回對話。
+寫完不要再 read 回 output.json：合法性由外環檢查，不合格會連原因退回。回覆只說「已寫工單指定產物」，不把內容貼回對話。
 
 ### 項目
 
@@ -12141,7 +12219,7 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1226|2a88aaa34803a7e837efbca6146d76dfc35deca90b7ce1af19c969b610054302|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1230|720ec1d10081ad6f690caa07490d87580b9d91ff9b00d919618c3245ff763952|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -13231,15 +13309,18 @@ OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些�
 | `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK` | `1` | 全部 | 串流中途斷線後仍用串流重送，不改非串流（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時） |
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 全部 | 不做更新檢查、遙測、錯誤回報、功能旗標抓取 |
 | `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | `false` | 全部 | 不產提示建議（背景請求經 gateway 也用主模型） |
-| `MAX_THINKING_TOKENS` | `0` | ps-status-reader、ps-spec-reader、ps-spec-judge | 機械工作不開 thinking（thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）；研究 worker 不關 |
+| `MAX_THINKING_TOKENS` | `0` | ps-status-reader、ps-spec-reader、ps-spec-judge | 機械工作不開 thinking（thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）；只對固定預算的模型有效；研究 worker 不關 |
+| `CLAUDE_CODE_EFFORT_LEVEL` | `low` | ps-status-reader、ps-spec-reader、ps-spec-judge | adaptive 的模型（Sonnet 4.6／5 起）不吃 `MAX_THINKING_TOKENS=0`，只能用 effort 壓低 thinking；模型不吃 effort 時 Claude Code 收到 400 會自動拿掉重送（數據行會看到 400） |
 
 - 整組不套：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'`；剔除單項：`$env:PS_SESSION_CLAUDE_ENV_SKIP = 'MAX_THINKING_TOKENS'`（逗號分隔、不分大小寫）。
-- 若公司的 Sonnet 版本拒絕關 thinking，數據行會出現 `400×N`：用 `PS_SESSION_CLAUDE_ENV_SKIP=MAX_THINKING_TOKENS` 剔除。
-- 不進預設、留在實驗階梯的：`CLAUDE_CODE_MAX_RETRIES`（與提前結束重疊，會把幾秒的抖動變成硬失敗）、`CLAUDE_CODE_EFFORT_LEVEL`（Sonnet 4.6 起才有，舊模型回 400）、
-  worker 的 `MAX_THINKING_TOKENS`（非 0 值在新模型回 400）。
+- 若公司的模型拒絕這些值，數據行會出現 `400×N`：用 `PS_SESSION_CLAUDE_ENV_SKIP=CLAUDE_CODE_EFFORT_LEVEL`（或 `MAX_THINKING_TOKENS`）剔除。
+- 不進預設、留在實驗階梯的：`CLAUDE_CODE_MAX_RETRIES`（與提前結束重疊，會把幾秒的抖動變成硬失敗）、worker 的 `MAX_THINKING_TOKENS`（非 0 值在新模型回 400）。
+- 外環每 30 秒把成功回應數、重試數、連續失敗數、狀態碼分布記進 `.ps-runtime\sdoc-logs\<時間>-<job>-<attempt>.timeline.txt`（只有數字與狀態碼）；
+  `ps-sdoc-diag` 用它算出真實的 gateway 逾時（`G=` 兩次重試的間隔）、卡住的請求跑了幾秒才第一次失敗（`D1=`）、最長的成功回應（`LP=`）。
 - 實驗階梯（照順序、一次改一項、每項看「模型端數據」行與各種工單的 SESSION_FAILED 次數；環境變數設在跑 `ps-sdoc.ps1` 或啟動 `claude --agent ps-spec-author`
   的**同一個視窗**，子行程繼承，關掉視窗就沒了；要固定就寫進 `.claude/settings.json` 的 `env`，但會影響互動 session）：
-  0. 用新 scripts 原樣跑一次（環境預設、分段 40 行、每頁上限都已生效），拿到數據行、狀態碼分布、提前結束行。
+  0. 用新 scripts 原樣跑一次（環境預設、分段 20 行、每頁上限、寫完不 Read 回都已生效），拿到數據行、狀態碼分布、提前結束行；
+     或直接跑 `scripts\ps-sdoc-diag.ps1`，照它最後兩行（SUM2 與 NEXT）做。
   1. 對照：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'` 再跑一次——差異＝請求形狀的影響。
   2. 再縮小每次回應：`$env:PS_SDOC_RESEARCH_PAGE_ITEMS = '4'`、`$env:PS_SDOC_READING_PART_LINES = '20'`。
   3. 研究 worker 也關 thinking：`$env:MAX_THINKING_TOKENS = '0'`（固定預算的模型）；adaptive 的模型（Sonnet 4.6 起）改 `$env:CLAUDE_CODE_EFFORT_LEVEL = 'low'`。
@@ -13273,8 +13354,9 @@ OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些�
 工單 input.json 的 `outputParts` 與 manifest 列出每段的行號範圍與檔名（inbox 的 `output-part-NN.json`），讀者一段寫一個檔，
 外環合併後照原本的規則驗收。目的：一次回應不要太長（公司 gateway 下約每秒 30～40 token，整份解讀一次寫完要好幾分鐘，中途斷一次就整段重來）。
 
-- 每段的 Mermaid 行上限預設 40（每行解讀約 105 B，40 行 ≈ 4.2 KB ≈ 35～50 秒；分段演算法會把連續小區塊塞滿到上限，所以這就是每次回應的實際上限）；
-  要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '20'`（5～1000），只影響這個視窗。
+- 每段的 Mermaid 行上限預設 20（每行解讀約 105 B，20 行 ≈ 2.1 KB ≈ 20～25 秒；分段演算法會把連續小區塊塞滿到上限，所以這就是每次回應的實際上限；
+  回應前的 thinking 不在內）；要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '40'`（5～1000），只影響這個視窗。
+- 四個 sdoc 代理寫完都不再 Read 回確認（合法性本來就由外環檢查、不合格連原因退回）：每段少一個整個 session context 最大的請求。
 - 各段原樣留在 attempt 目錄（`output-part-NN.json`），合併後的整份是同目錄的 `output.json`。
 - 少寫一段、某段不是合法 JSON、某段的 reader／指紋和第一段不同、同一狀態的 final 或同一轉移的 scenario 各段不一致：整份 INVALID，
   findings 指出第幾段；讀者若一次寫完 `output.json`（沒有分段）也照收。
@@ -13507,100 +13589,4 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 - findings 每筆 `{itemId,code,detail}`；code 使用 `MISSING_DETAIL`／`MISSING_BRANCH`／`EVIDENCE_MISMATCH`／`SCOPE_NOISE`／`CONTRADICTION`／`LANGUAGE`／`TOOL_BLOCKED`。detail 用繁中指出可修的具體差異；topic 層缺漏用 itemId `TOPIC`。
 - PASS 不代表企業實跑或重建等價驗證已完成；未解問題不能靠 review 宣言清零。
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/clone-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/clone-profile.json|59|93ff3d0fb58660c4aaad238f6fae89dab85952cf78647e5ae167ab262ad6fa08|0
-{
-  "schemaVersion": 1,
-  "id": "core-clone-v1",
-  "title": "核心功能重建規格",
-  "maxItemsPerPage": 40,
-  "note": "僅研究使用者指定 Component 的核心業務與有實際使用關係的依賴。固定欄位是深度檢查清單，不代表填滿就已證明語意完整。值必須具體；不適用的個別欄位需寫理由，未知寫 UNKNOWN 並將 coverage 設 PARTIAL。技術物件、欄位、值、訊息保留原名，說明使用繁體中文。",
-  "topics": [
-    {
-      "id": "scope", "title": "範圍與核心依賴", "allowNotApplicable": false,
-      "instructions": "先固定重建邊界。CORE 必含指定 Component 根；不以 delivered／custom 前綴決定核心。DEPENDENCY 須由核心追得實際使用鏈，提供逐跳證據；usedBy 寫呼叫者、方向與中間鏈，condition 寫何時使用，只描述最小契約。必需的 delivered 依賴同樣納入最小介面契約。EXCLUDED 保留簡短排除理由，不展開共用框架或其他業務。核心 Record 的原生欄位依 clone-contract「原生欄位無用判定」：判定無用者每個 Record 合成一筆 EXCLUDED（type FIELD），判不了或有使用跡象的欄位保留且不逐欄列。fieldUsage：每個 type RECORD 的 CORE／DEPENDENCY 項必填三種結論之一（排除 n 欄（FIELD 項 ID）／無可排除（查詢日）／判不了：原因代碼，見 clone-contract），其他項寫「不適用」。scope 項目 scopeRefs 為空；後續章節引用本 Component 已接受的 CORE／DEPENDENCY id。",
-      "fields": [{"key":"object","label":"物件"},{"key":"type","label":"型別"},{"key":"inclusion","label":"範圍分類"},{"key":"usedBy","label":"使用關係／方向"},{"key":"condition","label":"使用條件"},{"key":"reason","label":"納入／排除理由"},{"key":"fieldUsage","label":"原生欄位判定"}]
-    },
-    {
-      "id": "flows", "title": "業務流程與操作順序", "allowNotApplicable": true,
-      "instructions": "逐個核心使用情境拆出步驟、分支、前後條件與資料副作用；不要只有流程名。標明先後、失敗出口與可否重入。",
-      "fields": [{"key":"scenario","label":"情境"},{"key":"actor","label":"操作者"},{"key":"preconditions","label":"前置條件"},{"key":"sequence","label":"步驟順序"},{"key":"branches","label":"條件分支"},{"key":"postconditions","label":"後置條件"},{"key":"sideEffects","label":"資料／外部副作用"},{"key":"errors","label":"失敗與恢復"},{"key":"excludedPath","label":"排除路徑與邊界"}]
-    },
-    {
-      "id": "ui", "title": "畫面、欄位與條件呈現", "allowNotApplicable": false,
-      "instructions": "逐欄／操作控制描述：技術欄位與畫面位置、格式長度、值域、預設、空值、必填／唯讀／隱藏的觸發條件、連動與錯誤訊息。不能只抄欄位清單。scope 判定無用的欄位不寫。",
-      "fields": [{"key":"page","label":"頁面／位置"},{"key":"field","label":"欄位／控制"},{"key":"label","label":"顯示文字"},{"key":"searchKeys","label":"Search keys／查詢條件"},{"key":"scrollLevel","label":"Scroll level／父子列"},{"key":"dataType","label":"型別／格式／長度"},{"key":"valueDomain","label":"值域與儲存值"},{"key":"valueSource","label":"值來源／Prompt／Translate"},{"key":"defaultValue","label":"預設值／時機"},{"key":"nullBehavior","label":"空字串／NULL 差異"},{"key":"required","label":"必填條件"},{"key":"visibility","label":"顯示／隱藏條件"},{"key":"editability","label":"可編輯／唯讀條件"},{"key":"dependencies","label":"欄位依賴與重算"},{"key":"events","label":"事件與欄位連動"},{"key":"validation","label":"檢核與訊息"}]
-    },
-    {
-      "id": "data", "title": "資料模型與逐欄讀寫", "allowNotApplicable": false,
-      "instructions": "逐資料欄位與使用情境描述來源、鍵、有效日／序號、讀寫條件、轉換、空值與副作用；只保留核心確實使用的資料面。scope 判定無用的欄位不寫。",
-      "fields": [{"key":"record","label":"Record／表"},{"key":"field","label":"欄位"},{"key":"logicalKey","label":"業務邏輯鍵"},{"key":"physicalKey","label":"實體主鍵／有效日與序號"},{"key":"dataType","label":"型別"},{"key":"lengthPrecision","label":"長度／精度／尺度"},{"key":"relations","label":"關聯與參照條件"},{"key":"cardinality","label":"關聯基數／唯一性"},{"key":"sensitivity","label":"敏感分類／遮罩"},{"key":"valueDomain","label":"值域"},{"key":"nullBehavior","label":"空值／預設"},{"key":"readCondition","label":"讀取條件"},{"key":"writeCondition","label":"寫入條件"},{"key":"transformation","label":"來源與轉換"},{"key":"sideEffects","label":"連帶更新／影響"}]
-    },
-    {
-      "id": "rules", "title": "業務規則與逐條檢核", "allowNotApplicable": false,
-      "instructions": "每條規則給觸發事件、精確條件／運算、動作、先後優先序、拒絕結果與訊息，包含空值、邊界、不同權限與模式下的差異。",
-      "fields": [{"key":"trigger","label":"觸發事件"},{"key":"field","label":"作用欄位"},{"key":"condition","label":"精確條件"},{"key":"expression","label":"條件／計算式"},{"key":"storedValues","label":"儲存值與業務意義"},{"key":"action","label":"動作／計算"},{"key":"eventOrder","label":"事件順序／優先序"},{"key":"nullBoundary","label":"NULL／空字串／邊界"},{"key":"dateEffectiveSequence","label":"日期／有效日／序號條件"},{"key":"authorization","label":"權限／模式差異"},{"key":"errorMessage","label":"錯誤訊息／阻擋方式"},{"key":"sideEffects","label":"資料副作用"}]
-    },
-    {
-      "id": "states", "title": "狀態機與生命週期", "allowNotApplicable": true,
-      "instructions": "每個狀態轉移分列：起點、事件、守衛、終點、寫入／通知、禁止轉移與重入。沒有狀態機需有程式或已驗研究證據及理由，查不到不等於不適用。",
-      "fields": [{"key":"entity","label":"狀態實體"},{"key":"fromState","label":"原狀態"},{"key":"event","label":"事件"},{"key":"guard","label":"轉移條件"},{"key":"fieldExpression","label":"守衛欄位／條件式"},{"key":"toState","label":"目標狀態"},{"key":"actions","label":"轉移動作／副作用"},{"key":"disallowed","label":"禁止轉移"},{"key":"reentry","label":"重入／重複事件"}]
-    },
-    {
-      "id": "transactions", "title": "交易、提交與失敗恢復", "allowNotApplicable": true,
-      "instructions": "列出提交邊界、寫入順序、鎖定／併發、部分失敗、回復與重試；不能由函式名稱推定 atomicity。無法取得執行期行為時留明確缺口。",
-      "fields": [{"key":"operation","label":"操作"},{"key":"boundary","label":"交易邊界"},{"key":"writeOrder","label":"寫入順序"},{"key":"commit","label":"提交條件／時機"},{"key":"rollback","label":"失敗／回復範圍"},{"key":"locks","label":"鎖定範圍／時機"},{"key":"concurrency","label":"併發衝突"},{"key":"retry","label":"重試策略"},{"key":"idempotency","label":"冪等／重複提交"}]
-    },
-    {
-      "id": "interfaces", "title": "介面、檔案與批次契約", "allowNotApplicable": true,
-      "instructions": "逐個直接使用的介面／檔案欄位描述方向、觸發、格式、順序、值域、空值、錯誤回覆、重試和副作用，不擴展成整個共用平台文件。",
-      "fields": [{"key":"interface","label":"介面／檔案／程序"},{"key":"direction","label":"方向"},{"key":"trigger","label":"觸發／排程"},{"key":"field","label":"欄位／段落"},{"key":"format","label":"格式／欄位順序"},{"key":"valueDomain","label":"值域"},{"key":"nullBehavior","label":"空值／缺值"},{"key":"response","label":"回覆／錯誤契約"},{"key":"retry","label":"重試／重複處理"},{"key":"sideEffects","label":"副作用"}]
-    },
-    {
-      "id": "security", "title": "權限與操作限制", "allowNotApplicable": true,
-      "instructions": "分清登入可見性、進入權、操作權、資料範圍與拒絕效果；靜態Permission List 不等於某人目前可使用。無依據的Role／人員清單不可補造。",
-      "fields": [{"key":"principal","label":"角色／Permission List／主體"},{"key":"resource","label":"受控頁面／資料"},{"key":"operation","label":"操作"},{"key":"condition","label":"允許條件"},{"key":"dataScope","label":"資料範圍"},{"key":"denial","label":"拒絕行為"},{"key":"enforcement","label":"檢查位置／時機"}]
-    },
-    {
-      "id": "acceptance", "title": "正反例與邊界驗收情境", "allowNotApplicable": false,
-      "instructions": "把核心規則轉為可人工驗收的情境；scenarioType 使用 POSITIVE／NEGATIVE／BOUNDARY。每例具前置資料、動作順序、期望畫面／錯誤、期望資料副作用與可核對判準。這是待執行驗收設計，絕不標成已通過企業E2E。",
-      "fields": [{"key":"scenarioType","label":"正例／反例／邊界"},{"key":"ruleRefs","label":"對應規則 ID／來源"},{"key":"preconditions","label":"前置條件"},{"key":"inputs","label":"輸入值／資料"},{"key":"steps","label":"操作步驟"},{"key":"expectedResult","label":"預期結果／錯誤"},{"key":"expectedFields","label":"預期逐欄值／可見與唯讀"},{"key":"expectedData","label":"預期資料副作用"},{"key":"negativeBoundary","label":"反例／邊界差異"},{"key":"verification","label":"人工核對方式"}]
-    }
-  ]
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/clone-profile.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/examples/pack-a/pack.json|33|a54bda5d2278a1cb1471c42c1ca5077703dd57af0dac5d3dd4915b5c7ea1d8e1|0
-{
-  "schemaVersion": 1,
-  "packId": "pack-a",
-  "packVersion": 1,
-  "reviewedVersion": 1,
-  "template": "template-bound.md",
-  "slots": ["S01", "S02", "S03", "S04", "S05", "S06", "S07"],
-  "checklist": ["C01", "C02", "C03", "C04", "C05", "C06", "C07"],
-  "requirements": [
-    { "id": "R01", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.COMPONENT_IDENTITY", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ONE", "evidencePolicy": "AUDITED" },
-    { "id": "R02", "slot": "S01", "checklistRefs": ["C01"], "factKind": "UI.NAVIGATION", "required": false,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
-    { "id": "R05", "slot": "S02", "checklistRefs": ["C02"], "factKind": "UI.FIELD_INVENTORY", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
-    { "id": "R08", "slot": "S03", "checklistRefs": ["C03"], "factKind": "BEHAVIOR.RULES", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
-    { "id": "R20", "slot": "S03", "checklistRefs": ["C03"], "factKind": "BEHAVIOR.VALIDATIONS", "required": true,
-      "applicability": { "op": "FACT_TRUE", "fact": "BEHAVIOR.RULES.rules" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
-    { "id": "R10", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.FLOW", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ALL_DISCOVERED", "evidencePolicy": "STATIC" },
-    { "id": "R18", "slot": "S04", "checklistRefs": ["C04"], "factKind": "DATA.RECORD_USAGE", "required": false,
-      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FLOW.tables" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
-    { "id": "R12", "slot": "S05", "checklistRefs": ["C05"], "factKind": "PROCESS.EXECUTION", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
-    { "id": "R14", "slot": "S05", "checklistRefs": ["C05"], "factKind": "SECURITY.ACCESS", "required": false,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "ANY" },
-    { "id": "R15", "slot": "S06", "checklistRefs": ["C06"], "factKind": "RELATED.OBJECTS", "required": true,
-      "applicability": { "op": "ALWAYS" }, "cardinality": "ANY", "evidencePolicy": "STATIC" },
-    { "id": "R17", "slot": "S07", "checklistRefs": ["C07"], "factKind": "DATA.FILE_INPUT", "required": true,
-      "applicability": { "op": "FACT_TRUE", "fact": "DATA.FILE_INPUT.present" }, "cardinality": "ANY", "evidencePolicy": "STATIC" }
-  ]
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-a/pack.json
-@@@PSBUNDLE-PART-END|5a6b97d021d74e2e|3|8
+@@@PSBUNDLE-PART-END|a4645a94518ffafc|3|8

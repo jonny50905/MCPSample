@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 7a0cf65）第 6／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit b540051）第 6／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|7a0cf65|969cc6e4335258c9|6|6|3539|7492e9538f53819609ba4bb7568cddac3af030472beb644817f030c994b74fe4
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|8f7d55463db3aca7c5b6887f02268f47d90467f9940ba16fdfb0825d1f989181|1
+@@@PSBUNDLE-PART|1|claude|b540051|0152324a0e7f82d0|6|6|3539|4de67571d2a17ab7efaa76aad421777bec95ce8dc67c28f49f5149f05cb29389
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384|1
 # test-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單元測試；合成資料，不查 MCP、不讀企業產物、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
 $ErrorActionPreference = 'Stop'
@@ -144,9 +144,9 @@ $big = "# 大圖`n" + '```mermaid' + "`n" + ((1..25 | ForEach-Object { 'A' + $_ 
 $bp = Get-PsSdReadingParts $big 10
 Assert-Sd ($bp.Count -eq 3 -and $bp[0].Count -eq 10 -and $bp[1].Count -eq 10 -and $bp[2].Count -eq 6 -and $bp[2].To -eq 30) ('分段：單一區塊超過上限才在行與行之間切，剩下的行和後面的小區塊同一段（' + (($bp | ForEach-Object { '' + $_.From + '-' + $_.To }) -join ',') + '）')
 $none = Get-PsSdReadingParts ("# 沒有圖`n說明`n") 8
-Assert-Sd ($script:PsSdReadingPartLines -eq 40) '分段：每段 Mermaid 行上限預設 40（一次回應不要太長）'
+Assert-Sd ($script:PsSdReadingPartLines -eq 20) '分段：每段 Mermaid 行上限預設 20（一次回應不要太長）'
 $dp = Get-PsSdReadingParts $gateText 0
-Assert-Sd (@($dp).Count -eq 2 -and [int]$dp[0].Count -eq 40 -and [int]$dp[1].Count -eq 6) ('分段：守門範例用預設上限切成 2 段（40＋6；連續小區塊塞滿到上限）' + '（實得 ' + (@($dp | ForEach-Object { $_.Count }) -join '+') + '）')
+Assert-Sd (@($dp).Count -eq 3 -and [int]$dp[0].Count -eq 20 -and [int]$dp[1].Count -eq 20 -and [int]$dp[2].Count -eq 6) ('分段：守門範例用預設上限切成 3 段（20＋20＋6；連續小區塊塞滿到上限）' + '（實得 ' + (@($dp | ForEach-Object { $_.Count }) -join '+') + '）')
 Assert-Sd ($none.Count -eq 1 -and $none[0].Count -eq 0) '分段：沒有 Mermaid 區塊 → 一段'
 function Split-SdReading($R, $Parts) {
     # 照讀者的寫法切：每段只放這段範圍內的行，同一狀態、轉移在多段都出現就各段都寫；conflicts 放最後一段
@@ -2534,10 +2534,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1003|6e7a62c2d706ee0b344a3a7ec3ce605a165be1abba52506d5cf12e191ab5f551|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1003|069aaa4b29ced839f775694564e3e1ab692acead146c8d8a8048d363fd62898e|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "7a0cf65",
+  "commit": "b540051",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -2591,7 +2591,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/agents/ps-sdoc-worker.md",
       "lines": 35,
-      "sha256": "288724bf6ac8698cf6de3667b3462cd02ee71e3504e1251e47bc6a6bd8fe8e43",
+      "sha256": "c858fad9bc2d49443796cfd879d5fbaddacf4732e2e3ebb3511ff31972c342b4",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-sdoc-worker.md"
     },
@@ -2605,14 +2605,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/agents/ps-spec-judge.md",
       "lines": 22,
-      "sha256": "a17c64802b60c383ba148cbdc56b962d25e1438e2346639d3905f2163525b35d",
+      "sha256": "22220a7fdb15801c75371f855fcb93c52dc84a66cd5971860e54c83de7e6bcc9",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-spec-judge.md"
     },
     {
       "path": ".claude/agents/ps-spec-reader.md",
       "lines": 22,
-      "sha256": "eafd44798c8386756771ffd58fe8a76c0604a766fc4add9035b7ffcb139c8854",
+      "sha256": "7185001288aa53452714281ba16e0deea30bc646ff94c0aa85f27e3b5a2f96c9",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-spec-reader.md"
     },
@@ -2640,7 +2640,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/agents/ps-status-reader.md",
       "lines": 23,
-      "sha256": "4d68e4f45614eb3dfeaa16829c15a23228d967b655b7c1d9bea44c17c9a9c151",
+      "sha256": "980fe0bca3c15809b7e1617dad594147309aa7d1845f5f7e6e50b9f042b135ce",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-status-reader.md"
     },
@@ -2920,7 +2920,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/sdoc/research-contract.md",
       "lines": 279,
-      "sha256": "c83fadc09faafdee2944ee598f5231de7560928693a83622528a2a61e9f78a85",
+      "sha256": "c0041f65d065d781dccc7f9f3d8c3977161a99b0ba9973792be3b81cc8b8857b",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/research-contract.md"
     },
@@ -3309,8 +3309,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-auto-loop.ps1",
-      "lines": 2646,
-      "sha256": "25c96910e201b2e467c5ece3a1522e6e7c39303f54e5fa890b135a384b22fd7d",
+      "lines": 2647,
+      "sha256": "32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d",
       "bom": true
     },
     {
@@ -3369,8 +3369,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc-diag.ps1",
-      "lines": 305,
-      "sha256": "0924f636b6b8729cf028acf7d79037ed287bfd868104edf0527c94551f94d342",
+      "lines": 344,
+      "sha256": "09f5257bea3f70990ddc03c10355c19e377e7312e88088faa5159d9efe4bf0c4",
       "bom": true
     },
     {
@@ -3400,7 +3400,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-sdoc-status-lib.ps1",
       "lines": 632,
-      "sha256": "14948b56f8556e3cce12e59091ab3656503efe84793c950b08d7a220f715f711",
+      "sha256": "d608a28ad0dfdec155b520446aa828941b9f9a862196c2810f7252908742c28f",
       "bom": true
     },
     {
@@ -3411,8 +3411,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 689,
-      "sha256": "071ed8d9a8533efd98abe9b3ed51eee6da6c7514d7e07589fbcd1718c25da088",
+      "lines": 713,
+      "sha256": "db7af4e7e23ff0c7fb3cb69eb59dfa59429fc8a5a24ffe226df1490f19155e1f",
       "bom": true
     },
     {
@@ -3471,8 +3471,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 589,
-      "sha256": "041408624e153968b089022da771d2fb925016e83e00ee0b9685783f8cc25b4c",
+      "lines": 595,
+      "sha256": "68d87f544bd09bfbb89032e023613b2aa980e9f201e5e2a18670e8e8b02e6afe",
       "bom": true
     },
     {
@@ -3508,7 +3508,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/tests/test-sdoc.ps1",
       "lines": 280,
-      "sha256": "8f7d55463db3aca7c5b6887f02268f47d90467f9940ba16fdfb0825d1f989181",
+      "sha256": "88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384",
       "bom": true
     },
     {
@@ -3539,5 +3539,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|149|32f1c0c1a31fe4f126712e5541eab30418ed8180f2c9677d261bd1256e2ae0f3
-@@@PSBUNDLE-PART-END|969cc6e4335258c9|6|6
+@@@PSBUNDLE-EOF|149|5853c76621127ae309b366427e4846edc9315552b9ef8d0d38c45d84bbb9ac81
+@@@PSBUNDLE-PART-END|0152324a0e7f82d0|6|6

@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a0cf65）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit b540051）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|7a0cf65|5a6b97d021d74e2e|8|8|3644|ccb8526e310f9bfd18a9b856619c02bbeac1a0080d2066960d6b2a31244fb7a1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|8f7d55463db3aca7c5b6887f02268f47d90467f9940ba16fdfb0825d1f989181|1
+@@@PSBUNDLE-PART|1|opencode|b540051|a4645a94518ffafc|8|8|3645|0f317b0faf47ccfbc8bdbbeebbc1aafff391090d2d379ce3b32406d59f9ca1ed
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384|1
 # test-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單元測試；合成資料，不查 MCP、不讀企業產物、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
 $ErrorActionPreference = 'Stop'
@@ -144,9 +144,9 @@ $big = "# 大圖`n" + '```mermaid' + "`n" + ((1..25 | ForEach-Object { 'A' + $_ 
 $bp = Get-PsSdReadingParts $big 10
 Assert-Sd ($bp.Count -eq 3 -and $bp[0].Count -eq 10 -and $bp[1].Count -eq 10 -and $bp[2].Count -eq 6 -and $bp[2].To -eq 30) ('分段：單一區塊超過上限才在行與行之間切，剩下的行和後面的小區塊同一段（' + (($bp | ForEach-Object { '' + $_.From + '-' + $_.To }) -join ',') + '）')
 $none = Get-PsSdReadingParts ("# 沒有圖`n說明`n") 8
-Assert-Sd ($script:PsSdReadingPartLines -eq 40) '分段：每段 Mermaid 行上限預設 40（一次回應不要太長）'
+Assert-Sd ($script:PsSdReadingPartLines -eq 20) '分段：每段 Mermaid 行上限預設 20（一次回應不要太長）'
 $dp = Get-PsSdReadingParts $gateText 0
-Assert-Sd (@($dp).Count -eq 2 -and [int]$dp[0].Count -eq 40 -and [int]$dp[1].Count -eq 6) ('分段：守門範例用預設上限切成 2 段（40＋6；連續小區塊塞滿到上限）' + '（實得 ' + (@($dp | ForEach-Object { $_.Count }) -join '+') + '）')
+Assert-Sd (@($dp).Count -eq 3 -and [int]$dp[0].Count -eq 20 -and [int]$dp[1].Count -eq 20 -and [int]$dp[2].Count -eq 6) ('分段：守門範例用預設上限切成 3 段（20＋20＋6；連續小區塊塞滿到上限）' + '（實得 ' + (@($dp | ForEach-Object { $_.Count }) -join '+') + '）')
 Assert-Sd ($none.Count -eq 1 -and $none[0].Count -eq 0) '分段：沒有 Mermaid 區塊 → 一段'
 function Split-SdReading($R, $Parts) {
     # 照讀者的寫法切：每段只放這段範圍內的行，同一狀態、轉移在多段都出現就各段都寫；conflicts 放最後一段
@@ -2534,10 +2534,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|41a19782ceb6f758e4fa401639c52587c008642facc185bcad0a70fd97b8b45e|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|77426f551fc17124235172cfa7cc48f8e4f78a0f70186dda353915b56aba5544|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "7a0cf65",
+  "commit": "b540051",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -2608,7 +2608,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-sdoc-worker.md",
       "lines": 73,
-      "sha256": "ac3df05977607e857bb3862c60f92140845f3dd1b799cbe851335a0c5fb69a12",
+      "sha256": "40f96bee3b8eace7232c2d6373207db244e0ec389bf343d5971f60b7ea787b7f",
       "bom": false
     },
     {
@@ -2620,13 +2620,13 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-spec-judge.md",
       "lines": 48,
-      "sha256": "e56751218f9814adeb0be6fe00fc19cad9d054280d3d628ad567a78ed1bcef59",
+      "sha256": "d063f682fb9c3be730edab3105038488b589a450641699e42ffef68ec85c742d",
       "bom": false
     },
     {
       "path": ".opencode/agent/ps-spec-reader.md",
       "lines": 48,
-      "sha256": "17b2d70513322a9cfa9d6c02974ba1ba09caa82c50217fa01503f3c92aeac371",
+      "sha256": "41b495a45b5d36dcdb0c4c41f7667ad8ae27e2ca27edf8dc345c3678b65f3eff",
       "bom": false
     },
     {
@@ -2650,7 +2650,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-status-reader.md",
       "lines": 52,
-      "sha256": "7c960474ca75bfb3cf42b6f3eba57e3c30b60ca1835c6ec6d6825c6f0f6502ce",
+      "sha256": "c3f7f0b8d67a6f4e79adc37e0237f713d03e5d70c3406e73468147cccd46191b",
       "bom": false
     },
     {
@@ -2739,8 +2739,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4025,
-      "sha256": "e1f4e5bf59834c407c60da15d1848c34ae839450893e6b4236ec470f35885f3f",
+      "lines": 4054,
+      "sha256": "5021405a15777e9be56d81dce5ff6e695a04941ed0565ff8c5bfe900912a7a4b",
       "bom": false
     },
     {
@@ -2902,7 +2902,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/peoplesoft/sdoc/research-contract.md",
       "lines": 279,
-      "sha256": "35d5e034fbce9b115701d79748f9217dfe7d415ce19d8c91d172e52eab86fe1c",
+      "sha256": "83d510c2aee54d96ff24c26dce142c72a491e0afb583f351731b3dca866614d6",
       "bom": false
     },
     {
@@ -3057,8 +3057,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1226,
-      "sha256": "2a88aaa34803a7e837efbca6146d76dfc35deca90b7ce1af19c969b610054302",
+      "lines": 1230,
+      "sha256": "720ec1d10081ad6f690caa07490d87580b9d91ff9b00d919618c3245ff763952",
       "bom": false
     },
     {
@@ -3249,8 +3249,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-auto-loop.ps1",
-      "lines": 2646,
-      "sha256": "25c96910e201b2e467c5ece3a1522e6e7c39303f54e5fa890b135a384b22fd7d",
+      "lines": 2647,
+      "sha256": "32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d",
       "bom": true
     },
     {
@@ -3309,8 +3309,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-sdoc-diag.ps1",
-      "lines": 305,
-      "sha256": "0924f636b6b8729cf028acf7d79037ed287bfd868104edf0527c94551f94d342",
+      "lines": 344,
+      "sha256": "09f5257bea3f70990ddc03c10355c19e377e7312e88088faa5159d9efe4bf0c4",
       "bom": true
     },
     {
@@ -3340,7 +3340,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-sdoc-status-lib.ps1",
       "lines": 632,
-      "sha256": "14948b56f8556e3cce12e59091ab3656503efe84793c950b08d7a220f715f711",
+      "sha256": "d608a28ad0dfdec155b520446aa828941b9f9a862196c2810f7252908742c28f",
       "bom": true
     },
     {
@@ -3351,8 +3351,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 689,
-      "sha256": "071ed8d9a8533efd98abe9b3ed51eee6da6c7514d7e07589fbcd1718c25da088",
+      "lines": 713,
+      "sha256": "db7af4e7e23ff0c7fb3cb69eb59dfa59429fc8a5a24ffe226df1490f19155e1f",
       "bom": true
     },
     {
@@ -3411,8 +3411,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 589,
-      "sha256": "041408624e153968b089022da771d2fb925016e83e00ee0b9685783f8cc25b4c",
+      "lines": 595,
+      "sha256": "68d87f544bd09bfbb89032e023613b2aa980e9f201e5e2a18670e8e8b02e6afe",
       "bom": true
     },
     {
@@ -3448,7 +3448,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/tests/test-sdoc.ps1",
       "lines": 280,
-      "sha256": "8f7d55463db3aca7c5b6887f02268f47d90467f9940ba16fdfb0825d1f989181",
+      "sha256": "88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384",
       "bom": true
     },
     {
@@ -3496,7 +3496,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|146|742d7febdc115c8c7397c544cdff45b718643ede286b1d253b061eb9fc066456|0
+@@@PSBUNDLE-FILE|AGENTS.md|147|0ec2c70e8713f170999b0861224a3124c23df00937418dfbb67189585d90fba3|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -3579,7 +3579,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-14 再由 `claude/magical-hawking-txsbn2` 快轉併入
-   ——每次回應綁小（分段 40 行、研究頁外環上限）、外環設 Claude Code 環境預設、session 失敗但產出合格照收（L148），併入前 `main` 頭 `0c79d43`；
+   ——跟 deep-research 比：拿掉寫完 Read 回、讀者／判定 effort low、分段 20、時間軸檔、ps-sdoc-diag 一行回報（L149），併入前 `main` 頭 `a4152d8`；
+   同日稍早同一分支併入 ps-sdoc-diag 診斷腳本（代號回報）、每次回應綁小（分段 40 行、研究頁外環上限）、外環設 Claude Code 環境預設、session 失敗但產出合格照收（L148），併入前 `main` 頭 `0c79d43`；
    同日稍早同一分支併入 Claude Code 版撞 gateway 504 的根因、模型端數據行、卡住提前結束（L147），併入前 `main` 頭 `da14021`；
    2026-10-13 由 `claude/jolly-tesla-3l8lp5` 快轉併入 session slot 依前端分開、兩版可以同時跑（L146），併入前 `main` 頭 `beadc2b`；
    同日稍早同一分支併入 Spec 文件流程的 OpenCode 版備案（`ps-sdoc.ps1 -Cli opencode`、模型只在 `.opencode/peoplesoft/sdoc/model.yaml`、與 Claude Code 版並行，
@@ -3644,5 +3645,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|4d0c8b738cd5b3e3cd87a17c77f53cde1efff63d685247f93071901f3a7d1584
-@@@PSBUNDLE-PART-END|5a6b97d021d74e2e|8|8
+@@@PSBUNDLE-EOF|158|656802c2b001f19e09559b2114218d1a3239bd8637d75000cd33fdf6d53034e8
+@@@PSBUNDLE-PART-END|a4645a94518ffafc|8|8

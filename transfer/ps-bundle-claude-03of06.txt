@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 7a0cf65）第 3／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit b540051）第 3／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|7a0cf65|969cc6e4335258c9|3|6|7872|6917f4b4d270bdfb5a2c6d142dff993acdcc2f622e3220931b1d2a4ee81090d0
+@@@PSBUNDLE-PART|1|claude|b540051|0152324a0e7f82d0|3|6|7911|abe419eeffa743bafa900399c92f6a26440b54a7b42036345d7b00dffd0bc813
 @@@PSBUNDLE-FILE|scripts/ps-bundle.ps1|496|ee17daeaf5a5b9ff531a4f6b577ca0a71ff6dd4f29806d45a7198f3af079afe5|1
 # ps-bundle.ps1 — 搬運包：把一個版本要搬的檔收成幾份文字檔，公司機一個指令解回各檔
 # 用法（公司機）：
@@ -4727,7 +4727,7 @@ function Get-PsSdSpeculationWarnings {
     return , $v.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-check-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-diag.ps1|305|0924f636b6b8729cf028acf7d79037ed287bfd868104edf0527c94551f94d342|1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc-diag.ps1|344|09f5257bea3f70990ddc03c10355c19e377e7312e88088faa5159d9efe4bf0c4|1
 # ps-sdoc-diag.ps1 — Spec 文件流程的診斷報告：只印代號與數字（不印路徑、物件名、jobId、hash），可以用唸的回報給維護端。
 # 用法：powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 [-Last 12] [-Cli claude|opencode]
 #   讀 .ps-runtime\sdoc[-opencode]\<job>\attempts\aNNNN\{input.json,outcome.json} 與 .ps-runtime\sdoc[-opencode]-logs\*-<job>-aNNNN.{stream.jsonl,err.txt}，
@@ -4744,6 +4744,7 @@ function Get-PsSdSpeculationWarnings {
 #   ERR err 檔分類 E0=空或沒有 E504=含 504 ECONN=連線中斷／重置 E400=含 400 EOTH=其他
 #   MD  模型家族 S45/S46/S5/S55=Sonnet 4.5/4.6/5/5.5 O=Opus H=Haiku X=看不出  PT=解讀分段數  CAP=本頁上限  DUR=session 分鐘（檔名時間到 stream 最後寫入）
 #   TH  含 thinking 區塊的 assistant 事件數（0＝這個 session 沒開 thinking）  UZ=最後一個成功回應的 usage 數值欄（欄名:值；全 0＝gateway 沒回 usage）
+#   G=  兩次重試的平均間隔秒數（時間軸檔量到的；≈ gateway 逾時＋退避）  D1=卡住的請求跑了幾秒才第一次失敗  LP=最長的一個成功回應（秒，含工具時間；30 秒粒度）
 #   LT/LR 卡住的那個請求之前最後一個工具呼叫的名稱／其結果的位元組數（Read 大結果＝卡在輸入側；Write＝卡在寫完之後）  RU=result 事件的 usage 總計 in/cc/cr/out
 #   F 另有 INVALID 的驗收錯誤代號 NJ=不是合法 JSON NW=少寫一段 FP=指紋不同 OV=超過每頁上限 SC=schema／欄位錯 LN=逐行交代錯 ?=其他
 #   SUM KF=失敗工單種類分布 RT=全部狀態碼分布 CACHE=C0（從沒命中）/C1（部分）/C2（都有） MAXM/MAXO=最大輸入／輸出 P0=第一個請求就失敗的 session 數 AFTEROK=session 失敗但產出照收的 attempt 數
@@ -4834,6 +4835,34 @@ function Get-DgErrClass([string]$Err) {
     return 'EOTH'
 }
 function Format-DgK([int]$N) { return ([string][int][Math]::Round($N / 1000.0) + 'k') }
+# 時間軸檔（ps-session-lib 每 30 秒記的 P／R／T）→ @{ Gap; FirstFail; LongestOk }（秒；量不到為 0）
+function Get-DgTimeline([string]$Path) {
+    $r = @{ Gap = 0; FirstFail = 0; LongestOk = 0 }
+    if (-not [System.IO.File]::Exists($Path)) { return $r }
+    $prevP = 0; $prevR = 0; $prevT = 0; $lastPAt = $null; $lastRAt = $null; $gaps = @(); $okGaps = @(); $firstFail = 0
+    foreach ($ln in [System.IO.File]::ReadAllLines($Path)) {
+        $m = [regex]::Match($ln, '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|P=(\d+)\|R=(\d+)\|T=(\d+)')
+        if (-not $m.Success) { continue }
+        $t = $null
+        try { $t = [datetime]::ParseExact($m.Groups[1].Value, 'yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) } catch { continue }
+        $pp = [int]$m.Groups[2].Value; $rr = [int]$m.Groups[3].Value; $tt = [int]$m.Groups[4].Value
+        if ($pp -gt $prevP) {
+            if ($null -ne $lastPAt) { $okGaps += [int]($t - $lastPAt).TotalSeconds }
+            $lastPAt = $t; $lastRAt = $null
+        }
+        if ($rr -gt $prevR) {
+            $dr = $rr - $prevR
+            if ($null -ne $lastRAt -and $tt -ge $prevT + $dr) { $g = [int](($t - $lastRAt).TotalSeconds / $dr); for ($i = 0; $i -lt $dr; $i++) { $gaps += $g } }
+            elseif ($null -ne $lastPAt) { $firstFail = [int]($t - $lastPAt).TotalSeconds }
+            $lastRAt = $t
+        }
+        $prevP = $pp; $prevR = $rr; $prevT = $tt
+    }
+    if ($gaps.Count -gt 0) { $sum = 0; foreach ($g in $gaps) { $sum += $g }; $r.Gap = [int]($sum / $gaps.Count) }
+    $r.FirstFail = $firstFail
+    foreach ($g in $okGaps) { if ($g -gt $r.LongestOk) { $r.LongestOk = $g } }
+    return $r
+}
 # stream 的補充數據：thinking 區塊數、最後一個成功回應的 usage 欄位、卡住請求之前的最後一個工具與結果大小、result 的 usage 總計
 function Get-DgStreamExtra([string]$Path) {
     $r = @{ Think = 0; Usage = ''; LastTool = ''; LastResultLen = 0; ResultUsage = '' }
@@ -4916,13 +4945,15 @@ foreach ($r in $roots) {
             $inp = Get-DgJson (Join-Path $ad.FullName 'input.json')
             if ($null -eq $oc -or $null -eq $inp) { continue }
             $row = @{ Job = $jobs; Aid = $ad.Name; Cli = $r.Cli; Kind = (Get-DgKind ([string]$inp.kind)); Unit = (Get-DgUnit ([string]$inp.unit)); Status = (Get-DgStatus ([string]$oc.status))
-                Findings = (Get-DgFindings $oc.findings); SessionFindings = ''; Parts = 0; Cap = ''; Api = $null; Model = '-'; Err = 'E0'; Dur = ''; Extra = $null }
+                Findings = (Get-DgFindings $oc.findings); SessionFindings = ''; Parts = 0; Cap = ''; Api = $null; Model = '-'; Err = 'E0'; Dur = ''; Extra = $null; Tl = $null }
             if ($null -ne $oc.PSObject.Properties['sessionFindings']) { $row.SessionFindings = Get-DgFindings $oc.sessionFindings }
             if ($null -ne $inp.PSObject.Properties['outputParts']) { $row.Parts = @($inp.outputParts).Count }
             if ($null -ne $inp.PSObject.Properties['pageItemCap']) { $row.Cap = [string]$inp.pageItemCap }
             if ([System.IO.Directory]::Exists($r.Logs)) {
                 $sf = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.stream.jsonl') | Sort-Object Name | Select-Object -Last 1)
                 $ef = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.err.txt') | Sort-Object Name | Select-Object -Last 1)
+                $tf = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.timeline.txt') | Sort-Object Name | Select-Object -Last 1)
+                if ($tf.Count -gt 0) { $row.Tl = Get-DgTimeline $tf[0].FullName }
                 if ($sf.Count -gt 0) {
                     $row.Api = Get-PsOcClaudeApiRetry -StreamFile $sf[0].FullName
                     $row.Extra = Get-DgStreamExtra $sf[0].FullName
@@ -4974,6 +5005,12 @@ foreach ($row in $show) {
             if ([string]$x.Usage -ne '') { $line += ' UZ=' + [string]$x.Usage }
             if ([string]$x.ResultUsage -ne '') { $line += ' RU=' + [string]$x.ResultUsage }
         }
+        $tl = $row.Tl
+        if ($null -ne $tl) {
+            if ([int]$tl.Gap -gt 0) { $line += ' G=' + [int]$tl.Gap }
+            if ([int]$tl.FirstFail -gt 0) { $line += ' D1=' + [int]$tl.FirstFail }
+            if ([int]$tl.LongestOk -gt 0) { $line += ' LP=' + [int]$tl.LongestOk }
+        }
     }
     $line += ' ERR=' + $row.Err + ' MD=' + $row.Model
     if ($row.Parts -gt 0) { $line += ' PT=' + $row.Parts }
@@ -5005,10 +5042,12 @@ elseif ($null -ne $focus) {
         $rtF = [string]$a.Statuses; if ($rtF -eq '') { $rtF = '-' } else { $rtF = $rtF.Replace('無回應', 'NR').Replace('×', 'x').Replace('、', ',') }
         if ($rtF -match '(^|,)400x') { $has400 = $true }
         if ([int]$a.Progress -eq 0) { $p0f = $true }
-        if ([int]$a.Count -ge 3 -and $focus.Dur -ne '') {
+        if ($null -ne $focus.Tl -and [int]$focus.Tl.Gap -gt 0) { $gTxt = 'G=' + [int]$focus.Tl.Gap }
+        elseif ([int]$a.Count -ge 3 -and $focus.Dur -ne '') {
             $g = [int](([int]$focus.Dur * 60 - [int]$a.Requests * 30) / [int]$a.Count)
             if ($g -gt 0) { $gTxt = 'G~' + [string]([int][Math]::Round($g / 10.0) * 10) }
         }
+        if ($null -ne $focus.Tl -and [int]$focus.Tl.FirstFail -gt 0) { $gTxt += ' D1=' + [int]$focus.Tl.FirstFail }
     }
     if ($null -ne $x) {
         $th = [int]$x.Think
@@ -7873,4 +7912,4 @@ function Format-PsSdAlternatives {
     return ($head + '；最接近的寫法：' + [string]::Join('；', $shown))
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-schema-lib.ps1
-@@@PSBUNDLE-PART-END|969cc6e4335258c9|3|6
+@@@PSBUNDLE-PART-END|0152324a0e7f82d0|3|6
