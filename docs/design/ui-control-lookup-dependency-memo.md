@@ -20,8 +20,9 @@
    prompt record 的鍵結構都沒有查法；而且 **09 的分母只有 PeopleCode 程式**，不靠 PeopleCode 的系統檢核沒有分母、也沒有位置。
 3. 建議主軸：**metadata 是確定性的事實，交給外環**——模型照固定樣板原樣轉抄代碼，外環用 profile 校準過的對照表解碼，
    解出的事實由外環帶入項目並做 L2 比對（同 STATE／TRN 的骨架欄位「外環帶入、研究包不得寫」）；模型只寫 PeopleCode 造成的動態行為與業務語意。
-4. 分四期：**P0** 查法與校準（不改 schema，可先上線）→ **P1** metadata 單元與 schema 擴充 → **P2** 外環檢核、渲染投影、讀者題 → **P3** rebuild-kit 對照。
+4. 分四期（P＝Phase，分期代號；P0 最先做）：**P0** 查法與校準（不改 schema，可先上線）→ **P1** metadata 單元與 schema 擴充 → **P2** 外環檢核、渲染投影、讀者題 → **P3** rebuild-kit 對照。
    P0 需要管理者在公司機做一次校準（只回 PeopleTools 欄位名與代碼數字，不含業務資料）。
+5. **管理者回饋後的調整見 §7**：先用 SQL 驗證假設，再改走補查（ps-supplemental）把這些事實存進知識層，P1 的 meta 單元由知識層取代；分期改成 §7 的五步。
 
 ---
 
@@ -352,3 +353,42 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
 | Prompt Table Edit | 清單外的值被擋；No Edit 則放行 | `validation` |
 | Reasonable Date | 日期離今天太遠時警告（不擋） | 16 條款 |
 | `%EDITTABLE` | prompt 表名取自哪個工作欄位 | `dynamic.selector` |
+
+---
+
+## 7. 管理者回饋後的調整（2026-10-14）
+
+管理者回饋三點：先用 SQL 驗證（給 SQL、說明怎麼看，管理者回報符不符合）；P0／P1 的意思；改走補查，讓之後的研究一併找出並存起來。
+
+### 7.1 先用 SQL 驗證
+
+- **第一輪**：`ui-metadata-check-r1.md`（說明）＋`ui-metadata-check-r1.sql`（整份可一次跑）。驗表與欄位在不在、PeopleTools 版本、欄位型別代碼、Record 型別代碼、
+  Record 欄位 edit 位元（以 EDITTABLE、translate 值、欄位型別、鍵、search record 交叉核對）、頁面元件型別代碼（以綁定欄位的型別、translate 值、
+  同欄位重複、SUBPNLNAME 交叉核對）、prompt 的分布。多數段落自己標 OK／CHECK，回報只有代碼與數字。
+  已在本機以合成資料驗過：假設成立時全 OK；把位元（16384↔8192）或元件代碼（7↔8）對調時，對應項目標 CHECK。
+- **第二輪**（等第一輪結果）：管理者熟悉的一個 Classic 畫面逐欄核對解碼（只回對不上的 FIELDNUM）、設計期屬性的位元（唯讀、隱藏、相關顯示、必填）、
+  Component 的可用模式與處理模式、prompt 行為在 PIA 實測（清單外的值、有效日 prompt、上層欄位過濾）。
+- 兩輪的結論回填 profile `pageMetadata:`（§3.2），applied.md 記觀察值與日期。
+
+### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
+
+- **研究**（`/ps-research`）：NN 的「畫面與欄位」一併記元件型別、設計期屬性、查值（prompt：會不會檢核、高階鍵、有效日、SETID、動態 prompt、lookup 欄位）；
+  「行為邏輯」一併記欄位間相依（值、選項、查值、顯示／可改、檢核）。之後研究的新 NN 自動帶這些內容。
+- **補查**（`ps-supplemental`，SOP-23）：已畢業或已有 NN 的物件，以新的事實類別送補研究工單（暫名 `UI.CONTROL_DETAIL`、`UI.LOOKUP`、
+  `BEHAVIOR.FIELD_DEPENDENCY`，加進 `spec/capabilities.json`），迷你圈委派 ps-ui-flow／ps-peoplecode-flow 查，外環只追加地合併進 NN，照常稽核、畢業、
+  投影 wiki、進知識索引。查法收據（可重跑的 SELECT）跟著 NN 走。
+- **Spec 文件**：ui／data 研究單元照現行契約先讀知識層（KNOWLEDGE），知識層沒有或過期才現查；外環的比對（§3.7 的 R15～R19）取知識層或 Spec 分母的解碼結果。
+  知識層缺料時要不要由外環自動送補查，跟 SPEC1 的 `ps-spec -Plan` 自動提交一樣做，第 4 步再定。
+- **要先處理的相容性**：「畫面與欄位」那張 5 格表（欄位｜顯示文字｜類型｜選項｜生命狀態）被 3 處直接解析——補研究合併（`ps-supplemental-lib.ps1` 的節格式）、
+  知識索引（`ps-knowledge-lib.ps1`，整節的表格列都算欄位列）、CLONE1 抽取（`ps-spec-lib.ps1`）；NN lint（`ps-doc-lint.ps1`）只檢查這節存在。
+  新內容要另起子節或新節、不改那張表的格數，並讓這 3 處只讀自己那張表；格式在驗證後定。
+
+### 7.3 新的順序
+
+| 步 | 內容 | 取代 |
+|---|---|---|
+| 第 1 步 | SQL 驗證兩輪（§7.1），結果回填 profile | P0 的校準 |
+| 第 2 步 | 查法進框架：cookbook 新節、profile 對照、PeopleCode 偵測清單（§3.2、§3.3） | P0 其餘 |
+| 第 3 步 | 知識層：NN 格式、研究規則、補查的事實類別、四處解析相容（§7.2） | P1 的 meta 單元 |
+| 第 4 步 | Spec 文件吃知識層：schema 擴充、研究契約、外環檢核、渲染投影、讀者題、16 條款（§3.5～§3.8） | P1 其餘、P2 |
+| 第 5 步 | rebuild-kit 對照（§3.9） | P3 |

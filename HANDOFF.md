@@ -595,3 +595,5 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
 - Spec 文件的畫面元件、Prompt／Lookup、欄位間規則缺口（2026-10-14 管理者提出）：盤點與分期補法在
   `docs/design/ui-control-lookup-dependency-memo.md`（提案、未實作）；P0（cookbook 查法＋profile `pageMetadata:` 校準＋PeopleCode 偵測清單）
   等管理者同意，P1／P2 等公司機校準結果。
+  管理者回饋（同日）：先用 SQL 驗證、改走補查存進知識層（備忘 §7，分期改成五步）。第一輪驗證 SQL 在 `docs/design/ui-metadata-check-r1.md`／`.sql`
+  （等管理者回報 V1～V7 的 OK／CHECK 與代碼），第二輪（已知畫面核對、設計期屬性位元、Component 模式、prompt 實測）依第一輪結果再給。
