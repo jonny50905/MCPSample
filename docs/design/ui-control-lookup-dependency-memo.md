@@ -374,6 +374,15 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   PSSQLTEXTDEFN.SQLTYPE／SQLTEXT）；V4a、V4b 全 OK、V4c 全 0（PSDBFIELD.FIELDTYPE 0／1／2／4／6 與 RECTYPE 0／2 的對照成立）。
   V2、V5、V6、V7 報 ORA-00942：在 SQL Developer 手動跑時沒設 CURRENT_SCHEMA，帳號只有部分表有同義字（PSDBFIELD、PSRECDEFN 查得到；
   PSSTATUS、PSPNLFIELD、PSPNLGRPDEFN、PSRECFIELDDB 查不到）。說明檔已把設 schema 改成第 0 步，待重跑。
+- **第一輪結果（續，2026-10-16）**：V2 PeopleTools 8.59。V5 除 AU 外全 OK——帶 32768 的欄位 98.6% 是日期／時間型（門檻 99 訂太嚴，對應成立；
+  其餘 1.4% 視為殘留旗標，實作時 Auto-Update 只認日期／時間型欄位）。已成立的 edit 位元：1 Key、32 List Box Item、64 Descending、512 Translate、
+  2048 Search Key、4096 Reasonable Date、8192 Yes/No、16384 Prompt Table Edit、32768 Auto-Update；256 Required、16 Alternate Search Key、
+  4 System Maintained 與稽核位元還沒驗。DYN＝4182（PSRECFIELDDB 展開子 record 後的列數）：動態 prompt 很常見，第 3、4 步必做。
+  V7：當 prompt 的 Record 7291 個，其中 view 5395（74%）、以 EFFDT 為鍵 1429（20%）、以 SETID 為鍵 372（5%）、EDITTABLE 指向不存在的 Record 107——
+  view 的選取邏輯是 lookup 的主體；範圍內出現指向不存在 Record 的 prompt 時開 90 問題。V4d OK（之後的 SQL 以 RECNAME 欄位的 FORMAT 當大寫基準，不寫死數字）。
+  V6 第一版對整張 PSPNLFIELD 用分析函數，在 PROD 太久；改成只看客製頁面（名稱前綴走索引）、先分組再彙總，待重跑。
+- 管理者用 admin 帳號跑；agent 用的唯讀帳號還沒有這些表的 SELECT。授權清單（14 張 PeopleTools 定義表）與授權後的檢查 SQL 在說明檔「權限」一節；
+  agent 依 profile `oracle.currentSchema` 設 schema，不需要同義字。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 
