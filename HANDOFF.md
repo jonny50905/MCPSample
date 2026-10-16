@@ -597,3 +597,4 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   等管理者同意，P1／P2 等公司機校準結果。
   管理者回饋（同日）：先用 SQL 驗證、改走補查存進知識層（備忘 §7，分期改成五步）。第一輪驗證 SQL 在 `docs/design/ui-metadata-check-r1.md`／`.sql`
   （等管理者回報 V1～V7 的 OK／CHECK 與代碼），第二輪（已知畫面核對、設計期屬性位元、Component 模式、prompt 實測）依第一輪結果再給。
+  2026-10-16 第一輪部分結果：V1、V3、V4 符合（備忘 §7.1 有明細）；V2、V5～V7 因手動跑沒設 CURRENT_SCHEMA 撞 ORA-00942，說明檔加第 0 步，待重跑。

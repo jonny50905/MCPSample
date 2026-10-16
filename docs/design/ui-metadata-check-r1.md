@@ -9,8 +9,9 @@
 - 用 SQL Developer（或 SQLcl）以平常查 PeopleSoft 的唯讀帳號執行。整份一次跑：開 `ui-metadata-check-r1.sql` 的 Raw 複製，SQL Developer 按 F5（Run Script）；
   也可以照下面逐段複製、逐段跑（Ctrl+Enter）。
 - V5、V6 會掃整張 PSRECFIELDDB／PSPNLFIELD，可能要幾十秒到一兩分鐘。經 OpenCode 的 oracleMCP 跑可能撞 30 秒上限，建議直接在 SQL Developer 跑。
-- 出現 ORA-00942（表或視觀表不存在）：先執行 `ALTER SESSION SET CURRENT_SCHEMA = <PeopleTools 擁有者>;`（跟 profile `oracle.currentSchema` 同一個值）再重跑。
-- 照 V1 → V7 的順序。某段報 ORA-00904（欄位名稱無效）就直接回報「Vx ORA-00904 <欄位>」，那段不用再試。
+- **先做 V0（設 schema）再跑 V1**：唯讀帳號常常只有部分 PeopleTools 表有同義字（實測：PSDBFIELD、PSRECDEFN 查得到，PSSTATUS、
+  PSPNLFIELD、PSPNLGRPDEFN、PSRECFIELDDB 報 ORA-00942）。設了 schema 還是 ORA-00942＝帳號沒有那張表的查詢權限，回報表名。
+- 照 V0 → V7 的順序。某段報 ORA-00904（欄位名稱無效）就直接回報「Vx ORA-00904 <欄位>」，那段不用再試。
 
 ## 回報範本（一段一行，打字給我）
 
@@ -23,6 +24,18 @@ V4 全 OK ／ CHECK：___　（V4d：UPPER_FMT=___ MIXED_FMT=___，可省略）
 V5 全 OK，PS=___ DYN=___ ／ 不是全 OK 就照抄整行
 V6 全 OK ／ CHECK：___；OTHER 那一行：___
 V7 （可省略）___
+```
+
+## V0 設 schema（每次開新連線都要做）
+
+```sql
+SELECT OWNER, OBJECT_TYPE FROM ALL_OBJECTS WHERE OBJECT_NAME = 'PSPNLFIELD' ORDER BY OBJECT_TYPE, OWNER;
+```
+
+看 OBJECT_TYPE＝TABLE 那一列的 OWNER（通常跟 profile `oracle.currentSchema` 同一個值；不用回報），再執行：
+
+```sql
+ALTER SESSION SET CURRENT_SCHEMA = <上面那個 OWNER>;
 ```
 
 ## V1 表在不在

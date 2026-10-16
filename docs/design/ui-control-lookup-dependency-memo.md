@@ -369,6 +369,11 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
 - **第二輪**（等第一輪結果）：管理者熟悉的一個 Classic 畫面逐欄核對解碼（只回對不上的 FIELDNUM）、設計期屬性的位元（唯讀、隱藏、相關顯示、必填）、
   Component 的可用模式與處理模式、prompt 行為在 PIA 實測（清單外的值、有效日 prompt、上層欄位過濾）。
 - 兩輪的結論回填 profile `pageMetadata:`（§3.2），applied.md 記觀察值與日期。
+- **第一輪結果（公司環境，2026-10-16，部分）**：V1 表都看得到；V3 候選欄位全部存在（含第二輪要用的 PSPNLFIELD.FIELDUSE／PNLFIELDNAME／LBLTYPE、
+  PSRECFIELDDB.USEEDIT2／SETCNTRLFLD／DEFGUICONTROL、PSDBFIELD.FORMAT／FORMATFAMILY、PSRECDEFN.SETCNTRLFLD、PSPNLGRPDEFN.ACTIONS、
+  PSSQLTEXTDEFN.SQLTYPE／SQLTEXT）；V4a、V4b 全 OK、V4c 全 0（PSDBFIELD.FIELDTYPE 0／1／2／4／6 與 RECTYPE 0／2 的對照成立）。
+  V2、V5、V6、V7 報 ORA-00942：在 SQL Developer 手動跑時沒設 CURRENT_SCHEMA，帳號只有部分表有同義字（PSDBFIELD、PSRECDEFN 查得到；
+  PSSTATUS、PSPNLFIELD、PSPNLGRPDEFN、PSRECFIELDDB 查不到）。說明檔已把設 schema 改成第 0 步，待重跑。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 

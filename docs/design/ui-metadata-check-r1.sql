@@ -1,7 +1,13 @@
 -- Round 1: read-only checks of PeopleTools page/record metadata.
 -- How to read each result: docs/design/ui-metadata-check-r1.md
--- Run with the usual read-only PeopleSoft account. If a table is not found (ORA-00942),
--- run ALTER SESSION SET CURRENT_SCHEMA = <PeopleTools owner> first.
+-- Run with the usual read-only PeopleSoft account.
+-- Step V0 first: some PeopleTools tables may have no synonym in this account, so set the owner schema
+-- before V1 (otherwise V2, V5, V6, V7 can fail with ORA-00942 while V4 works).
+
+-- V0
+SELECT OWNER, OBJECT_TYPE FROM ALL_OBJECTS WHERE OBJECT_NAME = 'PSPNLFIELD' ORDER BY OBJECT_TYPE, OWNER;
+-- then, with the OWNER of the TABLE row above:
+-- ALTER SESSION SET CURRENT_SCHEMA = <OWNER>;
 
 -- V1
 SELECT T.TNAME AS MISSING
