@@ -388,6 +388,13 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   agent 用的唯讀帳號：管理者已授權、手動確認 14 張表都查得到。唯讀帳號執行 `ALTER SESSION SET CURRENT_SCHEMA` 報 ORA-02421——設 CURRENT_SCHEMA 不需要權限，
   02421 是名稱那段寫法不被接受（常見是多了單引號或 `< >`）；正確寫法與「不能設就由 DBA 建同義字」的備案已寫進說明檔，待管理者回報。
   若確認是引號造成，查詢手冊「設 schema」那步要補一句「名稱不加引號」（兩版、記課）——agent 自己執行同一句。
+- **第一輪結果（完，2026-10-19）**：G1＝GB_H 153、EB_H −17、GB_IN 98、GB_REC 78、OK——代碼 2 是 Group Box（98% 框內有其他元件；
+  78% 綁了 Record 欄位，PeopleCode 控制整塊顯示很常見）。Edit Box 的 FIELDBOTTOM − FIELDTOP 平均是負的：座標的上下語意依元件不同，
+  用高度、寬度之前要先查清楚（cookbook §2i 的框內判斷不受影響，GB_IN 就是用它算的）。V3c1 沒有缺欄：cookbook §2h～§2j 用到的
+  PNLFLDID、LBLTEXT、LABEL_ID、PTHIDEFIELDS、FIELDLEFT／TOP／RIGHT／BOTTOM 都在。V3c2 太長，改成第二輪的 Y/N 探查。
+  其他代碼（客製頁面，`代碼:筆數:旗標`）：10:30:N、12:1088、15:1、16:30:N、18:56:S:N、19:587、21:12:S、23:59:N、24:9:N、25:425:L、27:588:N。
+  依旗標推測（待第二輪核對）：12 按鈕／超連結（最多）、18 Secondary Page、19 Grid、21 開 secondary page 的按鈕、25 HTML Area、27 Scroll Area；
+  10、15、16、23、24 是版面類或其他按鈕類。第二輪 SQL 在 `ui-metadata-check-r2.md`。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 
