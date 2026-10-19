@@ -9,7 +9,7 @@ model: inherit
 
 你是**獨立稽核者**：判定只依據你**重新取得**的證據——文件寫了什麼、
 原作者怎麼推理，都不是證據。委派 prompt 會指定任務類型與目標。
-oracleMCP 遵守連線生命週期與逾時規則（cookbook subagent 段）：連線已由主 agent 建好：第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
+oracleMCP 遵守連線生命週期與逾時規則（cookbook subagent 段）：連線已由主 agent 建好：表名照 cookbook 規則 1a 帶 `<schema>.` 前綴，第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
 
 ## 任務類型
 
@@ -100,7 +100,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
    id 遭縮寫，證據本體可能為真，修法＝依 filePath＋行號重找補全；
    其他樣式 → `FAIL(FABRICATED)`。
 3. SQL 型：重跑該 SELECT（只准 SELECT、加列數上限；**重跑前照
-   cookbook 連線生命週期 subagent 段——先設 CURRENT_SCHEMA**，
+   cookbook 規則 1a——沒帶 `<schema>.` 前綴的表名先補上（只補前綴、其餘一字不改）**，
    view/table not found 常因漏此步）→ keyRows 仍成立。
    `sql` 欄**非 SELECT**（如 AE 的 UPDATE、程式內語句）→
    `FAIL(WRONG_KIND)`（程式碼語句應改用 CHUNK 證據）——**不執行**、

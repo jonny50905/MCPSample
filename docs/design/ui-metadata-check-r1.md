@@ -11,6 +11,7 @@
 - V5 會掃整張 PSRECFIELDDB，可能要幾十秒；V6 只看客製頁面（名稱以 profile 的客製前綴 `TW_` 開頭，走索引），幾秒內完成。建議直接在 SQL Developer 跑。
 - **先做 V0（設 schema）再跑 V1**：唯讀帳號常常只有部分 PeopleTools 表有同義字（實測：PSDBFIELD、PSRECDEFN 查得到，PSSTATUS、
   PSPNLFIELD、PSPNLGRPDEFN、PSRECFIELDDB 報 ORA-00942）。設了 schema 還是 ORA-00942＝帳號沒有那張表的查詢權限，回報表名。
+  agent 的唯讀帳號不能 ALTER SESSION（ORA-02421）：本檔的 SQL 只適合擁有者（admin）帳號跑；用唯讀帳號要每個表名前面加擁有者（第四輪起的 SQL 已寫成 `<schema>.表名`）。
 - 照 V0 → V7 的順序。某段報 ORA-00904（欄位名稱無效）就直接回報「Vx ORA-00904 <欄位>」，那段不用再試。
 
 ## 回報範本（一段一行，打字給我）
@@ -542,8 +543,8 @@ SELECT T.TNAME AS NO_ACCESS
 
 怎麼看：**沒有列＝授權都到位**；有列＝那幾張還沒授權。
 
-**agent 怎麼找到表**：查詢手冊的 SQL 不寫擁有者，agent 每次委派先執行 `ALTER SESSION SET CURRENT_SCHEMA = <profile oracle.currentSchema>`。
-所以 profile 的值要是擁有者名稱本身（不加引號）。唯讀帳號若真的不能設 CURRENT_SCHEMA，改由 DBA 替唯讀帳號建同義字（之後不設也查得到）：
+**agent 怎麼找到表**：唯讀帳號不能 `ALTER SESSION SET CURRENT_SCHEMA`、也沒有同義字（第三輪 A 測試），查詢手冊的 SQL 因此每個表名都寫成
+`<profile oracle.currentSchema>.表名`（L150、SOP-30）。profile 的值要是擁有者名稱本身（不加引號）。DBA 願意建同義字時才用得到下面這段（目前不需要）：
 
 ```sql
 CREATE SYNONYM <RO_USER>.PSSTATUS FOR <OWNER>.PSSTATUS;

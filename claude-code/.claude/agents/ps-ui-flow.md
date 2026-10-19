@@ -30,7 +30,7 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    照 §2 樣板對定位到的目標查證：translate values（含 ZHT）、由選項文字 /
    label 反查欄位、Page ↔ Record.Field ↔ Component 對映、prompt table 與基數、
    條件 UI 變異目標解析（§2h～§2j，流程照 SKILL「條件 UI」節）。
-   連線已由主 agent 建好：第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
+   連線已由主 agent 建好：表名照 cookbook 規則 1a 帶 `<schema>.` 前綴，第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
 3a. **導覽入口（委派任務問「使用者從哪裡進到這個畫面」時）**：先讀 profile `navigation:`。
    `verified: true` → **直接跑 cookbook §2k-C canonical**（bind：componentName＋profile 的 portal／labelLanguage），
    回傳列原樣映射：每列＝一個看得到的入口（entryType 依 CREF_USGT、visibility＝`CLASSIC_NAV_VISIBLE`、
@@ -66,14 +66,14 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；查詢一律加列數上限，
   高基數先 COUNT（cookbook 使用規則）。
 - **oracleMCP 連線生命週期（連線是全域共用單例；開只有主 agent 做、關誰都不做）**：連線已由主 agent
-  建好，先直接發本次第一個 SELECT；回「未連線」類錯誤 → 立即回報 `status: BLOCKED`、
+  建好；先 Read customization-profile.yaml 的 oracle.currentSchema，**PeopleSoft 的表與 view 一律寫成 `<該值>.表名`**
+  （cookbook 規則 1a：樣板的 `<schema>` 換成該值；DUAL、ALL_ 開頭的資料字典不加；值為 FILL_ME 就用裸表名；不執行 ALTER SESSION），
+  再直接發本次第一個 SELECT；回「未連線」類錯誤 → 立即回報 `status: BLOCKED`、
   `blockedReason: NOT_CONNECTED` 結束本委派（不 list_connections、不 connect——兩者工具已對本 agent
-  關閉、不重試）；成功 → **設 CURRENT_SCHEMA**（Read customization-profile.yaml 的 oracle.currentSchema，
-  執行一次 ALTER SESSION SET CURRENT_SCHEMA=<值>——唯一准許的非 SELECT、重複無害；值為 FILL_ME 就
-  跳過）→ 重發該查詢 → 查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；
+  關閉、不重試）；查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；
   查詢逾時（~30 秒）→ 停手回報 `status: BLOCKED`、`blockedReason: QUERY_TIMEOUT`，**不准重試迴圈**、
-  也不 disconnect。view/table not found 先想「schema 步驟做了沒」；值為 FILL_ME 而查不到表 →
-  `blockedReason: SCHEMA_UNRESOLVED`。
+  也不 disconnect。view/table not found 先查「PeopleSoft 表名都帶 `<schema>.` 前綴了沒」，補齊後重發一次；
+  值為 FILL_ME 而查不到表 → `blockedReason: SCHEMA_UNRESOLVED`。
 - **oracle 證據格式**：`kind: "SQL"` ＋ `sql` ＋ `keyRows`（關鍵列摘要）；
   **沒有 id、也不准自創 id**（`SQL-XLAT-1` 這種自編字串＝報告不合格）。
   只有真的取了 source chunk 才有 id / filePath，且必須逐字來自工具回傳。

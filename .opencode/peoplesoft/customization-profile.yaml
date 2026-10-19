@@ -74,10 +74,9 @@ namingSemantics:
   unlistedCodePolicy: GUESS_BUT_MARK
 
 oracle:
-  # PeopleTools 表的擁有者 schema——登入帳號非擁有者時，裸表名會
-  # view/table not found。連線生命週期第 3 步執行：
-  # ALTER SESSION SET CURRENT_SCHEMA=<此值>（唯一准許的非 SELECT）。
-  # 值為 FILL_ME 則跳過該步。
+  # PeopleTools 表的擁有者 schema（填擁有者名稱本身，不加引號）——唯讀帳號只查得到「擁有者.表名」：
+  # cookbook 規則 1a 把 PeopleSoft 的表與 view 寫成 <此值>.表名（DUAL、ALL_ 開頭的資料字典不加），不執行 ALTER SESSION。
+  # 值為 FILL_ME 則用裸表名（只有登入帳號就是擁有者、或帳號有同義字時查得到）。
   currentSchema: FILL_ME
   # 主 agent 開場直接 connect 這個名字（不 list、不從清單挑；必須與 SQLcl 已儲存連線名完全一致——大小寫、空白都算）。
   # FILL_ME／未填 → 主 agent 不 connect，回報「Oracle 連線未設定」——請回填。

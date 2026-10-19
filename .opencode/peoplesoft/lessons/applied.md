@@ -4052,3 +4052,30 @@
 - 驗證：test-sdoc（20 與 20＋20＋6）、test-claude-variant（環境預設 5 項、SKIP 剩 3、診斷 G=310／D1=300／LP=90 與 SUM2、Windows 時間軸檔 START／P=1 R=8／END=ABORT）、
   test-sdoc-run 四組、test-auto-loop、test-spec、test-bundle、test-ps51-static 全過。
 - 教訓：「哪條流程沒撞」要先問它跑在哪個 CLI、每個回合多大、第一次寫之前要想多少；一次回應＝thinking＋輸出，縮輸出之後還撞就是 thinking 與多餘的回合。
+
+### L150 agent 的唯讀帳號不能 ALTER SESSION、也沒有同義字——表名一律寫成「擁有者.表名」（2026-10-19）
+
+- 症狀：畫面 metadata 驗證（`docs/design/ui-metadata-check-r1`～`r3`）的 SQL 管理者一直用擁有者（admin）帳號跑，結果都對；第三輪「唯讀帳號 A 測試」
+  （agent 用的唯讀帳號、不設 schema、裸表名 `SELECT COUNT(*) FROM PSPNLFIELD`）FAIL（ORA-00942）。同一帳號 `ALTER SESSION SET CURRENT_SCHEMA` 報 ORA-02421；
+  加擁有者前綴（`<擁有者>.PSPNLFIELD`）查得到。管理者：DBA 不會改（不建同義字、不調帳號），SQL 一律照「`<schema>.table`」寫。
+- 根因：L19 為了不讓小模型每句加前綴，選了「每任務一次 ALTER SESSION＋裸表名」。這只在登入帳號能設 CURRENT_SCHEMA 時成立；agent 的唯讀帳號不能，
+  於是 subagent 照 cookbook 走：裸表名 ORA-00942 → ALTER SESSION 失敗 → 重發仍 ORA-00942——唯讀帳號下所有 PeopleTools 查詢都查不到
+  （歷來的 view 不存在／UNVERIFIABLE、「以失敗查詢當機器參照」有一部分可能也是這個原因，未逐一核對）。
+- 落點：
+  - 兩版 cookbook：新增規則 1a（`<schema>`＝profile `oracle.currentSchema`；DUAL 與 ALL_ 開頭的資料字典不加前綴，資料字典改加 `OWNER = UPPER('<schema>')`；
+    FILL_ME 用裸表名；不執行 ALTER SESSION）；所有 SQL 樣板 61 處表名改寫成 `<schema>.表名`（含子查詢、EXISTS、§2k-3 行內查詢）；
+    subagent 生命週期改成「第 0 步取前綴 → 查 → view/table not found 先檢查前綴、補齊重發一次 → 補齊仍查不到記 gaps（表名不對或沒授權）」；
+    規則 8a 的「加了前綴查不到」改成「加了 `PS_` 前綴查不到」（與擁有者前綴分開）。
+  - 兩版 ps-ui-flow／ps-metadata-flow／ps-ae-flow 的生命週期硬規則、ps-auditor 的 SQL 重跑（舊證據裸表名先補前綴、其餘一字不改）、四個 agent 執行段一句。
+  - 兩版 profile `oracle.currentSchema` 註解改寫（公司機已回填的 profile 會出 `.incoming`：只有註解 3 行不同，可不合併）。
+  - `scripts/ps-doc-lint.ps1`：canonical 導覽證據的 `FROM PSPRSMDEFN` 判斷容許擁有者前綴（test-auto-loop 加 53-TW_NAV_CANONQ）。
+  - SOP-2／SOP-12／SOP-21 有 ALTER SESSION 的句子改對；新增 SOP-30（唯讀帳號授權檢查：32 張表一次查出沒授權的、冒煙測試、業務資料表）。
+    test-scenarios 加 R43。
+- 沒做：runtime guard 機械擋「漏前綴的 sql_run」（無狀態、只擋不改，做得到；先看公司機上小模型漏帶的頻率再決定）；
+  plugin 重掛通知文字仍提到 CURRENT_SCHEMA（mcpAutoRecover 預設 off，文字不叫 agent 執行 ALTER SESSION，下次改 plugin 時一起改）。
+- 驗證：cookbook 54 句 SQL 換掉佔位後 sqlglot（Oracle）全部可解析；樣板裡沒有不帶前綴的 FROM／JOIN（CTE 名、資料字典除外）；
+  test-auto-loop（含新案例：修 lint 前 FAIL、修後 PASS）、test-claude-variant、test-bundle、test-ps51-static、test-knowledge、test-supplemental、
+  test-spec、test-spec-build、test-spec-clone、test-sdoc、test-sdoc-assemble、ps-agent-doc-lint 全過（pwsh 7.4；test-sdoc-run 全組由 main 的 Windows 5.1 CI 跑）；第四輪 SQL 以合成資料
+  （表放在另一個 schema、裸表名必失敗）跑過。test-oracle-runtime 需要真 OpenCode，沙箱沒跑。
+- 教訓：「一次設定、之後裸表名」依賴 session 狀態與帳號權限；換成唯讀帳號就整條斷。能寫在每句 SQL 裡的就不要放在 session 裡——樣板直接帶前綴，
+  模型只做替換，不必自己加。

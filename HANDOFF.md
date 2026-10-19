@@ -5,6 +5,13 @@
 
 ## 0. 一句話現況
 
+**agent 唯讀帳號的表名改帶擁有者前綴（2026-10-19，L150，分支 `claude/blissful-edison-7hbeqr`）**：畫面 metadata 第三輪的唯讀帳號 A 測試 FAIL——
+agent 用的唯讀帳號裸表名 ORA-00942、`ALTER SESSION SET CURRENT_SCHEMA` 報 ORA-02421、DBA 不建同義字；L19 的「ALTER SESSION＋裸表名」在唯讀帳號下
+所有 PeopleTools 查詢都查不到。兩版 cookbook 加規則 1a、61 處樣板寫成 `<schema>.表名`（`<schema>`＝profile `oracle.currentSchema`；DUAL、ALL_ 資料字典不加，
+資料字典加 OWNER 條件；不執行 ALTER SESSION），subagent 找不到表先補前綴重發一次；ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor、profile 註解、
+ps-doc-lint 導覽證據比對同步；SOP-30（唯讀帳號 32 張表授權檢查、冒煙測試、端對端 R43）。待公司機：解兩版搬運包（已回填的 profile 出 `.incoming`，只差註解）、
+SOP-30 授權檢查（＝第四輪 R4E）、端對端一題、第四輪 SQL（`docs/design/ui-metadata-check-r4.md`）回報。
+
 **跟 deep-research 比、拿掉寫完 Read 回、effort low、分段 20、時間軸檔、診斷一行回報（2026-10-14，L149，分支 `claude/magical-hawking-txsbn2`）**：
 公司機第一份代號回報 `MD=S5`、讀者第 6 個請求 504×8、usage 全 0。對照 deep-research（公司機只在 OpenCode 跑過；每回合小、Write ≤150 行、重活委派、
 寫完不 Read 回）後：四個 sdoc 代理與兩版 research-contract 拿掉「寫完 Read 回」；讀者／判定預設加 `CLAUDE_CODE_EFFORT_LEVEL=low`（Sonnet 5 不吃
@@ -602,3 +609,6 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   2026-10-19：V6 除 Group Box 外全 OK（改以 G1 確認，待跑）；唯讀帳號已授權；唯讀帳號 ALTER SESSION 報 ORA-02421，待確認寫法（備忘 §7.1）。
   同日續：G1 OK（代碼 2＝Group Box）、V3c1 無缺欄、其他代碼分布已收；第二輪 SQL `docs/design/ui-metadata-check-r2.md`（欄位探查、核對代碼 10 以上）待跑。
   同日續：第二輪收（ASSOCFIELDNUM 與 7 個 GOTO 欄存在、19＝Grid）；第三輪 SQL `docs/design/ui-metadata-check-r3.md`（自動判代碼、唯讀位元、必填旁證、唯讀帳號 A 測試）待跑。
+  同日續：第三輪收（10／23 混用、15／24 容器、FIELDUSE 16 是唯讀候選、ASSOCFIELDNUM 對應待查、256 不能當必填）；唯讀帳號 A 測試 FAIL、DBA 不改 →
+  框架改成表名帶擁有者前綴（L150、SOP-30；兩版 cookbook 與 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）。第四輪 SQL `docs/design/ui-metadata-check-r4.md` 待跑；
+  公司機搬新版後要做 SOP-30 授權檢查（R4E）與一題端對端（test-scenarios R43）。plugin 重掛通知仍提 CURRENT_SCHEMA（auto off，下次改 plugin 一起改）。

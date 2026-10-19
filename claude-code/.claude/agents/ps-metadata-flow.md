@@ -33,7 +33,7 @@ SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被
 3. 排程 / 授權 / origin / Record 結構：**Read
    `.claude/peoplesoft/oracle-query-cookbook.md`，照樣板用 oracleMCP 查**
    （§3 Process、§4 Security、§1 Origin、§6 Record、§7 欄位使用剖析），不要自己發明 SQL。
-   連線已由主 agent 建好：第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
+   連線已由主 agent 建好：表名照 cookbook 規則 1a 帶 `<schema>.` 前綴，第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
 4. 血緣邊需要原始碼佐證時，以 table / 欄位名搜 PeoplecodeElasticSearch
    取 chunk ids，再用 PeoplecodeSource 取段確認（遵守
    `.claude/peoplesoft/progressive-source-retrieval.md`）。
@@ -55,14 +55,14 @@ SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被
 - **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；每個查詢都要有列數上限
   （FETCH FIRST 200 ROWS ONLY）。
 - **oracleMCP 連線生命週期（連線是全域共用單例；開只有主 agent 做、關誰都不做）**：連線已由主 agent
-  建好，先直接發本次第一個 SELECT；回「未連線」類錯誤 → 立即回報 `status: BLOCKED`、
+  建好；先 Read customization-profile.yaml 的 oracle.currentSchema，**PeopleSoft 的表與 view 一律寫成 `<該值>.表名`**
+  （cookbook 規則 1a：樣板的 `<schema>` 換成該值；DUAL、ALL_ 開頭的資料字典不加；值為 FILL_ME 就用裸表名；不執行 ALTER SESSION），
+  再直接發本次第一個 SELECT；回「未連線」類錯誤 → 立即回報 `status: BLOCKED`、
   `blockedReason: NOT_CONNECTED` 結束本委派（不 list_connections、不 connect——兩者工具已對本 agent
-  關閉、不重試）；成功 → **設 CURRENT_SCHEMA**（Read customization-profile.yaml 的 oracle.currentSchema，
-  執行一次 ALTER SESSION SET CURRENT_SCHEMA=<值>——唯一准許的非 SELECT、重複無害；值為 FILL_ME 就
-  跳過）→ 重發該查詢 → 查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；
+  關閉、不重試）；查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；
   查詢逾時（~30 秒）→ 停手回報 `status: BLOCKED`、`blockedReason: QUERY_TIMEOUT`，**不准重試迴圈**、
-  也不 disconnect。view/table not found 先想「schema 步驟做了沒」；值為 FILL_ME 而查不到表 →
-  `blockedReason: SCHEMA_UNRESOLVED`。
+  也不 disconnect。view/table not found 先查「PeopleSoft 表名都帶 `<schema>.` 前綴了沒」，補齊後重發一次；
+  值為 FILL_ME 而查不到表 → `blockedReason: SCHEMA_UNRESOLVED`。
 
 - 排程 / 授權一律以 metadata 工具為準，不從程式註解或物件名稱推測。
 - 血緣每條邊必標操作類型與 evidence IDs；動態寫入標 DYNAMIC_RUNTIME。

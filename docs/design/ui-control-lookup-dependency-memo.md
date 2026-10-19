@@ -400,6 +400,14 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   核對確實是 Grid（應是 R2C 換了頁名，其餘代碼改由第三輪依特徵自動判斷）。唯讀帳號以「擁有者.PSPNLFIELD」查詢正常＝有權限；
   不加擁有者的查法（agent 的寫法）還沒測。第三輪 SQL 在 `ui-metadata-check-r3.md`：R3A 依 SUBPNLNAME／GOTOPNLGRPNAME／是否綁 Record／
   長字元／框內有無元件判其餘代碼；R3B 以 ASSOCFIELDNUM（相關顯示一定唯讀）算 FIELDUSE 的唯讀與 Display Control 位元；R3C 鍵欄位帶 256 的比例。
+- **第三輪結果（2026-10-19）**：R3A 沒有 CHECK——12 跑 PeopleCode 的按鈕、16 轉到別的 Component 的連結、18 Secondary Page、21 開 secondary page 的按鈕、
+  25 HTML Area、27 Scroll Area 依特徵成立；10（30 筆）、23（59 筆）MIXED，15（1 筆）、24（9 筆）CONTAINER，先列「其他元件（未校準）」。
+  R3B：REL_N 1984、97% 是 Edit Box；FIELDUSE 16 在相關顯示幾乎都有、在其他 Edit Box 不到一半＝唯讀位元的最強候選（DO=16）；沒找到 Display Control 位元（DC=NONE）；
+  ASSOCFIELDNUM 指到的欄只有 8% 有 prompt（CTL_PROMPT 8），與「相關顯示的控制欄通常有 prompt」不符——對應方式可能差一號或不是這個意思，第四輪 R4A 一次比幾種假設。
+  R3C：KEY_REQ 23、NONKEY_REQ 5——鍵欄位不會自動帶 256；256 是不是 Required 改拿已知欄位核對（R4B）。
+- 唯讀帳號 A 測試 FAIL（裸表名 ORA-00942）；`ALTER SESSION` 不能用、DBA 不建同義字 → 框架改成每個表名寫 `<schema>.表名`
+  （L150、SOP-30；兩版 cookbook 規則 1a 與四個查 DB 的 agent）。本文件之後的 SQL 一律帶 `<schema>.`。第四輪 SQL 在 `ui-metadata-check-r4.md`
+  （R4A ASSOCFIELDNUM 對應、R4B 必填位元、R4C 唯讀／隱藏位元、R4D Component 動作、R4E 唯讀帳號缺哪些表）。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 

@@ -686,6 +686,7 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | R4 | 併發 | 一題觸發 ≥2 個 DB 委派 | 只有主 agent connect 一次；subagent 端零 connect／disconnect 呼叫 |
 | R5 | 連線建不起來 | 停掉 SQLcl 端再問 | 主 agent connect 兩次都失敗 → list_connections 一次、把清單原文附在答覆、回「DB 連線建立失敗（原因）」；不說「通道忙碌」、不自己換名字重連 |
 | R6 | schema 未回填 | profile currentSchema=FILL_ME 時查 PeopleTools 表 | blockedReason=SCHEMA_UNRESOLVED，答覆說「currentSchema 未回填」 |
+| R43 | 唯讀帳號表名前綴 | agent 用唯讀帳號（不能 ALTER SESSION、沒有同義字）、profile currentSchema 已填，問一題要查 PSXLATITEM 的選項題 | subagent 的 sql_run 每個表名都是 `<currentSchema>.表名`、零 ALTER SESSION；漏帶前綴撞 ORA-00942 時補齊重發一次就成功；報告 COMPLETE |
 | R7 | 轉譯 | 上述各種 BLOCKED | orchestrator 依 blockedReason 用對應句型；NOT_CONNECTED 不會直接出現在對使用者的答覆；ORACLE_MCP_DOWN → 「oracleMCP 工具目前不可用（掛載故障，請管理者重掛）」 |
 | R8 | 無條件 | 問一題完全不需要 DB 的問題（例如純 PeopleCode 流程） | 主 agent 仍在開場 connect（第一個 oracleMCP 呼叫就是 connect，且在第一個 task 之前；零 list_connections）；答覆不受影響 |
 

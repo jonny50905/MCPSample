@@ -606,7 +606,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $navPortalEv = ($text -match '(?is)\bSELECT\b[\s\S]{0,400}?\bFROM\b[\s\S]{0,200}?\bPSPRSMDEFN') -or
                            ($text -match '(?m)^.*\bPSPRSMDEFN.*待人工SQL.*$') -or
                            ($text -match '(?m)^.*待人工SQL.*\bPSPRSMDEFN.*$') -or   # 反序寫法「待人工SQL（PSPRSMDEFN…）」同樣是合法出口
-                           ($text -match '(?i)\bFROM\s+PSPRSMDEFN\b')            # canonical query（CTE 內 SELECT 與 FROM 相距 >200 字，距離式抓不到）
+                           ($text -match '(?i)\bFROM\s+(?:[\w$#"]+\.)?PSPRSMDEFN\b')   # canonical query（CTE 內 SELECT 與 FROM 相距 >200 字，距離式抓不到）；表名可帶擁有者前綴（cookbook 規則 1a）
             $navKinds = @()
             if ($navClaim.Success -and -not $navPortalEv -and -not $navIsFlow) {
                 $violations += "${name}：功能定位宣稱導覽路徑「$($navClaim.Value.Trim())」但全檔無 Portal Registry 證據——technical menu 當導覽路徑（PSMENUITEM 只是 technicalMenuLocation；導覽入口走 cookbook §2k）"

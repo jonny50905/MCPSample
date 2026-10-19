@@ -80,7 +80,7 @@ merge（全隊採納）或退回。把關點在合併，不在事前。
      (4) 個位數殘項＋模型持續「判定不用做」→ **人工直通**，不再纏鬥：
          chunk 類＝build/直通測試直接呼叫 search_chunks（結構化參數），
          從工具回傳原文抄 UUID；oracle 類＝自己開 SQL Developer 跑
-         cookbook 樣板（記得先 ALTER SESSION SET CURRENT_SCHEMA），
+         cookbook 樣板（`<schema>.` 換成 profile oracle.currentSchema 的值；唯讀帳號見 SOP-30），
          keyRows 逐字抄——模型的「無須更動」判斷不參與，lint 說缺
          就是缺
 ```
@@ -486,7 +486,8 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
   (3) 只有並發時失敗＝搶用確認，錯開時間即可
 □ 通道死透（無並發也失敗）→ 重啟 VS Code／extension 再測
 □ view/table not found → 檢查 customization-profile.yaml 的
-  oracle.currentSchema 已填（cookbook 生命週期第 3 步）
+  oracle.currentSchema 已填、SQL 每個表名都帶 `<值>.` 前綴（cookbook 規則 1a）；
+  帶了仍查不到＝唯讀帳號沒有該表權限（SOP-30 第 2 步）
 ```
 
 ---
@@ -500,7 +501,7 @@ oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 
 ```text
 □ 新協定（cookbook 連線生命週期已改版）：**誰都不准 disconnect**（headless 結束時
-  連線隨行程關閉）；ALTER SESSION SET CURRENT_SCHEMA 每任務執行一次、重複無害。
+  連線隨行程關閉）；表名一律帶 `<schema>.` 前綴（2026-10-19 起取代每任務一次的 ALTER SESSION SET CURRENT_SCHEMA，L150）。
   【現況（issue #28／#29 後；2026-09-09 再修）】connect 只由主 agent 在第 0 步做（直接 connect profile
   oracle.connectionName 原樣，每題無條件、**不先 list_connections**——清單黏合會讀錯名字；connect 兩次失敗才 list 一次附原文給管理者）；
   subagent 不 connect、回未連線只回 BLOCKED(NOT_CONNECTED)。舊寫法「先直接查，回未連線錯誤才 connect 一次」與「先 list 再 connect」已作廢
@@ -609,7 +610,7 @@ guard 在執行前擋 `subagent_type=<skill 名>`，報告 `suggestedNext` 含 s
      (5) 確認該角色必要工具恢復：問主 agent「列出所有名稱含 oracleMCP 的工具全名」（R33）
      (6) 主 agent connect 到 profile 指定目標（重掛前的「已連線」不再有效）
      (7) 查詢 subagent 執行 SELECT 1 FROM DUAL（重掛後的第一個 DB 委派）
-     (8) 恢復需要的 schema 設定（subagent 的 ALTER SESSION SET CURRENT_SCHEMA 每任務一次），再繼續業務查詢
+     (8) 再繼續業務查詢（表名帶 `<schema>.` 前綴，沒有 session 層的 schema 設定要恢復）
      (9) 僅重派尚未完成的唯讀工作一次；寫入類、完成狀態不明的一律人工判斷
      重掛失敗／工具仍不見 → 第二層排查（SOP-12 快篩：VS Code／extension 活著？無並發直通測試）；不要反覆 disconnect／connect
 □ 5. 診斷怎麼看（模型說「沒有 oracleMCP 工具」時先分三種）：
@@ -1228,3 +1229,36 @@ Windows 另以假 `opencode.cmd`／`claude.cmd` 真的經 cmd.exe 走預檢、se
 `node tests/runtime-guard/run-sdoc-smoke.mjs`（真 OpenCode：四個外環 agent 以 `--agent`＋`--model` 啟動、read／write 權限邊界、
 不載入 `~/.claude/CLAUDE.md`）、`node tests/runtime-guard/run-clone-smoke.mjs`（`/ps-spec` 只准 `ps-sdoc.ps1 -Cli opencode …`）、
 `test-claude-variant.ps1`（兩版 sdoc 一一對應、資料檔逐字相同、契約標題相同）、`test-bundle.ps1`（model.yaml 保留本機）。
+
+## SOP-30 agent 唯讀帳號：表名帶擁有者前綴與授權檢查（L150）
+
+agent 連 DB 用的是唯讀帳號。這個帳號不能 `ALTER SESSION SET CURRENT_SCHEMA`（ORA-02421），也沒有同義字，裸表名一律 ORA-00942；
+DBA 不動。所以 cookbook 規則 1a：PeopleSoft 的表與 view 一律寫成 `<擁有者>.表名`（DUAL、ALL_ 開頭的資料字典不加），擁有者＝profile `oracle.currentSchema`，不執行 ALTER SESSION。
+
+□ 1. profile `oracle.currentSchema` 填擁有者名稱本身（不加引號；兩版 profile 都一樣）。沒填（FILL_ME）時 agent 用裸表名，
+     唯讀帳號必查不到 → SCHEMA_UNRESOLVED。
+□ 2. 用唯讀帳號跑授權檢查（`<OWNER>` 換成擁有者；32 張是 cookbook 樣板與畫面 metadata 驗證用到的 PeopleTools 表）：
+
+```sql
+SELECT T.COLUMN_VALUE AS NO_ACCESS
+  FROM TABLE(SYS.ODCIVARCHAR2LIST(
+       'PSSTATUS','PSPROJECTITEM','PSRECDEFN','PSRECFIELDDB','PSDBFIELD','PSDBFLDLABL','PSDBFLDLABLLANG',
+       'PSXLATITEM','PSXLATITEMLANG','PSPNLDEFN','PSPNLFIELD','PSPNLGROUP','PSPNLGRPDEFN','PSMENUDEFN','PSMENUITEM',
+       'PSSQLTEXTDEFN','PSPCMNAME','PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN','PSOPTIONS',
+       'PS_PRCSDEFN','PS_PRCSDEFNPNL','PS_PRCSJOBITEM','PSPRCSRQST','PS_PRCSRECUR',
+       'PSAUTHITEM','PSROLECLASS','PSROLEUSER','PSAESECTDEFN','PSAESTEPDEFN')) T
+ WHERE NOT EXISTS (SELECT 1 FROM ALL_OBJECTS O
+                    WHERE O.OWNER = UPPER('<OWNER>') AND O.OBJECT_NAME = T.COLUMN_VALUE
+                      AND O.OBJECT_TYPE IN ('TABLE', 'VIEW'));
+```
+
+     沒有列＝都查得到。有列＝那幾張唯讀帳號看不到：用擁有者帳號 `GRANT SELECT ON <OWNER>.<表名> TO <唯讀帳號>;` 補；
+     不補的話，用到那張表的查法（例：導覽入口、授權、排程）agent 記 gaps。
+□ 3. 冒煙測試（唯讀帳號）：`SELECT COUNT(*) FROM <OWNER>.PSPNLFIELD WHERE ROWNUM = 1;` 回 1＝通。
+□ 4. 業務資料表（`PS_<RECNAME>`；cookbook §2g 選項分布、§7c 欄位使用剖析）同樣要唯讀帳號有 SELECT；沒有的那張 agent 記 gaps、
+     判不了就保留，不換表名硬湊。
+□ 5. agent 回 view/table not found：先看那句 SQL 每個表名都帶了前綴沒（漏帶＝模型漏了，cookbook 連線生命週期第 3 步會補一次重發）；
+     帶了仍查不到＝第 2 步那張表沒授權，或本環境沒有這張表。
+□ 6. 舊研究文件的 SQL 證據多半是裸表名：auditor 重跑前自己補前綴（只補前綴、其餘一字不改），文件不必改。
+□ 7. 端對端（OpenCode 版，test-scenarios R43）：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`
+     ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 sql_run 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。

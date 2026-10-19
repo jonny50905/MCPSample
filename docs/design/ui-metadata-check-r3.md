@@ -148,6 +148,9 @@ SELECT COUNT(*) FROM PSPNLFIELD WHERE ROWNUM = 1;
 回 1＝通（帳號有同義字，agent 不必設 schema）；ORA-00942＝不通（agent 要靠 profile 的 `oracle.currentSchema` 設 schema，
 或請 DBA 依 `ui-metadata-check-r1.md`「權限」一節建同義字）。加上擁有者（`擁有者.PSPNLFIELD`）查得到只證明有權限，agent 的 SQL 不寫擁有者。
 
+結果（2026-10-19）：FAIL，唯讀帳號也不能 ALTER SESSION、DBA 不建同義字 → 框架改成 agent 的 SQL 每個表名都寫擁有者前綴（L150、SOP-30），
+第四輪起驗證 SQL 也一律寫 `<schema>.表名`（`ui-metadata-check-r4.md`）。
+
 ## 回報範本
 
 ```text
