@@ -395,6 +395,11 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   其他代碼（客製頁面，`代碼:筆數:旗標`）：10:30:N、12:1088、15:1、16:30:N、18:56:S:N、19:587、21:12:S、23:59:N、24:9:N、25:425:L、27:588:N。
   依旗標推測（待第二輪核對）：12 按鈕／超連結（最多）、18 Secondary Page、19 Grid、21 開 secondary page 的按鈕、25 HTML Area、27 Scroll Area；
   10、15、16、23、24 是版面類或其他按鈕類。第二輪 SQL 在 `ui-metadata-check-r2.md`。
+- **第二輪結果（2026-10-19）**：R2A＝NYYYYYYYYN、EXTRA 3——PSPNLFIELD 有 ASSOCFIELDNUM 與 7 個 GOTO 欄（PORTAL、NODE、MENU、PNLGRP、MKT、PNL、
+  PNLACTION），沒有 DSPLCNTRLFLD、POPUPNAME；另有 3 個同類樣式的欄位未點名。R2B 挑到的頁面 CODES＝12,19,21,25,27；R2C 管理者跑出來只有代碼 19、
+  核對確實是 Grid（應是 R2C 換了頁名，其餘代碼改由第三輪依特徵自動判斷）。唯讀帳號以「擁有者.PSPNLFIELD」查詢正常＝有權限；
+  不加擁有者的查法（agent 的寫法）還沒測。第三輪 SQL 在 `ui-metadata-check-r3.md`：R3A 依 SUBPNLNAME／GOTOPNLGRPNAME／是否綁 Record／
+  長字元／框內有無元件判其餘代碼；R3B 以 ASSOCFIELDNUM（相關顯示一定唯讀）算 FIELDUSE 的唯讀與 Display Control 位元；R3C 鍵欄位帶 256 的比例。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 
