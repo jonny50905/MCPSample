@@ -38,6 +38,9 @@ SELECT OWNER, OBJECT_TYPE FROM ALL_OBJECTS WHERE OBJECT_NAME = 'PSPNLFIELD' ORDE
 ALTER SESSION SET CURRENT_SCHEMA = <上面那個 OWNER>;
 ```
 
+名稱直接寫、不加單引號也不加尖括號，例如 `ALTER SESSION SET CURRENT_SCHEMA = SYSADM;`（SYSADM 換成你們的擁有者）。
+設 CURRENT_SCHEMA 不需要任何權限；報 ORA-02421 是名稱那段寫法不對（多了單引號、`< >` 或其他字元），不是權限問題。
+
 ## V1 表在不在
 
 ```sql
@@ -125,6 +128,38 @@ SELECT A.TABLE_NAME,
 
 怎麼看：每張表一行欄位名清單（Page 欄位的按鈕目標、顯示控制、使用旗標等候選；Component 的模式與處理模式候選；Component 內頁面表的全部欄位）。
 能抄就抄回來，打字太多就略過——第二輪會改用「你熟的畫面逐欄比對」找出旗標所在。
+
+## V3c Page 欄位補查（取代 V3b，輸出比較短）
+
+V3c1：現行查詢手冊（§2h～§2j）已在用、但 V3 沒驗到的 Page 欄位。
+
+```sql
+SELECT C.CNAME AS MISSING
+  FROM (SELECT 'PNLFLDID' AS CNAME FROM DUAL UNION ALL
+        SELECT 'LBLTEXT' FROM DUAL UNION ALL
+        SELECT 'LABEL_ID' FROM DUAL UNION ALL
+        SELECT 'PTHIDEFIELDS' FROM DUAL UNION ALL
+        SELECT 'FIELDLEFT' FROM DUAL UNION ALL
+        SELECT 'FIELDTOP' FROM DUAL UNION ALL
+        SELECT 'FIELDRIGHT' FROM DUAL UNION ALL
+        SELECT 'FIELDBOTTOM' FROM DUAL) C
+ WHERE NOT EXISTS (SELECT 1 FROM ALL_TAB_COLUMNS A
+                    WHERE A.TABLE_NAME = 'PSPNLFIELD' AND A.COLUMN_NAME = C.CNAME);
+```
+
+怎麼看：**沒有列＝符合**；有列就抄欄名（那幾段現行查法在公司環境會失敗，要改）。
+
+V3c2：相關顯示（代碼旁的說明欄）、按鈕目標、彈出頁的候選欄名。
+
+```sql
+SELECT LISTAGG(COLUMN_NAME, ',') WITHIN GROUP (ORDER BY COLUMN_NAME) AS COLS
+  FROM (SELECT DISTINCT COLUMN_NAME FROM ALL_TAB_COLUMNS
+         WHERE TABLE_NAME = 'PSPNLFIELD'
+           AND (COLUMN_NAME LIKE 'GOTO%' OR COLUMN_NAME LIKE '%DSPL%' OR COLUMN_NAME LIKE '%CNTRL%'
+                OR COLUMN_NAME LIKE '%ASSOC%' OR COLUMN_NAME LIKE '%POPUP%'));
+```
+
+怎麼看：一行欄名清單，照抄回來（通常不到 10 個；第二輪用它們查唯讀、隱藏與按鈕目標）。
 
 ## V4 欄位型別與 Record 型別代碼
 
@@ -386,6 +421,48 @@ SELECT 99 AS CODE,
 OTHER 旗標：`S`＝幾乎都有 SUBPNLNAME（像 Secondary Page）、`N`＝幾乎都沒綁 Record（Grid、Scroll Area、分隔線這類）、
 `L`＝多半綁長字元欄位（像 HTML Area）、`R`＝同一頁同欄位重複出現。按鈕／超連結、Grid、Scroll Area 的代碼第二輪用你熟的畫面確認。
 
+## G1 Group Box 確認（V6 的 CODE 2 報 CHECK 時跑）
+
+V6 用「沒綁 Record 的比例」判斷 Group Box，但 Group Box 常綁一個 Record 欄位，讓 PeopleCode 可以把整塊隱藏（查詢手冊 §2h 的情形），
+所以那條判斷不準。改看形狀：Group Box 是框，比 Edit Box 高很多，而且框裡有別的元件。只看客製頁面，走索引。
+
+```sql
+WITH P AS (
+  SELECT PNLNAME, FIELDNUM, FIELDTYPE, RECNAME, FIELDLEFT, FIELDTOP, FIELDRIGHT, FIELDBOTTOM
+    FROM PSPNLFIELD
+   WHERE PNLNAME LIKE 'TW\_%' ESCAPE '\'
+     AND FIELDTYPE IN (2, 4)
+),
+GB AS (
+  SELECT G.FIELDBOTTOM - G.FIELDTOP AS H,
+         CASE WHEN TRIM(G.RECNAME) IS NOT NULL THEN 1 ELSE 0 END AS HASREC,
+         CASE WHEN EXISTS (SELECT 1 FROM PSPNLFIELD X
+                            WHERE X.PNLNAME = G.PNLNAME AND X.FIELDNUM <> G.FIELDNUM
+                              AND X.FIELDLEFT >= G.FIELDLEFT AND X.FIELDRIGHT <= G.FIELDRIGHT
+                              AND X.FIELDTOP >= G.FIELDTOP AND X.FIELDBOTTOM <= G.FIELDBOTTOM)
+              THEN 1 ELSE 0 END AS HASIN
+    FROM P G
+   WHERE G.FIELDTYPE = 2
+),
+EB AS (
+  SELECT FIELDBOTTOM - FIELDTOP AS H FROM P WHERE FIELDTYPE = 4
+),
+S AS (
+  SELECT (SELECT ROUND(AVG(H)) FROM GB) AS GB_H,
+         (SELECT ROUND(AVG(H)) FROM EB) AS EB_H,
+         (SELECT ROUND(100 * AVG(HASIN)) FROM GB) AS GB_IN,
+         (SELECT ROUND(100 * AVG(HASREC)) FROM GB) AS GB_REC
+    FROM DUAL
+)
+SELECT 'GB_H=' || NVL(TO_CHAR(GB_H), 'NA') || ' EB_H=' || NVL(TO_CHAR(EB_H), 'NA')
+    || ' GB_IN=' || NVL(TO_CHAR(GB_IN), 'NA') || ' GB_REC=' || NVL(TO_CHAR(GB_REC), 'NA')
+    || CASE WHEN GB_H >= 3 * EB_H AND GB_IN >= 80 THEN ' OK' ELSE ' CHECK' END AS RESULT
+  FROM S;
+```
+
+怎麼看：一行字。GB_H／EB_H＝Group Box／Edit Box 的平均高度、GB_IN＝框裡有其他元件的 Group Box 比例、GB_REC＝綁了 Record 欄位的 Group Box 比例。
+**最後是 OK＝代碼 2 確定是 Group Box**（條件：GB_H ≥ 3 × EB_H 且 GB_IN ≥ 80）。GB_REC 的數字也抄回來（多少 Group Box 會被 PeopleCode 控制顯示）。
+
 ## V7（可省略）Prompt 的分布
 
 ```sql
@@ -440,7 +517,7 @@ GRANT SELECT ON <OWNER>.PSPCMNAME TO <RO_USER>;
 標籤與選項文字（PSDBFLDLABL、PSDBFLDLABLLANG、PSXLATITEM、PSXLATITEMLANG）、view 的 SQL（PSSQLTEXTDEFN）、PeopleCode 引用了哪些欄位（PSPCMNAME）、版本（PSSTATUS）。
 報 ORA-01031（權限不足）＝這個帳號不能授權，請 DBA 執行同一段。
 
-授權後用 **agent 的唯讀帳號** 登入檢查（先做 V0 的 ALTER SESSION）：
+授權後用 **agent 的唯讀帳號** 登入檢查（不需要先 ALTER SESSION）：
 
 ```sql
 SELECT T.TNAME AS NO_ACCESS
@@ -459,13 +536,33 @@ SELECT T.TNAME AS NO_ACCESS
         SELECT 'PSSQLTEXTDEFN' FROM DUAL UNION ALL
         SELECT 'PSPCMNAME' FROM DUAL) T
  WHERE NOT EXISTS (SELECT 1 FROM ALL_OBJECTS O
-                    WHERE O.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
-                      AND O.OBJECT_NAME = T.TNAME
+                    WHERE O.OBJECT_NAME = T.TNAME
                       AND O.OBJECT_TYPE IN ('TABLE', 'VIEW'));
 ```
 
-怎麼看：**沒有列＝授權都到位**；有列＝那幾張還沒授權。agent 自己會依 profile `oracle.currentSchema` 設 schema，所以那個值要是同一個擁有者；
-不需要另建同義字。
+怎麼看：**沒有列＝授權都到位**；有列＝那幾張還沒授權。
+
+**agent 怎麼找到表**：查詢手冊的 SQL 不寫擁有者，agent 每次委派先執行 `ALTER SESSION SET CURRENT_SCHEMA = <profile oracle.currentSchema>`。
+所以 profile 的值要是擁有者名稱本身（不加引號）。唯讀帳號若真的不能設 CURRENT_SCHEMA，改由 DBA 替唯讀帳號建同義字（之後不設也查得到）：
+
+```sql
+CREATE SYNONYM <RO_USER>.PSSTATUS FOR <OWNER>.PSSTATUS;
+CREATE SYNONYM <RO_USER>.PSPNLDEFN FOR <OWNER>.PSPNLDEFN;
+CREATE SYNONYM <RO_USER>.PSPNLFIELD FOR <OWNER>.PSPNLFIELD;
+CREATE SYNONYM <RO_USER>.PSPNLGROUP FOR <OWNER>.PSPNLGROUP;
+CREATE SYNONYM <RO_USER>.PSPNLGRPDEFN FOR <OWNER>.PSPNLGRPDEFN;
+CREATE SYNONYM <RO_USER>.PSRECDEFN FOR <OWNER>.PSRECDEFN;
+CREATE SYNONYM <RO_USER>.PSRECFIELDDB FOR <OWNER>.PSRECFIELDDB;
+CREATE SYNONYM <RO_USER>.PSDBFIELD FOR <OWNER>.PSDBFIELD;
+CREATE SYNONYM <RO_USER>.PSDBFLDLABL FOR <OWNER>.PSDBFLDLABL;
+CREATE SYNONYM <RO_USER>.PSDBFLDLABLLANG FOR <OWNER>.PSDBFLDLABLLANG;
+CREATE SYNONYM <RO_USER>.PSXLATITEM FOR <OWNER>.PSXLATITEM;
+CREATE SYNONYM <RO_USER>.PSXLATITEMLANG FOR <OWNER>.PSXLATITEMLANG;
+CREATE SYNONYM <RO_USER>.PSSQLTEXTDEFN FOR <OWNER>.PSSQLTEXTDEFN;
+CREATE SYNONYM <RO_USER>.PSPCMNAME FOR <OWNER>.PSPCMNAME;
+```
+
+已經存在的同義字會報 ORA-00955，略過即可。框架其他查法用到的表（例如導覽、權限、排程的表）原本就能查，不在這張清單裡。
 
 ## 第二輪（等第一輪結果再給 SQL）
 

@@ -383,6 +383,11 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   V6 第一版對整張 PSPNLFIELD 用分析函數，在 PROD 太久；改成只看客製頁面（名稱前綴走索引）、先分組再彙總，待重跑。
 - 管理者用 admin 帳號跑；agent 用的唯讀帳號還沒有這些表的 SELECT。授權清單（14 張 PeopleTools 定義表）與授權後的檢查 SQL 在說明檔「權限」一節；
   agent 依 profile `oracle.currentSchema` 設 schema，不需要同義字。
+- **第一輪結果（續，2026-10-19）**：V6 輕量版跑完，CODE 0～9、11 除 Group Box 外全 OK（NONE 也算正常）。Group Box 的 CHECK 判斷是「沒綁 Record 的比例 ≥ 50」——
+  但 Group Box 常綁 Record 欄位讓 PeopleCode 隱藏整塊（L92 的情形），這條判斷不準；改以 G1（高度與框內有無元件）確認，待跑。OTHER 那行（其他代碼）待抄回。
+  agent 用的唯讀帳號：管理者已授權、手動確認 14 張表都查得到。唯讀帳號執行 `ALTER SESSION SET CURRENT_SCHEMA` 報 ORA-02421——設 CURRENT_SCHEMA 不需要權限，
+  02421 是名稱那段寫法不被接受（常見是多了單引號或 `< >`）；正確寫法與「不能設就由 DBA 建同義字」的備案已寫進說明檔，待管理者回報。
+  若確認是引號造成，查詢手冊「設 schema」那步要補一句「名稱不加引號」（兩版、記課）——agent 自己執行同一句。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 
