@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit b540051）第 5／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit a3f1cce）第 5／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|b540051|0152324a0e7f82d0|5|6|5644|25369dc3cfccf7801cf61e24b21b453fa7ff653a00a662ba24a73cc83ce285be
+@@@PSBUNDLE-PART|1|claude|a3f1cce|5a4ba8810d931e97|5|6|5649|7dc8612a7f84439032cfc89869d00f0ae117bbb88daabbfec174b1fba5e95870
 @@@PSBUNDLE-FILE|scripts/ps-supplemental-lib.ps1|1193|e593d2cf6aaf9cd0e5dbd530beff91f89ce9abf054607e36c6045b03da75c857|1
 # ps-supplemental-lib.ps1 — 補研究協定（Supplemental Research）共用邏輯
 # 由 ps-supplemental.ps1（CLI）、ps-auto-loop.ps1（-SupplementalOnly 迷你圈）、ps-spec-lib.ps1（規劃器消費端）dot-source。
@@ -1565,7 +1565,7 @@ function ConvertTo-SdComparable {
     return $Value
 }
 @@@PSBUNDLE-END|scripts/tests/sdoc-test-fixtures.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1024|eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e|1
+@@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1029|6e4757761d772435828ac5da3e3e37f1e176246f9bacc98acb2270a4458b2a39|1
 # scripts/tests/test-auto-loop.ps1 — 外環函式的功能測試（AST 抽真實函式，跑 fixture 情境）
 # 用法：pwsh -NoProfile -File scripts/tests/test-auto-loop.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：調帳／治理／台帳／破壞防衛／歸檔 commit／分批稽核（manifest、part 不變量、合併器）
@@ -2136,8 +2136,12 @@ $nvPend = @('# 49 反序待人工SQL（TW_NAV_PEND）') + $nvHead + @('## 功能
 $nvTm = @('# 50 技術選單段用 >（TW_NAV_TM）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）。', '### Technical Menu', 'Technical Menu（非導覽路徑）：RECRUITING > USE > MANAGE_APPLICANTS') + $nvTail + $nvEvMenu
 $nvEvCanon = @('## Evidence 附錄', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', "| 1 | Portal Registry（canonical） | Classic 選單入口 | SQL：WITH NAV_TREE AS (SELECT CONNECT_BY_ROOT D.PORTAL_OBJNAME AS TARGET_CREF, LEVEL AS LVL, TRIM(D.PORTAL_LABEL) AS BASE_LABEL, CASE WHEN EXISTS (SELECT 1 FROM PSPRSMSYSATTRVL A WHERE A.PORTAL_NAME = D.PORTAL_NAME AND A.PORTAL_REFTYPE = D.PORTAL_REFTYPE AND A.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND A.PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(A.PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1')) THEN 1 ELSE 0 END AS IS_HIDDEN, CASE WHEN D.PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT' THEN 1 ELSE 0 END AS IS_ROOT FROM PSPRSMDEFN D START WITH D.PORTAL_REFTYPE = 'C' AND UPPER(TRIM(D.PORTAL_URI_SEG2)) = 'TW_X' CONNECT BY NOCYCLE PRIOR D.PORTAL_PRNTOBJNAME = D.PORTAL_OBJNAME AND D.PORTAL_REFTYPE = 'F' AND LEVEL <= 20) SELECT TARGET_CREF, LISTAGG(BASE_LABEL, ' > ') WITHIN GROUP (ORDER BY LVL DESC) AS MENU_PATH, MAX(IS_HIDDEN) AS PATH_HIDDEN FROM NAV_TREE GROUP BY TARGET_CREF FETCH FIRST 200 ROWS ONLY |")
 $nvCanon = @('# 51 canonical 證據（TW_NAV_CANON）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Classic 選單入口：Recruiting > Applicant Management > Manage Applicants（CLASSIC_NAV_VISIBLE）。') + $nvTail + $nvEvCanon
+# 表名帶擁有者前綴、SELECT→FROM 相距 >400 字（距離式抓不到，只有 FROM 直接比對認得）
+$nvPad = (1..25 | ForEach-Object { "D.PORTAL_LABEL AS L$_" }) -join ', '
+$nvEvCanonQ = @('## Evidence 附錄', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', ("| 1 | Portal Registry（canonical） | Classic 選單入口 | SQL：WITH NAV_TREE AS (SELECT CONNECT_BY_ROOT D.PORTAL_OBJNAME AS TARGET_CREF, " + $nvPad + ", LEVEL AS LVL FROM DEMOOWN.PSPRSMDEFN D START WITH D.PORTAL_REFTYPE = 'C' AND UPPER(TRIM(D.PORTAL_URI_SEG2)) = 'TW_X' CONNECT BY NOCYCLE PRIOR D.PORTAL_PRNTOBJNAME = D.PORTAL_OBJNAME AND D.PORTAL_REFTYPE = 'F' AND LEVEL <= 20) SELECT TARGET_CREF FROM NAV_TREE FETCH FIRST 200 ROWS ONLY |"))
+$nvCanonQ = @('# 53 canonical 證據帶擁有者前綴（TW_NAV_CANONQ）') + $nvHead + @('## 功能定位', '### 導覽入口', 'Classic 選單入口：Recruiting > Applicant Management > Manage Applicants（CLASSIC_NAV_VISIBLE）。') + $nvTail + $nvEvCanonQ
 $nvUniq = @('# 52 唯一入口措辭（TW_NAV_UNIQ）') + $nvHead + @('## 功能定位', '### 導覽入口', '本畫面唯一入口：Recruiting > Applicants > Manage。') + $nvTail + $nvEvPortal
-foreach ($pair in @(@('44-TW_NAV_SPACE.md', $nvSpace), @('45-TW_NAV_FLOW.md', $nvFlow), @('46-TW_NAV_AUTH.md', $nvAuth), @('47-TW_NAV_ONLY.md', $nvOnly), @('48-TW_NAV_GAP.md', $nvGap), @('49-TW_NAV_PEND.md', $nvPend), @('50-TW_NAV_TM.md', $nvTm), @('51-TW_NAV_CANON.md', $nvCanon), @('52-TW_NAV_UNIQ.md', $nvUniq))) {
+foreach ($pair in @(@('44-TW_NAV_SPACE.md', $nvSpace), @('45-TW_NAV_FLOW.md', $nvFlow), @('46-TW_NAV_AUTH.md', $nvAuth), @('47-TW_NAV_ONLY.md', $nvOnly), @('48-TW_NAV_GAP.md', $nvGap), @('49-TW_NAV_PEND.md', $nvPend), @('50-TW_NAV_TM.md', $nvTm), @('51-TW_NAV_CANON.md', $nvCanon), @('53-TW_NAV_CANONQ.md', $nvCanonQ), @('52-TW_NAV_UNIQ.md', $nvUniq))) {
     [System.IO.File]::WriteAllText((Join-Path $nvDir $pair[0]), ($pair[1] -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
 }
 [System.IO.File]::WriteAllText((Join-Path $nvDir "00-overview.md"), "# 總覽`r`n測試 fixture", (New-Object System.Text.UTF8Encoding($true)))
@@ -2156,6 +2160,7 @@ $nvOutF = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $nvDom -Na
 Assert ($nvOutF -match '47-TW_NAV_ONLY\.md：功能定位 ### 導覽入口 有 1 列但未解事項無' -and $nvOutF -match '\[導覽\] 47-TW_NAV_ONLY\.md：SINGLE_PATH_COLLAPSE') "surfaces=CLASSIC_AND_FLUID：有入口列但無 surface gap 行 → SINGLE_PATH_COLLAPSE"
 Assert ($nvOutF -notmatch '48-TW_NAV_GAP\.md：功能定位') "surfaces=CLASSIC_AND_FLUID：有 gap 行 → 零違規"
 Assert ($nvOut -notmatch '51-TW_NAV_CANON\.md：功能定位宣稱導覽路徑') "canonical query 逐字貼在 Evidence（CTE 內 SELECT→FROM 相距 >200 字）→ 認得是 Portal 證據"
+Assert (($nvEvCanonQ -join ' ') -match 'FROM DEMOOWN\.PSPRSMDEFN D' -and ($nvEvCanonQ -join ' ') -notmatch '(?is)\bSELECT\b[\s\S]{0,400}?\bFROM\b[\s\S]{0,200}?\bPSPRSMDEFN' -and $nvOut -notmatch '53-TW_NAV_CANONQ\.md：功能定位宣稱導覽路徑') "canonical 證據的表名帶擁有者前綴（cookbook 規則 1a）→ 仍認得是 Portal 證據"
 Assert ($nvOut -match '52-TW_NAV_UNIQ\.md：功能定位 宣稱唯一入口' -and $nvOut -match '\[導覽\] 52-TW_NAV_UNIQ\.md：SINGLE_PATH_COLLAPSE') "CLASSIC_ONLY 仍抓「唯一入口」措辭"
 Assert ($nvOut -notmatch '48-TW_NAV_GAP\.md：功能定位') "審查補強：有入口列＋gap 行＋Portal 證據 → 零違規"
 Assert ($nvOut -notmatch '49-TW_NAV_PEND\.md：功能定位宣稱導覽路徑') "審查補強：反序「待人工SQL（PSPRSMDEFN…）」是合法出口 → 不誤報"
@@ -5645,4 +5650,4 @@ Write-Host ('sdoc run tests: PASS=' + $script:passed + ' FAIL=' + $script:failed
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-run.ps1
-@@@PSBUNDLE-PART-END|0152324a0e7f82d0|5|6
+@@@PSBUNDLE-PART-END|5a4ba8810d931e97|5|6

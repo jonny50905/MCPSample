@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit b540051）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|b540051|a4645a94518ffafc|8|8|3645|0f317b0faf47ccfbc8bdbbeebbc1aafff391090d2d379ce3b32406d59f9ca1ed
+@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|8|8|3655|2e8f80f79d5e6df40b9dbaedeb15e11776f72425c3d53fc099e2ddcf79adea59
 @@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384|1
 # test-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單元測試；合成資料，不查 MCP、不讀企業產物、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -2534,10 +2534,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|77426f551fc17124235172cfa7cc48f8e4f78a0f70186dda353915b56aba5544|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|0984d51ff3a4568f5c9db10ac158756132d9da6a833d5c150b3a0b3bed61bb47|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "b540051",
+  "commit": "a3f1cce",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -2560,7 +2560,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-ae-flow.md",
       "lines": 96,
-      "sha256": "538e571e38b896036920d5ec83ab1b6b684207cb3da61edb8e67b46932bfb128",
+      "sha256": "03ee90e2066ec1e8aa749071bcf6665b900948ce6d68b2486126556eb51f6497",
       "bom": false
     },
     {
@@ -2572,7 +2572,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-auditor.md",
       "lines": 266,
-      "sha256": "a873d3ad50b559cef2a49fc527d074bb54e4e1ff2057f4fe32c1f2c20382b993",
+      "sha256": "a1397ec547e14b75c8092cab923ae13b18663abd01aa3b4e0ef4f735086c0477",
       "bom": false
     },
     {
@@ -2590,7 +2590,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-metadata-flow.md",
       "lines": 118,
-      "sha256": "eb28fb794e98a8330276248db49be161e66b1f3137185074dc78de541ff05bd9",
+      "sha256": "35a5aa5ae7989607da958a78d0666f7385bfae9909b24ac40c37576947c72f1d",
       "bom": false
     },
     {
@@ -2656,7 +2656,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-ui-flow.md",
       "lines": 146,
-      "sha256": "c6e664d76093fc33bd53ca1d1b74199d64baef05a007d69e8c5b306122d4c9b9",
+      "sha256": "d558fb682f98af2a16cabd062f4e79e4eb841eaedbbecb3506359bb94ebd86f7",
       "bom": false
     },
     {
@@ -2727,8 +2727,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/customization-profile.yaml",
-      "lines": 113,
-      "sha256": "db9b1e745b7e89675dab98a3d3b311c39cd59d020b85cf6932970fd8a8294bc2",
+      "lines": 112,
+      "sha256": "cc2e60bf7de43519e3150f52c996ef25b0d6077adbce8b06f3fe4cb3b5ebf93d",
       "bom": false
     },
     {
@@ -2739,8 +2739,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4054,
-      "sha256": "5021405a15777e9be56d81dce5ff6e695a04941ed0565ff8c5bfe900912a7a4b",
+      "lines": 4081,
+      "sha256": "d40c44f03358fabf1124bdec8a8e1bc707055e8a343e1ff14ef59705f50c178c",
       "bom": false
     },
     {
@@ -2757,8 +2757,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 753,
-      "sha256": "9be32c3ae3a32273f2217c53f168bcd8b61ef593fd841df560fbc0fc04a27618",
+      "lines": 763,
+      "sha256": "a300a107dd8d0876c1c5b4dc25876efa7b7a2285d80ca192a9df4206394e7129",
       "bom": false
     },
     {
@@ -3057,8 +3057,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1230,
-      "sha256": "720ec1d10081ad6f690caa07490d87580b9d91ff9b00d919618c3245ff763952",
+      "lines": 1264,
+      "sha256": "6edc9318db409e4f4ad0afd104ee694363b08bc25187c4021453026eeaf032a4",
       "bom": false
     },
     {
@@ -3159,8 +3159,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/test-scenarios.md",
-      "lines": 732,
-      "sha256": "d80454c713ec97d2d966c25288a37ca28685f21b24bd312383c24ffe047aae52",
+      "lines": 733,
+      "sha256": "186049455efc2c610ea2fc82d3d05f7f636780f4fcf493153530875d09473da9",
       "bom": false
     },
     {
@@ -3274,7 +3274,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-doc-lint.ps1",
       "lines": 1612,
-      "sha256": "5af2d5a422693ed0e09a443f6476c7ce1c6f6dd169f8236149d9a22f6d6b6a3b",
+      "sha256": "87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365",
       "bom": true
     },
     {
@@ -3399,8 +3399,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-auto-loop.ps1",
-      "lines": 1024,
-      "sha256": "eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e",
+      "lines": 1029,
+      "sha256": "6e4757761d772435828ac5da3e3e37f1e176246f9bacc98acb2270a4458b2a39",
       "bom": true
     },
     {
@@ -3496,7 +3496,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|147|0ec2c70e8713f170999b0861224a3124c23df00937418dfbb67189585d90fba3|0
+@@@PSBUNDLE-FILE|AGENTS.md|157|8c838e3e2a9491e1fac186447addccf32ca42726b816a3d9d3e77774221894fa|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -3578,7 +3578,17 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-10-14 再由 `claude/magical-hawking-txsbn2` 快轉併入
+4. **維護版線**：`main` 是正式版線（最近一次：2026-10-19 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   agent 唯讀帳號的表名改帶擁有者前綴（兩版 cookbook 規則 1a 與 61 處樣板、ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor、profile 註解、
+   ps-doc-lint 導覽證據比對、SOP-30；L150）、第四輪驗證 SQL（`docs/design/ui-metadata-check-r4.md`）與第三輪結果，各份重生，併入前 `main` 頭 `e86d8a6`；
+   同日稍早同一分支併入第三輪驗證 SQL（`docs/design/ui-metadata-check-r3.md`：依特徵自動判代碼、以相關顯示算唯讀位元、必填旁證、唯讀帳號 A 測試）與第二輪結果（框架檔未動、搬運包不變），併入前 `main` 頭 `5b60f84`；
+   同日稍早同一分支併入第二輪驗證 SQL（`docs/design/ui-metadata-check-r2.md`：欄位 Y/N 探查、找校準頁、核對代碼 10 以上）與第一輪結果完結記錄（框架檔未動、搬運包不變），併入前 `main` 頭 `b9f6762`；
+   同日稍早同一分支併入 G1（Group Box 以形狀確認）、V3c（Page 欄位補查）、唯讀帳號檢查改成免 ALTER SESSION＋同義字備案、ORA-02421 說明、結果續記（框架檔未動、搬運包不變），併入前 `main` 頭 `9d5f04c`；
+   2026-10-16 同一分支併入 V6 輕量版（只看客製頁面）、agent 唯讀帳號的授權清單與檢查 SQL、第一輪結果續記（框架檔未動、搬運包不變），併入前 `main` 頭 `12012d5`；
+   同日稍早同一分支併入第一輪驗證說明加第 0 步（設 CURRENT_SCHEMA）與部分結果（備忘 §7.1、HANDOFF；框架檔未動、搬運包不變），併入前 `main` 頭 `2d91149`；
+   2026-10-14 同一分支併入第一輪 metadata 驗證 SQL（`docs/design/ui-metadata-check-r1.md`／`.sql`）與備忘 §7（先 SQL 驗證、改走補查存進知識層；框架檔未動、搬運包不變），併入前 `main` 頭 `20cce49`；
+   同日稍早同一分支併入畫面元件、Prompt／Lookup 與欄位間規則的缺口盤點（提案 `docs/design/ui-control-lookup-dependency-memo.md`＋HANDOFF 一行；框架檔未動、搬運包不變），併入前 `main` 頭 `f76ef5e`；
+   同日稍早由 `claude/magical-hawking-txsbn2` 快轉併入
    ——跟 deep-research 比：拿掉寫完 Read 回、讀者／判定 effort low、分段 20、時間軸檔、ps-sdoc-diag 一行回報（L149），併入前 `main` 頭 `a4152d8`；
    同日稍早同一分支併入 ps-sdoc-diag 診斷腳本（代號回報）、每次回應綁小（分段 40 行、研究頁外環上限）、外環設 Claude Code 環境預設、session 失敗但產出合格照收（L148），併入前 `main` 頭 `0c79d43`；
    同日稍早同一分支併入 Claude Code 版撞 gateway 504 的根因、模型端數據行、卡住提前結束（L147），併入前 `main` 頭 `da14021`；
@@ -3645,5 +3655,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|656802c2b001f19e09559b2114218d1a3239bd8637d75000cd33fdf6d53034e8
-@@@PSBUNDLE-PART-END|a4645a94518ffafc|8|8
+@@@PSBUNDLE-EOF|158|30fe96712e7c34ee54da1dd27f88877c902e4425161056f6f1541c3b7b8c6416
+@@@PSBUNDLE-PART-END|f4668d8098f2324a|8|8

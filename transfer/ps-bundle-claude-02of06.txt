@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit b540051）第 2／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit a3f1cce）第 2／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|b540051|0152324a0e7f82d0|2|6|11380|e71a7f9451a41a8d099ab88b2857436360a9e2cbf1b1d14b3278756e189928d9
+@@@PSBUNDLE-PART|1|claude|a3f1cce|5a4ba8810d931e97|2|6|11380|e71a7f9451a41a8d099ab88b2857436360a9e2cbf1b1d14b3278756e189928d9
 @@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/schemas/05-ui.schema.json|519|c15b5fc0970d536bea5f29f5adbfe4b90100696ebc1b9a41c37744c3d09924ff|0
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -11381,4 +11381,4 @@ if ($graduated) {
 $mutex.ReleaseMutex(); $mutex.Dispose()
 if ($graduated) { exit 0 } else { exit 1 }
 @@@PSBUNDLE-END|scripts/ps-auto-loop.ps1
-@@@PSBUNDLE-PART-END|0152324a0e7f82d0|2|6
+@@@PSBUNDLE-PART-END|5a4ba8810d931e97|2|6

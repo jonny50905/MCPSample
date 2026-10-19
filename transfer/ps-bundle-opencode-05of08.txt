@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit b540051）第 5／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 5／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|b540051|a4645a94518ffafc|5|8|7824|5906b56633a01f9fe1e38050d698ea4dd0efa9ecd4a44e67553859cc16d295ef
-@@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1612|5af2d5a422693ed0e09a443f6476c7ce1c6f6dd169f8236149d9a22f6d6b6a3b|1
+@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|5|8|7824|b4d198093a9c1d44f8c5871a02a3a753ee27129ca6a4dd44952a1d8cd22d4394
+@@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1612|87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365|1
 # ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
 #       .\scripts\ps-doc-lint.ps1 -Domain 轉職 -StrictAudit
@@ -610,7 +610,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $navPortalEv = ($text -match '(?is)\bSELECT\b[\s\S]{0,400}?\bFROM\b[\s\S]{0,200}?\bPSPRSMDEFN') -or
                            ($text -match '(?m)^.*\bPSPRSMDEFN.*待人工SQL.*$') -or
                            ($text -match '(?m)^.*待人工SQL.*\bPSPRSMDEFN.*$') -or   # 反序寫法「待人工SQL（PSPRSMDEFN…）」同樣是合法出口
-                           ($text -match '(?i)\bFROM\s+PSPRSMDEFN\b')            # canonical query（CTE 內 SELECT 與 FROM 相距 >200 字，距離式抓不到）
+                           ($text -match '(?i)\bFROM\s+(?:[\w$#"]+\.)?PSPRSMDEFN\b')   # canonical query（CTE 內 SELECT 與 FROM 相距 >200 字，距離式抓不到）；表名可帶擁有者前綴（cookbook 規則 1a）
             $navKinds = @()
             if ($navClaim.Success -and -not $navPortalEv -and -not $navIsFlow) {
                 $violations += "${name}：功能定位宣稱導覽路徑「$($navClaim.Value.Trim())」但全檔無 Portal Registry 證據——technical menu 當導覽路徑（PSMENUITEM 只是 technicalMenuLocation；導覽入口走 cookbook §2k）"
@@ -7825,4 +7825,4 @@ function Get-PsSdConflictFacts {
     return , $out.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-status-lib.ps1
-@@@PSBUNDLE-PART-END|a4645a94518ffafc|5|8
+@@@PSBUNDLE-PART-END|f4668d8098f2324a|5|8

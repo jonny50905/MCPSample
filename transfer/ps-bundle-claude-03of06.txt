@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit b540051）第 3／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit a3f1cce）第 3／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|b540051|0152324a0e7f82d0|3|6|7911|abe419eeffa743bafa900399c92f6a26440b54a7b42036345d7b00dffd0bc813
+@@@PSBUNDLE-PART|1|claude|a3f1cce|5a4ba8810d931e97|3|6|7911|f0ffdd20c99c51edc3c4e40f74757c85ccfd1e7e500b9017173abd88030259b5
 @@@PSBUNDLE-FILE|scripts/ps-bundle.ps1|496|ee17daeaf5a5b9ff531a4f6b577ca0a71ff6dd4f29806d45a7198f3af079afe5|1
 # ps-bundle.ps1 — 搬運包：把一個版本要搬的檔收成幾份文字檔，公司機一個指令解回各檔
 # 用法（公司機）：
@@ -722,7 +722,7 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1612|5af2d5a422693ed0e09a443f6476c7ce1c6f6dd169f8236149d9a22f6d6b6a3b|1
+@@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1612|87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365|1
 # ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
 #       .\scripts\ps-doc-lint.ps1 -Domain 轉職 -StrictAudit
@@ -1331,7 +1331,7 @@ Get-ChildItem -LiteralPath $dir -Filter "*.md" |
             $navPortalEv = ($text -match '(?is)\bSELECT\b[\s\S]{0,400}?\bFROM\b[\s\S]{0,200}?\bPSPRSMDEFN') -or
                            ($text -match '(?m)^.*\bPSPRSMDEFN.*待人工SQL.*$') -or
                            ($text -match '(?m)^.*待人工SQL.*\bPSPRSMDEFN.*$') -or   # 反序寫法「待人工SQL（PSPRSMDEFN…）」同樣是合法出口
-                           ($text -match '(?i)\bFROM\s+PSPRSMDEFN\b')            # canonical query（CTE 內 SELECT 與 FROM 相距 >200 字，距離式抓不到）
+                           ($text -match '(?i)\bFROM\s+(?:[\w$#"]+\.)?PSPRSMDEFN\b')   # canonical query（CTE 內 SELECT 與 FROM 相距 >200 字，距離式抓不到）；表名可帶擁有者前綴（cookbook 規則 1a）
             $navKinds = @()
             if ($navClaim.Success -and -not $navPortalEv -and -not $navIsFlow) {
                 $violations += "${name}：功能定位宣稱導覽路徑「$($navClaim.Value.Trim())」但全檔無 Portal Registry 證據——technical menu 當導覽路徑（PSMENUITEM 只是 technicalMenuLocation；導覽入口走 cookbook §2k）"
@@ -7912,4 +7912,4 @@ function Format-PsSdAlternatives {
     return ($head + '；最接近的寫法：' + [string]::Join('；', $shown))
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-schema-lib.ps1
-@@@PSBUNDLE-PART-END|0152324a0e7f82d0|3|6
+@@@PSBUNDLE-PART-END|5a4ba8810d931e97|3|6

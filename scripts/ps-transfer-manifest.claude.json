@@ -1,18 +1,18 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "b540051",
+  "commit": "a3f1cce",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
       "lines": 68,
-      "sha256": "57a0174482aee761f59b889ccc72b7448201133e6b720a743eeb991044db8f44",
+      "sha256": "b7b6725e509225672e72ae400dacacd60b3f543da361335aaf4e886221fd1aa2",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-ae-flow.md"
     },
     {
       "path": ".claude/agents/ps-auditor.md",
       "lines": 244,
-      "sha256": "b91b56a7b6690e1880841100d4b81f60abc16437a01338676b9b49ec269d2b06",
+      "sha256": "5658bad5958fbca0def058f826dc7026ebfa0783a30f6d83ce8afb537c18721a",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-auditor.md"
     },
@@ -33,7 +33,7 @@
     {
       "path": ".claude/agents/ps-metadata-flow.md",
       "lines": 87,
-      "sha256": "4890d45d0a32bf1b29c8dfc82cfd36c7ea5bb035afb0d81b35e9f262774e0440",
+      "sha256": "16119559df331e5a6802b294901f3f6f1c06df87e8f25e37e898a75a26cddc9c",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-metadata-flow.md"
     },
@@ -110,7 +110,7 @@
     {
       "path": ".claude/agents/ps-ui-flow.md",
       "lines": 115,
-      "sha256": "8d66e384f9556a32a9a296f4d9e6dcbc4b8172e6b4501652898913256460c8d8",
+      "sha256": "68647863237feee7227fb84d0bb09040088af17cb3f22e387350aef20184a0f6",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-ui-flow.md"
     },
@@ -193,8 +193,8 @@
     },
     {
       "path": ".claude/peoplesoft/customization-profile.yaml",
-      "lines": 110,
-      "sha256": "cdf452f53dc2c2751dfe69db1e3939f6c187013d8aa4bc4bde500e6c97685755",
+      "lines": 109,
+      "sha256": "1fa65a03fb99c53c98c2a7013626cc0f96a02e4d0187bb9308571b3fc9ad3370",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/customization-profile.yaml"
     },
@@ -228,8 +228,8 @@
     },
     {
       "path": ".claude/peoplesoft/oracle-query-cookbook.md",
-      "lines": 753,
-      "sha256": "536cf2e7562374592efd23c55e1547ca9da945a1c47e4892e2ed6791166d5e1c",
+      "lines": 763,
+      "sha256": "4d9d256a91fa16fb96f30aa1534d7cf85e4dc10e5057441e0286c7515023acc2",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/oracle-query-cookbook.md"
     },
@@ -797,7 +797,7 @@
     {
       "path": "scripts/ps-doc-lint.ps1",
       "lines": 1612,
-      "sha256": "5af2d5a422693ed0e09a443f6476c7ce1c6f6dd169f8236149d9a22f6d6b6a3b",
+      "sha256": "87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365",
       "bom": true
     },
     {
@@ -922,8 +922,8 @@
     },
     {
       "path": "scripts/tests/test-auto-loop.ps1",
-      "lines": 1024,
-      "sha256": "eeede066ea2e85dd3f64b0de6e9ea250148c25b33ede70c7c20b8d06a211835e",
+      "lines": 1029,
+      "sha256": "6e4757761d772435828ac5da3e3e37f1e176246f9bacc98acb2270a4458b2a39",
       "bom": true
     },
     {

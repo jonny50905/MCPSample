@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit b540051）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|b540051|a4645a94518ffafc|2|8|6751|b67ae834ad02a05cdfbd3e38d43aaee97f8c61c996486d9037d0a2a4a12ce2db
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4054|5021405a15777e9be56d81dce5ff6e695a04941ed0565ff8c5bfe900912a7a4b|0
+@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|2|8|6584|b0867bfbc97c00b30d68b93005562c23e0dd09c116ec14e2e1f5b3340b3ee8f8
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4081|d40c44f03358fabf1124bdec8a8e1bc707055e8a343e1ff14ef59705f50c178c|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4056,6 +4056,33 @@
 - 驗證：test-sdoc（20 與 20＋20＋6）、test-claude-variant（環境預設 5 項、SKIP 剩 3、診斷 G=310／D1=300／LP=90 與 SUM2、Windows 時間軸檔 START／P=1 R=8／END=ABORT）、
   test-sdoc-run 四組、test-auto-loop、test-spec、test-bundle、test-ps51-static 全過。
 - 教訓：「哪條流程沒撞」要先問它跑在哪個 CLI、每個回合多大、第一次寫之前要想多少；一次回應＝thinking＋輸出，縮輸出之後還撞就是 thinking 與多餘的回合。
+
+### L150 agent 的唯讀帳號不能 ALTER SESSION、也沒有同義字——表名一律寫成「擁有者.表名」（2026-10-19）
+
+- 症狀：畫面 metadata 驗證（`docs/design/ui-metadata-check-r1`～`r3`）的 SQL 管理者一直用擁有者（admin）帳號跑，結果都對；第三輪「唯讀帳號 A 測試」
+  （agent 用的唯讀帳號、不設 schema、裸表名 `SELECT COUNT(*) FROM PSPNLFIELD`）FAIL（ORA-00942）。同一帳號 `ALTER SESSION SET CURRENT_SCHEMA` 報 ORA-02421；
+  加擁有者前綴（`<擁有者>.PSPNLFIELD`）查得到。管理者：DBA 不會改（不建同義字、不調帳號），SQL 一律照「`<schema>.table`」寫。
+- 根因：L19 為了不讓小模型每句加前綴，選了「每任務一次 ALTER SESSION＋裸表名」。這只在登入帳號能設 CURRENT_SCHEMA 時成立；agent 的唯讀帳號不能，
+  於是 subagent 照 cookbook 走：裸表名 ORA-00942 → ALTER SESSION 失敗 → 重發仍 ORA-00942——唯讀帳號下所有 PeopleTools 查詢都查不到
+  （歷來的 view 不存在／UNVERIFIABLE、「以失敗查詢當機器參照」有一部分可能也是這個原因，未逐一核對）。
+- 落點：
+  - 兩版 cookbook：新增規則 1a（`<schema>`＝profile `oracle.currentSchema`；DUAL 與 ALL_ 開頭的資料字典不加前綴，資料字典改加 `OWNER = UPPER('<schema>')`；
+    FILL_ME 用裸表名；不執行 ALTER SESSION）；所有 SQL 樣板 61 處表名改寫成 `<schema>.表名`（含子查詢、EXISTS、§2k-3 行內查詢）；
+    subagent 生命週期改成「第 0 步取前綴 → 查 → view/table not found 先檢查前綴、補齊重發一次 → 補齊仍查不到記 gaps（表名不對或沒授權）」；
+    規則 8a 的「加了前綴查不到」改成「加了 `PS_` 前綴查不到」（與擁有者前綴分開）。
+  - 兩版 ps-ui-flow／ps-metadata-flow／ps-ae-flow 的生命週期硬規則、ps-auditor 的 SQL 重跑（舊證據裸表名先補前綴、其餘一字不改）、四個 agent 執行段一句。
+  - 兩版 profile `oracle.currentSchema` 註解改寫（公司機已回填的 profile 會出 `.incoming`：只有註解 3 行不同，可不合併）。
+  - `scripts/ps-doc-lint.ps1`：canonical 導覽證據的 `FROM PSPRSMDEFN` 判斷容許擁有者前綴（test-auto-loop 加 53-TW_NAV_CANONQ）。
+  - SOP-2／SOP-12／SOP-21 有 ALTER SESSION 的句子改對；新增 SOP-30（唯讀帳號授權檢查：32 張表一次查出沒授權的、冒煙測試、業務資料表）。
+    test-scenarios 加 R43。
+- 沒做：runtime guard 機械擋「漏前綴的 sql_run」（無狀態、只擋不改，做得到；先看公司機上小模型漏帶的頻率再決定）；
+  plugin 重掛通知文字仍提到 CURRENT_SCHEMA（mcpAutoRecover 預設 off，文字不叫 agent 執行 ALTER SESSION，下次改 plugin 時一起改）。
+- 驗證：cookbook 54 句 SQL 換掉佔位後 sqlglot（Oracle）全部可解析；樣板裡沒有不帶前綴的 FROM／JOIN（CTE 名、資料字典除外）；
+  test-auto-loop（含新案例：修 lint 前 FAIL、修後 PASS）、test-claude-variant、test-bundle、test-ps51-static、test-knowledge、test-supplemental、
+  test-spec、test-spec-build、test-spec-clone、test-sdoc、test-sdoc-assemble、ps-agent-doc-lint 全過（pwsh 7.4；test-sdoc-run 全組由 main 的 Windows 5.1 CI 跑）；第四輪 SQL 以合成資料
+  （表放在另一個 schema、裸表名必失敗）跑過。test-oracle-runtime 需要真 OpenCode，沙箱沒跑。
+- 教訓：「一次設定、之後裸表名」依賴 session 狀態與帳號權限；換成唯讀帳號就整條斷。能寫在每句 SQL 裡的就不要放在 session 裡——樣板直接帶前綴，
+  模型只做替換，不必自己加。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -4215,7 +4242,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|753|9be32c3ae3a32273f2217c53f168bcd8b61ef593fd841df560fbc0fc04a27618|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|763|a300a107dd8d0876c1c5b4dc25876efa7b7a2285d80ca192a9df4206394e7129|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
@@ -4226,6 +4253,11 @@ UNRESOLVED
 
 ```text
 1. 只允許 SELECT。禁止 INSERT / UPDATE / DELETE / MERGE / DDL / PL/SQL 匿名區塊。
+1a. **表名一律帶擁有者前綴**（唯讀帳號只查得到 `擁有者.表名`）：`<schema>`＝customization-profile.yaml 的
+   oracle.currentSchema（原樣照抄、不加引號）。本手冊樣板已寫成 `<schema>.表名`，照抄時把 `<schema>` 換成該值；
+   自己組的查詢（實體表 PS_<RECNAME>、Prompt 表、規則 8 驗過欄位後的查詢）每個 FROM／JOIN／子查詢的 PeopleSoft 表與 view 也一樣帶。
+   DUAL 與 ALL_ 開頭的資料字典（ALL_TABLES／ALL_TAB_COLUMNS／ALL_OBJECTS）不加前綴；查資料字典改加 OWNER = UPPER('<schema>') 條件。
+   值為 FILL_ME → 拿掉 `<schema>.` 與 OWNER 條件，用裸表名。不執行 ALTER SESSION（唯讀帳號不准，表名帶前綴就不需要）。
 2. 每個查詢都要有列數上限：加 FETCH FIRST 200 ROWS ONLY（或 ROWNUM <= 200）。
 3. 可能高基數的查詢（值清單、使用者清單）先跑 COUNT(*)，超過 200 只回彙總。
 4. 使用者層級資料只回彙總（COUNT / 角色名），不列具名清單（遮罩原則）。
@@ -4247,15 +4279,15 @@ UNRESOLVED
    原 SQL 型待辦不因此視為完成。
 8. **查詢前欄位驗證**：要用「樣板裡沒有的
    欄位名」或不確定欄位存不存在時，先跑
-   SELECT column_name FROM all_tab_columns WHERE table_name='<大寫表名>'
+   SELECT column_name FROM all_tab_columns WHERE owner = UPPER('<schema>') AND table_name='<大寫表名>'
    確認後再查——**禁止憑記憶寫欄位名**；驗證後仍無該欄位 →
    記 gaps，不要換個猜法再試。
 8a. **表名同理，且禁止自行加減 `PS_` 前綴**：PeopleTools 系統表
    **不一定**有 PS_ 前綴——本 cookbook 樣板即並存兩型
    （`PSPRCSRQST` 無前綴、`PS_PRCSRECUR` 有前綴）。**樣板怎麼寫就怎麼查**；
    樣板沒有的表先跑
-   SELECT table_name FROM all_tables WHERE table_name LIKE '%<關鍵字>%'
-   確認實際表名。**「加了前綴查不到」不是資料不存在，是表名寫錯。**
+   SELECT table_name FROM all_tables WHERE owner = UPPER('<schema>') AND table_name LIKE '%<關鍵字>%'
+   確認實際表名。**「加了 `PS_` 前綴查不到」不是資料不存在，是表名寫錯。**
 9. **metadata MCP 不得作 evidence**：
    PeoplecodeMetadata 的工具（find_field_usage／search_component_metadata／
    get_ae_sql_metadata／**get_process_schedule_list**）回傳一律只作
@@ -4292,14 +4324,16 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
 **subagent（ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）——每次委派**：
 
 ```text
-1. 直接發本次任務的第一個 SELECT（連線已由主 agent 建好）
+0. 取前綴              → read customization-profile.yaml 取 oracle.currentSchema；本次每個查詢的 `<schema>` 都換成這個值
+                          （規則 1a）。值為 FILL_ME → 拿掉 `<schema>.` 前綴與 OWNER 條件，用裸表名
+1. 直接發本次任務的第一個 SELECT（連線已由主 agent 建好；表名已帶前綴）
 2. 回「未連線／not connected／no connection」類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED，
    結束本委派。不 list_connections、不 connect（工具已關）、不重試
-3. 設 schema            → read customization-profile.yaml 取 oracle.currentSchema，執行一次
-                          ALTER SESSION SET CURRENT_SCHEMA=<該值>（唯一准許的非 SELECT 語句；
-                          重複執行無害；值為 FILL_ME → 跳過）→ 重發第 1 步那個查詢一次。
-                          view/table not found 且值為 FILL_ME → blockedReason=SCHEMA_UNRESOLVED，不是 NOT_CONNECTED
-4. 查詢                 → 本次任務的查詢全部做完（裸表名即可，schema 已由第 3 步解決）
+3. 表名找不到          → view/table not found：逐一檢查 FROM／JOIN／子查詢的 PeopleSoft 表都寫成 `<schema>.表名`、
+                          `<schema>` 已換成 profile 值（規則 1a），補齊後重發一次；補齊仍查不到 → 表名不對或唯讀帳號
+                          沒有這張表的權限，記 gaps（寫表名），不換表名硬湊。值為 FILL_ME 而查不到表 →
+                          blockedReason=SCHEMA_UNRESOLVED，不是 NOT_CONNECTED。不執行 ALTER SESSION
+4. 查詢                 → 本次任務的查詢全部做完（PeopleSoft 表名都帶 `<schema>.` 前綴）
 5. 不得 disconnect      → 工具已關；逾時、BLOCKED 回報前也一樣不斷線
 ```
 
@@ -4319,7 +4353,7 @@ SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線
 
 ```sql
 AND A.EFF_STATUS = 'A'
-AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM <同表> B
+AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM <schema>.<同表> B
                 WHERE B.<同鍵> = A.<同鍵> AND B.EFFDT <= SYSDATE)
 ```
 
@@ -4333,7 +4367,7 @@ Prefix 判斷不用 SQL（比對 customization-profile 的 customPrefixes）。S
 
 ```sql
 SELECT PROJECTNAME, OBJECTTYPE, OBJECTVALUE1
-  FROM PSPROJECTITEM
+  FROM <schema>.PSPROJECTITEM
  WHERE OBJECTVALUE1 = :objectName
 FETCH FIRST 50 ROWS ONLY
 ```
@@ -4345,7 +4379,7 @@ FETCH FIRST 50 ROWS ONLY
 
 ```sql
 SELECT RECNAME, LASTUPDOPRID, LASTUPDDTTM
-  FROM PSRECDEFN
+  FROM <schema>.PSRECDEFN
  WHERE RECNAME = :recName
 ```
 
@@ -4361,13 +4395,13 @@ Menu 用 `PSMENUDEFN`，同樣看 `LASTUPDOPRID`。
 
 ```sql
 SELECT A.FIELDVALUE, A.XLATLONGNAME, L.XLATLONGNAME AS XLAT_ZHT
-  FROM PSXLATITEM A
-  LEFT JOIN PSXLATITEMLANG L
+  FROM <schema>.PSXLATITEM A
+  LEFT JOIN <schema>.PSXLATITEMLANG L
     ON L.FIELDNAME = A.FIELDNAME AND L.FIELDVALUE = A.FIELDVALUE
    AND L.EFFDT = A.EFFDT AND L.LANGUAGE_CD = 'ZHT'
  WHERE A.FIELDNAME = :fieldName
    AND A.EFF_STATUS = 'A'
-   AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM PSXLATITEM B
+   AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM <schema>.PSXLATITEM B
                    WHERE B.FIELDNAME = A.FIELDNAME
                      AND B.FIELDVALUE = A.FIELDVALUE AND B.EFFDT <= SYSDATE)
 FETCH FIRST 100 ROWS ONLY
@@ -4377,7 +4411,7 @@ FETCH FIRST 100 ROWS ONLY
 
 ```sql
 SELECT L.FIELDNAME, L.FIELDVALUE, L.XLATLONGNAME
-  FROM PSXLATITEMLANG L
+  FROM <schema>.PSXLATITEMLANG L
  WHERE L.LANGUAGE_CD = 'ZHT' AND L.XLATLONGNAME LIKE '%' || :displayText || '%'
 FETCH FIRST 50 ROWS ONLY
 ```
@@ -4386,8 +4420,8 @@ FETCH FIRST 50 ROWS ONLY
 
 ```sql
 SELECT A.FIELDNAME, A.LABEL_ID, A.LONGNAME, A.DEFAULT_LABEL, L.LONGNAME AS ZHT
-  FROM PSDBFLDLABL A
-  LEFT JOIN PSDBFLDLABLLANG L
+  FROM <schema>.PSDBFLDLABL A
+  LEFT JOIN <schema>.PSDBFLDLABLLANG L
     ON L.FIELDNAME = A.FIELDNAME AND L.LABEL_ID = A.LABEL_ID
    AND L.LANGUAGE_CD = 'ZHT'
  WHERE A.FIELDNAME = :fieldName
@@ -4399,7 +4433,7 @@ SELECT A.FIELDNAME, A.LABEL_ID, A.LONGNAME, A.DEFAULT_LABEL, L.LONGNAME AS ZHT
 
 ```sql
 SELECT PNLNAME, FIELDNUM, RECNAME, FIELDNAME, FIELDTYPE, LBLTYPE, LABEL_ID
-  FROM PSPNLFIELD
+  FROM <schema>.PSPNLFIELD
  WHERE PNLNAME = :pageName
 FETCH FIRST 200 ROWS ONLY
 ```
@@ -4410,23 +4444,23 @@ FETCH FIRST 200 ROWS ONLY
 
 ```sql
 -- Component 含哪些 Page
-SELECT PNLGRPNAME, PNLNAME, ITEMLABEL FROM PSPNLGROUP WHERE PNLGRPNAME = :componentName;
+SELECT PNLGRPNAME, PNLNAME, ITEMLABEL FROM <schema>.PSPNLGROUP WHERE PNLGRPNAME = :componentName;
 -- Page 屬於哪些 Component
-SELECT PNLGRPNAME FROM PSPNLGROUP WHERE PNLNAME = :pageName;
+SELECT PNLGRPNAME FROM <schema>.PSPNLGROUP WHERE PNLNAME = :pageName;
 -- Component 掛在哪些 Menu（**technicalMenuLocation**：App Designer 技術選單 metadata，
 -- 8.4 之後 BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級——**不得串成使用者導覽路徑**；
 -- 使用者看得到的入口走 §2k Portal Registry。本段亦是 §2k-2 的 seed（menu＋component＋market）
-SELECT MENUNAME, BARNAME, ITEMNAME FROM PSMENUITEM WHERE PNLGRPNAME = :componentName;
+SELECT MENUNAME, BARNAME, ITEMNAME FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :componentName;
 ```
 
 **2f. Prompt Table 與基數**
 
 ```sql
 SELECT RECNAME, FIELDNAME, EDITTABLE
-  FROM PSRECFIELDDB
+  FROM <schema>.PSRECFIELDDB
  WHERE RECNAME = :recName AND FIELDNAME = :fieldName;
 -- 先估基數再決定要不要列值（實體表名：SQLTABLENAME 空白時為 PS_<RECNAME>）
-SELECT COUNT(*) FROM PS_<EDITTABLE>;
+SELECT COUNT(*) FROM <schema>.PS_<EDITTABLE>;
 ```
 
 **2g. 選項使用實況（「哪些選項還在用？」）**
@@ -4434,7 +4468,7 @@ SELECT COUNT(*) FROM PS_<EDITTABLE>;
 ```sql
 -- 各值的實際資料分布（只回彙總，不撈明細；實體表名規則見 §6）
 SELECT <FIELDNAME>, COUNT(*) AS CNT
-  FROM PS_<RECNAME>
+  FROM <schema>.PS_<RECNAME>
  GROUP BY <FIELDNAME>
  ORDER BY CNT DESC
 FETCH FIRST 50 ROWS ONLY
@@ -4443,9 +4477,9 @@ FETCH FIRST 50 ROWS ONLY
 ```sql
 -- 含停用的完整選項清單（判斷廢棄選項時不要過濾 EFF_STATUS）
 SELECT A.FIELDVALUE, A.EFF_STATUS, A.EFFDT, A.XLATLONGNAME
-  FROM PSXLATITEM A
+  FROM <schema>.PSXLATITEM A
  WHERE A.FIELDNAME = :fieldName
-   AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM PSXLATITEM B
+   AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM <schema>.PSXLATITEM B
                    WHERE B.FIELDNAME = A.FIELDNAME
                      AND B.FIELDVALUE = A.FIELDVALUE AND B.EFFDT <= SYSDATE)
 FETCH FIRST 100 ROWS ONLY
@@ -4466,7 +4500,7 @@ PeopleCode UI 狀態變異（Visible 等）的目標解析入口。**不濾 FIEL
 SELECT PNLNAME, PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME,
        RECNAME, FIELDNAME, SUBPNLNAME, LBLTEXT, OCCURSLEVEL,
        FIELDLEFT, FIELDTOP, FIELDRIGHT, FIELDBOTTOM, PTHIDEFIELDS
-  FROM PSPNLFIELD
+  FROM <schema>.PSPNLFIELD
  WHERE RECNAME = :recName AND FIELDNAME = :fieldName
 FETCH FIRST 50 ROWS ONLY
 ```
@@ -4486,7 +4520,7 @@ Component 歸屬以 PeopleCode 證據所在者優先。
 ```sql
 SELECT PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME, RECNAME, FIELDNAME,
        SUBPNLNAME, LBLTEXT, OCCURSLEVEL
-  FROM PSPNLFIELD
+  FROM <schema>.PSPNLFIELD
  WHERE PNLNAME = :pageName
    AND PNLFLDID <> :groupBoxId
    AND FIELDLEFT >= :groupLeft AND FIELDRIGHT <= :groupRight
@@ -4501,14 +4535,14 @@ FETCH FIRST 200 ROWS ONLY
 -- 展開：Subpage 內有哪些控制項（結果中 FIELDTYPE=11 者以其 SUBPNLNAME 遞迴展開）
 SELECT PNLNAME, PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME,
        RECNAME, FIELDNAME, SUBPNLNAME, LBLTEXT, OCCURSLEVEL
-  FROM PSPNLFIELD
+  FROM <schema>.PSPNLFIELD
  WHERE PNLNAME = :subpageName
  ORDER BY FIELDNUM
 FETCH FIRST 200 ROWS ONLY;
 -- 向上：這個 Subpage 被哪些 Page 掛載。PSPNLGROUP 只登記真正的 Page——
 -- 變異目標長在 Subpage 上時，先向上找到掛載 Page（必要時遞迴），
 -- 才能用 §2e 對映 Component。
-SELECT PNLNAME FROM PSPNLFIELD
+SELECT PNLNAME FROM <schema>.PSPNLFIELD
  WHERE SUBPNLNAME = :subpageName AND FIELDTYPE = 11
 FETCH FIRST 50 ROWS ONLY;
 ```
@@ -4533,22 +4567,24 @@ Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 
 SELECT TABLE_NAME FROM ALL_TABLES
  WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMPERM','PSPRSMSYSATTRVL',
                       'PSPRSMATTRVAL','PSPRSMNAVINFO','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
+   AND OWNER = UPPER('<schema>')
 FETCH FIRST 20 ROWS ONLY;
 -- (2) 欄位名／型別（規則 8：禁止憑記憶寫欄位名）
 SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, COLUMN_ID
   FROM ALL_TAB_COLUMNS
  WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
+   AND OWNER = UPPER('<schema>')
  ORDER BY TABLE_NAME, COLUMN_ID
 FETCH FIRST 200 ROWS ONLY;
 -- (2b) base language（決定 2k-4 的 fallbackLanguageCode；不得憑 delivered convention 填 ENG）——表名／欄位同樣先看 (1)(2) 有沒有列出
-SELECT LANGUAGE_CD FROM PSOPTIONS FETCH FIRST 1 ROWS ONLY;
+SELECT LANGUAGE_CD FROM <schema>.PSOPTIONS FETCH FIRST 1 ROWS ONLY;
 -- (3) 代碼值域（不得憑記憶填，觀察後回填本節）
 -- (3) 必須在讀完 (1)(2) 回傳之後才發：(1) 未列出的表、(2) 未列出的欄位，其對應的 (3) 查詢直接跳過並記 gap
-SELECT PORTAL_REFTYPE, COUNT(*) FROM PSPRSMDEFN GROUP BY PORTAL_REFTYPE FETCH FIRST 20 ROWS ONLY;
-SELECT PORTAL_CREF_USGT, COUNT(*) FROM PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
+SELECT PORTAL_REFTYPE, COUNT(*) FROM <schema>.PSPRSMDEFN GROUP BY PORTAL_REFTYPE FETCH FIRST 20 ROWS ONLY;
+SELECT PORTAL_CREF_USGT, COUNT(*) FROM <schema>.PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
  GROUP BY PORTAL_CREF_USGT ORDER BY 2 DESC FETCH FIRST 20 ROWS ONLY;
-SELECT DISTINCT PORTAL_ATTR_NAM FROM PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY;
-SELECT PORTAL_NAME FROM PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY;
+SELECT DISTINCT PORTAL_ATTR_NAM FROM <schema>.PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY;
+SELECT PORTAL_NAME FROM <schema>.PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY;
 ```
 
 > **未驗前的降級規則**：(1)(2) 任一表／欄位查無 → 該筆記 gaps，**該 2k 步驟停止**（含本步驟的 (3)），
@@ -4572,10 +4608,10 @@ WITH NAV_TREE AS (
            LEVEL                              AS LVL,
            D.PORTAL_OBJNAME, D.PORTAL_PRNTOBJNAME,
            TRIM(D.PORTAL_LABEL)               AS BASE_LABEL,
-           (SELECT TRIM(L.PORTAL_LABEL) FROM PSPRSMDEFNLANG L
+           (SELECT TRIM(L.PORTAL_LABEL) FROM <schema>.PSPRSMDEFNLANG L
              WHERE L.PORTAL_NAME = D.PORTAL_NAME AND L.PORTAL_REFTYPE = D.PORTAL_REFTYPE
                AND L.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND L.LANGUAGE_CD = :languageCd) AS LANG_LABEL,
-           CASE WHEN EXISTS (SELECT 1 FROM PSPRSMSYSATTRVL A
+           CASE WHEN EXISTS (SELECT 1 FROM <schema>.PSPRSMSYSATTRVL A
                               WHERE A.PORTAL_NAME = D.PORTAL_NAME AND A.PORTAL_REFTYPE = D.PORTAL_REFTYPE
                                 AND A.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND A.PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV'
                                 AND UPPER(TRIM(DBMS_LOB.SUBSTR(A.PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1'))
@@ -4583,12 +4619,12 @@ WITH NAV_TREE AS (
            CASE WHEN D.PORTAL_EXPIRE_DT IS NOT NULL AND D.PORTAL_EXPIRE_DT < SYSDATE THEN 1 ELSE 0 END AS IS_EXPIRED,
            CASE WHEN D.PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT' OR TRIM(D.PORTAL_PRNTOBJNAME) IS NULL THEN 1 ELSE 0 END AS IS_ROOT,
            CONNECT_BY_ISCYCLE                 AS IS_CYCLE
-      FROM PSPRSMDEFN D
+      FROM <schema>.PSPRSMDEFN D
      START WITH D.PORTAL_REFTYPE = 'C'
             AND D.PORTAL_CREF_USGT IN ('TARG','LINK')
             AND D.PORTAL_NAME = :portalName
             AND UPPER(TRIM(D.PORTAL_URI_SEG2)) = UPPER(:componentName)
-            AND EXISTS (SELECT 1 FROM PSMENUITEM M
+            AND EXISTS (SELECT 1 FROM <schema>.PSMENUITEM M
                          WHERE UPPER(TRIM(M.PNLGRPNAME)) = UPPER(:componentName)
                            AND UPPER(TRIM(M.MENUNAME)) = UPPER(TRIM(D.PORTAL_URI_SEG1)))
    CONNECT BY NOCYCLE PRIOR D.PORTAL_PRNTOBJNAME = D.PORTAL_OBJNAME
@@ -4639,7 +4675,7 @@ FETCH FIRST 200 ROWS ONLY
 
 ```sql
 SELECT MENUNAME, BARNAME, ITEMNAME, PNLGRPNAME, MARKET
-  FROM PSMENUITEM WHERE PNLGRPNAME = :componentName
+  FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :componentName
 FETCH FIRST 200 ROWS ONLY
 ```
 
@@ -4653,7 +4689,7 @@ FETCH FIRST 200 ROWS ONLY
 -- 首選：structured URI 欄位（三欄同時比對，且限定 content reference）
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
-  FROM PSPRSMDEFN
+  FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(TRIM(PORTAL_URI_SEG1)) = UPPER(:menuName)
    AND UPPER(TRIM(PORTAL_URI_SEG2)) = UPPER(:componentName)
@@ -4661,7 +4697,7 @@ SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTO
 FETCH FIRST 200 ROWS ONLY;
 -- 次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
-  FROM PSPRSMDEFN
+  FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(PORTAL_URLTEXT) LIKE '%/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market) || '%'
    -- 或（避免 `_` 被 LIKE 當單字元萬用字元）：AND INSTR(UPPER(PORTAL_URLTEXT), '/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market)) > 0
@@ -4669,7 +4705,7 @@ FETCH FIRST 200 ROWS ONLY;
 -- 診斷（前兩條皆 0 列時才跑）：menu＋component 命中但 market 不符／空白 ⇒ PARTIAL_IDENTITY_MATCH（永不 CONFIRMED）
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
-  FROM PSPRSMDEFN
+  FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(TRIM(PORTAL_URI_SEG1)) = UPPER(:menuName)
    AND UPPER(TRIM(PORTAL_URI_SEG2)) = UPPER(:componentName)
@@ -4693,7 +4729,7 @@ FETCH FIRST 200 ROWS ONLY
 ```sql
 SELECT LEVEL AS LVL, PORTAL_NAME, PORTAL_REFTYPE, PORTAL_OBJNAME,
        PORTAL_PRNTOBJNAME, PORTAL_LABEL, PORTAL_SEQ_NUM, PORTAL_EXPIRE_DT
-  FROM PSPRSMDEFN
+  FROM <schema>.PSPRSMDEFN
  START WITH PORTAL_NAME = :portalName
         AND PORTAL_REFTYPE = 'C'
         AND PORTAL_OBJNAME = :crefObjName
@@ -4712,7 +4748,7 @@ FETCH FIRST 200 ROWS ONLY
 > 路徑標 `UNRESOLVED` 並記 gap；**絕不得**用物件名、delivered 慣例或印象補上缺掉的段。
 > 祖先一律是 Folder：`CONNECT BY` 必須加 `PORTAL_REFTYPE = 'F'`，否則同名的 Folder 與 CREF 會讓走訪分叉。
 > 隱藏旗標是 attribute 列（不是 PSPRSMDEFN 的欄位），鍵含 `PORTAL_REFTYPE`，值欄 `PORTAL_ATTR_VAL` 是 **CLOB**（直接比對＝ORA-00932）：
-> `SELECT PORTAL_OBJNAME FROM PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
+> `SELECT PORTAL_OBJNAME FROM <schema>.PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
 > ——target CREF 或**任一祖先**命中 ＝ 整條路徑在 Classic 選單看不到 → canonical 不回該列（診斷形 `PATH_HIDDEN=1`），gaps 記一行。
 > 同理，target 或**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → canonical 不回該列（診斷形 `PATH_EXPIRED=1`），gaps 記一行。
 > 平台可攜性：非 Oracle 環境改用遞迴 CTE＋顯式 depth 計數＋visited 反連接，行為必須完全一致（待驗）。
@@ -4724,8 +4760,8 @@ SELECT D.PORTAL_OBJNAME,
        D.PORTAL_LABEL AS BASE_LABEL,
        L.PORTAL_LABEL AS LANG_LABEL,
        COALESCE(NULLIF(TRIM(L.PORTAL_LABEL), ''), D.PORTAL_LABEL) AS DISPLAY_TEXT
-  FROM PSPRSMDEFN D
-  LEFT JOIN PSPRSMDEFNLANG L
+  FROM <schema>.PSPRSMDEFN D
+  LEFT JOIN <schema>.PSPRSMDEFNLANG L
     ON L.PORTAL_NAME = D.PORTAL_NAME
    AND L.PORTAL_REFTYPE = D.PORTAL_REFTYPE
    AND L.PORTAL_OBJNAME = D.PORTAL_OBJNAME
@@ -4750,14 +4786,14 @@ FETCH FIRST 200 ROWS ONLY
 -- (1) LINK 的指向機制**未證實**，先探測：LINK 列是否也帶 URI 三段？
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_PRNTOBJNAME
-  FROM PSPRSMDEFN
+  FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT = 'LINK'
 FETCH FIRST 20 ROWS ONLY;
 -- (2) 其他 surface 是否存在（存在與否都要回 gap，見下）
-SELECT PORTAL_CREF_USGT, COUNT(*) FROM PSPRSMDEFN
+SELECT PORTAL_CREF_USGT, COUNT(*) FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT IN ('GRPT','HPGT','HPGC')
  GROUP BY PORTAL_CREF_USGT FETCH FIRST 20 ROWS ONLY;
-SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM PSPRSMDEFN
+SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'F'
    AND (UPPER(PORTAL_LABEL) LIKE '%FLUID%' OR UPPER(PORTAL_LABEL) LIKE '%NAVIGATION COLLECTION%')
 FETCH FIRST 50 ROWS ONLY
@@ -4787,17 +4823,17 @@ FETCH FIRST 50 ROWS ONLY
 
 ```sql
 -- 程式 → Process Definition
-SELECT PRCSTYPE, PRCSNAME, DESCR FROM PS_PRCSDEFN WHERE PRCSNAME = :name;
+SELECT PRCSTYPE, PRCSNAME, DESCR FROM <schema>.PS_PRCSDEFN WHERE PRCSNAME = :name;
 -- 允許執行它的 Component（Run Control 頁面所在）
-SELECT PRCSNAME, PNLGRPNAME FROM PS_PRCSDEFNPNL WHERE PRCSNAME = :name;
+SELECT PRCSNAME, PNLGRPNAME FROM <schema>.PS_PRCSDEFNPNL WHERE PRCSNAME = :name;
 -- 被哪些 Job 包含
-SELECT PRCSJOBNAME, PRCSNAME, PRCSJOBSEQ FROM PS_PRCSJOBITEM WHERE PRCSNAME = :name;
+SELECT PRCSJOBNAME, PRCSNAME, PRCSJOBSEQ FROM <schema>.PS_PRCSJOBITEM WHERE PRCSNAME = :name;
 -- 已排程的請求（recurrence 名稱在此）
 SELECT PRCSNAME, RECURNAME, RUNSTATUS, RUNDTTM
-  FROM PSPRCSRQST WHERE PRCSNAME = :name AND RECURNAME <> ' '
+  FROM <schema>.PSPRCSRQST WHERE PRCSNAME = :name AND RECURNAME <> ' '
 FETCH FIRST 50 ROWS ONLY;
 -- Recurrence 定義
-SELECT * FROM PS_PRCSRECUR WHERE RECURNAME = :recurName;
+SELECT * FROM <schema>.PS_PRCSRECUR WHERE RECURNAME = :recurName;
 ```
 
 ---
@@ -4809,22 +4845,22 @@ SELECT * FROM PS_PRCSRECUR WHERE RECURNAME = :recurName;
 -- 本節回傳的 MENUNAME 是 **technical authorization metadata**，不是導覽路徑；
 -- 「某角色實際看得到哪個入口」需另外接 §2k 的 Portal Registry 入口與 CREF 權限，本節不足以回答
 SELECT DISTINCT A.CLASSID, A.MENUNAME, A.AUTHORIZEDACTIONS
-  FROM PSAUTHITEM A
-  JOIN PSMENUITEM M
+  FROM <schema>.PSAUTHITEM A
+  JOIN <schema>.PSMENUITEM M
     ON A.MENUNAME = M.MENUNAME AND A.BARITEMNAME = M.ITEMNAME
  WHERE M.PNLGRPNAME = :componentName
 FETCH FIRST 100 ROWS ONLY;
 
 -- Permission List → Roles
-SELECT ROLENAME, CLASSID FROM PSROLECLASS WHERE CLASSID = :classId;
+SELECT ROLENAME, CLASSID FROM <schema>.PSROLECLASS WHERE CLASSID = :classId;
 
 -- Role → 使用者「數量」（只回彙總，不列名單）
 SELECT ROLENAME, COUNT(*) AS USER_CNT
-  FROM PSROLEUSER WHERE ROLENAME = :roleName GROUP BY ROLENAME;
+  FROM <schema>.PSROLEUSER WHERE ROLENAME = :roleName GROUP BY ROLENAME;
 
 -- Row-level：Component 的 Search Record
 SELECT PNLGRPNAME, SEARCHRECNAME, ADDSRCHRECNAME
-  FROM PSPNLGRPDEFN WHERE PNLGRPNAME = :componentName;
+  FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME = :componentName;
 ```
 
 ---
@@ -4833,10 +4869,10 @@ SELECT PNLGRPNAME, SEARCHRECNAME, ADDSRCHRECNAME
 
 ```sql
 -- AE 有哪些 Section
-SELECT AE_APPLID, AE_SECTION, DESCR FROM PSAESECTDEFN WHERE AE_APPLID = :aeName;
+SELECT AE_APPLID, AE_SECTION, DESCR FROM <schema>.PSAESECTDEFN WHERE AE_APPLID = :aeName;
 -- Section 有哪些 Step
 SELECT AE_SECTION, AE_STEP, AE_STMT_TYPE
-  FROM PSAESTEPDEFN WHERE AE_APPLID = :aeName AND AE_SECTION = :section;
+  FROM <schema>.PSAESTEPDEFN WHERE AE_APPLID = :aeName AND AE_SECTION = :section;
 ```
 
 > Step 的 SQL / PeopleCode **內容**不從這裡撈——照長文本協定走
@@ -4848,13 +4884,13 @@ SELECT AE_SECTION, AE_STEP, AE_STMT_TYPE
 
 ```sql
 -- Record 定義與實體表名（SQLTABLENAME 空白 → PS_<RECNAME>）
-SELECT RECNAME, RECTYPE, SQLTABLENAME, RECDESCR FROM PSRECDEFN WHERE RECNAME = :recName;
+SELECT RECNAME, RECTYPE, SQLTABLENAME, RECDESCR FROM <schema>.PSRECDEFN WHERE RECNAME = :recName;
 -- Record 欄位清單（含 subrecord 展開）
 SELECT RECNAME, FIELDNAME, FIELDNUM, EDITTABLE
-  FROM PSRECFIELDDB WHERE RECNAME = :recName ORDER BY FIELDNUM
+  FROM <schema>.PSRECFIELDDB WHERE RECNAME = :recName ORDER BY FIELDNUM
 FETCH FIRST 200 ROWS ONLY;
 -- 欄位被哪些 Record 使用（血緣輔助）
-SELECT RECNAME FROM PSRECFIELDDB WHERE FIELDNAME = :fieldName
+SELECT RECNAME FROM <schema>.PSRECFIELDDB WHERE FIELDNAME = :fieldName
 FETCH FIRST 100 ROWS ONLY;
 ```
 
@@ -4875,6 +4911,7 @@ SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE
  WHERE TABLE_NAME IN ('PSRECFIELDDB', 'PSPCMNAME')
    AND COLUMN_NAME IN ('RECNAME', 'FIELDNAME', 'FIELDNUM', 'DEFRECNAME', 'DEFFIELDNAME', 'REFNAME',
                        'OBJECTVALUE1', 'OBJECTVALUE2', 'OBJECTVALUE3')
+   AND OWNER = UPPER('<schema>')
  ORDER BY TABLE_NAME, COLUMN_NAME
 FETCH FIRST 50 ROWS ONLY;
 ```
@@ -4886,7 +4923,7 @@ FETCH FIRST 50 ROWS ONLY;
 
 ```sql
 SELECT FIELDNAME, FIELDNUM, DEFRECNAME, DEFFIELDNAME
-  FROM PSRECFIELDDB
+  FROM <schema>.PSRECFIELDDB
  WHERE RECNAME = :recName
  ORDER BY FIELDNUM
 FETCH FIRST 200 ROWS ONLY;
@@ -4909,7 +4946,7 @@ FETCH FIRST 200 ROWS ONLY;
 ```
 
 - 回 0 列 → 沒有實體表（View、Derived／Work），整個 Record 判不了、全部保留。
-- 多個 OWNER → 只採 customization-profile `oracle.currentSchema` 那組；判斷不了就整個 Record 判不了、全部保留。
+- 多個 OWNER → 只採 `<schema>`（profile `oracle.currentSchema`）那組；判斷不了就整個 Record 判不了、全部保留。
 - DATA_TYPE 是 LONG、LONG RAW、RAW、CLOB、BLOB、NCLOB → 該欄判不了、保留，不進 7c。
 - 統計資訊只能用來判「有使用跡象」：日期型 NUM_DISTINCT ≥ 1、其他型 NUM_DISTINCT ≥ 3 → 保留，不必進 7c。
   其餘欄位（含沒有統計資訊）是候選，進 7c。統計資訊不能用來判無用。
@@ -4922,7 +4959,7 @@ SELECT COUNT(*) AS TOTAL_ROWS,
        SUM(CASE WHEN <CHAR_FIELD_D> NOT IN (' ', '<預設常數>') THEN 1 ELSE 0 END) AS <CHAR_FIELD_D>,
        SUM(CASE WHEN <NUM_FIELD> NOT IN (0, <預設常數>) THEN 1 ELSE 0 END) AS <NUM_FIELD>,
        SUM(CASE WHEN <DATE_FIELD> IS NOT NULL THEN 1 ELSE 0 END) AS <DATE_FIELD>
-  FROM <physicalTable>
+  FROM <schema>.<physicalTable>
 FETCH FIRST 1 ROWS ONLY;
 ```
 
@@ -4939,7 +4976,7 @@ FETCH FIRST 1 ROWS ONLY;
 
 ```sql
 SELECT OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME, COUNT(*) AS CNT
-  FROM PSPCMNAME
+  FROM <schema>.PSPCMNAME
  WHERE REFNAME IN (<7c 為 0 的欄位>)
  GROUP BY OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME
  ORDER BY OBJECTVALUE1
@@ -4961,9 +4998,9 @@ FETCH FIRST 200 ROWS ONLY;
 
 ```sql
 SELECT * FROM (
-  SELECT 'COMPONENT' AS KIND, PNLGRPNAME AS NAME FROM PSPNLGRPDEFN WHERE PNLGRPNAME IN (<名稱清單>)
+  SELECT 'COMPONENT' AS KIND, PNLGRPNAME AS NAME FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME IN (<名稱清單>)
   UNION ALL
-  SELECT 'RECORD' AS KIND, RECNAME AS NAME FROM PSRECDEFN WHERE RECNAME IN (<名稱清單>)
+  SELECT 'RECORD' AS KIND, RECNAME AS NAME FROM <schema>.PSRECDEFN WHERE RECNAME IN (<名稱清單>)
 ) FETCH FIRST 200 ROWS ONLY;
 ```
 
@@ -6548,208 +6585,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   "nextCursor": ""
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/data.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/functions.json|202|5e176f6a6507eef0a2e63cd6fea2f1811265858f9e848fe52822909783a10096|0
-{
-  "schemaVersion": "1.0",
-  "jobId": "clone-0123456789abcdef",
-  "attemptId": "a0001",
-  "unit": "functions",
-  "subject": "TW_DEMO_APV",
-  "page": 1,
-  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
-  "coverage": "COMPLETE",
-  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
-  "items": [
-    {
-      "type": "FR",
-      "key": "TW_DEMO_APV:APPROVE",
-      "component": "TW_DEMO_APV",
-      "basis": "DERIVED",
-      "certainty": "CONFIRMED",
-      "evidence": [],
-      "derivedFrom": [
-        "@TRN/REQ_STATUS:020>030",
-        "@TRN/REQ_STATUS:020>025",
-        "@TRN/REQ_STATUS:025>030"
-      ],
-      "name": "核准申請",
-      "description": "直屬主管核准待審申請；金額超過 50000 時轉部門主管再核准。",
-      "frKind": "TRANSITION",
-      "entry": {
-        "object": "@OBJ/COMPONENT:TW_DEMO_APV",
-        "modes": [
-          "UPDATE_DISPLAY"
-        ]
-      },
-      "actors": [
-        {
-          "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
-        },
-        {
-          "drv": "@DRV/REQUESTER_SUPERVISOR"
-        },
-        {
-          "drv": "@DRV/REQUESTER_DEPT_MANAGER"
-        }
-      ],
-      "realizes": [
-        "@TRN/REQ_STATUS:020>030",
-        "@TRN/REQ_STATUS:020>025",
-        "@TRN/REQ_STATUS:025>030"
-      ],
-      "preconditions": {
-        "left": {
-          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
-        },
-        "op": "IN",
-        "right": [
-          {
-            "state": "@STATE/REQ_STATUS:020"
-          },
-          {
-            "state": "@STATE/REQ_STATUS:025"
-          }
-        ]
-      },
-      "outcome": "狀態變為 030 並記錄核准者與核准日；或在高額時變為 025。",
-      "priority": "MUST"
-    },
-    {
-      "type": "FR",
-      "key": "TW_DEMO_APV:RETURN",
-      "component": "TW_DEMO_APV",
-      "basis": "DERIVED",
-      "certainty": "CONFIRMED",
-      "evidence": [],
-      "derivedFrom": [
-        "@TRN/REQ_STATUS:020>015",
-        "@TRN/REQ_STATUS:025>015"
-      ],
-      "name": "退回申請",
-      "description": "審核者填寫意見後退回，申請人可補件重新送出。",
-      "frKind": "TRANSITION",
-      "entry": {
-        "object": "@OBJ/COMPONENT:TW_DEMO_APV",
-        "modes": [
-          "UPDATE_DISPLAY"
-        ]
-      },
-      "actors": [
-        {
-          "role": "@ROLE/ROLE:TW_DEMO_APPROVER"
-        },
-        {
-          "drv": "@DRV/REQUESTER_SUPERVISOR"
-        },
-        {
-          "drv": "@DRV/REQUESTER_DEPT_MANAGER"
-        }
-      ],
-      "realizes": [
-        "@TRN/REQ_STATUS:020>015",
-        "@TRN/REQ_STATUS:025>015"
-      ],
-      "preconditions": {
-        "left": {
-          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
-        },
-        "op": "IN",
-        "right": [
-          {
-            "state": "@STATE/REQ_STATUS:020"
-          },
-          {
-            "state": "@STATE/REQ_STATUS:025"
-          }
-        ]
-      },
-      "outcome": "狀態變為 015，保留審核意見。",
-      "priority": "MUST"
-    },
-    {
-      "type": "FR",
-      "key": "TW_DEMO_REQ:CREATE",
-      "component": "TW_DEMO_REQ",
-      "basis": "DERIVED",
-      "certainty": "CONFIRMED",
-      "evidence": [],
-      "derivedFrom": [
-        "@TRN/REQ_STATUS:*>010"
-      ],
-      "name": "建立申請",
-      "description": "申請人在新增模式輸入金額與事由並存檔，建立狀態為草稿的申請單。",
-      "frKind": "TRANSITION",
-      "entry": {
-        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
-        "modes": [
-          "ADD"
-        ]
-      },
-      "actors": [
-        {
-          "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
-        }
-      ],
-      "realizes": [
-        "@TRN/REQ_STATUS:*>010"
-      ],
-      "preconditions": {
-        "na": "新建沒有前置狀態"
-      },
-      "outcome": "產生一張狀態 010 的申請單，申請人為目前使用者、單號已取號。",
-      "priority": "MUST"
-    },
-    {
-      "type": "FR",
-      "key": "TW_DEMO_REQ:SUBMIT",
-      "component": "TW_DEMO_REQ",
-      "basis": "DERIVED",
-      "certainty": "CONFIRMED",
-      "evidence": [],
-      "derivedFrom": [
-        "@TRN/REQ_STATUS:010>020",
-        "@TRN/REQ_STATUS:015>020"
-      ],
-      "name": "送出申請",
-      "description": "申請人把草稿或退回補件中的申請單送出給直屬主管審核。",
-      "frKind": "TRANSITION",
-      "entry": {
-        "object": "@OBJ/COMPONENT:TW_DEMO_REQ",
-        "modes": [
-          "UPDATE_DISPLAY"
-        ]
-      },
-      "actors": [
-        {
-          "role": "@ROLE/ROLE:TW_DEMO_REQUESTER"
-        }
-      ],
-      "realizes": [
-        "@TRN/REQ_STATUS:010>020",
-        "@TRN/REQ_STATUS:015>020"
-      ],
-      "preconditions": {
-        "left": {
-          "fld": "@FLD/TW_DEMO_REQHDR.REQ_STATUS"
-        },
-        "op": "IN",
-        "right": [
-          {
-            "state": "@STATE/REQ_STATUS:010"
-          },
-          {
-            "state": "@STATE/REQ_STATUS:015"
-          }
-        ]
-      },
-      "outcome": "狀態變為 020，記錄送出日，並排入送審通知。",
-      "priority": "MUST"
-    }
-  ],
-  "evidence": [],
-  "questions": [],
-  "requests": [],
-  "nextCursor": ""
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/functions.json
-@@@PSBUNDLE-PART-END|a4645a94518ffafc|2|8
+@@@PSBUNDLE-PART-END|f4668d8098f2324a|2|8

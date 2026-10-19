@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit b540051）第 4／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 4／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|b540051|a4645a94518ffafc|4|8|7747|64c2cf22060c0a5dd5cb450e339a53b9b0c9032b44b4f3e45b5c2be9ceb7c0c1
+@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|4|8|7748|1d4ce9adb704b3289df2ebe694a3b9bf3e7d691e9d670793566c7e5ecbafebd8
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/clone-profile.json|59|93ff3d0fb58660c4aaad238f6fae89dab85952cf78647e5ae167ab262ad6fa08|0
 {
   "schemaVersion": 1,
@@ -1336,7 +1336,7 @@ employeeNameSync:
     客製證據只涵蓋同步觸發與寫入 HR_NAME_SYNC；
     姓名原始欄位定義需查 PERSONAL_DATA（delivered fallback，使用時必須回報）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/test-fixtures.yaml
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/test-scenarios.md|732|d80454c713ec97d2d966c25288a37ca28685f21b24bd312383c24ffe047aae52|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/test-scenarios.md|733|186049455efc2c610ea2fc82d3d05f7f636780f4fcf493153530875d09473da9|0
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
@@ -2025,6 +2025,7 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | R4 | 併發 | 一題觸發 ≥2 個 DB 委派 | 只有主 agent connect 一次；subagent 端零 connect／disconnect 呼叫 |
 | R5 | 連線建不起來 | 停掉 SQLcl 端再問 | 主 agent connect 兩次都失敗 → list_connections 一次、把清單原文附在答覆、回「DB 連線建立失敗（原因）」；不說「通道忙碌」、不自己換名字重連 |
 | R6 | schema 未回填 | profile currentSchema=FILL_ME 時查 PeopleTools 表 | blockedReason=SCHEMA_UNRESOLVED，答覆說「currentSchema 未回填」 |
+| R43 | 唯讀帳號表名前綴 | agent 用唯讀帳號（不能 ALTER SESSION、沒有同義字）、profile currentSchema 已填，問一題要查 PSXLATITEM 的選項題 | subagent 的 sql_run 每個表名都是 `<currentSchema>.表名`、零 ALTER SESSION；漏帶前綴撞 ORA-00942 時補齊重發一次就成功；報告 COMPLETE |
 | R7 | 轉譯 | 上述各種 BLOCKED | orchestrator 依 blockedReason 用對應句型；NOT_CONNECTED 不會直接出現在對使用者的答覆；ORACLE_MCP_DOWN → 「oracleMCP 工具目前不可用（掛載故障，請管理者重掛）」 |
 | R8 | 無條件 | 問一題完全不需要 DB 的問題（例如純 PeopleCode 流程） | 主 agent 仍在開場 connect（第一個 oracleMCP 呼叫就是 connect，且在第一個 task 之前；零 list_connections）；答覆不受影響 |
 
@@ -7748,4 +7749,4 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-PART-END|a4645a94518ffafc|4|8
+@@@PSBUNDLE-PART-END|f4668d8098f2324a|4|8
