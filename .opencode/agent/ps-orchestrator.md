@@ -115,6 +115,7 @@ tools:
 | 問題涉及 | 委派給 |
 |---|---|
 | 畫面文字、欄位選項、label↔儲存值、Page/Component 結構 | @ps-ui-flow |
+| 欄位是什麼元件、唯讀／隱藏／必填、Prompt 查哪張表與檢不檢核 | @ps-ui-flow（cookbook §2l，一個 Page 一次） |
 | 欄位事件、存檔後動作、PeopleCode 分支邏輯 | @ps-peoplecode-flow |
 | SQL Definition、View SQL、table 讀寫、Meta-SQL | @ps-sql-flow |
 | SQR / SQC 程式、批次報表邏輯 | @ps-sqr-flow |

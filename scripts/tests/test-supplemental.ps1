@@ -271,7 +271,7 @@ Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x 
 Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'CONFIRMED 必須有證據#') "負例：CONFIRMED 無證據#"
 Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | MAYBE | x | 1 |', '| 摘要 | CONFIRMED | x | 1 |') $ev2) $false
 $t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap
-Assert ((-not $t.Ok) -and ($t.Errors -join ';') -match '信心「MAYBE」不在三值' -and ($t.Errors -join ';') -match '節名「摘要」不在八節') "負例：信心值域、節名八節"
+Assert ((-not $t.Ok) -and ($t.Errors -join ';') -match '信心「MAYBE」不在三值' -and ($t.Errors -join ';') -match '節名「摘要」不在能力目錄的 NN 節') "負例：信心值域、節名不在能力目錄的 NN 節"
 Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @() $ev2) $false
 Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'RESEARCHED 但追加事實為空') "負例：RESEARCHED 無事實"
 Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x | 1 |') @('| a | b | ChunkId 3f2a9c1e |')) $false
@@ -360,6 +360,28 @@ $mg4 = Merge-PsSuppReceipt -NnPath $noEv -Receipt $recv -RequestId $rid1
 $t4 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $noEv)
 Assert ($mg4.Ok -and $mg4.EvidenceRows[0] -eq 1 -and ([array]::IndexOf($t4, '## Evidence 附錄') -gt [array]::IndexOf($t4, '## 未解事項（gaps）')) -and (@($t4 | Where-Object { $_ -match '^## ' }).Count -eq 8)) "無附錄／缺多節的 NN：附錄建在檔尾（編號從 1）、五個缺節在未解事項前建立（共 8 個 ## 節）"
 Assert ((Test-PsSuppAlreadyCovered -TargetFacts $fAfter -FactKind 'DATA.FILE_INPUT' -Capabilities $cap) -and -not (Test-PsSuppAlreadyCovered -TargetFacts $facts1 -FactKind 'SECURITY.ACCESS' -Capabilities $cap)) "ALREADY_COVERED 判定：相關節非空洞才成立（原檔無權限節 → 不成立）"
+
+# 畫面元件（表格節、六格）：缺節時建在「畫面與欄位」之後；已有節時表末追加；ALREADY_COVERED 看畫面元件列數
+$ctlNn = Join-Path $root 'ctl-nn.md'
+Write-Utf8 $ctlNn (New-NnLines '07' 'TW_DEMO_C' @() $false) $false
+$rcCtl = Join-Path $partsDir ($rid1 + '.ctl.md')
+Write-Utf8 $rcCtl (New-ReceiptLines 'RESEARCHED' @('| 畫面元件 | CONFIRMED | TW_DEMO_PG｜5｜TW_DEMO_DEPTVW.DESCR｜Edit Box｜DISPLAY_ONLY RELATED_TO=4｜ | 2 |') $ev2) $false
+$recvCtl = Test-PsSuppReceipt -LiteralPath $rcCtl -Capabilities $cap
+Assert ($recvCtl.Ok -and $recvCtl.Facts.Count -eq 1 -and $recvCtl.Facts[0].Section -eq '畫面元件') "畫面元件事實：六格敘述（末格可空）合格"
+$factsCtl0 = Get-PsKnNnFacts -LiteralPath $ctlNn -Domain '職缺測試'
+Assert (-not (Test-PsSuppAlreadyCovered -TargetFacts $factsCtl0 -FactKind 'UI.CONTROLS' -Capabilities $cap)) "UI.CONTROLS：NN 沒有畫面元件 → 不得 ALREADY_COVERED"
+$mgC = Merge-PsSuppReceipt -NnPath $ctlNn -Receipt $recvCtl -RequestId $rid1
+$cl1 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $ctlNn)
+$iFld = [array]::IndexOf($cl1, '| DEMO_STATUS | 狀態 | Translate | 免役=E / 服役中=S | E：使用中（資料 3 筆） |')
+$iCtl = [array]::IndexOf($cl1, '## 畫面元件')
+$iBeh = [array]::IndexOf($cl1, '## 行為邏輯')
+Assert ($mgC.Ok -and $iFld -gt 0 -and $iCtl -eq ($iFld + 2) -and $cl1[$iCtl + 2] -eq '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |' -and $cl1[$iCtl + 4] -eq '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 | （附錄 #5） |' -and $cl1[$iCtl + 5] -eq '' -and $iBeh -eq ($iCtl + 6)) "缺「畫面元件」節：建在畫面與欄位之後、行為邏輯之前，六格，附錄參照接在查值格"
+$mgC2 = Merge-PsSuppReceipt -NnPath $ctlNn -Receipt $recvCtl -RequestId $rid1
+$cl2 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $ctlNn)
+$iCtl2 = [array]::IndexOf($cl2, '## 畫面元件')
+$factsCtl = Get-PsKnNnFacts -LiteralPath $ctlNn -Domain '職缺測試'
+Assert ($mgC2.Ok -and $cl2[$iCtl2 + 5] -eq '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 | （附錄 #7） |' -and $factsCtl.controlRows -eq 2 -and $factsCtl.fieldRows -eq 1 -and (Test-PsSuppAlreadyCovered -TargetFacts $factsCtl -FactKind 'UI.CONTROLS' -Capabilities $cap)) "已有「畫面元件」節：表末追加；畫面元件 2 列、畫面與欄位列數不受影響；ALREADY_COVERED 成立"
+Remove-Item -LiteralPath $ctlNn, $rcCtl -Force
 
 # ── 情境 6：attempts、D 列、result、wiki 標記、搬移 ────────────────
 Write-Host "情境 6：attempts 推導、目標無 NN → D 列、result create-only、wiki stale／reviewed、parts 搬移"

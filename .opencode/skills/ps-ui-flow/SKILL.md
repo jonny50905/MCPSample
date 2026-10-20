@@ -110,6 +110,12 @@ scroll 層級變異（HideRow／HideScroll 等，無 Record.Field 可解析）
 幾何包含（§2i）＝推斷：「欄位在框內」的結論最高標 INFERRED；
 座標與 metadata 事實本身仍是 SQL 證據（sql＋keyRows）。
 
+## 畫面元件（設計期設定）
+
+Page 上每個元件的種類、設計期屬性（Display Only、Invisible、Required、Key）、相關顯示與控制欄、查值方式（Prompt 表與檢核、
+Translate、Y/N）照 cookbook §2l 查、照它的轉寫規則回報（`pageControls[]`）。設計期設定是畫面打開時的預設；PeopleCode 在執行期
+改的顯示、可改、必填屬「條件 UI」，兩者分開寫，不互相覆蓋。
+
 ## 工具
 
 | 工具 | 用途 |

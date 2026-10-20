@@ -68,6 +68,10 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
    labels 由逐段列填）。0 列先跑 §2k-C 診斷形：`CLASSIC_VISIBLE = 0` 的列不列入口、gaps 記一行原因；仍 0 列照三步排查。
    `verified: false` → 先跑 2k-0 驗表名／欄位／值域並回報，不得自行推導。
    `technicalMenuLocations[]` 由 2k-1 取，永遠分開回報。本步屬 **oracleMCP 類委派，計入同時 ≤ 3**。
+3b. **畫面元件（委派任務要某個 Page 的元件清單時）**：照 cookbook §2l，一個 Page 一次、一次最多 40 列。
+   回報 `pageControls[]`：每個 Page（每一批）一筆，`sql` 放實際執行的 SELECT 原樣，`rows` 每列照 §2l 轉寫規則填
+   `fieldNum`／`field`／`control`／`properties`／`lookup`（字樣照抄、不翻譯、不解讀），回滿 40 列時 `more: true`。
+   不受 findings 8 筆上限；本步屬 **oracleMCP 類委派，計入同時 ≤ 3**。
 4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
 5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
    定義的 JSON 報告。
@@ -78,6 +82,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
   選項文字 / label 反查欄位、Page ↔ Component ↔ Record.Field 對映、
   prompt record 與基數、條件 UI 變異目標解析
   （Record.Field → Group Box／Subpage／受影響控制項，§2h～§2j）。
+- **可用（oracleMCP + cookbook §2l）**：Page 上的元件種類、設計期屬性（Display Only、Invisible、相關顯示與控制欄、
+  Required、Key）與查值（Prompt 表與檢核方式、Translate、Y/N），以 `pageControls[]` 回報。
 - **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查
   （只吃欄位名）、`search_component_metadata` Component 關鍵字搜尋
   （只吃 Component 關鍵字）——Page／Record 名帶入必查空。
@@ -133,7 +139,7 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 - 不得回傳大段原始資料：單一 quote ≤ 5 行，全報告引用總量 ≤ 20 行。
 - 每個 claim 必附 evidence IDs；沒證據的寫入 `gaps`，不寫入 `findings`。
 - 高基數 prompt 只回 metadata，不列值清單。
-- UI 候選最多看 20 筆、報告最多回 8 筆最相關。
+- UI 候選最多看 20 筆、報告最多回 8 筆最相關（`pageControls[]` 不在此限：照 §2l 每批 ≤ 40 列）。
 - **選項類任務的報告義務**：`suggestedNext` 必附一筆
   `{ "agent": "ps-peoplecode-flow", "task": "搜尋 <RECNAME>.<FIELDNAME> 與值 '<V1>','<V2>'… 的設值 / 分支邏輯" }`
   （除非委派 prompt 明說只要清單）——選項清單不等於業務含意的全部。

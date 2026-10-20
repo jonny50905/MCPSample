@@ -356,7 +356,7 @@ function Get-PsKnNnFacts {
         domain = $Domain; file = $name; title = ''; primaryObject = ''; status = 'UNKNOWN'; origin = ''
         lineCount = $lines.Count; hash = (Get-PsKnTextHash -Text $text)
         sections = @(); missingSections = @(); duplicateSections = 0
-        relatedObjects = @(); fieldRows = 0; fieldsNotApplicable = $false
+        relatedObjects = @(); fieldRows = 0; fieldsNotApplicable = $false; controlRows = 0
         behaviorCounts = [ordered]@{ CONFIRMED = 0; INFERRED = 0; DYNAMIC_RUNTIME = 0 }
         dataFlow = @(); executionHollow = $true; permissionHollow = $true; gaps = 0
         evidence = @(); evidenceKinds = [ordered]@{ CHUNK = 0; SQL = 0; PENDING_MANUAL = 0; UNRESOLVED = 0 }
@@ -416,6 +416,9 @@ function Get-PsKnNnFacts {
         if ($sec.End -gt $sec.Start) { $body = ($lines[($sec.Start) .. ([Math]::Min($sec.End, $lines.Count) - 1)]) -join "`n" }
         if ($body -match '（無') { $f.fieldsNotApplicable = $true }
     }
+    # 畫面元件
+    $sec = Find-PsKnSection -Headings $heads -Key '畫面元件'
+    if ($null -ne $sec) { $ctlRows = Get-PsKnTableRows -Lines $lines -Start $sec.Start -End $sec.End; $f.controlRows = $ctlRows.Count }
     # 行為邏輯
     $sec = Find-PsKnSection -Headings $heads -Key '行為邏輯'
     if ($null -ne $sec) {
@@ -834,7 +837,7 @@ function Build-PsKnowledgeIndex {
                 pendingRepairs = $gr.pendingRepairs; hashSinceAudit = $gr.hashSinceAudit; receiptTier = $tier; receiptStale = $receiptStale
                 lineCount = $nn.lineCount; hash = $nn.hash
                 sections = @($nn.sections); missingSections = @($nn.missingSections); duplicateSections = $nn.duplicateSections
-                relatedObjects = @($nn.relatedObjects); fieldRows = $nn.fieldRows; fieldsNotApplicable = $nn.fieldsNotApplicable
+                relatedObjects = @($nn.relatedObjects); fieldRows = $nn.fieldRows; fieldsNotApplicable = $nn.fieldsNotApplicable; controlRows = $nn.controlRows
                 behaviorCounts = $nn.behaviorCounts; dataFlow = @($nn.dataFlow); executionHollow = $nn.executionHollow; permissionHollow = $nn.permissionHollow
                 gaps = $nn.gaps; evidenceCount = $nn.evidence.Count; evidenceKinds = $nn.evidenceKinds; links = @($nn.links)
             }

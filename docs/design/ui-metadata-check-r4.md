@@ -130,6 +130,11 @@ SELECT 'GRANT SELECT ON ' || UPPER('<schema>') || '.' || T.COLUMN_VALUE || ' TO 
 通＝答得出選項、沒有「currentSchema 未回填」或「查不到表」；不通＝把 agent 回的那句錯誤類型（例：ORA-00942、ORA-02421）告訴我，不用貼 SQL。
 OpenCode 版也可以跑 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`，結束碼 0＝通（SOP-30 第 7 步）。
 
+## 結果（2026-10-20）
+
+H0 成立（ASSOCFIELDNUM＝控制欄 FIELDNUM）；256＝Required；FIELDUSE 1＝Display Only、2＝Invisible；ACTIONS 2＝Update/Display；唯讀帳號 32 張表都看得到。
+明細與判讀在 `ui-control-lookup-dependency-memo.md` §7.1；框架落在 cookbook §2l 與 NN「## 畫面元件」（L151）。
+
 ## 回報範本
 
 ```text

@@ -1126,6 +1126,21 @@ $legacyPlan.units[0].unitKey = Get-PsSpUnitKey -UnitId ([string]$legacyPlan.unit
 $legacyStatus = Get-PsSpUnitStatus -Root $root -Dirs $dirsE -Plan $legacyPlan -Index $idxCont
 Assert ([string]@($legacyStatus)[0].State -eq 'SOURCE_CHANGED' -and $null -eq @($legacyStatus)[0].Receipt) '舊版行號式 unitId 的 plan 必須重 Plan，不能沿用可能漏續篇的分母'
 
+Write-Host "情境：EXTRACT UI.CONTROLS（## 畫面元件）"
+$ctlRoot = Join-Path $root 'ctl-root'
+$ctlDom = Join-Path $ctlRoot (Join-Path 'docs' (Join-Path 'ps-research' '測試領域'))
+New-Item -ItemType Directory -Path $ctlDom -Force | Out-Null
+Write-Utf8 (Join-Path $ctlDom '07-TW_DEMO_C.md') @('# 07 功能（[[TW_DEMO_C]]）', '', '## 畫面與欄位', '', '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |', '|---|---|---|---|---|', '| DEMO_STATUS | 狀態 | Translate | E=免役 | 使用中 |', '', '## 畫面元件', '', '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |', '|---|---|---|---|---|---|', '| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（附錄 #1） |', '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |', '| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Link: PeopleCode |  |  |', '', '## Evidence 附錄', '', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', '| 1 | PSPNLFIELD | 畫面元件 | SELECT P.FIELDNUM FROM X.PSPNLFIELD P WHERE P.PNLNAME = ''TW_DEMO_PG'' |') $false
+Write-Utf8 (Join-Path $ctlDom '08-TW_DEMO_D.md') @('# 08 功能（[[TW_DEMO_D]]）', '', '## 畫面與欄位', '', '（無——Function Library，無使用者畫面）') $false
+$capCtl = Get-PsSpFactKind -Capabilities $caps -FactKind 'UI.CONTROLS'
+$ctxCtl = Get-PsSpNnCtx -Root $ctlRoot -Index $null -Domain '測試領域' -File '07-TW_DEMO_C.md' -Cache @{}
+$xCtl = New-PsSpExtractFacts -Req @{ id = 'R_CTL'; factKind = 'UI.CONTROLS'; evidencePolicy = 'ANY' } -Cap $capCtl -Targets @($ctxCtl) -Callees @() -Index $null -Root $ctlRoot -Component 'TW_DEMO_C' -Cache @{}
+$fCtl = @($xCtl.Facts)
+Assert ($null -ne $capCtl -and [string]$capCtl.mode -eq 'EXTRACT' -and $fCtl.Count -eq 1 -and @($fCtl[0].value.controls).Count -eq 3 -and @($fCtl[0].value.properties).Count -eq 2 -and @($fCtl[0].value.lookup).Count -eq 1 -and [string]$fCtl[0].closure -eq 'ROWS' -and @($fCtl[0].evidenceRefs).Count -eq 1 -and [bool]$fCtl[0].evidenceRefs[0].resolved) "EXTRACT UI.CONTROLS：3 列、2 列有屬性、1 列有查值、附錄參照解得到"
+$ctxNo = Get-PsSpNnCtx -Root $ctlRoot -Index $null -Domain '測試領域' -File '08-TW_DEMO_D.md' -Cache @{}
+$xNo = New-PsSpExtractFacts -Req @{ id = 'R_CTL'; factKind = 'UI.CONTROLS'; evidencePolicy = 'ANY' } -Cap $capCtl -Targets @($ctxNo) -Callees @() -Index $null -Root $ctlRoot -Component 'TW_DEMO_D' -Cache @{}
+Assert (@($xNo.Facts).Count -eq 0 -and @($xNo.Needs).Count -eq 1 -and [string]$xNo.Needs[0].Reason -eq 'MISSING') "EXTRACT UI.CONTROLS：沒有「## 畫面元件」→ MISSING（交補研究補）"
+
 Remove-Item -Recurse -Force $root
 Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }

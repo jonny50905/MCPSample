@@ -572,6 +572,74 @@ FETCH FIRST 50 ROWS ONLY
 > `AUTHORIZED_FOR_CONTEXT` 本版**不實作**：`PSPRSMPERM`（含 `PORTAL_ISCASCADE`）只給到 permission list 層級，
 > 角色／使用者／runtime portal context 皆未建模，此類問題一律回 gap。
 
+**2l. 畫面元件與設計期屬性（一個 Page 一次；NN「## 畫面元件」與「這個欄位是什麼元件、唯讀嗎、必填嗎、查值查哪裡」）**
+
+只列綁欄位的元件、按鈕／連結、Grid、Scroll Area、HTML Area、Subpage、Secondary Page；Static Text、Frame、Group Box、
+Static Image 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
+FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
+
+```sql
+SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
+       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List' WHEN 6 THEN 'Long Edit Box'
+                        WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
+                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Link: PeopleCode'
+                        WHEN 16 THEN 'Push Button/Link: Component' WHEN 18 THEN 'Secondary Page'
+                        WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Link: Secondary Page'
+                        WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area' ELSE 'OTHER' END AS CONTROL,
+       TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
+       CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
+       CASE WHEN BITAND(P.FIELDUSE, 2) > 0 THEN 'INVISIBLE' END AS INV,
+       CASE WHEN P.ASSOCFIELDNUM > 0 THEN P.ASSOCFIELDNUM END AS RELATED_TO,
+       CASE WHEN EXISTS (SELECT 1 FROM <schema>.PSPNLFIELD C
+                          WHERE C.PNLNAME = P.PNLNAME AND C.ASSOCFIELDNUM = P.FIELDNUM) THEN 'DISPLAY_CONTROL' END AS DC,
+       CASE WHEN BITAND(F.USEEDIT, 1) > 0 THEN 'KEY' END AS KEY_FLAG,
+       CASE WHEN BITAND(F.USEEDIT, 256) > 0 THEN 'REQUIRED' END AS REQ,
+       CASE WHEN BITAND(F.USEEDIT, 4096) > 0 THEN 'REASONABLE_DATE' END AS RDATE,
+       CASE WHEN BITAND(F.USEEDIT, 32768) > 0 THEN 'AUTO_UPDATE' END AS AUPD,
+       CASE WHEN BITAND(F.USEEDIT, 512) > 0 THEN 'XLAT' WHEN BITAND(F.USEEDIT, 8192) > 0 THEN 'YES_NO' END AS VALUES_EDIT,
+       TRIM(F.EDITTABLE) AS PROMPT_REC,
+       CASE WHEN TRIM(F.EDITTABLE) IS NULL THEN NULL
+            WHEN SUBSTR(TRIM(F.EDITTABLE), 1, 1) = '%' THEN 'DYNAMIC'
+            WHEN BITAND(F.USEEDIT, 16384) > 0 THEN 'EDIT' ELSE 'NO_EDIT' END AS PROMPT_EDIT,
+       (SELECT CASE WHEN R.RECTYPE = 0 THEN 'TABLE' WHEN R.RECTYPE IN (1, 5, 6) THEN 'VIEW'
+                    WHEN R.RECTYPE = 2 THEN 'DERIVED' ELSE 'OTHER' END
+          FROM <schema>.PSRECDEFN R WHERE R.RECNAME = TRIM(F.EDITTABLE)) AS PROMPT_KIND,
+       (SELECT LISTAGG(TRIM(K.FIELDNAME), ',') WITHIN GROUP (ORDER BY K.FIELDNUM)
+          FROM <schema>.PSRECFIELDDB K
+         WHERE K.RECNAME = TRIM(F.EDITTABLE) AND BITAND(K.USEEDIT, 1) > 0) AS PROMPT_KEYS,
+       TRIM(P.GOTOPNLGRPNAME) AS GOTO_COMPONENT, TRIM(P.SUBPNLNAME) AS SUBPAGE
+  FROM <schema>.PSPNLFIELD P
+  LEFT JOIN <schema>.PSRECFIELDDB F ON F.RECNAME = P.RECNAME AND F.FIELDNAME = P.FIELDNAME
+ WHERE P.PNLNAME = :pageName
+   AND P.FIELDTYPE NOT IN (0, 1, 2, 3)
+   AND P.FIELDNUM > :afterFieldNum
+ ORDER BY P.FIELDNUM
+FETCH FIRST 40 ROWS ONLY
+```
+
+轉寫規則（照輸出原樣抄，不加不減、不解讀）：
+
+- 欄位：`RECNAME.FIELDNAME`；沒綁 Record 的元件寫 LBLTEXT（沒有就留空）。
+- 元件：CONTROL；OTHER 寫 `OTHER（代碼 <CODE>）`，不猜是什麼元件。
+- 屬性：DO、INV、DC、KEY_FLAG、REQ、RDATE、AUPD 各欄有值的依序以空白串起，再接 `RELATED_TO=<RELATED_TO>`、
+  `LEVEL=<LVL>`（LVL 大於 0 才寫）、`GOTO=<GOTO_COMPONENT>`、`PAGE=<SUBPAGE>`（有值才寫）。
+- 查值：PROMPT_REC 有值寫 `PROMPT <PROMPT_REC> <PROMPT_EDIT>`，PROMPT_KIND／PROMPT_KEYS 有值再接
+  `（<PROMPT_KIND>；鍵 <PROMPT_KEYS>）`；沒有 prompt 時寫 VALUES_EDIT 的值；都沒有留空。
+- 元件是 Subpage、Secondary Page、Push Button/Link: Secondary Page → 以 SUBPAGE 的頁名再跑一次本節
+  （visited 去重、深度 ≤ 8，同 §2j）。
+- 寫成證據時 SQL 原樣保留（含 FROM 與頁名、`:afterFieldNum` 的實際值），每個 Page 每一批一列。
+
+值域：
+
+- DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
+- RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
+- KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
+- XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
+- PROMPT 的 EDIT＝輸入值必須在 prompt 清單內；NO_EDIT＝只提供查詢、不檢核；DYNAMIC＝prompt 表在執行期由另一個欄位的值決定
+  （PROMPT_REC 是 `%` 開頭的欄位名），追 PeopleCode 對該欄位的指派。
+- PROMPT_KIND＝TABLE、VIEW、DERIVED、OTHER；view 的選取條件照長文本協定以 ES＋Source 取，不從 Oracle 撈全文。
+  PROMPT_KEYS＝prompt record 的鍵（依欄位順序）；含 SETID、EFFDT 的照實寫。
+
 ---
 
 ## 3. Process / 排程（協定角色：ps_get_process_usage）

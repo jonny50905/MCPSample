@@ -890,6 +890,22 @@ function New-PsSpExtractFacts {
                 $facts += , ([ordered]@{ factId = ($fk + '@' + $Component); factKind = $fk; requirementIds = @($Req.id); subject = $Component; value = $val; sourceRefs = @($srs); evidenceRefs = @($evs); grade = (Get-PsSpMinGrade -Grades $grades); closure = $cl })
             }
         }
+        'UI.CONTROLS' {
+            $rows = @(); $srs = @(); $grades = @(); $found = $false; $evs = @()
+            foreach ($t in $Targets) {
+                $s = Get-PsSpSection -Ctx $t -Name '畫面元件'
+                if ($null -eq $s) { continue }
+                $found = $true; $srs += , (New-PsSpSourceRef -Ctx $t -Sec $s); $grades += $t.Grade
+                $body = Get-PsSpSectionBody -Ctx $t -Sec $s
+                foreach ($row in (Get-PsKnTableRows -Lines $t.Lines -Start ([int]$s.start) -End ([int]$s.end))) { $rows += , ([ordered]@{ file = $t.File; line = [int]$row.Line; cells = @($row.Cells) }) }
+                $evs += (Get-PsSpCitedEvidence -Ctx $t -Body $body)
+            }
+            if (-not $found -or $rows.Count -eq 0) { & $addNeed 'MISSING' 'COMPONENT' $Component $main.Grade $main }
+            else {
+                $val = [ordered]@{ controls = @($rows); properties = @($rows | Where-Object { $_.cells.Count -ge 5 -and [string]$_.cells[4] -ne '' }); lookup = @($rows | Where-Object { $_.cells.Count -ge 6 -and [string]$_.cells[5] -ne '' }) }
+                $facts += , ([ordered]@{ factId = ($fk + '@' + $Component); factKind = $fk; requirementIds = @($Req.id); subject = $Component; value = $val; sourceRefs = @($srs); evidenceRefs = @($evs); grade = (Get-PsSpMinGrade -Grades $grades); closure = 'ROWS' })
+            }
+        }
         'BEHAVIOR.RULES' {
             $rules = @(); $srs = @(); $grades = @(); $evs = @()
             foreach ($t in $Targets) {
@@ -2254,7 +2270,7 @@ function Get-PsSpEvaluation {
                 $cl = [string]$e.Facts[0].closure
                 $e.Closure = $cl
                 $rows = 0
-                foreach ($f in $e.Facts) { foreach ($pn in @('fields', 'rules', 'tables', 'objects', 'items', 'rows', 'entries')) { $v = Get-PsSpProp $f.value $pn; if ($null -ne $v) { $rows += @($v).Count; break } } }
+                foreach ($f in $e.Facts) { foreach ($pn in @('fields', 'rules', 'tables', 'objects', 'items', 'rows', 'entries', 'controls')) { $v = Get-PsSpProp $f.value $pn; if ($null -ne $v) { $rows += @($v).Count; break } } }
                 if ($fk -eq 'ENTITY.DETAIL' -or $fk -eq 'UI.COMPONENT_IDENTITY' -or $cl -eq 'PRESENT') { $rows = $a }
                 $e.Rows = $rows
                 if ([string]$q.cardinality -eq 'ONE' -and $a -ne 1 -and $fk -ne 'ENTITY.DETAIL') { & $add '7-12' @{ a = $a; c = 'ONE' } }
@@ -2364,6 +2380,7 @@ function ConvertTo-PsSpBlock {
                     if ($v.notApplicable) { $o += '（無畫面欄位）' }
                     else { $o += ConvertTo-PsSpTable -Header @('欄位', '顯示文字', '類型', '選項', '生命狀態') -Rows @($v.fields | ForEach-Object { $c = @($_.cells); while ($c.Count -lt 5) { $c += '' }; , @($c[0], $c[1], $c[2], $c[3], $c[4]) }) }
                 }
+                'UI.CONTROLS' { $o += ConvertTo-PsSpTable -Header @('頁面', '#', '欄位', '元件', '屬性', '查值') -Rows @($v.controls | ForEach-Object { $c = @($_.cells); while ($c.Count -lt 6) { $c += '' }; , @($c[0], $c[1], $c[2], $c[3], $c[4], $c[5]) }) }
                 'BEHAVIOR.RULES' { foreach ($rl in @($v.rules)) { $o += ('- ' + (ConvertTo-PsSpCell ([string]$rl.text))) } }
                 'DATA.FLOW' { $o += ConvertTo-PsSpTable -Header @('表', '操作', '來源', '信心') -Rows @($v.tables | ForEach-Object { , @([string]$_.table, [string]$_.op, [string]$_.source, [string]$_.confidence) }) }
                 'PROCESS.EXECUTION' {

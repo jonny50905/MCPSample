@@ -22,6 +22,7 @@ $script:PsSuppLeakMarkers = @('"agent"', '"findings"', '"searchScope"', '"covera
 $script:PsSuppForbiddenWords = @('requirementRef', 'jobId', 'packId', 'consumer', '{{slot:')
 $script:PsSuppTableSections = @{
     '畫面與欄位' = @{ Header = '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |'; Sep = '|---|---|---|---|---|'; Cells = 5; RefCell = 4 }
+    '畫面元件'   = @{ Header = '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |'; Sep = '|---|---|---|---|---|---|'; Cells = 6; RefCell = 5 }
     '資料流'     = @{ Header = '| 表 | 操作 | 來源 | 信心 |'; Sep = '|---|---|---|---|'; Cells = 3; RefCell = 2 }
     '相關物件'   = @{ Header = '| 物件 | 角色 |'; Sep = '|---|---|'; Cells = 2; RefCell = 1 }
 }
@@ -669,7 +670,7 @@ function Test-PsSuppReceipt {
                 $c = $row.Cells
                 if ($c.Count -ne 4) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列欄數 ' + $c.Count + ' ≠ 4'); continue }
                 $secKey = Get-PsKnSectionKey -Title $c[0]
-                if ($sections -notcontains $secKey) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列節名「' + $c[0] + '」不在八節'); continue }
+                if ($sections -notcontains $secKey) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列節名「' + $c[0] + '」不在能力目錄的 NN 節'); continue }
                 $conf = $c[1].Trim().ToUpperInvariant()
                 if ($confs -notcontains $conf) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列信心「' + $c[1] + '」不在三值'); continue }
                 $desc = $c[2].Trim()
@@ -712,6 +713,7 @@ function Test-PsSuppAlreadyCovered {
     foreach ($s in $secs) {
         switch ($s) {
             '畫面與欄位' { if ([int]$TargetFacts.fieldRows -eq 0 -and -not $TargetFacts.fieldsNotApplicable) { return $false } }
+            '畫面元件' { if ([int]$TargetFacts.controlRows -eq 0) { return $false } }
             '行為邏輯' { $bc = $TargetFacts.behaviorCounts; if (([int]$bc.CONFIRMED + [int]$bc.INFERRED + [int]$bc.DYNAMIC_RUNTIME) -eq 0) { return $false } }
             '資料流' { if (@($TargetFacts.dataFlow).Count -eq 0) { return $false } }
             '執行方式' { if ($TargetFacts.executionHollow) { return $false } }
@@ -862,12 +864,14 @@ function Merge-PsSuppReceipt {
         else {
             $disp = $secKey
             if ($secKey -eq '未解事項') { $disp = '未解事項（gaps）' }
+            $anchor = $anchorMissing
+            if ($secKey -eq '畫面元件') { $fieldSec = Find-PsKnSection -Headings $heads -Key '畫面與欄位'; if ($null -ne $fieldSec) { $anchor = Get-PsSuppInsertAfter -Lines $lines -Sec $fieldSec } }
             $blk = @('', ('## ' + $disp), '')
             if ($script:PsSuppTableSections.ContainsKey($secKey)) { $blk += $script:PsSuppTableSections[$secKey].Header; $blk += $script:PsSuppTableSections[$secKey].Sep }
             $bodyTrim = @($body)
             while ($bodyTrim.Count -gt 0 -and $bodyTrim[0] -eq '') { $bodyTrim = @($bodyTrim | Select-Object -Skip 1) }
             $blk += $bodyTrim
-            $order++; $inserts += , (@{ Index = $anchorMissing; Lines = $blk; Order = $order })
+            $order++; $inserts += , (@{ Index = $anchor; Lines = $blk; Order = $order })
         }
     }
     if ($inserts.Count -eq 0) { $res.Ok = $true; $res.Reason = 'NOTHING_TO_MERGE'; $res.HashAfter = $res.HashBefore; return $res }

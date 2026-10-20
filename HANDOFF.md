@@ -5,6 +5,12 @@
 
 ## 0. 一句話現況
 
+**畫面元件與設計期屬性進研究範本（2026-10-20，L151，分支 `claude/blissful-edison-7hbeqr`）**：第四輪驗證確認元件代碼、Display Only（FIELDUSE 1）、
+Invisible（2）、相關顯示（ASSOCFIELDNUM＝控制欄 FIELDNUM）、Required（USEEDIT 256）後落地：兩版 cookbook §2l（一個 Page 一次、解碼在 SQL、不含 `||`）、
+NN 新節「## 畫面元件」（頁面｜#｜欄位｜元件｜屬性｜查值）、ps-deep-research／ps-ui-flow（`pageControls[]`）／回報契約／問答契約／orchestrator 路由、
+補研究 factKind `UI.CONTROLS`（舊 NN 補法見 SOP-23）、Spec 引擎 EXTRACT `UI.CONTROLS`。待公司機：搬兩版搬運包、/ps-research 一個有畫面的 Component
+看「## 畫面元件」是否照表填、挑一份舊 NN 送 UI.CONTROLS 補研究。未做：Component 動作（ACTIONS 只核對到 2）、代碼 10／15／23／24、PeopleCode 偵測清單補齊。
+
 **agent 唯讀帳號的表名改帶擁有者前綴（2026-10-19，L150，分支 `claude/blissful-edison-7hbeqr`）**：畫面 metadata 第三輪的唯讀帳號 A 測試 FAIL——
 agent 用的唯讀帳號裸表名 ORA-00942、`ALTER SESSION SET CURRENT_SCHEMA` 報 ORA-02421、DBA 不建同義字；L19 的「ALTER SESSION＋裸表名」在唯讀帳號下
 所有 PeopleTools 查詢都查不到。兩版 cookbook 加規則 1a、61 處樣板寫成 `<schema>.表名`（`<schema>`＝profile `oracle.currentSchema`；DUAL、ALL_ 資料字典不加，
@@ -612,3 +618,5 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   同日續：第三輪收（10／23 混用、15／24 容器、FIELDUSE 16 是唯讀候選、ASSOCFIELDNUM 對應待查、256 不能當必填）；唯讀帳號 A 測試 FAIL、DBA 不改 →
   框架改成表名帶擁有者前綴（L150、SOP-30；兩版 cookbook 與 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）。第四輪 SQL `docs/design/ui-metadata-check-r4.md` 待跑；
   公司機搬新版後要做 SOP-30 授權檢查（R4E）與一題端對端（test-scenarios R43）。plugin 重掛通知仍提 CURRENT_SCHEMA（auto off，下次改 plugin 一起改）。
+  2026-10-20：第四輪收（ASSOCFIELDNUM＝控制欄 FIELDNUM、USEEDIT 256＝Required、FIELDUSE 1＝Display Only／2＝Invisible、ACTIONS 2＝Update/Display、唯讀帳號 32 張表都看得到；
+  備忘 §7.1）。第 2、3 步做了第一版：cookbook §2l、NN「## 畫面元件」、補研究 UI.CONTROLS（L151）。Component 動作的其他位元與代碼 10／15／23／24 待核對。

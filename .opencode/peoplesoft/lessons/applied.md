@@ -4079,3 +4079,31 @@
   （表放在另一個 schema、裸表名必失敗）跑過。test-oracle-runtime 需要真 OpenCode，沙箱沒跑。
 - 教訓：「一次設定、之後裸表名」依賴 session 狀態與帳號權限；換成唯讀帳號就整條斷。能寫在每句 SQL 裡的就不要放在 session 裡——樣板直接帶前綴，
   模型只做替換，不必自己加。
+
+### L151 畫面元件與設計期屬性進研究範本——cookbook §2l、NN「## 畫面元件」、補研究 UI.CONTROLS（2026-10-20）
+
+- 需求：管理者盤點 Spec 只知道欄位型別，缺畫面元件種類、元件屬性、Prompt／Lookup、欄位間規則；要求先用 SQL 驗證，再走補查存進知識層
+  （`docs/design/ui-control-lookup-dependency-memo.md` §7）。第四輪驗證後，元件種類、屬性與查值的代碼足以落地。
+- 公司環境（PeopleTools 8.59）已核對、本課採用的代碼：FIELDTYPE 4 Edit Box、5 Drop-Down List、6 Long Edit Box、7 Check Box、8 Radio Button、
+  9 Image、11 Subpage、12／16／21 Push Button/Link（PeopleCode／Component／Secondary Page）、18 Secondary Page、19 Grid、25 HTML Area、27 Scroll Area
+  （0～3 是版面元件不列；10、15、23、24 未核對 → OTHER）；FIELDUSE 1 Display Only、2 Invisible；ASSOCFIELDNUM＝相關顯示的控制欄 FIELDNUM；
+  USEEDIT 1 Key、256 Required、512 Translate、4096 Reasonable Date、8192 Y/N、16384 Prompt Table Edit、32768 Auto-Update；RECTYPE 0 Table、
+  2 Derived、1／5／6 View。
+- 落點：
+  - 兩版 cookbook §2l：一個 Page 一次、40 列一批（`:afterFieldNum` 續查）、解碼全在 SQL 裡且不含 `||`（NN 證據格不能有直線），附轉寫規則與值域。
+  - NN 範本新節「## 畫面元件」（頁面｜#｜欄位｜元件｜屬性｜查值），接在「## 畫面與欄位」之後；不是必要章節，舊 NN 不受 lint 影響。
+  - ps-deep-research（兩版）：主物件有畫面時委派 ps-ui-flow 跑 §2l 填表；ps-ui-flow（兩版 agent＋SKILL）加步驟 3b 與 `pageControls[]`；
+    subagent-report-contract（兩版）加 `pageControls[]`（結構化轉寫，不算引用行數、不受 findings 8 筆上限）；knowledge-retrieval-contract、
+    ps-orchestrator 路由各加一列。
+  - 補研究：capabilities.json 加 factKind `UI.CONTROLS`、nnSections 加「畫面元件」；ps-supplemental-lib 認六格表格節、缺節時插在
+    「畫面與欄位」之後、ALREADY_COVERED 看畫面元件列數；ps-knowledge-lib 另計 `controlRows`（不併進 fieldRows）；supplemental-contract（兩版）
+    加委派鏈與格式。舊 NN 補法：`ps-supplemental.ps1 -New -Target COMPONENT:<物件> -FactKind UI.CONTROLS -Properties controls,properties,lookup`（SOP-23）。
+  - Spec 引擎：ps-spec-lib 的 EXTRACT 與渲染認 `UI.CONTROLS`（沒有該節 → MISSING，交補研究）；兩版 generic.manifest 重生。
+- 設計取捨：另起 `##` 節而不是「畫面與欄位」下的 `###` 子節——那張 5 格表被補研究合併、知識索引、Spec 抽取三處以「整節的表格列」解析，
+  子節裡的第二張表會被算成欄位列、補研究也會把新欄位列接到第二張表的尾巴。
+- 實作備忘：`Get-PsKnTableRows` 以一元逗號回傳陣列，外面再包 `@()` 會變成「一個元素的陣列」（Count 恆為 1）；直接取 `.Count`。
+- 沒做：Component 動作（ACTIONS 只核對到 2＝Update/Display）、代碼 10／15／23／24、radio／checkbox 的儲存值、Grid 能否增刪列、
+  PeopleCode 偵測清單補齊（AddDropDownItem、InsertEnabled 等；備忘 §3.3）、Spec 文件流程（DOC1）吃這些事實（備忘 §7.3 第 4 步）。
+- 驗證：§2l 以合成資料跑過（DuckDB，表放在另一個 schema、裸表名必失敗）：相關顯示與控制欄、動態 prompt、Grid 內欄位、續查；
+  test-supplemental（缺節插入位置、已有節追加、ALREADY_COVERED）、test-knowledge（controlRows）、test-spec（EXTRACT UI.CONTROLS 與 MISSING）
+  新增案例；全套測試、ps-agent-doc-lint 全過。

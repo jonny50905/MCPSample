@@ -408,6 +408,14 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
 - 唯讀帳號 A 測試 FAIL（裸表名 ORA-00942）；`ALTER SESSION` 不能用、DBA 不建同義字 → 框架改成每個表名寫 `<schema>.表名`
   （L150、SOP-30；兩版 cookbook 規則 1a 與四個查 DB 的 agent）。本文件之後的 SQL 一律帶 `<schema>.`。第四輪 SQL 在 `ui-metadata-check-r4.md`
   （R4A ASSOCFIELDNUM 對應、R4B 必填位元、R4C 唯讀／隱藏位元、R4D Component 動作、R4E 唯讀帳號缺哪些表）。
+- **第四輪結果（2026-10-20，唯讀帳號跑）**：R4A＝ALL N 15154 P 14 R 0；H0 N 1984 P 54 R 22；H2 N 1867 P 13 R 1；NB N 1984 P 41 R 17（H1 沒回）——
+  H0 成立：ASSOCFIELDNUM＝相關顯示的控制欄 FIELDNUM（控制欄有 prompt 的比例是全體 Edit Box 的 4 倍；相關顯示的 Record 就是 prompt 表的佔 22%，
+  其餘多半是說明由 PeopleCode 或另一個 view 帶出）；NB 偏高是因為控制欄常緊接在相關顯示前面。R4B＝REQ=Y、OPT=N → USEEDIT 256＝Required。
+  R4C＝勾 Display Only 的三個欄位都是 BITS 1,16，沒勾的 NONE，Display Only＋Invisible 的是 1,2（公司頁面沒有只勾 Invisible 的）→
+  FIELDUSE 1＝Display Only、2＝Invisible；16 不是唯讀（R3B 的 DO=16 改判：16 幾乎只出現在相關顯示，應是 Related Field 旗標；框架改用 ASSOCFIELDNUM，
+  不靠 16）。R3B 沒選出 1，是因為一般 Edit Box 超過一半本來就唯讀（門檻 IN_OTH ≤ 50）。R4D＝ACTIONS 2＝只勾 Update/Display → 位元 2＝Update/Display；
+  Add、Update/Display All、Correction 的位元還沒核對（分布那行沒回），Component 動作先不進框架。R4E＝32 張表唯讀帳號都看得到。
+  → 第 2、3 步開始：cookbook §2l（每個 Page 一次，解碼只用已核對的代碼）、NN 新節「## 畫面元件」、補研究事實類別 UI.CONTROLS（L151）。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 

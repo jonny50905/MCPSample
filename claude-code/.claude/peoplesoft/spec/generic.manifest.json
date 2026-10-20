@@ -34,8 +34,8 @@
     },
     {
       "path": ".claude/peoplesoft/spec/capabilities.json",
-      "sha256": "67E7A913080F50A6E268F245744D730F147DB683AFF100BDBCA87ED7BFE01573",
-      "lines": 38
+      "sha256": "6514E5D73CA2568ACEA32F9C3A4FF6C288B4964E92B7244B929C23049DF86BC8",
+      "lines": 39
     },
     {
       "path": ".claude/peoplesoft/spec/clone-contract.md",
@@ -104,8 +104,8 @@
     },
     {
       "path": "scripts/ps-spec-lib.ps1",
-      "sha256": "D8460EC0599C9B21CBFF47A32E295F91D3710B431384912AEE8BCC905C47AD67",
-      "lines": 2730
+      "sha256": "0FB1320C511B4939E2ECB3F1558F5C2E3674B4E8C97757BAF6DD6E5574CE5CD2",
+      "lines": 2747
     },
     {
       "path": "scripts/ps-spec.ps1",

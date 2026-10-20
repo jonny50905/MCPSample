@@ -62,6 +62,22 @@
      「（無——Function Library，無使用者畫面）」——不適用要申報，
      不能省略標題（標題是機器契約，L103）。 -->
 
+## 畫面元件
+
+<依 oracle-query-cookbook §2l（每個 Page 一次）照轉寫規則填；每個 Page 的 SQL 進 Evidence 附錄。>
+
+| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |
+|---|---|---|---|---|---|
+| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（VIEW；鍵 SETID,DEPTID,EFFDT） |
+| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |
+| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List |  | XLAT |
+| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Link: PeopleCode |  |  |
+
+<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
+     # ＝FIELDNUM；屬性與查值的字樣照 §2l 轉寫規則，不翻譯、不改寫。
+     主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
+     沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
+
 ## 行為邏輯
 
 <條件 → 動作，逐項標信心等級：>

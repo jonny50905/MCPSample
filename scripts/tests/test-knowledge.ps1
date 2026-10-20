@@ -133,6 +133,9 @@ Assert ($nnA.evidence[0].ref -eq $uuid1 -and $nnA.evidence[0].n -eq 1) "證據�
 Assert (($nnA.links -contains 'TW_A') -and ($nnA.links -contains 'PS_JOB') -and $nnA.links.Count -eq 2) "全文 wikilink 去重"
 $nnC = Get-PsKnNnFacts -LiteralPath (Join-Path $domA '03-TW_C.md') -Domain '職缺測試'
 Assert ($nnC.status -eq 'BLOCKED' -and $nnC.missingSections -contains '權限' -and $nnC.permissionHollow) "缺「## 權限」節＝missingSections 記錄、視為空洞"
+$ctlText = (@('# 07 功能（[[TW_DEMO_C]]）', '', '## 畫面與欄位', '', '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |', '|---|---|---|---|---|', '| DEMO_STATUS | 狀態 | Translate | E=免役 | 使用中 |', '', '## 畫面元件', '', '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |', '|---|---|---|---|---|---|', '| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT |', '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |', '', '## 行為邏輯', '', '- **CONFIRMED**：a') -join "`n")
+$nnCtl = Get-PsKnNnFacts -LiteralPath (Join-Path $domA '07-TW_DEMO_C.md') -Domain '職缺測試' -Text $ctlText
+Assert ($nnCtl.controlRows -eq 2 -and $nnCtl.fieldRows -eq 1 -and $null -ne (Get-PsKnSectionRange -Sections $nnCtl.sections -Name '畫面元件')) "## 畫面元件：另計 controlRows（2），不併進畫面與欄位的列數（1）；節有行號供索引列出"
 Assert ((Get-PsKnFileHash -LiteralPath (Join-Path $domA '01-TW_A.md')) -ceq (Get-NormalizedFileHash -LiteralPath (Join-Path $domA '01-TW_A.md'))) "正規化 hash 與 ps-graduation.ps1 的 Get-NormalizedFileHash 一致"
 $ov = Get-PsKnOverviewFacts -LiteralPath (Join-Path $domA '00-overview.md')
 Assert ($ov.functionMap.Count -eq 2 -and $ov.functionMap[1].object -eq 'TW_B' -and $ov.functionMap[1].type -eq '批次') "功能地圖：物件／類型"

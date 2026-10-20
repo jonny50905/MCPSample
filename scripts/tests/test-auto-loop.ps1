@@ -916,7 +916,7 @@ $sup = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/command/ps-
 Assert ($sup -match '(?m)^agent: ps-deep-research' -and $sup -match 'supplemental-parts/current\.manifest\.md' -and $sup -match '不是研究模式' -and $sup -match '已寫') "ps-supplement 指令：掛 ps-deep-research、第一動作 read 工單、只寫收據"
 $capJ = $null
 try { $capJ = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/spec/capabilities.json')) | ConvertFrom-Json } catch { $capJ = $null }
-Assert ($null -ne $capJ -and @($capJ.factKinds.PSObject.Properties).Count -eq 15 -and @($capJ.targetTypes).Count -eq 10 -and $capJ.factKinds.'DATA.FILE_INPUT'.mode -eq 'COMPOSE' -and $capJ.factKinds.'DATA.FILE_INPUT'.follow -eq $true) "能力目錄：15 個 factKind、10 個 target 型別、DATA.FILE_INPUT 為 COMPOSE＋follow"
+Assert ($null -ne $capJ -and @($capJ.factKinds.PSObject.Properties).Count -eq 16 -and @($capJ.targetTypes).Count -eq 10 -and $capJ.factKinds.'DATA.FILE_INPUT'.mode -eq 'COMPOSE' -and $capJ.factKinds.'DATA.FILE_INPUT'.follow -eq $true -and $capJ.factKinds.'UI.CONTROLS'.mode -eq 'EXTRACT' -and @($capJ.nnSections) -contains '畫面元件') "能力目錄：16 個 factKind（含 UI.CONTROLS）、nnSections 含畫面元件、10 個 target 型別、DATA.FILE_INPUT 為 COMPOSE＋follow"
 $sw = Join-Path $repoRoot '.opencode/agent/ps-spec-worker.md'
 if (Test-Path -LiteralPath $sw) {
     $swt = [System.IO.File]::ReadAllText($sw)
