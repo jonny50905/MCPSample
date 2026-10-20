@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 7／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 7／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|7|8|5649|7dc8612a7f84439032cfc89869d00f0ae117bbb88daabbfec174b1fba5e95870
-@@@PSBUNDLE-FILE|scripts/ps-supplemental-lib.ps1|1193|e593d2cf6aaf9cd0e5dbd530beff91f89ce9abf054607e36c6045b03da75c857|1
+@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|7|8|5656|cac82a2106db3a1526fe4b7000cf44bf1c291b1b75e3140900e3b9aa0d392faf
+@@@PSBUNDLE-FILE|scripts/ps-supplemental-lib.ps1|1197|6dd300916a4281a4f843fce5687a48271ce4d0b27b732dafbbc168489493ef11|1
 # ps-supplemental-lib.ps1 — 補研究協定（Supplemental Research）共用邏輯
 # 由 ps-supplemental.ps1（CLI）、ps-auto-loop.ps1（-SupplementalOnly 迷你圈）、ps-spec-lib.ps1（規劃器消費端）dot-source。
 # 前置：先 dot-source scripts/ps-knowledge-lib.ps1（讀檔／hash／canonical JSON／原子寫入／NN 解析都借它的）。
@@ -26,6 +26,7 @@ $script:PsSuppLeakMarkers = @('"agent"', '"findings"', '"searchScope"', '"covera
 $script:PsSuppForbiddenWords = @('requirementRef', 'jobId', 'packId', 'consumer', '{{slot:')
 $script:PsSuppTableSections = @{
     '畫面與欄位' = @{ Header = '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |'; Sep = '|---|---|---|---|---|'; Cells = 5; RefCell = 4 }
+    '畫面元件'   = @{ Header = '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |'; Sep = '|---|---|---|---|---|---|'; Cells = 6; RefCell = 5 }
     '資料流'     = @{ Header = '| 表 | 操作 | 來源 | 信心 |'; Sep = '|---|---|---|---|'; Cells = 3; RefCell = 2 }
     '相關物件'   = @{ Header = '| 物件 | 角色 |'; Sep = '|---|---|'; Cells = 2; RefCell = 1 }
 }
@@ -673,7 +674,7 @@ function Test-PsSuppReceipt {
                 $c = $row.Cells
                 if ($c.Count -ne 4) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列欄數 ' + $c.Count + ' ≠ 4'); continue }
                 $secKey = Get-PsKnSectionKey -Title $c[0]
-                if ($sections -notcontains $secKey) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列節名「' + $c[0] + '」不在八節'); continue }
+                if ($sections -notcontains $secKey) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列節名「' + $c[0] + '」不在能力目錄的 NN 節'); continue }
                 $conf = $c[1].Trim().ToUpperInvariant()
                 if ($confs -notcontains $conf) { $r.Errors += ('「## 追加事實」第 ' + $ri + ' 列信心「' + $c[1] + '」不在三值'); continue }
                 $desc = $c[2].Trim()
@@ -716,6 +717,7 @@ function Test-PsSuppAlreadyCovered {
     foreach ($s in $secs) {
         switch ($s) {
             '畫面與欄位' { if ([int]$TargetFacts.fieldRows -eq 0 -and -not $TargetFacts.fieldsNotApplicable) { return $false } }
+            '畫面元件' { if ([int]$TargetFacts.controlRows -eq 0) { return $false } }
             '行為邏輯' { $bc = $TargetFacts.behaviorCounts; if (([int]$bc.CONFIRMED + [int]$bc.INFERRED + [int]$bc.DYNAMIC_RUNTIME) -eq 0) { return $false } }
             '資料流' { if (@($TargetFacts.dataFlow).Count -eq 0) { return $false } }
             '執行方式' { if ($TargetFacts.executionHollow) { return $false } }
@@ -866,12 +868,14 @@ function Merge-PsSuppReceipt {
         else {
             $disp = $secKey
             if ($secKey -eq '未解事項') { $disp = '未解事項（gaps）' }
+            $anchor = $anchorMissing
+            if ($secKey -eq '畫面元件') { $fieldSec = Find-PsKnSection -Headings $heads -Key '畫面與欄位'; if ($null -ne $fieldSec) { $anchor = Get-PsSuppInsertAfter -Lines $lines -Sec $fieldSec } }
             $blk = @('', ('## ' + $disp), '')
             if ($script:PsSuppTableSections.ContainsKey($secKey)) { $blk += $script:PsSuppTableSections[$secKey].Header; $blk += $script:PsSuppTableSections[$secKey].Sep }
             $bodyTrim = @($body)
             while ($bodyTrim.Count -gt 0 -and $bodyTrim[0] -eq '') { $bodyTrim = @($bodyTrim | Select-Object -Skip 1) }
             $blk += $bodyTrim
-            $order++; $inserts += , (@{ Index = $anchorMissing; Lines = $blk; Order = $order })
+            $order++; $inserts += , (@{ Index = $anchor; Lines = $blk; Order = $order })
         }
     }
     if ($inserts.Count -eq 0) { $res.Ok = $true; $res.Reason = 'NOTHING_TO_MERGE'; $res.HashAfter = $res.HashBefore; return $res }
@@ -1565,7 +1569,7 @@ function ConvertTo-SdComparable {
     return $Value
 }
 @@@PSBUNDLE-END|scripts/tests/sdoc-test-fixtures.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1029|6e4757761d772435828ac5da3e3e37f1e176246f9bacc98acb2270a4458b2a39|1
+@@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1029|0cadab25c68c0b58a3e2f2feb9fa338014aa4dc1882d40e20d407992da771fd6|1
 # scripts/tests/test-auto-loop.ps1 — 外環函式的功能測試（AST 抽真實函式，跑 fixture 情境）
 # 用法：pwsh -NoProfile -File scripts/tests/test-auto-loop.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：調帳／治理／台帳／破壞防衛／歸檔 commit／分批稽核（manifest、part 不變量、合併器）
@@ -2484,7 +2488,7 @@ $sup = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/command/ps-
 Assert ($sup -match '(?m)^agent: ps-deep-research' -and $sup -match 'supplemental-parts/current\.manifest\.md' -and $sup -match '不是研究模式' -and $sup -match '已寫') "ps-supplement 指令：掛 ps-deep-research、第一動作 read 工單、只寫收據"
 $capJ = $null
 try { $capJ = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/spec/capabilities.json')) | ConvertFrom-Json } catch { $capJ = $null }
-Assert ($null -ne $capJ -and @($capJ.factKinds.PSObject.Properties).Count -eq 15 -and @($capJ.targetTypes).Count -eq 10 -and $capJ.factKinds.'DATA.FILE_INPUT'.mode -eq 'COMPOSE' -and $capJ.factKinds.'DATA.FILE_INPUT'.follow -eq $true) "能力目錄：15 個 factKind、10 個 target 型別、DATA.FILE_INPUT 為 COMPOSE＋follow"
+Assert ($null -ne $capJ -and @($capJ.factKinds.PSObject.Properties).Count -eq 16 -and @($capJ.targetTypes).Count -eq 10 -and $capJ.factKinds.'DATA.FILE_INPUT'.mode -eq 'COMPOSE' -and $capJ.factKinds.'DATA.FILE_INPUT'.follow -eq $true -and $capJ.factKinds.'UI.CONTROLS'.mode -eq 'EXTRACT' -and @($capJ.nnSections) -contains '畫面元件') "能力目錄：16 個 factKind（含 UI.CONTROLS）、nnSections 含畫面元件、10 個 target 型別、DATA.FILE_INPUT 為 COMPOSE＋follow"
 $sw = Join-Path $repoRoot '.opencode/agent/ps-spec-worker.md'
 if (Test-Path -LiteralPath $sw) {
     $swt = [System.IO.File]::ReadAllText($sw)
@@ -3458,7 +3462,7 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-claude-variant.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|338|dc18bdc60f9607362f1b474ceb11c3b35974bd142221ac361b132e056f3cee76|1
+@@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|341|78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：合成 fixtures（臨時目錄，結束自刪；無公司資料）：NN 解析（節行號／續篇／PARTIAL／BLOCKED／缺節／CRLF＋BOM／中文路徑）、
@@ -3594,6 +3598,9 @@ Assert ($nnA.evidence[0].ref -eq $uuid1 -and $nnA.evidence[0].n -eq 1) "證據�
 Assert (($nnA.links -contains 'TW_A') -and ($nnA.links -contains 'PS_JOB') -and $nnA.links.Count -eq 2) "全文 wikilink 去重"
 $nnC = Get-PsKnNnFacts -LiteralPath (Join-Path $domA '03-TW_C.md') -Domain '職缺測試'
 Assert ($nnC.status -eq 'BLOCKED' -and $nnC.missingSections -contains '權限' -and $nnC.permissionHollow) "缺「## 權限」節＝missingSections 記錄、視為空洞"
+$ctlText = (@('# 07 功能（[[TW_DEMO_C]]）', '', '## 畫面與欄位', '', '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |', '|---|---|---|---|---|', '| DEMO_STATUS | 狀態 | Translate | E=免役 | 使用中 |', '', '## 畫面元件', '', '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |', '|---|---|---|---|---|---|', '| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT |', '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |', '', '## 行為邏輯', '', '- **CONFIRMED**：a') -join "`n")
+$nnCtl = Get-PsKnNnFacts -LiteralPath (Join-Path $domA '07-TW_DEMO_C.md') -Domain '職缺測試' -Text $ctlText
+Assert ($nnCtl.controlRows -eq 2 -and $nnCtl.fieldRows -eq 1 -and $null -ne (Get-PsKnSectionRange -Sections $nnCtl.sections -Name '畫面元件')) "## 畫面元件：另計 controlRows（2），不併進畫面與欄位的列數（1）；節有行號供索引列出"
 Assert ((Get-PsKnFileHash -LiteralPath (Join-Path $domA '01-TW_A.md')) -ceq (Get-NormalizedFileHash -LiteralPath (Join-Path $domA '01-TW_A.md'))) "正規化 hash 與 ps-graduation.ps1 的 Get-NormalizedFileHash 一致"
 $ov = Get-PsKnOverviewFacts -LiteralPath (Join-Path $domA '00-overview.md')
 Assert ($ov.functionMap.Count -eq 2 -and $ov.functionMap[1].object -eq 'TW_B' -and $ov.functionMap[1].type -eq '批次') "功能地圖：物件／類型"
@@ -5650,4 +5657,4 @@ Write-Host ('sdoc run tests: PASS=' + $script:passed + ' FAIL=' + $script:failed
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-run.ps1
-@@@PSBUNDLE-PART-END|f4668d8098f2324a|7|8
+@@@PSBUNDLE-PART-END|269accc620bbeda1|7|8

@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|2|8|6584|b0867bfbc97c00b30d68b93005562c23e0dd09c116ec14e2e1f5b3340b3ee8f8
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4081|d40c44f03358fabf1124bdec8a8e1bc707055e8a343e1ff14ef59705f50c178c|0
+@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|2|8|6309|6dce63f3b1a622fdc1dac090370542eac935bb38e563ec7280bf3bc6c9f21b69
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4109|583d4bdcb915890f07bc33a59361a86dc70cf89d6a4ff440464d402607415529|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4083,6 +4083,34 @@
   （表放在另一個 schema、裸表名必失敗）跑過。test-oracle-runtime 需要真 OpenCode，沙箱沒跑。
 - 教訓：「一次設定、之後裸表名」依賴 session 狀態與帳號權限；換成唯讀帳號就整條斷。能寫在每句 SQL 裡的就不要放在 session 裡——樣板直接帶前綴，
   模型只做替換，不必自己加。
+
+### L151 畫面元件與設計期屬性進研究範本——cookbook §2l、NN「## 畫面元件」、補研究 UI.CONTROLS（2026-10-20）
+
+- 需求：管理者盤點 Spec 只知道欄位型別，缺畫面元件種類、元件屬性、Prompt／Lookup、欄位間規則；要求先用 SQL 驗證，再走補查存進知識層
+  （`docs/design/ui-control-lookup-dependency-memo.md` §7）。第四輪驗證後，元件種類、屬性與查值的代碼足以落地。
+- 公司環境（PeopleTools 8.59）已核對、本課採用的代碼：FIELDTYPE 4 Edit Box、5 Drop-Down List、6 Long Edit Box、7 Check Box、8 Radio Button、
+  9 Image、11 Subpage、12／16／21 Push Button/Link（PeopleCode／Component／Secondary Page）、18 Secondary Page、19 Grid、25 HTML Area、27 Scroll Area
+  （0～3 是版面元件不列；10、15、23、24 未核對 → OTHER）；FIELDUSE 1 Display Only、2 Invisible；ASSOCFIELDNUM＝相關顯示的控制欄 FIELDNUM；
+  USEEDIT 1 Key、256 Required、512 Translate、4096 Reasonable Date、8192 Y/N、16384 Prompt Table Edit、32768 Auto-Update；RECTYPE 0 Table、
+  2 Derived、1／5／6 View。
+- 落點：
+  - 兩版 cookbook §2l：一個 Page 一次、40 列一批（`:afterFieldNum` 續查）、解碼全在 SQL 裡且不含 `||`（NN 證據格不能有直線），附轉寫規則與值域。
+  - NN 範本新節「## 畫面元件」（頁面｜#｜欄位｜元件｜屬性｜查值），接在「## 畫面與欄位」之後；不是必要章節，舊 NN 不受 lint 影響。
+  - ps-deep-research（兩版）：主物件有畫面時委派 ps-ui-flow 跑 §2l 填表；ps-ui-flow（兩版 agent＋SKILL）加步驟 3b 與 `pageControls[]`；
+    subagent-report-contract（兩版）加 `pageControls[]`（結構化轉寫，不算引用行數、不受 findings 8 筆上限）；knowledge-retrieval-contract、
+    ps-orchestrator 路由各加一列。
+  - 補研究：capabilities.json 加 factKind `UI.CONTROLS`、nnSections 加「畫面元件」；ps-supplemental-lib 認六格表格節、缺節時插在
+    「畫面與欄位」之後、ALREADY_COVERED 看畫面元件列數；ps-knowledge-lib 另計 `controlRows`（不併進 fieldRows）；supplemental-contract（兩版）
+    加委派鏈與格式。舊 NN 補法：`ps-supplemental.ps1 -New -Target COMPONENT:<物件> -FactKind UI.CONTROLS -Properties controls,properties,lookup`（SOP-23）。
+  - Spec 引擎：ps-spec-lib 的 EXTRACT 與渲染認 `UI.CONTROLS`（沒有該節 → MISSING，交補研究）；兩版 generic.manifest 重生。
+- 設計取捨：另起 `##` 節而不是「畫面與欄位」下的 `###` 子節——那張 5 格表被補研究合併、知識索引、Spec 抽取三處以「整節的表格列」解析，
+  子節裡的第二張表會被算成欄位列、補研究也會把新欄位列接到第二張表的尾巴。
+- 實作備忘：`Get-PsKnTableRows` 以一元逗號回傳陣列，外面再包 `@()` 會變成「一個元素的陣列」（Count 恆為 1）；直接取 `.Count`。
+- 沒做：Component 動作（ACTIONS 只核對到 2＝Update/Display）、代碼 10／15／23／24、radio／checkbox 的儲存值、Grid 能否增刪列、
+  PeopleCode 偵測清單補齊（AddDropDownItem、InsertEnabled 等；備忘 §3.3）、Spec 文件流程（DOC1）吃這些事實（備忘 §7.3 第 4 步）。
+- 驗證：§2l 以合成資料跑過（DuckDB，表放在另一個 schema、裸表名必失敗）：相關顯示與控制欄、動態 prompt、Grid 內欄位、續查；
+  test-supplemental（缺節插入位置、已有節追加、ALREADY_COVERED）、test-knowledge（controlRows）、test-spec（EXTRACT UI.CONTROLS 與 MISSING）
+  新增案例；全套測試、ps-agent-doc-lint 全過。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -4242,7 +4270,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|763|a300a107dd8d0876c1c5b4dc25876efa7b7a2285d80ca192a9df4206394e7129|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|831|f971622db36539dd68829c395e6d9e5c9b027b0524008cd016505cc440ee63fc|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
@@ -4816,6 +4844,74 @@ FETCH FIRST 50 ROWS ONLY
 > 與 2k-3 走出的路徑不一致時**記 gap，不得選邊**。
 > `AUTHORIZED_FOR_CONTEXT` 本版**不實作**：`PSPRSMPERM`（含 `PORTAL_ISCASCADE`）只給到 permission list 層級，
 > 角色／使用者／runtime portal context 皆未建模，此類問題一律回 gap。
+
+**2l. 畫面元件與設計期屬性（一個 Page 一次；NN「## 畫面元件」與「這個欄位是什麼元件、唯讀嗎、必填嗎、查值查哪裡」）**
+
+只列綁欄位的元件、按鈕／連結、Grid、Scroll Area、HTML Area、Subpage、Secondary Page；Static Text、Frame、Group Box、
+Static Image 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
+FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
+
+```sql
+SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
+       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List' WHEN 6 THEN 'Long Edit Box'
+                        WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
+                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Link: PeopleCode'
+                        WHEN 16 THEN 'Push Button/Link: Component' WHEN 18 THEN 'Secondary Page'
+                        WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Link: Secondary Page'
+                        WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area' ELSE 'OTHER' END AS CONTROL,
+       TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
+       CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
+       CASE WHEN BITAND(P.FIELDUSE, 2) > 0 THEN 'INVISIBLE' END AS INV,
+       CASE WHEN P.ASSOCFIELDNUM > 0 THEN P.ASSOCFIELDNUM END AS RELATED_TO,
+       CASE WHEN EXISTS (SELECT 1 FROM <schema>.PSPNLFIELD C
+                          WHERE C.PNLNAME = P.PNLNAME AND C.ASSOCFIELDNUM = P.FIELDNUM) THEN 'DISPLAY_CONTROL' END AS DC,
+       CASE WHEN BITAND(F.USEEDIT, 1) > 0 THEN 'KEY' END AS KEY_FLAG,
+       CASE WHEN BITAND(F.USEEDIT, 256) > 0 THEN 'REQUIRED' END AS REQ,
+       CASE WHEN BITAND(F.USEEDIT, 4096) > 0 THEN 'REASONABLE_DATE' END AS RDATE,
+       CASE WHEN BITAND(F.USEEDIT, 32768) > 0 THEN 'AUTO_UPDATE' END AS AUPD,
+       CASE WHEN BITAND(F.USEEDIT, 512) > 0 THEN 'XLAT' WHEN BITAND(F.USEEDIT, 8192) > 0 THEN 'YES_NO' END AS VALUES_EDIT,
+       TRIM(F.EDITTABLE) AS PROMPT_REC,
+       CASE WHEN TRIM(F.EDITTABLE) IS NULL THEN NULL
+            WHEN SUBSTR(TRIM(F.EDITTABLE), 1, 1) = '%' THEN 'DYNAMIC'
+            WHEN BITAND(F.USEEDIT, 16384) > 0 THEN 'EDIT' ELSE 'NO_EDIT' END AS PROMPT_EDIT,
+       (SELECT CASE WHEN R.RECTYPE = 0 THEN 'TABLE' WHEN R.RECTYPE IN (1, 5, 6) THEN 'VIEW'
+                    WHEN R.RECTYPE = 2 THEN 'DERIVED' ELSE 'OTHER' END
+          FROM <schema>.PSRECDEFN R WHERE R.RECNAME = TRIM(F.EDITTABLE)) AS PROMPT_KIND,
+       (SELECT LISTAGG(TRIM(K.FIELDNAME), ',') WITHIN GROUP (ORDER BY K.FIELDNUM)
+          FROM <schema>.PSRECFIELDDB K
+         WHERE K.RECNAME = TRIM(F.EDITTABLE) AND BITAND(K.USEEDIT, 1) > 0) AS PROMPT_KEYS,
+       TRIM(P.GOTOPNLGRPNAME) AS GOTO_COMPONENT, TRIM(P.SUBPNLNAME) AS SUBPAGE
+  FROM <schema>.PSPNLFIELD P
+  LEFT JOIN <schema>.PSRECFIELDDB F ON F.RECNAME = P.RECNAME AND F.FIELDNAME = P.FIELDNAME
+ WHERE P.PNLNAME = :pageName
+   AND P.FIELDTYPE NOT IN (0, 1, 2, 3)
+   AND P.FIELDNUM > :afterFieldNum
+ ORDER BY P.FIELDNUM
+FETCH FIRST 40 ROWS ONLY
+```
+
+轉寫規則（照輸出原樣抄，不加不減、不解讀）：
+
+- 欄位：`RECNAME.FIELDNAME`；沒綁 Record 的元件寫 LBLTEXT（沒有就留空）。
+- 元件：CONTROL；OTHER 寫 `OTHER（代碼 <CODE>）`，不猜是什麼元件。
+- 屬性：DO、INV、DC、KEY_FLAG、REQ、RDATE、AUPD 各欄有值的依序以空白串起，再接 `RELATED_TO=<RELATED_TO>`、
+  `LEVEL=<LVL>`（LVL 大於 0 才寫）、`GOTO=<GOTO_COMPONENT>`、`PAGE=<SUBPAGE>`（有值才寫）。
+- 查值：PROMPT_REC 有值寫 `PROMPT <PROMPT_REC> <PROMPT_EDIT>`，PROMPT_KIND／PROMPT_KEYS 有值再接
+  `（<PROMPT_KIND>；鍵 <PROMPT_KEYS>）`；沒有 prompt 時寫 VALUES_EDIT 的值；都沒有留空。
+- 元件是 Subpage、Secondary Page、Push Button/Link: Secondary Page → 以 SUBPAGE 的頁名再跑一次本節
+  （visited 去重、深度 ≤ 8，同 §2j）。
+- 寫成證據時 SQL 原樣保留（含 FROM 與頁名、`:afterFieldNum` 的實際值），每個 Page 每一批一列。
+
+值域：
+
+- DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
+- RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
+- KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
+- XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
+- PROMPT 的 EDIT＝輸入值必須在 prompt 清單內；NO_EDIT＝只提供查詢、不檢核；DYNAMIC＝prompt 表在執行期由另一個欄位的值決定
+  （PROMPT_REC 是 `%` 開頭的欄位名），追 PeopleCode 對該欄位的指派。
+- PROMPT_KIND＝TABLE、VIEW、DERIVED、OTHER；view 的選取條件照長文本協定以 ES＋Source 取，不從 Oracle 撈全文。
+  PROMPT_KEYS＝prompt record 的鍵（依欄位順序）；含 SETID、EFFDT 的照實寫。
 
 ---
 
@@ -5933,7 +6029,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|114|9010b8f16ca9ab2ae35ffdd38029c2fb3bc6001235a5df1533e0e92522f8c674|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|130|bb7c6b7669381d784a79d21450aad82ac3989b6947d21881d451d0f7466e58ed|0
 # <NN> <功能名>（[[<Component / 物件名>]]）
 
 > 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE | PARTIAL | BLOCKED
@@ -5997,6 +6093,22 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 物件無畫面（Function Library 等）：標題保留，內文寫
      「（無——Function Library，無使用者畫面）」——不適用要申報，
      不能省略標題（標題是機器契約，L103）。 -->
+
+## 畫面元件
+
+<依 oracle-query-cookbook §2l（每個 Page 一次）照轉寫規則填；每個 Page 的 SQL 進 Evidence 附錄。>
+
+| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |
+|---|---|---|---|---|---|
+| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（VIEW；鍵 SETID,DEPTID,EFFDT） |
+| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |
+| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List |  | XLAT |
+| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Link: PeopleCode |  |  |
+
+<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
+     # ＝FIELDNUM；屬性與查值的字樣照 §2l 轉寫規則，不翻譯、不改寫。
+     主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
+     沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
 
 ## 行為邏輯
 
@@ -6198,391 +6310,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   ]
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/ai-instructions.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/data.json|385|a72d79c2b3ab6f94ec9eb6371ab94ddcb93c8eb369a94048fbe82d0ddffbbd26|0
-{
-  "schemaVersion": "1.0",
-  "jobId": "clone-0123456789abcdef",
-  "attemptId": "a0001",
-  "unit": "data",
-  "subject": "TW_DEMO_APV",
-  "page": 1,
-  "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
-  "coverage": "COMPLETE",
-  "summary": "合成範例：只示範研究包的格式；項目已裁成每種最多 4 個，參照的項目不一定在本範例裡。",
-  "items": [
-    {
-      "type": "ENT",
-      "key": "TW_DEMO_DEPT",
-      "basis": "METADATA",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E1"
-      ],
-      "record": "@OBJ/RECORD:TW_DEMO_DEPT",
-      "name": "部門（有效日）",
-      "businessMeaning": "部門資料；本功能只用來找部門主管。",
-      "storageKind": "SQL_TABLE",
-      "physicalName": "PS_TW_DEMO_DEPT",
-      "keys": [
-        "@FLD/TW_DEMO_DEPT.DEPTID",
-        "@FLD/TW_DEMO_DEPT.EFFDT"
-      ],
-      "effectiveDating": {
-        "kind": "EFFDT",
-        "currentRow": {
-          "asOf": {
-            "ctx": "CURRENT_DATE"
-          },
-          "effStatusActiveOnly": true
-        }
-      }
-    },
-    {
-      "type": "ENT",
-      "key": "TW_DEMO_EMP",
-      "basis": "METADATA",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E1"
-      ],
-      "record": "@OBJ/RECORD:TW_DEMO_EMP",
-      "name": "員工任職（有效日）",
-      "businessMeaning": "員工任職資料；本功能只用來找申請人的部門與直屬主管。",
-      "storageKind": "SQL_TABLE",
-      "physicalName": "PS_TW_DEMO_EMP",
-      "keys": [
-        "@FLD/TW_DEMO_EMP.EMPLID",
-        "@FLD/TW_DEMO_EMP.EFFDT"
-      ],
-      "effectiveDating": {
-        "kind": "EFFDT",
-        "currentRow": {
-          "asOf": {
-            "ctx": "CURRENT_DATE"
-          },
-          "effStatusActiveOnly": true
-        }
-      }
-    },
-    {
-      "type": "ENT",
-      "key": "TW_DEMO_REQHDR",
-      "basis": "METADATA",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E1"
-      ],
-      "record": "@OBJ/RECORD:TW_DEMO_REQHDR",
-      "name": "申請單",
-      "businessMeaning": "一張申請單一列；狀態、金額、事由與審核結果都在這裡。",
-      "storageKind": "SQL_TABLE",
-      "physicalName": "PS_TW_DEMO_REQHDR",
-      "keys": [
-        "@FLD/TW_DEMO_REQHDR.REQ_ID"
-      ],
-      "effectiveDating": {
-        "kind": "NONE"
-      }
-    },
-    {
-      "type": "FLD",
-      "key": "TW_DEMO_DEPT.DEPTID",
-      "basis": "METADATA",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E1"
-      ],
-      "entity": "@ENT/TW_DEMO_DEPT",
-      "fieldName": "DEPTID",
-      "label": "部門",
-      "dataType": "CHAR",
-      "length": 10,
-      "required": "ALWAYS",
-      "default": {
-        "na": "無 Record 層預設值"
-      },
-      "valueDomain": {
-        "free": true
-      },
-      "keyRoles": [
-        "KEY"
-      ],
-      "sensitivity": "NONE",
-      "usageEvidence": "CODE_REFERENCED"
-    },
-    {
-      "type": "FLD",
-      "key": "TW_DEMO_DEPT.EFFDT",
-      "basis": "METADATA",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E1"
-      ],
-      "entity": "@ENT/TW_DEMO_DEPT",
-      "fieldName": "EFFDT",
-      "label": "生效日",
-      "dataType": "DATE",
-      "length": {
-        "na": "日期型別沒有長度"
-      },
-      "required": "ALWAYS",
-      "default": {
-        "na": "無 Record 層預設值"
-      },
-      "valueDomain": {
-        "free": true
-      },
-      "keyRoles": [
-        "KEY"
-      ],
-      "sensitivity": "NONE",
-      "usageEvidence": "CODE_REFERENCED"
-    },
-    {
-      "type": "FLD",
-      "key": "TW_DEMO_DEPT.EFF_STATUS",
-      "basis": "METADATA",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E1"
-      ],
-      "entity": "@ENT/TW_DEMO_DEPT",
-      "fieldName": "EFF_STATUS",
-      "label": "有效狀態",
-      "dataType": "CHAR",
-      "length": 1,
-      "required": "ALWAYS",
-      "default": {
-        "na": "無 Record 層預設值"
-      },
-      "valueDomain": {
-        "xlat": [
-          {
-            "stored": "A",
-            "label": "有效",
-            "active": true,
-            "dataPresence": "HAS_DATA"
-          },
-          {
-            "stored": "I",
-            "label": "無效",
-            "active": true,
-            "dataPresence": "HAS_DATA"
-          }
-        ]
-      },
-      "keyRoles": [],
-      "sensitivity": "NONE",
-      "usageEvidence": "CODE_REFERENCED"
-    },
-    {
-      "type": "FLD",
-      "key": "TW_DEMO_DEPT.MANAGER_ID",
-      "basis": "METADATA",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E1",
-        "E2"
-      ],
-      "entity": "@ENT/TW_DEMO_DEPT",
-      "fieldName": "MANAGER_ID",
-      "label": "部門主管",
-      "dataType": "CHAR",
-      "length": 11,
-      "required": "NO",
-      "default": {
-        "na": "無 Record 層預設值"
-      },
-      "valueDomain": {
-        "prompt": {
-          "entity": "@ENT/TW_DEMO_EMP",
-          "keyField": "@FLD/TW_DEMO_EMP.EMPLID"
-        }
-      },
-      "keyRoles": [],
-      "relations": [
-        {
-          "target": "@FLD/TW_DEMO_EMP.EMPLID",
-          "kind": "LOGICAL_FK"
-        }
-      ],
-      "sensitivity": "PERSONAL",
-      "usageEvidence": "CODE_REFERENCED"
-    },
-    {
-      "type": "DRV",
-      "key": "REQUESTER_DEPT_MANAGER",
-      "basis": "CODE",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E7",
-        "E2"
-      ],
-      "name": "申請人的部門主管",
-      "meaning": "申請人目前任職部門的主管；025（高額）由此人審核。",
-      "inputs": [
-        {
-          "name": "REQUESTER",
-          "from": {
-            "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
-          }
-        }
-      ],
-      "resultType": "PERSON_ID",
-      "resolution": {
-        "sources": [
-          "@ENT/TW_DEMO_EMP",
-          "@ENT/TW_DEMO_DEPT"
-        ],
-        "joins": [
-          {
-            "left": "@FLD/TW_DEMO_EMP.EMPLID",
-            "right": {
-              "param": "REQUESTER"
-            }
-          },
-          {
-            "left": "@FLD/TW_DEMO_DEPT.DEPTID",
-            "right": {
-              "fld": "@FLD/TW_DEMO_EMP.DEPTID"
-            }
-          }
-        ],
-        "filter": "ALWAYS",
-        "effectiveDating": [
-          {
-            "entity": "@ENT/TW_DEMO_EMP",
-            "rule": "CURRENT_ROW",
-            "asOf": {
-              "ctx": "CURRENT_DATE"
-            },
-            "effStatusActiveOnly": true
-          },
-          {
-            "entity": "@ENT/TW_DEMO_DEPT",
-            "rule": "CURRENT_ROW",
-            "asOf": {
-              "ctx": "CURRENT_DATE"
-            },
-            "effStatusActiveOnly": true
-          }
-        ],
-        "pick": "@FLD/TW_DEMO_DEPT.MANAGER_ID",
-        "tieBreak": {
-          "na": "兩個實體都取目前有效列，結果唯一"
-        }
-      },
-      "whenNotFound": {
-        "result": "EMPTY",
-        "note": "部門沒有目前有效列或 MANAGER_ID 為空白時結果為空；原系統對此沒有檢查，案件會停在 025，審核清單中沒有人看得到。"
-      },
-      "whenMultiple": {
-        "rule": "UNIQUE_BY_KEY",
-        "note": "兩個實體的目前有效列各只有一列。"
-      },
-      "implementedAt": [
-        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
-        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange"
-      ]
-    },
-    {
-      "type": "DRV",
-      "key": "REQUESTER_SUPERVISOR",
-      "basis": "CODE",
-      "certainty": "CONFIRMED",
-      "evidence": [
-        "E8",
-        "E3"
-      ],
-      "name": "申請人的直屬主管",
-      "meaning": "申請人目前任職資料上登記的直屬主管；送出時必須存在，020 由此人審核。",
-      "inputs": [
-        {
-          "name": "REQUESTER",
-          "from": {
-            "fld": "@FLD/TW_DEMO_REQHDR.REQUESTER_EMPLID"
-          }
-        }
-      ],
-      "resultType": "PERSON_ID",
-      "resolution": {
-        "sources": [
-          "@ENT/TW_DEMO_EMP"
-        ],
-        "joins": [
-          {
-            "left": "@FLD/TW_DEMO_EMP.EMPLID",
-            "right": {
-              "param": "REQUESTER"
-            }
-          }
-        ],
-        "filter": "ALWAYS",
-        "effectiveDating": [
-          {
-            "entity": "@ENT/TW_DEMO_EMP",
-            "rule": "CURRENT_ROW",
-            "asOf": {
-              "ctx": "CURRENT_DATE"
-            },
-            "effStatusActiveOnly": true
-          }
-        ],
-        "pick": "@FLD/TW_DEMO_EMP.SUPERVISOR_ID",
-        "tieBreak": {
-          "na": "鍵（EMPLID＋EFFDT）加目前有效列規則保證只有一列"
-        }
-      },
-      "whenNotFound": {
-        "result": "EMPTY",
-        "note": "查無目前有效的任職列，或 SUPERVISOR_ID 為空白時結果為空；送出時由 09 的規則擋下。"
-      },
-      "whenMultiple": {
-        "rule": "UNIQUE_BY_KEY",
-        "note": "目前有效列規則下每位員工只有一列。"
-      },
-      "implementedAt": [
-        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.SUBMIT_PB.FieldChange",
-        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.APPROVE_PB.FieldChange",
-        "@OBJ/PEOPLECODE:TW_DEMO_REQWRK.RETURN_PB.FieldChange"
-      ]
-    }
-  ],
-  "evidence": [
-    {
-      "id": "E1",
-      "kind": "METADATA_RECEIPT",
-      "locator": "inventory/records.json#fields",
-      "excerpt": "TW_DEMO_REQHDR 13 fields; TW_DEMO_EMP 5 used; TW_DEMO_DEPT 4 used"
-    },
-    {
-      "id": "E2",
-      "kind": "SQL",
-      "locator": "SELECT COUNT(*), SUM(CASE WHEN MANAGER_ID <> ' ' THEN 1 ELSE 0 END) FROM PS_TW_DEMO_DEPT",
-      "excerpt": "87|85"
-    },
-    {
-      "id": "E3",
-      "kind": "SQL",
-      "locator": "SELECT COUNT(*), SUM(CASE WHEN SUPERVISOR_ID <> ' ' THEN 1 ELSE 0 END) FROM PS_TW_DEMO_EMP",
-      "excerpt": "5210|5198"
-    },
-    {
-      "id": "E7",
-      "kind": "CHUNK",
-      "locator": "c4132e9c-d9b0-fb8d-ccac-22e4f83f199c",
-      "excerpt": "SQLExec(\"SELECT D.MANAGER_ID FROM PS_TW_DEMO_EMP E, PS_TW_DEMO_DEPT D WHERE ... current EFFDT rows ... AND D.DEPTID = E.DEPTID\", &emplid, &mgr);"
-    },
-    {
-      "id": "E8",
-      "kind": "CHUNK",
-      "locator": "06323a06-d258-ee9b-4140-2ae46d8d54f1",
-      "excerpt": "SQLExec(\"SELECT SUPERVISOR_ID FROM PS_TW_DEMO_EMP E WHERE EMPLID = :1 AND EFF_STATUS = 'A' AND EFFDT = (SELECT MAX(EFFDT) FROM PS_TW_DEMO_EMP WHERE EMPLID = E.EMPLID AND EFFDT <= %CurrentDateIn)\", &emplid, &sup);"
-    }
-  ],
-  "questions": [],
-  "requests": [],
-  "nextCursor": ""
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/examples/data.json
-@@@PSBUNDLE-PART-END|f4668d8098f2324a|2|8
+@@@PSBUNDLE-PART-END|269accc620bbeda1|2|8

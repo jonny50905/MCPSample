@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 5／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 5／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|5|8|7824|b4d198093a9c1d44f8c5871a02a3a753ee27129ca6a4dd44952a1d8cd22d4394
+@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|5|8|7827|7398cb1a092d1a873c5c5ba3aeabae0736e76eefc4f1b9a4bf47c74c5950f350
 @@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1612|87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365|1
 # ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
@@ -2200,7 +2200,7 @@ function Write-GraduationReceipt {
     }
 }
 @@@PSBUNDLE-END|scripts/ps-graduation.ps1
-@@@PSBUNDLE-FILE|scripts/ps-knowledge-lib.ps1|1094|f840c27ebf96bd9901f860728f9cc3f2371235a39012a491f118dc4044ddec91|1
+@@@PSBUNDLE-FILE|scripts/ps-knowledge-lib.ps1|1097|3584bb7303779683420f806a6dfe82045eeec70d96a98061a1023ec4f10f6ba1|1
 # ps-knowledge-lib.ps1 — 知識索引（Knowledge Index）共用邏輯（issue #33）
 # 由 ps-knowledge.ps1（CLI）、ps-auto-loop.ps1（safe point 發布）、ps-spec-lib.ps1（規劃器）、
 # ps-supplemental-lib.ps1（路由）dot-source。純函式庫：dot-source 不產生任何副作用、不呼叫模型、不查 DB。
@@ -2559,7 +2559,7 @@ function Get-PsKnNnFacts {
         domain = $Domain; file = $name; title = ''; primaryObject = ''; status = 'UNKNOWN'; origin = ''
         lineCount = $lines.Count; hash = (Get-PsKnTextHash -Text $text)
         sections = @(); missingSections = @(); duplicateSections = 0
-        relatedObjects = @(); fieldRows = 0; fieldsNotApplicable = $false
+        relatedObjects = @(); fieldRows = 0; fieldsNotApplicable = $false; controlRows = 0
         behaviorCounts = [ordered]@{ CONFIRMED = 0; INFERRED = 0; DYNAMIC_RUNTIME = 0 }
         dataFlow = @(); executionHollow = $true; permissionHollow = $true; gaps = 0
         evidence = @(); evidenceKinds = [ordered]@{ CHUNK = 0; SQL = 0; PENDING_MANUAL = 0; UNRESOLVED = 0 }
@@ -2619,6 +2619,9 @@ function Get-PsKnNnFacts {
         if ($sec.End -gt $sec.Start) { $body = ($lines[($sec.Start) .. ([Math]::Min($sec.End, $lines.Count) - 1)]) -join "`n" }
         if ($body -match '（無') { $f.fieldsNotApplicable = $true }
     }
+    # 畫面元件
+    $sec = Find-PsKnSection -Headings $heads -Key '畫面元件'
+    if ($null -ne $sec) { $ctlRows = Get-PsKnTableRows -Lines $lines -Start $sec.Start -End $sec.End; $f.controlRows = $ctlRows.Count }
     # 行為邏輯
     $sec = Find-PsKnSection -Headings $heads -Key '行為邏輯'
     if ($null -ne $sec) {
@@ -3037,7 +3040,7 @@ function Build-PsKnowledgeIndex {
                 pendingRepairs = $gr.pendingRepairs; hashSinceAudit = $gr.hashSinceAudit; receiptTier = $tier; receiptStale = $receiptStale
                 lineCount = $nn.lineCount; hash = $nn.hash
                 sections = @($nn.sections); missingSections = @($nn.missingSections); duplicateSections = $nn.duplicateSections
-                relatedObjects = @($nn.relatedObjects); fieldRows = $nn.fieldRows; fieldsNotApplicable = $nn.fieldsNotApplicable
+                relatedObjects = @($nn.relatedObjects); fieldRows = $nn.fieldRows; fieldsNotApplicable = $nn.fieldsNotApplicable; controlRows = $nn.controlRows
                 behaviorCounts = $nn.behaviorCounts; dataFlow = @($nn.dataFlow); executionHollow = $nn.executionHollow; permissionHollow = $nn.permissionHollow
                 gaps = $nn.gaps; evidenceCount = $nn.evidence.Count; evidenceKinds = $nn.evidenceKinds; links = @($nn.links)
             }
@@ -7825,4 +7828,4 @@ function Get-PsSdConflictFacts {
     return , $out.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-status-lib.ps1
-@@@PSBUNDLE-PART-END|f4668d8098f2324a|5|8
+@@@PSBUNDLE-PART-END|269accc620bbeda1|5|8

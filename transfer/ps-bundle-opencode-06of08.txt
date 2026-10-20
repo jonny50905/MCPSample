@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 6／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 6／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|6|8|6261|6798d4dcf4a5a2314c182bb2ef330f1cee01f95f08563be2270364eff856e9f1
+@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|6|8|6278|a22ad27888115d60666baf1ee699a2ccefe96aaf258a258491650aaaea3bedf7
 @@@PSBUNDLE-FILE|scripts/ps-sdoc.ps1|1501|f15b7d2e24675462854fe77239109e097064d275d792194a644626c48a9256ae|1
 # ps-sdoc.ps1 — Spec 文件流程的單一入口：00-index＋14 份文件＋90 問題清單。Claude Code 版照舊；OpenCode 版加 -Cli opencode。
 # 第 0 階段三位讀者解讀 STATUS 檔（不一致的逐項第 2 輪多數決）→ 研究單元依序（每頁研究與獨立覆核分開 session）→ 外環組裝、檢核、渲染。
@@ -3222,7 +3222,7 @@ function ConvertTo-PsCloneTrace {
     return (($o -join "`n") + "`n")
 }
 @@@PSBUNDLE-END|scripts/ps-spec-clone-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-spec-lib.ps1|2729|d8460ec0599c9b21cbff47a32e295f91d3710b431384912aee8bcc905c47ad67|1
+@@@PSBUNDLE-FILE|scripts/ps-spec-lib.ps1|2746|0fb1320c511b4939e2ecb3f1558f5c2e3674b4e8c97757baf6dd6e5574ce5cd2|1
 # ps-spec-lib.ps1 — Spec 引擎共用邏輯：Component＋私有需求包（pack）→ EXTRACT facts／COMPOSE 單位 → 外環派工與驗收
 #                   → 確定性 render（模板副本：markers 置換 {{slot:Sxx}}／headings 綁章節標題與原生佔位符）→ gate；結論碼 SPEC1-<stage>-<code>[-<count>]。
 # 由 ps-spec.ps1（CLI）與 scripts/tests/test-spec.ps1 dot-source。
@@ -4113,6 +4113,22 @@ function New-PsSpExtractFacts {
                 $val = [ordered]@{ fields = @($rows); fieldsPresent = $fv; choices = @($rows | Where-Object { $_.cells.Count -ge 4 -and [string]$_.cells[3] -ne '' }); lifecycle = @($rows | Where-Object { $_.cells.Count -ge 5 -and [string]$_.cells[4] -ne '' }); notApplicable = $na }
                 $cl = 'ROWS'; if ($na) { $cl = 'NOT_APPLICABLE' }
                 $facts += , ([ordered]@{ factId = ($fk + '@' + $Component); factKind = $fk; requirementIds = @($Req.id); subject = $Component; value = $val; sourceRefs = @($srs); evidenceRefs = @($evs); grade = (Get-PsSpMinGrade -Grades $grades); closure = $cl })
+            }
+        }
+        'UI.CONTROLS' {
+            $rows = @(); $srs = @(); $grades = @(); $found = $false; $evs = @()
+            foreach ($t in $Targets) {
+                $s = Get-PsSpSection -Ctx $t -Name '畫面元件'
+                if ($null -eq $s) { continue }
+                $found = $true; $srs += , (New-PsSpSourceRef -Ctx $t -Sec $s); $grades += $t.Grade
+                $body = Get-PsSpSectionBody -Ctx $t -Sec $s
+                foreach ($row in (Get-PsKnTableRows -Lines $t.Lines -Start ([int]$s.start) -End ([int]$s.end))) { $rows += , ([ordered]@{ file = $t.File; line = [int]$row.Line; cells = @($row.Cells) }) }
+                $evs += (Get-PsSpCitedEvidence -Ctx $t -Body $body)
+            }
+            if (-not $found -or $rows.Count -eq 0) { & $addNeed 'MISSING' 'COMPONENT' $Component $main.Grade $main }
+            else {
+                $val = [ordered]@{ controls = @($rows); properties = @($rows | Where-Object { $_.cells.Count -ge 5 -and [string]$_.cells[4] -ne '' }); lookup = @($rows | Where-Object { $_.cells.Count -ge 6 -and [string]$_.cells[5] -ne '' }) }
+                $facts += , ([ordered]@{ factId = ($fk + '@' + $Component); factKind = $fk; requirementIds = @($Req.id); subject = $Component; value = $val; sourceRefs = @($srs); evidenceRefs = @($evs); grade = (Get-PsSpMinGrade -Grades $grades); closure = 'ROWS' })
             }
         }
         'BEHAVIOR.RULES' {
@@ -5479,7 +5495,7 @@ function Get-PsSpEvaluation {
                 $cl = [string]$e.Facts[0].closure
                 $e.Closure = $cl
                 $rows = 0
-                foreach ($f in $e.Facts) { foreach ($pn in @('fields', 'rules', 'tables', 'objects', 'items', 'rows', 'entries')) { $v = Get-PsSpProp $f.value $pn; if ($null -ne $v) { $rows += @($v).Count; break } } }
+                foreach ($f in $e.Facts) { foreach ($pn in @('fields', 'rules', 'tables', 'objects', 'items', 'rows', 'entries', 'controls')) { $v = Get-PsSpProp $f.value $pn; if ($null -ne $v) { $rows += @($v).Count; break } } }
                 if ($fk -eq 'ENTITY.DETAIL' -or $fk -eq 'UI.COMPONENT_IDENTITY' -or $cl -eq 'PRESENT') { $rows = $a }
                 $e.Rows = $rows
                 if ([string]$q.cardinality -eq 'ONE' -and $a -ne 1 -and $fk -ne 'ENTITY.DETAIL') { & $add '7-12' @{ a = $a; c = 'ONE' } }
@@ -5589,6 +5605,7 @@ function ConvertTo-PsSpBlock {
                     if ($v.notApplicable) { $o += '（無畫面欄位）' }
                     else { $o += ConvertTo-PsSpTable -Header @('欄位', '顯示文字', '類型', '選項', '生命狀態') -Rows @($v.fields | ForEach-Object { $c = @($_.cells); while ($c.Count -lt 5) { $c += '' }; , @($c[0], $c[1], $c[2], $c[3], $c[4]) }) }
                 }
+                'UI.CONTROLS' { $o += ConvertTo-PsSpTable -Header @('頁面', '#', '欄位', '元件', '屬性', '查值') -Rows @($v.controls | ForEach-Object { $c = @($_.cells); while ($c.Count -lt 6) { $c += '' }; , @($c[0], $c[1], $c[2], $c[3], $c[4], $c[5]) }) }
                 'BEHAVIOR.RULES' { foreach ($rl in @($v.rules)) { $o += ('- ' + (ConvertTo-PsSpCell ([string]$rl.text))) } }
                 'DATA.FLOW' { $o += ConvertTo-PsSpTable -Header @('表', '操作', '來源', '信心') -Rows @($v.tables | ForEach-Object { , @([string]$_.table, [string]$_.op, [string]$_.source, [string]$_.confidence) }) }
                 'PROCESS.EXECUTION' {
@@ -6262,4 +6279,4 @@ finally {
 }
 Finish $code $exitCode
 @@@PSBUNDLE-END|scripts/ps-spec.ps1
-@@@PSBUNDLE-PART-END|f4668d8098f2324a|6|8
+@@@PSBUNDLE-PART-END|269accc620bbeda1|6|8

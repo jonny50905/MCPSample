@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a3f1cce）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a3f1cce|f4668d8098f2324a|8|8|3655|2e8f80f79d5e6df40b9dbaedeb15e11776f72425c3d53fc099e2ddcf79adea59
+@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|8|8|3694|70a8718904d1fff8ee3ded121b82860b5c1b15a476fee4479ad13d1c95c13ff3
 @@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384|1
 # test-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單元測試；合成資料，不查 MCP、不讀企業產物、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -874,7 +874,7 @@ Write-Host ('clone tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-spec-clone.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1132|ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244|1
+@@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1147|953ca3e1254e5e35b21ee34eef9bf3726ec266a0ad3ceb7552c17594e8afb41c|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：合成 fixtures（臨時目錄，結束自刪；無公司資料；物件名一律 TW_DEMO_*／PS_DEMO_*）：
@@ -2003,12 +2003,27 @@ $legacyPlan.units[0].unitKey = Get-PsSpUnitKey -UnitId ([string]$legacyPlan.unit
 $legacyStatus = Get-PsSpUnitStatus -Root $root -Dirs $dirsE -Plan $legacyPlan -Index $idxCont
 Assert ([string]@($legacyStatus)[0].State -eq 'SOURCE_CHANGED' -and $null -eq @($legacyStatus)[0].Receipt) '舊版行號式 unitId 的 plan 必須重 Plan，不能沿用可能漏續篇的分母'
 
+Write-Host "情境：EXTRACT UI.CONTROLS（## 畫面元件）"
+$ctlRoot = Join-Path $root 'ctl-root'
+$ctlDom = Join-Path $ctlRoot (Join-Path 'docs' (Join-Path 'ps-research' '測試領域'))
+New-Item -ItemType Directory -Path $ctlDom -Force | Out-Null
+Write-Utf8 (Join-Path $ctlDom '07-TW_DEMO_C.md') @('# 07 功能（[[TW_DEMO_C]]）', '', '## 畫面與欄位', '', '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |', '|---|---|---|---|---|', '| DEMO_STATUS | 狀態 | Translate | E=免役 | 使用中 |', '', '## 畫面元件', '', '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |', '|---|---|---|---|---|---|', '| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（附錄 #1） |', '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |', '| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Link: PeopleCode |  |  |', '', '## Evidence 附錄', '', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', '| 1 | PSPNLFIELD | 畫面元件 | SELECT P.FIELDNUM FROM X.PSPNLFIELD P WHERE P.PNLNAME = ''TW_DEMO_PG'' |') $false
+Write-Utf8 (Join-Path $ctlDom '08-TW_DEMO_D.md') @('# 08 功能（[[TW_DEMO_D]]）', '', '## 畫面與欄位', '', '（無——Function Library，無使用者畫面）') $false
+$capCtl = Get-PsSpFactKind -Capabilities $caps -FactKind 'UI.CONTROLS'
+$ctxCtl = Get-PsSpNnCtx -Root $ctlRoot -Index $null -Domain '測試領域' -File '07-TW_DEMO_C.md' -Cache @{}
+$xCtl = New-PsSpExtractFacts -Req @{ id = 'R_CTL'; factKind = 'UI.CONTROLS'; evidencePolicy = 'ANY' } -Cap $capCtl -Targets @($ctxCtl) -Callees @() -Index $null -Root $ctlRoot -Component 'TW_DEMO_C' -Cache @{}
+$fCtl = @($xCtl.Facts)
+Assert ($null -ne $capCtl -and [string]$capCtl.mode -eq 'EXTRACT' -and $fCtl.Count -eq 1 -and @($fCtl[0].value.controls).Count -eq 3 -and @($fCtl[0].value.properties).Count -eq 2 -and @($fCtl[0].value.lookup).Count -eq 1 -and [string]$fCtl[0].closure -eq 'ROWS' -and @($fCtl[0].evidenceRefs).Count -eq 1 -and [bool]$fCtl[0].evidenceRefs[0].resolved) "EXTRACT UI.CONTROLS：3 列、2 列有屬性、1 列有查值、附錄參照解得到"
+$ctxNo = Get-PsSpNnCtx -Root $ctlRoot -Index $null -Domain '測試領域' -File '08-TW_DEMO_D.md' -Cache @{}
+$xNo = New-PsSpExtractFacts -Req @{ id = 'R_CTL'; factKind = 'UI.CONTROLS'; evidencePolicy = 'ANY' } -Cap $capCtl -Targets @($ctxNo) -Callees @() -Index $null -Root $ctlRoot -Component 'TW_DEMO_D' -Cache @{}
+Assert (@($xNo.Facts).Count -eq 0 -and @($xNo.Needs).Count -eq 1 -and [string]$xNo.Needs[0].Reason -eq 'MISSING') "EXTRACT UI.CONTROLS：沒有「## 畫面元件」→ MISSING（交補研究補）"
+
 Remove-Item -Recurse -Force $root
 Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-spec.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|524|02cf5b26122222697986c2bac5796c1cc5d830c0482f603f2e4e93c3a6cafa35|1
+@@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|546|1e02eea5bed7f6cb97e190cfd0b00ce9b79a8c7e7079b9e6e488e8a59bc13154|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
 # 範圍：合成 fixtures（臨時目錄，結束自刪；無公司資料）：need 驗證負例、workKey／requestId 確定性、同 need 並行提交只一檔、
@@ -2282,7 +2297,7 @@ Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x 
 Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'CONFIRMED 必須有證據#') "負例：CONFIRMED 無證據#"
 Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | MAYBE | x | 1 |', '| 摘要 | CONFIRMED | x | 1 |') $ev2) $false
 $t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap
-Assert ((-not $t.Ok) -and ($t.Errors -join ';') -match '信心「MAYBE」不在三值' -and ($t.Errors -join ';') -match '節名「摘要」不在八節') "負例：信心值域、節名八節"
+Assert ((-not $t.Ok) -and ($t.Errors -join ';') -match '信心「MAYBE」不在三值' -and ($t.Errors -join ';') -match '節名「摘要」不在能力目錄的 NN 節') "負例：信心值域、節名不在能力目錄的 NN 節"
 Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @() $ev2) $false
 Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'RESEARCHED 但追加事實為空') "負例：RESEARCHED 無事實"
 Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x | 1 |') @('| a | b | ChunkId 3f2a9c1e |')) $false
@@ -2371,6 +2386,28 @@ $mg4 = Merge-PsSuppReceipt -NnPath $noEv -Receipt $recv -RequestId $rid1
 $t4 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $noEv)
 Assert ($mg4.Ok -and $mg4.EvidenceRows[0] -eq 1 -and ([array]::IndexOf($t4, '## Evidence 附錄') -gt [array]::IndexOf($t4, '## 未解事項（gaps）')) -and (@($t4 | Where-Object { $_ -match '^## ' }).Count -eq 8)) "無附錄／缺多節的 NN：附錄建在檔尾（編號從 1）、五個缺節在未解事項前建立（共 8 個 ## 節）"
 Assert ((Test-PsSuppAlreadyCovered -TargetFacts $fAfter -FactKind 'DATA.FILE_INPUT' -Capabilities $cap) -and -not (Test-PsSuppAlreadyCovered -TargetFacts $facts1 -FactKind 'SECURITY.ACCESS' -Capabilities $cap)) "ALREADY_COVERED 判定：相關節非空洞才成立（原檔無權限節 → 不成立）"
+
+# 畫面元件（表格節、六格）：缺節時建在「畫面與欄位」之後；已有節時表末追加；ALREADY_COVERED 看畫面元件列數
+$ctlNn = Join-Path $root 'ctl-nn.md'
+Write-Utf8 $ctlNn (New-NnLines '07' 'TW_DEMO_C' @() $false) $false
+$rcCtl = Join-Path $partsDir ($rid1 + '.ctl.md')
+Write-Utf8 $rcCtl (New-ReceiptLines 'RESEARCHED' @('| 畫面元件 | CONFIRMED | TW_DEMO_PG｜5｜TW_DEMO_DEPTVW.DESCR｜Edit Box｜DISPLAY_ONLY RELATED_TO=4｜ | 2 |') $ev2) $false
+$recvCtl = Test-PsSuppReceipt -LiteralPath $rcCtl -Capabilities $cap
+Assert ($recvCtl.Ok -and $recvCtl.Facts.Count -eq 1 -and $recvCtl.Facts[0].Section -eq '畫面元件') "畫面元件事實：六格敘述（末格可空）合格"
+$factsCtl0 = Get-PsKnNnFacts -LiteralPath $ctlNn -Domain '職缺測試'
+Assert (-not (Test-PsSuppAlreadyCovered -TargetFacts $factsCtl0 -FactKind 'UI.CONTROLS' -Capabilities $cap)) "UI.CONTROLS：NN 沒有畫面元件 → 不得 ALREADY_COVERED"
+$mgC = Merge-PsSuppReceipt -NnPath $ctlNn -Receipt $recvCtl -RequestId $rid1
+$cl1 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $ctlNn)
+$iFld = [array]::IndexOf($cl1, '| DEMO_STATUS | 狀態 | Translate | 免役=E / 服役中=S | E：使用中（資料 3 筆） |')
+$iCtl = [array]::IndexOf($cl1, '## 畫面元件')
+$iBeh = [array]::IndexOf($cl1, '## 行為邏輯')
+Assert ($mgC.Ok -and $iFld -gt 0 -and $iCtl -eq ($iFld + 2) -and $cl1[$iCtl + 2] -eq '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |' -and $cl1[$iCtl + 4] -eq '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 | （附錄 #5） |' -and $cl1[$iCtl + 5] -eq '' -and $iBeh -eq ($iCtl + 6)) "缺「畫面元件」節：建在畫面與欄位之後、行為邏輯之前，六格，附錄參照接在查值格"
+$mgC2 = Merge-PsSuppReceipt -NnPath $ctlNn -Receipt $recvCtl -RequestId $rid1
+$cl2 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $ctlNn)
+$iCtl2 = [array]::IndexOf($cl2, '## 畫面元件')
+$factsCtl = Get-PsKnNnFacts -LiteralPath $ctlNn -Domain '職缺測試'
+Assert ($mgC2.Ok -and $cl2[$iCtl2 + 5] -eq '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 | （附錄 #7） |' -and $factsCtl.controlRows -eq 2 -and $factsCtl.fieldRows -eq 1 -and (Test-PsSuppAlreadyCovered -TargetFacts $factsCtl -FactKind 'UI.CONTROLS' -Capabilities $cap)) "已有「畫面元件」節：表末追加；畫面元件 2 列、畫面與欄位列數不受影響；ALREADY_COVERED 成立"
+Remove-Item -LiteralPath $ctlNn, $rcCtl -Force
 
 # ── 情境 6：attempts、D 列、result、wiki 標記、搬移 ────────────────
 Write-Host "情境 6：attempts 推導、目標無 NN → D 列、result create-only、wiki stale／reviewed、parts 搬移"
@@ -2534,10 +2571,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|0984d51ff3a4568f5c9db10ac158756132d9da6a833d5c150b3a0b3bed61bb47|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|799b76eb7abd4d43609bd39215a0c21453f0bcf39f10fdd81ebdfb213b8556f6|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "a3f1cce",
+  "commit": "fb01cfe",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -2583,8 +2620,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 531,
-      "sha256": "4529a198ceb2d30cf91f2cede15e2456b0595cc4c45e5e49a5cf27dea094136e",
+      "lines": 535,
+      "sha256": "040f5570b2183549b6a462f9c881c771ccd33d19c6c1c8521ee577ab8067131f",
       "bom": false
     },
     {
@@ -2595,8 +2632,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-orchestrator.md",
-      "lines": 237,
-      "sha256": "1bece723b32644aedb35946485081225cb95f40a924d8650336ecc04dedf909b",
+      "lines": 238,
+      "sha256": "2d583998425840088fa64667e16755a44b5a45729bb7f7f31744cbe7f4a1e749",
       "bom": false
     },
     {
@@ -2655,8 +2692,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-ui-flow.md",
-      "lines": 146,
-      "sha256": "d558fb682f98af2a16cabd062f4e79e4eb841eaedbbecb3506359bb94ebd86f7",
+      "lines": 152,
+      "sha256": "8fc251d22ab145bb2fcca0053054c9d5b5fe8a5777772f24c3487e94212268e9",
       "bom": false
     },
     {
@@ -2733,14 +2770,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/knowledge-retrieval-contract.md",
-      "lines": 127,
-      "sha256": "c4c7329b663e5d2f6cd2644644ef49be07afa4ae6f5ef3e3fd74883408dc6af0",
+      "lines": 128,
+      "sha256": "05e8dd17dc8d7732bb3d472619658f41aa8160766c763d89d9db6003e3af12d1",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4081,
-      "sha256": "d40c44f03358fabf1124bdec8a8e1bc707055e8a343e1ff14ef59705f50c178c",
+      "lines": 4109,
+      "sha256": "583d4bdcb915890f07bc33a59361a86dc70cf89d6a4ff440464d402607415529",
       "bom": false
     },
     {
@@ -2757,8 +2794,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 763,
-      "sha256": "a300a107dd8d0876c1c5b4dc25876efa7b7a2285d80ca192a9df4206394e7129",
+      "lines": 831,
+      "sha256": "f971622db36539dd68829c395e6d9e5c9b027b0524008cd016505cc440ee63fc",
       "bom": false
     },
     {
@@ -2793,8 +2830,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/report-templates/function-detail-template.md",
-      "lines": 114,
-      "sha256": "9010b8f16ca9ab2ae35ffdd38029c2fb3bc6001235a5df1533e0e92522f8c674",
+      "lines": 130,
+      "sha256": "bb7c6b7669381d784a79d21450aad82ac3989b6947d21881d451d0f7466e58ed",
       "bom": false
     },
     {
@@ -3057,14 +3094,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1264,
-      "sha256": "6edc9318db409e4f4ad0afd104ee694363b08bc25187c4021453026eeaf032a4",
+      "lines": 1266,
+      "sha256": "772135fd8406e044cf7b3c92ed6d2b4b64a828fe9c6c4dc4ebe8b84bb4637d10",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/spec/capabilities.json",
-      "lines": 37,
-      "sha256": "67e7a913080f50a6e268f245744d730f147db683aff100bdbca87ed7bfe01573",
+      "lines": 38,
+      "sha256": "6514e5d73ca2568acea32f9c3a4ff6c288b4964e92b7244b929c23049df86bc8",
       "bom": false
     },
     {
@@ -3118,7 +3155,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "1c868fb77273b9abc9f465cd111448ed5628056a78df44ab96bdef4fdeda3032",
+      "sha256": "0be19e632b2f643a3991f4c43057d674a64e3609e2ade236e132e943dafc8353",
       "bom": false
     },
     {
@@ -3141,14 +3178,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/subagent-report-contract.md",
-      "lines": 175,
-      "sha256": "d925106f95478f9d1fdf5d489729a673c6dbc1a22845656d66be4afe6e49b2f4",
+      "lines": 187,
+      "sha256": "48b31b28fc56550389732deb4e9ce1aa390c1ab795248da1b937ffd1c24a1d10",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/supplemental-contract.md",
-      "lines": 100,
-      "sha256": "97462eb9e0198ed5b1d7f255e88f1ac87b5380e4e57747f26e5b44ccc4490a77",
+      "lines": 102,
+      "sha256": "f8b09efd42058d83df8276c209d15489c18085fc955bf81b9ef2c8eec54d3501",
       "bom": false
     },
     {
@@ -3231,8 +3268,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/skills/ps-ui-flow/SKILL.md",
-      "lines": 192,
-      "sha256": "109b97d1930c081c771c0ec8309568af888e86fa2b3c75668c9ac65538c4d3d5",
+      "lines": 198,
+      "sha256": "4717489fdeb082e205e8d816dc7c9c3f005c4f99a1897c58c096a9f9f591e48b",
       "bom": false
     },
     {
@@ -3291,8 +3328,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-knowledge-lib.ps1",
-      "lines": 1094,
-      "sha256": "f840c27ebf96bd9901f860728f9cc3f2371235a39012a491f118dc4044ddec91",
+      "lines": 1097,
+      "sha256": "3584bb7303779683420f806a6dfe82045eeec70d96a98061a1023ec4f10f6ba1",
       "bom": true
     },
     {
@@ -3369,8 +3406,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-spec-lib.ps1",
-      "lines": 2729,
-      "sha256": "d8460ec0599c9b21cbff47a32e295f91d3710b431384912aee8bcc905c47ad67",
+      "lines": 2746,
+      "sha256": "0fb1320c511b4939e2ecb3f1558f5c2e3674b4e8c97757baf6dd6e5574ce5cd2",
       "bom": true
     },
     {
@@ -3381,8 +3418,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-supplemental-lib.ps1",
-      "lines": 1193,
-      "sha256": "e593d2cf6aaf9cd0e5dbd530beff91f89ce9abf054607e36c6045b03da75c857",
+      "lines": 1197,
+      "sha256": "6dd300916a4281a4f843fce5687a48271ce4d0b27b732dafbbc168489493ef11",
       "bom": true
     },
     {
@@ -3400,7 +3437,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/tests/test-auto-loop.ps1",
       "lines": 1029,
-      "sha256": "6e4757761d772435828ac5da3e3e37f1e176246f9bacc98acb2270a4458b2a39",
+      "sha256": "0cadab25c68c0b58a3e2f2feb9fa338014aa4dc1882d40e20d407992da771fd6",
       "bom": true
     },
     {
@@ -3417,8 +3454,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-knowledge.ps1",
-      "lines": 338,
-      "sha256": "dc18bdc60f9607362f1b474ceb11c3b35974bd142221ac361b132e056f3cee76",
+      "lines": 341,
+      "sha256": "78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3",
       "bom": true
     },
     {
@@ -3465,14 +3502,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-spec.ps1",
-      "lines": 1132,
-      "sha256": "ef26f9ac70b8702e68a3eaa6c9526b9d06a8060c940c9966312fdb997272a244",
+      "lines": 1147,
+      "sha256": "953ca3e1254e5e35b21ee34eef9bf3726ec266a0ad3ceb7552c17594e8afb41c",
       "bom": true
     },
     {
       "path": "scripts/tests/test-supplemental.ps1",
-      "lines": 524,
-      "sha256": "02cf5b26122222697986c2bac5796c1cc5d830c0482f603f2e4e93c3a6cafa35",
+      "lines": 546,
+      "sha256": "1e02eea5bed7f6cb97e190cfd0b00ce9b79a8c7e7079b9e6e488e8a59bc13154",
       "bom": true
     }
   ],
@@ -3496,7 +3533,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|157|8c838e3e2a9491e1fac186447addccf32ca42726b816a3d9d3e77774221894fa|0
+@@@PSBUNDLE-FILE|AGENTS.md|159|5a267565e792da3f91caf73a65074afb664b305432a21731b03223d53ae78c80|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -3578,8 +3615,10 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-10-19 再由 `claude/blissful-edison-7hbeqr` 快轉併入
-   agent 唯讀帳號的表名改帶擁有者前綴（兩版 cookbook 規則 1a 與 61 處樣板、ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor、profile 註解、
+4. **維護版線**：`main` 是正式版線（最近一次：2026-10-20 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   畫面元件與設計期屬性進研究範本（cookbook §2l、NN「## 畫面元件」、ps-deep-research／ps-ui-flow `pageControls[]`、補研究與 Spec 引擎 `UI.CONTROLS`；L151）
+   與第四輪結果，各份重生，併入前 `main` 頭 `e78f5f6`；
+   2026-10-19 同一分支併入 agent 唯讀帳號的表名改帶擁有者前綴（兩版 cookbook 規則 1a 與 61 處樣板、ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor、profile 註解、
    ps-doc-lint 導覽證據比對、SOP-30；L150）、第四輪驗證 SQL（`docs/design/ui-metadata-check-r4.md`）與第三輪結果，各份重生，併入前 `main` 頭 `e86d8a6`；
    同日稍早同一分支併入第三輪驗證 SQL（`docs/design/ui-metadata-check-r3.md`：依特徵自動判代碼、以相關顯示算唯讀位元、必填旁證、唯讀帳號 A 測試）與第二輪結果（框架檔未動、搬運包不變），併入前 `main` 頭 `5b60f84`；
    同日稍早同一分支併入第二輪驗證 SQL（`docs/design/ui-metadata-check-r2.md`：欄位 Y/N 探查、找校準頁、核對代碼 10 以上）與第一輪結果完結記錄（框架檔未動、搬運包不變），併入前 `main` 頭 `b9f6762`；
@@ -3655,5 +3694,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|30fe96712e7c34ee54da1dd27f88877c902e4425161056f6f1541c3b7b8c6416
-@@@PSBUNDLE-PART-END|f4668d8098f2324a|8|8
+@@@PSBUNDLE-EOF|158|95fa29a6ab90cfb03910e1109ace0cb9821b961d483bfdd421b1ec43d25cf7ba
+@@@PSBUNDLE-PART-END|269accc620bbeda1|8|8
