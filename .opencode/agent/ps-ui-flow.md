@@ -71,6 +71,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
 3b. **畫面元件（委派任務要某個 Page 的元件清單時）**：照 cookbook §2l，一個 Page 一次、一次最多 40 列。
    回報 `pageControls[]`：每個 Page（每一批）一筆，`sql` 放實際執行的 SELECT 原樣，`rows` 每列照 §2l 轉寫規則填
    `fieldNum`／`field`／`control`／`properties`／`lookup`（字樣照抄、不翻譯、不解讀），回滿 40 列時 `more: true`。
+   委派要 Component 的動作時照 §2m 跑一次，同樣以 `pageControls[]` 一筆回報（`page`＝Component 名、`rows` 一列：
+   `fieldNum` 0、`control` `Component`）。
    不受 findings 8 筆上限；本步屬 **oracleMCP 類委派，計入同時 ≤ 3**。
 4. 用委派背景中的 searchMode / customPrefixes 過濾與排序候選。
 5. 完成後**只輸出一份** `.opencode/peoplesoft/subagent-report-contract.md`
@@ -84,6 +86,8 @@ businessDomain / searchMode / customPrefixes 與聚焦問題。
   （Record.Field → Group Box／Subpage／受影響控制項，§2h～§2j）。
 - **可用（oracleMCP + cookbook §2l）**：Page 上的元件種類、設計期屬性（Display Only、Invisible、相關顯示與控制欄、
   Required、Key）與查值（Prompt 表與檢核方式、Translate、Y/N），以 `pageControls[]` 回報。
+- **可用（oracleMCP + cookbook §2m）**：Component 允許的動作（Add、Update/Display、Update/Display All、Correction）
+  與搜尋 Record，以 `pageControls[]` 的 Component 列回報。
 - **可用（PeoplecodeMetadata，定位用）**：`find_field_usage` 欄位用途反查
   （只吃欄位名）、`search_component_metadata` Component 關鍵字搜尋
   （只吃 Component 關鍵字）——Page／Record 名帶入必查空。

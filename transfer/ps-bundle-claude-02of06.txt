@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit fb01cfe）第 2／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit abce4bb）第 2／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|fb01cfe|426d56a96a338694|2|6|9965|dfc1e89793914095e10406d03f80227995e404e7920b9f6a1db0b0a4f5048454
+@@@PSBUNDLE-PART|1|claude|abce4bb|df8b88bcdd8a5680|2|6|9973|e705461a2c285d32e445ddbf19f5672c5c72ebb7fbc3a35ebf634a8fd0afb989
 @@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/schemas/04-workflow.schema.json|1211|d534c59ff293a11cccae0eb3187848380bf036e7fecf92a80d987cf5bb8256f2|0
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -8030,7 +8030,7 @@ CAP-REQ: sources=[行為邏輯, Evidence 附錄], subject=COMPONENT, output=[tri
 - 綁定（bindingMode／章節標題／佔位符）進 bindingHash：改綁定與改模板同級，會換一個 generation；改 requirements 才是 contentHash（2-08 重跑 `-Plan`）。
 - gate／render 的等級看現況知識索引（每個動詞都先重建 STALE 索引）：規劃後等級低於政策＝7-22，不會發 SPEC_COMPLETE；ENTITY.DETAIL 規劃與 gate 都只看 wiki 等級（引用它的 NN 等級不算），所以 NN 未稽核不會誤開 7-22。
 @@@PSBUNDLE-END|.claude/peoplesoft/spec/troubleshooting-matrix.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/subagent-report-contract.md|187|a8b834be4c5c31ad2029e3d9056a63f21c5c419ac07c1d3d5a23be18d5a146f0|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/subagent-report-contract.md|193|50d3ef7707b0ba625982e71287041b5fe38043bc80267cc03eae676efb07bced|0
 # Subagent Report Contract（回報契約）
 
 所有 ps-* subagent 的**最終輸出只能是一份符合本契約的 JSON**，
@@ -8166,6 +8166,12 @@ orchestrator 主 context 只累積小而結構化的報告。
   ],
   "pageControls": [
     {
+      "page": "TW_DEMO_REQ",
+      "sql": "SELECT TRIM(G.PNLGRPNAME) AS COMPONENT, … FROM <擁有者>.PSPNLGRPDEFN G WHERE G.PNLGRPNAME = 'TW_DEMO_REQ'",
+      "more": false,
+      "rows": [ { "fieldNum": 0, "field": "", "control": "Component", "properties": "ADD UPDATE_DISPLAY", "lookup": "SEARCH TW_DEMO_REQSRCH" } ]
+    },
+    {
       "page": "TW_DEMO_PG",
       "sql": "SELECT P.FIELDNUM, … FROM <擁有者>.PSPNLFIELD P … WHERE P.PNLNAME = 'TW_DEMO_PG' … AND P.FIELDNUM > 0 …",
       "more": false,
@@ -8206,7 +8212,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
 | `dependencies[]` | ✔（可為空陣列） | 原生 / 相依物件，只能出現在這裡 |
 | `technicalMenuLocations[]` | 選填 | PSMENUITEM 的 MENUNAME／BARNAME／ITEMNAME——**technical metadata，不是導覽路徑** |
-| `pageControls[]` | 選填（委派要某個 Page 的元件清單時必填） | 每個 Page 每一批一筆：`page`、`sql`（實際執行的 cookbook §2l SELECT 原樣，即本批的 SQL 證據）、`more`（回滿 40 列＝true，委派方以最後的 fieldNum 續派）、`rows[]`（`fieldNum`／`field`／`control`／`properties`／`lookup`，照 §2l 轉寫規則逐字填、每批 ≤ 40 列）。rows 是結構化轉寫，不算引用行數、不受 findings 8 筆上限 |
+| `pageControls[]` | 選填（委派要某個 Page 的元件清單時必填） | 每個 Page 每一批一筆：`page`、`sql`（實際執行的 cookbook §2l SELECT 原樣，即本批的 SQL 證據）、`more`（回滿 40 列＝true，委派方以最後的 fieldNum 續派）、`rows[]`（`fieldNum`／`field`／`control`／`properties`／`lookup`，照 §2l 轉寫規則逐字填、每批 ≤ 40 列）。rows 是結構化轉寫，不算引用行數、不受 findings 8 筆上限。Component 動作（§2m）也是一筆：`page`＝Component 名、`rows` 一列（`fieldNum` 0、`field` 空、`control` `Component`、`properties`＝動作、`lookup`＝搜尋 Record） |
 | `navigationEntries[]` | 選填（導覽類委派必填，可為空陣列） | Portal Registry 入口，**複數**；每筆帶 entryType／labels／visibility（值域見 `mcp-tool-contracts.md` §3）。空陣列＋gaps＝查無；未支援的 surface 記 gaps，不得省略 |
 | `dynamicRuntimeWarnings[]` | ✔（可為空陣列） | 所有 DYNAMIC_RUNTIME 事項集中列出 |
 | `gaps[]` | ✔（可為空陣列） | 未涵蓋範圍與原因（budget 到頂 / 與題無關 / 查無） |
@@ -8219,7 +8225,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 - 引用報告時帶 evidence IDs；需要原文時按 ID 定向補取，不重跑檢索。
 - 多份報告衝突時：以 confidence 高者為準；同級衝突如實並陳並標 INFERRED。
 @@@PSBUNDLE-END|.claude/peoplesoft/subagent-report-contract.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/supplemental-contract.md|102|6a3224b30fe0befface81528d59a9e758ac7ed710251108481f76b43f8e96634|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/supplemental-contract.md|102|d28d83484060518cd8996f6daa6914330bb69cba925f079016de08a4dc3932da|0
 # 補研究契約（Supplemental Research：指定 NN＋指定問題的定向補查）
 
 適用：`/ps-supplement <領域>` 指令（由 ps-auto-loop 的補研究迷你圈啟動；不是給人手動下的指令）。
@@ -8242,7 +8248,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | 事實類別 | 委派鏈（依序） | 缺證據出口 |
 |---|---|---|
 | UI.COMPONENT_IDENTITY、UI.NAVIGATION、UI.FIELD_INVENTORY | ps-ui-flow（導覽入口依 cookbook §2k canonical） | SQL 型→追加證據寫 `待人工SQL` |
-| UI.CONTROLS | ps-ui-flow（cookbook §2l，一個 Page 一個委派；回報 `pageControls[]` 每列寫一條「畫面元件」事實，SQL 寫一列追加證據） | SQL 型→追加證據寫 `待人工SQL` |
+| UI.CONTROLS | ps-ui-flow（cookbook §2m 一次＋§2l 一個 Page 一個委派；回報 `pageControls[]` 每列寫一條「畫面元件」事實，SQL 寫一列追加證據） | SQL 型→追加證據寫 `待人工SQL` |
 | BEHAVIOR.RULES、BEHAVIOR.VALIDATIONS | ps-peoplecode-flow →（規則讀 View 時）ps-sql-flow | CHUNK 型→不寫該事實、處置 NO_EVIDENCE＋查法收據 |
 | DATA.FLOW、DATA.RECORD_USAGE | ps-sql-flow → ps-peoplecode-flow | 同上 |
 | DATA.FILE_INPUT、DATA.FILE_OUTPUT | ps-peoplecode-flow（File 物件／Rowset 讀寫）→ callee：ps-sqr-flow（SQR／SQC）、ps-ae-flow（AE） | 同上 |
@@ -8288,7 +8294,7 @@ BLOCKED(NOT_CONNECTED) 只重連重派一次。
 - 信心 ∈ CONFIRMED／INFERRED／DYNAMIC_RUNTIME；CONFIRMED 必須有證據#。
 - 證據#＝追加證據表的列序（1 起算），多筆用 `;`；無＝`無`。外環會把它換成 NN 附錄的新編號。
 - **表格節的敘述**用全形直線 `｜` 分格，格數固定：畫面與欄位 5 格（欄位｜顯示文字｜類型｜選項｜生命狀態）、
-  畫面元件 6 格（頁面｜#｜欄位｜元件｜屬性｜查值；照 cookbook §2l 轉寫規則）、
+  畫面元件 6 格（頁面｜#｜欄位｜元件｜屬性｜查值；照 cookbook §2m、§2l 轉寫規則）、
   資料流 3 格（表｜操作｜來源；信心由信心欄補上）、相關物件 2 格（物件｜角色）。條列節（行為邏輯、未解事項）與
   文字節（功能定位、執行方式、權限）寫一句完整敘述。
 - 機器參照只准三種：完整 36 字元 ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。ChunkId 不得縮寫。
@@ -9345,7 +9351,7 @@ Use Oracle Process metadata through ps-process-flow to explain how the SQR is ru
 - `.claude/peoplesoft/progressive-source-retrieval.md`
 - `.claude/peoplesoft/customization-profile.yaml`
 @@@PSBUNDLE-END|.claude/skills/ps-sqr-flow/SKILL.md
-@@@PSBUNDLE-FILE|.claude/skills/ps-ui-flow/SKILL.md|198|43631595884f79f6e14599ba1368e21bd9101e5a13ed151256b853a3d827e9f2|0
+@@@PSBUNDLE-FILE|.claude/skills/ps-ui-flow/SKILL.md|200|23fa1722d0c4e0dabd7cdcb64dcb11a4218e2e4e6aa91195ab44b0c7be0191d2|0
 ---
 name: ps-ui-flow
 description: PeopleSoft UI 分析 — 畫面顯示文字、選項 label 與儲存值對映、由文字反查 Component / Page / Record.Field。
@@ -9463,6 +9469,8 @@ scroll 層級變異（HideRow／HideScroll 等，無 Record.Field 可解析）
 Page 上每個元件的種類、設計期屬性（Display Only、Invisible、Required、Key）、相關顯示與控制欄、查值方式（Prompt 表與檢核、
 Translate、Y/N）照 cookbook §2l 查、照它的轉寫規則回報（`pageControls[]`）。設計期設定是畫面打開時的預設；PeopleCode 在執行期
 改的顯示、可改、必填屬「條件 UI」，兩者分開寫，不互相覆蓋。
+Component 允許的動作（Add、Update/Display、Update/Display All、Correction）與搜尋 Record 照 cookbook §2m 查，
+寫成同一張表的第一列（元件＝`Component`）。
 
 ## 工具
 
@@ -9966,4 +9974,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|426d56a96a338694|2|6
+@@@PSBUNDLE-PART-END|df8b88bcdd8a5680|2|6

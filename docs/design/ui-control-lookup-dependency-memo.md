@@ -416,6 +416,12 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   不靠 16）。R3B 沒選出 1，是因為一般 Edit Box 超過一半本來就唯讀（門檻 IN_OTH ≤ 50）。R4D＝ACTIONS 2＝只勾 Update/Display → 位元 2＝Update/Display；
   Add、Update/Display All、Correction 的位元還沒核對（分布那行沒回），Component 動作先不進框架。R4E＝32 張表唯讀帳號都看得到。
   → 第 2、3 步開始：cookbook §2l（每個 Page 一次，解碼只用已核對的代碼）、NN 新節「## 畫面元件」、補研究事實類別 UI.CONTROLS（L151）。
+- **第四輪後續（2026-10-20）**：管理者確認 ACTIONS 的位元順序（1 Add、2 Update/Display、4 Update/Display All、8 Correction）→ Component 動作與搜尋 Record
+  進框架（cookbook §2m，寫成「## 畫面元件」第一列；L152）。R4A～R4D 和官方對照：USEEDIT 與 Oracle PeopleCode API（QueryDBRecordField 的 Flag）一致；
+  FIELDUSE 1、2、16 與社群整理一致（Oracle：勾 Related Field 會自動勾 Display Only，對上 R4C 的 1,16）；ACTIONS 與 PSAUTHITEM.AUTHORIZEDACTIONS
+  同一組位元；已解碼的元件代碼一致，12／16／21 依按鈕目的地改叫 PeopleCode Command／Internal Link／Secondary Page，5 改叫 Drop-Down List Box。
+  對不上的：代碼 10、15、23、24（社群：Scroll Bar、External Link 按鈕、Horizontal Rule、Tab Separator）與 FIELDUSE 8（社群：Display Control；第三輪 DC=NONE）
+  → 第五輪 SQL `ui-metadata-check-r5.md`（R5A 特徵＋App Designer 對照、R5B 8／16 與 ASSOCFIELDNUM 交叉）。對照表與來源在第五輪說明檔。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 

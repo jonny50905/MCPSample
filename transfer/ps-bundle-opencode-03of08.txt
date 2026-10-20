@@ -1,6 +1,104 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|3|8|14117|d9997de2e2ccb439d5dc7193870902fbe79063fd8d336c9a563e11d7333aaa82
+@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|3|8|14175|7a607c3c4f5f2d89b7e5d7f463a9b59dec62296dae2196b9eb57f93f3490f8e5
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/research-domains.txt|28|6be65b50cee4d82d152301f4ed68cdf1a6d88d9e6d2fac4896cf109d8a393da8|0
+# research-domains.txt — 批次研究的領域佇列（issue #3）
+#
+# 規則：
+#   - 一行一個領域；順序就是研究順序（人工決定，模型不得增刪重排）
+#   - 空行與 # 開頭是註解；暫停某領域直接在行首加 # 即可
+#   - 本檔只回答「要研究什麼」，不記錄進度——進度真相在各領域的
+#     checklist.md 與 graduation.json（收據由 ps-auto-loop 畢業時寫入）
+#   - 領域名不可用：wiki（共用 Entity Wiki 目錄）、Windows 裝置名
+#     （CON/PRN/AUX/NUL/COM1-9/LPT1-9，含帶副檔名形）、含 < > : " / \ | ? * & % ^
+#     或「..」、以「-」或「.」開頭、超過 50 字元——preflight 會整批拒絕
+#   - 領域「畢業」後請把該行註解移出佇列（SOP-14）——維運期的月度 audit 會
+#     使收據失效，留在佇列會被 batch 自動重跑（永動工單機）
+#
+# 用法：.\scripts\ps-auto-all.ps1
+#       （選配熔絲：-MaxDomains 10 -MaxBatchHours 8 -MaxConsecutiveFailures 3）
+#
+# 佇列（管理者 2026-09 指定）：
+職缺
+
+# 範例（拿掉 # 即生效）：
+# 招募
+# 任用
+# 轉職
+# 試用期
+# 考勤
+# 薪資
+# 績效
+# 離職
+@@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/ai-instructions.json|66|5956d48dc50fc104ea8e79204254d910b04d6595355347159f09583b5f4a7640|0
+{
+  "schemaVersion": 1,
+  "note": "16 AI 實作指引的固定條款（每個 job 都一樣）。改條款要提高框架的 schema 版本。",
+  "clauses": [
+    {
+      "key": "AI:01",
+      "category": "READING",
+      "clause": "先讀 00-index：閱讀順序、ID 前綴對照、本版狀態。看到任何 ID，到前綴對照表指定的文件找定義；以 ID 為準，不以章節位置為準。"
+    },
+    {
+      "key": "AI:02",
+      "category": "SCOPE",
+      "clause": "只實作 01～19 本體列出的項目。90 問題清單中的圖外狀態與圖外轉移不實作，除非 19 有決策把它納入。"
+    },
+    {
+      "key": "AI:03",
+      "category": "DATA",
+      "clause": "07「不建置的原生欄位」所列欄位不建資料欄、不上畫面、不寫規則。DEPENDENCY 實體只建文件列出的欄位（最小介面）。"
+    },
+    {
+      "key": "AI:04",
+      "category": "DATA",
+      "clause": "狀態碼、選項儲存值、訊息原文一律保留原值；畫面文字可以調整，但不得更改儲存值。"
+    },
+    {
+      "key": "AI:05",
+      "category": "LOGIC",
+      "clause": "條件的空白語意照共同定義實作：字元欄空白＝NULL 或單一空白；數值欄未輸入視為 0；日期欄未輸入為 NULL。"
+    },
+    {
+      "key": "AI:06",
+      "category": "UNKNOWN_HANDLING",
+      "clause": "遇到 UNRESOLVED 或文件沒有說明的行為，不要自行補上；記下 ID 與問題回報，等待 19 的決策。"
+    },
+    {
+      "key": "AI:07",
+      "category": "UNKNOWN_HANDLING",
+      "clause": "NOT_APPLICABLE 表示已查證「沒有」，不要補做；它不是待辦。"
+    },
+    {
+      "key": "AI:08",
+      "category": "SCOPE",
+      "clause": "文件不指定技術。不要把原系統的 Component、Page、Record 結構當成必須照搬的架構；要保留的是可觀測行為與資料語意。"
+    },
+    {
+      "key": "AI:09",
+      "category": "TRACEABILITY",
+      "clause": "在程式、測試與提交訊息標註實作的 ID（FR、BR、TC…），讓驗收能逐項對照 18 的完成條件。"
+    },
+    {
+      "key": "AI:10",
+      "category": "CHANGE_DISCIPLINE",
+      "clause": "發現規格矛盾或錯誤時不要自行修改規格；回報 ID 與證據，由 19 的決策處理後再實作。"
+    },
+    {
+      "key": "AI:11",
+      "category": "LOGIC",
+      "clause": "04 的守門轉移（exitMode＝ON_COMPLETION）照 guard 實作：逐列條件對所有子資料求值，沒有子資料時依 whenEmpty；SYSTEM_GATE 活動由系統檢查完成條件，EXPECTED_ONLY 活動不要自行加上檢查。"
+    },
+    {
+      "key": "AI:12",
+      "category": "SCOPE",
+      "clause": "90 的 NATIVE_UNUSED_BRANCH 是已證明不會執行的原系統分支：不要實作，也不要為它加條件或保留選項，除非 19 有決策納入。"
+    }
+  ]
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/ai-instructions.json
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/examples/data.json|385|a72d79c2b3ab6f94ec9eb6371ab94ddcb93c8eb369a94048fbe82d0ddffbbd26|0
 {
   "schemaVersion": "1.0",
@@ -12810,7 +12908,7 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1266|772135fd8406e044cf7b3c92ed6d2b4b64a828fe9c6c4dc4ebe8b84bb4637d10|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1266|6545c4b87db7ea526c72b4da52c790ed32f883655020f71e28dfee482856c9a3|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -13636,7 +13734,7 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
    不建檔；既有結果為終局時要重跑加 `-Resubmit`（建新世代，舊世代由迷你圈標 SUPERSEDED）。路由：`-DomainHint`
    ＞ 索引中以目標為主物件的 NN 所在領域 ＞ 目錄掃描；零候選＝`ROUTING_REQUIRED`（加 hint，領域須有 00-overview）。
    `-GitCommit` 只 commit request 檔到內部 git（永不 push）。
-   舊 NN 補「## 畫面元件」：`-FactKind UI.CONTROLS -Properties controls,properties,lookup`（迷你圈委派 ps-ui-flow 跑 cookbook §2l，
+   舊 NN 補「## 畫面元件」：`-FactKind UI.CONTROLS -Properties controls,properties,lookup`（迷你圈委派 ps-ui-flow 跑 cookbook §2m 與 §2l，
    合併時沒有該節就建在「## 畫面與欄位」之後）。新研究的 NN 由 /ps-research 直接寫，不必補。
 2. **執行**：`ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]`（迷你圈；exit 4＝完成）；
    `ps-auto-all` 在每個領域判收據前若有 pending 會自動先跑。每 run 至多 2 張（`-SupplementalPerRun`）、
@@ -14078,44 +14176,4 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 □ 7. 端對端（OpenCode 版，test-scenarios R43）：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`
      ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 sql_run 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。
 @@@PSBUNDLE-END|.opencode/peoplesoft/SOP.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/capabilities.json|38|6514e5d73ca2568acea32f9c3a4ff6c288b4964e92b7244b929c23049df86bc8|0
-{
-  "schemaVersion": 1,
-  "note": "能力目錄（公開、機械讀）：補研究 need.factKind／properties／context 與 Spec 需求包 requirements.factKind 的封閉值域。sections 用知識索引的節鍵；EXTRACT＝外環從 NN 節確定性抽取，COMPOSE＝worker 依 manifest 切片組表、外環算覆蓋率。follow＝可沿相關物件表的呼叫／啟動／排程／執行角色一跳讀 callee NN 同節。目錄外＝UNSUPPORTED。新增能力走 CAP-REQ 表單（support-codes.md）。",
-  "targetTypes": ["COMPONENT", "RECORD", "FIELD", "PAGE", "AE", "SQR", "SQC", "SQL", "PROCESS", "MENU"],
-  "objectNamePattern": "^[A-Z0-9_][A-Z0-9_.$#-]{0,59}$",
-  "contextKeys": {
-    "operation": ["IMPORT", "EXPORT", "SAVE", "SEARCH", "APPROVE", "BATCH", "ANY"],
-    "mode": ["ADD", "UPDATE", "CORRECT", "DISPLAY", "ANY"],
-    "page": "OBJECT_NAME",
-    "record": "OBJECT_NAME",
-    "field": "OBJECT_NAME",
-    "process": "OBJECT_NAME"
-  },
-  "evidencePolicies": ["AUDITED", "STATIC", "ANY"],
-  "freshness": ["CURRENT", "AS_OF"],
-  "confidence": ["CONFIRMED", "INFERRED", "DYNAMIC_RUNTIME"],
-  "nnSections": ["相關物件", "功能定位", "畫面與欄位", "畫面元件", "行為邏輯", "資料流", "執行方式", "權限", "未解事項"],
-  "followRoles": ["呼叫", "啟動", "排程", "執行"],
-  "followTypes": ["AE", "SQR", "SQC", "PROCESS"],
-  "factKinds": {
-    "UI.COMPONENT_IDENTITY": { "mode": "EXTRACT", "sections": [], "head": true, "properties": ["primaryObject", "origin", "status", "functionName"], "closure": "SINGLE" },
-    "UI.NAVIGATION": { "mode": "EXTRACT", "sections": ["功能定位"], "subsections": ["導覽入口", "Technical Menu"], "properties": ["entries", "technicalMenu"], "closure": "ROWS" },
-    "UI.FIELD_INVENTORY": { "mode": "EXTRACT", "sections": ["畫面與欄位"], "properties": ["fields", "choices", "lifecycle"], "closure": "ROWS" },
-    "UI.CONTROLS": { "mode": "EXTRACT", "sections": ["畫面元件"], "properties": ["controls", "properties", "lookup"], "closure": "ROWS" },
-    "BEHAVIOR.RULES": { "mode": "EXTRACT", "sections": ["行為邏輯"], "properties": ["rules", "confidence"], "closure": "ITEMS" },
-    "DATA.FLOW": { "mode": "EXTRACT", "sections": ["資料流"], "properties": ["reads", "writes", "tables"], "closure": "ROWS" },
-    "PROCESS.EXECUTION": { "mode": "EXTRACT", "follow": true, "sections": ["執行方式"], "properties": ["online", "batch", "schedule"], "closure": "PRESENT" },
-    "SECURITY.ACCESS": { "mode": "EXTRACT", "sections": ["權限"], "properties": ["permissionLists", "roles"], "closure": "PRESENT" },
-    "RELATED.OBJECTS": { "mode": "EXTRACT", "sections": ["相關物件"], "properties": ["objects", "roles", "classification"], "closure": "ROWS" },
-    "GAPS": { "mode": "EXTRACT", "sections": ["未解事項"], "properties": ["items"], "closure": "ITEMS" },
-    "EVIDENCE.APPENDIX": { "mode": "EXTRACT", "sections": ["Evidence附錄"], "properties": ["rows", "kinds"], "closure": "ROWS" },
-    "ENTITY.DETAIL": { "mode": "EXTRACT", "hop": "wiki", "sections": ["資料流"], "properties": ["observations", "relations"], "closure": "PER_RECORD" },
-    "BEHAVIOR.VALIDATIONS": { "mode": "COMPOSE", "sections": ["行為邏輯", "Evidence附錄"], "properties": ["trigger", "condition", "message"], "table": ["來源條目", "觸發", "條件", "訊息", "證據"], "closure": "COVERAGE" },
-    "DATA.FILE_INPUT": { "mode": "COMPOSE", "follow": true, "sections": ["行為邏輯", "資料流", "執行方式"], "properties": ["present", "layout", "fields"], "table": ["來源條目", "欄位", "格式", "說明", "證據"], "closure": "COVERAGE" },
-    "DATA.FILE_OUTPUT": { "mode": "COMPOSE", "follow": true, "sections": ["行為邏輯", "資料流", "執行方式"], "properties": ["present", "layout", "fields"], "table": ["來源條目", "欄位", "格式", "說明", "證據"], "closure": "COVERAGE" },
-    "DATA.RECORD_USAGE": { "mode": "COMPOSE", "sections": ["資料流", "行為邏輯"], "properties": ["fields", "usage"], "table": ["來源條目", "欄位", "用途", "證據"], "enums": { "用途": ["READ", "LOOKUP", "WRITE"] }, "closure": "COVERAGE" }
-  }
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/spec/capabilities.json
-@@@PSBUNDLE-PART-END|269accc620bbeda1|3|8
+@@@PSBUNDLE-PART-END|661c83716db583b8|3|8

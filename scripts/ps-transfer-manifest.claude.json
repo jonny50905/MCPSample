@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "fb01cfe",
+  "commit": "abce4bb",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -25,8 +25,8 @@
     },
     {
       "path": ".claude/agents/ps-deep-research.md",
-      "lines": 516,
-      "sha256": "f425df76412fb8f075dd0ced8772c3832c6431daaa24cbf4579941fb7a122f87",
+      "lines": 517,
+      "sha256": "e49288ae1084deddf6d7b6feba5e6f14fbe889c611ebf27c7c100b0aac17e58d",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-deep-research.md"
     },
@@ -39,8 +39,8 @@
     },
     {
       "path": ".claude/agents/ps-orchestrator.md",
-      "lines": 212,
-      "sha256": "53922e79e00fa91a0477d370a642657b6b87c98c673574df1749ab35b23b8768",
+      "lines": 213,
+      "sha256": "b9e2ea32132cb2805310b2848406d7173d67c3e2256aa1fb7f5f810fb19376ee",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-orchestrator.md"
     },
@@ -109,8 +109,8 @@
     },
     {
       "path": ".claude/agents/ps-ui-flow.md",
-      "lines": 121,
-      "sha256": "76d170ad355685ad1a214358104779067b4c9c8fb2390764dd5a772f4fd67667",
+      "lines": 125,
+      "sha256": "4a07a7eb70f6e840739e0737760110d642831cdd4cf14837d0e56e9db4971226",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-ui-flow.md"
     },
@@ -200,8 +200,8 @@
     },
     {
       "path": ".claude/peoplesoft/knowledge-retrieval-contract.md",
-      "lines": 129,
-      "sha256": "4c7ca7cb6dc1bf95177dce881b49952b9988eee43d95d3272f63252d2078adf3",
+      "lines": 130,
+      "sha256": "b0239fbe68bd215622c501a03dafbe2cdf5aaff43fde927dfb8110160e686629",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/knowledge-retrieval-contract.md"
     },
@@ -228,8 +228,8 @@
     },
     {
       "path": ".claude/peoplesoft/oracle-query-cookbook.md",
-      "lines": 831,
-      "sha256": "25c0708cb7667d20773c984db87d7ea16f6a08ba151ea4d1a142dc8e8033a426",
+      "lines": 863,
+      "sha256": "38d63a6abaf4ce40019ca8f188d31d9cddf7b7902fa59b84ce368a521a5d7d9a",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/oracle-query-cookbook.md"
     },
@@ -263,8 +263,8 @@
     },
     {
       "path": ".claude/peoplesoft/report-templates/function-detail-template.md",
-      "lines": 130,
-      "sha256": "bb7c6b7669381d784a79d21450aad82ac3989b6947d21881d451d0f7466e58ed",
+      "lines": 131,
+      "sha256": "48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/report-templates/function-detail-template.md"
     },
@@ -655,15 +655,15 @@
     },
     {
       "path": ".claude/peoplesoft/subagent-report-contract.md",
-      "lines": 187,
-      "sha256": "a8b834be4c5c31ad2029e3d9056a63f21c5c419ac07c1d3d5a23be18d5a146f0",
+      "lines": 193,
+      "sha256": "50d3ef7707b0ba625982e71287041b5fe38043bc80267cc03eae676efb07bced",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/subagent-report-contract.md"
     },
     {
       "path": ".claude/peoplesoft/supplemental-contract.md",
       "lines": 102,
-      "sha256": "6a3224b30fe0befface81528d59a9e758ac7ed710251108481f76b43f8e96634",
+      "sha256": "d28d83484060518cd8996f6daa6914330bb69cba925f079016de08a4dc3932da",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/supplemental-contract.md"
     },
@@ -746,8 +746,8 @@
     },
     {
       "path": ".claude/skills/ps-ui-flow/SKILL.md",
-      "lines": 198,
-      "sha256": "43631595884f79f6e14599ba1368e21bd9101e5a13ed151256b853a3d827e9f2",
+      "lines": 200,
+      "sha256": "23fa1722d0c4e0dabd7cdcb64dcb11a4218e2e4e6aa91195ab44b0c7be0191d2",
       "bom": false,
       "repo": "claude-code/.claude/skills/ps-ui-flow/SKILL.md"
     },
@@ -989,7 +989,7 @@
     {
       "path": "scripts/tests/test-spec.ps1",
       "lines": 1147,
-      "sha256": "953ca3e1254e5e35b21ee34eef9bf3726ec266a0ad3ceb7552c17594e8afb41c",
+      "sha256": "74de0409c4a47e4cbd6f09b008bed4d3a63352c4578750dcf8d40d36d269846f",
       "bom": true
     },
     {

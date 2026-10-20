@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|2|8|6309|6dce63f3b1a622fdc1dac090370542eac935bb38e563ec7280bf3bc6c9f21b69
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4109|583d4bdcb915890f07bc33a59361a86dc70cf89d6a4ff440464d402607415529|0
+@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|2|8|6269|4ca15f7b60c83dace285055f3d81664490c36d5bc314ef74e9f5307251df1320
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4134|95c41f272727c3115c768954cb2ec62f2608043fb7680d850c27c3006f1d6a2f|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4111,6 +4111,31 @@
 - 驗證：§2l 以合成資料跑過（DuckDB，表放在另一個 schema、裸表名必失敗）：相關顯示與控制欄、動態 prompt、Grid 內欄位、續查；
   test-supplemental（缺節插入位置、已有節追加、ALREADY_COVERED）、test-knowledge（controlRows）、test-spec（EXTRACT UI.CONTROLS 與 MISSING）
   新增案例；全套測試、ps-agent-doc-lint 全過。
+
+### L152 Component 動作與搜尋 Record 寫進「## 畫面元件」第一列；元件名稱改成 App Designer 的叫法；官方對照與第五輪驗證（2026-10-20）
+
+- 需求：管理者確認 PSPNLGRPDEFN.ACTIONS 的位元順序和框架假設一樣（1 Add、2 Update/Display、4 Update/Display All、8 Correction；
+  R4D 實測 2＝只勾 Update/Display），要求直接加進框架；並要求 R4A～R4D 和官方對照，有衝突的提供確認用 SQL。
+- 官方對照（2026-10-20 查；docs.oracle.com 只能看搜尋摘要）：USEEDIT 和 Oracle PeopleCode API（QueryDBRecordField 的 Flag 屬性）一致——
+  1 Key、2048 Search Item、32768 Auto Update；256 Required、512 Translate、4096 Date Range Edit（App Designer 叫 Reasonable Date Test）、
+  8192 Yes/No、16384 Edit Table。FIELDUSE 社群整理 1 Display Only、2 Invisible、8 Display Control、16 Related Field、1024 Show Label；
+  Oracle 文件「勾 Related Field 會自動勾 Display Only」對上 R4C 的 1,16。ACTIONS 和社群整理的 PSAUTHITEM.AUTHORIZEDACTIONS 同一組位元
+  （128 各家說法不一）。已解碼的 FIELDTYPE 和社群表一致；12／16／21 社群依按鈕的 Destination 叫 PeopleCode Command／Internal Link／Secondary Page。
+  對不上：FIELDTYPE 10、15、23、24（社群：Scroll Bar、External Link 按鈕、Horizontal Rule、Tab Separator；第三輪特徵判 MIXED／CONTAINER）、
+  FIELDUSE 8（社群：Display Control；第三輪 DC=NONE）→ 第五輪 SQL `docs/design/ui-metadata-check-r5.md`（對照表與來源也在那裡）。
+- 落點：
+  - 兩版 cookbook §2m：一個 Component 一次；ACT_ADD／ACT_UPD／ACT_ALL／ACT_COR 在 SQL 裡解碼，其他位元以 OTHER_BITS 照數字寫；
+    搜尋 Record 與新增用的搜尋 Record；轉寫成「## 畫面元件」第一列（頁面＝Component、#＝0、元件＝Component、屬性＝動作、查值＝搜尋 Record）。
+  - §2l 元件名稱改成 App Designer 的叫法：5 Drop-Down List Box、12／16／21 Push Button/Hyperlink: PeopleCode Command／Internal Link／Secondary Page；
+    值域加按鈕目的地的意思。代碼不變，只改字樣。
+  - NN 範本（兩版）加 Component 列範例；ps-ui-flow（agent＋SKILL）、ps-deep-research、subagent-report-contract（`pageControls[]` 的 Component 列）、
+    supplemental-contract、knowledge-retrieval-contract、ps-orchestrator 路由（兩版）；SOP-23 補法的說明。
+- 設計取捨：Component 放在同一張表的第一列，不另起表格、不寫成敘述——節內第二張表會被補研究合併、知識索引、Spec 抽取算成元件列（同 L151），
+  寫成敘述則 Spec 引擎的 UI.CONTROLS 抽不到；放在表裡三處都不用改。#＝0 不會和 FIELDNUM 撞（FIELDNUM 從 1 起）。
+- 沒做：§4 的 AUTHORIZEDACTIONS 解碼（同一組位元，但 128 未定，先不動）；搜尋 Record 的搜尋鍵與清單欄位；PSPNLGRPDEFN.MARKET 沒核對過，
+  同名多個 market 版本時每列各寫一列；代碼 10／15／23／24 與 FIELDUSE 8 等第五輪結果。
+- 驗證：§2m 以合成資料跑過（DuckDB，表放在另一個 schema：多動作、ADD_SEARCH、OTHER=128、查無）；§2l 改名後重跑；第五輪兩句 SQL 以合成資料跑過；
+  test-spec 的 UI.CONTROLS 夾具加 Component 列（4 列、3 列有屬性、2 列有查值、第一列元件＝Component）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -4270,7 +4295,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|831|f971622db36539dd68829c395e6d9e5c9b027b0524008cd016505cc440ee63fc|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|863|b8ce6149bb1f02e38cc2f383d155a4a0301115e76c07a4220190b9768d2548f5|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
@@ -4853,11 +4878,11 @@ FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
 
 ```sql
 SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
-       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List' WHEN 6 THEN 'Long Edit Box'
+       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List Box' WHEN 6 THEN 'Long Edit Box'
                         WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
-                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Link: PeopleCode'
-                        WHEN 16 THEN 'Push Button/Link: Component' WHEN 18 THEN 'Secondary Page'
-                        WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Link: Secondary Page'
+                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 16 THEN 'Push Button/Hyperlink: Internal Link' WHEN 18 THEN 'Secondary Page'
+                        WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Hyperlink: Secondary Page'
                         WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area' ELSE 'OTHER' END AS CONTROL,
        TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
        CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
@@ -4898,13 +4923,15 @@ FETCH FIRST 40 ROWS ONLY
   `LEVEL=<LVL>`（LVL 大於 0 才寫）、`GOTO=<GOTO_COMPONENT>`、`PAGE=<SUBPAGE>`（有值才寫）。
 - 查值：PROMPT_REC 有值寫 `PROMPT <PROMPT_REC> <PROMPT_EDIT>`，PROMPT_KIND／PROMPT_KEYS 有值再接
   `（<PROMPT_KIND>；鍵 <PROMPT_KEYS>）`；沒有 prompt 時寫 VALUES_EDIT 的值；都沒有留空。
-- 元件是 Subpage、Secondary Page、Push Button/Link: Secondary Page → 以 SUBPAGE 的頁名再跑一次本節
+- 元件是 Subpage、Secondary Page、Push Button/Hyperlink: Secondary Page → 以 SUBPAGE 的頁名再跑一次本節
   （visited 去重、深度 ≤ 8，同 §2j）。
 - 寫成證據時 SQL 原樣保留（含 FROM 與頁名、`:afterFieldNum` 的實際值），每個 Page 每一批一列。
 
 值域：
 
 - DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
+- 元件名稱＝App Designer 的元件名；按鈕／超連結在冒號後接目的地：PeopleCode Command＝按下去跑所綁欄位的 FieldChange
+  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁。
 - RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
 - KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
 - XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
@@ -4912,6 +4939,36 @@ FETCH FIRST 40 ROWS ONLY
   （PROMPT_REC 是 `%` 開頭的欄位名），追 PeopleCode 對該欄位的指派。
 - PROMPT_KIND＝TABLE、VIEW、DERIVED、OTHER；view 的選取條件照長文本協定以 ES＋Source 取，不從 Oracle 撈全文。
   PROMPT_KEYS＝prompt record 的鍵（依欄位順序）；含 SETID、EFFDT 的照實寫。
+
+**2m. Component 動作與搜尋 Record（一個 Component 一次；NN「## 畫面元件」表格的第一列）**
+
+```sql
+SELECT TRIM(G.PNLGRPNAME) AS COMPONENT, G.ACTIONS AS CODE,
+       CASE WHEN BITAND(G.ACTIONS, 1) > 0 THEN 'ADD' END AS ACT_ADD,
+       CASE WHEN BITAND(G.ACTIONS, 2) > 0 THEN 'UPDATE_DISPLAY' END AS ACT_UPD,
+       CASE WHEN BITAND(G.ACTIONS, 4) > 0 THEN 'UPDATE_DISPLAY_ALL' END AS ACT_ALL,
+       CASE WHEN BITAND(G.ACTIONS, 8) > 0 THEN 'CORRECTION' END AS ACT_COR,
+       CASE WHEN G.ACTIONS > BITAND(G.ACTIONS, 15) THEN G.ACTIONS - BITAND(G.ACTIONS, 15) END AS OTHER_BITS,
+       TRIM(G.SEARCHRECNAME) AS SEARCH_REC, TRIM(G.ADDSRCHRECNAME) AS ADD_SEARCH_REC
+  FROM <schema>.PSPNLGRPDEFN G
+ WHERE G.PNLGRPNAME = :componentName
+```
+
+轉寫規則（照輸出原樣抄，不加不減、不解讀）：
+
+- 頁面＝COMPONENT、#＝0、欄位留空、元件＝`Component`。
+- 屬性：ACT_ADD、ACT_UPD、ACT_ALL、ACT_COR 有值的依序以空白串起；OTHER_BITS 有值再接 `OTHER=<OTHER_BITS>`。
+- 查值：`SEARCH <SEARCH_REC>`；ADD_SEARCH_REC 有值再接 `；ADD_SEARCH <ADD_SEARCH_REC>`。
+- 回多列（同名 Component 有多個 market 版本）每列各寫一列；0 列＝名稱不是 Component，不寫這一列，「未解事項」記一行。
+- 寫成證據時 SQL 原樣保留（含 FROM 與 Component 名），一列。
+
+值域：
+
+- ADD＝可新增一筆新的鍵值（進入時先輸入新鍵值）；UPDATE_DISPLAY＝修改既有資料，有效日期的列只看得到目前與未來；
+  UPDATE_DISPLAY_ALL＝看得到歷史列、只能改目前與未來的列；CORRECTION＝連歷史列都能改。沒有有效日期列的 Component，後三者效果相同。
+- 使用者實際能用哪幾個動作還要看權限（Permission List 對該 Menu Item 授權的動作，§4）。
+- SEARCH＝搜尋頁查的 Record（搜尋條件是它的搜尋鍵；列層級安全也靠它，§4）；ADD_SEARCH＝新增時用的搜尋 Record，沒有＝新增也用 SEARCH。
+- OTHER＝四個動作以外的位元，照數字寫，不猜意思。
 
 ---
 
@@ -6029,7 +6086,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|130|bb7c6b7669381d784a79d21450aad82ac3989b6947d21881d451d0f7466e58ed|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|131|48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972|0
 # <NN> <功能名>（[[<Component / 物件名>]]）
 
 > 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE | PARTIAL | BLOCKED
@@ -6096,17 +6153,18 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 
 ## 畫面元件
 
-<依 oracle-query-cookbook §2l（每個 Page 一次）照轉寫規則填；每個 Page 的 SQL 進 Evidence 附錄。>
+<依 oracle-query-cookbook §2m（Component 一次，寫第一列）與 §2l（每個 Page 一次）照轉寫規則填；每次的 SQL 進 Evidence 附錄。>
 
 | 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |
 |---|---|---|---|---|---|
+| TW_DEMO_REQ | 0 |  | Component | ADD UPDATE_DISPLAY | SEARCH TW_DEMO_REQSRCH |
 | TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（VIEW；鍵 SETID,DEPTID,EFFDT） |
 | TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |
-| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List |  | XLAT |
-| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Link: PeopleCode |  |  |
+| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
+| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
 
 <!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
-     # ＝FIELDNUM；屬性與查值的字樣照 §2l 轉寫規則，不翻譯、不改寫。
+     # ＝FIELDNUM（Component 那列寫 0）；屬性與查值的字樣照 §2m、§2l 轉寫規則，不翻譯、不改寫。
      主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
      沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
 
@@ -6212,102 +6270,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 - 注意：本清單可能不完整——30 年系統的命名不一定命中 alias；
   發現遺漏請直接在 checklist.md 的「調查進度」加列。
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/overview-template.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/research-domains.txt|28|6be65b50cee4d82d152301f4ed68cdf1a6d88d9e6d2fac4896cf109d8a393da8|0
-# research-domains.txt — 批次研究的領域佇列（issue #3）
-#
-# 規則：
-#   - 一行一個領域；順序就是研究順序（人工決定，模型不得增刪重排）
-#   - 空行與 # 開頭是註解；暫停某領域直接在行首加 # 即可
-#   - 本檔只回答「要研究什麼」，不記錄進度——進度真相在各領域的
-#     checklist.md 與 graduation.json（收據由 ps-auto-loop 畢業時寫入）
-#   - 領域名不可用：wiki（共用 Entity Wiki 目錄）、Windows 裝置名
-#     （CON/PRN/AUX/NUL/COM1-9/LPT1-9，含帶副檔名形）、含 < > : " / \ | ? * & % ^
-#     或「..」、以「-」或「.」開頭、超過 50 字元——preflight 會整批拒絕
-#   - 領域「畢業」後請把該行註解移出佇列（SOP-14）——維運期的月度 audit 會
-#     使收據失效，留在佇列會被 batch 自動重跑（永動工單機）
-#
-# 用法：.\scripts\ps-auto-all.ps1
-#       （選配熔絲：-MaxDomains 10 -MaxBatchHours 8 -MaxConsecutiveFailures 3）
-#
-# 佇列（管理者 2026-09 指定）：
-職缺
-
-# 範例（拿掉 # 即生效）：
-# 招募
-# 任用
-# 轉職
-# 試用期
-# 考勤
-# 薪資
-# 績效
-# 離職
-@@@PSBUNDLE-END|.opencode/peoplesoft/research-domains.txt
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/ai-instructions.json|66|5956d48dc50fc104ea8e79204254d910b04d6595355347159f09583b5f4a7640|0
-{
-  "schemaVersion": 1,
-  "note": "16 AI 實作指引的固定條款（每個 job 都一樣）。改條款要提高框架的 schema 版本。",
-  "clauses": [
-    {
-      "key": "AI:01",
-      "category": "READING",
-      "clause": "先讀 00-index：閱讀順序、ID 前綴對照、本版狀態。看到任何 ID，到前綴對照表指定的文件找定義；以 ID 為準，不以章節位置為準。"
-    },
-    {
-      "key": "AI:02",
-      "category": "SCOPE",
-      "clause": "只實作 01～19 本體列出的項目。90 問題清單中的圖外狀態與圖外轉移不實作，除非 19 有決策把它納入。"
-    },
-    {
-      "key": "AI:03",
-      "category": "DATA",
-      "clause": "07「不建置的原生欄位」所列欄位不建資料欄、不上畫面、不寫規則。DEPENDENCY 實體只建文件列出的欄位（最小介面）。"
-    },
-    {
-      "key": "AI:04",
-      "category": "DATA",
-      "clause": "狀態碼、選項儲存值、訊息原文一律保留原值；畫面文字可以調整，但不得更改儲存值。"
-    },
-    {
-      "key": "AI:05",
-      "category": "LOGIC",
-      "clause": "條件的空白語意照共同定義實作：字元欄空白＝NULL 或單一空白；數值欄未輸入視為 0；日期欄未輸入為 NULL。"
-    },
-    {
-      "key": "AI:06",
-      "category": "UNKNOWN_HANDLING",
-      "clause": "遇到 UNRESOLVED 或文件沒有說明的行為，不要自行補上；記下 ID 與問題回報，等待 19 的決策。"
-    },
-    {
-      "key": "AI:07",
-      "category": "UNKNOWN_HANDLING",
-      "clause": "NOT_APPLICABLE 表示已查證「沒有」，不要補做；它不是待辦。"
-    },
-    {
-      "key": "AI:08",
-      "category": "SCOPE",
-      "clause": "文件不指定技術。不要把原系統的 Component、Page、Record 結構當成必須照搬的架構；要保留的是可觀測行為與資料語意。"
-    },
-    {
-      "key": "AI:09",
-      "category": "TRACEABILITY",
-      "clause": "在程式、測試與提交訊息標註實作的 ID（FR、BR、TC…），讓驗收能逐項對照 18 的完成條件。"
-    },
-    {
-      "key": "AI:10",
-      "category": "CHANGE_DISCIPLINE",
-      "clause": "發現規格矛盾或錯誤時不要自行修改規格；回報 ID 與證據，由 19 的決策處理後再實作。"
-    },
-    {
-      "key": "AI:11",
-      "category": "LOGIC",
-      "clause": "04 的守門轉移（exitMode＝ON_COMPLETION）照 guard 實作：逐列條件對所有子資料求值，沒有子資料時依 whenEmpty；SYSTEM_GATE 活動由系統檢查完成條件，EXPECTED_ONLY 活動不要自行加上檢查。"
-    },
-    {
-      "key": "AI:12",
-      "category": "SCOPE",
-      "clause": "90 的 NATIVE_UNUSED_BRANCH 是已證明不會執行的原系統分支：不要實作，也不要為它加條件或保留選項，除非 19 有決策納入。"
-    }
-  ]
-}
-@@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/ai-instructions.json
-@@@PSBUNDLE-PART-END|269accc620bbeda1|2|8
+@@@PSBUNDLE-PART-END|661c83716db583b8|2|8

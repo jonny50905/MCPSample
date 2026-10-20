@@ -5,6 +5,12 @@
 
 ## 0. 一句話現況
 
+**Component 動作進「## 畫面元件」第一列＋官方對照（2026-10-20，L152，分支 `claude/blissful-edison-7hbeqr`）**：管理者確認 ACTIONS 位元順序
+（1 Add、2 Update/Display、4 Update/Display All、8 Correction）→ 兩版 cookbook §2m（一個 Component 一次，動作與搜尋 Record 解碼在 SQL）、NN 範本與
+ps-ui-flow／ps-deep-research／回報契約／補研究契約／問答契約／orchestrator 路由；§2l 元件名稱改成 App Designer 的叫法（Drop-Down List Box、
+Push Button/Hyperlink: PeopleCode Command／Internal Link／Secondary Page）。R4A～R4D 和官方對照：USEEDIT（Oracle API）、FIELDUSE 1／2／16、ACTIONS、
+已解碼的元件代碼都一致；代碼 10／15／23／24 與 FIELDUSE 8 對不上 → 第五輪 SQL `docs/design/ui-metadata-check-r5.md` 待跑。
+
 **畫面元件與設計期屬性進研究範本（2026-10-20，L151，分支 `claude/blissful-edison-7hbeqr`）**：第四輪驗證確認元件代碼、Display Only（FIELDUSE 1）、
 Invisible（2）、相關顯示（ASSOCFIELDNUM＝控制欄 FIELDNUM）、Required（USEEDIT 256）後落地：兩版 cookbook §2l（一個 Page 一次、解碼在 SQL、不含 `||`）、
 NN 新節「## 畫面元件」（頁面｜#｜欄位｜元件｜屬性｜查值）、ps-deep-research／ps-ui-flow（`pageControls[]`）／回報契約／問答契約／orchestrator 路由、
@@ -620,3 +626,5 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   公司機搬新版後要做 SOP-30 授權檢查（R4E）與一題端對端（test-scenarios R43）。plugin 重掛通知仍提 CURRENT_SCHEMA（auto off，下次改 plugin 一起改）。
   2026-10-20：第四輪收（ASSOCFIELDNUM＝控制欄 FIELDNUM、USEEDIT 256＝Required、FIELDUSE 1＝Display Only／2＝Invisible、ACTIONS 2＝Update/Display、唯讀帳號 32 張表都看得到；
   備忘 §7.1）。第 2、3 步做了第一版：cookbook §2l、NN「## 畫面元件」、補研究 UI.CONTROLS（L151）。Component 動作的其他位元與代碼 10／15／23／24 待核對。
+  同日續：管理者確認 ACTIONS 位元順序 → Component 動作進框架（cookbook §2m、「## 畫面元件」第一列；L152）；R4A～R4D 官方對照完成，
+  對不上的代碼 10／15／23／24 與 FIELDUSE 8 交第五輪 SQL（`docs/design/ui-metadata-check-r5.md`）。

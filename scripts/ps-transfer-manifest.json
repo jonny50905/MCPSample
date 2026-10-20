@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "fb01cfe",
+  "commit": "abce4bb",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -46,8 +46,8 @@
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 535,
-      "sha256": "040f5570b2183549b6a462f9c881c771ccd33d19c6c1c8521ee577ab8067131f",
+      "lines": 536,
+      "sha256": "0e06d9f3746d30fa19712482af8a0aff5f58b46c579cd2a440d39c2b80338244",
       "bom": false
     },
     {
@@ -58,8 +58,8 @@
     },
     {
       "path": ".opencode/agent/ps-orchestrator.md",
-      "lines": 238,
-      "sha256": "2d583998425840088fa64667e16755a44b5a45729bb7f7f31744cbe7f4a1e749",
+      "lines": 239,
+      "sha256": "161220d07a8a5870373b4979d707d03c40d28b4514f76aa08f447cc6912aabb9",
       "bom": false
     },
     {
@@ -118,8 +118,8 @@
     },
     {
       "path": ".opencode/agent/ps-ui-flow.md",
-      "lines": 152,
-      "sha256": "8fc251d22ab145bb2fcca0053054c9d5b5fe8a5777772f24c3487e94212268e9",
+      "lines": 156,
+      "sha256": "fb17e0899e966e1c91c5f7297bc28597c647bac8ff5f2e8c4519fe8bf1d20542",
       "bom": false
     },
     {
@@ -196,14 +196,14 @@
     },
     {
       "path": ".opencode/peoplesoft/knowledge-retrieval-contract.md",
-      "lines": 128,
-      "sha256": "05e8dd17dc8d7732bb3d472619658f41aa8160766c763d89d9db6003e3af12d1",
+      "lines": 129,
+      "sha256": "4e33ab6d2306f0fc38520a797082346f9619ded792cc5994d7ecc79344710ec9",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4109,
-      "sha256": "583d4bdcb915890f07bc33a59361a86dc70cf89d6a4ff440464d402607415529",
+      "lines": 4134,
+      "sha256": "95c41f272727c3115c768954cb2ec62f2608043fb7680d850c27c3006f1d6a2f",
       "bom": false
     },
     {
@@ -220,8 +220,8 @@
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 831,
-      "sha256": "f971622db36539dd68829c395e6d9e5c9b027b0524008cd016505cc440ee63fc",
+      "lines": 863,
+      "sha256": "b8ce6149bb1f02e38cc2f383d155a4a0301115e76c07a4220190b9768d2548f5",
       "bom": false
     },
     {
@@ -256,8 +256,8 @@
     },
     {
       "path": ".opencode/peoplesoft/report-templates/function-detail-template.md",
-      "lines": 130,
-      "sha256": "bb7c6b7669381d784a79d21450aad82ac3989b6947d21881d451d0f7466e58ed",
+      "lines": 131,
+      "sha256": "48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972",
       "bom": false
     },
     {
@@ -521,7 +521,7 @@
     {
       "path": ".opencode/peoplesoft/SOP.md",
       "lines": 1266,
-      "sha256": "772135fd8406e044cf7b3c92ed6d2b4b64a828fe9c6c4dc4ebe8b84bb4637d10",
+      "sha256": "6545c4b87db7ea526c72b4da52c790ed32f883655020f71e28dfee482856c9a3",
       "bom": false
     },
     {
@@ -604,14 +604,14 @@
     },
     {
       "path": ".opencode/peoplesoft/subagent-report-contract.md",
-      "lines": 187,
-      "sha256": "48b31b28fc56550389732deb4e9ce1aa390c1ab795248da1b937ffd1c24a1d10",
+      "lines": 193,
+      "sha256": "533fdada04cd35b172a75f1f3a7ce361935592e8e21d22c9b59e1c94ae241465",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/supplemental-contract.md",
       "lines": 102,
-      "sha256": "f8b09efd42058d83df8276c209d15489c18085fc955bf81b9ef2c8eec54d3501",
+      "sha256": "90e66c2e99069bfb11749223dd5c49af0ede183963d6c526df2bec965556885d",
       "bom": false
     },
     {
@@ -694,8 +694,8 @@
     },
     {
       "path": ".opencode/skills/ps-ui-flow/SKILL.md",
-      "lines": 198,
-      "sha256": "4717489fdeb082e205e8d816dc7c9c3f005c4f99a1897c58c096a9f9f591e48b",
+      "lines": 200,
+      "sha256": "8a8fdfba3b06f63da882c43dff5666b7da6dfedd869bf4d7bf5e75e54b099115",
       "bom": false
     },
     {
@@ -929,7 +929,7 @@
     {
       "path": "scripts/tests/test-spec.ps1",
       "lines": 1147,
-      "sha256": "953ca3e1254e5e35b21ee34eef9bf3726ec266a0ad3ceb7552c17594e8afb41c",
+      "sha256": "74de0409c4a47e4cbd6f09b008bed4d3a63352c4578750dcf8d40d36d269846f",
       "bom": true
     },
     {

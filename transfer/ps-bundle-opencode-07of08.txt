@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 7／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 7／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|7|8|5656|cac82a2106db3a1526fe4b7000cf44bf1c291b1b75e3140900e3b9aa0d392faf
+@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|7|8|5656|cac82a2106db3a1526fe4b7000cf44bf1c291b1b75e3140900e3b9aa0d392faf
 @@@PSBUNDLE-FILE|scripts/ps-supplemental-lib.ps1|1197|6dd300916a4281a4f843fce5687a48271ce4d0b27b732dafbbc168489493ef11|1
 # ps-supplemental-lib.ps1 — 補研究協定（Supplemental Research）共用邏輯
 # 由 ps-supplemental.ps1（CLI）、ps-auto-loop.ps1（-SupplementalOnly 迷你圈）、ps-spec-lib.ps1（規劃器消費端）dot-source。
@@ -5657,4 +5657,4 @@ Write-Host ('sdoc run tests: PASS=' + $script:passed + ' FAIL=' + $script:failed
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-run.ps1
-@@@PSBUNDLE-PART-END|269accc620bbeda1|7|8
+@@@PSBUNDLE-PART-END|661c83716db583b8|7|8

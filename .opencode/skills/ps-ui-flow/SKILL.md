@@ -115,6 +115,8 @@ scroll 層級變異（HideRow／HideScroll 等，無 Record.Field 可解析）
 Page 上每個元件的種類、設計期屬性（Display Only、Invisible、Required、Key）、相關顯示與控制欄、查值方式（Prompt 表與檢核、
 Translate、Y/N）照 cookbook §2l 查、照它的轉寫規則回報（`pageControls[]`）。設計期設定是畫面打開時的預設；PeopleCode 在執行期
 改的顯示、可改、必填屬「條件 UI」，兩者分開寫，不互相覆蓋。
+Component 允許的動作（Add、Update/Display、Update/Display All、Correction）與搜尋 Record 照 cookbook §2m 查，
+寫成同一張表的第一列（元件＝`Component`）。
 
 ## 工具
 

@@ -580,11 +580,11 @@ FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
 
 ```sql
 SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
-       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List' WHEN 6 THEN 'Long Edit Box'
+       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List Box' WHEN 6 THEN 'Long Edit Box'
                         WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
-                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Link: PeopleCode'
-                        WHEN 16 THEN 'Push Button/Link: Component' WHEN 18 THEN 'Secondary Page'
-                        WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Link: Secondary Page'
+                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 16 THEN 'Push Button/Hyperlink: Internal Link' WHEN 18 THEN 'Secondary Page'
+                        WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Hyperlink: Secondary Page'
                         WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area' ELSE 'OTHER' END AS CONTROL,
        TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
        CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
@@ -625,13 +625,15 @@ FETCH FIRST 40 ROWS ONLY
   `LEVEL=<LVL>`（LVL 大於 0 才寫）、`GOTO=<GOTO_COMPONENT>`、`PAGE=<SUBPAGE>`（有值才寫）。
 - 查值：PROMPT_REC 有值寫 `PROMPT <PROMPT_REC> <PROMPT_EDIT>`，PROMPT_KIND／PROMPT_KEYS 有值再接
   `（<PROMPT_KIND>；鍵 <PROMPT_KEYS>）`；沒有 prompt 時寫 VALUES_EDIT 的值；都沒有留空。
-- 元件是 Subpage、Secondary Page、Push Button/Link: Secondary Page → 以 SUBPAGE 的頁名再跑一次本節
+- 元件是 Subpage、Secondary Page、Push Button/Hyperlink: Secondary Page → 以 SUBPAGE 的頁名再跑一次本節
   （visited 去重、深度 ≤ 8，同 §2j）。
 - 寫成證據時 SQL 原樣保留（含 FROM 與頁名、`:afterFieldNum` 的實際值），每個 Page 每一批一列。
 
 值域：
 
 - DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
+- 元件名稱＝App Designer 的元件名；按鈕／超連結在冒號後接目的地：PeopleCode Command＝按下去跑所綁欄位的 FieldChange
+  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁。
 - RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
 - KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
 - XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
@@ -639,6 +641,36 @@ FETCH FIRST 40 ROWS ONLY
   （PROMPT_REC 是 `%` 開頭的欄位名），追 PeopleCode 對該欄位的指派。
 - PROMPT_KIND＝TABLE、VIEW、DERIVED、OTHER；view 的選取條件照長文本協定以 ES＋Source 取，不從 Oracle 撈全文。
   PROMPT_KEYS＝prompt record 的鍵（依欄位順序）；含 SETID、EFFDT 的照實寫。
+
+**2m. Component 動作與搜尋 Record（一個 Component 一次；NN「## 畫面元件」表格的第一列）**
+
+```sql
+SELECT TRIM(G.PNLGRPNAME) AS COMPONENT, G.ACTIONS AS CODE,
+       CASE WHEN BITAND(G.ACTIONS, 1) > 0 THEN 'ADD' END AS ACT_ADD,
+       CASE WHEN BITAND(G.ACTIONS, 2) > 0 THEN 'UPDATE_DISPLAY' END AS ACT_UPD,
+       CASE WHEN BITAND(G.ACTIONS, 4) > 0 THEN 'UPDATE_DISPLAY_ALL' END AS ACT_ALL,
+       CASE WHEN BITAND(G.ACTIONS, 8) > 0 THEN 'CORRECTION' END AS ACT_COR,
+       CASE WHEN G.ACTIONS > BITAND(G.ACTIONS, 15) THEN G.ACTIONS - BITAND(G.ACTIONS, 15) END AS OTHER_BITS,
+       TRIM(G.SEARCHRECNAME) AS SEARCH_REC, TRIM(G.ADDSRCHRECNAME) AS ADD_SEARCH_REC
+  FROM <schema>.PSPNLGRPDEFN G
+ WHERE G.PNLGRPNAME = :componentName
+```
+
+轉寫規則（照輸出原樣抄，不加不減、不解讀）：
+
+- 頁面＝COMPONENT、#＝0、欄位留空、元件＝`Component`。
+- 屬性：ACT_ADD、ACT_UPD、ACT_ALL、ACT_COR 有值的依序以空白串起；OTHER_BITS 有值再接 `OTHER=<OTHER_BITS>`。
+- 查值：`SEARCH <SEARCH_REC>`；ADD_SEARCH_REC 有值再接 `；ADD_SEARCH <ADD_SEARCH_REC>`。
+- 回多列（同名 Component 有多個 market 版本）每列各寫一列；0 列＝名稱不是 Component，不寫這一列，「未解事項」記一行。
+- 寫成證據時 SQL 原樣保留（含 FROM 與 Component 名），一列。
+
+值域：
+
+- ADD＝可新增一筆新的鍵值（進入時先輸入新鍵值）；UPDATE_DISPLAY＝修改既有資料，有效日期的列只看得到目前與未來；
+  UPDATE_DISPLAY_ALL＝看得到歷史列、只能改目前與未來的列；CORRECTION＝連歷史列都能改。沒有有效日期列的 Component，後三者效果相同。
+- 使用者實際能用哪幾個動作還要看權限（Permission List 對該 Menu Item 授權的動作，§4）。
+- SEARCH＝搜尋頁查的 Record（搜尋條件是它的搜尋鍵；列層級安全也靠它，§4）；ADD_SEARCH＝新增時用的搜尋 Record，沒有＝新增也用 SEARCH。
+- OTHER＝四個動作以外的位元，照數字寫，不猜意思。
 
 ---
 

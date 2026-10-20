@@ -1,6 +1,46 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 4／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 4／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|4|8|7867|1e42091fd9e49ad1af13e0fd6c3c5c6643234aca4c710285e4d660615d945211
+@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|4|8|7915|b36e84fbab7bc38523c278e60e30693f07247a9544e836f205eef461476d56ea
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/capabilities.json|38|6514e5d73ca2568acea32f9c3a4ff6c288b4964e92b7244b929c23049df86bc8|0
+{
+  "schemaVersion": 1,
+  "note": "能力目錄（公開、機械讀）：補研究 need.factKind／properties／context 與 Spec 需求包 requirements.factKind 的封閉值域。sections 用知識索引的節鍵；EXTRACT＝外環從 NN 節確定性抽取，COMPOSE＝worker 依 manifest 切片組表、外環算覆蓋率。follow＝可沿相關物件表的呼叫／啟動／排程／執行角色一跳讀 callee NN 同節。目錄外＝UNSUPPORTED。新增能力走 CAP-REQ 表單（support-codes.md）。",
+  "targetTypes": ["COMPONENT", "RECORD", "FIELD", "PAGE", "AE", "SQR", "SQC", "SQL", "PROCESS", "MENU"],
+  "objectNamePattern": "^[A-Z0-9_][A-Z0-9_.$#-]{0,59}$",
+  "contextKeys": {
+    "operation": ["IMPORT", "EXPORT", "SAVE", "SEARCH", "APPROVE", "BATCH", "ANY"],
+    "mode": ["ADD", "UPDATE", "CORRECT", "DISPLAY", "ANY"],
+    "page": "OBJECT_NAME",
+    "record": "OBJECT_NAME",
+    "field": "OBJECT_NAME",
+    "process": "OBJECT_NAME"
+  },
+  "evidencePolicies": ["AUDITED", "STATIC", "ANY"],
+  "freshness": ["CURRENT", "AS_OF"],
+  "confidence": ["CONFIRMED", "INFERRED", "DYNAMIC_RUNTIME"],
+  "nnSections": ["相關物件", "功能定位", "畫面與欄位", "畫面元件", "行為邏輯", "資料流", "執行方式", "權限", "未解事項"],
+  "followRoles": ["呼叫", "啟動", "排程", "執行"],
+  "followTypes": ["AE", "SQR", "SQC", "PROCESS"],
+  "factKinds": {
+    "UI.COMPONENT_IDENTITY": { "mode": "EXTRACT", "sections": [], "head": true, "properties": ["primaryObject", "origin", "status", "functionName"], "closure": "SINGLE" },
+    "UI.NAVIGATION": { "mode": "EXTRACT", "sections": ["功能定位"], "subsections": ["導覽入口", "Technical Menu"], "properties": ["entries", "technicalMenu"], "closure": "ROWS" },
+    "UI.FIELD_INVENTORY": { "mode": "EXTRACT", "sections": ["畫面與欄位"], "properties": ["fields", "choices", "lifecycle"], "closure": "ROWS" },
+    "UI.CONTROLS": { "mode": "EXTRACT", "sections": ["畫面元件"], "properties": ["controls", "properties", "lookup"], "closure": "ROWS" },
+    "BEHAVIOR.RULES": { "mode": "EXTRACT", "sections": ["行為邏輯"], "properties": ["rules", "confidence"], "closure": "ITEMS" },
+    "DATA.FLOW": { "mode": "EXTRACT", "sections": ["資料流"], "properties": ["reads", "writes", "tables"], "closure": "ROWS" },
+    "PROCESS.EXECUTION": { "mode": "EXTRACT", "follow": true, "sections": ["執行方式"], "properties": ["online", "batch", "schedule"], "closure": "PRESENT" },
+    "SECURITY.ACCESS": { "mode": "EXTRACT", "sections": ["權限"], "properties": ["permissionLists", "roles"], "closure": "PRESENT" },
+    "RELATED.OBJECTS": { "mode": "EXTRACT", "sections": ["相關物件"], "properties": ["objects", "roles", "classification"], "closure": "ROWS" },
+    "GAPS": { "mode": "EXTRACT", "sections": ["未解事項"], "properties": ["items"], "closure": "ITEMS" },
+    "EVIDENCE.APPENDIX": { "mode": "EXTRACT", "sections": ["Evidence附錄"], "properties": ["rows", "kinds"], "closure": "ROWS" },
+    "ENTITY.DETAIL": { "mode": "EXTRACT", "hop": "wiki", "sections": ["資料流"], "properties": ["observations", "relations"], "closure": "PER_RECORD" },
+    "BEHAVIOR.VALIDATIONS": { "mode": "COMPOSE", "sections": ["行為邏輯", "Evidence附錄"], "properties": ["trigger", "condition", "message"], "table": ["來源條目", "觸發", "條件", "訊息", "證據"], "closure": "COVERAGE" },
+    "DATA.FILE_INPUT": { "mode": "COMPOSE", "follow": true, "sections": ["行為邏輯", "資料流", "執行方式"], "properties": ["present", "layout", "fields"], "table": ["來源條目", "欄位", "格式", "說明", "證據"], "closure": "COVERAGE" },
+    "DATA.FILE_OUTPUT": { "mode": "COMPOSE", "follow": true, "sections": ["行為邏輯", "資料流", "執行方式"], "properties": ["present", "layout", "fields"], "table": ["來源條目", "欄位", "格式", "說明", "證據"], "closure": "COVERAGE" },
+    "DATA.RECORD_USAGE": { "mode": "COMPOSE", "sections": ["資料流", "行為邏輯"], "properties": ["fields", "usage"], "table": ["來源條目", "欄位", "用途", "證據"], "enums": { "用途": ["READ", "LOOKUP", "WRITE"] }, "closure": "COVERAGE" }
+  }
+}
+@@@PSBUNDLE-END|.opencode/peoplesoft/spec/capabilities.json
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/clone-contract.md|97|7206c4672c8348aec36b97dbc84872c7f1343d415fcd8f453887890b7c2f7594|0
 # 核心功能重建 Spec 契約
 
@@ -799,7 +839,7 @@ CAP-REQ: sources=[行為邏輯, Evidence 附錄], subject=COMPONENT, output=[tri
 - 綁定（bindingMode／章節標題／佔位符）進 bindingHash：改綁定與改模板同級，會換一個 generation；改 requirements 才是 contentHash（2-08 重跑 `-Plan`）。
 - gate／render 的等級看現況知識索引（每個動詞都先重建 STALE 索引）：規劃後等級低於政策＝7-22，不會發 SPEC_COMPLETE；ENTITY.DETAIL 規劃與 gate 都只看 wiki 等級（引用它的 NN 等級不算），所以 NN 未稽核不會誤開 7-22。
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/troubleshooting-matrix.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/subagent-report-contract.md|187|48b31b28fc56550389732deb4e9ce1aa390c1ab795248da1b937ffd1c24a1d10|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/subagent-report-contract.md|193|533fdada04cd35b172a75f1f3a7ce361935592e8e21d22c9b59e1c94ae241465|0
 # Subagent Report Contract（回報契約）
 
 所有 ps-* subagent 的**最終輸出只能是一份符合本契約的 JSON**，
@@ -935,6 +975,12 @@ orchestrator 主 context 只累積小而結構化的報告。
   ],
   "pageControls": [
     {
+      "page": "TW_DEMO_REQ",
+      "sql": "SELECT TRIM(G.PNLGRPNAME) AS COMPONENT, … FROM <擁有者>.PSPNLGRPDEFN G WHERE G.PNLGRPNAME = 'TW_DEMO_REQ'",
+      "more": false,
+      "rows": [ { "fieldNum": 0, "field": "", "control": "Component", "properties": "ADD UPDATE_DISPLAY", "lookup": "SEARCH TW_DEMO_REQSRCH" } ]
+    },
+    {
       "page": "TW_DEMO_PG",
       "sql": "SELECT P.FIELDNUM, … FROM <擁有者>.PSPNLFIELD P … WHERE P.PNLNAME = 'TW_DEMO_PG' … AND P.FIELDNUM > 0 …",
       "more": false,
@@ -975,7 +1021,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
 | `dependencies[]` | ✔（可為空陣列） | 原生 / 相依物件，只能出現在這裡 |
 | `technicalMenuLocations[]` | 選填 | PSMENUITEM 的 MENUNAME／BARNAME／ITEMNAME——**technical metadata，不是導覽路徑** |
-| `pageControls[]` | 選填（委派要某個 Page 的元件清單時必填） | 每個 Page 每一批一筆：`page`、`sql`（實際執行的 cookbook §2l SELECT 原樣，即本批的 SQL 證據）、`more`（回滿 40 列＝true，委派方以最後的 fieldNum 續派）、`rows[]`（`fieldNum`／`field`／`control`／`properties`／`lookup`，照 §2l 轉寫規則逐字填、每批 ≤ 40 列）。rows 是結構化轉寫，不算引用行數、不受 findings 8 筆上限 |
+| `pageControls[]` | 選填（委派要某個 Page 的元件清單時必填） | 每個 Page 每一批一筆：`page`、`sql`（實際執行的 cookbook §2l SELECT 原樣，即本批的 SQL 證據）、`more`（回滿 40 列＝true，委派方以最後的 fieldNum 續派）、`rows[]`（`fieldNum`／`field`／`control`／`properties`／`lookup`，照 §2l 轉寫規則逐字填、每批 ≤ 40 列）。rows 是結構化轉寫，不算引用行數、不受 findings 8 筆上限。Component 動作（§2m）也是一筆：`page`＝Component 名、`rows` 一列（`fieldNum` 0、`field` 空、`control` `Component`、`properties`＝動作、`lookup`＝搜尋 Record） |
 | `navigationEntries[]` | 選填（導覽類委派必填，可為空陣列） | Portal Registry 入口，**複數**；每筆帶 entryType／labels／visibility（值域見 `mcp-tool-contracts.md` §3）。空陣列＋gaps＝查無；未支援的 surface 記 gaps，不得省略 |
 | `dynamicRuntimeWarnings[]` | ✔（可為空陣列） | 所有 DYNAMIC_RUNTIME 事項集中列出 |
 | `gaps[]` | ✔（可為空陣列） | 未涵蓋範圍與原因（budget 到頂 / 與題無關 / 查無） |
@@ -988,7 +1034,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 - 引用報告時帶 evidence IDs；需要原文時按 ID 定向補取，不重跑檢索。
 - 多份報告衝突時：以 confidence 高者為準；同級衝突如實並陳並標 INFERRED。
 @@@PSBUNDLE-END|.opencode/peoplesoft/subagent-report-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/supplemental-contract.md|102|f8b09efd42058d83df8276c209d15489c18085fc955bf81b9ef2c8eec54d3501|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/supplemental-contract.md|102|90e66c2e99069bfb11749223dd5c49af0ede183963d6c526df2bec965556885d|0
 # 補研究契約（Supplemental Research：指定 NN＋指定問題的定向補查）
 
 適用：`/ps-supplement <領域>` 指令（由 ps-auto-loop 的補研究迷你圈啟動；不是給人手動下的指令）。
@@ -1011,7 +1057,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | 事實類別 | 委派鏈（依序） | 缺證據出口 |
 |---|---|---|
 | UI.COMPONENT_IDENTITY、UI.NAVIGATION、UI.FIELD_INVENTORY | @ps-ui-flow（導覽入口依 cookbook §2k canonical） | SQL 型→追加證據寫 `待人工SQL` |
-| UI.CONTROLS | @ps-ui-flow（cookbook §2l，一個 Page 一個委派；回報 `pageControls[]` 每列寫一條「畫面元件」事實，SQL 寫一列追加證據） | SQL 型→追加證據寫 `待人工SQL` |
+| UI.CONTROLS | @ps-ui-flow（cookbook §2m 一次＋§2l 一個 Page 一個委派；回報 `pageControls[]` 每列寫一條「畫面元件」事實，SQL 寫一列追加證據） | SQL 型→追加證據寫 `待人工SQL` |
 | BEHAVIOR.RULES、BEHAVIOR.VALIDATIONS | @ps-peoplecode-flow →（規則讀 View 時）@ps-sql-flow | CHUNK 型→不寫該事實、處置 NO_EVIDENCE＋查法收據 |
 | DATA.FLOW、DATA.RECORD_USAGE | @ps-sql-flow → @ps-peoplecode-flow | 同上 |
 | DATA.FILE_INPUT、DATA.FILE_OUTPUT | @ps-peoplecode-flow（File 物件／Rowset 讀寫）→ callee：@ps-sqr-flow（SQR／SQC）、@ps-ae-flow（AE） | 同上 |
@@ -1057,7 +1103,7 @@ BLOCKED(NOT_CONNECTED) 只重連重派一次。
 - 信心 ∈ CONFIRMED／INFERRED／DYNAMIC_RUNTIME；CONFIRMED 必須有證據#。
 - 證據#＝追加證據表的列序（1 起算），多筆用 `;`；無＝`無`。外環會把它換成 NN 附錄的新編號。
 - **表格節的敘述**用全形直線 `｜` 分格，格數固定：畫面與欄位 5 格（欄位｜顯示文字｜類型｜選項｜生命狀態）、
-  畫面元件 6 格（頁面｜#｜欄位｜元件｜屬性｜查值；照 cookbook §2l 轉寫規則）、
+  畫面元件 6 格（頁面｜#｜欄位｜元件｜屬性｜查值；照 cookbook §2m、§2l 轉寫規則）、
   資料流 3 格（表｜操作｜來源；信心由信心欄補上）、相關物件 2 格（物件｜角色）。條列節（行為邏輯、未解事項）與
   文字節（功能定位、執行方式、權限）寫一句完整敘述。
 - 機器參照只准三種：完整 36 字元 ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。ChunkId 不得縮寫。
@@ -3962,7 +4008,7 @@ Use Oracle Process metadata through ps-process-flow to explain how the SQR is ru
 - `.opencode/peoplesoft/progressive-source-retrieval.md`
 - `.opencode/peoplesoft/customization-profile.yaml`
 @@@PSBUNDLE-END|.opencode/skills/ps-sqr-flow/SKILL.md
-@@@PSBUNDLE-FILE|.opencode/skills/ps-ui-flow/SKILL.md|198|4717489fdeb082e205e8d816dc7c9c3f005c4f99a1897c58c096a9f9f591e48b|0
+@@@PSBUNDLE-FILE|.opencode/skills/ps-ui-flow/SKILL.md|200|8a8fdfba3b06f63da882c43dff5666b7da6dfedd869bf4d7bf5e75e54b099115|0
 ---
 name: ps-ui-flow
 description: PeopleSoft UI 分析 — 畫面顯示文字、選項 label 與儲存值對映、由文字反查 Component / Page / Record.Field。
@@ -4080,6 +4126,8 @@ scroll 層級變異（HideRow／HideScroll 等，無 Record.Field 可解析）
 Page 上每個元件的種類、設計期屬性（Display Only、Invisible、Required、Key）、相關顯示與控制欄、查值方式（Prompt 表與檢核、
 Translate、Y/N）照 cookbook §2l 查、照它的轉寫規則回報（`pageControls[]`）。設計期設定是畫面打開時的預設；PeopleCode 在執行期
 改的顯示、可改、必填屬「條件 UI」，兩者分開寫，不互相覆蓋。
+Component 允許的動作（Add、Update/Display、Update/Display All、Correction）與搜尋 Record 照 cookbook §2m 查，
+寫成同一張表的第一列（元件＝`Component`）。
 
 ## 工具
 
@@ -7868,4 +7916,4 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-PART-END|269accc620bbeda1|4|8
+@@@PSBUNDLE-PART-END|661c83716db583b8|4|8

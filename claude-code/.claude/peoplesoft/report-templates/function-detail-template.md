@@ -64,17 +64,18 @@
 
 ## 畫面元件
 
-<依 oracle-query-cookbook §2l（每個 Page 一次）照轉寫規則填；每個 Page 的 SQL 進 Evidence 附錄。>
+<依 oracle-query-cookbook §2m（Component 一次，寫第一列）與 §2l（每個 Page 一次）照轉寫規則填；每次的 SQL 進 Evidence 附錄。>
 
 | 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |
 |---|---|---|---|---|---|
+| TW_DEMO_REQ | 0 |  | Component | ADD UPDATE_DISPLAY | SEARCH TW_DEMO_REQSRCH |
 | TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（VIEW；鍵 SETID,DEPTID,EFFDT） |
 | TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |
-| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List |  | XLAT |
-| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Link: PeopleCode |  |  |
+| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
+| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
 
 <!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
-     # ＝FIELDNUM；屬性與查值的字樣照 §2l 轉寫規則，不翻譯、不改寫。
+     # ＝FIELDNUM（Component 那列寫 0）；屬性與查值的字樣照 §2m、§2l 轉寫規則，不翻譯、不改寫。
      主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
      沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
 

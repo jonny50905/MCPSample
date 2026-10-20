@@ -134,6 +134,8 @@ OpenCode 版也可以跑 `powershell -NoProfile -ExecutionPolicy Bypass -File sc
 
 H0 成立（ASSOCFIELDNUM＝控制欄 FIELDNUM）；256＝Required；FIELDUSE 1＝Display Only、2＝Invisible；ACTIONS 2＝Update/Display；唯讀帳號 32 張表都看得到。
 明細與判讀在 `ui-control-lookup-dependency-memo.md` §7.1；框架落在 cookbook §2l 與 NN「## 畫面元件」（L151）。
+管理者確認 ACTIONS 的勾選順序是 1 Add、2 Update/Display、4 Update/Display All、8 Correction（和本文假設一樣）→ Component 動作也進框架
+（cookbook §2m、「## 畫面元件」第一列；L152）。和官方對照有出入的代碼改由第五輪確認（`ui-metadata-check-r5.md`）。
 
 ## 回報範本
 

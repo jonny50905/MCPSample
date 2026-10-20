@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|8|8|3694|70a8718904d1fff8ee3ded121b82860b5c1b15a476fee4479ad13d1c95c13ff3
+@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|8|8|3695|c16f4465f05905971cd2647f322c7ba64c46ee6ead579292ba6c4b09d0c39dc0
 @@@PSBUNDLE-FILE|scripts/tests/test-sdoc.ps1|280|88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384|1
 # test-sdoc.ps1 — Spec 文件流程（Claude Code 版）的單元測試；合成資料，不查 MCP、不讀企業產物、不呼叫模型。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -874,7 +874,7 @@ Write-Host ('clone tests: PASS=' + $script:passed + ' FAIL=' + $script:failed)
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-spec-clone.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1147|953ca3e1254e5e35b21ee34eef9bf3726ec266a0ad3ceb7552c17594e8afb41c|1
+@@@PSBUNDLE-FILE|scripts/tests/test-spec.ps1|1147|74de0409c4a47e4cbd6f09b008bed4d3a63352c4578750dcf8d40d36d269846f|1
 # scripts/tests/test-spec.ps1 — Spec 引擎（ps-spec-lib／ps-spec CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-spec.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：合成 fixtures（臨時目錄，結束自刪；無公司資料；物件名一律 TW_DEMO_*／PS_DEMO_*）：
@@ -2007,13 +2007,13 @@ Write-Host "情境：EXTRACT UI.CONTROLS（## 畫面元件）"
 $ctlRoot = Join-Path $root 'ctl-root'
 $ctlDom = Join-Path $ctlRoot (Join-Path 'docs' (Join-Path 'ps-research' '測試領域'))
 New-Item -ItemType Directory -Path $ctlDom -Force | Out-Null
-Write-Utf8 (Join-Path $ctlDom '07-TW_DEMO_C.md') @('# 07 功能（[[TW_DEMO_C]]）', '', '## 畫面與欄位', '', '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |', '|---|---|---|---|---|', '| DEMO_STATUS | 狀態 | Translate | E=免役 | 使用中 |', '', '## 畫面元件', '', '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |', '|---|---|---|---|---|---|', '| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（附錄 #1） |', '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |', '| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Link: PeopleCode |  |  |', '', '## Evidence 附錄', '', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', '| 1 | PSPNLFIELD | 畫面元件 | SELECT P.FIELDNUM FROM X.PSPNLFIELD P WHERE P.PNLNAME = ''TW_DEMO_PG'' |') $false
+Write-Utf8 (Join-Path $ctlDom '07-TW_DEMO_C.md') @('# 07 功能（[[TW_DEMO_C]]）', '', '## 畫面與欄位', '', '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |', '|---|---|---|---|---|', '| DEMO_STATUS | 狀態 | Translate | E=免役 | 使用中 |', '', '## 畫面元件', '', '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |', '|---|---|---|---|---|---|', '| TW_DEMO_C | 0 |  | Component | ADD UPDATE_DISPLAY | SEARCH TW_DEMO_CSRCH |', '| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（附錄 #1） |', '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |', '| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |', '', '## Evidence 附錄', '', '| # | 位置 | 說明 | 機器參照 |', '|---|---|---|---|', '| 1 | PSPNLFIELD | 畫面元件 | SELECT P.FIELDNUM FROM X.PSPNLFIELD P WHERE P.PNLNAME = ''TW_DEMO_PG'' |') $false
 Write-Utf8 (Join-Path $ctlDom '08-TW_DEMO_D.md') @('# 08 功能（[[TW_DEMO_D]]）', '', '## 畫面與欄位', '', '（無——Function Library，無使用者畫面）') $false
 $capCtl = Get-PsSpFactKind -Capabilities $caps -FactKind 'UI.CONTROLS'
 $ctxCtl = Get-PsSpNnCtx -Root $ctlRoot -Index $null -Domain '測試領域' -File '07-TW_DEMO_C.md' -Cache @{}
 $xCtl = New-PsSpExtractFacts -Req @{ id = 'R_CTL'; factKind = 'UI.CONTROLS'; evidencePolicy = 'ANY' } -Cap $capCtl -Targets @($ctxCtl) -Callees @() -Index $null -Root $ctlRoot -Component 'TW_DEMO_C' -Cache @{}
 $fCtl = @($xCtl.Facts)
-Assert ($null -ne $capCtl -and [string]$capCtl.mode -eq 'EXTRACT' -and $fCtl.Count -eq 1 -and @($fCtl[0].value.controls).Count -eq 3 -and @($fCtl[0].value.properties).Count -eq 2 -and @($fCtl[0].value.lookup).Count -eq 1 -and [string]$fCtl[0].closure -eq 'ROWS' -and @($fCtl[0].evidenceRefs).Count -eq 1 -and [bool]$fCtl[0].evidenceRefs[0].resolved) "EXTRACT UI.CONTROLS：3 列、2 列有屬性、1 列有查值、附錄參照解得到"
+Assert ($null -ne $capCtl -and [string]$capCtl.mode -eq 'EXTRACT' -and $fCtl.Count -eq 1 -and @($fCtl[0].value.controls).Count -eq 4 -and @($fCtl[0].value.properties).Count -eq 3 -and @($fCtl[0].value.lookup).Count -eq 2 -and [string]$fCtl[0].value.controls[0].cells[3] -eq 'Component' -and [string]$fCtl[0].closure -eq 'ROWS' -and @($fCtl[0].evidenceRefs).Count -eq 1 -and [bool]$fCtl[0].evidenceRefs[0].resolved) "EXTRACT UI.CONTROLS：4 列（第一列是 Component 動作）、3 列有屬性、2 列有查值、附錄參照解得到"
 $ctxNo = Get-PsSpNnCtx -Root $ctlRoot -Index $null -Domain '測試領域' -File '08-TW_DEMO_D.md' -Cache @{}
 $xNo = New-PsSpExtractFacts -Req @{ id = 'R_CTL'; factKind = 'UI.CONTROLS'; evidencePolicy = 'ANY' } -Cap $capCtl -Targets @($ctxNo) -Callees @() -Index $null -Root $ctlRoot -Component 'TW_DEMO_D' -Cache @{}
 Assert (@($xNo.Facts).Count -eq 0 -and @($xNo.Needs).Count -eq 1 -and [string]$xNo.Needs[0].Reason -eq 'MISSING') "EXTRACT UI.CONTROLS：沒有「## 畫面元件」→ MISSING（交補研究補）"
@@ -2571,10 +2571,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|799b76eb7abd4d43609bd39215a0c21453f0bcf39f10fdd81ebdfb213b8556f6|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|105fb774589cc0697ac104729441261705b26acd7cfb2fc09126e00e24c25eb5|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "fb01cfe",
+  "commit": "abce4bb",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -2620,8 +2620,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 535,
-      "sha256": "040f5570b2183549b6a462f9c881c771ccd33d19c6c1c8521ee577ab8067131f",
+      "lines": 536,
+      "sha256": "0e06d9f3746d30fa19712482af8a0aff5f58b46c579cd2a440d39c2b80338244",
       "bom": false
     },
     {
@@ -2632,8 +2632,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-orchestrator.md",
-      "lines": 238,
-      "sha256": "2d583998425840088fa64667e16755a44b5a45729bb7f7f31744cbe7f4a1e749",
+      "lines": 239,
+      "sha256": "161220d07a8a5870373b4979d707d03c40d28b4514f76aa08f447cc6912aabb9",
       "bom": false
     },
     {
@@ -2692,8 +2692,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-ui-flow.md",
-      "lines": 152,
-      "sha256": "8fc251d22ab145bb2fcca0053054c9d5b5fe8a5777772f24c3487e94212268e9",
+      "lines": 156,
+      "sha256": "fb17e0899e966e1c91c5f7297bc28597c647bac8ff5f2e8c4519fe8bf1d20542",
       "bom": false
     },
     {
@@ -2770,14 +2770,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/knowledge-retrieval-contract.md",
-      "lines": 128,
-      "sha256": "05e8dd17dc8d7732bb3d472619658f41aa8160766c763d89d9db6003e3af12d1",
+      "lines": 129,
+      "sha256": "4e33ab6d2306f0fc38520a797082346f9619ded792cc5994d7ecc79344710ec9",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4109,
-      "sha256": "583d4bdcb915890f07bc33a59361a86dc70cf89d6a4ff440464d402607415529",
+      "lines": 4134,
+      "sha256": "95c41f272727c3115c768954cb2ec62f2608043fb7680d850c27c3006f1d6a2f",
       "bom": false
     },
     {
@@ -2794,8 +2794,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 831,
-      "sha256": "f971622db36539dd68829c395e6d9e5c9b027b0524008cd016505cc440ee63fc",
+      "lines": 863,
+      "sha256": "b8ce6149bb1f02e38cc2f383d155a4a0301115e76c07a4220190b9768d2548f5",
       "bom": false
     },
     {
@@ -2830,8 +2830,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/report-templates/function-detail-template.md",
-      "lines": 130,
-      "sha256": "bb7c6b7669381d784a79d21450aad82ac3989b6947d21881d451d0f7466e58ed",
+      "lines": 131,
+      "sha256": "48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972",
       "bom": false
     },
     {
@@ -3095,7 +3095,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/peoplesoft/SOP.md",
       "lines": 1266,
-      "sha256": "772135fd8406e044cf7b3c92ed6d2b4b64a828fe9c6c4dc4ebe8b84bb4637d10",
+      "sha256": "6545c4b87db7ea526c72b4da52c790ed32f883655020f71e28dfee482856c9a3",
       "bom": false
     },
     {
@@ -3178,14 +3178,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/subagent-report-contract.md",
-      "lines": 187,
-      "sha256": "48b31b28fc56550389732deb4e9ce1aa390c1ab795248da1b937ffd1c24a1d10",
+      "lines": 193,
+      "sha256": "533fdada04cd35b172a75f1f3a7ce361935592e8e21d22c9b59e1c94ae241465",
       "bom": false
     },
     {
       "path": ".opencode/peoplesoft/supplemental-contract.md",
       "lines": 102,
-      "sha256": "f8b09efd42058d83df8276c209d15489c18085fc955bf81b9ef2c8eec54d3501",
+      "sha256": "90e66c2e99069bfb11749223dd5c49af0ede183963d6c526df2bec965556885d",
       "bom": false
     },
     {
@@ -3268,8 +3268,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/skills/ps-ui-flow/SKILL.md",
-      "lines": 198,
-      "sha256": "4717489fdeb082e205e8d816dc7c9c3f005c4f99a1897c58c096a9f9f591e48b",
+      "lines": 200,
+      "sha256": "8a8fdfba3b06f63da882c43dff5666b7da6dfedd869bf4d7bf5e75e54b099115",
       "bom": false
     },
     {
@@ -3503,7 +3503,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/tests/test-spec.ps1",
       "lines": 1147,
-      "sha256": "953ca3e1254e5e35b21ee34eef9bf3726ec266a0ad3ceb7552c17594e8afb41c",
+      "sha256": "74de0409c4a47e4cbd6f09b008bed4d3a63352c4578750dcf8d40d36d269846f",
       "bom": true
     },
     {
@@ -3533,7 +3533,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|159|5a267565e792da3f91caf73a65074afb664b305432a21731b03223d53ae78c80|0
+@@@PSBUNDLE-FILE|AGENTS.md|160|2275be5c172230a97b2546d8f2d7484d897580add79c155ed331884de665527d|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -3616,8 +3616,9 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-20 再由 `claude/blissful-edison-7hbeqr` 快轉併入
-   畫面元件與設計期屬性進研究範本（cookbook §2l、NN「## 畫面元件」、ps-deep-research／ps-ui-flow `pageControls[]`、補研究與 Spec 引擎 `UI.CONTROLS`；L151）
-   與第四輪結果，各份重生，併入前 `main` 頭 `e78f5f6`；
+   畫面元件與設計期屬性進研究範本（cookbook §2l、NN「## 畫面元件」、ps-deep-research／ps-ui-flow `pageControls[]`、補研究與 Spec 引擎 `UI.CONTROLS`；L151）、
+   Component 動作與搜尋 Record（cookbook §2m，寫成「## 畫面元件」第一列；元件名稱改成 App Designer 的叫法；L152）、第四輪結果、
+   官方對照與第五輪驗證 SQL（`docs/design/ui-metadata-check-r5.md`），各份重生，併入前 `main` 頭 `e78f5f6`；
    2026-10-19 同一分支併入 agent 唯讀帳號的表名改帶擁有者前綴（兩版 cookbook 規則 1a 與 61 處樣板、ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor、profile 註解、
    ps-doc-lint 導覽證據比對、SOP-30；L150）、第四輪驗證 SQL（`docs/design/ui-metadata-check-r4.md`）與第三輪結果，各份重生，併入前 `main` 頭 `e86d8a6`；
    同日稍早同一分支併入第三輪驗證 SQL（`docs/design/ui-metadata-check-r3.md`：依特徵自動判代碼、以相關顯示算唯讀位元、必填旁證、唯讀帳號 A 測試）與第二輪結果（框架檔未動、搬運包不變），併入前 `main` 頭 `5b60f84`；
@@ -3694,5 +3695,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|95fa29a6ab90cfb03910e1109ace0cb9821b961d483bfdd421b1ec43d25cf7ba
-@@@PSBUNDLE-PART-END|269accc620bbeda1|8|8
+@@@PSBUNDLE-EOF|158|557f679ac8e52ce6ac098a090a106e5ad553494edc612bd4cf041b34fc82a446
+@@@PSBUNDLE-PART-END|661c83716db583b8|8|8

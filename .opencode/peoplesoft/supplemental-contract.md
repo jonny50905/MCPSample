@@ -20,7 +20,7 @@
 | 事實類別 | 委派鏈（依序） | 缺證據出口 |
 |---|---|---|
 | UI.COMPONENT_IDENTITY、UI.NAVIGATION、UI.FIELD_INVENTORY | @ps-ui-flow（導覽入口依 cookbook §2k canonical） | SQL 型→追加證據寫 `待人工SQL` |
-| UI.CONTROLS | @ps-ui-flow（cookbook §2l，一個 Page 一個委派；回報 `pageControls[]` 每列寫一條「畫面元件」事實，SQL 寫一列追加證據） | SQL 型→追加證據寫 `待人工SQL` |
+| UI.CONTROLS | @ps-ui-flow（cookbook §2m 一次＋§2l 一個 Page 一個委派；回報 `pageControls[]` 每列寫一條「畫面元件」事實，SQL 寫一列追加證據） | SQL 型→追加證據寫 `待人工SQL` |
 | BEHAVIOR.RULES、BEHAVIOR.VALIDATIONS | @ps-peoplecode-flow →（規則讀 View 時）@ps-sql-flow | CHUNK 型→不寫該事實、處置 NO_EVIDENCE＋查法收據 |
 | DATA.FLOW、DATA.RECORD_USAGE | @ps-sql-flow → @ps-peoplecode-flow | 同上 |
 | DATA.FILE_INPUT、DATA.FILE_OUTPUT | @ps-peoplecode-flow（File 物件／Rowset 讀寫）→ callee：@ps-sqr-flow（SQR／SQC）、@ps-ae-flow（AE） | 同上 |
@@ -66,7 +66,7 @@ BLOCKED(NOT_CONNECTED) 只重連重派一次。
 - 信心 ∈ CONFIRMED／INFERRED／DYNAMIC_RUNTIME；CONFIRMED 必須有證據#。
 - 證據#＝追加證據表的列序（1 起算），多筆用 `;`；無＝`無`。外環會把它換成 NN 附錄的新編號。
 - **表格節的敘述**用全形直線 `｜` 分格，格數固定：畫面與欄位 5 格（欄位｜顯示文字｜類型｜選項｜生命狀態）、
-  畫面元件 6 格（頁面｜#｜欄位｜元件｜屬性｜查值；照 cookbook §2l 轉寫規則）、
+  畫面元件 6 格（頁面｜#｜欄位｜元件｜屬性｜查值；照 cookbook §2m、§2l 轉寫規則）、
   資料流 3 格（表｜操作｜來源；信心由信心欄補上）、相關物件 2 格（物件｜角色）。條列節（行為邏輯、未解事項）與
   文字節（功能定位、執行方式、權限）寫一句完整敘述。
 - 機器參照只准三種：完整 36 字元 ChunkId／可重跑的 `SELECT … FROM …`／`待人工SQL`。ChunkId 不得縮寫。

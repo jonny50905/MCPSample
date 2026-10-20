@@ -133,6 +133,12 @@ orchestrator 主 context 只累積小而結構化的報告。
   ],
   "pageControls": [
     {
+      "page": "TW_DEMO_REQ",
+      "sql": "SELECT TRIM(G.PNLGRPNAME) AS COMPONENT, … FROM <擁有者>.PSPNLGRPDEFN G WHERE G.PNLGRPNAME = 'TW_DEMO_REQ'",
+      "more": false,
+      "rows": [ { "fieldNum": 0, "field": "", "control": "Component", "properties": "ADD UPDATE_DISPLAY", "lookup": "SEARCH TW_DEMO_REQSRCH" } ]
+    },
+    {
       "page": "TW_DEMO_PG",
       "sql": "SELECT P.FIELDNUM, … FROM <擁有者>.PSPNLFIELD P … WHERE P.PNLNAME = 'TW_DEMO_PG' … AND P.FIELDNUM > 0 …",
       "more": false,
@@ -173,7 +179,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
 | `dependencies[]` | ✔（可為空陣列） | 原生 / 相依物件，只能出現在這裡 |
 | `technicalMenuLocations[]` | 選填 | PSMENUITEM 的 MENUNAME／BARNAME／ITEMNAME——**technical metadata，不是導覽路徑** |
-| `pageControls[]` | 選填（委派要某個 Page 的元件清單時必填） | 每個 Page 每一批一筆：`page`、`sql`（實際執行的 cookbook §2l SELECT 原樣，即本批的 SQL 證據）、`more`（回滿 40 列＝true，委派方以最後的 fieldNum 續派）、`rows[]`（`fieldNum`／`field`／`control`／`properties`／`lookup`，照 §2l 轉寫規則逐字填、每批 ≤ 40 列）。rows 是結構化轉寫，不算引用行數、不受 findings 8 筆上限 |
+| `pageControls[]` | 選填（委派要某個 Page 的元件清單時必填） | 每個 Page 每一批一筆：`page`、`sql`（實際執行的 cookbook §2l SELECT 原樣，即本批的 SQL 證據）、`more`（回滿 40 列＝true，委派方以最後的 fieldNum 續派）、`rows[]`（`fieldNum`／`field`／`control`／`properties`／`lookup`，照 §2l 轉寫規則逐字填、每批 ≤ 40 列）。rows 是結構化轉寫，不算引用行數、不受 findings 8 筆上限。Component 動作（§2m）也是一筆：`page`＝Component 名、`rows` 一列（`fieldNum` 0、`field` 空、`control` `Component`、`properties`＝動作、`lookup`＝搜尋 Record） |
 | `navigationEntries[]` | 選填（導覽類委派必填，可為空陣列） | Portal Registry 入口，**複數**；每筆帶 entryType／labels／visibility（值域見 `mcp-tool-contracts.md` §3）。空陣列＋gaps＝查無；未支援的 surface 記 gaps，不得省略 |
 | `dynamicRuntimeWarnings[]` | ✔（可為空陣列） | 所有 DYNAMIC_RUNTIME 事項集中列出 |
 | `gaps[]` | ✔（可為空陣列） | 未涵蓋範圍與原因（budget 到頂 / 與題無關 / 查無） |

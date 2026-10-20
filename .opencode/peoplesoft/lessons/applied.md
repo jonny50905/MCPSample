@@ -4107,3 +4107,28 @@
 - 驗證：§2l 以合成資料跑過（DuckDB，表放在另一個 schema、裸表名必失敗）：相關顯示與控制欄、動態 prompt、Grid 內欄位、續查；
   test-supplemental（缺節插入位置、已有節追加、ALREADY_COVERED）、test-knowledge（controlRows）、test-spec（EXTRACT UI.CONTROLS 與 MISSING）
   新增案例；全套測試、ps-agent-doc-lint 全過。
+
+### L152 Component 動作與搜尋 Record 寫進「## 畫面元件」第一列；元件名稱改成 App Designer 的叫法；官方對照與第五輪驗證（2026-10-20）
+
+- 需求：管理者確認 PSPNLGRPDEFN.ACTIONS 的位元順序和框架假設一樣（1 Add、2 Update/Display、4 Update/Display All、8 Correction；
+  R4D 實測 2＝只勾 Update/Display），要求直接加進框架；並要求 R4A～R4D 和官方對照，有衝突的提供確認用 SQL。
+- 官方對照（2026-10-20 查；docs.oracle.com 只能看搜尋摘要）：USEEDIT 和 Oracle PeopleCode API（QueryDBRecordField 的 Flag 屬性）一致——
+  1 Key、2048 Search Item、32768 Auto Update；256 Required、512 Translate、4096 Date Range Edit（App Designer 叫 Reasonable Date Test）、
+  8192 Yes/No、16384 Edit Table。FIELDUSE 社群整理 1 Display Only、2 Invisible、8 Display Control、16 Related Field、1024 Show Label；
+  Oracle 文件「勾 Related Field 會自動勾 Display Only」對上 R4C 的 1,16。ACTIONS 和社群整理的 PSAUTHITEM.AUTHORIZEDACTIONS 同一組位元
+  （128 各家說法不一）。已解碼的 FIELDTYPE 和社群表一致；12／16／21 社群依按鈕的 Destination 叫 PeopleCode Command／Internal Link／Secondary Page。
+  對不上：FIELDTYPE 10、15、23、24（社群：Scroll Bar、External Link 按鈕、Horizontal Rule、Tab Separator；第三輪特徵判 MIXED／CONTAINER）、
+  FIELDUSE 8（社群：Display Control；第三輪 DC=NONE）→ 第五輪 SQL `docs/design/ui-metadata-check-r5.md`（對照表與來源也在那裡）。
+- 落點：
+  - 兩版 cookbook §2m：一個 Component 一次；ACT_ADD／ACT_UPD／ACT_ALL／ACT_COR 在 SQL 裡解碼，其他位元以 OTHER_BITS 照數字寫；
+    搜尋 Record 與新增用的搜尋 Record；轉寫成「## 畫面元件」第一列（頁面＝Component、#＝0、元件＝Component、屬性＝動作、查值＝搜尋 Record）。
+  - §2l 元件名稱改成 App Designer 的叫法：5 Drop-Down List Box、12／16／21 Push Button/Hyperlink: PeopleCode Command／Internal Link／Secondary Page；
+    值域加按鈕目的地的意思。代碼不變，只改字樣。
+  - NN 範本（兩版）加 Component 列範例；ps-ui-flow（agent＋SKILL）、ps-deep-research、subagent-report-contract（`pageControls[]` 的 Component 列）、
+    supplemental-contract、knowledge-retrieval-contract、ps-orchestrator 路由（兩版）；SOP-23 補法的說明。
+- 設計取捨：Component 放在同一張表的第一列，不另起表格、不寫成敘述——節內第二張表會被補研究合併、知識索引、Spec 抽取算成元件列（同 L151），
+  寫成敘述則 Spec 引擎的 UI.CONTROLS 抽不到；放在表裡三處都不用改。#＝0 不會和 FIELDNUM 撞（FIELDNUM 從 1 起）。
+- 沒做：§4 的 AUTHORIZEDACTIONS 解碼（同一組位元，但 128 未定，先不動）；搜尋 Record 的搜尋鍵與清單欄位；PSPNLGRPDEFN.MARKET 沒核對過，
+  同名多個 market 版本時每列各寫一列；代碼 10／15／23／24 與 FIELDUSE 8 等第五輪結果。
+- 驗證：§2m 以合成資料跑過（DuckDB，表放在另一個 schema：多動作、ADD_SEARCH、OTHER=128、查無）；§2l 改名後重跑；第五輪兩句 SQL 以合成資料跑過；
+  test-spec 的 UI.CONTROLS 夾具加 Component 列（4 列、3 列有屬性、2 列有查值、第一列元件＝Component）；全套測試、ps-agent-doc-lint 全過。

@@ -133,8 +133,9 @@ docs/ps-research/<領域>/
    **「## 畫面與欄位」生命狀態欄的欄位剖析**：欄位所屬 Record 有實體表時，委派 ps-metadata-flow
    跑 cookbook §7a～7c（oracleMCP 類，計入同時 ≤ 3），照 §7c 的記法寫進該欄位的生命狀態格、
    SQL 進 Evidence 附錄；選項生命狀態照原寫法接在同一格。剖析沒做或判不了 → 該格不寫欄位剖析，不算缺口。
-   **「## 畫面元件」**（主物件有畫面時寫，接在「## 畫面與欄位」之後）：委派 ps-ui-flow 對主 Component 的每個 Page 跑
-   cookbook §2l（oracleMCP 類，計入同時 ≤ 3；一個 Page 一個委派），回報的 `pageControls[]` 每列照寫成表的一列；
+   **「## 畫面元件」**（主物件有畫面時寫，接在「## 畫面與欄位」之後）：委派 ps-ui-flow 對主 Component 跑 cookbook §2m（一次，結果寫表格第一列；
+   可併在第一個 Page 的委派）、對它的每個 Page 跑 §2l（oracleMCP 類，計入同時 ≤ 3；一個 Page 一個委派），
+   回報的 `pageControls[]` 每列照寫成表的一列；
    `more: true` → 以最後一列的 # 續派同一個 Page；元件是 Subpage、Secondary Page 的照 §2l 規則續查。每個 Page 每一批的 SQL
    進 Evidence 附錄一列。沒查或查不到 → 內文寫「畫面元件：未查證」，「## 未解事項」記一行查法收據。
 3. **物件連結**：NN 文件中的核心物件名（Component / Record / 程式）

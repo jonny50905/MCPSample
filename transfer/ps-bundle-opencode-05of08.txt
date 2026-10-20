@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit fb01cfe）第 5／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 5／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|fb01cfe|269accc620bbeda1|5|8|7827|7398cb1a092d1a873c5c5ba3aeabae0736e76eefc4f1b9a4bf47c74c5950f350
+@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|5|8|7827|7398cb1a092d1a873c5c5ba3aeabae0736e76eefc4f1b9a4bf47c74c5950f350
 @@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1612|87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365|1
 # ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
@@ -7828,4 +7828,4 @@ function Get-PsSdConflictFacts {
     return , $out.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-status-lib.ps1
-@@@PSBUNDLE-PART-END|269accc620bbeda1|5|8
+@@@PSBUNDLE-PART-END|661c83716db583b8|5|8
