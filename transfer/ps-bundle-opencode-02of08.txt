@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a87e342）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|2|8|6269|4ca15f7b60c83dace285055f3d81664490c36d5bc314ef74e9f5307251df1320
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4134|95c41f272727c3115c768954cb2ec62f2608043fb7680d850c27c3006f1d6a2f|0
+@@@PSBUNDLE-PART|1|opencode|a87e342|88d9d0c9cad051c8|2|8|6269|bdcce63360fd0c388c372fcac795b05e844efe683bab8c5e4173bd00e0b9d387
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4134|c2f05270b7d36355147be8b83c753ad2bbeb9d525d7266804bb131e1b28c71b5|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4135,7 +4135,7 @@
 - 沒做：§4 的 AUTHORIZEDACTIONS 解碼（同一組位元，但 128 未定，先不動）；搜尋 Record 的搜尋鍵與清單欄位；PSPNLGRPDEFN.MARKET 沒核對過，
   同名多個 market 版本時每列各寫一列；代碼 10／15／23／24 與 FIELDUSE 8 等第五輪結果。
 - 驗證：§2m 以合成資料跑過（DuckDB，表放在另一個 schema：多動作、ADD_SEARCH、OTHER=128、查無）；§2l 改名後重跑；第五輪兩句 SQL 以合成資料跑過；
-  test-spec 的 UI.CONTROLS 夾具加 Component 列（4 列、3 列有屬性、2 列有查值、第一列元件＝Component）。
+  test-spec 的 UI.CONTROLS 夾具加 Component 列（4 列、3 列有屬性、2 列有查值、第一列元件＝Component）；全套測試、ps-agent-doc-lint 全過。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -6270,4 +6270,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 - 注意：本清單可能不完整——30 年系統的命名不一定命中 alias；
   發現遺漏請直接在 checklist.md 的「調查進度」加列。
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/overview-template.md
-@@@PSBUNDLE-PART-END|661c83716db583b8|2|8
+@@@PSBUNDLE-PART-END|88d9d0c9cad051c8|2|8

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit abce4bb）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a87e342）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|abce4bb|661c83716db583b8|3|8|14175|7a607c3c4f5f2d89b7e5d7f463a9b59dec62296dae2196b9eb57f93f3490f8e5
+@@@PSBUNDLE-PART|1|opencode|a87e342|88d9d0c9cad051c8|3|8|14175|7a607c3c4f5f2d89b7e5d7f463a9b59dec62296dae2196b9eb57f93f3490f8e5
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/research-domains.txt|28|6be65b50cee4d82d152301f4ed68cdf1a6d88d9e6d2fac4896cf109d8a393da8|0
 # research-domains.txt — 批次研究的領域佇列（issue #3）
 #
@@ -14176,4 +14176,4 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 □ 7. 端對端（OpenCode 版，test-scenarios R43）：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`
      ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 sql_run 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。
 @@@PSBUNDLE-END|.opencode/peoplesoft/SOP.md
-@@@PSBUNDLE-PART-END|661c83716db583b8|3|8
+@@@PSBUNDLE-PART-END|88d9d0c9cad051c8|3|8
