@@ -350,7 +350,7 @@ function Start-SdMutexHold([string]$Name, [string]$Tag) {
             }
             finally { if ($held) { $m.ReleaseMutex() }; $m.Dispose() } }).AddArgument($Name).AddArgument($ready).AddArgument($release)
     $handle = $ps.BeginInvoke()
-    for ($i = 0; $i -lt 200 -and -not [System.IO.File]::Exists($ready); $i++) { Start-Sleep -Milliseconds 50 }
+    for ($i = 0; $i -lt 1200 -and -not [System.IO.File]::Exists($ready); $i++) { Start-Sleep -Milliseconds 50 }
     $ok = $false
     if ([System.IO.File]::Exists($ready)) { $ok = ([System.IO.File]::ReadAllText($ready) -eq 'True') }
     return @{ Ps = $ps; Handle = $handle; Release = $release; Held = $ok }
@@ -481,19 +481,12 @@ try {
         Assert-Sd ($r.Code -eq 'DOC1-7-01' -and -not [System.IO.File]::Exists((Join-Path $jobRootW 'revisions/r0002.json'))) '改回原樣：-Status 回到 DOC1-7-01，沒有開新版本'
         # 鎖：另一個執行緒持有同 Root＋同 Component 的鎖 → DOC1-0-03
         $lockName = 'Global\MCPSample-SpecDocs-' + (Get-PsKnTextHash -Text ([System.IO.Path]::GetFullPath($rootW).TrimEnd('\', '/').ToUpperInvariant())).Substring(0, 16) + '-' + $jobW
-        $ready = Join-Path $base 'lock.ready'; $release = Join-Path $base 'lock.release'
-        $ps = [powershell]::Create()
-        [void]$ps.AddScript({ param($Name, $Ready, $Release)
-                $m = New-Object System.Threading.Mutex($false, $Name); $held = $false
-                try { $held = $m.WaitOne(5000); [System.IO.File]::WriteAllText($Ready, [string]$held); $w = [System.Diagnostics.Stopwatch]::StartNew(); while (-not [System.IO.File]::Exists($Release) -and $w.Elapsed.TotalSeconds -lt 60) { Start-Sleep -Milliseconds 50 } }
-                finally { if ($held) { $m.ReleaseMutex() }; $m.Dispose() } }).AddArgument($lockName).AddArgument($ready).AddArgument($release)
-        $handle = $ps.BeginInvoke()
+        $hold = Start-SdMutexHold $lockName 'lock'
         try {
-            for ($i = 0; $i -lt 200 -and -not [System.IO.File]::Exists($ready); $i++) { Start-Sleep -Milliseconds 50 }
             $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
-            Assert-Sd ([System.IO.File]::ReadAllText($ready) -eq 'True' -and $r.Code -eq 'DOC1-0-03' -and $r.Exit -eq 3) '另一個執行緒持鎖：DOC1-0-03（不碰任何檔案）'
+            Assert-Sd ($hold.Held -and $r.Code -eq 'DOC1-0-03' -and $r.Exit -eq 3) '另一個執行緒持鎖：DOC1-0-03（不碰任何檔案）' ('held=' + $hold.Held + ' code=' + $r.Code)
         }
-        finally { [System.IO.File]::WriteAllText($release, 'x'); [void]$ps.EndInvoke($handle); $ps.Dispose() }
+        finally { Stop-SdMutexHold $hold }
         $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
         Assert-Sd ($r.Code -eq 'DOC1-7-01') '鎖釋放後恢復'
         # 全部文件都由人核准 → APPROVED

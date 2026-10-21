@@ -5,6 +5,10 @@
 
 ## 0. 一句話現況
 
+**盤點 SQL 紀錄＋CI 鎖測試修正（2026-10-21，L154，分支 `claude/blissful-edison-7hbeqr`）**：管理者要一份可下載的盤點 SQL 說明——
+`docs/design/ui-control-sql-record.md`（正式查詢 §2l／§2m、代碼對照與確認方式、第三輪起各輪 SQL 與結果、未定案事項、來源）。
+main `997d414` 的 Windows 5.1 CI 在慢 runner 上誤判鎖測試（walk 組只等背景執行緒 10 秒）→ 改用共用 helper、等 60 秒。
+
 **元件代碼 10／15／23／24 進 §2l（2026-10-21，L153，分支 `claude/blissful-edison-7hbeqr`）**：第五輪 App Designer 對照確認 10 Scroll Bar、15 External Link 按鈕、
 23 Horizontal Rule、24 Tab Separator（和社群表一致）→ 兩版 cookbook §2l 解碼 10、15、24，23 不列。R5B 顯示 ASSOCFIELDNUM 可能存的是控制欄的 Field ID
 （PNLFLDID）而不是 tab order、FIELDUSE 8 可能才是 Display Control → 第六輪 SQL `docs/design/ui-metadata-check-r6.md` 待跑；結果出來前 §2l 的
@@ -634,3 +638,4 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   同日續：管理者確認 ACTIONS 位元順序 → Component 動作進框架（cookbook §2m、「## 畫面元件」第一列；L152）；R4A～R4D 官方對照完成，
   對不上的代碼 10／15／23／24 與 FIELDUSE 8 交第五輪 SQL（`docs/design/ui-metadata-check-r5.md`）。
   2026-10-21：第五輪收（10／15／23／24 以 App Designer 確認、進 §2l，L153；R5B 指向 ASSOCFIELDNUM＝Field ID 的可能）；第六輪 SQL `docs/design/ui-metadata-check-r6.md` 待跑。
+  同日續：盤點 SQL 紀錄 `docs/design/ui-control-sql-record.md`（給管理者留存）；CI 鎖測試誤判修正（L154）。

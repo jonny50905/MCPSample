@@ -4147,3 +4147,15 @@
   DISPLAY_CONTROL 改用 FIELDUSE 8；15 的網址來源欄位沒查。
 - 驗證：§2l 合成資料加 10／15／24 與未知代碼 26（OTHER）、23 不列、續查；第六輪 SQL 以合成資料跑過（H3 成立、兩者相同兩種情境）；
   ps-agent-doc-lint、test-auto-loop／ps51-static／knowledge／supplemental／spec、搬運包重生後 test-claude-variant／test-bundle 全過。
+
+### L154 Windows 5.1 CI 的鎖測試在慢 runner 上誤判——等背景執行緒拿鎖改用共用 helper、上限 60 秒（2026-10-21）
+
+- 症狀：main `997d414` 的 CI（ps51-tests run 47）只有 `test-sdoc-run.ps1 -Only walk` 的「另一個執行緒持鎖：DOC1-0-03」FAIL；
+  同一次 runner 特別慢（test-sdoc 9 分鐘、前一次 48 秒；walk 組 10.5 分鐘、前一次 6 分鐘）。該次只改 markdown（cookbook §2l、設計文件），
+  沒動腳本；本機與前一次 CI 都過。
+- 根因：walk 組的鎖測試自己寫了一份持鎖程式，只等背景 runspace 10 秒寫出 ready 檔；runner 慢時背景執行緒還沒拿到鎖，
+  ps-sdoc 已經做完鎖檢查（回 DOC1-7-01）。同檔的共用 helper `Start-SdMutexHold`（session slot 測試在用）比較完整
+  （持鎖上限 180 秒、ready 檔存在才讀），但等待一樣只有 10 秒。
+- 落點：walk 組改用 `Start-SdMutexHold`／`Stop-SdMutexHold`；helper 等 ready 的上限 10 秒→60 秒（拿到就走，平常不變慢）；
+  斷言失敗時印出 held 與實際代碼。
+- 驗證：本機 `test-sdoc-run.ps1 -Only walk` 35 PASS、test-ps51-static 過。
