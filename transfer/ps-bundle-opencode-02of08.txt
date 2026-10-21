@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 37ca345）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 33b8d07）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|37ca345|63bafb7a7d8c20fc|2|8|6128|e42ec1894ea6c4650e8dcf6fec013e6d3bdac073cbc83d41ff232f55f1dc3a6a
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4171|ca37049489021412b827dba67f9f63aaaa7ba407b263362769be86d954771819|0
+@@@PSBUNDLE-PART|1|opencode|33b8d07|bb0f7b37ef69fbd0|2|8|6140|1a4a049610aaa297b2b56619c3270a820df84d5ebe59f2149817befebbb2677c
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4183|2044fd7bf40e6d8309c552a2f072921780f632bb43dc98925c7694be6b2432b2|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4173,6 +4173,18 @@
   驗證 SQL 的目的只是確認代碼意思，筆數最多是旁證。
 - 落點：AGENTS.md 協作鐵律加「驗證 metadata 代碼只確認意思」；`docs/design/ui-control-sql-record.md` 改成只記代碼＝什麼、怎麼確認、
   輸出怎麼讀，拿掉所有數量；`docs/design/ui-metadata-check-r6.md` 撤掉 R6C。之後的驗證 SQL 與紀錄照這條。
+
+### L156 相關顯示的 ASSOCFIELDNUM：tab order 與 Field ID 都不對，改測「從 0 起算」；挑相關顯示要用 FIELDUSE 16（2026-10-21）
+
+- 第六輪 R6（唯讀帳號）＝N 1984、SAME 1005、H0 1984,149,8,97、H3 1697,236,30,339、B16 1984,2177、DUPID 0：以 tab order（H0）或
+  Field ID（H3）找到的「控制欄」有 Prompt 的比例只在一般 Edit Box 水準（7.5%、13.9% 對 14%），帶 8 的也少 → 兩種對應都不對。
+- 兩個觀察：(1) 帶 16 的欄位比 ASSOCFIELDNUM 大於 0 的多 193 個，那些的 ASSOCFIELDNUM 是 0——第三輪起用「ASSOCFIELDNUM > 0」挑相關顯示，
+  把它們漏了；(2) 第四輪 R4A 回報的「H0 P=54 R=22」和 R6 重算的 H0 對不上，比較像 H1（ASSOCFIELDNUM＋1）那一行（當時回報少一行）。
+- 新假設：ASSOCFIELDNUM 從 0 起算，控制欄 tab order＝ASSOCFIELDNUM＋1。第七輪 `docs/design/ui-metadata-check-r7.md`：改用 FIELDUSE 16 挑相關顯示，
+  比 tab order＋1（H1）與 Field ID＋1（H4）；可選 R7B 用 App Designer 對一個例子。
+- 框架未動：cookbook §2l 的 RELATED_TO（現在輸出 ASSOCFIELDNUM 原值、只在大於 0 時）與 DISPLAY_CONTROL（別人的 ASSOCFIELDNUM＝本列 FIELDNUM）
+  等第七輪；若 H1 成立，兩者都要改成＋1、並以 16 判斷是不是相關顯示。
+- 做法上的教訓：挑某類元件要用它的旗標（16），不要用參照欄「有沒有值」代替——參照值 0 可能是合法的索引。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -6129,4 +6141,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-PART-END|63bafb7a7d8c20fc|2|8
+@@@PSBUNDLE-PART-END|bb0f7b37ef69fbd0|2|8
