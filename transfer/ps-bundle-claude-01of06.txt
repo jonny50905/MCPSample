@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 33b8d07）第 1／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 1639958）第 1／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|33b8d07|546c5b8cc069d410|1|6|10396|db41566403e4748c3deb0107d0101798763dba4fbad4c92913cf650bc737b98e
-@@@PSBUNDLE|1|claude|33b8d07|149
+@@@PSBUNDLE-PART|1|claude|1639958|3bf3f6e6c40b947e|1|6|10396|f98c0af58684b960292a77c6197f352e0a914b99470f2780ea72baa27c565839
+@@@PSBUNDLE|1|claude|1639958|149
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|b7b6725e509225672e72ae400dacacd60b3f543da361335aaf4e886221fd1aa2|0
 ---
 name: ps-ae-flow
@@ -3053,7 +3053,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.claude/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/oracle-query-cookbook.md|869|da6f34aac42322b9c80c18bd812992d285c8f0c3ffaa709f313e1674bdfcee46|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/oracle-query-cookbook.md|869|52a5cbc2c2b9eca7b84f37481d67b3e1f9ff13ace4c16869f709bf6e142d5004|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
@@ -3648,9 +3648,8 @@ SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
        TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
        CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
        CASE WHEN BITAND(P.FIELDUSE, 2) > 0 THEN 'INVISIBLE' END AS INV,
-       CASE WHEN P.ASSOCFIELDNUM > 0 THEN P.ASSOCFIELDNUM END AS RELATED_TO,
-       CASE WHEN EXISTS (SELECT 1 FROM <schema>.PSPNLFIELD C
-                          WHERE C.PNLNAME = P.PNLNAME AND C.ASSOCFIELDNUM = P.FIELDNUM) THEN 'DISPLAY_CONTROL' END AS DC,
+       CASE WHEN BITAND(P.FIELDUSE, 16) > 0 THEN P.ASSOCFIELDNUM + 1 END AS RELATED_TO,
+       CASE WHEN BITAND(P.FIELDUSE, 8) > 0 THEN 'DISPLAY_CONTROL' END AS DC,
        CASE WHEN BITAND(F.USEEDIT, 1) > 0 THEN 'KEY' END AS KEY_FLAG,
        CASE WHEN BITAND(F.USEEDIT, 256) > 0 THEN 'REQUIRED' END AS REQ,
        CASE WHEN BITAND(F.USEEDIT, 4096) > 0 THEN 'REASONABLE_DATE' END AS RDATE,
@@ -3696,7 +3695,8 @@ FETCH FIRST 40 ROWS ONLY
   （網址不在本查詢的欄位裡）。
 - Scroll Bar＝舊式的層級捲動，和 Scroll Area 一樣框住下一層的列；Tab Separator＝Grid 裡把欄位分成分頁的分隔，LBLTEXT 是分頁標籤，
   它後面的欄位到下一個 Tab Separator 為止屬於這個分頁。
-- RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
+- RELATED_TO＝本列是相關顯示（代碼旁的說明欄，FIELDUSE 16），值＝控制欄的 FIELDNUM（ASSOCFIELDNUM 從 0 起算，SQL 已加 1）；
+  DISPLAY_CONTROL＝本列是相關顯示的控制欄（FIELDUSE 8）。
 - KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
 - XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
 - PROMPT 的 EDIT＝輸入值必須在 prompt 清單內；NO_EDIT＝只提供查詢、不檢核；DYNAMIC＝prompt 表在執行期由另一個欄位的值決定
@@ -10397,4 +10397,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   }
 }
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/schemas/03-roles-permissions.schema.json
-@@@PSBUNDLE-PART-END|546c5b8cc069d410|1|6
+@@@PSBUNDLE-PART-END|3bf3f6e6c40b947e|1|6

@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 33b8d07）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 1639958）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|33b8d07|bb0f7b37ef69fbd0|2|8|6140|1a4a049610aaa297b2b56619c3270a820df84d5ebe59f2149817befebbb2677c
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4183|2044fd7bf40e6d8309c552a2f072921780f632bb43dc98925c7694be6b2432b2|0
+@@@PSBUNDLE-PART|1|opencode|1639958|4c870e95f3053443|2|8|6153|3c3ed06ec544baad97e5e3d0987364024edfcda39ecae131a923b8c6409d49b5
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4196|484315e9d7a65dce14f0f0cc8c3e2d105d81869fbcf6a1ea97f21c20a9629ed7|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4185,6 +4185,19 @@
 - 框架未動：cookbook §2l 的 RELATED_TO（現在輸出 ASSOCFIELDNUM 原值、只在大於 0 時）與 DISPLAY_CONTROL（別人的 ASSOCFIELDNUM＝本列 FIELDNUM）
   等第七輪；若 H1 成立，兩者都要改成＋1、並以 16 判斷是不是相關顯示。
 - 做法上的教訓：挑某類元件要用它的旗標（16），不要用參照欄「有沒有值」代替——參照值 0 可能是合法的索引。
+
+### L157 相關顯示定案：控制欄 FIELDNUM＝ASSOCFIELDNUM＋1、FIELDUSE 8＝Display Control——§2l 改用旗標判斷（2026-10-21）
+
+- 第七輪：管理者把驗證交給公司機的 Claude（可查 DB），prompt 附 R7K（以「控制欄的欄位名是相關顯示 Record 的鍵」與「控制欄帶 8」比 H0、H1、H3、H4
+  與前一欄）並要它抽查幾個相關顯示（含 ASSOCFIELDNUM＝0、tab order 與 Field ID 不一致的頁面）。回報：H1 成立——控制欄 FIELDNUM＝ASSOCFIELDNUM＋1；
+  FIELDUSE 位元 8＝Display Control。
+- 落點：兩版 cookbook §2l——RELATED_TO 從「ASSOCFIELDNUM 大於 0 時原值」改成「FIELDUSE 帶 16 時 ASSOCFIELDNUM＋1」（補回指到第 1 欄、存 0 的相關顯示）；
+  DISPLAY_CONTROL 從「有別的欄位的 ASSOCFIELDNUM 等於本列 FIELDNUM」改成「FIELDUSE 帶 8」（也省掉一個子查詢）；值域照改。
+  NN 範本、回報契約的範例列意思不變（RELATED_TO=4＝控制欄 tab order 4）。
+- 影響：用舊版 §2l 寫過「## 畫面元件」的 NN，RELATED_TO 差 1、漏了指到第 1 欄的相關顯示、DISPLAY_CONTROL 可能標錯欄。補研究只追加、
+  該節已有列會判 ALREADY_COVERED，不會重寫——要嘛重跑 /ps-research，要嘛先把那一節整節刪掉、再照 SOP-23 送 `-FactKind UI.CONTROLS`。
+- 驗證：§2l 合成資料改成「ASSOCFIELDNUM 從 0 起算」並加一個指到第 1 欄（存 0）的相關顯示：控制欄標 DISPLAY_CONTROL、相關顯示 RELATED_TO＝4 與 1；
+  ps-agent-doc-lint、test-auto-loop、test-claude-variant、test-bundle 全過。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -4344,7 +4357,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|869|ff4445e7f704702ce2cf29adc55bbfdc5ab078b134065e950b40892274558538|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|869|260eae6a9a6bebd6f358312ca0577ae4434807741971be08582aec0d2f0ece3f|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
@@ -4939,9 +4952,8 @@ SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
        TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
        CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
        CASE WHEN BITAND(P.FIELDUSE, 2) > 0 THEN 'INVISIBLE' END AS INV,
-       CASE WHEN P.ASSOCFIELDNUM > 0 THEN P.ASSOCFIELDNUM END AS RELATED_TO,
-       CASE WHEN EXISTS (SELECT 1 FROM <schema>.PSPNLFIELD C
-                          WHERE C.PNLNAME = P.PNLNAME AND C.ASSOCFIELDNUM = P.FIELDNUM) THEN 'DISPLAY_CONTROL' END AS DC,
+       CASE WHEN BITAND(P.FIELDUSE, 16) > 0 THEN P.ASSOCFIELDNUM + 1 END AS RELATED_TO,
+       CASE WHEN BITAND(P.FIELDUSE, 8) > 0 THEN 'DISPLAY_CONTROL' END AS DC,
        CASE WHEN BITAND(F.USEEDIT, 1) > 0 THEN 'KEY' END AS KEY_FLAG,
        CASE WHEN BITAND(F.USEEDIT, 256) > 0 THEN 'REQUIRED' END AS REQ,
        CASE WHEN BITAND(F.USEEDIT, 4096) > 0 THEN 'REASONABLE_DATE' END AS RDATE,
@@ -4987,7 +4999,8 @@ FETCH FIRST 40 ROWS ONLY
   （網址不在本查詢的欄位裡）。
 - Scroll Bar＝舊式的層級捲動，和 Scroll Area 一樣框住下一層的列；Tab Separator＝Grid 裡把欄位分成分頁的分隔，LBLTEXT 是分頁標籤，
   它後面的欄位到下一個 Tab Separator 為止屬於這個分頁。
-- RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
+- RELATED_TO＝本列是相關顯示（代碼旁的說明欄，FIELDUSE 16），值＝控制欄的 FIELDNUM（ASSOCFIELDNUM 從 0 起算，SQL 已加 1）；
+  DISPLAY_CONTROL＝本列是相關顯示的控制欄（FIELDUSE 8）。
 - KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
 - XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
 - PROMPT 的 EDIT＝輸入值必須在 prompt 清單內；NO_EDIT＝只提供查詢、不檢核；DYNAMIC＝prompt 表在執行期由另一個欄位的值決定
@@ -6141,4 +6154,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-PART-END|bb0f7b37ef69fbd0|2|8
+@@@PSBUNDLE-PART-END|4c870e95f3053443|2|8
