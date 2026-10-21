@@ -8,8 +8,8 @@
 | 代碼存在哪裡 | 代表什麼 | 用到的 SQL |
 |---|---|---|
 | PSPNLFIELD.FIELDTYPE | 頁面元件的種類（Edit Box、Grid、按鈕…） | V6、G1、R2B、R2C、R3A、R5A |
-| PSPNLFIELD.FIELDUSE（位元相加） | 元件的設計期屬性（唯讀、隱藏、相關顯示…） | R3B、R4C、R5B、R6 |
-| PSPNLFIELD.ASSOCFIELDNUM | 相關顯示（代碼旁的說明欄）指到哪個控制欄 | R2A、R4A、R5B、R6 |
+| PSPNLFIELD.FIELDUSE（位元相加） | 元件的設計期屬性（唯讀、隱藏、相關顯示…） | R3B、R4C、R5B、R6、R7 |
+| PSPNLFIELD.ASSOCFIELDNUM | 相關顯示（代碼旁的說明欄）指到哪個控制欄 | R2A、R4A、R5B、R6、R7 |
 | PSRECFIELDDB.USEEDIT（位元相加） | Record 欄位設定（鍵、必填、Translate、Y/N、Prompt…） | V5、R3C、R4B |
 | PSRECFIELDDB.EDITTABLE、PSRECDEFN.RECTYPE | 查值的 Prompt 表與它的種類 | V4、V5 |
 | PSDBFIELD.FIELDTYPE | 欄位資料型別 | V4 |
@@ -61,8 +61,8 @@ SQL 用 `BITAND(欄位, 位元) > 0` 判斷某個勾選有沒有勾。
 |---|---|---|---|
 | 1 | Display Only（唯讀） | DISPLAY_ONLY | 確認（R4C） |
 | 2 | Invisible（隱藏） | INVISIBLE | 確認（R4C） |
-| 16 | Related Field（相關顯示）；勾它會自動勾 Display Only，所以相關顯示是 1＋16 | 用 ASSOCFIELDNUM 判斷（RELATED_TO=） | 確認是相關顯示的旗標（R4C）；和 ASSOCFIELDNUM 是否一一對應待 R6 |
-| 8 | Display Control（相關顯示的控制欄） | 目前用「有相關顯示指到本欄」判斷（DISPLAY_CONTROL） | 待 R6 |
+| 16 | Related Field（相關顯示）；勾它會自動勾 Display Only，所以相關顯示是 1＋16 | 用 ASSOCFIELDNUM 判斷（RELATED_TO=） | 確認是相關顯示的旗標（R4C、R6：ASSOCFIELDNUM 大於 0 的全部帶 16；另有一批帶 16 但 ASSOCFIELDNUM 是 0） |
+| 8 | Display Control（相關顯示的控制欄） | 目前用「有相關顯示指到本欄」判斷（DISPLAY_CONTROL） | 待 R7（R6 的兩種對應都不對，無法判斷） |
 | 4、32、1024… | 社群文件另列（文字顯示、多幣別、顯示標籤…） | 不用 | 沒確認 |
 
 第三輪曾把 16 當成「唯讀」（R3B），第四輪用已知欄位核對後改正：唯讀是 1，16 是相關顯示。
@@ -71,10 +71,12 @@ SQL 用 `BITAND(欄位, 位元) > 0` 判斷某個勾選有沒有勾。
 
 相關顯示是代碼欄旁邊顯示說明的欄位（例如部門代碼旁的部門名稱），ASSOCFIELDNUM 記著它是哪個控制欄的說明。存的數字有兩種可能：
 
-- **H0**：控制欄的 tab order（FIELDNUM）。第四輪 R4A 比的幾種對應裡 H0 最好。
-- **H3**：控制欄的 Field ID（PNLFLDID，欄位放上頁面時給的編號，調 tab order 不會變）。沒調過順序的頁面兩者相同。
+- **H0**：控制欄的 tab order（FIELDNUM）——R6：不對（找到的欄位有 Prompt 的比例只在一般欄位水準）。
+- **H3**：控制欄的 Field ID（PNLFLDID，欄位放上頁面時給的編號）——R6：也不對。
+- **H1**（第七輪測）：ASSOCFIELDNUM 從 0 起算，控制欄的 tab order＝ASSOCFIELDNUM＋1；指到第 1 個欄位的相關顯示存的是 0。
+  R6 看到有一批相關顯示的 ASSOCFIELDNUM 正好是 0，第四輪 R4A 回報的最佳一組也比較像這個。
 
-第五輪 R5B 的結果比較支持 H3，R6 確認。確認前，研究文件的 RELATED_TO、DISPLAY_CONTROL 在調過 tab order 的頁面可能指錯欄。
+R7 確認前，研究文件的 RELATED_TO、DISPLAY_CONTROL 不當定論（若 H1 成立，現在寫的 RELATED_TO 差 1、而且漏了指到第 1 欄的相關顯示）。
 
 ### 2.4 Record 欄位設定（PSRECFIELDDB.USEEDIT，位元相加）
 
@@ -166,7 +168,7 @@ R4D：挑的客製 Component ACTIONS＝2，App Designer 只勾 Update/Display；
 
 | SQL | 確認什麼 | 輸出怎麼看 | 結論 |
 |---|---|---|---|
-| R4A | 相關顯示指到哪一欄：比幾種對應 | 每種對應的 P（指到的欄有 Prompt 的比例）、R（Prompt 表就是相關顯示 Record 的比例）；最高的就是對的 | H0（tab order）最好（第五輪起存疑） |
+| R4A | 相關顯示指到哪一欄：比幾種對應 | 每種對應的 P（指到的欄有 Prompt 的比例）、R（Prompt 表就是相關顯示 Record 的比例）；最高的就是對的 | 回報的最佳一組標成 H0；R6 重算 H0 對不上，那一組比較像 H1（＋1） |
 | R4B | 256 是不是 Required：拿 App Designer 已知欄位比 | `REQ=Y`、`OPT=N` 就成立 | 成立 |
 | R4C | 唯讀、隱藏的位元：拿已知欄位比 | 每個欄位的位元清單 | 1＝Display Only、2＝Invisible、相關顯示是 1＋16 |
 | R4D | Component 動作：拿已知 Component 比 | ACTIONS 數字＋App Designer 勾了哪些 | 2＝Update/Display；順序 1、2、4、8 |
@@ -179,12 +181,21 @@ R4D：挑的客製 Component ACTIONS＝2，App Designer 只勾 Update/Display；
 | R5A | 代碼 10、15、23、24 | 各代碼的特徵，加一個樣本頁與 tab order，拿去 App Designer Order 頁籤找那個元件看類型 | 10 Scroll Bar、15 External Link 按鈕、23 Horizontal Rule、24 Tab Separator |
 | R5B | FIELDUSE 8 是不是 Display Control | 控制欄（用 tab order 對應）裡帶 8 的有多少 | 對不上 → R6 |
 
-### 第六輪（待跑）
+### 第六輪（2026-10-21，唯讀帳號）
 
 | SQL | 確認什麼 | 輸出怎麼看 |
 |---|---|---|
 | R6 | ASSOCFIELDNUM 存的是控制欄的 tab order（H0）還是 Field ID（H3）；FIELDUSE 8 是不是 Display Control | 一行：H0、H3 各四個數（找到的控制欄、其中有 Prompt 的、Prompt 表＝相關顯示 Record 的、帶 8 的）。H3 明顯比 H0 大、第四個接近第一個 → 存的是 Field ID、8＝Display Control；反過來 → 維持 tab order |
 | R6B（可選） | 同上，用 App Designer 對一個相關顯示 | 相關顯示的 ASSOCFIELDNUM 等於控制欄的 tab order 還是 Field ID |
+
+結論：H0、H3 都不對；ASSOCFIELDNUM 大於 0 的全部帶 16，另有一批帶 16 但 ASSOCFIELDNUM 是 0；Field ID 同頁不重複。
+
+### 第七輪（待跑）
+
+| SQL | 確認什麼 | 輸出怎麼看 |
+|---|---|---|
+| R7 | ASSOCFIELDNUM 是不是從 0 起算（控制欄 tab order＝ASSOCFIELDNUM＋1，H1；或 Field ID＋1，H4）；FIELDUSE 8 是不是 Display Control | 一行：A0（ASSOCFIELDNUM 是 0 的相關顯示）、H1 與 H4 各四個數（同 R6）。哪組明顯高、第四個接近第一個，就是那組 |
+| R7B（可選） | 同上，用 App Designer 對一個相關顯示 | ASSOC＝控制欄 tab order 減 1 → H1 成立 |
 
 ---
 
@@ -230,7 +241,7 @@ ADD_SEARCH_REC＝新增用的搜尋 Record（沒有＝新增也用 SEARCH_REC）
 
 ## 5. 還沒定案
 
-- 相關顯示的對應（2.3）與 FIELDUSE 8（2.2）：等 R6。
+- 相關顯示的對應（2.3）與 FIELDUSE 8（2.2）：等 R7。
 - 代碼 15 External Link 的網址存在哪個欄位：沒查。
 - 權限表 PSAUTHITEM.AUTHORIZEDACTIONS：和 ACTIONS 同一組位元，但 128 的意思各家說法不一，還沒解碼。
 - 搜尋 Record 的搜尋鍵與清單欄位：§2m 只給 Record 名。
@@ -245,6 +256,7 @@ ADD_SEARCH_REC＝新增用的搜尋 Record（沒有＝新增也用 SEARCH_REC）
 | R4A～R4E | `docs/design/ui-metadata-check-r4.md` |
 | R5A、R5B（含官方／社群對照表與來源連結） | `docs/design/ui-metadata-check-r5.md` |
 | R6、R6B | `docs/design/ui-metadata-check-r6.md` |
+| R7、R7B | `docs/design/ui-metadata-check-r7.md` |
 | 正式查詢 §2l、§2m | `.opencode/peoplesoft/oracle-query-cookbook.md`（Claude Code 版：`claude-code/.claude/peoplesoft/oracle-query-cookbook.md`） |
 
 第一到三輪的 SQL 是 admin 帳號設 CURRENT_SCHEMA 跑的，表名沒有帶擁有者；用唯讀帳號重跑要先把表名改成 `<schema>.表名`。

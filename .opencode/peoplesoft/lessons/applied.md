@@ -4169,3 +4169,15 @@
   驗證 SQL 的目的只是確認代碼意思，筆數最多是旁證。
 - 落點：AGENTS.md 協作鐵律加「驗證 metadata 代碼只確認意思」；`docs/design/ui-control-sql-record.md` 改成只記代碼＝什麼、怎麼確認、
   輸出怎麼讀，拿掉所有數量；`docs/design/ui-metadata-check-r6.md` 撤掉 R6C。之後的驗證 SQL 與紀錄照這條。
+
+### L156 相關顯示的 ASSOCFIELDNUM：tab order 與 Field ID 都不對，改測「從 0 起算」；挑相關顯示要用 FIELDUSE 16（2026-10-21）
+
+- 第六輪 R6（唯讀帳號）＝N 1984、SAME 1005、H0 1984,149,8,97、H3 1697,236,30,339、B16 1984,2177、DUPID 0：以 tab order（H0）或
+  Field ID（H3）找到的「控制欄」有 Prompt 的比例只在一般 Edit Box 水準（7.5%、13.9% 對 14%），帶 8 的也少 → 兩種對應都不對。
+- 兩個觀察：(1) 帶 16 的欄位比 ASSOCFIELDNUM 大於 0 的多 193 個，那些的 ASSOCFIELDNUM 是 0——第三輪起用「ASSOCFIELDNUM > 0」挑相關顯示，
+  把它們漏了；(2) 第四輪 R4A 回報的「H0 P=54 R=22」和 R6 重算的 H0 對不上，比較像 H1（ASSOCFIELDNUM＋1）那一行（當時回報少一行）。
+- 新假設：ASSOCFIELDNUM 從 0 起算，控制欄 tab order＝ASSOCFIELDNUM＋1。第七輪 `docs/design/ui-metadata-check-r7.md`：改用 FIELDUSE 16 挑相關顯示，
+  比 tab order＋1（H1）與 Field ID＋1（H4）；可選 R7B 用 App Designer 對一個例子。
+- 框架未動：cookbook §2l 的 RELATED_TO（現在輸出 ASSOCFIELDNUM 原值、只在大於 0 時）與 DISPLAY_CONTROL（別人的 ASSOCFIELDNUM＝本列 FIELDNUM）
+  等第七輪；若 H1 成立，兩者都要改成＋1、並以 16 判斷是不是相關顯示。
+- 做法上的教訓：挑某類元件要用它的旗標（16），不要用參照欄「有沒有值」代替——參照值 0 可能是合法的索引。

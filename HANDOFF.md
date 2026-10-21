@@ -644,3 +644,5 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   按鈕分 12／15／16／21 四個代碼、合計 1131）→ 紀錄補說明，R6C 補各代碼筆數（`docs/design/ui-metadata-check-r6.md`）。
   同日續：管理者指正——不該盤點系統裡有多少個元件，只要確認代碼＝哪個元件，讓 NN 不誤判 → 紀錄拿掉所有數量、R6C 撤掉，
   AGENTS.md 協作鐵律加一條（L155）。待管理者：R6（相關顯示存 tab order 還是 Field ID、FIELDUSE 8）。
+  同日續：R6 收——tab order、Field ID 都不對；有一批相關顯示的 ASSOCFIELDNUM 是 0 → 改測「從 0 起算」（L156），第七輪 SQL
+  `docs/design/ui-metadata-check-r7.md` 待跑。§2l 的 RELATED_TO／DISPLAY_CONTROL 等第七輪再改。

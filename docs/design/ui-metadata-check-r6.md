@@ -73,6 +73,16 @@ SELECT 'ASSOC=' || ASSOCFIELDNUM AS RESULT
  WHERE PNLNAME = '<頁面>' AND RECNAME = '<相關顯示的 Record>' AND FIELDNAME = '<相關顯示的欄位>';
 ```
 
+## 結果（2026-10-21）
+
+R6＝N 1984、SAME 1005、H0 1984,149,8,97、H3 1697,236,30,339、B16 1984,2177、DUPID 0。
+
+- H0、H3 找到的「控制欄」有 Prompt 的比例（7.5%、13.9%）都只在一般 Edit Box 的水準（14%），帶 8 的也少 → 兩種對應都不對。
+- ASSOCFIELDNUM 大於 0 的全部帶 16；但帶 16 的有 2177 個，多出來的 193 個 ASSOCFIELDNUM 是 0 → 前幾輪用「大於 0」挑相關顯示漏了它們。
+- Field ID 在同一頁不重複（DUPID 0）；一半左右的相關顯示 tab order 與 Field ID 指到同一欄（SAME 1005）。
+- 新假設：ASSOCFIELDNUM 從 0 起算（控制欄 tab order＝ASSOCFIELDNUM＋1；指到第 1 欄存 0）。第四輪 R4A 回報的 H0（P 54、R 22）和本輪 H0 對不上，
+  比較像 H1（＋1）那一行。→ 第七輪 `ui-metadata-check-r7.md`。
+
 ## 回報範本
 
 ```

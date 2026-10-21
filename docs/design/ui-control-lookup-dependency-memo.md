@@ -427,6 +427,10 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   以 tab order 對應的控制欄只有 8% 帶 8，帶 8 的欄位數卻和相關顯示個數相近 → 懷疑 ASSOCFIELDNUM 存的是控制欄的 Field ID（PNLFLDID），
   第四輪 H0 只在沒調過順序的頁面成立。第六輪 SQL `ui-metadata-check-r6.md`（H0 與 H3 同時比、B16 補回）。結果出來前，§2l 的 RELATED_TO、
   DISPLAY_CONTROL 不當定論。
+- **第六輪結果（2026-10-21）**：R6＝N 1984、SAME 1005、H0 1984,149,8,97、H3 1697,236,30,339、B16 1984,2177、DUPID 0——tab order（H0）與 Field ID（H3）
+  找到的控制欄有 Prompt 的比例都在一般 Edit Box 水準、帶 8 的少：兩種都不對。帶 16 的比 ASSOCFIELDNUM 大於 0 的多 193 個（那些 ASSOCFIELDNUM＝0）。
+  新假設 ASSOCFIELDNUM 從 0 起算（控制欄 tab order＝ASSOCFIELDNUM＋1）；R4A 回報的 H0 數字應是 H1 那一行。第七輪 `ui-metadata-check-r7.md`
+  （改用 16 挑相關顯示，比 tab order＋1 與 Field ID＋1；可選 App Designer 對一個例子）。管理者另指示：驗證只確認代碼意思、不盤點數量（L155）。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 
