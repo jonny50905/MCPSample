@@ -73,27 +73,9 @@ SELECT 'ASSOC=' || ASSOCFIELDNUM AS RESULT
  WHERE PNLNAME = '<頁面>' AND RECNAME = '<相關顯示的 Record>' AND FIELDNAME = '<相關顯示的欄位>';
 ```
 
-## R6C 各元件代碼的筆數與頁數（補盤點紀錄）
-
-第一輪 V6 的輸出其實有每個代碼的筆數，但只回報了 OK，盤點紀錄裡 0～9、11（含 Group Box、Subpage）的筆數因此空著。這句一行補齊：
-
-```sql
-SELECT (SELECT LISTAGG(FIELDTYPE || ':' || CNT || ':' || PAGES, ' ') WITHIN GROUP (ORDER BY FIELDTYPE)
-          FROM (SELECT FIELDTYPE, COUNT(*) AS CNT, COUNT(DISTINCT PNLNAME) AS PAGES
-                  FROM <schema>.PSPNLFIELD
-                 WHERE PNLNAME LIKE 'TW\_%' ESCAPE '\'
-                 GROUP BY FIELDTYPE))
-       || ' PAGES=' || (SELECT COUNT(DISTINCT PNLNAME) FROM <schema>.PSPNLFIELD
-                         WHERE PNLNAME LIKE 'TW\_%' ESCAPE '\') AS RESULT
-  FROM DUAL;
-```
-
-怎麼看：一行 `代碼:元件筆數:用到的頁數 …`，最後 `PAGES=` 是客製頁面總數。整行照抄。
-
 ## 回報範本
 
 ```
 R6 ___（整行）
-R6C ___（整行）
 （可選）R6B ASSOC=__，控制欄 tab order=__、Field ID=__
 ```

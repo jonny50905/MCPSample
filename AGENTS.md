@@ -80,6 +80,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-21 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   代碼確認紀錄（`docs/design/ui-control-sql-record.md` 拿掉數量、只留代碼＝什麼與怎麼確認）、拿掉 R6C 計數 SQL、協作鐵律加「驗證只確認代碼意思」（L155），
+   框架檔未動，各份重生，併入前 `main` 頭 `50fcb81`；同日稍早同一分支併入
    盤點紀錄補說明（筆數「未統計」不是 0、「不列」是不寫進研究文件、按鈕依 Destination 分四個代碼合計 1131）與 R6C 各代碼筆數 SQL，
    框架檔未動，各份重生，併入前 `main` 頭 `e363e02`；同日稍早同一分支併入
    盤點紀錄改寫（`docs/design/ui-control-sql-record.md` 改成每支 SQL 盤點什麼、結果代碼表、輸出怎麼解讀；框架檔未動，AGENTS.md 在 OpenCode 搬運包裡，各份重生），
@@ -143,6 +145,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   新增或修改／行數（供編輯器總行數核對，允許 ±1 行尾差異）；
   `.ps1` 標註「存 UTF-8 with BOM」。搬完整波跑一次
   `ps-fs-doctor -Domain <領域>`（檢查 D 抓雙 BOM/FEFF 污染）。
+- **驗證 metadata 代碼只確認意思**（2026-10-21 管理者）：給管理者跑的驗證 SQL 只回答「這個代碼＝哪個元件／設定」，
+  目的是讓 NN 翻譯不誤判；不盤點公司系統裡各有幾個、不要求回報數量，紀錄也不寫數量。比例或筆數只能當確認意思的旁證。
 - 使用者受公司規範限制**無法提供真實檔名與機敏值**——以編號、
   類別、遮罩值溝通，不要追問原文。
 - 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態

@@ -4159,3 +4159,13 @@
 - 落點：walk 組改用 `Start-SdMutexHold`／`Stop-SdMutexHold`；helper 等 ready 的上限 10 秒→60 秒（拿到就走，平常不變慢）；
   斷言失敗時印出 held 與實際代碼。
 - 驗證：本機 `test-sdoc-run.ps1 -Only walk` 35 PASS、test-ps51-static 過。
+
+### L155 驗證 metadata 代碼只確認意思，不盤點數量（2026-10-21）
+
+- 症狀：管理者要一份「SQL 目的、結果、怎麼解讀」的紀錄；紀錄列了各代碼在客製頁面的筆數，沒統計的寫「—」，管理者讀成
+  Group Box、Subpage 沒有、按鈕只有 1 個；接著又給了 R6C 要管理者回報每個代碼的筆數。
+- 管理者指正：不應該盤點系統裡有多少個什麼元件，只需要確定「這個代號就是這個元件」，讓之後做 NN 不會誤判。
+- 根因：把驗證過程的統計（V6 的其他代碼筆數、Prompt 分布、按鈕各目的地筆數）當成盤點結果寫進紀錄，又為了補空格另外要數量；
+  驗證 SQL 的目的只是確認代碼意思，筆數最多是旁證。
+- 落點：AGENTS.md 協作鐵律加「驗證 metadata 代碼只確認意思」；`docs/design/ui-control-sql-record.md` 改成只記代碼＝什麼、怎麼確認、
+  輸出怎麼讀，拿掉所有數量；`docs/design/ui-metadata-check-r6.md` 撤掉 R6C。之後的驗證 SQL 與紀錄照這條。
