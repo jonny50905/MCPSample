@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 887cde0）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 82dbe13）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|887cde0|cc43bcce8d163e2e|8|8|5893|cb528d8cacfc25203cb1a10e8b46070c4e53a2d04bc3b3cdd583393ab7d69175
+@@@PSBUNDLE-PART|1|opencode|82dbe13|898d33b5b9169568|8|8|5888|822fb3ee385a812dae8adaae4e335bb49d70a2686acf372f69c217f18884863d
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|341|78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -1325,7 +1325,7 @@ Write-Host ('sdoc assemble tests: PASS=' + $script:passed + ' FAIL=' + $script:f
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-assemble.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|869|6c44ef048951c7743f8e131090314ef7228a2d877d90db0c13180433bb8721ee|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|862|c177ad9ef1bf6fcaf0afa8aa1f7f87a18a33c649f5c148465fd2b08941064228|1
 # test-sdoc-run.ps1 — Spec 文件流程外環（ps-sdoc.ps1）端到端：合成 worker 依工單回狀態圖解讀、研究包、覆核；不查 MCP、不呼叫模型。
 # 以設計範例（walkthrough、gate）為來源：從空目錄跑到發布，比對發布的 canonical 與範例，並驗結論碼、中斷、重試、重跑、裁決與核准。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-run.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -1678,7 +1678,7 @@ function Start-SdMutexHold([string]$Name, [string]$Tag) {
             }
             finally { if ($held) { $m.ReleaseMutex() }; $m.Dispose() } }).AddArgument($Name).AddArgument($ready).AddArgument($release)
     $handle = $ps.BeginInvoke()
-    for ($i = 0; $i -lt 200 -and -not [System.IO.File]::Exists($ready); $i++) { Start-Sleep -Milliseconds 50 }
+    for ($i = 0; $i -lt 1200 -and -not [System.IO.File]::Exists($ready); $i++) { Start-Sleep -Milliseconds 50 }
     $ok = $false
     if ([System.IO.File]::Exists($ready)) { $ok = ([System.IO.File]::ReadAllText($ready) -eq 'True') }
     return @{ Ps = $ps; Handle = $handle; Release = $release; Held = $ok }
@@ -1809,19 +1809,12 @@ try {
         Assert-Sd ($r.Code -eq 'DOC1-7-01' -and -not [System.IO.File]::Exists((Join-Path $jobRootW 'revisions/r0002.json'))) '改回原樣：-Status 回到 DOC1-7-01，沒有開新版本'
         # 鎖：另一個執行緒持有同 Root＋同 Component 的鎖 → DOC1-0-03
         $lockName = 'Global\MCPSample-SpecDocs-' + (Get-PsKnTextHash -Text ([System.IO.Path]::GetFullPath($rootW).TrimEnd('\', '/').ToUpperInvariant())).Substring(0, 16) + '-' + $jobW
-        $ready = Join-Path $base 'lock.ready'; $release = Join-Path $base 'lock.release'
-        $ps = [powershell]::Create()
-        [void]$ps.AddScript({ param($Name, $Ready, $Release)
-                $m = New-Object System.Threading.Mutex($false, $Name); $held = $false
-                try { $held = $m.WaitOne(5000); [System.IO.File]::WriteAllText($Ready, [string]$held); $w = [System.Diagnostics.Stopwatch]::StartNew(); while (-not [System.IO.File]::Exists($Release) -and $w.Elapsed.TotalSeconds -lt 60) { Start-Sleep -Milliseconds 50 } }
-                finally { if ($held) { $m.ReleaseMutex() }; $m.Dispose() } }).AddArgument($lockName).AddArgument($ready).AddArgument($release)
-        $handle = $ps.BeginInvoke()
+        $hold = Start-SdMutexHold $lockName 'lock'
         try {
-            for ($i = 0; $i -lt 200 -and -not [System.IO.File]::Exists($ready); $i++) { Start-Sleep -Milliseconds 50 }
             $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
-            Assert-Sd ([System.IO.File]::ReadAllText($ready) -eq 'True' -and $r.Code -eq 'DOC1-0-03' -and $r.Exit -eq 3) '另一個執行緒持鎖：DOC1-0-03（不碰任何檔案）'
+            Assert-Sd ($hold.Held -and $r.Code -eq 'DOC1-0-03' -and $r.Exit -eq 3) '另一個執行緒持鎖：DOC1-0-03（不碰任何檔案）' ('held=' + $hold.Held + ' code=' + $r.Code)
         }
-        finally { [System.IO.File]::WriteAllText($release, 'x'); [void]$ps.EndInvoke($handle); $ps.Dispose() }
+        finally { Stop-SdMutexHold $hold }
         $r = Invoke-SdRun $rootW $comps $fxW '' @{ Status = $true }
         Assert-Sd ($r.Code -eq 'DOC1-7-01') '鎖釋放後恢復'
         # 全部文件都由人核准 → APPROVED
@@ -4766,10 +4759,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|c015b85e986d3597f69bbd982d4e3d41554a49f87d29a361fdd6609c4af7299d|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|d7b2306976d1594a2846aaf375901108616f43e7f387c2bb6f117c05291d0535|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "887cde0",
+  "commit": "82dbe13",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -4971,8 +4964,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4149,
-      "sha256": "c8d5d040fc24d54067e9922a0fbf084604b0a47011660b423602feb9f5ddafe0",
+      "lines": 4161,
+      "sha256": "593c5b49ce35bdc5176c55145850f5b33eb1f61d4307c7c8ce69e5349cb2b15a",
       "bom": false
     },
     {
@@ -5673,8 +5666,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 869,
-      "sha256": "6c44ef048951c7743f8e131090314ef7228a2d877d90db0c13180433bb8721ee",
+      "lines": 862,
+      "sha256": "c177ad9ef1bf6fcaf0afa8aa1f7f87a18a33c649f5c148465fd2b08941064228",
       "bom": true
     },
     {
@@ -5728,7 +5721,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|163|808ee2f7665874d362b38f7927a91356a1aa210ea39bf973ac2419efd7978c2e|0
+@@@PSBUNDLE-FILE|AGENTS.md|165|68d8f9d30dff8d50fa5f7b87b9c87f13b20830b734d4d317b4a1dfc47ea19165|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -5811,6 +5804,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-21 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   盤點 SQL 紀錄（`docs/design/ui-control-sql-record.md`）與 Windows 5.1 CI 鎖測試誤判修正（walk 組改用共用 helper、等 60 秒；L154），各份重生，
+   併入前 `main` 頭 `997d414`；同日稍早同一分支併入
    元件代碼 10／15／23／24 以 App Designer 確認後進 §2l（10 Scroll Bar、15 External Link 按鈕、24 Tab Separator 解碼，23 Horizontal Rule 不列；L153）、
    第五輪結果與第六輪驗證 SQL（`docs/design/ui-metadata-check-r6.md`），各份重生，併入前 `main` 頭 `7bc739a`；
    2026-10-20 同一分支併入
@@ -5893,5 +5888,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|c22603b00d3185255eb35add2f68e046ba485d60ba9c35c94454169dac4f7a39
-@@@PSBUNDLE-PART-END|cc43bcce8d163e2e|8|8
+@@@PSBUNDLE-EOF|158|277e750d19c870658fda88360cdc7d416f47df7a4d17ef8e99c6878a56c00984
+@@@PSBUNDLE-PART-END|898d33b5b9169568|8|8
