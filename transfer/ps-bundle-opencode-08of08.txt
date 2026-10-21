@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 15e47b9）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 37ca345）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|15e47b9|76e931de78bf2763|8|8|5892|6064dfb3caca1662e45f43a15ddd4a0f4770ef245276dc16f74e356791f6d77b
+@@@PSBUNDLE-PART|1|opencode|37ca345|63bafb7a7d8c20fc|8|8|5896|4e5b6a2004ba87d432cf81c3db2b4b32c5b69f3478f725671aa4ff3b7a7cf050
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|341|78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4759,10 +4759,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|a2dc72eec80a02757d118b5868823f0e68d2919b440d78bb831873e78ba854b1|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|c65f87b779f2a4b44f9e4221ae0f227c5d830b54a0b890919e8c63bde6f61114|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "15e47b9",
+  "commit": "37ca345",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -4964,8 +4964,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4161,
-      "sha256": "593c5b49ce35bdc5176c55145850f5b33eb1f61d4307c7c8ce69e5349cb2b15a",
+      "lines": 4171,
+      "sha256": "ca37049489021412b827dba67f9f63aaaa7ba407b263362769be86d954771819",
       "bom": false
     },
     {
@@ -5721,7 +5721,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|169|6cfeb9b3cd71c4df7f9eef33486a70b015dbc9106917622e0ce9f29bbd2bd98a|0
+@@@PSBUNDLE-FILE|AGENTS.md|173|e0154f6d71c7237537d076049738726be7e939776417efbd848cd4949fc10f1c|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -5804,6 +5804,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-21 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   代碼確認紀錄（`docs/design/ui-control-sql-record.md` 拿掉數量、只留代碼＝什麼與怎麼確認）、拿掉 R6C 計數 SQL、協作鐵律加「驗證只確認代碼意思」（L155），
+   框架檔未動，各份重生，併入前 `main` 頭 `50fcb81`；同日稍早同一分支併入
    盤點紀錄補說明（筆數「未統計」不是 0、「不列」是不寫進研究文件、按鈕依 Destination 分四個代碼合計 1131）與 R6C 各代碼筆數 SQL，
    框架檔未動，各份重生，併入前 `main` 頭 `e363e02`；同日稍早同一分支併入
    盤點紀錄改寫（`docs/design/ui-control-sql-record.md` 改成每支 SQL 盤點什麼、結果代碼表、輸出怎麼解讀；框架檔未動，AGENTS.md 在 OpenCode 搬運包裡，各份重生），
@@ -5867,6 +5869,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   新增或修改／行數（供編輯器總行數核對，允許 ±1 行尾差異）；
   `.ps1` 標註「存 UTF-8 with BOM」。搬完整波跑一次
   `ps-fs-doctor -Domain <領域>`（檢查 D 抓雙 BOM/FEFF 污染）。
+- **驗證 metadata 代碼只確認意思**（2026-10-21 管理者）：給管理者跑的驗證 SQL 只回答「這個代碼＝哪個元件／設定」，
+  目的是讓 NN 翻譯不誤判；不盤點公司系統裡各有幾個、不要求回報數量，紀錄也不寫數量。比例或筆數只能當確認意思的旁證。
 - 使用者受公司規範限制**無法提供真實檔名與機敏值**——以編號、
   類別、遮罩值溝通，不要追問原文。
 - 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
@@ -5892,5 +5896,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|6b86a99ffcb5c58bd0de65038aaffa3d5c19309ce98091cc22a0024178931199
-@@@PSBUNDLE-PART-END|76e931de78bf2763|8|8
+@@@PSBUNDLE-EOF|158|e1b24961e442f97fc2cd2c9c8e1d3e4344d15fa01eb1dd63ba3f2b344a9ca2f0
+@@@PSBUNDLE-PART-END|63bafb7a7d8c20fc|8|8

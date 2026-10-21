@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 15e47b9）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 37ca345）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|15e47b9|76e931de78bf2763|2|8|6118|0bfa041b6bb6431fe91d96bd914aab73e7c580df4b1fe9d7f2461ad41ba190c2
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4161|593c5b49ce35bdc5176c55145850f5b33eb1f61d4307c7c8ce69e5349cb2b15a|0
+@@@PSBUNDLE-PART|1|opencode|37ca345|63bafb7a7d8c20fc|2|8|6128|e42ec1894ea6c4650e8dcf6fec013e6d3bdac073cbc83d41ff232f55f1dc3a6a
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4171|ca37049489021412b827dba67f9f63aaaa7ba407b263362769be86d954771819|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4163,6 +4163,16 @@
 - 落點：walk 組改用 `Start-SdMutexHold`／`Stop-SdMutexHold`；helper 等 ready 的上限 10 秒→60 秒（拿到就走，平常不變慢）；
   斷言失敗時印出 held 與實際代碼。
 - 驗證：本機 `test-sdoc-run.ps1 -Only walk` 35 PASS、test-ps51-static 過。
+
+### L155 驗證 metadata 代碼只確認意思，不盤點數量（2026-10-21）
+
+- 症狀：管理者要一份「SQL 目的、結果、怎麼解讀」的紀錄；紀錄列了各代碼在客製頁面的筆數，沒統計的寫「—」，管理者讀成
+  Group Box、Subpage 沒有、按鈕只有 1 個；接著又給了 R6C 要管理者回報每個代碼的筆數。
+- 管理者指正：不應該盤點系統裡有多少個什麼元件，只需要確定「這個代號就是這個元件」，讓之後做 NN 不會誤判。
+- 根因：把驗證過程的統計（V6 的其他代碼筆數、Prompt 分布、按鈕各目的地筆數）當成盤點結果寫進紀錄，又為了補空格另外要數量；
+  驗證 SQL 的目的只是確認代碼意思，筆數最多是旁證。
+- 落點：AGENTS.md 協作鐵律加「驗證 metadata 代碼只確認意思」；`docs/design/ui-control-sql-record.md` 改成只記代碼＝什麼、怎麼確認、
+  輸出怎麼讀，拿掉所有數量；`docs/design/ui-metadata-check-r6.md` 撤掉 R6C。之後的驗證 SQL 與紀錄照這條。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -6119,4 +6129,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-PART-END|76e931de78bf2763|2|8
+@@@PSBUNDLE-PART-END|63bafb7a7d8c20fc|2|8
