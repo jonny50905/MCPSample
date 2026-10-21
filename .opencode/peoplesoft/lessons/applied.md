@@ -4132,3 +4132,18 @@
   同名多個 market 版本時每列各寫一列；代碼 10／15／23／24 與 FIELDUSE 8 等第五輪結果。
 - 驗證：§2m 以合成資料跑過（DuckDB，表放在另一個 schema：多動作、ADD_SEARCH、OTHER=128、查無）；§2l 改名後重跑；第五輪兩句 SQL 以合成資料跑過；
   test-spec 的 UI.CONTROLS 夾具加 Component 列（4 列、3 列有屬性、2 列有查值、第一列元件＝Component）；全套測試、ps-agent-doc-lint 全過。
+
+### L153 元件代碼 10、15、23、24 以 App Designer 確認後進 §2l；相關顯示的對應與 FIELDUSE 8 待第六輪（2026-10-21）
+
+- 第五輪結果（唯讀帳號，`docs/design/ui-metadata-check-r5.md`）：R5A（CODE N LVL REC LBL GRID）10＝30 100 0 100 0、15＝1 0 0 100 0、
+  19＝587 100 100 24 16、23＝59 31 2 0 0、24＝9 100 0 100 100、27＝588 100 0 54 2。管理者以 SAMPLE_NUM 對 App Designer Order 頁籤的 tab order 欄
+  （＝PSPNLFIELD.FIELDNUM）看元件：10 Scroll bar、15 按鈕（Destination External Link）、23 Horizontal rule、24 Tab separator——和社群表一致。
+- R5B＝CTL_N 1105、B8_N 2044、BOTH8 84、REL_N 1984（B16 兩個數沒回）：以「ASSOCFIELDNUM＝控制欄 FIELDNUM」找到的控制欄只有 8% 帶 8，
+  帶 8 的欄位數卻和相關顯示個數相近 → 懷疑 ASSOCFIELDNUM 存的是控制欄的 Field ID（PNLFLDID，調 tab order 不會變），第四輪 H0 只在沒調過順序的頁面成立。
+  第六輪 SQL `docs/design/ui-metadata-check-r6.md`（H0 與 H3 同時比：控制欄個數、有 prompt、prompt 表＝相關顯示 Record、帶 8；B16 補回；Field ID 重複檢查）。
+- 落點：兩版 cookbook §2l：10 Scroll Bar、15 Push Button/Hyperlink: External Link、24 Tab Separator 解碼；23 Horizontal Rule 和 Frame、Static Image 一樣不列（裝飾）；
+  值域加 External Link、Scroll Bar、Tab Separator 的意思。
+- 沒做：§2l 的 RELATED_TO／DISPLAY_CONTROL 仍照 FIELDNUM 對應——第六輪若 H3 成立，RELATED_TO 要換成以 PNLFLDID 找到的控制欄 FIELDNUM、
+  DISPLAY_CONTROL 改用 FIELDUSE 8；15 的網址來源欄位沒查。
+- 驗證：§2l 合成資料加 10／15／24 與未知代碼 26（OTHER）、23 不列、續查；第六輪 SQL 以合成資料跑過（H3 成立、兩者相同兩種情境）；
+  ps-agent-doc-lint、test-auto-loop／ps51-static／knowledge／supplemental／spec、搬運包重生後 test-claude-variant／test-bundle 全過。

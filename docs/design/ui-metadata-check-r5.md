@@ -107,6 +107,13 @@ B8_N／B16_N＝FIELDUSE 帶 8／16 的欄位數；BOTH8＝控制欄裡帶 8 的�
 - ACTIONS／AUTHORIZEDACTIONS：[peoplesofttutorial.com](https://peoplesofttutorial.com/authorized-actions-in-psauthitem/)、[PeopleSoft DBA](https://peoplesoftdba.wordpress.com/2012/07/17/authorized-action-codes-in-psauthitem/)；
   四個動作的意思：[ctcLink Page Action Basics](https://cptc.teamdynamix.com/TDClient/222/Portal/KB/ArticleDet?ID=4395)
 
+## 結果（2026-10-21）
+
+- R5A（CODE N LVL REC LBL GRID；AD＝App Designer，管理者以 SAMPLE_NUM 對 Order 頁籤的 tab order 欄）：10＝30 100 0 100 0，Scroll bar；15＝1 0 0 100 0，按鈕、Destination External Link（管理者另註：有填 Record name）；19＝587 100 100 24 16，Grid；23＝59 31 2 0 0，Horizontal rule；24＝9 100 0 100 100，Tab separator；27＝588 100 0 54 2，Scroll Area。四個代碼都和社群表一致；SAMPLE_NUM＝tab order 也確認 FIELDNUM 就是 Order 頁籤的順序。
+  → 進框架（cookbook §2l，L153）：10 Scroll Bar、15 Push Button/Hyperlink: External Link、24 Tab Separator 解碼；23 和 Frame、Static Image 一樣不列。
+- R5B＝CTL_N 1105、B8_N 2044、BOTH8 84、REL_N 1984（B16_N、BOTH16 沒回）：以 tab order 找到的控制欄只有 8% 帶 8。帶 8 的欄位數和相關顯示個數相近，
+  懷疑 ASSOCFIELDNUM 存的是控制欄的 Field ID（PNLFLDID）而不是 tab order → 第六輪 `ui-metadata-check-r6.md`。
+
 ## 回報範本
 
 ```

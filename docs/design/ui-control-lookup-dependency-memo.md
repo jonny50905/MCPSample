@@ -422,6 +422,11 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   同一組位元；已解碼的元件代碼一致，12／16／21 依按鈕目的地改叫 PeopleCode Command／Internal Link／Secondary Page，5 改叫 Drop-Down List Box。
   對不上的：代碼 10、15、23、24（社群：Scroll Bar、External Link 按鈕、Horizontal Rule、Tab Separator）與 FIELDUSE 8（社群：Display Control；第三輪 DC=NONE）
   → 第五輪 SQL `ui-metadata-check-r5.md`（R5A 特徵＋App Designer 對照、R5B 8／16 與 ASSOCFIELDNUM 交叉）。對照表與來源在第五輪說明檔。
+- **第五輪結果（2026-10-21）**：R5A 以 App Designer 確認 10 Scroll Bar、15 External Link 按鈕、23 Horizontal Rule、24 Tab Separator（和社群表一致；
+  SAMPLE_NUM 對上 Order 頁籤的 tab order＝FIELDNUM）→ §2l 解碼 10、15、24，23 不列（L153）。R5B＝CTL_N 1105、B8_N 2044、BOTH8 84、REL_N 1984：
+  以 tab order 對應的控制欄只有 8% 帶 8，帶 8 的欄位數卻和相關顯示個數相近 → 懷疑 ASSOCFIELDNUM 存的是控制欄的 Field ID（PNLFLDID），
+  第四輪 H0 只在沒調過順序的頁面成立。第六輪 SQL `ui-metadata-check-r6.md`（H0 與 H3 同時比、B16 補回）。結果出來前，§2l 的 RELATED_TO、
+  DISPLAY_CONTROL 不當定論。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 

@@ -574,18 +574,21 @@ FETCH FIRST 50 ROWS ONLY
 
 **2l. 畫面元件與設計期屬性（一個 Page 一次；NN「## 畫面元件」與「這個欄位是什麼元件、唯讀嗎、必填嗎、查值查哪裡」）**
 
-只列綁欄位的元件、按鈕／連結、Grid、Scroll Area、HTML Area、Subpage、Secondary Page；Static Text、Frame、Group Box、
-Static Image 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
+只列綁欄位的元件、按鈕／連結、Grid（含 Tab Separator）、Scroll Area、Scroll Bar、HTML Area、Subpage、Secondary Page；
+Static Text、Frame、Group Box、Static Image、Horizontal Rule 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
 FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
 
 ```sql
 SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
        CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List Box' WHEN 6 THEN 'Long Edit Box'
                         WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
-                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 10 THEN 'Scroll Bar' WHEN 11 THEN 'Subpage'
+                        WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 15 THEN 'Push Button/Hyperlink: External Link'
                         WHEN 16 THEN 'Push Button/Hyperlink: Internal Link' WHEN 18 THEN 'Secondary Page'
                         WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Hyperlink: Secondary Page'
-                        WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area' ELSE 'OTHER' END AS CONTROL,
+                        WHEN 24 THEN 'Tab Separator' WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area'
+                        ELSE 'OTHER' END AS CONTROL,
        TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
        CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
        CASE WHEN BITAND(P.FIELDUSE, 2) > 0 THEN 'INVISIBLE' END AS INV,
@@ -611,7 +614,7 @@ SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
   FROM <schema>.PSPNLFIELD P
   LEFT JOIN <schema>.PSRECFIELDDB F ON F.RECNAME = P.RECNAME AND F.FIELDNAME = P.FIELDNAME
  WHERE P.PNLNAME = :pageName
-   AND P.FIELDTYPE NOT IN (0, 1, 2, 3)
+   AND P.FIELDTYPE NOT IN (0, 1, 2, 3, 23)
    AND P.FIELDNUM > :afterFieldNum
  ORDER BY P.FIELDNUM
 FETCH FIRST 40 ROWS ONLY
@@ -633,7 +636,10 @@ FETCH FIRST 40 ROWS ONLY
 
 - DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
 - 元件名稱＝App Designer 的元件名；按鈕／超連結在冒號後接目的地：PeopleCode Command＝按下去跑所綁欄位的 FieldChange
-  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁。
+  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁、External Link＝開外部網址
+  （網址不在本查詢的欄位裡）。
+- Scroll Bar＝舊式的層級捲動，和 Scroll Area 一樣框住下一層的列；Tab Separator＝Grid 裡把欄位分成分頁的分隔，LBLTEXT 是分頁標籤，
+  它後面的欄位到下一個 Tab Separator 為止屬於這個分頁。
 - RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
 - KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
 - XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
