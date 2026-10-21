@@ -1,6 +1,190 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a87e342）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 887cde0）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a87e342|88d9d0c9cad051c8|3|8|14175|7a607c3c4f5f2d89b7e5d7f463a9b59dec62296dae2196b9eb57f93f3490f8e5
+@@@PSBUNDLE-PART|1|opencode|887cde0|cc43bcce8d163e2e|3|8|13091|902a1c2ba7fde44f3f900af316ff09509cb1f11423dec81bf318f1eaadb55a22
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|131|48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972|0
+# <NN> <功能名>（[[<Component / 物件名>]]）
+
+> 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE | PARTIAL | BLOCKED
+> Origin：<CUSTOM_PREFIX | …>　搜尋政策：<mode>　Delivered fallback：<未使用 | 使用於…>
+
+<!-- 物件細節寫進 wiki entity 檔（../wiki/<物件名>.md），本文用 [[物件名]]
+     連結、不重複詳述；本文專注「功能流程」的敘事。 -->
+
+## 相關物件
+
+| 物件 | 角色 |
+|---|---|
+| [[TW_XXX]] | 主 Component |
+| [[PS_YYY]] | 寫入目標 |
+
+## 功能定位
+
+<誰在用、業務目的。一段話。>
+
+### 導覽入口
+
+<依 cookbook §2k 取得的 Portal Registry 入口；每個入口一列。沒查證就整段寫
+ 「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」。>
+
+| # | Portal | 入口型 | CREF 物件名 | 導覽入口（Portal Registry 登錄路徑） | 可見性 | 語系／來源 | 證據 |
+|---|---|---|---|---|---|---|---|
+| 1 | <PORTAL_NAME> | PORTAL_REGISTRY | <PORTAL_OBJNAME> | <段1> > <段2> > <段3> | <CLASSIC_NAV_VISIBLE｜REGISTRY_DEFINED｜UNKNOWN_VISIBILITY> | <語系>／<LANG｜BASE> | <E01.n> |
+
+<!-- 入口型：PORTAL_REGISTRY / CREF_LINK / NAV_COLLECTION / FLUID_TILE / NAVBAR / UNKNOWN
+     可見性：CLASSIC_NAV_VISIBLE（cookbook §2k-C canonical 回傳的列：Classic 選單會顯示，未經 user 授權驗證）
+             REGISTRY_DEFINED（只有 registry 證據，未跑 canonical）
+             UNKNOWN_VISIBILITY（祖先 hidden-from-nav／CREF 過期／走訪未達根／未解析 surface）
+             AUTHORIZED_FOR_CONTEXT 本版不得產出，正文也不得出現這個字串。
+     CREF 物件名＝canonical 的 CREF_OBJECT，查不到寫 UNRESOLVED。多入口就寫多列，不得壓成一列。
+     診斷形 CLASSIC_VISIBLE=0 的列不列入本表，改在「未解事項」記一行原因（hidden／過期／未達根）。
+     profile navigation.surfaces 非 CLASSIC_ONLY 時，Navigation Collection／Fluid Tile／NavBar 即使查無也要在
+     「未解事項」記一行 gap、不得宣稱「唯一入口」；CLASSIC_ONLY 不需。
+     值域見 mcp-tool-contracts.md §3。 -->
+
+### Technical Menu
+
+<PSMENUITEM 的 MENUNAME / BARNAME / ITEMNAME，以「/」分隔，多筆用分號。
+ 這是 App Designer 技術選單 metadata，**不是使用者點得到的路徑**。>
+
+<MENUNAME> / <BARNAME> / <ITEMNAME>
+
+<!-- 不可把這一段當成「導覽入口」的 fallback：BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級，
+     串成 A > B > C 就是誤報。兩段是兩個 claim，各自附證據，缺哪段就照實寫未確認。 -->
+
+## 畫面與欄位
+
+| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |
+|---|---|---|---|---|
+| MIL_STATUS | 兵役狀態 | Translate | 免役=E / 服役中=S / … | 欄位：有值（全表，查詢日 YYYY-MM-DD）；E：使用中（資料 N 筆） |
+
+<動態 label / 動態選項標 DYNAMIC_RUNTIME 並附 evidence。>
+
+<!-- 生命狀態格的欄位剖析（「欄位：…」）照 oracle-query-cookbook §7c 的記法，只寫有值或非預設 0 筆，
+     不寫實際筆數；沒剖析就只寫選項生命狀態。 -->
+
+<!-- 物件無畫面（Function Library 等）：標題保留，內文寫
+     「（無——Function Library，無使用者畫面）」——不適用要申報，
+     不能省略標題（標題是機器契約，L103）。 -->
+
+## 畫面元件
+
+<依 oracle-query-cookbook §2m（Component 一次，寫第一列）與 §2l（每個 Page 一次）照轉寫規則填；每次的 SQL 進 Evidence 附錄。>
+
+| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |
+|---|---|---|---|---|---|
+| TW_DEMO_REQ | 0 |  | Component | ADD UPDATE_DISPLAY | SEARCH TW_DEMO_REQSRCH |
+| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（VIEW；鍵 SETID,DEPTID,EFFDT） |
+| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |
+| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
+| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
+
+<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
+     # ＝FIELDNUM（Component 那列寫 0）；屬性與查值的字樣照 §2m、§2l 轉寫規則，不翻譯、不改寫。
+     主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
+     沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
+
+## 行為邏輯
+
+<條件 → 動作，逐項標信心等級：>
+
+- **CONFIRMED**：選 E 時開放免役原因並帶入日期（`<filePath>:<行號>`）
+- **DYNAMIC_RUNTIME**：核准後回寫的目標表由設定檔決定（`<filePath>:<行號>`）
+
+## 資料流
+
+| 表 | 操作 | 來源 | 信心 |
+|---|---|---|---|
+| PS_TW_XXX | UPDATE | 存檔 PeopleCode | CONFIRMED |
+
+## 執行方式
+
+<線上操作 / 批次（Process、排程、Run Control 頁面）。>
+
+## 權限
+
+<Menu → Component → Permission List → Role（人數彙總）。>
+
+## 未解事項（gaps）
+
+- <查不到、超出 budget、工具受限的部分——誠實列出>
+
+## Evidence 附錄
+
+| # | 位置 | 說明 | 機器參照 |
+|---|---|---|---|
+| 1 | `peoplecode/TW_XXX/.../FieldChange.pcode:12-24` | E 分支條件 | ChunkId `3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d` |
+
+<!-- ChunkId 一律逐字複製「完整 36 字元 UUID」（如上例長度）——
+     它不是 git SHA，**禁止縮寫成前 8 碼**；縮寫會被稽核判
+     FAIL(TRUNCATED_ID)、lint 也會抓。 -->
+| 2 | SQL：`SELECT … FROM PSXLATITEM …` | 選項清單 | keyRows：E=免役… |
+| 3 | `PS_PRCSRECUR`（RECURNAME='X'） | 排程週期 | 待人工SQL |
+
+<!-- 機器參照欄只准放三種東西之一（lint 逐列檢查，L55）：
+     (a) 完整 36 字元 ChunkId
+     (b) 可重跑的 SELECT … FROM …
+     (c) 待人工SQL ← **查不到時的合法出口**
+     「ChunkId」「PeopleCode chunk」「OracleMCP SQL」這類**只是標籤不是證據**
+     ——稽核重跑時跑不了任何東西，一律判違規。
+     取不到證據時**照型別走對應出口**，不要用敘述搪塞：
+       · SQL／metadata 型（查 DB 表）查不到 → 機器參照寫 `待人工SQL`
+         （管理者自跑 SQL 後回填）
+       · CHUNK 型（程式碼）取不到 → **移除該列**、把該主張降級 INFERRED
+       兩者都要在「未解事項」記一行查法收據（查了什麼、怎麼查、結果如何）
+     **更不要在 gaps 寫「環境限制」當跳過理由**——宣稱受限卻沒有任何一列
+     走出口，lint 會直接點名（L56）；真的受限就走出口，那才叫申報。 -->
+@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/function-detail-template.md
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/overview-template.md|49|e2ccd269668daf8d0f7a059b3d1c8b3b00ca8f69e666439905339a69204a1e74|0
+# <領域顯示名> 業務總覽
+
+> 產生日期：<YYYY-MM-DD>　（進度與狀態見同目錄 checklist.md；本檔階段一寫完後凍結）
+> 第 <N> 版（於稽核輪次 <R> 換版）　← 換版時**照這串字寫**，第一版可省略；
+>   lint 用它算落後幾輪，寫成別的格式會判成「沒換版」而繼續提醒（L54）
+> 本檔是「階段一盤點快照」——凍結後**不隨輪次更新**（L2 防覆寫截斷）；
+> 現況一律以 checklist.md／NN 檔／wiki 為準。落後多輪想刷新走 SOP-15
+> 換版程序（agent 對本檔零寫入，換版由人主導）。
+> 搜尋政策：<CUSTOM_FIRST | CUSTOM_ONLY_ROOTS>（domain <命中 domainId | 未命中，使用預設政策>）
+> Delivered fallback：<未使用 | 已使用於：…>
+
+## 一句話總結
+
+<這個業務領域在系統裡由哪些東西組成、大致怎麼運作。>
+
+## 功能地圖
+
+| # | 功能 | Component / 物件 | 類型 | Origin | 一句話說明 |
+|---|---|---|---|---|---|
+| 01 | <功能名> | [[TW_XXX]] | 線上頁面 | CUSTOM_PREFIX | <說明> |
+
+<!-- 物件欄一律用 [[wikilink]] 連到 entity 檔——總覽同時是人類的 MOC 導航頁 -->
+
+## 批次與排程
+
+| 程式 | 類型 | 何時執行 | 做什麼 |
+|---|---|---|---|
+
+## 核心資料表
+
+| Record | 用途 | 主要讀寫者 |
+|---|---|---|
+
+## 流程關係（選配——用文字箭頭，禁用圍欄圖）
+
+申請頁面 → 核准 → 批次生效
+
+<!-- 寫檔禁用三反引號圍欄（與寫入工具衝突）；需要正式圖表由人工後製 -->
+
+## 調查進度
+
+（不在本檔——見同目錄 `checklist.md`；打勾、⚠、稽核補查、Gaps 都只改那裡）
+
+## 掃描範圍聲明
+
+- 已掃角度：<UI 文字/選單（oracleMCP）、物件描述、Process 定義、客製程式碼（ES）…>
+- 未掃 / 受限：<例如 UI Semantic Index 未建、某來源 BLOCKED…>
+- 注意：本清單可能不完整——30 年系統的命名不一定命中 alias；
+  發現遺漏請直接在 checklist.md 的「調查進度」加列。
+@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/overview-template.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/research-domains.txt|28|6be65b50cee4d82d152301f4ed68cdf1a6d88d9e6d2fac4896cf109d8a393da8|0
 # research-domains.txt — 批次研究的領域佇列（issue #3）
 #
@@ -12908,1272 +13092,4 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1266|6545c4b87db7ea526c72b4da52c790ed32f883655020f71e28dfee482856c9a3|0
-# 管理者 SOP（人工作業標準程序）
-
-適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
-一般使用者只需要 OpenCode（或 Claude Code 版，見 SOP-26）對話（問答、`/ps-research`、`/ps-audit`、`/ps-lesson`），
-不需要本文件。
-
----
-
-## SOP-1 教訓 PR 審查——最重要的一份
-
-**流程**：同事 `/ps-lesson` → **該機立即生效**（agent 直接修落點檔＋記錄
-applied.md）→ 同事 commit ＋ push → 內部 git 開 **PR** → 你審 diff →
-merge（全隊採納）或退回。把關點在合併，不在事前。
-
-```text
-【審 PR 時看五件事（看 diff 即可，單筆 2~5 分鐘）】
-□ 1. 落點優先序對嗎？機械化檢查 > 資料修正 > 窄規則 > AGENTS.md
-     （能用 lint / 格式判定 / tools deny 解決的，不該寫成 prose 規則）
-□ 2. 是「最小新增」嗎？——只加不刪；有任何既有規則被改寫/移除 → 退回
-□ 3. 措辭會不會太寬、誤傷正常行為？
-□ 4. 測試檢查點有跟著加進 test-scenarios.md 嗎？
-□ 5. 沒把握 → 把 diff 遮敏後貼給較強模型審（物件名可代稱；機密不出機器）
-
-【merge 後】
-□ 通知全員 pull ＋ 重啟 OpenCode（教訓才會到每台機器）
-
-【退回時】
-□ PR reject ＋ 註明理由
-□ 通知該同事在本機 revert 該 commit（他的機器退回原狀）
-□ 若教訓本身有價值只是落點/措辭不對 → 修改後重新提交
-```
-
-**節奏**：教訓 PR 隨到隨審或每日批次；會導致嚴重錯誤決策的緊急教訓即時處理。
-**例外案件**：`pending.md` 裡狀態 PENDING 的（agent 沒把握自動套用的）——
-人工判斷落點後自行修改、記錄 applied.md、照常走 PR。
-
----
-
-## SOP-2 Lint 執行
-
-**時機**：每個領域 `/ps-research` 跑完後；`/ps-audit` 前；懷疑格式壞掉時。
-
-```text
-□ 1. PowerShell 執行（絕對路徑，任何目錄皆可、不用 cd）：
-     powershell -File "<repo路徑>\scripts\ps-doc-lint.ps1" -Domain "<領域>"
-     （適用舊版 Windows PowerShell 5.1；script 已帶 UTF-8 BOM）
-□ 1a. 被執行原則擋（PSSecurityException）→ 依序：
-     (1) Unblock-File 該 .ps1 後重試
-     (2) 請 IT 對 scripts\ps-doc-lint.ps1 簽章或加白名單
-     (3) 「執行原則替代跑法」——**實際指令不入 repo**（安控會掃
-         繞過類字樣，連純文字都擋，2026-07 實測）：由管理者存於
-         本機筆記，需要時向系統維護者索取
-□ 1b. 可「自行在本機」建捷徑檔——**嚴禁 commit 進 repo**
-      （公司安控會擋含可執行檔的 git 下載，見 SOP-3）
-□ 2. 綠色 PASS → 結束
-□ 3. 紅色 FAIL → 逐項處理：
-     - 「checklist 已打勾但檔案不存在」「檔案未列於清單」
-       → 對話叫 deep-research 修（或人工補 checklist 行）
-     - 「ChunkId 遭縮寫為 8 碼」→ **lint 清單驅動的手術式修復**：
-       把 lint 列的 檔×id 清單直接貼給 PS-DEEP-RESEARCH 逐筆修
-       （每筆委派重取 chunk、必附「舊→新」收據）；修復波前後各
-       commit 一次內部 git（快照可回滾）
-     - 「ChunkId 非 UUID / 自編 id」（非 8 碼樣式）→ 證據捏造，
-       跑 /ps-audit 該領域
-     - 「缺章節 / 無 confidence 標註」→ 對話叫 deep-research 重寫該檔該節
-     - wiki 類警告（斷鏈 / 孤兒 / 過期 / frontmatter 缺欄）
-       → 斷鏈孤兒叫 deep-research 修；stale 排入下次 /ps-research
-□ 4. 修完重跑 lint 確認
-□ 5. 附註：-StrictAudit 參數是 auto-loop 畢業門專用（issue #2——
-     90-audit.md 的結構性警告升為 FAIL，擋「稽核沒真的做完」的誤畢業）；
-     人工執行**不加**此參數，行為與以往完全相同
-□ 6. 手術波跑完 lint **未減項**時的升級梯（L32）：
-     (1) fresh session 原樣重貼一次（排除新鮮度變因）
-     (2) 仍無效＝寫入鏈不可信 → 切「**模型查、人工貼**」：委派改為
-         「只在回覆輸出對照表『舊值 → 新完整UUID』、驗貨照舊、
-         **禁止寫任何檔案**」，人工照表逐筆貼
-     (3) 環境事實：tool-call 約束解碼（SOP-10 第 5 步）經公司政策
-         否決（2026-08）——寫入不可靠是**永久條件**，本升級梯是
-         標準程序不是例外
-     (4) 個位數殘項＋模型持續「判定不用做」→ **人工直通**，不再纏鬥：
-         chunk 類＝build/直通測試直接呼叫 search_chunks（結構化參數），
-         從工具回傳原文抄 UUID；oracle 類＝自己開 SQL Developer 跑
-         cookbook 樣板（`<schema>.` 換成 profile oracle.currentSchema 的值；唯讀帳號見 SOP-30），
-         keyRows 逐字抄——模型的「無須更動」判斷不參與，lint 說缺
-         就是缺
-```
-
----
-
-## SOP-3 內部 Git
-
-**原則**：產出（docs/ps-research/）與框架（.opencode/）都 commit 到**內部** git；
-**嚴禁推到任何外部 remote**。
-**repo 禁放可執行檔**（.cmd／.bat／.exe／.vbs 等——公司安控會擋含
-可執行檔的 git 下載，2026-07 實測）；自動化一律 .ps1＋SOP 教跑法，
-捷徑檔只准使用者自建於本機、不入版控。
-
-```text
-□ 何時 commit：
-  - 一個領域研究完成或告一段落後
-  - /ps-audit 跑完後（含 90-audit.md 與回灌）
-  - 教訓套用後（SOP-1 第 9 步）
-  - 人工修正文件後
-□ Commit message 前綴（讓 git log 可過濾）：
-  - kb(research): <領域> 新增/更新研究
-  - kb(audit):    <領域> 稽核與回灌
-  - kb(fix):      人工修正 <檔案>（含 reviewed 標記）
-  - kb(rule):     教訓套用 <L編號>
-□ 推送前檢查：git remote -v 確認只有內部 remote
-□ 回答「這條事實哪次加的」：git log --follow / git blame <entity檔>
-```
-
----
-
-## SOP-4 回滾（文件被 agent 弄壞時；含「部分還原」）
-
-**部分損壞**（如 lint 報缺章節——覆寫時被寫掉）不必整檔回滾：
-`git log --oneline -- <檔路徑>` 找舊版 → `git show <commit>:<檔路徑>`
-確認舊版章節完整 → 人工把缺的章節貼回（或貼給 deep-research 合併，
-註明「僅補回缺章節，其他內容不動」）。git 裡也沒有 → 該項回
-checklist 重查。
-
-```text
-□ 1. 先確認災情範圍：git status / git diff（未 commit 的變更）
-□ 2. 未 commit 的壞變更 → git checkout -- docs/ps-research/<壞掉的路徑>
-□ 3. 已 commit 的壞變更 → git log 找壞 commit → git revert <sha>
-     （用 revert 不用 reset——保留歷史）
-□ 4. 回滾後把肇因登錄教訓：/ps-lesson <一句話描述 agent 做了什麼壞事>
-```
-
----
-
-## SOP-5 人工修正文件與 reviewed 標記
-
-**時機**：你（或領域專家）確認某份文件 / entity 檔內容有誤，要人工修正。
-
-```text
-□ 1. 修正內容時遵守「作廢不刪除」：
-     - entity 檔：舊事實移到「## Invalidated」節標日期原因，新事實寫回 Observations
-     - 領域文件：錯誤敘述改正，必要時在該段留一行「（更正：原載…，經確認為…）」
-□ 2. 該檔 frontmatter 改 reviewed: true
-     → 從此 agent 不得覆寫此檔既有內容（只能追加），重生成也會跳過
-□ 3. 若這個錯反映系統性問題 → 順手 /ps-lesson 登錄
-□ 4. git commit（前綴 kb(fix):）
-```
-
----
-
-## SOP-6 Checklist 人工加項
-
-盤點漏了功能時，兩種方式擇一：
-
-```text
-方式 A（推薦）：對話裡講——「把 TW_XXX 加進 <領域> 的調查清單」
-方式 B（手改）：編輯該領域目錄 checklist.md 的「調查進度」，照格式加一行：
-              - [ ] NN <功能名> `<物件名>` → NN-<物件名>.md
-              （舊領域還沒有 checklist.md 時不用手動搬——
-              下次 /ps-research 會自動遷移）
-之後跑 /ps-research <領域> 就會查它。
-```
-
----
-
-## SOP-7 Obsidian（選配的人類閱讀介面）
-
-不裝完全不影響任何功能。要裝：
-
-```text
-□ 1. Obsidian → Open folder as vault → 選 docs/ps-research/
-□ 2. 立刻把 .obsidian/ 加進內部 git 的 .gitignore
-     （至少 ignore .obsidian/workspace.json——它每次開檔都變）
-□ 3. 注意：不要用 Obsidian 的 Properties 圖形介面改 frontmatter
-     ——它會重排/改寫 YAML 格式，跟 agent 寫入互相打架產生幻影 diff。
-     要改 frontmatter 用純文字模式或編輯器改。
-□ 4. 好處：wikilink 點擊跳轉、backlink 面板、graph view、
-     全域搜尋 `- [ ]` 看所有未完成調查
-```
-
----
-
-## SOP-8 環境異動時的對齊檢查
-
-```text
-□ 新增 MCP server 註冊 → 先在**全部 9 個 agent 檔**的 tools 加
-  "<註冊名>_*": false（tools map 是覆寫表：沒列＝預設全開，主 agent 會
-  直接呼叫繞過 subagent 架構；其回傳也塞不進證據契約，誘發捏造）。
-  之後要用再走正式整合：選定歸屬 subagent → 該檔改 allow ＋補工具
-  對照表＋定義證據格式，其餘 agent 檔維持 deny
-□ MCP server 註冊名變了 → 改 agent 檔 tools 的 "<註冊名>_*" 前綴
-  （含 deny 項），前綴大小寫須完全一致
-□ 換模型 → 重跑 Smoke Set（test-scenarios.md §5，9 題）確認規則遵循沒退化
-□ OpenCode 升版 → 確認 agent（Tab 清單）、command（/ 清單）、
-  skill 都有載入；異常先看 frontmatter 格式
-□ OpenCode 升版 → 驗 tools 圍堵仍生效：agent 檔的 tools 布林表自
-  v1.1.1 起屬 deprecated（併入 permission 設定）——升版後抽測主
-  agent 是否仍不碰檢索 MCP；失效即把各 agent 的 deny 改寫成
-  permission 格式（圍堵牆騎在 deprecated 機制上，升版是唯一風險點）
-□ OpenCode 升版 → 檢查是否**新增內建 agent／subagent**（如 general／
-  explore／scout）——內建不吃本專案的封鎖，須在 .opencode/agent/
-  放**同名覆寫檔**補封 4 個 MCP（2026-08 實測：委派會漏到內建
-  explore 直呼 MCP）
-□ PeopleTools 升版 → cookbook 的表名/欄位抽 2~3 條樣板實跑驗證
-□ MCP server **程式修改**（bug fix／功能變更）→ 至少直通測試該
-  server 的每個 tool；修的是檢索類 server → 歷史「查無」判定與
-  文件 gaps 全帶嫌疑，下輪 audit 的二次定位會自動平反，**不必**
-  專案式重查；若涉及**重建索引** → chunk id 輪換，走 SOP-11
-□ 檢索 server **新增 source type／物件類型**（≠ 上一條的修既有 server）
-  → **自動平反機制無效，必須專案式補查**。差別在於：修 bug 時文件裡
-  至少有一筆「查無」或 gap 可被重新檢驗；新增類型時 agent 過去**根本
-  看不見**該類型，很可能整段沒寫——沒寫的東西 lint 不標、audit 不查、
-  二次定位抓不到，那是**覆蓋缺口不是證據缺口**。三步：
-  (1) 新值補進 progressive-source-retrieval §6.0 的 componentType 表
-      （唯一權威表）＋相關 agent／lint 的定位提示；
-  (2) 掃既有文件中該類型的「查無」與「未提及」段落，開補查工單；
-  (3) 舊的該類型「查無」結論一律作廢重查，不得沿用
-  （2026-08 SQR／SQC 進索引即走此條，見 L68）
-```
-
----
-
-## SOP-9 write 工具 JSON 解析失敗排查
-
-畫面出現 `invalid[tool=write, error=... JSON Parse error expected '}']`：
-
-```text
-□ 這不是檔案被汙染——是模型產生的「工具呼叫 JSON」本身壞掉；
-  最常見原因＝單次寫入內容太長被截斷（大檔整檔覆寫）
-□ 規則側已緩解：進度拆到小檔 checklist.md、00-overview 凍結、
-  單次寫檔約 150 行上限、同檔失敗 2 次標 ⚠ 跳過（不會卡死）
-□ 服務端可做（管理者）：推理伺服器若支援 tool-call 約束解碼
-  （vLLM auto tool choice／grammar、Ollama JSON mode 等）→ 打開，
-  可大幅降低 JSON 壞格率（**本環境 2026-07 探針已確認輸出上限充足
-  ——數到 3000 能完成——故約束解碼是唯一高價值槓桿**）
-□ 個案收尾：從 checklist.md 找標 ⚠（寫入失敗）的項，重跑 /ps-research
-  讓它補做；反覆失敗的同一檔改用 SOP-5 人工建檔
-□ invalid[tool=task] 同根因——委派 prompt 過長（常見：把整份檔案
-  貼進委派）；規則側已改「驗檔委派只傳路徑」＋ prompt 約 30 行上限
-□ 紅字「閃現後自癒」＝正常：錯誤會回饋給模型、它重試成功就繼續
-  ——不需處理。要介入的只有：同一呼叫紅字堆疊不前進（人工標
-  BLOCKED 續下一項）、紅字後整個停住（回「做」推一下）、
-  幾乎每呼叫都紅（找管理者開約束解碼）
-□ **【L60】headless 下多了一個致命環節**：連續 invalid 重試會觸發
-  opencode 的 `doom_loop` 保護，跳出「continue after repeated failures?」
-  詢問（pattern 顯示為 `invalid`）。該權限**預設是 "ask"**，而 headless
-  沒有 TTY 可以回答＝**永遠阻塞**，提示還畫在 TTY 上、log 裡看不到。
-  症狀只剩「輸出靜止」，逾時上限開多大都一樣撞滿、產出為零。
-  → 跑 auto-loop 前**必須**先照 SOP-17 第 0 條把 `doom_loop` 設 "allow"，
-    本行的「逾時熔絲自動處理」才成立。沒設＝每次都燒滿整個上限。
-□ subagent 鬼打牆（不斷重複相同產出、沒有盡頭）＝退化迴圈（L34）：
-  **不用等，直接中斷、開新 session 重跑**——checklist 未勾＝進度
-  不會丟，fresh session 通常一次就過（抽樣事故非確定性障礙）。
-  auto-loop 下不需人工：逾時熔絲自動處理（強殺→一致性檢查→
-  下圈 fresh 重跑→連續 2 次才熔斷給人工）；覺得反應太慢可調短
-  -ResearchTimeoutMin／-AuditTimeoutMin
-```
-
----
-
-## SOP-10 Serving 端上限與約束解碼檢查（L6 兩疑點）
-
-先認 stack：開 opencode.json 看 provider baseURL 埠號——
-11434＝Ollama／1234＝LM Studio／8000 常見為 vLLM。
-
-```text
-□ 1. OpenCode 端宣告：opencode.json 該 model 的 limit（context／output）
-     ——TUI 的 context % 按這個算；設太小會提早壓縮、看起來「用滿」
-□ 2. Serving 端真實 context：
-     - Ollama：ollama show <model>（含 --parameters）；伺服器日誌 n_ctx；
-       注意 Ollama 超長輸入「靜默截斷」不報錯（日誌 truncating input prompt）
-     - vLLM：curl http://host:8000/v1/models 看 max_model_len；
-       或啟動參數 --max-model-len
-     - LM Studio：載入模型頁 context length 欄位
-     - llama.cpp server：/props 端點 n_ctx；啟動參數 --ctx-size
-□ 3. 萬用探針（會報錯的 stack）：PowerShell 丟超長輸入，錯誤訊息
-     會寫出真實上限（maximum context length is XXXX）：
-       $b=@{model="<名>";messages=@(@{role="user";content=("測 "*200000)})}|ConvertTo-Json -Depth 5
-       Invoke-RestMethod -Uri "http://<host>:<port>/v1/chat/completions" -Method Post -ContentType "application/json" -Body $b
-□ 4. 輸出上限探針：對話叫它「從 1 數到 3000，每行一個數字」，
-     斷點 ≈ 輸出 token 上限；並查 opencode.json 的 maxTokens／limit.output
-□ 5. 約束解碼（治 tool-call JSON 壞格）：
-     - vLLM：--enable-auto-tool-choice ＋ Qwen 系 tool-call parser
-       ＋ guided decoding（xgrammar／outlines）
-     - Ollama：升級新版（原生約束 tool-call JSON／structured outputs）
-     - llama.cpp：grammar（GBNF）／新版 --jinja 工具支援
-□ 5a. thinking 標記洩漏（輸出出現 </think>、<|im_end|> 等）＝
-     chat template／reasoning parser 未對齊：對齊 model card 的模板
-     （vLLM 開對應 reasoning parser）；工具密集用途可評估**關閉
-     thinking**（enable_thinking=false／prompt 加 /no_think）——
-     通常 tool-call 更穩、更快；lint 會抓漏進文件的髒標記
-□ 6. 建議值：context 不必盲開 262K（KV cache／prefill 代價大）——
-     subagent 隔離下 32K～64K 通常足夠；輸出上限建議 ≥ 8K
-□ 7. 查到的數字回報對話，據以調整規則（如寫檔行數上限）
-```
-
----
-
-## SOP-16 兩段式畢業與廣度優先排程
-
-**為什麼**：畢業門原本只有一級——未勾=0＋lint 全綠＋StrictAudit 全綠，
-那是 100 分門。但 100 分的尾巴是漸近線（SOP-13 已載明「修復寫入會以低
-固定率播下新小瑕疵」），加上稽核每輪回灌新項，單一領域可以無限追下去。
-結果是**第一個領域追完美、其餘領域停在零分**——而 wiki 的價值在「每個
-領域都查得到」，不在「一個領域完美」。
-
-```text
-tier 1＝覆蓋畢業（可用／80 分）
-  門：SESSION_OK ＋ WORK_TRANSITION_OK ＋ lint -CoverageOnly 全過
-      ＋ RESEARCH_SCOPE_OK（#23／L110：原始調查項與 D 新發現項全部建檔完成；
-        checkpoint ≠ discovery complete；GraduationGateVersion 4）
-  保證：功能查得到、每份文件有實質內容、沒被截斷或污染
-  不保證：每句話能逐條回溯驗證（證據 id／機器參照／confidence 屬美工）
-  未勾項：留著不擋——稽核回灌的補強項是建議不是債（SOP-13）
-        但原始調查項／D 項未勾＝research 債：相位回 research、不得畢業
-        （只有 A／U 補強項不擋；-Preflight 會印「research 債」）
-
-tier 2＝精修畢業（100 分）
-  門：現行三層門（未勾=0 ＋ lint 全綠 ＋ StrictAudit 全綠），一字未改
-```
-
-```text
-□ 單領域：powershell -File .\scripts\ps-auto-loop.ps1 -Domain <領域>
-  （預設 -Tier 1）；要精修再跑一次加 -Tier 2
-□ 批次：ps-auto-all 預設**兩趟**——所有領域先到 tier 1，全部跑完才開
-  第二趟做 tier 2。只跑一趟用 -Tier 1 或 -Tier 2
-□ 收據記 tier：tier 1 收據放不了 tier 2 的行（第二趟會照常重跑該領域）；
-  tier 2 收據涵蓋 tier 1
-□ 相位判定（tier 1）**不看未勾數，看缺料還在不在**——照未勾數判會因
-  「勾 2 個、回灌 3 個」而永遠進不了 audit＝永遠畢不了業（實案：一輪
-  回灌 11 項）。進度熔絲同理改量「缺料違規數」
-□ 分類是白名單：只有明確列在 lint 的 $polishPatterns 才算美工，
-  其餘一律缺料（fail-safe：漏分類只會讓門更嚴，不會放水）
-□ 標準凍結紀律：衝刺期不加新 lint 檢查——每加一條＝所有既有檔案重新
-  不合格＋所有收據失效，終點線自己在移動
-```
-
----
-
-## SOP-17 無人看管排程（衝刺期夜間跑批）
-
-**目標不是「讓它一直跑」，是「讓它跑到全部畢業為止」。** 全部 tier 2 畢業
-之後就該切維運節奏（SOP-13），不再夜夜開跑——連續迴圈＝永動工單機。
-
-用 Windows 工作排程器叫 `ps-auto-all.ps1`，不要自己寫 sleep 迴圈守著
-（那需要一個行程永遠活著，當機沒人重啟，也沒有 OS 層的重疊保護）。
-
-```text
-□ 1. 觸發：每日一次，挑**下班後的離峰時段**起跑
-     （批次期間＝重載期，SOP-12：禁手動 /ps-research、/ps-audit、查 DB 問答）
-□ 2. 動作：powershell.exe
-     引數：-NoProfile -ExecutionPolicy Bypass -File "<repo>\scripts\ps-auto-all.ps1"
-           -MaxCyclesPerDomain 6 -MaxBatchHours 9 -MaxConsecutiveFailures 3
-     起始於：<repo>（工作目錄一定要設，腳本用相對路徑找 docs/ 與 .opencode/）
-□ 3. 設定頁勾「如果工作已在執行，不要啟動新的執行個體」
-     （雙保險：ps-auto-loop 自己也有互斥鎖，重疊會 exit 3 停批）
-□ 4. **不要**加 -Force（那是忽略收據全部重驗，夜跑用它等於每晚重跑全部領域）
-□ 5. 圍欄要用 -MaxCyclesPerDomain 收斂：MaxBatchHours 只在**領域之間**檢查，
-     攔不住進行中的領域（單領域最壞＝MaxCycles×120 分）
-□ 0. **【必要前提】headless 權限設定**（L60；不設就會每晚卡死一次）：
-     opencode 有兩個權限預設是 "ask"——`doom_loop`（重複的相同工具呼叫）
-     與 `external_directory`（專案目錄外的路徑）。headless 沒有 TTY 可以
-     回答，"ask" ＝**永遠阻塞**到逾時強殺，而且提示在 log 裡看不到。
-     TUI 點「always allow」只在該互動 session 內有效、**不落檔**。
-     在**本機全域** `~/.config/opencode/opencode.json`（就是已經註冊 MCP
-     的那份；內含公司內部主機名，**不進 repo**）加：
-     ```json
-     "permission": { "doom_loop": "deny", "external_directory": "allow" }
-     ```
-□ 0a.【建議】同一份 opencode.json 加 `"default_agent": "ps-orchestrator"`：
-     TAB 順序＝default 排第一、其餘按字母序（無排序選項），預設是
-     build → plan → ps-deep-research → ps-orchestrator。設了之後變成
-     **ps-orchestrator → build → plan → ps-deep-research**——一般使用者
-     開站直接落在問答 agent，deep-research 沉到最後。headless 不受影響
-     （/ps-research、/ps-audit 的 frontmatter 與手術的 --agent 都明指
-     agent，優先於 default）。設完開新 session 驗證起始 agent 是
-     ps-orchestrator；若版本不支援此鍵＝靜默無效，維持原排序
-     · `doom_loop: **deny**`（L60 二次修正，2026-08 實測定案）：提示原文是
-       「continue after **repeated failures**?」——它管的是**反覆失敗的呼叫**，
-       不是「反覆呼叫同一個東西」。三種設定的實際行為：
-         `ask`（預設）＝跳提示、headless 無人可答 → 卡死，**但看得見**；
-         `allow`＝**無限重試失敗的呼叫** → 卡死，**完全看不見**（實測：
-           subagent 讀一個不存在的 tool-output 檔，靜止 30 分以上、零輸出、
-           零提示）；
-         `deny`＝停止重試 → **快速失敗、看得見**。
-       確定性失敗（檔不存在、工具名錯、掛錯 server）重試一萬次結果相同
-       ——L61 已立此原則，`allow` 等於在設定層打開無限重試，與該原則相反。
-       **無人環境的判準：看得見的失敗 ＞ 看不見的重試。**
-     · `external_directory: allow`——**opencode 自己會把過長的工具回傳寫進
-       `%TEMP%` 再讓模型讀回來**（管理者實測觀察）。那個路徑在專案目錄外，
-       設 deny 會讓 subagent 讀不到自己剛存的資料；設 ask 就是現在這個
-       永遠阻塞的死鎖。這也最能解釋「為什麼偏偏卡在第 14 檔」——
-       那個檔的證據量大到觸發暫存機制。
-     · `doom_loop: allow`——稽核會對同一個 chunk id 重複取用（不同檔引用
-       同一段程式碼），那是正當行為；設 deny 會擋掉真的驗證。
-     · 這兩個設定放行／封鎖的只是「路徑範圍」與「失敗後續試」；agent 的
-       `tools` 白名單照常生效，subagent 的 bash／write／edit 仍然是封的。
-       跑飛仍由**外環逾時／一致性檢查**熔斷（框架本來就是這個分工）。
-     · **不要用 `--auto`**：那是把所有非 deny 的 ask 一次放行，範圍過大。
-     · 原則：**無人環境只有 allow 或 deny 兩種安全狀態，沒有第三種**——
-       "ask" 在沒有 TTY 的地方一律等於死鎖。
-     改完**重啟 opencode**，先手動跑一次 `/ps-audit <領域>` 確認不再跳提示。
-□ 6. 環境前提（沒滿足就不是無人看管，是每晚失敗一次）：
-     · 地端模型服務必須是**常駐服務**，不是登入才啟動的東西
-     · opencode 必須在該排程帳號的 PATH 上（.cmd 型，L46）
-     · 若勾「不論使用者是否登入都執行」，先手動用該帳號跑一次 -Preflight 驗證
-□ 7. 早上只看一行：auto-loop-logs\batch-*.log 的 Summary
-     GRADUATED／NEEDS_ATTENTION／MUTEX_BUSY／SYSTEM_ERROR／SKIPPED
-□ 8. 退場：領域 tier 2 畢業後從 research-domains.txt **註解移出**
-     ——留在佇列＝每晚重驗，正是 SOP-13 要避免的永動工單機
-```
-
-**已知缺口（現階段靠人看，不做自動化）**：某個領域若每晚都
-NEEDS_ATTENTION，排程會每晚重燒它幾小時而沒有人知道。要不要加「連敗
-N 晚自動除役」得先有實測基線（L48：門檻照實測設，不照直覺設）——
-目前領域數與夜跑次數都不足以定那個 N。**在此之前，每天早上看 Summary
-那一行就是這條熔絲**。
-
-追記（issue #28，2026-09-07）：連線的「開」收攏到主 agent——ps-orchestrator／ps-deep-research／
-ps-audit-orchestrator 的 tools 只開 `oracleMCP_list_connections` 與 `oracleMCP_connect`，派第一個 DB 委派前
-connect 一次；subagent 的 `oracleMCP_connect` 硬關，未連線只回 `BLOCKED(NOT_CONNECTED)` 由主 agent 重建再重派。
-「第一個先單獨派」規則作廢。快篩加第 (0) 步：主 agent 的 opencode.json 對 `oracleMCP_connect` 的權限必須是
-allow——headless 下 ask 等於擋，症狀是主 agent 卡在 connect、所有 DB 委派回 NOT_CONNECTED。
-再追記（同日）：公司機實測主 agent 看得到 connect、看不到 list_connections——OpenCode 0.6.0～1.0.x 會把 MCP 工具名的
-連字號改成底線（`oracleMCP_list_connections`），tools 表寫連字號就對不上；1.1.30 起保留連字號。落點：三個主 agent 的
-tools 表兩種拼法都開；profile 加 `oracle.connectionName`（SQLcl 已儲存連線名，管理者本機回填），主 agent 直接
-connect、不再依賴 list_connections；四個 subagent 硬規則段殘留的「回未連線才 list→connect」舊流程改為只回
-BLOCKED(NOT_CONNECTED)。快篩第 (0) 步再加一項：問主 agent「列出所有名稱含 oracleMCP 的工具全名」，看到
-connect 與 list_connections 才算通。管理者定案：公司機就是底線版，全樹一律寫 `list_connections`／`sql_run`，
-連字號拼法全部移除、不再兩種都開。
-再追記（同日）：搬完後主 agent 仍常不 connect——「要派 DB 委派之前才 connect」是條件式規則，模型常跳過。改為無條件：
-三個主 agent 開場固定 read profile → `oracleMCP_connect`，做完才准查 wiki、委派、作答（agent 檔「第 0 步」；cookbook 主 agent 段、
-/ps-audit、/ps-audit-batch 同步）。快篩：看主 agent 的第一個 oracleMCP 呼叫是不是 connect、是否在第一個 task 之前。
-再追記（同日）：管理者定案開場順序固定 `list_connections` → `connect`，不跳過 list；profile `oracle.connectionName`
-只用來在清單裡挑名字（有填且在清單裡用它，否則清單第一個）。快篩改看：前兩個 oracleMCP 呼叫依序是 list_connections、connect。
-再追記（issue #29 外部 review 第二輪）：「否則清單第一個」作廢——profile `oracle.connectionName` 必填且必須在清單裡，缺值／不在清單
-→ 主 agent 回「Oracle 連線未設定」、不 connect、不挑清單第一個（設定錯誤不能變成靜默連錯 DB；三個主 agent 第 0 步、cookbook、
-profile 註解、閘門擋下訊息同步）。四個 subagent 的 Oracle 工具改為允許清單（`"oracleMCP_*": false` 之後只開 `"oracleMCP_sql_run": true`）：
-list_connections／connect／disconnect／sqlcl_run 對 subagent 不可見；cookbook subagent 段「工具已關」自此為真。快篩加 R17／R18（SOP-21 步驟 3）。
-
----
-
-## SOP-13 維運節奏（領域畢業後的營運模式）
-
-領域完成衝刺（畢業）後，**不再**「每次 research 後緊接 audit」——
-修復寫入本身會以低固定率播下新小瑕疵（寫入攪動地板），連續迴圈
-＝永動工單機。改為：
-
-```text
-□ 問答：隨時（系統存在的目的）
-□ lint：任何寫入波之後跑（30 秒，確定性）
-□ research：只在「有想處理的工單」時跑——回灌 A 項是建議不是債，
-  躺著沒關係；縮寫類用 lint 手術指令按波清理
-□ audit：CR 上線後（SOP-11）或月度一次；判讀看趨勢與基準線，
-  不追單輪絕對值
-□ 慢性類（縮寫涓流／欄位錯）：照對應機制處理，不為它們加開稽核輪
-```
-
----
-
-## SOP-12 oracleMCP 單通道操作紀律
-
-oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
-**輕量查詢可並發**（3 subagent 同呼成功）；問題出在**重載**：
-稽核 SQL 風暴期間並行查詢會排隊逾時（>30s → BLOCKED），
-且各 session 的 disconnect 可能互拆共用連線。
-
-```text
-□ 原則：**重載期間不並行**——audit／research 跑 SQL 重驗段時，
-  避免在其他視窗問需要查 DB 的問題（wiki 已有／純程式碼題不限）；
-  平時輕量查詢並行無妨
-□ 批次（ps-auto-all，SOP-14）執行時段**整段視同重載期間**——期間禁止
-  手動 /ps-research、/ps-audit 與需查 DB 的問答（相位不可預測，且手動
-  寫入會落在批次的畢業門與收據之間，讓收據認證未驗證的內容）
-□ **稽核自己的併發也算在內，但只算「真的會查 DB 的」（L67→L83 修正）**：
-  本節原本只管「跨視窗」。稽核 session 自己派的 subagent 若**會呼叫
-  oracleMCP**（SQL 型證據重跑、任務 C 反查、metadata 類），一樣佔用這條
-  單工連線——**那些上限 3**。但**純 ES＋Source 的委派**（任務 A 的 ChunkId
-  解引用、多數任務 B）**完全不碰 oracleMCP，不受本節限制**，上限 6。
-  L67 當初把兩者一律壓到 3，等於拿一個資料庫連線的限制去綁不用它的委派
-  ——稽核時長因此無謂拉長。**判準是「會呼叫哪個 server」，不是任務類型。**
-  另：**不要改成全循序**——subagent 卡死是機率性的（L34），循序會把單點
-  故障放大成整輪停擺。規則寫在 ps-audit.md 與 ps-deep-research.md
-□ 常見症狀：問答說「DB 通道忙碌／逾時」、稽核出現成批
-  UNVERIFIABLE(逾時／view 不可用)——先想「是不是兩個視窗在搶」
-□ 快篩三步：(1) VS Code 與 SQL Developer extension 活著？
-  (2) 無並發時 build 模式直通測試（叫它用 oracleMCP 查 SELECT 1）
-  (3) 只有並發時失敗＝搶用確認，錯開時間即可
-□ 通道死透（無並發也失敗）→ 重啟 VS Code／extension 再測
-□ view/table not found → 檢查 customization-profile.yaml 的
-  oracle.currentSchema 已填、SQL 每個表名都帶 `<值>.` 前綴（cookbook 規則 1a）；
-  帶了仍查不到＝唯讀帳號沒有該表權限（SOP-30 第 2 步）
-```
-
----
-
-**2026-09-03 實驗定案（L109）——連線是 MCP server 全域單例，不是每個 agent 一條**：
-(1) main 開連線 → subagent 只查：通；(2) main 不開 → subagent 只查：不通；
-(3) main 不開 → subagent 自開再查：通。結論：所有 agent 共用同一個開關，任何一方
-`disconnect` 就把其他人一起斷線。上文「輕量查詢可並發」只在沒人 disconnect 時成立；
-分批稽核 3 個 auditor 並行、先查完的那個 disconnect，就是「一堆 oracleMCP_disconnect、
-批次 4/6、loop 一圈接一圈停不下來」的根因。
-
-```text
-□ 新協定（cookbook 連線生命週期已改版）：**誰都不准 disconnect**（headless 結束時
-  連線隨行程關閉）；表名一律帶 `<schema>.` 前綴（2026-10-19 起取代每任務一次的 ALTER SESSION SET CURRENT_SCHEMA，L150）。
-  【現況（issue #28／#29 後；2026-09-09 再修）】connect 只由主 agent 在第 0 步做（直接 connect profile
-  oracle.connectionName 原樣，每題無條件、**不先 list_connections**——清單黏合會讀錯名字；connect 兩次失敗才 list 一次附原文給管理者）；
-  subagent 不 connect、回未連線只回 BLOCKED(NOT_CONNECTED)。舊寫法「先直接查，回未連線錯誤才 connect 一次」與「先 list 再 connect」已作廢
-□ 會查 oracleMCP 的委派同時 ≤ 3 維持（硬性 deny 落地後恢復；曾短暫壓到 1，
-  那是 disconnect 真因未明時的暫時解）；**派本批第一個 oracleMCP 委派之前，主 agent 先
-  connect 一次（profile 連線名原樣；不先 list）**（issue #28 後 subagent 不再 connect，也不再要求第一個先單獨派）——
-  ps-audit-batch／ps-audit／ps-deep-research／ps-audit-orchestrator／ps-contract-batch／ps-contract-verify 已同步
-□ 【已作廢，保留供對照】主 agent 的 oracleMCP 權限全關、由第一個 subagent 開線——
-  issue #28 起反轉：主 agent 開 list_connections／connect（sql_run／disconnect 仍關），
-  subagent 只查；issue #29 起第 0 步由執行期閘門強制（SOP-21）
-□ 風暴判讀：auto-loop-logs\<領域>\*-audit-b*.out.txt 裡 oracleMCP_disconnect
-  一批出現數十次且無查詢結果列＝有人還在 disconnect（舊版 agent 檔沒搬到）
-□ 硬性擋線（管理者要求）：四個帶 oracleMCP 的 subagent（ps-auditor／ps-ui-flow／
-  ps-metadata-flow／ps-ae-flow）tools 表在 "oracleMCP_*": true **之後**加
-  "oracleMCP_disconnect": false（OpenCode 規則：最後匹配者優先，順序不可顛倒）——
-  不聽話的 subagent 也叫不到 disconnect；prompt 層的「不得 disconnect」只是第二道。
-  primary agent（ps-deep-research／ps-orchestrator／ps-audit-orchestrator）`oracleMCP_*: false`
-  之後只開 list_connections／connect（issue #28）；只有管理者的互動 session（build／general）還能 disconnect。本機 opencode.json
-  若版本支援 per-tool permission 可再加 "oracleMCP_disconnect": "deny"，版本未驗證前
-  不要加（config 驗證失敗會讓 agent 載入失敗，症狀同 L60「agent 未被認到」）
-```
-
-**2026-09-08 追記（issue #29／L115）**：第 0 步的順序改由執行期閘門強制（`.opencode/plugin/
-ps-oracle-preflight-gate.js`）——prompt 只剩第二道。部署與驗證程序見 **SOP-21**。
-
-**2026-09-09 再追記（公司機實測兩件事，管理者定案）**：
-(1) **tools 表不得用 `"oracleMCP_*": false` 萬用字元 deny 再開個別工具**——公司機的 OpenCode 一遇到萬用字元 deny 就把整個 oracleMCP
-對該 agent 隱藏，後面的 `"oracleMCP_connect": true` 救不回（模型回報「本次工具環境中沒有掛載 list_connections 以及 connect」）；
-改成逐工具明寫 true／false 就正常。沙箱的 1.18.29 是「最後匹配者優先」，公司機版本不同、行為不同——兩邊都安全的寫法只有逐工具明寫。
-落點：三個主 agent（list_connections／connect true；disconnect／sql_run／sqlcl_run false）與四個 DB subagent（sql_run true、其餘四個 false）
-全部改逐工具；上面「硬性擋線」段的 `"oracleMCP_*": true 之後加 disconnect false` 寫法**作廢**。整個 MCP 全關的 agent（ps-peoplecode-flow／
-ps-sql-flow／ps-sqr-flow／general／scout／explore）保留 `"oracleMCP_*": false`（全關就是要它不可見）。閘門載入時把「萬用字元 deny＋個別 true」
-的混寫記到 `_plugin.log`（`wildcardDenyMix=[…]`＋WARN 行）；test-auto-loop 情境 31 擋混寫回流。
-(2) **第 0 步不再 list_connections，直接 connect profile 的連線名**——SQLcl 的 `list_connections` 把名稱和連線字串黏在一起回
-（`Name:ABCReadonlyConnect string: {…}`），模型從清單挑名字會讀成「ABCReadonlyConnect」、怎麼連都失敗。連線名唯一的來源是
-`customization-profile.yaml` 的 `oracle.connectionName`（**原樣照抄**，閘門在執行前比對）。list_connections 只剩一個用途：connect 兩次都失敗時
-呼叫一次、把清單**原文**附在答覆裡讓管理者核對 profile 值（不要自己改名字）。閘門不變量隨之縮成 `NEED_CONNECT ─connect 成功→ READY`，
-list 的 after 只記錄不改狀態；analyzer 的 turnInvariantViolations 只看 connect→READY、多一個 listCalls 觀察值（正常應為 0）。
-
-**2026-09-09 再追記（工具名更正：查詢工具實名是 `sql_run`，不是 `run_sql`）**：管理者以公司機 /mcp 核對，oracleMCP 的查詢工具全名是
-`oracleMCP_sql_run`。錯名的來源與經過（git 追溯）：ae72d49（2026-09-07，issue #28 嚴格版）第一次在 tools 表註解寫成 SQLcl 拼法 `run-sql`
-（從產品文件推的，沒有拿 /mcp 清單核對）→ 3b3a5b8 補成兩種拼法都開（多了 `run_sql`）→ 03274d0 定案「全樹底線拼法」時把錯名 `run_sql` 鎖進
-全樹 → a31c946 起 plugin／analyzer 寫死 `oracleMCP_run_sql` → e0b1c75 起四個 DB subagent 的允許清單寫 `"oracleMCP_run_sql": true`。
-在此之前 subagent 用 `"oracleMCP_*": true`，沒有拼過工具名，所以沒錯。L103（2026-08-31）其實早記過模型自創的 `oracle_sql_run`——後綴是對的、
-錯的只是前綴，當時沒有回頭拿它核對真名。
-影響：tools 表沒列到真名 → `sql_run` 對每個 agent 都是「沒列＝開」——DB subagent 照常能查（所以流程看起來能走），但主 agent 也能自己查
-（不該）；plugin 對 `sql_run` 的 after 列從未寫過 → 子 session 的 SQL 證據缺、analyzer 的 dbTasksCompleted 在公司機永遠 0（B1 可用判定必
-FAIL、R21 看不到 ok:true）；閘門的 DB 能力判定靠 `"oracleMCP_run_sql": true` 誤打誤撞仍正確。
-更正：全樹 `run_sql` → `sql_run`（七個 agent 的 tools 表、plugin、analyzer、cookbook、test-scenarios、情境 31／32／33、假 MCP／假模型／e2e、
-歷史追記的引文也一併改，避免再被抄回）；情境 31 加守衛擋 `run_sql`／`run-sql`／`sql-run` 回流。管理者同日補上全名清單：
-`list_connections`／`connect`／`disconnect`／`sql_run`／`sqlcl_run`——`run_sqlcl` 也是錯的，已一併改成 `sqlcl_run`（同樣「沒列＝開」，
-之前對 subagent 其實沒關到）。教訓：工具名只能來自 /mcp 的實際清單，
-不能從產品文件推；chat 裡出現過的名字（哪怕是模型猜的）都要拿去核對。
-
-**2026-09-10 再追記（issue #30／#31／#32；L116～L118）**：(1) **派工前置閘門與 todo 閘門已移除**（issue #30）——公司機已能按流程連線，
-「每題 READY 才能派工」「第一個工具必須 todowrite」的狀態機、每題重置、synthetic 提醒與 `PS_ORACLE_PREFLIGHT_REQUIRED`／`PS_TODO_FIRST_REQUIRED`
-全部拿掉；舊 plugin `ps-oracle-preflight-gate.js` **必須刪除**（manifest removed 清單、fs-doctor 檢查 M 會點名 R）。保留的只有無狀態的
-`ps-runtime-guard.js`：connect 目標比對（`ORACLE_CONNECTION_NOT_CONFIGURED`／`MISMATCH`）、task 目標是不是 agent（`PS_TASK_TARGET_INVALID`）、
-oracleMCP 掛載診斷。派工順序回到 agent 規則：subagent 回 NOT_CONNECTED → 主 agent 收齊後重連、重派**一次**；不再宣稱「模型錯序也一定不會派出 task」。
-(2) **ORACLE_MCP_DOWN 的語意改為「本次 oracleMCP 工具不可用」**（issue #31）：工具清單整個 oracleMCP_ 前綴不見＝OpenCode 到 MCP server 的
-client／transport／工具目錄失效（可能是暫時的），**不再推論「SQLcl／VS Code 已死、絕非暫時故障」**；處置＝不猜名、不重試、不多 connect、不重派，
-交管理者在**受影響的那個視窗** `/mcps` 對 oracleMCP disconnect→connect（已驗證有效的恢復邊界；`/new` 無效、另一視窗不受影響），重掛後重新 connect
-與 `SELECT 1 FROM DUAL`。上面快篩「(1) VS Code 與 extension 活著？」「通道死透 → 重啟 VS Code」保留為第二層排查，第一層先看 `/mcps` 與
-`_mcp-diag.jsonl`（SOP-21）。(3) `ps-security-flow` 是 skill 不是 agent（issue #32）：授權問題派 `ps-metadata-flow`、skill 寫進 task 文字；
-guard 在執行前擋 `subagent_type=<skill 名>`，報告 `suggestedNext` 含 skill 名時在回覆附註——都是路由錯誤，不算 Oracle 問題。
-
-## SOP-21 Oracle 執行期 guard、MCP 掛載診斷與人工恢復（issue #30／#31／#32；L116～L118）
-
-現況一句話：**沒有派工前置閘門、沒有 todo 閘門**（issue #30 移除，理由：公司機已能按流程連線，流程控制不該再是連線的必要條件）。
-執行期只剩 `.opencode/plugin/ps-runtime-guard.js` 三件**無狀態**的小事——不保存 READY／turn／連線世代、不查 task 能力、不代模型 connect、
-不拿回覆文字決定能不能派工：
-
-| 事 | 做什麼 | 不做什麼 |
-|---|---|---|
-| connect 目標 guard | `oracleMCP_connect` 執行前比對本次 `connection_name` 與 profile `oracle.connectionName`：未填／FILL_ME → `ORACLE_CONNECTION_NOT_CONFIGURED`；不一致 → `ORACLE_CONNECTION_MISMATCH`（throw，工具不執行、不改參數）。`oracle.connectGuard: observe`／env `PS_ORACLE_CONNECT_GUARD=observe` 只記不擋 | 不驗清單成員資格、不擋 task、不看 connect 回覆 |
-| task 目標檢查 | `subagent_type` 是 `.opencode/skills/<名>` 而非 `.opencode/agent/<名>.md` → `PS_TASK_TARGET_INVALID`（訊息指出承載 agent：ps-security-flow／ps-data-lineage／ps-process-flow → ps-metadata-flow）；task 回覆的報告 `suggestedNext[].agent` 是 skill 名或不存在的 agent → 回覆末尾附 `[ps-runtime-guard]` 註記 | 不改參數、不 alias、不新增 agent；不把路由錯誤當 Oracle 問題 |
-| oracleMCP 診斷 | session jsonl（chat.message／oracleMCP_* before-after／task before-after／invalid）＋主機 `_mcp-diag.jsonl`（`mcp.tools.changed` 事件、/mcp 狀態快照、模型呼叫看不到的工具、工具 part 錯誤遮罩摘要、受控重掛決定與世代）。只記工具名、計數、事件、遮罩後的錯誤摘要 | 不記 SQL／結果／prompt／密碼／完整連線字串 |
-| 受控重掛（**預設 off**） | 只在 host 證據觸發：/mcp 狀態 `failed`（transport 關閉），或 tools.changed 之後某個**先前執行過**的 oracleMCP_ 工具對**允許它**的 agent 變成 invalid（OpenCode 判定，不是 LLM 字串）；同 host 同一故障事件只重掛一次（disconnect→connect，與 `/mcps` 相同）；有 oracleMCP_ 呼叫在途先等（≤60 秒）；disabled／needs_auth／未設定不碰；一次失敗即停；恢復後在下一次回覆附註「已重掛：重新 connect、SELECT 1 FROM DUAL」 | 不憑 ORACLE_MCP_DOWN 字串重啟；不重啟其他 host／共用服務；不回放寫入；plugin 拿不到「呼叫工具」的 API，DB 層驗證由 agent 做 |
-
-```text
-□ 1. 搬檔與「舊 plugin 不再載入」：照搬運清單搬 ps-runtime-guard.js、agent 檔、profile（只合併 oracle 區塊：拿掉 preflightGate／
-     preflightReminder／todoFirst，加 connectGuard: enforce、mcpAutoRecover: off；已填的 connectionName／currentSchema 不動）、
-     cookbook、契約、skill、scripts；**刪除** .opencode\plugin\ps-oracle-preflight-gate.js 與 scripts\tests\test-oracle-gate-runtime.ps1
-     （manifest 的 removed 清單；fs-doctor 檢查 M 若報 R＝舊檔還在）。.opencode\.npmrc 的 offline=true 保留。
-     舊 plugin 只貼入新檔不刪＝兩個 plugin 一起載入。搬完**重新啟動 opencode 行程**（/new 不會重載 plugin）。
-□ 2. 有載入嗎：開任一 session 後看 auto-loop-logs\ps-runtime-guard\_plugin.log 出現
-     「loaded … connectGuard=enforce autoRecover=off diag=on agents=[…] skills=[…] wildcardDenyMix=[]」。
-     沒有 ps-runtime-guard 的 loaded 行＝沒載到（檔名／目錄／JS 語法），用 opencode --print-logs --log-level DEBUG 看 plugin 錯誤；
-     還看得到舊目錄 auto-loop-logs\ps-oracle-gate 在長新檔＝舊 plugin 沒刪乾淨。
-□ 3. 快篩（一題＋同視窗第二題，ps-orchestrator）：看 auto-loop-logs\ps-runtime-guard\<sessionID>.jsonl——
-     - 正常：before connect（decision=allow、connection＝profileConnection＝profile 值）→ after connect（ok:true）→ before task（allow）
-       → after task（reportStatus=COMPLETE、childSessionID）；子 session 的 jsonl 有 sql_run after 列 ok:true
-     - 先派後連（沒有閘門，不會被擋）：after task notConnected=true → before connect → after task COMPLETE；`-AnalyzeSession` 的
-       reconnects=1、reconnectLoops=0。連兩次以上＝reconnectLoops>0＝agent 規則沒被遵守，回報維護 session
-     - 連線名設定錯誤（R32）：profile 暫改成 SQLcl 沒有的名字 → before connect decision=block、note=ORACLE_CONNECTION_MISMATCH／
-       NOT_CONFIGURED、沒有 after 列、SQLcl 沒收到；模型回報「Oracle 連線未設定」、不換名字重試
-     - 工具可見性（R33）：問主 agent「列出所有名稱含 oracleMCP 的工具全名」→ 只有 list_connections、connect；派 ps-ui-flow 問同一句 → 只有 sql_run
-     - skill 名誤派（R36）：誘導主 agent 派 subagent_type=ps-security-flow → transcript 該 task 件是 error、含 PS_TASK_TARGET_INVALID 與
-       ps-metadata-flow；模型改派 ps-metadata-flow；jsonl 的 before task decision=block note=PS_TASK_TARGET_INVALID:skill；沒有多 connect
-□ 4. 人工恢復 SOP（Oracle MCP 工具在同一視窗消失；/new 無效；另一視窗仍正常）——每一步做完再做下一步：
-     (1) 停止派新的 Oracle 工作（不要再問 DB 題、不要開新批）
-     (2) 等現有工作結束，或確認取消完成——Timeout 不等於底層 SQL 已停止；無法確認在途工作安全狀態時，維持人工處置、不重掛
-     (3) 保留精簡故障紀錄：_mcp-diag.jsonl 末段、該 session 的 jsonl、/mcps 畫面上 oracleMCP 的狀態（全部留內網）
-     (4) 只對受影響 instance 的 oracleMCP 重掛一次：在**那個視窗** /mcps → oracleMCP → disconnect → connect（不要另開 opencode serve、
-         不要動其他視窗、不要全域殺 Java／SQLcl；若背後是共用遠端服務，先核對影響範圍，不為單一 client 重啟整個服務）
-     (5) 確認該角色必要工具恢復：問主 agent「列出所有名稱含 oracleMCP 的工具全名」（R33）
-     (6) 主 agent connect 到 profile 指定目標（重掛前的「已連線」不再有效）
-     (7) 查詢 subagent 執行 SELECT 1 FROM DUAL（重掛後的第一個 DB 委派）
-     (8) 再繼續業務查詢（表名帶 `<schema>.` 前綴，沒有 session 層的 schema 設定要恢復）
-     (9) 僅重派尚未完成的唯讀工作一次；寫入類、完成狀態不明的一律人工判斷
-     重掛失敗／工具仍不見 → 第二層排查（SOP-12 快篩：VS Code／extension 活著？無並發直通測試）；不要反覆 disconnect／connect
-□ 5. 診斷怎麼看（模型說「沒有 oracleMCP 工具」時先分三種）：
-     - 權限過濾：session jsonl 有 invalid 列且 allowedByAgent=false（該 agent 的 tools 表本來就關）→ 改 tools 表，不是掛載故障
-     - 錯名：invalid 列 seenBefore=false（這個名字在本主機從沒執行過）→ 模型猜名，對照 /mcp 實名（SOP-12 再追記）
-     - 目錄遺失／transport：_mcp-diag.jsonl 有 event（mcp.tools.changed）＋ snapshot（runtimeStatus=failed、statusError=Connection closed；
-       或 connected＋catalog suspect）＋ invalid-tool（seenBefore=true、allowedByAgent=true）＋ recovery（faultReason=transport-closed／
-       catalog-lost；auto off 時 decision=would-remount）→ 走步驟 4
-     欄位：kind（loaded／event／snapshot／invalid-tool／tool-error／recovery）、instance（每個 opencode 行程一個 id；另一視窗＝另一個 id）、
-     runtimeStatus（connected／failed／disabled／needs_auth／absent／unavailable）、statusError（遮罩）、toolCatalog（1.18.29 的 host API
-     不暴露 MCP 工具目錄，會記 "not exposed by host API"；較新版本若 /experimental/tool/ids 含 oracleMCP_ 名就會列出）、seenTools
-     （本主機執行過的 oracleMCP_ 工具名）、faultReason／evidence／decision／faultId／gen（恢復世代）。
-     「最終送給模型的工具清單」在 1.18.29 沒有 API 可取：用 R33 問法或 invalid 列反推。
-□ 6. 受控自動重掛（預設 off；公司機驗過下列三點才開）：
-     (a) 同 host 管理入口存在：/mcps 對 oracleMCP disconnect→connect 有效（管理者已驗）＝ host 有 /mcp/{name}/connect、/disconnect 路由，
-         guard 用 plugin 的同 host client 呼叫同一組路由（沙箱 1.18.29 已驗 e2e vanish-auto／transport-close）；
-     (b) 先在 off 狀態跑一次真實故障，_mcp-diag.jsonl 出現 decision=would-remount 且 faultReason 正確（不是權限過濾、不是錯名）；
-     (c) 開：profile oracle.mcpAutoRecover: on（或 $env:PS_ORACLE_MCP_AUTO_RECOVER='on' 該次啟動）；再重現一次故障，
-         應看到 remount-start → remount-ok →（下一次 oracleMCP 呼叫）verified-by-call，下一題第一個 oracleMCP 回覆附「已重掛」註記，
-         主 agent 依註記重新 connect、subagent SELECT 1 FROM DUAL；另一視窗的 _mcp-diag.jsonl 沒有 recovery 列。
-     出現 remount-failed／suppressed／gave-up＝自動恢復停了，走步驟 4；不要為了讓它再試而反覆製造事件。
-□ 7. 驗收腳本：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
-     覆蓋與行為六項都要 0：hookMismatch、turnMismatch、callMismatch、reconnectLoops、downThenConnect、downThenRedispatch；
-     可用看 sessionsWithDbTaskOk 與 dbTasks completed／partial／blocked／invalid／completedNoSql；觀察值 notConnectedReports（模型錯序機率）、
-     routingBlocks、suggestedNextInvalid、connectBlocks、invalidOracleCalls、listCalls；主機診斷摘要（tools.changed／快照狀態／重掛決定）。
-     30 次回歸：-Scenario B1 -Runs 30（需 DB 的題：每 session ≥1 個完成的 DB task）／B2／B3（純 PeopleCode：0 個 DB task）。
-□ 8. 已知限制（誠實記載不等於已修復）：
-     (a) 派工順序沒有機械保證：模型先派後連會多一次 NOT_CONNECTED 來回（analyzer 只擋「超過一次」）；
-     (b) 工具消失的根因未定：只做了「降低故障影響」（診斷、人工 SOP、受控重掛），沒有「找到並修正根因」；
-     (c) 1.18.29 拿不到 MCP 工具目錄與每個 agent 的最終工具清單；
-     (d) 受控重掛只驗「工具恢復（下一次 oracleMCP 呼叫執行得到）」，DB 層（profile 目標、SELECT 1 FROM DUAL、schema）由 agent 依附註做；
-     (e) 共用連線的有效性、跨 session 集中復原、真 SQLcl repeated-connect 契約仍是另案（topology 實驗 T1～T3 見 R42）。
-□ 9. 可選硬化（不隨本批啟用；公司機先驗證語法與效果）：主 agent 的 task 目標可用 OpenCode 原生 permission 縮成白名單，
-     例如在 ps-orchestrator.md frontmatter 加
-       permission:
-         task:
-           "*": deny
-           "ps-*": allow
-     沙箱 1.18.29 語法可用；skill 名（ps-security-flow）仍會匹配 "ps-*"，所以它擋不住誤派——擋誤派靠 guard；
-     這條只用來禁掉 general／explore／scout。版本不同 permission 語法可能不同，config 驗證失敗會讓 agent 載入失敗（L60 症狀），先在測試目錄驗。
-```
-
-## SOP-11 系統 CR 上線後的知識庫對齊
-
-前提觀念：ES 索引是程式碼**快照**——索引沒更新，稽核驗的是舊
-code，全部白驗。oracleMCP 查線上 DB，CR 後立即反映、不需此步；
-所以 chunk 證據與 SQL 證據的時效是**不同步**的。
-
-```text
-□ 1. CR 上線 → 先依既有索引維護程序重建／增量更新 ES 索引
-□ 2. 從 CR 單取「動到的物件清單」（Component / Record / 程式名）
-□ 3. 定位受影響知識：對每個物件 grep docs/ps-research/
-     （wiki 檔名、aliases、[[物件名]] 反連結都是純文字）
-     → 得到受影響的 entity 檔與 NN-*.md 清單
-□ 4. 快速標記（二選一）：
-     A. 人工：受影響 entity 檔 frontmatter status 改 stale（SOP-5）
-     B. 對話：切 PS-DEEP-RESEARCH 說「CR-<編號> 修改了 <物件清單>：
-        把對應 entity 檔標 stale，事實變更寫進 Invalidated 節」
-□ 5. 重驗更新：對受影響領域 /ps-audit <領域>——被 CR 改掉的 chunk
-     會 FAIL／查無 → 自動回灌 A 項 → /ps-research <領域> 消化
-     → 文件與 wiki 就地更新（作廢不刪除；reviewed 檔只追加）
-□ 6. 不知道影響範圍：跳過 2~4，對可能相關的領域直接 /ps-audit
-     ——證據解引用會自己找出變掉的地方（較慢但完備）
-□ 7. 兜底：lint 的 90 天過期警示點名久未驗證的 entity；
-     大型改版後全領域輪流 /ps-audit 一輪
-□ 8. **收據不會自動失效（L64）**：contentHash 只看檔案內容，索引重建
-     不動任何 .md——已畢業領域的收據照樣有效、batch 照樣 SKIP，
-     而它的每條引用都已是死的。重建完成的檢查清單**必含**：
-     對已畢業領域逐一手動 /ps-audit（回灌 A 項→內容變→收據自然失效），
-     或 batch 加 -Force 全部重驗
-□ 9. **整庫 chunk id 輪替**（重建而非增量）＝所有領域證據全滅：
-     第一輪 audit 預期成批查無——auditor 會標「疑似索引已重建」並
-     逐筆走二次定位（L64），**不是**成批捏造；找到新 id 判
-     FAIL(ID_RELINK)、三管道皆無判 UNVERIFIABLE(INDEX_REBUILT)，
-     **每一筆都必須在計分卡佔一列**（L69：值域外的判定會讓整批從
-     計分卡蒸發——塌縮且零 FAIL）。tier 1 的畢業門會擋記分卡塌縮，
-     重建後第一輪要看 90-audit.md 的回灌清單，不要只看畢業訊息
-```
-
----
-
-## SOP-14 批次多領域研究（ps-auto-all）
-
-佇列 `.opencode/peoplesoft/research-domains.txt`（人工維護、一行一領域、
-`#` 註解；只回答「要研究什麼」，不存進度）。收據
-`docs/ps-research/<領域>/graduation.json` 只由 ps-auto-loop 畢業時寫入，
-排程器只驗不寫；**收據＝單機事實**——不進 git（.gitignore 已擋），
-各機各自畢業，batch 只在管理機跑。
-
-```text
-□ 啟動前：Unblock-File 四支腳本（auto-all／auto-loop／doc-lint／graduation
-  ——auto-all 用子 powershell 跑 auto-loop，執行原則須四支都放行）
-□ 跑批：powershell -File "<repo>\scripts\ps-auto-all.ps1"
-  （選配熔絲 -MaxDomains 10 -MaxBatchHours 8 -MaxConsecutiveFailures 3；
-  -Force＝忽略收據全部重驗；-MaxCyclesPerDomain 可縮單領域天花板。
-  注意 MaxBatchHours 只在領域之間檢查——單領域最壞時長
-  ＝MaxCycles×(audit 120m＋surgery 60m×MaxSurgeryPerCycle)，
-  要硬圍欄就縮 MaxCyclesPerDomain，別指望 MaxBatchHours）
-□ 批次時段＝重載期間（SOP-12）：禁手動 /ps-research、/ps-audit、查 DB 問答
-□ 領域畢業後：從佇列**註解移出**——維運期月度 audit 會使收據失效，
-  留在佇列＝batch 每次自動重跑（SOP-13 明文要避免的永動工單機）；
-  重新排入時機由人決定（CR 後、要清消 A 項時）
-□ 早上看 auto-loop-logs\batch-*.log 的 Summary：
-  GRADUATED＝畢業（收據已驗）；NEEDS_ATTENTION＝該領域卡住（看
-  auto-loop-logs\<領域>\ 的 GATE 行與 strict-cycle*.txt），不擋其他領域；
-  MUTEX_BUSY＝鎖被外部持有（錯開重跑即可，非損壞）；
-  SYSTEM_ERROR＝automation 不可信（環境級，修完才准重跑）
-□ 批次被 Ctrl+C 中斷：對當時進行中的領域跑一次 lint（SOP-2）確認無半寫
-  損壞再重啟批次；收據不會半寫誤判（寫入後回讀重驗＋壞 JSON 一律當無效）
-□ exit 0 但收據無效＝兩端判準不一致（版本歪斜？）——停批屬設計行為，
-  先核對四支腳本是否同版（gateVersion／schemaVersion 常數在 ps-graduation.ps1）
-□ lint／收據腳本的修改要**攢批**（2026-08 管理者裁決）：ps-doc-lint.ps1
-  或 ps-graduation.ps1 任何改動（含純措辭）＝全部已畢業領域收據失效、
-  下次 batch 每領域重燒一輪 audit session——措辭類小改不單獨上，
-  攢到 CR 後／月度 audit 等本來就要全面重驗的時點一起改
-```
-
----
-
-## SOP-15 00-overview 換版（凍結快照的刷新程序）
-
-00-overview 階段一寫完即凍結（L2：防大檔覆寫截斷與破壞性覆寫），
-從此**不隨輪次更新**——它是「盤點快照」不是現況；現況真相在
-checklist／NN 檔／wiki。lint 會在領域歷 3 輪稽核後開始提醒落後。
-
-```text
-□ 1. 時機：畢業收尾、CR 對齊後、或 lint 落後提醒且你覺得導航頁已失真
-□ 2. 開 fresh session 對 PS-DEEP-RESEARCH 說：
-     「依 checklist-archive、NN 檔與 wiki 現況，重製 00-overview 的
-      內容草稿，寫到 00-overview-draft.md——不要動 00-overview.md」
-     （agent 對凍結檔維持零寫入；草稿是新檔＝真 append 哲學）
-□ 2a. 併入清單：lint 的「功能地圖缺 N 個後續發現的項目」警告就是
-      換版必併清單（機械 diff，checklist＋archive 對 overview 內文）
-      ——換版後重跑 lint 該警告應消失，否則草稿漏抄
-□ 3. 人工審草稿 → 滿意就人工把內容覆蓋進 00-overview.md：
-     產生日期改當天，並在檔頭引言區加一行**照這串字寫**：
-       > 第 2 版（於稽核輪次 20 換版）
-     R＝換版當下 checklist.md 的稽核輪次。lint 用這串字算「落後幾輪」——
-     寫成別的格式（缺輪次數字、換句話說）會被判成沒換版而繼續提醒（L54）。
-     → 刪草稿檔
-□ 4. lint 確認 → commit（kb(fix): 00-overview 換版）
-□ 5. 換版使 graduation 收據 contentHash 失效＝下次 batch 重驗——
-     屬預期行為（文件變了本該重驗）；想省成本就攢在 CR 後一起做
-```
-
-## SOP-19 導覽入口首次上線（issue #24；L111）
-
-cookbook §2k 的 Portal Registry 表名／欄位／代碼值域**全數未在公司機驗證**。上線程序：
-
-1. 管理者先手跑 §2k-0 的四段查詢（`ALL_TABLES` → `ALL_TAB_COLUMNS` → `PORTAL_REFTYPE`／
-   `PORTAL_CREF_USGT`／`PORTAL_ATTR_NAM` 分布 → `PSPRDMDEFN` 的 portal 清單），把觀察值**回填 §2k-0 的註解**。
-2. 用一個已知 Component（menu＋component＋market 三者皆知）走一次 2k-2 → 2k-3 → 2k-4，
-   確認 (a) 三欄比對真的命中、(b) 走訪終止在 `PORTAL_ROOT_OBJECT`、(c) ZHT 覆寫確實存在。
-   任一步不成立＝該步驟改回 gap，**不得**降級成 PSMENUITEM 補位。
-3. 跑 §2k-5 的 LINK 探測，把「LINK 列是否帶 URI 三段」的答案回填 §2k-5——
-   回填前所有多入口宣稱一律附 gap。
-4. 回填完成前，NN 檔的「### 導覽入口」一律寫「未確認（navigation metadata 尚未查證）」；
-   lint 的 `[導覽]` 工單在此階段是**預期的**（美工類、不擋 tier 1）。
-5. 回填完成、回灌戰役結束後才考慮把 `technical menu 當導覽路徑`／`可見性過度宣稱`
-   兩個訊息字串移出 `ps-doc-lint.ps1` 的 `$polishPatterns`（升為缺料類、擋 tier 1）。
-6. 改 `ps-doc-lint.ps1` 後必跑 `pwsh -File scripts\tests\test-auto-loop.ps1`（情境 28）。
-
-（本程序已由 SOP-20 的 profile 化取代：驗證做一次、回填 `navigation:`，之後直接跑 canonical。）
-
-## SOP-20 Classic 導覽 profile 驗證（一次；issue #27）
-
-導覽入口不再是每題的研究問題：環境事實記在 `customization-profile.yaml` 的 `navigation:` 區塊，
-ps-ui-flow 只跑 cookbook §2k-C canonical query、原樣回傳。管理者做一次即可：
-
-1. 跑 cookbook §2k-0 (1)(2)(2b)(3)：確認 PSPRSMDEFN／PSPRSMDEFNLANG／PSPRSMSYSATTRVL／PSMENUITEM 存在、
-   `PORTAL_ATTR_VAL` 型別（CLOB→`attrValType: CLOB`）、`PORTAL_HIDE_FROM_NAV` 的觀察值（→`hideFromNavValues`）、
-   base 語系（`PSOPTIONS.LANGUAGE_CD`→`labelLanguage`）、使用者登入的 portal（`PSPRDMDEFN`→`portal`）。
-2. 拿一個已知 Component 跑 §2k-C：確認 (a) 可見路徑與 Classic 選單一致、(b) 被 Hide from portal navigation 的
-   CREF 出現在 `CLASSIC_VISIBLE=0`、(c) `ROOT_REACHED=1`、(d) 跑逐段列看 `LABEL_SOURCE` 全是 BASE（英文 UI）。
-   `CONNECT_BY_ISCYCLE`／`PORTAL_EXPIRE_DT`／LINK 列是否帶 SEG 也在這一步一併確認。
-3. 全部成立 → `navigation.verified: true`；任一步不成立 → 留 `false` 並記 gaps，不得降級成 PSMENUITEM 補位。
-   驗證結果（觀察值、日期）記進 applied.md 該課的追記，profile 註解只留結論。
-4. 之後 Fluid 上線、換 portal、換語系、換 PeopleTools 版本時只改 profile，不改 cookbook 與 agent。
-5. 改 `ps-doc-lint.ps1`／`ps-contract-lib.ps1` 後必跑 `test-auto-loop.ps1`（情境 28／30）與 `test-contract.ps1`。
-
-## SOP-22 知識索引（Knowledge Index）——問答讀 NN 研究文件的定位層（issue #33）
-
-問答不再只看 wiki：`docs/ps-research/<領域>/NN-*.md`（已 lint／稽核／畢業的研究文件）經
-`scripts\ps-knowledge.ps1` 編成索引，ps-orchestrator 依 `.opencode/peoplesoft/knowledge-retrieval-contract.md`
-用固定的 grep／read 呼叫形狀定位、只讀對應節、標來源等級、答覆附 `## 來源表`。
-
-1. **索引是本機快取**：`docs/ps-research/knowledge/{index.md,objects.md,index.json}`，已 gitignore
-   （含單機收據欄，不能跨機共用）。內部 git 的 `.gitignore` 也要加同樣四行：
-   `docs/ps-research/knowledge/`、`docs/ps-research/*/supplemental-parts/`、`.ps-private/`、`.ps-runtime/`。
-2. **何時重建**：`git pull` 之後、`/ps-correct` 之後、懷疑過時時手跑
-   `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-knowledge.ps1 -Rebuild`；
-   ps-auto-loop 在三個 safe point（啟動歸檔後、每圈末快照前、收據＋提煉後）自動重建，ps-auto-all preflight
-   `-Check` 到 STALE／MISSING 也自動重建——正常批次不必手跑。
-3. **檢查**：`-Check` 印 `KNOWLEDGE_CHECK：CURRENT|STALE|MISSING`（exit 0／1／2）；STALE 只在結論碼帶變動檔數，
-   檔名寫到 `auto-loop-logs\knowledge-doctor.txt`（本機看）。`-Find <詞>`、`-Slice <NN> -Section <節>` 供人工核對定位。
-4. **等級與有效性**（封閉值，見契約）：NN `AUDITED_CLEAN`／`AUDITED_ISSUES`／`UNAUDITED`／`PARTIAL`／`BLOCKED`；
-   wiki `verified`／`draft`／`stale`／`STALE_BY_SOURCE`／`EXPIRED`。「稽核後未改」靠領域目錄的 `audit-done.json`
-   （每次稽核合併由外環寫、進內部 git）；舊領域第一次合併後才有，之前只以本機 `auto-loop-logs` 的 done 檔判定。
-5. **驗收**：test-scenarios I2（含 grep 呼叫形狀的致命檢查點與來源表 regex）；沙箱 `scripts\tests\test-knowledge.ps1`。
-6. **回報維護端**只給結論碼 `KNOW1-<stage>-<code>[-<count>]` 與 enum（碼表 `.opencode/peoplesoft/spec/support-codes.md`），
-   不給路徑、物件名、hash。
-
-## SOP-23 補研究（Supplemental Research）——指定 NN＋指定問題的定向補查（issue #36）
-
-給三種來源用：問答查不到而物件已有 NN（orchestrator 會印指令）、Spec 規劃器缺事實（自動提交）、人工 QA。
-request／result 是資料檔（無自由文字），研究只回答 generic need；消費端的 requirementRef 等身分不會進 Research 端。
-
-1. **提交**：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ps-supplemental.ps1 -New -Target COMPONENT:<物件> -FactKind <碼> -Properties <a,b> [-Context "operation=IMPORT"] [-EvidencePolicy AUDITED] [-DomainHint <領域>] [-GitCommit]`
-   （碼與屬性見 `.opencode/peoplesoft/spec/capabilities.json`）。requestId 由 need 決定：同 need 重提交回 PENDING、
-   不建檔；既有結果為終局時要重跑加 `-Resubmit`（建新世代，舊世代由迷你圈標 SUPERSEDED）。路由：`-DomainHint`
-   ＞ 索引中以目標為主物件的 NN 所在領域 ＞ 目錄掃描；零候選＝`ROUTING_REQUIRED`（加 hint，領域須有 00-overview）。
-   `-GitCommit` 只 commit request 檔到內部 git（永不 push）。
-   舊 NN 補「## 畫面元件」：`-FactKind UI.CONTROLS -Properties controls,properties,lookup`（迷你圈委派 ps-ui-flow 跑 cookbook §2m 與 §2l，
-   合併時沒有該節就建在「## 畫面與欄位」之後）。新研究的 NN 由 /ps-research 直接寫，不必補。
-2. **執行**：`ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]`（迷你圈；exit 4＝完成）；
-   `ps-auto-all` 在每個領域判收據前若有 pending 會自動先跑。每 run 至多 2 張（`-SupplementalPerRun`）、
-   同一個 NN 一個 run 只合併一張（其餘留到下次 run，仍 pending、不算 attempts）；
-   每張 attempts 上限 2（工單檔數＝attempts；session 崩潰也算一次）；已合併的 attempt 只補發布、永不重派（不會二次合併）。
-   模型（`/ps-supplement`，掛 ps-deep-research）只寫收據；外環驗收、只追加地合併進目標 NN、
-   合併後 lint 缺料違規變多即還原（outcome 記 LINT_REGRESSION）。
-3. **目標尚無 NN**：迷你圈不派 session，改在該領域 checklist 寫一列 `D<輪次>-<序>` 新發現（`-Status` 顯示
-   `WAITING_RESEARCH`）；等研究相位（`/ps-research` 或 auto-loop）建檔後再跑迷你圈。
-4. **結果**：`-Status [-Domain]`、`-Result -RequestId <id>`；outcome ∈ RESOLVED／PARTIAL／UNRESOLVED／OUT_OF_SCOPE／SUPERSEDED；
-   完成層 RESEARCHED（result 存在）→ AUDITED（affected 檔 AUDITED_CLEAN 且該領域稽核輪次 > 完成時輪次——等下一輪全量稽核）
-   → GRADUATED（本機收據）→ PROJECTED（wiki 有效）。受影響的非 reviewed wiki 標 `status: stale`；reviewed 的在
-   Invalidated 追加一行請人工覆核。合併後收據無效＝下一輪稽核重驗、畢業重驗（ps-auto-all 會自動 RUN）。
-5. **排錯**：`auto-loop-logs\<領域>\supplemental-done\<requestId>.a<n>.outcome.json`（timedOut／exitCode／failureKind／
-   receiptValid／receiptErrors／merged／lintRegression／destructionRestored／integrityFail）；未發布的 parts 在
-   `docs/ps-research/<領域>/supplemental-parts/`。session slot 被占＝同一版另一個 headless session（ps-spec -Run／另一個迷你圈／
-   auto-loop／ps-sdoc；slot 兩版各一把，另一版不算）在跑：外環會等最多一天（每 5 分鐘印一行心跳），等滿才回 SLOT_BUSY 停機且不計 attempts——看 log 是誰占著、錯開即可。
-   迷你圈遇未預期例外 → `SUPP1-3-03`（exit 2）：已合併的不回退、未發布的留在 parts 下次續跑；request 檔寫不進（`SUPP1-1-06`）
-   稍後重送同一 need 即可。auto-loop 只認通過 intake 驗證的 request（id／workKey／need 對不上的列在 log 的「intake 拒收」，
-   不會被派工）；迷你圈期間的圍籬盯著 `supplemental/requests|results/` 與 `wiki/`：既有檔被改寫或刪除一律還原，
-   `wiki/` 的新增檔一律刪除，`requests|results/` 的新增檔先驗身分（檔名文法、requestId＝檔名、schemaVersion／need／
-   workKey 重算；result 另驗 outcome 值域）——驗得過＝窗口期間 `ps-supplemental.ps1 -New／-Submit` 或 `ps-spec.ps1 -Plan`
-   正常提交的檔，留著且不算違規，驗不過才刪。只有真違規記 fenceViolations 並作廢該次 attempt。
-6. **回報維護端**只給 `SUPP1-<stage>-<code>[-<count>]` 與 enum。
-
-## SOP-24 Spec 引擎——私有需求包接入與 job 執行（issue #34／#35）
-
-本節只用於有既定公司 Template／Checklist、需要精準綁定欄位的情境。
-只想以 Component 產生供獨立 LLM 重建的核心規格，直接走 SOP-25，不需先建 pack。
-
-分母＝**目標 Component＋公司私有需求包**（不是整個領域）；公司 Template／Checklist 原文與映射只放
-`.ps-private\spec\<packId>\`（gitignore、fs-doctor 不列管、不進任何 git）；job 狀態在 `.ps-runtime\spec\<jobId>\`。
-generic 部分（`scripts\ps-spec*.ps1`、`.opencode\peoplesoft\spec\**`、worker agent／command）禁改，`-Doctor` stage 0 機械驗。
-
-1. **接入（一次）**：`ps-spec.ps1 -InitPack -Pack <packId> -Template <公司 Template 的副本.md>`（結論碼 `SPEC1-1-05`；目錄已存在＝
-   `SPEC1-1-06`，不覆寫）。它把那份 Template **原樣**複製成 `.ps-private\spec\<packId>\template-bound.md`（章節與原文一個字都不改，
-   也不插標記），並產出 pack.json 骨架：`bindingMode: headings`、每個章節標題一個 slot（文件標題 H1 不算；該章節自己的內文——不含子章節——恰有一個原生 `{{…}}` 佔位符時一併綁上）、
-   其餘 `{{…}}` 進 `placeholders`（fact 待填或整筆刪掉）。接著逐項填：Checklist 每項一個 `C<nn>`，每項映射到 ≥1 個 requirement
-   （factKind 從 capabilities.json 挑；挑不到填 `UNSUPPORTED`，並用 support-codes.md 的 CAP-REQ 表單向維護端申請，不附原文）；
-   `placeholders` 的文件參數（產品名、文件編號這類）填成 `<factKind>.<property>`。slot 有佔位符就置換該佔位符、沒有就補在章節末；
-   引擎產不出的內容（流程圖之類）**不要**綁 slot，留著原生佔位符由人補——gate 只看 requirement 是否滿足，不會因為文件看起來滿了就假裝完成。
-   `{{slot:Sxx}}` 標記（`bindingMode: markers`）只留給 `examples\pack-a`／`pack-b` 這種合成範例與既有映射。
-   然後 `ps-spec.ps1 -ValidatePack -Pack <packId>`（骨架填完前本來就回 `SPEC1-1-03`）；`scripts\tests\test-spec.ps1` 全綠；
-   對一個已研究的 Component 跑 `-Plan／-Run／-Render／-Gate`；內部覆核後填 `reviewedVersion`（≠ `packVersion` 時 `SPEC1-8-01`，不出貨）。
-2. **跑 job**：`-Plan -JobId <小寫id> -Component <名> -Pack <packId> [-DomainHint]` → `-Run`（每個 unit 一個 worker session，
-   共用同一版的 session slot；缺事實自動提交補研究，進 `WAITING_KNOWLEDGE`／`WAITING_AUDIT` 時 exit 0 並釋放鎖，等 SOP-23
-   的迷你圈與下一輪稽核後重跑 `-Run`）→ `-Render` → `-Gate`（verdict SPEC_COMPLETE／SPEC_PARTIAL／BLOCKED）。
-   產出 `.ps-runtime\spec\<jobId>\outputs\<generation>\{spec.md,trace.md,gate.json}`；重 render 位元組相同；來源 NN 改了就
-   `SOURCE_CHANGED`，要重 plan。`.ps-runtime\spec` 固定在 repo 根（worker 的 command 與 permission 以此路徑為準；`-RuntimeRoot`
-   只給 `-FakeWorker` 測試用，派真 worker 時帶別的路徑＝`SPEC1-9-07`）。規劃後來源被稽核標紅或改過＝gate `7-22`（重跑稽核或修 NN 後
-   `-Plan`）；片段只處置了部分條目＝`4-07` 自動拆分重派、不計 attempt；session 回報 CONTEXT_OVERFLOW 一樣算容量事件拆分。
-3. **排錯**：`-Doctor -JobId <id> [-Drill <stage>-<code>]` 只印 opaque tuple；責任分工見 `troubleshooting-matrix.md`
-   （1／8 私有映射、2／3／4／6／7 引擎、5 Research、0 搬運完整性）。attempt／splits／收據檔寫不進＝`3-07`（關掉開著
-   `.ps-runtime\spec` 檔案的程式——編輯器、防毒——再重跑 `-Run`；已驗收但收據沒寫成的單位會重派）。
-4. **回報維護端**只給 `SPEC1-<stage>-<code>[-<count>]` 與 drill tuple；template／checklist 原文與 `.ps-private` 內容不出公司。
-5. 改 `ps-spec*.ps1`／`spec\**` 後必跑 `test-spec.ps1`、`test-ps51-static.ps1`（5.1 語法紀律與 BOM）、`test-auto-loop.ps1`（情境 34）。
-
-綁定補充：headings 的 slot 只處理該標題的直屬內文（到下一個任意層級標題前），不包含子章節；
-同位置不能綁兩個 slot。同列不同 placeholder 會一起保留。調整 requirement 的 slot 並簽核新 packVersion 後，
-Render 使用新綁定；內容事實有改仍須 Plan。NO_EVIDENCE 不是不存在的證明，不算已覆蓋。
-行號式 VALIDATIONS 舊 plan 必須重 Plan 一次；新 unit ID 以來源檔身分區分續篇。
-生成的 spec.md 是投影，不是可直接保留人工修改的工作稿，人工交付修訂請另存副本。
-
-## SOP-25 Component 直接產生核心功能重建 Spec
-
-> OpenCode 版的 `/ps-spec` 與 `ps-spec-author` 已改走 Spec 文件流程（00-index＋14 份＋90，SOP-28／SOP-29）。
-> 本節的單一 spec.md（CLONE1）仍可用：在 PowerShell 直接執行下方的 `scripts/ps-spec-build.ps1`；第 1、2 步的對話入口只剩歷史參考。
-
-### 日常操作
-
-1. （對話入口已改走 SOP-29）在 repo 根目錄的 PowerShell 執行下方的 `scripts/ps-spec-build.ps1` 命令，輸入
-   `TW_DEMO_A,TW_DEMO_B`。所有名稱均為合成範例，實際名稱只在公司機輸入。無須 Pack／Domain／自行挑內部階段。
-2. 每次呼叫預設跑 4 個 session，RUNNABLE（`CLONE1-3-02-<n>`）就用同一個命令續跑。
-   範圍先研究再獨立覆核；之後依 10 個 topic 分段查證及覆核。每頁最多 40 筆，每 topic 最多 20 頁。
-   兩次無效或覆核失敗後暫停該頁；可繼續的其他 Component／主題仍會處理，不無限重試。
-3. 回覆會顯示 `docs/ps-spec/<job>/README.md` 與最新文件位置。spec.md 是自足的核心行為契約，
-   trace.md 放來源定位，gate.json 放狀態／缺口；未驗收片段另以 candidate.md 保留，不混入已接受正文。
-4. 中斷後輸入相同 Component 清單即續跑（大小寫／排序／重複不影響 job 身分）。只查進度可以說
-   「狀態 TW_DEMO_A」；環境修復後說「重試被擋項 TW_DEMO_A」；實際來源更新後說「重新查證 TW_DEMO_A」。
-   系統不擅自清空舊資料，不自動替使用者增加重試預算。
-
-需要不用對話的入口時，在 repo 根目錄的 PowerShell 執行：
-
-```powershell
-powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_DEMO_A,TW_DEMO_B'
-```
-
-`-Status` 唯讀、不派模型；`-Retry` 開新重試預算、保留已接受頁；`-Refresh` 建新研究版本、保留歷史。
-三者不能混用。PowerShell 執行原則、OpenCode 模型／MCP 掛載必須由管理者依既有公司規範配置；
-此入口不會修改權限或下載依賴。
-
-### 寫什麼、排除什麼
-
-- 目標讀者是另一個獨立 LLM：繁體中文說明，Page／Record.Field／事件／SQL／schema／stored value／原始訊息維持原文。
-- 規格固定涵蓋範圍、流程、畫面、資料、規則、狀態、交易、介面、權限、正反例及邊界驗收。
-  畫面要逐欄條件，規則要精確判斷式與事件次序，狀態要守衛與非法轉移；不能只列摘要。
-- CORE／DEPENDENCY／EXCLUDED 依實際使用鏈與證據，不依 delivered／custom 猜測。
-  核心用到的 PeopleSoft 原生功能只寫最小替代契約；無關功能只留下簡短排除理由，不展開正文。
-- NN／wiki 只是定位起點，不存在也能定向查證；關鍵行為要追原始來源。不會自動改寫 NN、wiki 或研究 checklist。
-- 原生欄位：只有「PROD 實體表全表非預設值 0 筆」且「核心路徑程式沒有指名引用」才判無用，記在範圍表
-  （EXCLUDED、類型 FIELD、每個 Record 一列），正文不寫；其他一律保留。判不了（沒有實體表、空表、LOB、
-  非 PROD、逾時、查法沒做完）就保留，不算缺口、不停下來等人。查法見 cookbook §7，規則見 clone-contract
-  「原生欄位無用判定」。誤判（其實有用）時後續章節會列缺口，修正後「重新查證」。
-- 外環確定性擋關：正文任何欄位寫到判定無用的 Record.Field（含 PS_ 實體表名、data 的 record＋field 欄），
-  該頁不驗收（`FIELD_EXCLUDED_IN_BODY`）；排除項格式、資料剖析斷言、a／b／c 三種查法、資料彙總與交叉參照
-  兩筆 SQL 證據缺一、type 大小寫不精確也不驗收（`FIELD_EXCLUSION_*`／`FIELD_TYPE_CASE`）。spec.md 另有「不建置的原生欄位」表與合計；
-  被某 Component 判無用、但其他 Component 正文仍引用的欄位不列入不建置表，另列「整體重建須建置」。
-- 每個範圍內 Record 都要寫「原生欄位判定」結論：排除 n 欄／無可排除／判不了：原因代碼（NO_TABLE、EMPTY_TABLE、
-  NOT_PROD、TIMEOUT、QUERY_FAILED、CHECK_INCOMPLETE）；缺結論 scope 不驗收（`FIELD_USAGE_REQUIRED`）。
-  沒做判定只能寫 CHECK_INCOMPLETE，所以「不建置欄位＝0」可以分辨是都在用、還是沒查。
-- 試跑回報給維護端只用計數：輸出（與 gate.json 的 fieldUsage）中的「欄位統計」行——範圍內 Record／已判定／
-  判不了（依代碼）、不建置 Record／欄位數、跨 Component 須建置數、畫面與資料項目數——加上耗時、委派次數；
-  不回物件名或欄位名。
-
-### 狀態、恢復與保證界線
-
-| 狀態 | 意義與動作 |
-|---|---|
-| RUNNABLE | 還有可處理的研究／覆核頁；同清單繼續 |
-| BLOCKED | 已留草稿／缺口；先處理原因，再 -Retry。已接受頁不用重做 |
-| STALE | 本機研究或執行契約已變；同清單重跑會建立新版本 |
-| REVIEW_READY | 結構與獨立 LLM 覆核通過，供內部人員審閱；不是企業 E2E 或重建等價驗證 |
-
-純分頁用 PARTIAL＋nextCursor、gaps 空；未知條件用 gaps 明列，不能用續頁結束把未知抹掉。
-缺口頁即使覆核認為如實描述，也不發完成收據；只補查該頁，重試額度用完才停。
-同一 job 有鎖；模型 session 沿用同一版的 session slot（兩版各一把）。slot 被占、檔案暫時鎖定時不假裝工作已完成。
-
-本機來源／agent 契約 fingerprint 改變會失效；目前採保守策略，其他領域 NN 改動也可能觸發新版本。
-搬入新版契約或 cookbook 後，既有 job 會顯示 STALE；同清單重跑即建新版本，舊成果保留。
-Oracle／PeopleCode 遠端本體的改動不會被本機 hash 自動察覺，已知上游更新請明確重新查證。
-原生動態 UI、執行時資料與權限仍需公司內部核對；未能觀察就留缺口，不能憑框架常識補成事實。
-
-generated 每次產出為不可覆寫世代，current.json 指向成功發布版本；人工交付版另存，避免與續跑混用。
-`.ps-runtime/clone-spec/`、`.ps-runtime/clone-spec-logs/`、`docs/ps-spec/` 都是機敏本機產物，不進 git、不出公司。
-對外維護只回最後一行 `CLONE1-...` 與狀態，不回傳物件、路徑、hash、trace 或真實內容。
-
-### 維護驗證
-
-真 PS 5.1 跑 `test-spec-clone.ps1`、`test-spec-build.ps1`、`test-spec.ps1`、`test-auto-loop.ps1`；
-PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-guard 單元／假模型 E2E，
-以及 `node tests/runtime-guard/run-clone-smoke.mjs`（OPENCODE_BIN 可指定既有執行檔）。
-這些測試只驗機制及合成資料，不代替企業功能驗收。維護端重生 generic／transfer manifest 後再搬整檔；公司機不重生基準。
-
-## SOP-26 Claude Code 版（另一個前端；只搬一版）
-
-同一套框架另有 Claude Code CLI＋Sonnet 的前端，原始檔在 repo 的 `claude-code/`。公司機**只裝一版、只搬那一版**
-（例外：Spec 文件流程的 OpenCode 版當備案、兩版同一個資料夾並行時兩版都搬，SOP-29）；
-安裝步驟、日常使用與兩版對照（主代理、委派、hook、MCP 工具全名、headless 權限）見 `claude-code/README.md`（給人看，不搬）。
-
-□ 1. 搬運：`scripts/**` 原樣＋`claude-code/CLAUDE.md`、`claude-code/.claude/**` 去掉 `claude-code/` 前綴；
-     清單＝`scripts/ps-transfer-manifest.claude.json`（`path`＝本機路徑、`repo`＝GitHub 位置）。`.ps1` 存 UTF-8 with BOM。
-□ 2. profile：`.claude/peoplesoft/customization-profile.yaml` 的鍵值與 OpenCode 版逐行相同，把本機已回填的值抄過去。
-□ 3. MCP：`claude mcp add --scope user` 註冊 oracleMCP／PeoplecodeElasticSearch／PeoplecodeSource／PeoplecodeMetadata（名字逐字相同）。
-□ 4. 在專案資料夾執行一次 `claude` 接受信任詢問（否則專案權限允許清單被忽略，headless 工具全部被拒）。
-□ 5. `ps-fs-doctor` 應顯示「Claude Code 版」且結論 G；再跑 `scripts\ps-claude-doctor.ps1 -Live`（hook 自測、MCP 註冊、
-     真 session 第 0 步開線）結論 G。外環照舊跑；它們依 `.claude/peoplesoft` 是否存在改開 `claude -p --agent …`；
-     同一資料夾要跑 OpenCode 版外環先設 `$env:PS_CLI='opencode'`。
-
-啟動方式：業務問答 `claude --agent ps-orchestrator`；產文件／稽核／教訓 `claude --agent ps-deep-research`；直接 `claude` 是一般 session
-（沒有主代理的工具限制，給框架維護與排錯用——在裡面改了框架檔要回報維護端，下次搬運包會把 scripts 換回維護端版本）。
-
-SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context 由 Claude Code 管理）；SOP-17 改看 `.claude/settings.json`
-允許清單與信任（臨時換權限模式用 `$env:PS_CLAUDE_PERMISSION_MODE`）；SOP-21 的恢復是該 session `/mcp` 選 oracleMCP 重新連線，
-沒有自動重掛，hook 紀錄在 `auto-loop-logs\ps-runtime-guard\hook-<日期>.jsonl`。
-
-## SOP-27 搬運包（一版收成幾份文字檔）
-
-公司機不能 git 下載時，每版要搬的檔收成幾份文字檔（每份約 500 KB 以內，只在檔與檔之間切）：OpenCode 版
-`transfer/ps-bundle-opencode-01ofNN.txt`…、Claude Code 版 `transfer/ps-bundle-claude-01ofNN.txt`…（維護端 `ps-fs-doctor -WriteManifest`
-自動重生；使用說明在 `transfer/README.md`）。
-
-□ 1. 第一次：手動搬 `scripts/ps-bundle.ps1`（UTF-8 with BOM）。之後每個搬運包都帶新版的它。本機還是只認單一檔的舊版時也先手動換新版。
-□ 2. 開一個空資料夾；對應版本的每一份都開 GitHub Raw → 全選複製 → 記事本另存 UTF-8 的 .txt 放進去（檔名不拘；或 Download raw file）。
-□ 3. `powershell -NoProfile -File .\scripts\ps-bundle.ps1 -Bundle <資料夾> -DryRun` 看計畫；沒問題再去掉 `-DryRun` 執行
-     （`-Bundle` 給其中任一份也可以，同資料夾的其他份自動找齊）。
-□ 4. 結論代號：G 完成；C 有衝突（本機改過、搬運包也改了）→ 比對 `<檔>.incoming` 合併後刪掉它；
-     T 不完整（訊息指出缺哪一份或哪一份被截斷，重新複製那一份；資料夾混了別次打包的份也是 T，只留這次的）；
-     H 雜湊不符（多半不是存成 UTF-8；訊息指出第幾份）；P 路徑不合法；W 寫入後驗證失敗。T／H／P 時一個檔都沒寫。
-□ 5. 接著跑 `ps-fs-doctor`（Claude Code 版另跑 `ps-claude-doctor`）。保留本機的檔（已回填的 profile 等）在檢查 M 會列為版本不符，屬正常。
-
-被覆寫或刪除的舊檔備份在 `auto-loop-logs\ps-bundle-backup\<時間>\`；要回到上一版就把備份複製回原位。
-
-- 只換一個檔也用搬運包，不要從 GitHub 網頁複製單一檔貼上：網頁內容開頭帶著 BOM 字元，編輯器存成「UTF-8 with BOM」時會再加一個，
-  變成雙 BOM。雙 BOM 的 `.ps1` 在 5.1 報的錯會指在檔案開頭（例如 `Unexpected attribute 'CmdletBinding'`／「未預期的屬性」），
-  看起來像語法錯。遇到就跑 `ps-fs-doctor` 看檢查 D，再用搬運包重解一次：`scripts\` 底下的檔一律以新版覆寫，雙 BOM 會一起修掉。
-
-## SOP-28 Spec 文件（00-index＋14 份文件＋90 問題清單；issue #37）
-
-兩版的 `/ps-spec` 都走 `scripts/ps-sdoc.ps1`。本節以 Claude Code 版為主；OpenCode 版（外環加 `-Cli opencode`、目錄各加 `-opencode`、
-模型在 `.opencode/peoplesoft/sdoc/model.yaml`）的差異見 SOP-29。Claude Code 版入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，
-或 `claude --agent ps-spec-author` 後輸入清單（名稱為合成範例）。結論碼見 `.claude/peoplesoft/spec/support-codes.md` 的 DOC1。
-
-### 日常操作
-
-□ 1. 第一次輸入清單：DOC1-0-01，在 `.ps-private\sdoc\<jobId>\` 建 status.md、project.md、decisions.md、approvals.md 骨架。
-□ 2. 把這組 Component 的狀態圖（Mermaid flowchart 或 stateDiagram-v2，畫法不限、可多張）與圖下的說明貼進 status.md，
-     刪掉第一行的 `<!-- SDOC:SKELETON -->`；project.md 選填（目標、決策責任）。
-□ 3. 再輸入同一份清單：第 0 階段三位讀者解讀狀態圖 → 11 個研究單元（每頁研究與獨立覆核分開 session）→ L5 乾淨讀者。
-     ps-spec-author 每次呼叫只跑一個 session（每個 session 回報一次進度），DOC1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑。
-     每個 session 上限預設 60 分；要改就跟 ps-spec-author 說「每個 session 上限 N 分」（1～110，Bash 工具一次最多 2 小時），
-     直接在 PowerShell 跑 `scripts\ps-sdoc.ps1 -TimeoutMin N` 可到 180。
-□ 4. 依結論碼處理：
-     - DOC1-3-04（session 失敗，不扣失敗次數）：看輸出的 `SESSION(...) 判讀` 行（見下方「session 失敗的判讀」）——被模型端拖慢就用更大的
-       -TimeoutMin 續跑；卡在模型端（gateway）就把狀態碼、次數與時間交 IT；沒有模型端重試的照 SOP-12／Claude Code 設定排查。
-     - DOC1-4-01：讀者對狀態圖仍無多數或圖與圖矛盾 → 看 90 的 STATUS_READING_CONFLICT／STATUS_SELF_CONFLICT，改 status.md 後重跑（開新研究版本）。
-     - DOC1-4-03：某頁兩次未通過或預算用完 → 看輸出的「缺口」行，排除原因後說「重試被擋項」（-Retry）。
-     - DOC1-5-01（DRAFT）：看 00-index「未通過的檢核」與 90 的 BLOCKING 問題，在 decisions.md 裁決（NO_CHANGE／DROP／ACCEPT_GAP／
-       AMEND_INPUT／ADD_SCOPE），同命令重新組裝；只有 ADD_SCOPE 與改 status.md 會開新研究版本。
-     - DOC1-7-01（REVIEW_READY）：五層檢核全過 → 人工審閱；同意的文件把 00-index 的 docHash 前 12 碼寫進 approvals.md。
-       文件內容改了，舊的核准自動不成立。
-     - DOC1-7-02（APPROVED）：全部文件已核准。
-□ 5. 回報維護端：只回最後一行 DOC1 結論碼、「欄位統計」與「乾淨讀者（L5）」兩行的計數；不回物件名、路徑、hash、status.md 內容。
-
-| 什麼 | 在哪 |
-|---|---|
-| 人工輸入 | `.ps-private\sdoc\<jobId>\`（gitignore，不進任何 git） |
-| 產出入口 | `docs\ps-spec\<jobId>\README.md` → `generated\<代號>\00-index.md` |
-| 執行狀態 | `.ps-runtime\sdoc\<jobId>\`（attempt、收據、ID 對照、工作中文件、inbox） |
-| session log | `.ps-runtime\sdoc-logs\` |
-
-- docs/ps-research 有更新時只提示「要以新知識重查請加 -Refresh」，不自動換版本；STATUS 檔、ADD_SCOPE 裁決或 schema 改了才自動開新版本。
-- generated 是可重建投影，不在裡面修稿；修改走 decisions.md、status.md 或重新研究。
-
-### session 失敗的判讀（模型端 504 等）
-
-Claude Code 遇到模型端可重試的錯誤（5xx、429／529、沒有回應）會自己重試同一個請求，最多 10 次，每次重試前在 stream 寫一行
-`system/api_retry`（含 HTTP 狀態碼）。公司 gateway 回 504 時，每次重試都要等滿 gateway 的逾時。ps-session-lib 讀這些事件：
-
-| 在哪看 | 內容 |
-|---|---|
-| `SESSION(...) 環境預設` 行 | 外環替這個 Claude Code 子行程設了哪些環境變數（見下方「外環的 Claude Code 環境預設」）；括號列「沿用視窗已設」的 |
-| 執行中每 5 分鐘的「進行中」行 | `模型端重試 N 次（504×k…）`，之後接「目前這個請求已連續失敗 M 次」或「之後已恢復」，量得到時加「重試間隔約 G 秒」；另有「成功請求 N 次、最後一次輸入 X token、快取命中 Y 次」 |
-| 強殺或結束時的 `SESSION(...) 判讀` 行 | **被模型端拖慢**（有重試、之後仍有進展）／**卡在模型端（gateway）**（最後同一個請求連續失敗 3 次以上，或 Claude Code 重試用完）／API 錯誤（沒有重試，不是逾時類） |
-| `SESSION(...) 提前結束` 行 | 同一個請求連續失敗達門檻（預設 5）**且這一串失敗已持續 60 秒以上**，外環在 TimeoutMin 之前就強殺——每次重試都要等滿 gateway 逾時，再等只是把上限耗光；幾秒內的快速重試（抖動）不算 |
-| `SESSION(...) 模型端數據` 行 | 成功請求 N 次、主代理最後一次輸入 X token（最大）、子代理最大輸入、快取命中 Y／N 次、單次最多輸出 Z token、API 累計秒數、模型端重試次數與狀態碼、重試間隔約 G 秒（≈ gateway 逾時＋退避） |
-| 最後的「session 失敗」行 | 依上面判讀給下一步；沒有模型端事件時維持「檢查 Claude Code／MCP」 |
-| 「session 失敗（…）但產出已驗收通過，照收」 | session 逾時、結束碼不是 0 或提前結束，但工單指定的產出已寫完且驗收通過（例如寫完後 Read 回確認的那個請求才卡住）：照收、不是 DOC1-3-04；outcome.json 另記 `sessionFindings` |
-| attempt 的 `outcome.json` findings | `TIMED_OUT`、`EXIT_<n>`、`API_ABORTED`（提前結束）、`API_RETRY_SLOW`、`API_RETRY_STUCK`、`API_ERROR`（加上原有的 CONTEXT_OVERFLOW 等）；驗收錯誤另放 `diagnostics` |
-
-- 「卡住」判讀門檻：`scripts/ps-session-lib.ps1` 的 `$script:PsOcApiStuckAfter`（預設 3）；提前結束門檻 `$script:PsOcApiAbortAfter`（預設 5；最少持續
-  `$script:PsOcApiAbortMinSec`＝60 秒），跑外環的視窗設 `$env:PS_SESSION_API_ABORT_AFTER`（0＝不提前結束、1～20，小於 3 提高到 3）可改。
-- 為什麼 TimeoutMin 不是槓桿：504 是 gateway 等上游逾時的回覆；Claude Code 對 5xx 重試**同一個請求**（預設 10 次），每次都等滿 gateway 逾時。
-  那個請求在 gateway 逾時內完成不了，10 次都一樣；TimeoutMin 只決定外環等多久才放棄。
-- 為什麼同一個 Sonnet 走 Claude Code 比走 OpenCode 容易撞（請求的形狀不同，都是 Claude Code 文件寫的行為）：
-  串流中途斷線後 Claude Code 改用**非串流**重送同一個請求（gateway 要把整段回應憋完才回，幾分鐘的回應一定逾時，之後每次重試都一樣）；
-  thinking 期間串流上只有 SSE `ping`，gateway 不直通或濾掉 ping 就把連線當閒置切掉（狀態碼「無回應」多半是這種：連線中途斷，或 Claude Code 自己的
-  串流看門狗在 180 秒沒收到任何位元組時放棄）；系統提示＋工具清單＋CLAUDE.md 讓每個請求的輸入大數倍，gateway 沒把 `cache_control` 傳到上游就每個請求
-  重送整份 context；背景請求（標題、分類、摘要）經 gateway 也用主模型。
-- 怎麼讀「模型端數據」行：
-  - 快取命中 0／N（每個請求都沒命中）：gateway 沒把 `cache_control` 傳到上游（Claude Code 文件列的判別特徵）→ 交 IT：cache_control 直通、system 陣列不要轉成字串。
-  - 重試間隔約 G 秒：G 就是 gateway 對 `/v1/messages` 的逾時（加幾秒退避）。Claude Code 自己單次請求等 10 分（`API_TIMEOUT_MS`），G 遠小於 600 秒＝gateway 先放棄；
-    只有幾秒＝連線抖動的快速重試，不是逾時。
-  - 狀態碼「無回應」：不是 gateway 回的——連線中途斷，或 Claude Code 的串流看門狗放棄；配合 thinking／ping 那一項看。
-  - 主代理最後一次輸入 X（最大 Y）、單次最多輸出 Z：卡住的那個請求比 Y 更大、要寫的比 Z 更長（看「最大」不看「最後一次」：最後一次可能是子代理的小 context）；
-    對照每段要交代的行數、每頁的項目上限決定縮多少。
-
-### 外環的 Claude Code 環境預設
-
-外環開 Claude Code 的 headless 子行程時，只在那一刻替子行程設下面的環境變數，啟動後拿掉；**視窗已設的同名變數一律沿用**（所以 SOP 的實驗仍可逐項做）；
-OpenCode 版不套。log 的 `SESSION(...) 環境預設` 行列出設了哪些、沿用了哪些。
-
-| 變數 | 值 | 哪些代理 | 作用 |
-|---|---|---|---|
-| `CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK` | `1` | 全部 | 串流中途斷線後仍用串流重送，不改非串流（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時） |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 全部 | 不做更新檢查、遙測、錯誤回報、功能旗標抓取 |
-| `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | `false` | 全部 | 不產提示建議（背景請求經 gateway 也用主模型） |
-| `MAX_THINKING_TOKENS` | `0` | ps-status-reader、ps-spec-reader、ps-spec-judge | 機械工作不開 thinking（thinking 期間串流上只有 ping，gateway 不直通就當閒置切掉）；只對固定預算的模型有效；研究 worker 不關 |
-| `CLAUDE_CODE_EFFORT_LEVEL` | `low` | ps-status-reader、ps-spec-reader、ps-spec-judge | adaptive 的模型（Sonnet 4.6／5 起）不吃 `MAX_THINKING_TOKENS=0`，只能用 effort 壓低 thinking；模型不吃 effort 時 Claude Code 收到 400 會自動拿掉重送（數據行會看到 400） |
-
-- 整組不套：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'`；剔除單項：`$env:PS_SESSION_CLAUDE_ENV_SKIP = 'MAX_THINKING_TOKENS'`（逗號分隔、不分大小寫）。
-- 若公司的模型拒絕這些值，數據行會出現 `400×N`：用 `PS_SESSION_CLAUDE_ENV_SKIP=CLAUDE_CODE_EFFORT_LEVEL`（或 `MAX_THINKING_TOKENS`）剔除。
-- 不進預設、留在實驗階梯的：`CLAUDE_CODE_MAX_RETRIES`（與提前結束重疊，會把幾秒的抖動變成硬失敗）、worker 的 `MAX_THINKING_TOKENS`（非 0 值在新模型回 400）。
-- 外環每 30 秒把成功回應數、重試數、連續失敗數、狀態碼分布記進 `.ps-runtime\sdoc-logs\<時間>-<job>-<attempt>.timeline.txt`（只有數字與狀態碼）；
-  `ps-sdoc-diag` 用它算出真實的 gateway 逾時（`G=` 兩次重試的間隔）、卡住的請求跑了幾秒才第一次失敗（`D1=`）、最長的成功回應（`LP=`）。
-- 實驗階梯（照順序、一次改一項、每項看「模型端數據」行與各種工單的 SESSION_FAILED 次數；環境變數設在跑 `ps-sdoc.ps1` 或啟動 `claude --agent ps-spec-author`
-  的**同一個視窗**，子行程繼承，關掉視窗就沒了；要固定就寫進 `.claude/settings.json` 的 `env`，但會影響互動 session）：
-  0. 用新 scripts 原樣跑一次（環境預設、分段 20 行、每頁上限、寫完不 Read 回都已生效），拿到數據行、狀態碼分布、提前結束行；
-     或直接跑 `scripts\ps-sdoc-diag.ps1`，照它最後兩行（SUM2 與 NEXT）做。
-  1. 對照：`$env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'` 再跑一次——差異＝請求形狀的影響。
-  2. 再縮小每次回應：`$env:PS_SDOC_RESEARCH_PAGE_ITEMS = '4'`、`$env:PS_SDOC_READING_PART_LINES = '20'`。
-  3. 研究 worker 也關 thinking：`$env:MAX_THINKING_TOKENS = '0'`（固定預算的模型）；adaptive 的模型（Sonnet 4.6 起）改 `$env:CLAUDE_CODE_EFFORT_LEVEL = 'low'`。
-  4. 早點失敗：`$env:CLAUDE_CODE_MAX_RETRIES = '3'`（預設 10）。
-  5. 仍卡：SOP-29 的 `-Cli opencode`，`.opencode/peoplesoft/sdoc/model.yaml` 填公司 Sonnet 的 `<provider>/<model>`——同一個外環、同一套契約，只換 CLI。
-- 卡在模型端時要問 IT 的：gateway 對 `/v1/messages` 的上游逾時與閒置逾時（能否 ≥ 600 秒）、是否串流直通（SSE 不緩衝、保留 `ping`）、
-  `cache_control` 是否直通、非串流請求的整體逾時、尖峰時段的容量或排隊限制。只給狀態碼、次數、間隔與 token 數，不給內容。
-- log 不能複製出來時，跑 `powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 -Last 15`：每個 attempt 一行、最後一行 SUM，全部是代號與數字
-  （工單種類、狀態、findings、成功請求數、快取命中、thinking 區塊數、卡住前最後一個工具與結果大小、usage 欄、狀態碼分布、err 分類、模型家族、分段數、每頁上限、分鐘），
-  代號對照在腳本開頭；用唸的回報維護端即可。`MD=S5`（Sonnet 5 家族）時 `MAX_THINKING_TOKENS=0` 無效，要用 `CLAUDE_CODE_EFFORT_LEVEL=low`。
-
-### 研究包每頁上限
-
-一次回應（一個 Write）不要太長：研究頁的項目數由外環驗收，超過＝INVALID（計次；findings 進下一張工單的「前次未通過的原因」），工單與 input.json 的
-`pageItemCap` 印出本頁上限，模型達上限就 `PARTIAL`＋`nextCursor`。
-
-| 單元 | 每頁上限 | 依範例量到的每項大小 |
-|---|---|---|
-| 預設 | 8 | 1.1～1.6 KB（ui、data、scope、workflow、rules）→ 8 項 ≈ 9～13 KB ≈ 75～140 秒 |
-| texts | 40（items＋statusTexts 合計） | statusTexts 約 100 B/筆 |
-| operations | 3 | 4.5 KB |
-| testing | 4 | 2.5 KB |
-
-- `$env:PS_SDOC_RESEARCH_PAGE_ITEMS`（1～60）設了就所有單元一律用它；`60`＝schema 上限＝舊行為。上游需求頁（REQUESTS）與改寫頁（L5-AMEND）不受此上限。
-- 每個主題最多 60 頁（原 30）。連兩次超量會 BLOCKED（DOC1-4-03）：用 -Retry 並把 `PS_SDOC_RESEARCH_PAGE_ITEMS` 調大。
-- 研究 session 數會比以前多（每頁項目少），ps-spec-author 每次呼叫一個 session，回合數等比增加。
-
-### 狀態圖解讀分段寫出
-
-第 0 階段每位讀者把解讀分段寫：外環把 status.md 的 Mermaid 行切成幾段（只在區塊與區塊之間切，單一區塊太大才在行與行之間切），
-工單 input.json 的 `outputParts` 與 manifest 列出每段的行號範圍與檔名（inbox 的 `output-part-NN.json`），讀者一段寫一個檔，
-外環合併後照原本的規則驗收。目的：一次回應不要太長（公司 gateway 下約每秒 30～40 token，整份解讀一次寫完要好幾分鐘，中途斷一次就整段重來）。
-
-- 每段的 Mermaid 行上限預設 20（每行解讀約 105 B，20 行 ≈ 2.1 KB ≈ 20～25 秒；分段演算法會把連續小區塊塞滿到上限，所以這就是每次回應的實際上限；
-  回應前的 thinking 不在內）；要調就在跑 ps-sdoc 的同一個 PowerShell 視窗設 `$env:PS_SDOC_READING_PART_LINES = '40'`（5～1000），只影響這個視窗。
-- 四個 sdoc 代理寫完都不再 Read 回確認（合法性本來就由外環檢查、不合格連原因退回）：每段少一個整個 session context 最大的請求。
-- 各段原樣留在 attempt 目錄（`output-part-NN.json`），合併後的整份是同目錄的 `output.json`。
-- 少寫一段、某段不是合法 JSON、某段的 reader／指紋和第一段不同、同一狀態的 final 或同一轉移的 scenario 各段不一致：整份 INVALID，
-  findings 指出第幾段；讀者若一次寫完 `output.json`（沒有分段）也照收。
-
-### 維護驗證
-
-`test-sdoc.ps1`、`test-sdoc-assemble.ps1`、`test-sdoc-run.ps1`（合成 worker 端到端，PS 7 約 5 分鐘）、`test-claude-variant.ps1`、
-`test-ps51-static.ps1`。改 schema 或貫穿範例後跑 `test-sdoc-assemble.ps1 -WriteExamples` 重生 `claude-code/.claude/peoplesoft/sdoc/examples/`。
-這些測試只驗機制與合成資料，不代替公司機的真 PS 5.1、真 claude CLI 與企業資料驗收。
-
-- 三支 sdoc 測試以設計範例（`docs/design/spec-schema-framework`）為預期結果，範例不在搬運包：公司機上會印 `SKIP` 後結束（exit 0）。
-  公司機搬完後的確認改用「第一次輸入清單停在 DOC1-0-01、建出四個骨架檔」（不呼叫模型）。
-- 部署版面演練（維護端）：`ps-bundle.ps1` 把 `transfer/ps-bundle-claude-*of*.txt` 各份解到空目錄（`.claude\` 在根目錄、檔案換行是 CRLF），
-  再把 `docs/design/spec-schema-framework` 複製進去，跑 test-sdoc、test-sdoc-run 的守門組（`-Only gate`）與第一次 `ps-sdoc.ps1`；
-  測試比對檔案內容一律不比換行。
-- 真 Windows PowerShell 5.1：GitHub Actions `ps51-tests`（`.github/workflows/ps51-tests.yml`）在 Windows runner 以 `powershell.exe`
-  跑上述測試與部署版面演練。test-sdoc-run 拆成三組平行（`-Only walk｜edge｜gate`，本機也能這樣只跑一組），一輪約 10 分鐘，仍不是每次推都跑（只限動到 scripts、claude-code、設計範例、搬運包或工作流程本身）：
-  推到 `main` 一定跑（公司機拿的版本）；推到 `claude/**` 只有 head commit 的標題以 `[ps51]` 開頭才跑（說明裡提到不算）（PS 7 本機測試證明不了 5.1 行為的改動才加：
-  編碼、檔案共用、cmd.exe／Start-Process、JSON 解析、文化設定、腳本新用到的 .NET API）；也可在 Actions 頁手動觸發。
-  其他推送會開一筆 run，但兩個 job 立刻略過。平常以本機 PS 7 測試與 5.1 靜態守衛為準，不等 CI。
-  新增測試要加進工作流程的清單；`test-oracle-runtime.ps1` 需要真 OpenCode session，不放進去。
-- 5.1 相容的靜態檢查：除 `test-ps51-static.ps1` 外，可用 PSScriptAnalyzer 的 PSUseCompatibleSyntax／Commands／Types 規則配 Windows PowerShell 5.1
-  設定檔（模組內附 `compatibility_profiles`）；它查不到預設編碼、ConvertFrom-Json 行為、原生命令 stderr、排序文化、路徑分隔這類語意差異。
-
-## SOP-29 Spec 文件 OpenCode 版（Claude Code 版的備案；兩版並行）
-
-Claude Code 版（SOP-28）遇到公司 gateway、CLI 之類一時解不了的問題時，用 OpenCode CLI＋另一個模型跑同一個 Spec 文件流程。
-研究規則、檢核、產出格式與 Claude Code 版相同（同一個外環 `scripts/ps-sdoc.ps1`；同一份 worker 輸出兩版發布的文件逐位元相同），
-只換 CLI 與模型。Claude Code 版的檔（`CLAUDE.md`、`.claude/**`）不必動（同一個資料夾時仍要解同一次交接的 Claude Code 版搬運包，見第 1 步）。
-SOP-28 的「研究包每頁上限」「狀態圖解讀分段寫出」「session 失敗但產出已驗收照收」兩版相同；「外環的 Claude Code 環境預設」只套 Claude Code 版。
-
-□ 1. 搬運：OpenCode 版搬運包（`transfer/ps-bundle-opencode-01ofNN.txt`…，SOP-27）。可以解在 Claude Code 版的同一個資料夾
-     （`scripts/**` 兩版共用、`.claude/` 不受影響；研究知識 `docs/ps-research`、狀態圖都在原地），也可以另開資料夾。
-     同一個資料夾時，同一次交接的 Claude Code 版搬運包也要解：有 `.claude/` 的資料夾 ps-fs-doctor 照 Claude Code 版的 manifest 檢查，
-     只解 OpenCode 版會把更新過的共用 scripts 報成「版本不符」（M）；兩包都解之後兩版都一致（沒改的 `.claude/`、`CLAUDE.md` 顯示「相同」）。
-     OpenCode 版那邊的檢查：`$env:PS_CLI = 'opencode'` 後再跑 ps-fs-doctor（檢查完關掉這個視窗或 `Remove-Item Env:PS_CLI`）。
-     另開資料夾只解 OpenCode 版；研究知識 `docs\ps-research` 要另外複製過去。
-□ 2. **唯一要填的地方**：`.opencode/peoplesoft/sdoc/model.yaml` 的 `model` 那一行，寫 `<provider>/<model>`，照
-     `opencode models <provider>` 列出的原樣（大小寫、冒號、斜線照抄）。預設先放小模型 `anthropic/claude-haiku-4-5`。
-     provider 的連線（網址、金鑰）在 OpenCode 自己的全域 `opencode.json`，不寫進 repo。狀態圖讀者、研究、覆核、乾淨讀者、判定的
-     session 全用這個模型；臨時試別的模型可在命令加 `-Model <provider>/<model>`（不改檔）。搬運包重解時，已填的 model.yaml 保留本機。
-□ 3. 其他沿用 OpenCode 版原本的設定：全域 `opencode.json` 註冊的四個 MCP（名字逐字相同）、SOP-17 第 0 步的 headless 權限
-     （`doom_loop: deny`、`external_directory: allow`）、`.opencode/peoplesoft/customization-profile.yaml` 已回填的值
-     （兩版 profile 鍵值相同：沒填過就把 `.claude\peoplesoft\customization-profile.yaml` 整份複製過來；外環看到沒填會提醒）。
-□ 4. 執行（在專案資料夾的 PowerShell）：
-     `powershell -NoProfile -File scripts\ps-sdoc.ps1 -Cli opencode -Components 'TW_DEMO_A,TW_DEMO_B'`
-     （名稱為合成範例）。同一資料夾有 `.claude/` 時 `-Cli opencode` 一定要帶，不帶就是 Claude Code 版；另開的資料夾只有
-     `.opencode/` 時可省略。也可在 OpenCode 對話切到 `ps-spec-author` 後輸入 `/ps-spec TW_DEMO_A TW_DEMO_B`（它固定帶 `-Cli opencode`、
-     每次一個 session、DOC1-3-02-<n> 自動續跑）。輸出最前面一行 `OpenCode 模型：<model>（<設定檔>）` 是這次用的模型。
-□ 5. 第一次：DOC1-0-01，在 `.ps-private\sdoc-opencode\<jobId>\` 建四個骨架檔（填法同 SOP-28）。同一資料夾的 Claude Code 版
-     已放好同一組 Component 的 status.md 時，自動複製 status.md（與已填的 project.md）過來；之後兩版各自獨立，改一邊不影響另一邊。
-□ 6. 開第一個 session 前，外環先問 `opencode models <provider>`：模型不在清單或 provider 沒設定 → 印「模型不能用」並停在 DOC1-9-01
-     （不必等 session 失敗）；查不了（逾時、無法執行）只提醒、照常開 session。
-□ 7. 結論碼與 SOP-28 相同（`.opencode/peoplesoft/spec/support-codes.md` 的 DOC1）。DOC1-3-04（session 失敗）時：OpenCode 沒有
-     Claude Code 的 api_retry 事件，判讀行只有逾時與靜止時間；錯誤訊息在 `.ps-runtime\sdoc-opencode-logs\` 最新的 `.err.txt`
-     （OpenCode 對模型名、provider 錯誤常只回「Unexpected server error」——先回第 2 步確認模型）。
-
-| 什麼 | Claude Code 版 | OpenCode 版 |
-|---|---|---|
-| 命令 | `scripts\ps-sdoc.ps1 -Components '…'` | 同左加 `-Cli opencode` |
-| 模型 | `.claude/settings.json`（sonnet） | `.opencode/peoplesoft/sdoc/model.yaml`（唯一要填） |
-| 人工輸入 | `.ps-private\sdoc\<jobId>\` | `.ps-private\sdoc-opencode\<jobId>\` |
-| 產出入口 | `docs\ps-spec\<jobId>\README.md` | `docs\ps-spec-opencode\<jobId>\README.md` |
-| 執行狀態／log | `.ps-runtime\sdoc\`／`.ps-runtime\sdoc-logs\` | `.ps-runtime\sdoc-opencode\`／`.ps-runtime\sdoc-opencode-logs\` |
-| session slot（同一版一次一個 session） | `Global\MCPSample-OpencodeSession` | `Global\MCPSample-OpencodeSession-opencode`（兩版可以同時跑） |
-| 契約、schema、範例 | `.claude/peoplesoft/sdoc/` | `.opencode/peoplesoft/sdoc/`（資料檔逐字相同，契約只換工具用語） |
-| agent 讀寫範圍 | hook（PowerShell） | agent 檔的 permission（read／edit／task） |
-
-- 兩版同一資料夾並存：jobId 相同，但目錄分開、各有自己的研究版本，互不覆蓋；換來換去不會讓另一版重開研究版本。
-  兩版可以同時跑：session slot 兩版各一把（Claude Code 版沿用原本那把、OpenCode 版另一把），各自一次一個 headless session；
-  同一版另一個外環（ps-auto-loop／ps-spec -Run／補研究迷你圈／另一個 ps-sdoc）正在跑時才停在 DOC1-3-03（不扣失敗次數），錯開再跑。
-  還沒換新 scripts 的資料夾只認原本那把（與 Claude Code 版排隊）。
-- 兩版同時跑時兩邊的研究都會查 DB：照 SOP-12，輕量查詢可並行、重載（稽核 SQL 風暴）會排隊逾時；出現成批逾時或 UNVERIFIABLE 就錯開時間。
-- 同一資料夾有 `CLAUDE.md` 時，Claude Code 只讀 `CLAUDE.md`、不讀 OpenCode 版帶進來的 `AGENTS.md`（沒有 `CLAUDE.md` 時才讀 `AGENTS.md`）：
-  Claude Code 版的指引不變。Claude Code 的 `/config` 把 Project instructions 改成 `claude-md-and-agents-md` 才會兩個都讀——公司機保持預設。
-- 外環開 OpenCode session 時設 `OPENCODE_DISABLE_CLAUDE_CODE=1`：不載入家目錄 `~/.claude/CLAUDE.md` 與 `.claude/skills`
-  （公司機也裝了 Claude Code，不讓兩邊的設定混在一起）。只在 ps-sdoc 這個行程內，跑完還原。
-- 自己開 OpenCode 對話（TUI）時，同一資料夾的 `.claude/skills` 會和 `.opencode/skills` 同名；要在同一資料夾開對話，先在同一個
-  PowerShell 視窗設 `$env:OPENCODE_DISABLE_CLAUDE_CODE = '1'` 再執行 `opencode`。
-- 小模型調整：狀態圖解讀每段行數 `$env:PS_SDOC_READING_PART_LINES`（預設 60；回應常被截斷時調小，例如 30）；每個 session 上限 `-TimeoutMin`。
-- OpenCode 的 grep／glob 權限只比對搜尋字樣、不比對路徑：研究 worker 的 grep 可能搜到工單範圍外的檔（讀檔仍受 read 權限限制，
-  與 ps-clone-worker 相同）；乾淨讀者與判定因此不開 grep／glob，只用 read（讀目錄會列出檔名）。
-- 回報維護端：最後一行 DOC1 結論碼、說明是 OpenCode 版，以及「欄位統計」「乾淨讀者（L5）」兩行的計數；模型只講類別（例：地端小模型），
-  不貼 provider 網址、路徑、物件名。
-
-### 維護驗證
-
-`test-sdoc-run.ps1 -Only opencode`（OpenCode 版的目錄、model.yaml、`-Model`／`-Cli` 檢查、與 Claude Code 版同資料夾並存、
-同一份合成 worker 輸出兩版發布的文件逐位元相同、模型預檢、session slot 兩版各一把（另一版占著照樣取得、同一版占著 SLOT_BUSY）；
-Windows 另以假 `opencode.cmd`／`claude.cmd` 真的經 cmd.exe 走預檢、session 命令列與兩版同時開 session）、
-`node tests/runtime-guard/run-sdoc-smoke.mjs`（真 OpenCode：四個外環 agent 以 `--agent`＋`--model` 啟動、read／write 權限邊界、
-不載入 `~/.claude/CLAUDE.md`）、`node tests/runtime-guard/run-clone-smoke.mjs`（`/ps-spec` 只准 `ps-sdoc.ps1 -Cli opencode …`）、
-`test-claude-variant.ps1`（兩版 sdoc 一一對應、資料檔逐字相同、契約標題相同）、`test-bundle.ps1`（model.yaml 保留本機）。
-
-## SOP-30 agent 唯讀帳號：表名帶擁有者前綴與授權檢查（L150）
-
-agent 連 DB 用的是唯讀帳號。這個帳號不能 `ALTER SESSION SET CURRENT_SCHEMA`（ORA-02421），也沒有同義字，裸表名一律 ORA-00942；
-DBA 不動。所以 cookbook 規則 1a：PeopleSoft 的表與 view 一律寫成 `<擁有者>.表名`（DUAL、ALL_ 開頭的資料字典不加），擁有者＝profile `oracle.currentSchema`，不執行 ALTER SESSION。
-
-□ 1. profile `oracle.currentSchema` 填擁有者名稱本身（不加引號；兩版 profile 都一樣）。沒填（FILL_ME）時 agent 用裸表名，
-     唯讀帳號必查不到 → SCHEMA_UNRESOLVED。
-□ 2. 用唯讀帳號跑授權檢查（`<OWNER>` 換成擁有者；32 張是 cookbook 樣板與畫面 metadata 驗證用到的 PeopleTools 表）：
-
-```sql
-SELECT T.COLUMN_VALUE AS NO_ACCESS
-  FROM TABLE(SYS.ODCIVARCHAR2LIST(
-       'PSSTATUS','PSPROJECTITEM','PSRECDEFN','PSRECFIELDDB','PSDBFIELD','PSDBFLDLABL','PSDBFLDLABLLANG',
-       'PSXLATITEM','PSXLATITEMLANG','PSPNLDEFN','PSPNLFIELD','PSPNLGROUP','PSPNLGRPDEFN','PSMENUDEFN','PSMENUITEM',
-       'PSSQLTEXTDEFN','PSPCMNAME','PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN','PSOPTIONS',
-       'PS_PRCSDEFN','PS_PRCSDEFNPNL','PS_PRCSJOBITEM','PSPRCSRQST','PS_PRCSRECUR',
-       'PSAUTHITEM','PSROLECLASS','PSROLEUSER','PSAESECTDEFN','PSAESTEPDEFN')) T
- WHERE NOT EXISTS (SELECT 1 FROM ALL_OBJECTS O
-                    WHERE O.OWNER = UPPER('<OWNER>') AND O.OBJECT_NAME = T.COLUMN_VALUE
-                      AND O.OBJECT_TYPE IN ('TABLE', 'VIEW'));
-```
-
-     沒有列＝都查得到。有列＝那幾張唯讀帳號看不到：用擁有者帳號 `GRANT SELECT ON <OWNER>.<表名> TO <唯讀帳號>;` 補；
-     不補的話，用到那張表的查法（例：導覽入口、授權、排程）agent 記 gaps。
-□ 3. 冒煙測試（唯讀帳號）：`SELECT COUNT(*) FROM <OWNER>.PSPNLFIELD WHERE ROWNUM = 1;` 回 1＝通。
-□ 4. 業務資料表（`PS_<RECNAME>`；cookbook §2g 選項分布、§7c 欄位使用剖析）同樣要唯讀帳號有 SELECT；沒有的那張 agent 記 gaps、
-     判不了就保留，不換表名硬湊。
-□ 5. agent 回 view/table not found：先看那句 SQL 每個表名都帶了前綴沒（漏帶＝模型漏了，cookbook 連線生命週期第 3 步會補一次重發）；
-     帶了仍查不到＝第 2 步那張表沒授權，或本環境沒有這張表。
-□ 6. 舊研究文件的 SQL 證據多半是裸表名：auditor 重跑前自己補前綴（只補前綴、其餘一字不改），文件不必改。
-□ 7. 端對端（OpenCode 版，test-scenarios R43）：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`
-     ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 sql_run 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。
-@@@PSBUNDLE-END|.opencode/peoplesoft/SOP.md
-@@@PSBUNDLE-PART-END|88d9d0c9cad051c8|3|8
+@@@PSBUNDLE-PART-END|cc43bcce8d163e2e|3|8

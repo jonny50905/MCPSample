@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit a87e342）第 1／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 887cde0）第 1／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|a87e342|c064c8a062249fce|1|6|10390|a8dd38b590772811153a3181dacc657a740f5a6194ae485cd5835ab60d033d90
-@@@PSBUNDLE|1|claude|a87e342|149
+@@@PSBUNDLE-PART|1|claude|887cde0|ef890285ce6e24b5|1|6|10396|e6d338e0376d2f0032525e5422f73c315da818234126f66bb97983214dae00fe
+@@@PSBUNDLE|1|claude|887cde0|149
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|68|b7b6725e509225672e72ae400dacacd60b3f543da361335aaf4e886221fd1aa2|0
 ---
 name: ps-ae-flow
@@ -3053,7 +3053,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.claude/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/oracle-query-cookbook.md|863|38d63a6abaf4ce40019ca8f188d31d9cddf7b7902fa59b84ce368a521a5d7d9a|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/oracle-query-cookbook.md|869|da6f34aac42322b9c80c18bd812992d285c8f0c3ffaa709f313e1674bdfcee46|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
@@ -3630,18 +3630,21 @@ FETCH FIRST 50 ROWS ONLY
 
 **2l. 畫面元件與設計期屬性（一個 Page 一次；NN「## 畫面元件」與「這個欄位是什麼元件、唯讀嗎、必填嗎、查值查哪裡」）**
 
-只列綁欄位的元件、按鈕／連結、Grid、Scroll Area、HTML Area、Subpage、Secondary Page；Static Text、Frame、Group Box、
-Static Image 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
+只列綁欄位的元件、按鈕／連結、Grid（含 Tab Separator）、Scroll Area、Scroll Bar、HTML Area、Subpage、Secondary Page；
+Static Text、Frame、Group Box、Static Image、Horizontal Rule 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
 FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
 
 ```sql
 SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
        CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List Box' WHEN 6 THEN 'Long Edit Box'
                         WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
-                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 10 THEN 'Scroll Bar' WHEN 11 THEN 'Subpage'
+                        WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 15 THEN 'Push Button/Hyperlink: External Link'
                         WHEN 16 THEN 'Push Button/Hyperlink: Internal Link' WHEN 18 THEN 'Secondary Page'
                         WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Hyperlink: Secondary Page'
-                        WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area' ELSE 'OTHER' END AS CONTROL,
+                        WHEN 24 THEN 'Tab Separator' WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area'
+                        ELSE 'OTHER' END AS CONTROL,
        TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
        CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
        CASE WHEN BITAND(P.FIELDUSE, 2) > 0 THEN 'INVISIBLE' END AS INV,
@@ -3667,7 +3670,7 @@ SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
   FROM <schema>.PSPNLFIELD P
   LEFT JOIN <schema>.PSRECFIELDDB F ON F.RECNAME = P.RECNAME AND F.FIELDNAME = P.FIELDNAME
  WHERE P.PNLNAME = :pageName
-   AND P.FIELDTYPE NOT IN (0, 1, 2, 3)
+   AND P.FIELDTYPE NOT IN (0, 1, 2, 3, 23)
    AND P.FIELDNUM > :afterFieldNum
  ORDER BY P.FIELDNUM
 FETCH FIRST 40 ROWS ONLY
@@ -3689,7 +3692,10 @@ FETCH FIRST 40 ROWS ONLY
 
 - DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
 - 元件名稱＝App Designer 的元件名；按鈕／超連結在冒號後接目的地：PeopleCode Command＝按下去跑所綁欄位的 FieldChange
-  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁。
+  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁、External Link＝開外部網址
+  （網址不在本查詢的欄位裡）。
+- Scroll Bar＝舊式的層級捲動，和 Scroll Area 一樣框住下一層的列；Tab Separator＝Grid 裡把欄位分成分頁的分隔，LBLTEXT 是分頁標籤，
+  它後面的欄位到下一個 Tab Separator 為止屬於這個分頁。
 - RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
 - KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
 - XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
@@ -10391,4 +10397,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   }
 }
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/schemas/03-roles-permissions.schema.json
-@@@PSBUNDLE-PART-END|c064c8a062249fce|1|6
+@@@PSBUNDLE-PART-END|ef890285ce6e24b5|1|6

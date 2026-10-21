@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a87e342）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 887cde0）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a87e342|88d9d0c9cad051c8|2|8|6269|bdcce63360fd0c388c372fcac795b05e844efe683bab8c5e4173bd00e0b9d387
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4134|c2f05270b7d36355147be8b83c753ad2bbeb9d525d7266804bb131e1b28c71b5|0
+@@@PSBUNDLE-PART|1|opencode|887cde0|cc43bcce8d163e2e|2|8|6106|248478caf70041345a629aeea41d8804198e24be63aafbec0a1aa461a421a474
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4149|c8d5d040fc24d54067e9922a0fbf084604b0a47011660b423602feb9f5ddafe0|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4136,6 +4136,21 @@
   同名多個 market 版本時每列各寫一列；代碼 10／15／23／24 與 FIELDUSE 8 等第五輪結果。
 - 驗證：§2m 以合成資料跑過（DuckDB，表放在另一個 schema：多動作、ADD_SEARCH、OTHER=128、查無）；§2l 改名後重跑；第五輪兩句 SQL 以合成資料跑過；
   test-spec 的 UI.CONTROLS 夾具加 Component 列（4 列、3 列有屬性、2 列有查值、第一列元件＝Component）；全套測試、ps-agent-doc-lint 全過。
+
+### L153 元件代碼 10、15、23、24 以 App Designer 確認後進 §2l；相關顯示的對應與 FIELDUSE 8 待第六輪（2026-10-21）
+
+- 第五輪結果（唯讀帳號，`docs/design/ui-metadata-check-r5.md`）：R5A（CODE N LVL REC LBL GRID）10＝30 100 0 100 0、15＝1 0 0 100 0、
+  19＝587 100 100 24 16、23＝59 31 2 0 0、24＝9 100 0 100 100、27＝588 100 0 54 2。管理者以 SAMPLE_NUM 對 App Designer Order 頁籤的 tab order 欄
+  （＝PSPNLFIELD.FIELDNUM）看元件：10 Scroll bar、15 按鈕（Destination External Link）、23 Horizontal rule、24 Tab separator——和社群表一致。
+- R5B＝CTL_N 1105、B8_N 2044、BOTH8 84、REL_N 1984（B16 兩個數沒回）：以「ASSOCFIELDNUM＝控制欄 FIELDNUM」找到的控制欄只有 8% 帶 8，
+  帶 8 的欄位數卻和相關顯示個數相近 → 懷疑 ASSOCFIELDNUM 存的是控制欄的 Field ID（PNLFLDID，調 tab order 不會變），第四輪 H0 只在沒調過順序的頁面成立。
+  第六輪 SQL `docs/design/ui-metadata-check-r6.md`（H0 與 H3 同時比：控制欄個數、有 prompt、prompt 表＝相關顯示 Record、帶 8；B16 補回；Field ID 重複檢查）。
+- 落點：兩版 cookbook §2l：10 Scroll Bar、15 Push Button/Hyperlink: External Link、24 Tab Separator 解碼；23 Horizontal Rule 和 Frame、Static Image 一樣不列（裝飾）；
+  值域加 External Link、Scroll Bar、Tab Separator 的意思。
+- 沒做：§2l 的 RELATED_TO／DISPLAY_CONTROL 仍照 FIELDNUM 對應——第六輪若 H3 成立，RELATED_TO 要換成以 PNLFLDID 找到的控制欄 FIELDNUM、
+  DISPLAY_CONTROL 改用 FIELDUSE 8；15 的網址來源欄位沒查。
+- 驗證：§2l 合成資料加 10／15／24 與未知代碼 26（OTHER）、23 不列、續查；第六輪 SQL 以合成資料跑過（H3 成立、兩者相同兩種情境）；
+  ps-agent-doc-lint、test-auto-loop／ps51-static／knowledge／supplemental／spec、搬運包重生後 test-claude-variant／test-bundle 全過。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -4295,7 +4310,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|863|b8ce6149bb1f02e38cc2f383d155a4a0301115e76c07a4220190b9768d2548f5|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|869|ff4445e7f704702ce2cf29adc55bbfdc5ab078b134065e950b40892274558538|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
@@ -4872,18 +4887,21 @@ FETCH FIRST 50 ROWS ONLY
 
 **2l. 畫面元件與設計期屬性（一個 Page 一次；NN「## 畫面元件」與「這個欄位是什麼元件、唯讀嗎、必填嗎、查值查哪裡」）**
 
-只列綁欄位的元件、按鈕／連結、Grid、Scroll Area、HTML Area、Subpage、Secondary Page；Static Text、Frame、Group Box、
-Static Image 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
+只列綁欄位的元件、按鈕／連結、Grid（含 Tab Separator）、Scroll Area、Scroll Bar、HTML Area、Subpage、Secondary Page；
+Static Text、Frame、Group Box、Static Image、Horizontal Rule 不列（Group Box 的顯示條件走 §2h～§2i）。一次最多 40 列：回滿 40 列 → `:afterFieldNum` 換成最後一列的
 FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
 
 ```sql
 SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
        CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List Box' WHEN 6 THEN 'Long Edit Box'
                         WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
-                        WHEN 11 THEN 'Subpage' WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 10 THEN 'Scroll Bar' WHEN 11 THEN 'Subpage'
+                        WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
+                        WHEN 15 THEN 'Push Button/Hyperlink: External Link'
                         WHEN 16 THEN 'Push Button/Hyperlink: Internal Link' WHEN 18 THEN 'Secondary Page'
                         WHEN 19 THEN 'Grid' WHEN 21 THEN 'Push Button/Hyperlink: Secondary Page'
-                        WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area' ELSE 'OTHER' END AS CONTROL,
+                        WHEN 24 THEN 'Tab Separator' WHEN 25 THEN 'HTML Area' WHEN 27 THEN 'Scroll Area'
+                        ELSE 'OTHER' END AS CONTROL,
        TRIM(P.RECNAME) AS RECNAME, TRIM(P.FIELDNAME) AS FIELDNAME, TRIM(P.LBLTEXT) AS LBLTEXT,
        CASE WHEN BITAND(P.FIELDUSE, 1) > 0 THEN 'DISPLAY_ONLY' END AS DO,
        CASE WHEN BITAND(P.FIELDUSE, 2) > 0 THEN 'INVISIBLE' END AS INV,
@@ -4909,7 +4927,7 @@ SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
   FROM <schema>.PSPNLFIELD P
   LEFT JOIN <schema>.PSRECFIELDDB F ON F.RECNAME = P.RECNAME AND F.FIELDNAME = P.FIELDNAME
  WHERE P.PNLNAME = :pageName
-   AND P.FIELDTYPE NOT IN (0, 1, 2, 3)
+   AND P.FIELDTYPE NOT IN (0, 1, 2, 3, 23)
    AND P.FIELDNUM > :afterFieldNum
  ORDER BY P.FIELDNUM
 FETCH FIRST 40 ROWS ONLY
@@ -4931,7 +4949,10 @@ FETCH FIRST 40 ROWS ONLY
 
 - DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
 - 元件名稱＝App Designer 的元件名；按鈕／超連結在冒號後接目的地：PeopleCode Command＝按下去跑所綁欄位的 FieldChange
-  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁。
+  （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁、External Link＝開外部網址
+  （網址不在本查詢的欄位裡）。
+- Scroll Bar＝舊式的層級捲動，和 Scroll Area 一樣框住下一層的列；Tab Separator＝Grid 裡把欄位分成分頁的分隔，LBLTEXT 是分頁標籤，
+  它後面的欄位到下一個 Tab Separator 為止屬於這個分頁。
 - RELATED_TO＝本列是相關顯示（代碼旁的說明欄），值＝控制欄的 FIELDNUM；DISPLAY_CONTROL＝有相關顯示以本列為控制欄。
 - KEY、REQUIRED、REASONABLE_DATE、AUTO_UPDATE（存檔時系統自動押時間）是 Record 欄位的設定，同一欄位在每個 Page 都一樣。
 - XLAT＝值須在 Translate 清單內；YES_NO＝只收 Y／N。
@@ -6086,188 +6107,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|131|48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972|0
-# <NN> <功能名>（[[<Component / 物件名>]]）
-
-> 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE | PARTIAL | BLOCKED
-> Origin：<CUSTOM_PREFIX | …>　搜尋政策：<mode>　Delivered fallback：<未使用 | 使用於…>
-
-<!-- 物件細節寫進 wiki entity 檔（../wiki/<物件名>.md），本文用 [[物件名]]
-     連結、不重複詳述；本文專注「功能流程」的敘事。 -->
-
-## 相關物件
-
-| 物件 | 角色 |
-|---|---|
-| [[TW_XXX]] | 主 Component |
-| [[PS_YYY]] | 寫入目標 |
-
-## 功能定位
-
-<誰在用、業務目的。一段話。>
-
-### 導覽入口
-
-<依 cookbook §2k 取得的 Portal Registry 入口；每個入口一列。沒查證就整段寫
- 「Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）」。>
-
-| # | Portal | 入口型 | CREF 物件名 | 導覽入口（Portal Registry 登錄路徑） | 可見性 | 語系／來源 | 證據 |
-|---|---|---|---|---|---|---|---|
-| 1 | <PORTAL_NAME> | PORTAL_REGISTRY | <PORTAL_OBJNAME> | <段1> > <段2> > <段3> | <CLASSIC_NAV_VISIBLE｜REGISTRY_DEFINED｜UNKNOWN_VISIBILITY> | <語系>／<LANG｜BASE> | <E01.n> |
-
-<!-- 入口型：PORTAL_REGISTRY / CREF_LINK / NAV_COLLECTION / FLUID_TILE / NAVBAR / UNKNOWN
-     可見性：CLASSIC_NAV_VISIBLE（cookbook §2k-C canonical 回傳的列：Classic 選單會顯示，未經 user 授權驗證）
-             REGISTRY_DEFINED（只有 registry 證據，未跑 canonical）
-             UNKNOWN_VISIBILITY（祖先 hidden-from-nav／CREF 過期／走訪未達根／未解析 surface）
-             AUTHORIZED_FOR_CONTEXT 本版不得產出，正文也不得出現這個字串。
-     CREF 物件名＝canonical 的 CREF_OBJECT，查不到寫 UNRESOLVED。多入口就寫多列，不得壓成一列。
-     診斷形 CLASSIC_VISIBLE=0 的列不列入本表，改在「未解事項」記一行原因（hidden／過期／未達根）。
-     profile navigation.surfaces 非 CLASSIC_ONLY 時，Navigation Collection／Fluid Tile／NavBar 即使查無也要在
-     「未解事項」記一行 gap、不得宣稱「唯一入口」；CLASSIC_ONLY 不需。
-     值域見 mcp-tool-contracts.md §3。 -->
-
-### Technical Menu
-
-<PSMENUITEM 的 MENUNAME / BARNAME / ITEMNAME，以「/」分隔，多筆用分號。
- 這是 App Designer 技術選單 metadata，**不是使用者點得到的路徑**。>
-
-<MENUNAME> / <BARNAME> / <ITEMNAME>
-
-<!-- 不可把這一段當成「導覽入口」的 fallback：BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級，
-     串成 A > B > C 就是誤報。兩段是兩個 claim，各自附證據，缺哪段就照實寫未確認。 -->
-
-## 畫面與欄位
-
-| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |
-|---|---|---|---|---|
-| MIL_STATUS | 兵役狀態 | Translate | 免役=E / 服役中=S / … | 欄位：有值（全表，查詢日 YYYY-MM-DD）；E：使用中（資料 N 筆） |
-
-<動態 label / 動態選項標 DYNAMIC_RUNTIME 並附 evidence。>
-
-<!-- 生命狀態格的欄位剖析（「欄位：…」）照 oracle-query-cookbook §7c 的記法，只寫有值或非預設 0 筆，
-     不寫實際筆數；沒剖析就只寫選項生命狀態。 -->
-
-<!-- 物件無畫面（Function Library 等）：標題保留，內文寫
-     「（無——Function Library，無使用者畫面）」——不適用要申報，
-     不能省略標題（標題是機器契約，L103）。 -->
-
-## 畫面元件
-
-<依 oracle-query-cookbook §2m（Component 一次，寫第一列）與 §2l（每個 Page 一次）照轉寫規則填；每次的 SQL 進 Evidence 附錄。>
-
-| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |
-|---|---|---|---|---|---|
-| TW_DEMO_REQ | 0 |  | Component | ADD UPDATE_DISPLAY | SEARCH TW_DEMO_REQSRCH |
-| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（VIEW；鍵 SETID,DEPTID,EFFDT） |
-| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |
-| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
-| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
-
-<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
-     # ＝FIELDNUM（Component 那列寫 0）；屬性與查值的字樣照 §2m、§2l 轉寫規則，不翻譯、不改寫。
-     主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
-     沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
-
-## 行為邏輯
-
-<條件 → 動作，逐項標信心等級：>
-
-- **CONFIRMED**：選 E 時開放免役原因並帶入日期（`<filePath>:<行號>`）
-- **DYNAMIC_RUNTIME**：核准後回寫的目標表由設定檔決定（`<filePath>:<行號>`）
-
-## 資料流
-
-| 表 | 操作 | 來源 | 信心 |
-|---|---|---|---|
-| PS_TW_XXX | UPDATE | 存檔 PeopleCode | CONFIRMED |
-
-## 執行方式
-
-<線上操作 / 批次（Process、排程、Run Control 頁面）。>
-
-## 權限
-
-<Menu → Component → Permission List → Role（人數彙總）。>
-
-## 未解事項（gaps）
-
-- <查不到、超出 budget、工具受限的部分——誠實列出>
-
-## Evidence 附錄
-
-| # | 位置 | 說明 | 機器參照 |
-|---|---|---|---|
-| 1 | `peoplecode/TW_XXX/.../FieldChange.pcode:12-24` | E 分支條件 | ChunkId `3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d` |
-
-<!-- ChunkId 一律逐字複製「完整 36 字元 UUID」（如上例長度）——
-     它不是 git SHA，**禁止縮寫成前 8 碼**；縮寫會被稽核判
-     FAIL(TRUNCATED_ID)、lint 也會抓。 -->
-| 2 | SQL：`SELECT … FROM PSXLATITEM …` | 選項清單 | keyRows：E=免役… |
-| 3 | `PS_PRCSRECUR`（RECURNAME='X'） | 排程週期 | 待人工SQL |
-
-<!-- 機器參照欄只准放三種東西之一（lint 逐列檢查，L55）：
-     (a) 完整 36 字元 ChunkId
-     (b) 可重跑的 SELECT … FROM …
-     (c) 待人工SQL ← **查不到時的合法出口**
-     「ChunkId」「PeopleCode chunk」「OracleMCP SQL」這類**只是標籤不是證據**
-     ——稽核重跑時跑不了任何東西，一律判違規。
-     取不到證據時**照型別走對應出口**，不要用敘述搪塞：
-       · SQL／metadata 型（查 DB 表）查不到 → 機器參照寫 `待人工SQL`
-         （管理者自跑 SQL 後回填）
-       · CHUNK 型（程式碼）取不到 → **移除該列**、把該主張降級 INFERRED
-       兩者都要在「未解事項」記一行查法收據（查了什麼、怎麼查、結果如何）
-     **更不要在 gaps 寫「環境限制」當跳過理由**——宣稱受限卻沒有任何一列
-     走出口，lint 會直接點名（L56）；真的受限就走出口，那才叫申報。 -->
-@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/function-detail-template.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/overview-template.md|49|e2ccd269668daf8d0f7a059b3d1c8b3b00ca8f69e666439905339a69204a1e74|0
-# <領域顯示名> 業務總覽
-
-> 產生日期：<YYYY-MM-DD>　（進度與狀態見同目錄 checklist.md；本檔階段一寫完後凍結）
-> 第 <N> 版（於稽核輪次 <R> 換版）　← 換版時**照這串字寫**，第一版可省略；
->   lint 用它算落後幾輪，寫成別的格式會判成「沒換版」而繼續提醒（L54）
-> 本檔是「階段一盤點快照」——凍結後**不隨輪次更新**（L2 防覆寫截斷）；
-> 現況一律以 checklist.md／NN 檔／wiki 為準。落後多輪想刷新走 SOP-15
-> 換版程序（agent 對本檔零寫入，換版由人主導）。
-> 搜尋政策：<CUSTOM_FIRST | CUSTOM_ONLY_ROOTS>（domain <命中 domainId | 未命中，使用預設政策>）
-> Delivered fallback：<未使用 | 已使用於：…>
-
-## 一句話總結
-
-<這個業務領域在系統裡由哪些東西組成、大致怎麼運作。>
-
-## 功能地圖
-
-| # | 功能 | Component / 物件 | 類型 | Origin | 一句話說明 |
-|---|---|---|---|---|---|
-| 01 | <功能名> | [[TW_XXX]] | 線上頁面 | CUSTOM_PREFIX | <說明> |
-
-<!-- 物件欄一律用 [[wikilink]] 連到 entity 檔——總覽同時是人類的 MOC 導航頁 -->
-
-## 批次與排程
-
-| 程式 | 類型 | 何時執行 | 做什麼 |
-|---|---|---|---|
-
-## 核心資料表
-
-| Record | 用途 | 主要讀寫者 |
-|---|---|---|
-
-## 流程關係（選配——用文字箭頭，禁用圍欄圖）
-
-申請頁面 → 核准 → 批次生效
-
-<!-- 寫檔禁用三反引號圍欄（與寫入工具衝突）；需要正式圖表由人工後製 -->
-
-## 調查進度
-
-（不在本檔——見同目錄 `checklist.md`；打勾、⚠、稽核補查、Gaps 都只改那裡）
-
-## 掃描範圍聲明
-
-- 已掃角度：<UI 文字/選單（oracleMCP）、物件描述、Process 定義、客製程式碼（ES）…>
-- 未掃 / 受限：<例如 UI Semantic Index 未建、某來源 BLOCKED…>
-- 注意：本清單可能不完整——30 年系統的命名不一定命中 alias；
-  發現遺漏請直接在 checklist.md 的「調查進度」加列。
-@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/overview-template.md
-@@@PSBUNDLE-PART-END|88d9d0c9cad051c8|2|8
+@@@PSBUNDLE-PART-END|cc43bcce8d163e2e|2|8

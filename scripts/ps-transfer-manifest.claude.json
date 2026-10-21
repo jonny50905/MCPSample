@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "a87e342",
+  "commit": "887cde0",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -228,8 +228,8 @@
     },
     {
       "path": ".claude/peoplesoft/oracle-query-cookbook.md",
-      "lines": 863,
-      "sha256": "38d63a6abaf4ce40019ca8f188d31d9cddf7b7902fa59b84ce368a521a5d7d9a",
+      "lines": 869,
+      "sha256": "da6f34aac42322b9c80c18bd812992d285c8f0c3ffaa709f313e1674bdfcee46",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/oracle-query-cookbook.md"
     },

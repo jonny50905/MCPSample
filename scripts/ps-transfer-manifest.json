@@ -1,6 +1,6 @@
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "a87e342",
+  "commit": "887cde0",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -202,8 +202,8 @@
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4134,
-      "sha256": "c2f05270b7d36355147be8b83c753ad2bbeb9d525d7266804bb131e1b28c71b5",
+      "lines": 4149,
+      "sha256": "c8d5d040fc24d54067e9922a0fbf084604b0a47011660b423602feb9f5ddafe0",
       "bom": false
     },
     {
@@ -220,8 +220,8 @@
     },
     {
       "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 863,
-      "sha256": "b8ce6149bb1f02e38cc2f383d155a4a0301115e76c07a4220190b9768d2548f5",
+      "lines": 869,
+      "sha256": "ff4445e7f704702ce2cf29adc55bbfdc5ab078b134065e950b40892274558538",
       "bom": false
     },
     {
