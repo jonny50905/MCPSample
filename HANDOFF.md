@@ -5,6 +5,11 @@
 
 ## 0. 一句話現況
 
+**相關顯示定案、§2l 改用旗標（2026-10-21，L157，分支 `claude/blissful-edison-7hbeqr`）**：公司機的 Claude 查 DB 確認控制欄 FIELDNUM＝ASSOCFIELDNUM＋1、
+FIELDUSE 8＝Display Control → 兩版 cookbook §2l：相關顯示看 FIELDUSE 16、RELATED_TO＝ASSOCFIELDNUM＋1、DISPLAY_CONTROL 看 FIELDUSE 8。
+畫面元件的代碼對照全部定案（`docs/design/ui-control-sql-record.md`）。待公司機：搬兩版搬運包；用舊版寫過「## 畫面元件」的 NN 要重跑 /ps-research，
+或先刪掉該節再送 UI.CONTROLS 補研究（補研究只追加、有列會判 ALREADY_COVERED）。
+
 **盤點 SQL 紀錄＋CI 鎖測試修正（2026-10-21，L154，分支 `claude/blissful-edison-7hbeqr`）**：管理者要一份可下載的盤點 SQL 說明——
 `docs/design/ui-control-sql-record.md`（正式查詢 §2l／§2m、代碼對照與確認方式、第三輪起各輪 SQL 與結果、未定案事項、來源）。
 main `997d414` 的 Windows 5.1 CI 在慢 runner 上誤判鎖測試（walk 組只等背景執行緒 10 秒）→ 改用共用 helper、等 60 秒。
@@ -646,3 +651,4 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   AGENTS.md 協作鐵律加一條（L155）。待管理者：R6（相關顯示存 tab order 還是 Field ID、FIELDUSE 8）。
   同日續：R6 收——tab order、Field ID 都不對；有一批相關顯示的 ASSOCFIELDNUM 是 0 → 改測「從 0 起算」（L156），第七輪 SQL
   `docs/design/ui-metadata-check-r7.md` 待跑。§2l 的 RELATED_TO／DISPLAY_CONTROL 等第七輪再改。
+  同日續：第七輪收（公司機 Claude 查 DB：控制欄 FIELDNUM＝ASSOCFIELDNUM＋1、FIELDUSE 8＝Display Control）→ §2l 改（L157）。

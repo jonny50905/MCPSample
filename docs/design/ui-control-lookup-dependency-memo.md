@@ -431,6 +431,8 @@ edit 位元的常見對照（**未在公司環境驗證**；只當校準的候�
   找到的控制欄有 Prompt 的比例都在一般 Edit Box 水準、帶 8 的少：兩種都不對。帶 16 的比 ASSOCFIELDNUM 大於 0 的多 193 個（那些 ASSOCFIELDNUM＝0）。
   新假設 ASSOCFIELDNUM 從 0 起算（控制欄 tab order＝ASSOCFIELDNUM＋1）；R4A 回報的 H0 數字應是 H1 那一行。第七輪 `ui-metadata-check-r7.md`
   （改用 16 挑相關顯示，比 tab order＋1 與 Field ID＋1；可選 App Designer 對一個例子）。管理者另指示：驗證只確認代碼意思、不盤點數量（L155）。
+- **第七輪結果（2026-10-21）**：管理者交給公司機的 Claude（可查 DB）跑 R7K（控制欄是不是相關顯示 Record 的鍵、帶不帶 8）並抽查，結論：
+  ASSOCFIELDNUM 從 0 起算（控制欄 FIELDNUM＝ASSOCFIELDNUM＋1），FIELDUSE 8＝Display Control → §2l 改（L157）。相關顯示的對應定案。
 
 ### 7.2 改走補查與知識層（取代 §3.4 只活在 Spec job 裡的 meta 單元）
 

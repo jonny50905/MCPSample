@@ -4181,3 +4181,16 @@
 - 框架未動：cookbook §2l 的 RELATED_TO（現在輸出 ASSOCFIELDNUM 原值、只在大於 0 時）與 DISPLAY_CONTROL（別人的 ASSOCFIELDNUM＝本列 FIELDNUM）
   等第七輪；若 H1 成立，兩者都要改成＋1、並以 16 判斷是不是相關顯示。
 - 做法上的教訓：挑某類元件要用它的旗標（16），不要用參照欄「有沒有值」代替——參照值 0 可能是合法的索引。
+
+### L157 相關顯示定案：控制欄 FIELDNUM＝ASSOCFIELDNUM＋1、FIELDUSE 8＝Display Control——§2l 改用旗標判斷（2026-10-21）
+
+- 第七輪：管理者把驗證交給公司機的 Claude（可查 DB），prompt 附 R7K（以「控制欄的欄位名是相關顯示 Record 的鍵」與「控制欄帶 8」比 H0、H1、H3、H4
+  與前一欄）並要它抽查幾個相關顯示（含 ASSOCFIELDNUM＝0、tab order 與 Field ID 不一致的頁面）。回報：H1 成立——控制欄 FIELDNUM＝ASSOCFIELDNUM＋1；
+  FIELDUSE 位元 8＝Display Control。
+- 落點：兩版 cookbook §2l——RELATED_TO 從「ASSOCFIELDNUM 大於 0 時原值」改成「FIELDUSE 帶 16 時 ASSOCFIELDNUM＋1」（補回指到第 1 欄、存 0 的相關顯示）；
+  DISPLAY_CONTROL 從「有別的欄位的 ASSOCFIELDNUM 等於本列 FIELDNUM」改成「FIELDUSE 帶 8」（也省掉一個子查詢）；值域照改。
+  NN 範本、回報契約的範例列意思不變（RELATED_TO=4＝控制欄 tab order 4）。
+- 影響：用舊版 §2l 寫過「## 畫面元件」的 NN，RELATED_TO 差 1、漏了指到第 1 欄的相關顯示、DISPLAY_CONTROL 可能標錯欄。補研究只追加、
+  該節已有列會判 ALREADY_COVERED，不會重寫——要嘛重跑 /ps-research，要嘛先把那一節整節刪掉、再照 SOP-23 送 `-FactKind UI.CONTROLS`。
+- 驗證：§2l 合成資料改成「ASSOCFIELDNUM 從 0 起算」並加一個指到第 1 欄（存 0）的相關顯示：控制欄標 DISPLAY_CONTROL、相關顯示 RELATED_TO＝4 與 1；
+  ps-agent-doc-lint、test-auto-loop、test-claude-variant、test-bundle 全過。
