@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 470011c）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 15e47b9）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|470011c|b1fdd08f568c7a4a|2|8|6118|0bfa041b6bb6431fe91d96bd914aab73e7c580df4b1fe9d7f2461ad41ba190c2
+@@@PSBUNDLE-PART|1|opencode|15e47b9|76e931de78bf2763|2|8|6118|0bfa041b6bb6431fe91d96bd914aab73e7c580df4b1fe9d7f2461ad41ba190c2
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4161|593c5b49ce35bdc5176c55145850f5b33eb1f61d4307c7c8ce69e5349cb2b15a|0
 # 教訓歸檔（applied）
 
@@ -6119,4 +6119,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-PART-END|b1fdd08f568c7a4a|2|8
+@@@PSBUNDLE-PART-END|76e931de78bf2763|2|8
