@@ -640,3 +640,5 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   2026-10-21：第五輪收（10／15／23／24 以 App Designer 確認、進 §2l，L153；R5B 指向 ASSOCFIELDNUM＝Field ID 的可能）；第六輪 SQL `docs/design/ui-metadata-check-r6.md` 待跑。
   同日續：盤點 SQL 紀錄 `docs/design/ui-control-sql-record.md`（給管理者留存）；CI 鎖測試誤判修正（L154）。
   同日續：管理者要的是「盤點什麼、結果、怎麼解讀」→ 紀錄改寫成代碼表與解讀為主，SQL 原文改列位置。
+  同日續：管理者質疑 Group Box／Subpage 沒有、按鈕只有 1 個——是紀錄寫法讓人誤會（V6 當時只回 OK 沒回筆數；「不列」指不寫進 NN；
+  按鈕分 12／15／16／21 四個代碼、合計 1131）→ 紀錄補說明，R6C 補各代碼筆數（`docs/design/ui-metadata-check-r6.md`）。

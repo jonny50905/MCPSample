@@ -64,7 +64,7 @@ SAME＝兩種方式找到同一欄的個數；B16＝相關顯示裡帶 16 的個
 - H3 的數比 H0 小或差不多 → 維持 tab order 的對應；8 在這個環境不是 Display Control。
 - B16 的兩個數都接近 N → 16＝Related Field，和 ASSOCFIELDNUM 大於 0 是同一件事。
 
-可選（App Designer 對照，R6 判不出來時再做）：找一個相關顯示欄位（Use 頁籤勾了 Related Field），記下它的 Related Control Field 是哪一欄；
+R6B（可選，App Designer 對照，R6 判不出來時再做）：找一個相關顯示欄位（Use 頁籤勾了 Related Field），記下它的 Related Control Field 是哪一欄；
 在 Order 頁籤看那個控制欄的 tab order 和 Field ID，兩個數字不一樣的話跑下面這句，把 ASSOC 和那兩個數字一起回報：
 
 ```sql
@@ -73,9 +73,27 @@ SELECT 'ASSOC=' || ASSOCFIELDNUM AS RESULT
  WHERE PNLNAME = '<頁面>' AND RECNAME = '<相關顯示的 Record>' AND FIELDNAME = '<相關顯示的欄位>';
 ```
 
+## R6C 各元件代碼的筆數與頁數（補盤點紀錄）
+
+第一輪 V6 的輸出其實有每個代碼的筆數，但只回報了 OK，盤點紀錄裡 0～9、11（含 Group Box、Subpage）的筆數因此空著。這句一行補齊：
+
+```sql
+SELECT (SELECT LISTAGG(FIELDTYPE || ':' || CNT || ':' || PAGES, ' ') WITHIN GROUP (ORDER BY FIELDTYPE)
+          FROM (SELECT FIELDTYPE, COUNT(*) AS CNT, COUNT(DISTINCT PNLNAME) AS PAGES
+                  FROM <schema>.PSPNLFIELD
+                 WHERE PNLNAME LIKE 'TW\_%' ESCAPE '\'
+                 GROUP BY FIELDTYPE))
+       || ' PAGES=' || (SELECT COUNT(DISTINCT PNLNAME) FROM <schema>.PSPNLFIELD
+                         WHERE PNLNAME LIKE 'TW\_%' ESCAPE '\') AS RESULT
+  FROM DUAL;
+```
+
+怎麼看：一行 `代碼:元件筆數:用到的頁數 …`，最後 `PAGES=` 是客製頁面總數。整行照抄。
+
 ## 回報範本
 
 ```
 R6 ___（整行）
-（可選）ASSOC=__，控制欄 tab order=__、Field ID=__
+R6C ___（整行）
+（可選）R6B ASSOC=__，控制欄 tab order=__、Field ID=__
 ```

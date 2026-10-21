@@ -80,6 +80,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-21 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   盤點紀錄補說明（筆數「未統計」不是 0、「不列」是不寫進研究文件、按鈕依 Destination 分四個代碼合計 1131）與 R6C 各代碼筆數 SQL，
+   框架檔未動，各份重生，併入前 `main` 頭 `e363e02`；同日稍早同一分支併入
    盤點紀錄改寫（`docs/design/ui-control-sql-record.md` 改成每支 SQL 盤點什麼、結果代碼表、輸出怎麼解讀；框架檔未動，AGENTS.md 在 OpenCode 搬運包裡，各份重生），
    併入前 `main` 頭 `b9eef9c`；同日稍早同一分支併入
    盤點 SQL 紀錄（`docs/design/ui-control-sql-record.md`）與 Windows 5.1 CI 鎖測試誤判修正（walk 組改用共用 helper、等 60 秒；L154），各份重生，

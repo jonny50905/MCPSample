@@ -11,7 +11,7 @@
 
 | 盤點對象 | 存在哪裡 | 用到的 SQL |
 |---|---|---|
-| 頁面元件的種類（Edit Box、Grid、按鈕…） | PSPNLFIELD.FIELDTYPE | V6、G1、R2B、R2C、R3A、R5A |
+| 頁面元件的種類（Edit Box、Grid、按鈕…） | PSPNLFIELD.FIELDTYPE | V6、G1、R2B、R2C、R3A、R5A、R6C |
 | 元件的設計期屬性（唯讀、隱藏、相關顯示…） | PSPNLFIELD.FIELDUSE（位元相加） | R3B、R4C、R5B、R6 |
 | 相關顯示（代碼旁的說明欄）指到哪個控制欄 | PSPNLFIELD.ASSOCFIELDNUM | R2A、R3B、R4A、R5B、R6 |
 | Record 欄位設定（鍵、必填、Translate、Y/N、Prompt…） | PSRECFIELDDB.USEEDIT（位元相加） | V5、R3C、R4B |
@@ -31,18 +31,18 @@ SQL 用 `BITAND(欄位, 位元) > 0` 判斷某個勾選有沒有勾。
 
 | 代碼 | 元件（App Designer 名稱） | 客製頁面筆數 | 研究文件怎麼寫 | 怎麼確認的 |
 |---|---|---|---|---|
-| 0 | Static Text | — | 不列（版面） | V6 |
-| 1 | Frame | — | 不列（版面） | V6 |
-| 2 | Group Box | — | 不列（顯示條件另外查） | G1：98% 框內有其他元件 |
-| 3 | Static Image | — | 不列（版面） | V6 |
+| 0 | Static Text | 未統計 | 不列（版面） | V6 |
+| 1 | Frame | 未統計 | 不列（版面） | V6 |
+| 2 | Group Box | 未統計 | 不列（顯示條件另外查） | G1：98% 框內有其他元件 |
+| 3 | Static Image | 未統計 | 不列（版面） | V6 |
 | 4 | Edit Box | 綁欄位的 15154 | Edit Box | V6 |
-| 5 | Drop-Down List Box | — | Drop-Down List Box | V6 |
-| 6 | Long Edit Box | — | Long Edit Box | V6 |
-| 7 | Check Box | — | Check Box | V6 |
-| 8 | Radio Button | — | Radio Button | V6 |
-| 9 | Image | — | Image | V6 |
+| 5 | Drop-Down List Box | 未統計 | Drop-Down List Box | V6 |
+| 6 | Long Edit Box | 未統計 | Long Edit Box | V6 |
+| 7 | Check Box | 未統計 | Check Box | V6 |
+| 8 | Radio Button | 未統計 | Radio Button | V6 |
+| 9 | Image | 未統計 | Image | V6 |
 | 10 | Scroll Bar（舊式的層級捲動） | 30 | Scroll Bar | R5A＋App Designer |
-| 11 | Subpage | — | Subpage | V6 |
+| 11 | Subpage | 未統計 | Subpage | V6 |
 | 12 | Push Button/Hyperlink：PeopleCode Command（按下去跑 PeopleCode） | 1088 | Push Button/Hyperlink: PeopleCode Command | R3A |
 | 15 | Push Button/Hyperlink：External Link（開外部網址） | 1 | Push Button/Hyperlink: External Link | R5A＋App Designer |
 | 16 | Push Button/Hyperlink：Internal Link（轉到別的 Component） | 30 | Push Button/Hyperlink: Internal Link | R3A |
@@ -55,7 +55,17 @@ SQL 用 `BITAND(欄位, 位元) > 0` 判斷某個勾選有沒有勾。
 | 27 | Scroll Area | 588 | Scroll Area | R3A |
 | 其他 | 客製頁面沒出現 | 0 | OTHER（代碼 n），不猜 | — |
 
-「—」＝V6 只回 OK、沒回筆數。客製頁面出現的代碼就是上表這些；13、14、17、20、26、30 等社群文件列的按鈕或元件，客製頁面沒有。
+表格兩欄的意思：
+
+- **客製頁面筆數**：「未統計」＝沒有數字，不是 0。第一輪 V6 的輸出其實有每個代碼的筆數，但當時只回報了 OK，所以 0～9、11（含 Group Box、Subpage）
+  空著；Edit Box 的 15154 來自 R4A。第六輪的 R6C 會一次補齊每個代碼的筆數與用到的頁數。
+- **研究文件怎麼寫**：「不列」＝不寫進研究文件的「## 畫面元件」表（Static Text、Frame、Group Box、Static Image 是版面，Horizontal Rule 是裝飾），
+  不是頁面上沒有。Group Box 確實存在而且常用（G1 就是拿客製頁面所有 Group Box 算的），它控制整塊顯示／隱藏的條件另外照查詢手冊 §2h～§2i 查。
+  Subpage 有列，而且會展開它裡面的元件。
+- **Push Button/Hyperlink** 依按鈕的 Destination 分成四個代碼：12 PeopleCode Command 1088、16 Internal Link 30、21 Secondary Page 12、
+  15 External Link 1，合計 **1131**。「1」只是 External Link 那一種。
+
+客製頁面出現的代碼就是上表這些；13、14、17、20、26、30 等社群文件列的按鈕或元件，客製頁面沒有（V6 的「其他代碼」那行沒有它們）。
 
 ### 2.2 元件的設計期屬性（PSPNLFIELD.FIELDUSE，位元相加）
 
@@ -214,6 +224,7 @@ R5A 的數字（N、LVL、REC、LBL、GRID）：
 
 | SQL | 盤點什麼 | 輸出怎麼看 |
 |---|---|---|
+| R6C | 每個元件代碼在客製頁面的筆數與用到的頁數（補 2.1 的「未統計」） | 一行 `代碼:元件筆數:頁數 …`＋`PAGES=` 客製頁面總數 |
 | R6 | 相關顯示的 ASSOCFIELDNUM 存的是控制欄的 tab order（H0）還是 Field ID（H3） | `N= SAME= H0=a,b,c,d H3=a,b,c,d B16=x,y DUPID=z`：a 找到的控制欄數、b 其中有 prompt 的、c prompt 表＝相關顯示 Record 的、d 帶 8 的；H3 明顯大於 H0、且 d 接近 a → 存的是 Field ID、8＝Display Control；反過來 → 維持 tab order。B16 兩個數接近 N → 16 和 ASSOCFIELDNUM 一一對應。DUPID 應為 0 |
 
 ---
@@ -274,7 +285,7 @@ ADD_SEARCH_REC＝新增用的搜尋 Record（沒有＝新增也用 SEARCH_REC）
 | R3A～R3C、唯讀帳號 A 測試 | `docs/design/ui-metadata-check-r3.md` |
 | R4A～R4E | `docs/design/ui-metadata-check-r4.md` |
 | R5A、R5B（含官方／社群對照表與來源連結） | `docs/design/ui-metadata-check-r5.md` |
-| R6 | `docs/design/ui-metadata-check-r6.md` |
+| R6、R6B、R6C | `docs/design/ui-metadata-check-r6.md` |
 | 正式查詢 §2l、§2m | `.opencode/peoplesoft/oracle-query-cookbook.md`（Claude Code 版：`claude-code/.claude/peoplesoft/oracle-query-cookbook.md`） |
 
 第一到三輪的 SQL 是 admin 帳號設 CURRENT_SCHEMA 跑的，表名沒有帶擁有者；用唯讀帳號重跑要先把表名改成 `<schema>.表名`。
