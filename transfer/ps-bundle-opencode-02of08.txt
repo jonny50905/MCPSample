@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit bdc09b2）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 367d186）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|bdc09b2|9613799aa07a4f95|2|8|6140|9a15d314e1ddca9d4f32439318777deb0503427faba5e2afc01567b60351f6fd
+@@@PSBUNDLE-PART|1|opencode|367d186|49d3507d78ea813b|2|8|6140|9a15d314e1ddca9d4f32439318777deb0503427faba5e2afc01567b60351f6fd
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4219|7039c79341e9ac963d99f60978117b0da51956b6428766fe8fb6904312f66330|0
 # 教訓歸檔（applied）
 
@@ -6141,4 +6141,4 @@ a dependency of a TW_ custom object.
 
 - <各功能深查後的重大未解事項彙整到此>
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/checklist-template.md
-@@@PSBUNDLE-PART-END|9613799aa07a4f95|2|8
+@@@PSBUNDLE-PART-END|49d3507d78ea813b|2|8
