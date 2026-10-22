@@ -80,6 +80,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-22 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   主管報告第 5 章加例子與 5.8 完整例子，框架檔未動，各份重生，併入前 `main` 頭 `91c7fb2`；同日稍早同一分支併入
    主管報告第 5 章改成完整代碼一覽、協作鐵律加「只改文件的併回不跑 5.1 CI」（L159），框架檔未動，各份重生，併入前 `main` 頭 `4f0121c`；
    同日稍早同一分支併入
    主管報告「難在哪裡」精簡為三條，框架檔未動，各份重生，併入前 `main` 頭 `46d09bc`；同日稍早同一分支併入

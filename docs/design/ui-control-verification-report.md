@@ -170,6 +170,10 @@
 | 27 | Scroll Area | 捲動區 | 列出 | 第三輪 R3A |
 | 其他 | （公司的客製頁面沒有用到） | — | 照原代碼寫 OTHER，不猜 | — |
 
+**例**（下面的頁面、欄位名都是合成的）：一個申請單頁面上有一個「申請類別」欄位，元件代碼是 5，研究文件就寫 Drop-Down List Box；
+一個「核准」按鈕的代碼是 12，寫成 Push Button/Hyperlink: PeopleCode Command，按下去做什麼另外寫在「行為邏輯」；
+頁面上框住幾個欄位的 Group Box（代碼 2）不寫進表。
+
 ### 5.2 元件屬性（PSPNLFIELD.FIELDUSE，位元）——4 個
 
 | 位元 | 意思 | 研究文件寫法 | 怎麼確認的 |
@@ -179,6 +183,16 @@
 | 8 | Display Control（相關顯示的控制欄） | DISPLAY_CONTROL | 第七輪 R7K＋抽查 |
 | 16 | Related Field（相關顯示；勾它會自動勾唯讀，所以相關顯示是 1＋16） | RELATED_TO=控制欄的 tab order | 第四輪 R4C、第六輪 R6 |
 
+**例**：使用旗標存的是加總，拆開就知道勾了哪些。
+
+| 存的數字 | 拆成 | 意思 |
+|---|---|---|
+| 0 | — | 一般可以輸入的欄位 |
+| 1 | 1 | 唯讀 |
+| 3 | 1＋2 | 唯讀，而且隱藏 |
+| 8 | 8 | 相關顯示的控制欄（例如「部門代碼」） |
+| 17 | 1＋16 | 相關顯示（例如「部門代碼」旁邊顯示的部門名稱），一定唯讀 |
+
 ### 5.3 相關顯示的對應（PSPNLFIELD.ASSOCFIELDNUM）
 
 | 規則 | 怎麼確認的 |
@@ -186,6 +200,10 @@
 | 關聯欄號從 0 起算：控制欄的 tab order（FIELDNUM）＝關聯欄號＋1；指到第 1 個欄位的相關顯示存 0 | 第六輪 R6 排除兩種對應；第七輪 R7K＋抽查定案 |
 | 判斷是不是相關顯示看位元 16，不看關聯欄號有沒有大於 0 | 第六輪 R6 |
 | tab order（FIELDNUM）就是 App Designer Order 頁籤的順序 | 第五輪 R5A |
+
+**例**：部門代碼在 tab order 4（使用旗標 8），旁邊的部門名稱在 tab order 5（使用旗標 17、關聯欄號 3）。3＋1＝4，
+所以部門名稱是部門代碼的說明，研究文件在部門名稱那一列寫 RELATED_TO=4。
+另一個例子：員工編號放在頁面第 1 欄，旁邊的姓名關聯欄號是 0，0＋1＝1，指的就是員工編號。前幾輪用「關聯欄號大於 0」挑相關顯示，漏掉的就是這種。
 
 ### 5.4 Record 欄位設定（PSRECFIELDDB.USEEDIT，位元）——10 個
 
@@ -204,6 +222,17 @@
 
 這組和 Oracle PeopleCode API 文件列的位元一致。鍵欄位不會自動算必填（第三輪 R3C），必填一律看 256。
 
+**例**：
+
+| 存的數字 | 拆成 | 研究文件寫法 |
+|---|---|---|
+| 257 | 1＋256 | KEY REQUIRED（鍵，必填） |
+| 2049 | 1＋2048 | KEY（同時是搜尋鍵） |
+| 16640 | 256＋16384 | REQUIRED，查值寫 PROMPT <表> EDIT（必填，輸入值要在 Prompt 清單內） |
+| 512 | 512 | 查值寫 XLAT（值要在 Translate 清單內） |
+| 8192 | 8192 | 查值寫 YES_NO |
+| 32768 | 32768 | AUTO_UPDATE（存檔時系統押時間，使用者不填） |
+
 ### 5.5 查值（Prompt）
 
 | 代碼 | 意思 | 研究文件寫法 | 怎麼確認的 |
@@ -215,6 +244,10 @@
 | Prompt 表的 RECTYPE 2 | Derived／Work（只在畫面上，不存資料庫） | DERIVED | 第一輪 V4 |
 | Prompt 表的 RECTYPE 1、5、6 | 三種 View（SQL、Dynamic、Query View） | VIEW | PeopleTools 定義 |
 
+**例**：部門代碼的 Prompt 表是一個部門 view、USEEDIT 帶 16384 → 研究文件寫 `PROMPT <部門 view> EDIT（VIEW；鍵 SETID,DEPTID,EFFDT）`：
+輸入的部門要在 view 查得到，而且查值會看 SetID 與有效日期。另一個欄位的 Prompt 表寫成 `%EDITTABLE` → 動態 Prompt，研究文件寫 DYNAMIC，
+再去追 PeopleCode 在執行期指定哪張表。
+
 ### 5.6 欄位資料型別（PSDBFIELD.FIELDTYPE）
 
 | 代碼 | 意思 | 怎麼確認的 |
@@ -225,6 +258,8 @@
 | 4 | 日期 | 第一輪 V4 |
 | 6 | 日期時間 | 第一輪 V4 |
 
+**例**：一個欄位資料型別是 4（日期），Record 欄位設定又帶 4096 → 這是日期欄位，而且輸入時會做合理日期檢查。
+
 ### 5.7 Component 動作（PSPNLGRPDEFN.ACTIONS，位元）——4 個
 
 | 位元 | 動作（Component Properties → Use → Actions） | 意思 | 研究文件寫法 | 怎麼確認的 |
@@ -233,6 +268,44 @@
 | 2 | Update/Display | 修改現行資料（有效日期只看得到目前與未來） | UPDATE_DISPLAY | 第四輪 R4D（App Designer 已知 Component） |
 | 4 | Update/Display All | 看得到歷史列，只能改目前與未來 | UPDATE_DISPLAY_ALL | 第四輪 R4D＋管理者確認順序 |
 | 8 | Correction | 連歷史列都能改 | CORRECTION | 第四輪 R4D＋管理者確認順序 |
+
+**例**：
+
+| 存的數字 | 拆成 | 意思 |
+|---|---|---|
+| 2 | 2 | 只能修改現行資料（第四輪核對的那個 Component 就是這樣） |
+| 3 | 1＋2 | 可以新增，也可以修改 |
+| 10 | 2＋8 | 可以修改、可以更正歷史，但不能新增 |
+| 15 | 1＋2＋4＋8 | 四個動作都有 |
+
+研究文件把 Component 本身寫成「## 畫面元件」的第一列，例如 `| TW_DEMO_REQ | 0 |  | Component | ADD UPDATE_DISPLAY | SEARCH TW_DEMO_REQSRCH |`
+（ACTIONS＝3，搜尋頁查 TW_DEMO_REQSRCH）。
+
+### 5.8 完整例子：從原始數字到研究文件
+
+一個合成的申請單頁面，查詢手冊 §2l 讀到的原始數字：
+
+| tab order | 綁的欄位 | 元件代碼 | 使用旗標 | 關聯欄號 | Record 欄位設定 | Prompt 表 |
+|---|---|---|---|---|---|---|
+| 3 | TW_DEMO_REQHDR.REQ_ID | 4 | 1 | 0 | 257 | — |
+| 4 | TW_DEMO_REQHDR.DEPTID | 4 | 8 | 0 | 16640 | TW_DEMO_DEPTVW（view） |
+| 5 | TW_DEMO_DEPTVW.DESCR | 4 | 17 | 3 | 0 | — |
+| 6 | TW_DEMO_REQHDR.REQ_TYPE | 5 | 0 | 0 | 512 | — |
+| 11 | TW_DEMO_WRK.APPROVE_PB | 12 | 0 | 0 | 0 | — |
+
+照上面各節的對照翻譯後，研究文件「## 畫面元件」寫成：
+
+| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |
+|---|---|---|---|---|---|
+| TW_DEMO_PG | 3 | TW_DEMO_REQHDR.REQ_ID | Edit Box | DISPLAY_ONLY KEY REQUIRED |  |
+| TW_DEMO_PG | 4 | TW_DEMO_REQHDR.DEPTID | Edit Box | DISPLAY_CONTROL REQUIRED | PROMPT TW_DEMO_DEPTVW EDIT（VIEW；鍵 SETID,DEPTID,EFFDT） |
+| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 |  |
+| TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
+| TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
+
+讀起來就是：申請單號是鍵，畫面上唯讀、不能改；部門代碼必填、要從部門 view 選，輸入值會被檢核；旁邊的部門名稱唯讀、是部門代碼的說明；
+申請類別是下拉選單、值來自 Translate 清單；「核准」按鈕按下去執行 PeopleCode。只要其中一個代碼翻錯——例如把使用旗標 16 當成唯讀、
+或把關聯欄號當成 tab order——這張表就會寫錯，重建出來的畫面也會跟著錯。
 
 每一項的細節與 SQL 輸出怎麼讀，見 `docs/design/ui-control-sql-record.md`。
 
