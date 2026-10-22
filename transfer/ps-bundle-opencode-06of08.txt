@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 55a7259）第 6／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 2b60151）第 6／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|55a7259|126453758a7b53ec|6|8|6694|231bcfd6d04e149c8d2ffd2a091ef99c880a2a7117fbddd5c6fc25dd1cb48233
+@@@PSBUNDLE-PART|1|opencode|2b60151|7ccee212a90407e9|6|8|6694|231bcfd6d04e149c8d2ffd2a091ef99c880a2a7117fbddd5c6fc25dd1cb48233
 @@@PSBUNDLE-FILE|scripts/ps-sdoc-lib.ps1|1448|901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c|1
 # ps-sdoc-lib.ps1 — Spec 文件流程（Claude Code 版）的核心：常數、項目工具、ID registry、研究包驗收與合成、canonical 組裝、計算文件。
 # 依賴（呼叫端先載入）：ps-knowledge-lib.ps1（JSON 輸出、hash、原子寫入）、ps-sdoc-schema-lib.ps1、ps-sdoc-status-lib.ps1。
@@ -6695,4 +6695,4 @@ function ConvertTo-PsCloneTrace {
     return (($o -join "`n") + "`n")
 }
 @@@PSBUNDLE-END|scripts/ps-spec-clone-lib.ps1
-@@@PSBUNDLE-PART-END|126453758a7b53ec|6|8
+@@@PSBUNDLE-PART-END|7ccee212a90407e9|6|8

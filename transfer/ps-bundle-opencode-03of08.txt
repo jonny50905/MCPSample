@@ -1,6 +1,42 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 55a7259）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 2b60151）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|55a7259|126453758a7b53ec|3|8|13091|902a1c2ba7fde44f3f900af316ff09509cb1f11423dec81bf318f1eaadb55a22
+@@@PSBUNDLE-PART|1|opencode|2b60151|7ccee212a90407e9|3|8|13127|94a86ba4ebf002d4a15d3dd42bd8e9bcaaf0032b7975b14efcfc28d1538ed24b
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/entity-template.md|34|de2a989eba864ef30cf837956e9b09ac774822fd85522cbb2869c4fd0fdcf34a|0
+---
+aliases: []                # 中英文別名、口語簡稱——查重與反查靠這個，必填
+type: RECORD               # RECORD | COMPONENT | PAGE | FIELD | SQR | SQC | AE | SQL | PROCESS | OTHER
+origin: CUSTOM_PREFIX      # CUSTOM_PREFIX | CUSTOM_REGISTRY | MODIFIED_DELIVERED | DELIVERED | UNKNOWN
+status: draft              # draft（未驗證）| verified（稽核通過）| stale（來源已變/逾期）
+confidence: 0.5            # 0.0 ~ 1.0
+last_verified: YYYY-MM-DD
+sources: []                # 依據的 chunk UUID / SQL 摘要 / human:<日期>（人工指正）（時效偵測鍵）
+reviewed: false            # true = 人工審定——agent 不得覆寫既有內容，只能追加
+---
+# <物件名>
+
+<一句話定位：這個物件是什麼、屬於哪個業務。>
+
+## Observations
+
+<!-- 一行一個事實：- [分類] 事實 (evidence)。分類例：結構 / 行為 / 資料 / 選項 / 排程 / 權限 -->
+- [結構] MIL_STATUS 為 Translate value，共 5 值（chunk `3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d` / SQL）
+
+<!-- chunk id 一律完整 36 字元 UUID（如上例），禁止縮寫成前 8 碼 -->
+- [行為] 值 'E' 時開放 EXEMPT_RSN 並帶入日期（`<filePath>:<行號>`）
+
+## Relations
+
+<!-- 一行一條 typed 關係，目標一律 [[wikilink]]。
+     常用：part_of / contains / reads / writes_to / written_by /
+           called_by / calls / triggered_by / secured_by -->
+- part_of [[兵役]]
+- written_by [[TW_MIL001]]
+
+## Invalidated（作廢紀錄——只追加，不刪除）
+
+<!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
+- YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
+@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|131|48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972|0
 # <NN> <功能名>（[[<Component / 物件名>]]）
 
@@ -13092,4 +13128,4 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-PART-END|126453758a7b53ec|3|8
+@@@PSBUNDLE-PART-END|7ccee212a90407e9|3|8
