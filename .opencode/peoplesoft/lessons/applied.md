@@ -4207,3 +4207,13 @@
   真正不一的是元件代碼名稱與缺漏（例如代碼 18）；§3 對照列「4 個代碼與社群不一致」→ 第三輪判不出、無法印證；R7 列 → 備案（實際跑的是 R7K）。
 - 連帶：代碼確認紀錄未定案事項的 128 改寫；第五輪說明檔加查核補註。
 - 做法上的教訓：給第三方看的報告，數字要附單位、主詞要精確（誰執行、哪幾輪）；從搜尋摘要得來的「說法不一」要有兩個以上來源才寫。
+
+### L159 只改文件的併回也會觸發 5.1 CI——原因與 `[skip ci]` 慣例（2026-10-22）
+
+- 症狀：管理者問「只改文件，為什麼 CI 會啟動？」——這幾天的文件併回（報告、紀錄）每次都跑了約 20 分鐘的 ps51-tests。
+- 根因：ps51-tests 的觸發路徑含 `scripts/**` 與 `transfer/**`。每次併回都要更新 AGENTS.md 的維護版線，而 AGENTS.md 在 OpenCode 搬運包裡，
+  所以搬運包與 manifest 都得重產；每份搬運包的檔頭又帶 commit 戳記與整包雜湊、manifest 也帶戳記，於是兩版十四份與兩份 manifest 全部改變，
+  碰到觸發路徑。
+- 落點：AGENTS.md 協作鐵律加「只改文件的併回不跑 5.1 CI」：只動 `docs/**`、`HANDOFF.md`、AGENTS.md 維護版線時，併回 `main` 的最後一筆 commit
+  訊息加 `[skip ci]`（GitHub 對 push 事件看 head commit 訊息，就不啟動 workflow）；本機照跑 test-bundle、test-claude-variant。
+  動到腳本、`.opencode/**`、`claude-code/**` 或 workflow 的不加。workflow 本身不改。

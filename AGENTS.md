@@ -80,6 +80,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-22 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   主管報告第 5 章改成完整代碼一覽、協作鐵律加「只改文件的併回不跑 5.1 CI」（L159），框架檔未動，各份重生，併入前 `main` 頭 `4f0121c`；
+   同日稍早同一分支併入
    主管報告「難在哪裡」精簡為三條，框架檔未動，各份重生，併入前 `main` 頭 `46d09bc`；同日稍早同一分支併入
    主管報告經兩個 subagent 查核後的修正（L158；代碼確認紀錄的 128、第五輪說明檔補註），框架檔未動，各份重生，併入前 `main` 頭 `afba9a5`；
    同日稍早同一分支併入
@@ -133,6 +135,9 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 
 - **併回 `main` 已授權**（2026-10-13 管理者）：改動在本機測試（需要時加 5.1 CI）驗證過，就直接快轉併回 `main`，
   不必等管理者說「併回 main」；照樣更新上面的維護版線、重產搬運包，回覆裡說明併回了什麼並附搬運清單。
+- **只改文件的併回不跑 5.1 CI**（2026-10-22 管理者）：只動 `docs/**`、`HANDOFF.md`、`AGENTS.md` 維護版線時，搬運包與 manifest 只因維護版線與檔頭戳記重產；
+  併回 `main` 的最後一筆 commit 訊息加 `[skip ci]`，GitHub 就不啟動 ps51-tests（本機照跑 test-bundle、test-claude-variant）。
+  動到 `scripts/**` 的腳本、`.opencode/**`、`claude-code/**` 或 workflow 的併回不加。
 - 使用者在**公司內網 Windows＋PowerShell 5.1＋OpenCode CLI** 操作，
   目標模型是本機部署（見 applied.md L6）；一切只經 opencode cli，
   沒有任何 web UI。

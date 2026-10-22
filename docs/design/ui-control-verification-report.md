@@ -137,18 +137,104 @@
 
 ---
 
-## 5. 確認了什麼（代碼對照摘要）
+## 5. 盤點成果：代碼一覽
 
-| 類別 | 確認的內容 |
+> 只列「代碼＝什麼」與「怎麼確認的」，不列公司系統裡各有幾個。「位元」的意思是：一個欄位同時有好幾個勾選時，存的是各勾選代表數字的和，
+> 例如使用旗標 17＝1（唯讀）＋16（相關顯示）。表名、欄位名是 PeopleTools 的產品名稱。
+
+### 5.1 頁面元件代碼（PSPNLFIELD.FIELDTYPE）——22 種
+
+| 代碼 | 元件（App Designer 名稱） | 中文說明 | 研究文件 | 怎麼確認的 |
+|---|---|---|---|---|
+| 0 | Static Text | 靜態文字 | 不列（版面） | 第一輪 V6 |
+| 1 | Frame | 框 | 不列（版面） | 第一輪 V6 |
+| 2 | Group Box | 群組框 | 不列（版面） | 第一輪 G1 |
+| 3 | Static Image | 靜態圖 | 不列（版面） | 第一輪 V6 |
+| 4 | Edit Box | 輸入框 | 列出 | 第一輪 V6 |
+| 5 | Drop-Down List Box | 下拉選單 | 列出 | 第一輪 V6 |
+| 6 | Long Edit Box | 長文字框 | 列出 | 第一輪 V6 |
+| 7 | Check Box | 核取方塊 | 列出 | 第一輪 V6 |
+| 8 | Radio Button | 選項按鈕 | 列出 | 第一輪 V6 |
+| 9 | Image | 圖片（綁欄位） | 列出 | 第一輪 V6 |
+| 10 | Scroll Bar | 舊式的層級捲軸 | 列出 | 第五輪 R5A＋App Designer |
+| 11 | Subpage | 子頁面（再展開裡面的元件） | 列出 | 第一輪 V6 |
+| 12 | Push Button/Hyperlink：PeopleCode Command | 按鈕：按下去執行 PeopleCode | 列出 | 第三輪 R3A |
+| 15 | Push Button/Hyperlink：External Link | 按鈕：開外部網址 | 列出 | 第五輪 R5A＋App Designer |
+| 16 | Push Button/Hyperlink：Internal Link | 按鈕：轉到別的 Component | 列出 | 第三輪 R3A |
+| 18 | Secondary Page | 次頁 | 列出 | 第三輪 R3A |
+| 19 | Grid | 表格 | 列出 | 第二輪 R2C＋App Designer |
+| 21 | Push Button/Hyperlink：Secondary Page | 按鈕：開次頁 | 列出 | 第三輪 R3A |
+| 23 | Horizontal Rule | 分隔線 | 不列（裝飾） | 第五輪 R5A＋App Designer |
+| 24 | Tab Separator | 把 Grid 欄位分成分頁 | 列出 | 第五輪 R5A＋App Designer |
+| 25 | HTML Area | HTML 區 | 列出 | 第三輪 R3A |
+| 27 | Scroll Area | 捲動區 | 列出 | 第三輪 R3A |
+| 其他 | （公司的客製頁面沒有用到） | — | 照原代碼寫 OTHER，不猜 | — |
+
+### 5.2 元件屬性（PSPNLFIELD.FIELDUSE，位元）——4 個
+
+| 位元 | 意思 | 研究文件寫法 | 怎麼確認的 |
+|---|---|---|---|
+| 1 | Display Only（唯讀） | DISPLAY_ONLY | 第四輪 R4C（App Designer 已知欄位） |
+| 2 | Invisible（隱藏） | INVISIBLE | 第四輪 R4C（App Designer 已知欄位） |
+| 8 | Display Control（相關顯示的控制欄） | DISPLAY_CONTROL | 第七輪 R7K＋抽查 |
+| 16 | Related Field（相關顯示；勾它會自動勾唯讀，所以相關顯示是 1＋16） | RELATED_TO=控制欄的 tab order | 第四輪 R4C、第六輪 R6 |
+
+### 5.3 相關顯示的對應（PSPNLFIELD.ASSOCFIELDNUM）
+
+| 規則 | 怎麼確認的 |
 |---|---|
-| 頁面元件（22 種） | 靜態文字、框、Group Box、靜態圖、輸入框、下拉選單、長文字框、核取方塊、選項按鈕、圖片、舊式捲軸、子頁面、按鈕（執行 PeopleCode／外部連結／轉到別的 Component／開次頁）、次頁、Grid、分隔線、Grid 分頁、HTML 區、捲動區 |
-| 元件屬性（4 個位元） | 1＝唯讀、2＝隱藏、8＝相關顯示的控制欄、16＝相關顯示 |
-| 相關顯示的對應 | 控制欄的 tab order＝關聯欄號＋1（從 0 起算） |
-| Record 欄位設定（10 個位元） | 鍵、清單欄位、遞減鍵、必填、Translate 檢核、搜尋鍵、合理日期、Y/N、Prompt 檢核、自動押時間 |
-| Prompt | 有 Prompt 表、動態 Prompt（執行期才決定）、會不會檢核、Prompt 表是實體表／view／Derived |
-| Component 動作（4 個位元） | 新增、修改、看歷史、更正 |
+| 關聯欄號從 0 起算：控制欄的 tab order（FIELDNUM）＝關聯欄號＋1；指到第 1 個欄位的相關顯示存 0 | 第六輪 R6 排除兩種對應；第七輪 R7K＋抽查定案 |
+| 判斷是不是相關顯示看位元 16，不看關聯欄號有沒有大於 0 | 第六輪 R6 |
+| tab order（FIELDNUM）就是 App Designer Order 頁籤的順序 | 第五輪 R5A |
 
-完整對照與每一項怎麼確認的，見 `docs/design/ui-control-sql-record.md`。
+### 5.4 Record 欄位設定（PSRECFIELDDB.USEEDIT，位元）——10 個
+
+| 位元 | 意思（App Designer Record Field 屬性） | 研究文件寫法 | 怎麼確認的 |
+|---|---|---|---|
+| 1 | Key（鍵） | KEY | 第一輪 V5 |
+| 32 | List Box Item（搜尋結果清單的欄位） | — | 第一輪 V5 |
+| 64 | Descending Key（遞減鍵） | — | 第一輪 V5 |
+| 256 | Required（必填） | REQUIRED | 第四輪 R4B（App Designer 已知欄位） |
+| 512 | Translate Table Edit（值要在 Translate 清單內） | XLAT | 第一輪 V5 |
+| 2048 | Search Key（搜尋鍵） | — | 第一輪 V5 |
+| 4096 | Reasonable Date Test（合理日期檢查） | REASONABLE_DATE | 第一輪 V5 |
+| 8192 | Yes/No Table Edit（只收 Y／N） | YES_NO | 第一輪 V5 |
+| 16384 | Prompt Table Edit（輸入值必須在 Prompt 清單內） | PROMPT … EDIT | 第一輪 V5 |
+| 32768 | Auto-Update（存檔時系統自動押時間） | AUTO_UPDATE | 第一輪 V5 |
+
+這組和 Oracle PeopleCode API 文件列的位元一致。鍵欄位不會自動算必填（第三輪 R3C），必填一律看 256。
+
+### 5.5 查值（Prompt）
+
+| 代碼 | 意思 | 研究文件寫法 | 怎麼確認的 |
+|---|---|---|---|
+| EDITTABLE 有值 | 這個欄位有 Prompt 表（查值按鈕） | PROMPT <表> | 第一輪 V5 |
+| EDITTABLE 以 `%` 開頭 | 動態 Prompt：Prompt 表在執行期由另一個欄位決定 | DYNAMIC | 第一輪 V5 |
+| USEEDIT 帶 16384 | 輸入值會被檢核；沒帶＝只給查詢、不檢核 | EDIT／NO_EDIT | 第一輪 V5 |
+| Prompt 表的 RECTYPE 0 | 實體表 | TABLE | 第一輪 V4 |
+| Prompt 表的 RECTYPE 2 | Derived／Work（只在畫面上，不存資料庫） | DERIVED | 第一輪 V4 |
+| Prompt 表的 RECTYPE 1、5、6 | 三種 View（SQL、Dynamic、Query View） | VIEW | PeopleTools 定義 |
+
+### 5.6 欄位資料型別（PSDBFIELD.FIELDTYPE）
+
+| 代碼 | 意思 | 怎麼確認的 |
+|---|---|---|
+| 0 | 字元 | 第一輪 V4 |
+| 1 | 長字元 | 第一輪 V4 |
+| 2 | 數字 | 第一輪 V4 |
+| 4 | 日期 | 第一輪 V4 |
+| 6 | 日期時間 | 第一輪 V4 |
+
+### 5.7 Component 動作（PSPNLGRPDEFN.ACTIONS，位元）——4 個
+
+| 位元 | 動作（Component Properties → Use → Actions） | 意思 | 研究文件寫法 | 怎麼確認的 |
+|---|---|---|---|---|
+| 1 | Add | 新增一筆新鍵值 | ADD | 第四輪 R4D＋管理者確認順序 |
+| 2 | Update/Display | 修改現行資料（有效日期只看得到目前與未來） | UPDATE_DISPLAY | 第四輪 R4D（App Designer 已知 Component） |
+| 4 | Update/Display All | 看得到歷史列，只能改目前與未來 | UPDATE_DISPLAY_ALL | 第四輪 R4D＋管理者確認順序 |
+| 8 | Correction | 連歷史列都能改 | CORRECTION | 第四輪 R4D＋管理者確認順序 |
+
+每一項的細節與 SQL 輸出怎麼讀，見 `docs/design/ui-control-sql-record.md`。
 
 ---
 
