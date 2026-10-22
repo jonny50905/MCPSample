@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 78eef7e）第 5／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5cb35d7）第 5／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|78eef7e|21c8777b245dacfd|5|6|6518|c6b942be24973591d5dd6e88a300cf8440a059fe9e7c2b871a63b22895e49573
+@@@PSBUNDLE-PART|1|claude|5cb35d7|83f90a34982efa76|5|6|6539|1ac1399dbfc9197e00fa430a388890b73a3f1f637b65adbf3a44a7d3d97315de
 @@@PSBUNDLE-FILE|scripts/ps-spec-lib.ps1|2746|0fb1320c511b4939e2ecb3f1558f5c2e3674b4e8c97757baf6dd6e5574ce5cd2|1
 # ps-spec-lib.ps1 — Spec 引擎共用邏輯：Component＋私有需求包（pack）→ EXTRACT facts／COMPOSE 單位 → 外環派工與驗收
 #                   → 確定性 render（模板副本：markers 置換 {{slot:Sxx}}／headings 綁章節標題與原生佔位符）→ gate；結論碼 SPEC1-<stage>-<code>[-<count>]。
@@ -4626,7 +4626,7 @@ function ConvertTo-SdComparable {
     return $Value
 }
 @@@PSBUNDLE-END|scripts/tests/sdoc-test-fixtures.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1029|0cadab25c68c0b58a3e2f2feb9fa338014aa4dc1882d40e20d407992da771fd6|1
+@@@PSBUNDLE-FILE|scripts/tests/test-auto-loop.ps1|1056|1c2909efbc3122337405013df7e76f5641624dae31edf3f54b6069c73e18db69|1
 # scripts/tests/test-auto-loop.ps1 — 外環函式的功能測試（AST 抽真實函式，跑 fixture 情境）
 # 用法：pwsh -NoProfile -File scripts/tests/test-auto-loop.ps1   （PowerShell 7 或 5.1 皆可）
 # 範圍：調帳／治理／台帳／破壞防衛／歸檔 commit／分批稽核（manifest、part 不變量、合併器）
@@ -5237,13 +5237,13 @@ $ckText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peopleso
 $ckM = [regex]::Match($ckText, '(?s)\*\*2k-C\..*?```sql\r?\n(.*?)```')
 $ckSql = if ($ckM.Success) { $ckM.Groups[1].Value } else { '' }
 Assert ($ckM.Success) "cookbook 有 §2k-C canonical 區塊"
-foreach ($must in @('DBMS_LOB.SUBSTR', 'NOCYCLE', "PORTAL_REFTYPE = 'F'", 'LEVEL <= 20', 'FETCH FIRST', 'CLASSIC_VISIBLE', "IN ('TARG','LINK')", 'PORTAL_EXPIRE_DT', 'CONNECT_BY_ISCYCLE', 'PSPRSMDEFNLANG', ':portalName', ':languageCd', 'WHERE CLASSIC_VISIBLE = 1', 'NAV_PATHS')) { Assert ($ckSql.Contains($must)) "canonical 含 $must" }
+foreach ($must in @('TO_CHAR(SUBSTR(A.PORTAL_ATTR_VAL, 1, 100))', 'NOCYCLE', "PORTAL_REFTYPE = 'F'", 'LEVEL <= 20', 'FETCH FIRST', 'CLASSIC_VISIBLE', "IN ('TARG','LINK')", 'PORTAL_EXPIRE_DT', 'CONNECT_BY_ISCYCLE', 'PSPRSMDEFNLANG', ':portalName', ':languageCd', 'WHERE CLASSIC_VISIBLE = 1', 'NAV_PATHS')) { Assert ($ckSql.Contains($must)) "canonical 含 $must" }
 Assert ($ckSql -notmatch 'BARNAME|ITEMNAME|LIKE ''%') "canonical 不含 BARNAME／ITEMNAME／LIKE 子字串比對"
 Assert ($ckSql -notmatch '(?m)^\s*HAVING') "canonical 不用 HAVING 丟列（hidden／過期以旗標回傳）"
 $pfText = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
 Assert ($pfText -match '(?m)^navigation:' -and $pfText -match '(?m)^\s*surfaces:\s*CLASSIC_ONLY' -and $pfText -match '(?m)^\s*identity:\s*MENU_COMPONENT\b' -and $pfText -match '(?m)^\s*labelLanguage:\s*ENG' -and $pfText -match '(?m)^\s*attrValType:\s*CLOB') "profile navigation 區塊：surfaces／identity／labelLanguage／attrValType"
 
-Write-Host "情境 31：oracleMCP 權限分工與路由邊界——主 agent 開 list_connections／connect、不開 sql_run／disconnect；subagent 只開 sql_run；模型檔沒有閘門承諾；skill 不是 agent（issue #30／#32）"
+Write-Host "情境 31：oracleMCP（@vdeserto/oracle-mcp-server）權限分工與路由邊界——主 agent 五個工具全關、沒有開線步驟；subagent 只開 oracle_execute_query；cookbook SQL 符合 server 的檢查；skill 不是 agent"
 function Get-AgentToolPerm([string]$File, [string]$Tool) {
     $txt = [System.IO.File]::ReadAllText($File)
     $m = [regex]::Match($txt, '(?ms)^tools:\r?\n(.*?)(?=^[A-Za-z_]+:|^---|\z)')
@@ -5258,34 +5258,55 @@ function Get-AgentToolPerm([string]$File, [string]$Tool) {
     }
     return $eff
 }
-foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
+$oraTools = @('oracleMCP_oracle_list_schemas', 'oracleMCP_oracle_list_tables', 'oracleMCP_oracle_describe_table', 'oracleMCP_oracle_get_table_data', 'oracleMCP_oracle_execute_query')
+$oraOld = 'oracleMCP_(connect|disconnect|list_connections|sql_run|sqlcl_run)\b'
+foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator', 'ps-clone-worker', 'ps-sdoc-worker')) {
     $pf = Join-Path $repoRoot ".opencode/agent/$pa.md"
-    Assert ((Get-AgentToolPerm $pf 'oracleMCP_connect') -eq 'true' -and (Get-AgentToolPerm $pf 'oracleMCP_list_connections') -eq 'true') "主 agent $pa：connect／list_connections 開"
-    Assert ((Get-AgentToolPerm $pf 'oracleMCP_sql_run') -eq 'false' -and (Get-AgentToolPerm $pf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $pf 'oracleMCP_sqlcl_run') -eq 'false') "主 agent $pa：sql_run／disconnect／sqlcl_run 關（不因重構擴大 Oracle 權限）"
     $paTxt = [System.IO.File]::ReadAllText($pf)
-    Assert ($paTxt -notmatch '"oracleMCP_\*"' -and $paTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_connect":\s*true' -and $paTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*false' -and $paTxt -match '(?m)^\s*"oracleMCP_sqlcl_run":\s*false') "主 agent $pa：Oracle 逐工具明寫，不用 oracleMCP_* 萬用字元"
+    Assert (@($oraTools | Where-Object { (Get-AgentToolPerm $pf $_) -ne 'false' }).Count -eq 0) "主 agent $pa：oracleMCP 五個工具全關（不查 DB，沒有開線步驟）"
+    Assert ($paTxt -notmatch '"oracleMCP_\*"' -and @($oraTools | Where-Object { $paTxt -notmatch ('(?m)^\s*"' + $_ + '":\s*false') }).Count -eq 0 -and $paTxt -notmatch $oraOld) "主 agent $pa：Oracle 逐工具明寫、不用萬用字元；沒有 SQLcl 時代的舊工具名"
 }
 foreach ($sa in @('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor')) {
     $sf = Join-Path $repoRoot ".opencode/agent/$sa.md"
-    Assert ((Get-AgentToolPerm $sf 'oracleMCP_sql_run') -eq 'true') "subagent $sa：sql_run 開"
-    Assert ((Get-AgentToolPerm $sf 'oracleMCP_connect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_disconnect') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_list_connections') -eq 'false' -and (Get-AgentToolPerm $sf 'oracleMCP_sqlcl_run') -eq 'false') "subagent $sa：Oracle 允許清單——connect／disconnect／list_connections／sqlcl_run 全關，只開 sql_run"
     $saTxt = [System.IO.File]::ReadAllText($sf)
-    Assert ($saTxt -notmatch '"oracleMCP_\*"' -and $saTxt -match '(?m)^\s*"oracleMCP_list_connections":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_connect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_disconnect":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_sqlcl_run":\s*false' -and $saTxt -match '(?m)^\s*"oracleMCP_sql_run":\s*true') "subagent $sa：Oracle 逐工具明寫（list／connect／disconnect／sqlcl_run false、sql_run true）"
-    Assert ($saTxt -notmatch '才 `list_connections`' -and $saTxt -notmatch '回未連線錯誤才 connect' -and $saTxt -match 'NOT_CONNECTED') "subagent $sa：硬規則段無「回未連線才 list→connect」殘留、含 NOT_CONNECTED"
+    Assert ((Get-AgentToolPerm $sf 'oracleMCP_oracle_execute_query') -eq 'true' -and @($oraTools | Where-Object { $_ -ne 'oracleMCP_oracle_execute_query' -and (Get-AgentToolPerm $sf $_) -ne 'false' }).Count -eq 0) "subagent $sa：只開 oracle_execute_query，其餘四個關"
+    Assert ($saTxt -notmatch '"oracleMCP_\*"' -and $saTxt -match '(?m)^\s*"oracleMCP_oracle_execute_query":\s*true' -and $saTxt -notmatch $oraOld) "subagent $sa：Oracle 逐工具明寫；沒有舊工具名"
+    Assert ($saTxt -match 'NOT_CONNECTED' -and $saTxt -match 'SELECT 1 AS OK FROM DUAL' -and $saTxt -match '規則 7b' -and $saTxt -notmatch '連線已由主 agent 建好' -and $saTxt -notmatch 'list_connections') "subagent $sa：錯誤處理照 cookbook（Database query failed → SELECT 1 AS OK FROM DUAL 判連線）、SQL 照規則 7b；沒有「主 agent 建連線」殘留"
 }
 $prof31 = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml'))
-Assert ($prof31 -match '(?m)^\s*connectionName:\s*\S+' -and $prof31 -match '(?m)^\s*connectGuard:\s*enforce\b' -and $prof31 -match '(?m)^\s*mcpAutoRecover:\s*off\b') "profile：oracle.connectionName 存在、connectGuard 預設 enforce、mcpAutoRecover 預設 off"
-Assert ($prof31 -notmatch '(?m)^\s*preflightGate:' -and $prof31 -notmatch '(?m)^\s*preflightReminder:' -and $prof31 -notmatch '(?m)^\s*todoFirst:' -and $prof31 -match 'PS_ORACLE_CONNECT_GUARD' -and $prof31 -match 'PS_ORACLE_MCP_AUTO_RECOVER') "profile：閘門設定項（preflightGate／preflightReminder／todoFirst）已移除；guard 與自動重掛的 env 有註明"
+Assert ($prof31 -notmatch '(?m)^\s*connectionName:' -and $prof31 -notmatch '(?m)^\s*connectGuard:' -and $prof31 -match '(?m)^\s*mcpAutoRecover:\s*off\b' -and $prof31 -match 'ORACLE_CONNECTION_STRING') "profile：沒有 connectionName／connectGuard（連線在 MCP 設定的 environment）、mcpAutoRecover 預設 off"
+Assert ($prof31 -notmatch '(?m)^\s*preflightGate:' -and $prof31 -notmatch '(?m)^\s*preflightReminder:' -and $prof31 -notmatch '(?m)^\s*todoFirst:' -and $prof31 -notmatch 'PS_ORACLE_CONNECT_GUARD' -and $prof31 -match 'PS_ORACLE_MCP_AUTO_RECOVER') "profile：閘門設定項與 connect guard 開關已移除；自動重掛的 env 有註明"
+# cookbook（兩版）：連線與錯誤處理一節；每個 sql 區塊都過得了 server 的送出前檢查（一句、無分號與註解、SELECT／WITH 開頭、沒有被擋的字）
+$ckBlockedWord = '(?i)\b(INSERT|UPDATE|DELETE|MERGE|UPSERT|DROP|CREATE|ALTER|TRUNCATE|RENAME|COMMENT|GRANT|REVOKE|EXECUTE|EXEC|CALL|ANYDATA|XMLTYPE)\b'
+$ckBlockedSub = '(?i)DBMS_|UTL_|OWA_|XMLDB|XDB_|CTXSYS|HTTPURITYPE|URIFACTORY'
+foreach ($ckRel in @('.opencode/peoplesoft/oracle-query-cookbook.md', 'claude-code/.claude/peoplesoft/oracle-query-cookbook.md')) {
+    $ckT = [System.IO.File]::ReadAllText((Join-Path $repoRoot $ckRel))
+    $ckBad = @()
+    $ckN = 0
+    foreach ($bm in [regex]::Matches($ckT, '(?s)```sql\r?\n(.*?)```')) {
+        $ckN++
+        $q = $bm.Groups[1].Value
+        $why = @()
+        if ($q.Contains(';')) { $why += ';' }
+        if ($q.Contains('--') -or $q.Contains('/*')) { $why += 'comment' }
+        if ($q.TrimStart() -notmatch '^(?i)(SELECT|WITH)\b') { $why += 'start' }
+        if ($q -match $ckBlockedWord) { $why += $Matches[1] }
+        if ($q -match $ckBlockedSub) { $why += 'package' }
+        if ($q -match '(?is)\bSELECT\b.+\bINTO\b' -or $q -match '(?i)\bFOR\s+UPDATE\b') { $why += 'into/for-update' }
+        if ($why.Count -gt 0) { $ckBad += (($q.Trim() -split "`r?`n")[0].Substring(0, [Math]::Min(40, (($q.Trim() -split "`r?`n")[0]).Length)) + '=' + ($why -join '+')) }
+    }
+    Assert ($ckN -ge 50 -and $ckBad.Count -eq 0) ("cookbook $ckRel：$ckN 個 sql 區塊都過得了 oracleMCP 的送出前檢查" + $(if ($ckBad.Count -gt 0) { '：' + (($ckBad | Select-Object -First 4) -join ' / ') } else { '' }))
+}
 $ckLc = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/oracle-query-cookbook.md'))
-Assert ($ckLc -match '連線的擁有者是主 agent' -and $ckLc -match 'blockedReason=NOT_CONNECTED' -and $ckLc -match 'list_connections' -and $ckLc -match 'oracle\.connectionName' -and $ckLc -notmatch '第一個先單獨派\*\*，') "cookbook 生命週期：主 agent／subagent 兩段，先單獨派規則已移除"
-Assert ($ckLc -match 'CONNECTION_NOT_CONFIGURED' -and $ckLc -match '原樣照抄' -and $ckLc -match '不先 list_connections' -and $ckLc -notmatch '或清單第一個') "cookbook：連線名＝profile 原樣照抄、不先 list、不從清單挑；缺值 → 報設定錯誤"
-Assert ($ckLc -match '掛載故障' -and $ckLc -match 'SOP-21' -and $ckLc -match '只一次' -and $ckLc -match 'ORACLE_MCP_DOWN ≠ NOT_CONNECTED' -and $ckLc -notmatch 'VS Code 端已死' -and $ckLc -notmatch '不是暫時故障、重試不會出現') "cookbook 7a／生命週期：工具不見＝掛載故障（可重掛恢復、不猜名不重試）；NOT_CONNECTED 至多重連重派一次；不再推論「一定已死、絕非暫時」"
+Assert ($ckLc -match '(?m)^## 連線與錯誤處理' -and $ckLc -match 'blockedReason=NOT_CONNECTED' -and $ckLc -match 'oracleMCP_oracle_execute_query' -and $ckLc -match 'SELECT 1 AS OK FROM DUAL' -and $ckLc -match '(?m)^7b\.' -and $ckLc -match '(?m)^7c\.' -and $ckLc -notmatch 'list_connections' -and $ckLc -notmatch 'connectionName' -and $ckLc -notmatch '連線的擁有者是主 agent' -and $ckLc -notmatch '第一個先單獨派\*\*，') "cookbook：連線與錯誤處理一節（沒有 connect）、SQL 形狀（7b）與回覆判讀（7c）"
+Assert ($ckLc -match 'Error: Database query failed\.' -and $ckLc -match 'Error: Table or view does not exist\.' -and $ckLc -match 'Error: Query timed out' -and $ckLc -match 'FETCH FIRST <limit> ROWS ONLY' -and $ckLc -match '\[truncado' -and $ckLc -match 'linha\(s\) retornada\(s\)') "cookbook：server 的錯誤訊息對照、外層包 FETCH FIRST（欄名不得重複）、截斷與列數判讀"
+Assert ($ckLc -match '掛載故障' -and $ckLc -match 'SOP-21' -and $ckLc -match '只一次' -and $ckLc -match 'ORACLE_MCP_DOWN ≠ NOT_CONNECTED' -and $ckLc -notmatch 'VS Code 端已死' -and $ckLc -notmatch '不是暫時故障、重試不會出現') "cookbook 7a／錯誤處理：工具不見＝掛載故障（可重掛恢復、不猜名不重試）；NOT_CONNECTED 至多重派一次"
 $firstPick = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) + @(Get-Item (Join-Path $repoRoot '.opencode/plugin/ps-runtime-guard.js')) + @(Get-Item (Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '否則(用)?清單第一個|則用清單第一個' } | ForEach-Object { $_.Name })
 Assert ($firstPick.Count -eq 0) "agent／command／plugin／profile 不再有「否則用清單第一個」（靜默連錯 DB 的來源）：$($firstPick -join ',')"
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt0 = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
-    Assert ($pt0 -match '不要從清單挑名字' -and $pt0 -match '原樣照抄' -and $pt0 -match 'Oracle 連線未設定' -and $pt0 -notmatch '不挑清單第一個') "主 agent $pa：第 0 步 connect 用 profile 連線名原樣、不從清單挑名字；缺值 → 回報「Oracle 連線未設定」"
-    Assert ($pt0 -match '只一次' -and $pt0 -match '掛載故障' -and $pt0 -match 'ORACLE_CONNECTION_MISMATCH' -and $pt0 -match '成功\*\*的 `oracleMCP_connect`') "主 agent $pa：NOT_CONNECTED 至多重連重派一次；工具不見＝掛載故障（不猜名不重派）；guard 擋 connect 目標；自檢＝成功的 connect 先於 DB 委派"
+    Assert ($pt0 -match '不必開線' -and $pt0 -notmatch 'oracleMCP_connect' -and $pt0 -notmatch 'list_connections' -and $pt0 -notmatch 'connectionName' -and $pt0 -notmatch 'ORACLE_CONNECTION_') "主 agent $pa：沒有開線步驟（不 connect、不 list、沒有 profile 連線名與 connect guard 錯誤碼）"
+    Assert ($pt0 -match '只一次' -and $pt0 -match 'NOT_CONNECTED' -and $pt0 -match 'ORACLE_MCP_DOWN') "主 agent $pa：NOT_CONNECTED 至多重派一次；ORACLE_MCP_DOWN 不重派"
 }
 $rcTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/peoplesoft/subagent-report-contract.md'))
 Assert ($rcTxt -match 'blockedReason' -and $rcTxt -match 'NOT_CONNECTED' -and $rcTxt -match 'SCHEMA_UNRESOLVED' -and $rcTxt -match 'QUERY_TIMEOUT') "report-contract：blockedReason 封閉值域"
@@ -5295,22 +5316,22 @@ Assert ($noSolo.Count -eq 0) "agent／command 不再有「先單獨派」：$($n
 $hyPat = 'list' + '-connections|run' + '-sql|sql' + '-run|sqlcl' + '-run'
 $hy = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml | Where-Object { $_.Name -ne 'SOP.md' -and $_.Name -ne 'applied.md' -and ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
 $hy += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1,*.json | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $hyPat } | ForEach-Object { $_.Name })
-Assert ($hy.Count -eq 0) "全樹 oracleMCP 工具名一律底線拼法（list_connections／sql_run）：$($hy -join ',')"
-# oracleMCP 工具實名（公司機 /mcp 核對）：list_connections／connect／disconnect／sql_run／sqlcl_run；舊錯名 run_ + sql／run_ + sqlcl 不得回流（SOP／applied 的歷史追記除外）
+Assert ($hy.Count -eq 0) "全樹沒有連字號拼法的 oracleMCP 工具名：$($hy -join ',')"
+# SQLcl 時代的舊工具名（connect／disconnect／list_connections／sql_run／sqlcl_run 與錯名 run_ + sql）不得留在模型讀的檔、plugin、AGENTS.md（SOP／applied 的歷史與 test-scenarios 的反例除外）
 $oldName = 'run_' + 'sql'
-$oldHits = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml,*.js | Where-Object { $_.Name -ne 'SOP.md' -and $_.Name -ne 'applied.md' -and ([System.IO.File]::ReadAllText($_.FullName)) -match $oldName } | ForEach-Object { $_.Name })
+$oldHits = @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode') -Recurse -Include *.md,*.yaml,*.js | Where-Object { @('SOP.md', 'applied.md', 'test-scenarios.md') -notcontains $_.Name -and (([System.IO.File]::ReadAllText($_.FullName)) -match $oldName -or ([System.IO.File]::ReadAllText($_.FullName)) -match $oraOld) } | ForEach-Object { $_.Name })
 $oldHits += @(Get-ChildItem -Path (Join-Path $repoRoot 'scripts') -Recurse -Include *.ps1 | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $oldName } | ForEach-Object { $_.Name })
-if (([System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))) -match $oldName) { $oldHits += 'AGENTS.md' }
-Assert ($oldHits.Count -eq 0) "oracleMCP 工具實名 sql_run／sqlcl_run：模型讀的檔、plugin、scripts 不得再出現舊錯名（run_ + sql／run_ + sqlcl）：$($oldHits -join ',')"
+$agTxt31 = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))
+if ($agTxt31 -match $oldName -or $agTxt31 -match $oraOld) { $oldHits += 'AGENTS.md' }
+Assert ($oldHits.Count -eq 0) "SQLcl 時代的舊工具名不得留在模型讀的檔、plugin、AGENTS.md：$($oldHits -join ',')"
 $nextAction = @{ 'ps-orchestrator' = '先查知識層'; 'ps-deep-research' = '歸戶提煉'; 'ps-audit-orchestrator' = 'audit-parts/manifest.txt' }
 foreach ($pa in @('ps-orchestrator', 'ps-deep-research', 'ps-audit-orchestrator')) {
     $pt = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".opencode/agent/$pa.md"))
-    Assert ($pt -match '開線（第 0 步' -and $pt -match '無條件' -and $pt -match 'oracleMCP_connect' -and $pt -notmatch '(?m)^## 第 0 步') "主 agent $pa：開線（第 0 步）是工作流裡的編號步驟，不再是獨立章節"
-    $s0 = $pt.Substring($pt.IndexOf('開線（第 0 步')); $iL = $s0.IndexOf('oracleMCP_list_connections'); $iC = $s0.IndexOf('oracleMCP_connect'); $iN = $s0.IndexOf($nextAction[$pa])
-    Assert ($iC -ge 0 -and $iN -gt $iC -and ($iL -lt 0 -or $iL -gt $iC) -and $s0 -match '不要先呼叫 list_connections' -and $s0 -notmatch 'read profile → connect' -and $s0 -notmatch '順序固定 list → connect') "主 agent $pa：開線步驟＝直接 connect（不先 list；list 只在 connect 失敗後附清單原文給管理者），且排在後續動作（$($nextAction[$pa])）之前"
+    $iS = $pt.IndexOf('不必開線'); $iN = $pt.IndexOf($nextAction[$pa], [Math]::Max(0, $iS))
+    Assert ($iS -ge 0 -and $iN -gt $iS -and $pt -notmatch '(?m)^## 第 0 步' -and $pt -notmatch '開線（第 0 步') "主 agent $pa：「不必開線」是工作流裡的編號步驟、排在後續動作（$($nextAction[$pa])）之前；沒有舊的開線步驟"
 }
-$cond = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '派出第一個.{0,12}之前.{0,6}先由你 connect|派出前先由你 connect|read profile → connect' } | ForEach-Object { $_.Name })
-Assert ($cond.Count -eq 0) "agent／command 不再有條件式 connect（派出第一個之前才 connect）：$($cond -join ',')"
+$cond = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match '派出第一個.{0,12}之前.{0,6}先由你 connect|派出前先由你 connect|read profile → connect|派前先 connect|第 0 步建好' } | ForEach-Object { $_.Name })
+Assert ($cond.Count -eq 0) "agent／command 不再有 connect 步驟（派前先 connect／第 0 步建好）：$($cond -join ',')"
 # 閘門承諾清理（issue #30）：模型讀的檔、AGENTS.md、profile 不得再承諾「執行期會擋順序」「第一個工具必須 todowrite」
 $gatePromise = 'PS_ORACLE_PREFLIGHT_REQUIRED|PS_TODO_FIRST_REQUIRED|執行期閘門會擋|todowrite 必須|第一個工具呼叫必須是|ps-oracle-preflight-gate|preflightGate|preflightReminder|todoFirst|沒做完就派會被擋|NEED_CONNECT'
 $gp31 = @(@(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/command/*.md')) + @(Get-ChildItem -Path (Join-Path $repoRoot '.opencode/skills/*/SKILL.md')) + @(Get-Item (Join-Path $repoRoot '.opencode/peoplesoft/oracle-query-cookbook.md')) + @(Get-Item (Join-Path $repoRoot '.opencode/peoplesoft/subagent-report-contract.md')) + @(Get-Item (Join-Path $repoRoot '.opencode/peoplesoft/customization-profile.yaml')) + @(Get-Item (Join-Path $repoRoot 'AGENTS.md')) + @(Get-Item (Join-Path $repoRoot '.opencode/peoplesoft/README.md')) | Where-Object { ([System.IO.File]::ReadAllText($_.FullName)) -match $gatePromise } | ForEach-Object { $_.Name })
@@ -5320,7 +5341,7 @@ Assert (-not (Test-Path -LiteralPath (Join-Path $repoRoot '.opencode/plugin/ps-o
 $skTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/skills/ps-security-flow/SKILL.md'))
 $skFm = [regex]::Match($skTxt, '(?s)^---\r?\n(.*?)\r?\n---').Groups[1].Value
 Assert ($skFm -match 'name: ps-security-flow' -and $skFm -match '不是可供 task 委派的 agent' -and $skFm -match '委派 ps-metadata-flow' -and $skFm -match '不得使用 subagent_type=ps-security-flow') "ps-security-flow SKILL.md frontmatter：摘要就說明不是 agent、承載者是 ps-metadata-flow"
-Assert ($skTxt -match '(?m)^## 承載 agent 與讀取方式' -and $skTxt -notmatch '(?m)^## Subagent 模式' -and $skTxt -match '"subagent_type": "ps-metadata-flow"' -and $skTxt -match 'oracleMCP_sql_run' -and $skTxt -notmatch '(?m)^\| `ps_get_security_path` \|' -and $skTxt -match '協定角色' -and $skTxt -match 'NOT_CONNECTED' -and $skTxt -match 'ORACLE_MCP_DOWN') "ps-security-flow SKILL.md：承載段標題、正確 task 範例、實際途徑走 sql_run＋cookbook；契約角色標明不是可呼叫工具"
+Assert ($skTxt -match '(?m)^## 承載 agent 與讀取方式' -and $skTxt -notmatch '(?m)^## Subagent 模式' -and $skTxt -match '"subagent_type": "ps-metadata-flow"' -and $skTxt -match 'oracleMCP_oracle_execute_query' -and $skTxt -notmatch '(?m)^\| `ps_get_security_path` \|' -and $skTxt -match '協定角色' -and $skTxt -match 'NOT_CONNECTED' -and $skTxt -match 'ORACLE_MCP_DOWN') "ps-security-flow SKILL.md：承載段標題、正確 task 範例、實際途徑走 oracle_execute_query＋cookbook；契約角色標明不是可呼叫工具"
 Assert (-not (Test-Path -LiteralPath (Join-Path $repoRoot '.opencode/agent/ps-security-flow.md'))) "不新增 .opencode/agent/ps-security-flow.md（不以同名 agent 或 alias 接受誤派）"
 $mfTxt = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.opencode/agent/ps-metadata-flow.md'))
 Assert ($mfTxt -match '承載 agent' -and $mfTxt -match 'subagent_type=ps-metadata-flow' -and $mfTxt -match 'ps-security-flow/SKILL\.md') "ps-metadata-flow：宣告自己是授權／血緣／排程 skill 的承載 agent"
@@ -5352,13 +5373,13 @@ Assert ($adOut -match '教訓編號 L<nn>：1 處') "L 編號只計數不擋"
 $null = ((& $adLint -Root $adRoot *>&1 | ForEach-Object { [string]$_ }) -join "`n"); Assert ($LASTEXITCODE -eq 0) "乾淨檔 → exit 0"
 $adReal = ((& $adLint -Root $repoRoot *>&1 | ForEach-Object { [string]$_ }) -join "`n"); Assert ($LASTEXITCODE -eq 0) "本 repo 的模型檔目前乾淨（exit 0）：$(($adReal -split "`n" | Where-Object { $_ -match '\[' } | Select-Object -First 3) -join ' / ')"
 
-Write-Host "情境 32：執行期 guard plugin——檔案形狀／零相依／單一匯出／無派工狀態機／connect 目標比對／skill 名擋／掛載診斷與受控重掛安全邊界／npmrc offline／AGENTS.md／analyzer 判定項（issue #30／#31／#32）"
+Write-Host "情境 32：執行期 guard plugin——檔案形狀／零相依／單一匯出／無派工狀態機／沒有 connect 目標比對／skill 名擋／掛載診斷與受控重掛安全邊界／npmrc offline／AGENTS.md／analyzer 判定項"
 $gp = Join-Path $repoRoot '.opencode/plugin/ps-runtime-guard.js'
 Assert (Test-Path -LiteralPath $gp) "plugin 檔存在：.opencode/plugin/ps-runtime-guard.js"
 $gt = [System.IO.File]::ReadAllText($gp)
-foreach ($must in @('ORACLE_CONNECTION_NOT_CONFIGURED', 'ORACLE_CONNECTION_MISMATCH', 'PS_TASK_TARGET_INVALID', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'event: async', 'mcp.tools.changed', 'message.part.updated', 'mcp.status', 'MCP_PREFIX + "sql_run"', 'MCP_PREFIX + "connect"', 'subagent_type', 'dbCapable', 'reportStatus', 'childSessionID', 'suggestedNext', 'SKILL_CARRIER', '"ps-security-flow": "ps-metadata-flow"', 'wildcardDenyMix', 'PS_ORACLE_CONNECT_GUARD', 'PS_ORACLE_MCP_AUTO_RECOVER', 'would-remount', 'remount-ok', 'remount-failed', 'not-eligible', 'deferred', 'verified-by-call', 'merged', 'suppressed', 'maskError', '_mcp-diag.jsonl', 'TOOL_INVALID', 'seenTools', 'catalogSuspect', 'recovered-unverified', 'SELECT 1 FROM DUAL')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
+foreach ($must in @('PS_TASK_TARGET_INVALID', '"tool.execute.before"', '"tool.execute.after"', '"chat.message"', 'event: async', 'mcp.tools.changed', 'message.part.updated', 'mcp.status', 'MCP_PREFIX + "oracle_execute_query"', 'subagent_type', 'dbCapable', 'reportStatus', 'childSessionID', 'suggestedNext', 'SKILL_CARRIER', '"ps-security-flow": "ps-metadata-flow"', 'wildcardDenyMix', 'PS_ORACLE_MCP_AUTO_RECOVER', 'would-remount', 'remount-ok', 'remount-failed', 'not-eligible', 'deferred', 'verified-by-call', 'merged', 'suppressed', 'maskError', '_mcp-diag.jsonl', 'TOOL_INVALID', 'seenTools', 'catalogSuspect', 'recovered-unverified', 'SELECT 1 AS OK FROM DUAL')) { Assert ($gt.Contains($must)) "plugin 含 $must" }
 Assert ($gt -notmatch 'NEED_CONNECT' -and $gt -notmatch '"READY"' -and $gt -notmatch 'PS_ORACLE_PREFLIGHT_REQUIRED' -and $gt -notmatch 'PS_TODO_FIRST_REQUIRED' -and $gt -notmatch 'todoWritten' -and $gt -notmatch 'turnId:' -and $gt -notmatch 'connectGen' -and $gt -notmatch 'parts\.push\(' -and $gt -notmatch 'buildReminder' -and $gt -notmatch 'partId\(' -and $gt -notmatch 'preflightGate' -and $gt -notmatch 'todoFirst') "plugin 沒有派工狀態機／todo 閘門／synthetic 提醒殘留（NEED_CONNECT／READY／turnId／connectGen／parts.push／todo）"
-Assert ($gt -match 'const problem = connectProblem\(profileName, target\)' -and $gt -match 'throw new Error\(problem\.message\)' -and $gt -match 'readSwitch\(d, "PS_ORACLE_CONNECT_GUARD", "connectGuard", \["enforce", "observe"\], "enforce"\)') "plugin：connect 目標 guard 無狀態（只比對本次參數與 profile）、enforce 預設、observe 只記錄"
+Assert ($gt -notmatch 'connectProblem' -and $gt -notmatch 'ORACLE_CONNECTION_' -and $gt -notmatch 'PS_ORACLE_CONNECT_GUARD' -and $gt -notmatch 'connectionName' -and $gt -notmatch 'MCP_PREFIX \+ "connect"' -and $gt -match 'throw new Error\(problem\.message\)') "plugin：沒有 connect 目標比對（新 server 沒有 connect）；唯一的擋是 task 目標"
 Assert ($gt -match 'targetProblem\(target, new Set\(fresh\(\)\.keys\(\)\), skills\)' -and $gt -match 'annotateSuggestedNext\(out, problems\)' -and $gt -match '不要當成 Oracle 掛載故障回報') "plugin：task 目標＝skill 名在執行前擋（指出承載 agent）；suggestedNext 無效目標在回覆附註；訊息明說不是 Oracle 問題"
 Assert ($gt -match 'readSwitch\(d, "PS_ORACLE_MCP_AUTO_RECOVER", "mcpAutoRecover", \["on", "off"\], "off"\)' -and $gt -match 'recovery\.evaluating' -and $gt -match 'inflightCount\(\) > 0' -and $gt -match 'st\.status === "disabled" \|\| st\.status === "absent" \|\| st\.status === "needs_auth"' -and $gt -match 'REMOUNT_DEFER_MAX_MS' -and $gt -match 'recovery\.phase = "failed"' -and $gt -match 'allowed === false\) note = "tool is denied by this agent') "plugin：自動重掛預設 off；同一故障事件只一次（evaluating／merged）；在途呼叫先等（有界）；disabled／needs_auth 不碰；失敗即停；權限過濾不當故障"
 $gImports = @([regex]::Matches($gt, '(?m)^import\s.*?from\s+"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
@@ -5367,19 +5388,19 @@ Assert (@([regex]::Matches($gt, '(?m)^export\s')).Count -eq 1 -and $gt -match '(
 Assert ($gt -notmatch '(?i)bypass' -and $gt -notmatch '繞過') "plugin 無「繞過」類字串（SOP-3 安控）"
 Assert ($gt -notmatch 'out\.args\s*=(?!=)' -and $gt -notmatch 'args\.subagent_type\s*=(?!=)' -and $gt -notmatch 'session\.get') "plugin 只擋不改參數（不對 out.args／subagent_type 賦值）、不查祖先 session"
 $rt = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/tests/test-oracle-runtime.ps1'))
-foreach ($must in @('reconnectLoops', 'downThenConnect', 'downThenRedispatch', 'routingBlocks', 'suggestedNextInvalid', 'invalidOracleCalls', 'Get-ChildSqlOk', 'dbTasksCompletedNoSql', 'hookMismatch', 'turnMismatch', 'callMismatch', 'exportFailures', 'ps-runtime-guard', '_mcp-diag.jsonl', 'Show-Diag', 'messageID', 'ExpectDbTask', 'Test-DbCapable', 'taskParents', '.export.json')) { Assert ($rt.Contains($must)) "runtime 驗收腳本含 $must" }
-Assert ($rt -notmatch 'executedBeforePreflight' -and $rt -notmatch 'turnInvariantViolations' -and $rt -notmatch 'NEED_CONNECT' -and $rt -notmatch 'todoBlocks' -and $rt -notmatch "next -eq 'READY'" -and $rt -notmatch 'Test-Exempt') "runtime 驗收腳本：沒有 READY／todo 順序判定殘留、無豁免；完成＝報告 COMPLETE 且子 session sql_run 成功"
+foreach ($must in @('redispatchLoops', 'oldToolCalls', 'downThenRedispatch', 'routingBlocks', 'suggestedNextInvalid', 'invalidOracleCalls', 'Get-ChildSqlOk', 'dbTasksCompletedNoSql', 'hookMismatch', 'turnMismatch', 'callMismatch', 'exportFailures', 'ps-runtime-guard', '_mcp-diag.jsonl', 'Show-Diag', 'messageID', 'ExpectDbTask', 'Test-DbCapable', 'taskParents', '.export.json')) { Assert ($rt.Contains($must)) "runtime 驗收腳本含 $must" }
+Assert ($rt -notmatch 'reconnectLoops' -and $rt -notmatch 'downThenConnect' -and $rt -notmatch 'connectBlocks' -and $rt -match "'oracleMCP_oracle_execute_query'" -and $rt -notmatch 'executedBeforePreflight' -and $rt -notmatch 'turnInvariantViolations' -and $rt -notmatch 'NEED_CONNECT' -and $rt -notmatch 'todoBlocks' -and $rt -notmatch "next -eq 'READY'" -and $rt -notmatch 'Test-Exempt') "runtime 驗收腳本：沒有 READY／todo 順序判定殘留、無豁免；完成＝報告 COMPLETE 且子 session oracle_execute_query 成功"
 Assert (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'scripts/tests/test-oracle-gate-runtime.ps1'))) "舊的 test-oracle-gate-runtime.ps1 已刪除"
 $npmrc = Join-Path $repoRoot '.opencode/.npmrc'
 Assert ((Test-Path -LiteralPath $npmrc) -and ([System.IO.File]::ReadAllText($npmrc) -match '(?m)^offline=true\s*$')) ".opencode/.npmrc 含 offline=true（斷網時相依安裝秒失敗，plugin 照常載入）"
 $ag = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'AGENTS.md'))
-$i0 = $ag.IndexOf('第 0 步'); $iw = $ag.IndexOf('docs/ps-research/wiki/')
-Assert ($i0 -ge 0 -and $iw -gt $i0 -and $ag -match 'ps-runtime-guard' -and $ag -match 'PS_TASK_TARGET_INVALID' -and $ag -match 'ORACLE_CONNECTION_MISMATCH' -and $ag -match '沒有派工前置' -and $ag -match 'tests/runtime-guard' -and $ag -notmatch 'ps-oracle-preflight-gate' -and $ag -notmatch 'tests/oracle-gate') "AGENTS.md：第 0 步在「先查 wiki」之前；說明 guard 只擋兩件事、沒有派工前置閘門；測試路徑更新"
+$i0 = $ag.IndexOf('沒有開線步驟'); $iw = $ag.IndexOf('docs/ps-research/wiki/')
+Assert ($i0 -ge 0 -and $iw -gt $i0 -and $ag -match 'ps-runtime-guard' -and $ag -match 'PS_TASK_TARGET_INVALID' -and $ag -notmatch 'ORACLE_CONNECTION_MISMATCH' -and $ag -match 'oracleMCP_oracle_execute_query' -and $ag -match '沒有派工前置' -and $ag -match 'tests/runtime-guard' -and $ag -notmatch 'ps-oracle-preflight-gate' -and $ag -notmatch 'tests/oracle-gate') "AGENTS.md：「沒有開線步驟」寫在「先查 wiki」之前；guard 只擋 task 目標、沒有派工前置閘門；測試路徑更新"
 foreach ($f in (Get-ChildItem -Path (Join-Path $repoRoot '.opencode/agent/*.md'))) {
-    $eff = Get-AgentToolPerm $f.FullName 'oracleMCP_sql_run'
+    $eff = Get-AgentToolPerm $f.FullName 'oracleMCP_oracle_execute_query'
     $isDb = ($eff -ne 'false')
     $expected = (@('ps-ui-flow', 'ps-metadata-flow', 'ps-ae-flow', 'ps-auditor') -contains $f.BaseName)
-    Assert ($isDb -eq $expected) "DB subagent 判定（sql_run 最後匹配者，沒列＝開）：$($f.BaseName) sql_run=$eff → dbCapable=$isDb"
+    Assert ($isDb -eq $expected) "DB subagent 判定（oracle_execute_query 最後匹配者，沒列＝開）：$($f.BaseName) oracle_execute_query=$eff → dbCapable=$isDb"
 }
 $mfJson = $null
 try { $mfJson = (Get-Content -LiteralPath (Join-Path $repoRoot 'scripts/ps-transfer-manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { }
@@ -5395,7 +5416,7 @@ if ($nodeCmd -and (Test-Path -LiteralPath $unit)) {
 }
 else { Write-Host "  （跳過單元測試：沒有 node 或 tests/runtime-guard 未搬——它只在維護沙箱跑，公司機用 scripts/tests/test-oracle-runtime.ps1）" }
 
-Write-Host "情境 33：runtime 驗收腳本的判定邏輯——AST 抽出 Get-SessionVerdict 餵固定 jsonl 樣本（issue #30：完成定義不變、NOT_CONNECTED 至多一次、DOWN 後不 connect 不重派、路由擋、覆蓋率）"
+Write-Host "情境 33：runtime 驗收腳本的判定邏輯——AST 抽出 Get-SessionVerdict 餵固定 jsonl 樣本（完成定義不變、NOT_CONNECTED 至多重派一輪、DOWN 後不重派、舊工具名、路由擋、覆蓋率）"
 $rtSrc = Get-Content (Join-Path $repoRoot 'scripts/tests/test-oracle-runtime.ps1') -Raw
 $rtTok = $null; $rtErr = $null
 $rtAst = [System.Management.Automation.Language.Parser]::ParseInput($rtSrc, [ref]$rtTok, [ref]$rtErr)
@@ -5406,61 +5427,67 @@ $global:gateDir = Join-Path $dir 'guard'
 New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
 function New-GateLog([string]$Id, [string[]]$Rows) { [System.IO.File]::WriteAllLines((Join-Path $gateDir ($Id + '.jsonl')), $Rows, (New-Object System.Text.UTF8Encoding($false))) }
 $chat = '{"hook":"chat.message","agent":"ps-orchestrator","messageID":"m1"}'
-$connB = '{"hook":"before","tool":"oracleMCP_connect","callID":"c1","agent":"ps-orchestrator","messageID":"m1","connection":"HR_DEV","profileConnection":"HR_DEV","mode":"enforce","decision":"allow"}'
-$connA = '{"hook":"after","tool":"oracleMCP_connect","callID":"c1","agent":"ps-orchestrator","messageID":"m1","ok":true,"outputLength":30,"connection":"HR_DEV"}'
-$tb = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","messageID":"m1","target":"ps-ui-flow","dbCapable":true,"basis":"sql_run:enabled","decision":"allow"}'
-$ta = '{"hook":"after","tool":"task","callID":"t1","agent":"ps-orchestrator","messageID":"m1","target":"ps-ui-flow","dbCapable":true,"basis":"sql_run:enabled","executed":true,"notConnected":false,"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE","taskState":"completed","childSessionID":"ses_child_ok"}'
-$sqlOk = '{"hook":"after","tool":"oracleMCP_sql_run","callID":"q1","agent":"ps-ui-flow","messageID":"mc","ok":true,"outputLength":12}'
+$tb = '{"hook":"before","tool":"task","callID":"t1","agent":"ps-orchestrator","messageID":"m1","target":"ps-ui-flow","dbCapable":true,"basis":"execute_query:enabled","decision":"allow"}'
+$ta = '{"hook":"after","tool":"task","callID":"t1","agent":"ps-orchestrator","messageID":"m1","target":"ps-ui-flow","dbCapable":true,"basis":"execute_query:enabled","executed":true,"notConnected":false,"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE","taskState":"completed","childSessionID":"ses_child_ok"}'
+$sqlOk = '{"hook":"after","tool":"oracleMCP_oracle_execute_query","callID":"q1","agent":"ps-ui-flow","messageID":"mc","ok":true,"outputLength":12}'
 function Set-Call([string]$Row, [string]$From, [string]$To) { return ($Row -replace ('"callID":"' + $From + '"'), ('"callID":"' + $To + '"')) }
 $taNc = ($ta -replace '"notConnected":false', '"notConnected":true' -replace '"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportStatus":"BLOCKED","blockedReason":"NOT_CONNECTED"')
 New-GateLog 'ses_child_ok' @($sqlOk)
 New-GateLog 'ses_child_nosql' @(($sqlOk -replace '"ok":true', '"ok":false'))
-New-GateLog 'ses_ok' @($chat, $connB, $connA, $tb, $ta)
+New-GateLog 'ses_ok' @($chat, $tb, $ta)
 $v = Get-SessionVerdict 'ses_ok' ''
-Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 1 -and $v.executed -eq 1 -and $v.dbTasksCompleted -eq 1 -and $v.reconnectLoops -eq 0 -and $v.notConnectedReports -eq 0 -and $v.routingBlocks -eq 0 -and $v.hookMismatch -eq 0 -and $v.callMismatch -eq 0) "正常：connect → task → COMPLETE＋子 session sql_run ok → dbOk=1、無違反"
-# 先派後連：NOT_CONNECTED → 重連一次 → 重派一次 → COMPLETE（合法）
-New-GateLog 'ses_nc_once' @($chat, $tb, $taNc, (Set-Call $connB 'c1' 'c2'), (Set-Call $connA 'c1' 'c2'), (Set-Call $tb 't1' 't2'), (Set-Call $ta 't1' 't2'))
+Assert ($v.turns -eq 1 -and $v.taskAttempts -eq 1 -and $v.executed -eq 1 -and $v.dbTasksCompleted -eq 1 -and $v.redispatchLoops -eq 0 -and $v.notConnectedReports -eq 0 -and $v.routingBlocks -eq 0 -and $v.oldToolCalls -eq 0 -and $v.hookMismatch -eq 0 -and $v.callMismatch -eq 0) "正常：task → COMPLETE＋子 session oracle_execute_query ok → dbOk=1、無違反（沒有 connect 步驟）"
+# DB 一時連不上：NOT_CONNECTED → 重派一次 → COMPLETE（合法）
+New-GateLog 'ses_nc_once' @($chat, $tb, $taNc, (Set-Call $tb 't1' 't2'), (Set-Call $ta 't1' 't2'))
 $v = Get-SessionVerdict 'ses_nc_once' ''
-Assert ($v.notConnectedReports -eq 1 -and $v.reconnects -eq 1 -and $v.reconnectLoops -eq 0 -and $v.dbTasksCompleted -eq 1 -and $v.dbTasksBlocked -eq 1 -and $v.executed -eq 2) "先派後連：NOT_CONNECTED 一次 → 重連一次、重派一次 → COMPLETE：reconnects=1、loops=0、dbOk=1（BLOCKED 那筆不算完成）"
-# 迴圈：NOT_CONNECTED → connect → NOT_CONNECTED → connect → NOT_CONNECTED（重連兩次＝違反）
-New-GateLog 'ses_nc_loop' @($chat, $tb, $taNc, (Set-Call $connB 'c1' 'c2'), (Set-Call $connA 'c1' 'c2'), (Set-Call $tb 't1' 't2'), (Set-Call $taNc 't1' 't2'), (Set-Call $connB 'c1' 'c3'), (Set-Call $connA 'c1' 'c3'), (Set-Call $tb 't1' 't3'), (Set-Call $taNc 't1' 't3'))
+Assert ($v.notConnectedReports -eq 1 -and $v.redispatches -eq 1 -and $v.redispatchLoops -eq 0 -and $v.dbTasksCompleted -eq 1 -and $v.dbTasksBlocked -eq 1 -and $v.executed -eq 2) "NOT_CONNECTED 一次 → 重派一次 → COMPLETE：redispatches=1、loops=0、dbOk=1（BLOCKED 那筆不算完成）"
+# 重派後仍 NOT_CONNECTED 就停手（合法）
+New-GateLog 'ses_nc_stop' @($chat, $tb, $taNc, (Set-Call $tb 't1' 't2'), (Set-Call $taNc 't1' 't2'))
+$v = Get-SessionVerdict 'ses_nc_stop' ''
+Assert ($v.notConnectedReports -eq 2 -and $v.redispatches -eq 1 -and $v.redispatchLoops -eq 0 -and $v.dbTasksCompleted -eq 0) "重派後仍 NOT_CONNECTED → 停手、回報 DB 連線失敗：loops=0"
+# 迴圈：NOT_CONNECTED → 重派 → NOT_CONNECTED → 又派（違反）
+New-GateLog 'ses_nc_loop' @($chat, $tb, $taNc, (Set-Call $tb 't1' 't2'), (Set-Call $taNc 't1' 't2'), (Set-Call $tb 't1' 't3'), (Set-Call $taNc 't1' 't3'))
 $v = Get-SessionVerdict 'ses_nc_loop' ''
-Assert ($v.notConnectedReports -eq 3 -and $v.reconnects -eq 2 -and $v.reconnectLoops -eq 1 -and $v.dbTasksCompleted -eq 0 -and $v.dbTasksBlocked -eq 3) "重連迴圈：NOT_CONNECTED 後 connect 兩次 → reconnectLoops=1（判 FAIL 的來源）、dbOk=0"
-# ORACLE_MCP_DOWN 之後又 connect、又派 DB task（違反）；純 DOWN 回報＋停手（合法）
+Assert ($v.notConnectedReports -eq 3 -and $v.redispatches -eq 2 -and $v.redispatchLoops -eq 1 -and $v.dbTasksCompleted -eq 0 -and $v.dbTasksBlocked -eq 3) "重派迴圈：重派後又 NOT_CONNECTED 還再派 → redispatchLoops=1（判 FAIL 的來源）、dbOk=0"
+# 同一批多個委派都 NOT_CONNECTED、一起重派一次（合法：一輪）
+New-GateLog 'ses_nc_batch' @($chat, $tb, (Set-Call $tb 't1' 't2'), $taNc, (Set-Call $taNc 't1' 't2'), (Set-Call $tb 't1' 't3'), (Set-Call $tb 't1' 't4'), (Set-Call $ta 't1' 't3'), (Set-Call $ta 't1' 't4'))
+$v = Get-SessionVerdict 'ses_nc_batch' ''
+Assert ($v.notConnectedReports -eq 2 -and $v.redispatches -eq 2 -and $v.redispatchLoops -eq 0 -and $v.dbTasksCompleted -eq 2) "同一批兩個委派都 NOT_CONNECTED → 兩個一起重派一輪 → loops=0、dbOk=2"
+# ORACLE_MCP_DOWN 之後又派 DB task（違反）；純 DOWN 回報＋停手（合法）
 $taDown = ($ta -replace '"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportStatus":"BLOCKED","blockedReason":"ORACLE_MCP_DOWN"')
-New-GateLog 'ses_down_bad' @($chat, $tb, $taDown, (Set-Call $connB 'c1' 'c2'), (Set-Call $connA 'c1' 'c2'), (Set-Call $tb 't1' 't2'))
+New-GateLog 'ses_down_bad' @($chat, $tb, $taDown, (Set-Call $tb 't1' 't2'))
 $v = Get-SessionVerdict 'ses_down_bad' ''
-Assert ($v.downReports -eq 1 -and $v.downThenConnect -eq 1 -and $v.downThenRedispatch -eq 1 -and $v.tasksNotReturned -eq 1) "DOWN 後又 connect、又派 DB task → downThenConnect=1、downThenRedispatch=1（判 FAIL）；未返回的 task 另計"
+Assert ($v.downReports -eq 1 -and $v.downThenRedispatch -eq 1 -and $v.tasksNotReturned -eq 1) "DOWN 後又派 DB task → downThenRedispatch=1（判 FAIL）；未返回的 task 另計"
 New-GateLog 'ses_down_ok' @($chat, $tb, $taDown)
 $v = Get-SessionVerdict 'ses_down_ok' ''
-Assert ($v.downReports -eq 1 -and $v.downThenConnect -eq 0 -and $v.downThenRedispatch -eq 0 -and $v.dbTasksBlocked -eq 1 -and $v.dbTasksCompleted -eq 0) "DOWN 回報後停手 → 無違反；DOWN 不算完成"
-# 假成功反例：BLOCKED(QUERY_TIMEOUT)／非 JSON（INVALID）／COMPLETE 但子 session 沒有成功的 sql_run／沒有 reportStatus／PARTIAL——都不算完成
+Assert ($v.downReports -eq 1 -and $v.downThenRedispatch -eq 0 -and $v.dbTasksBlocked -eq 1 -and $v.dbTasksCompleted -eq 0) "DOWN 回報後停手 → 無違反；DOWN 不算完成"
+# 假成功反例：BLOCKED(QUERY_TIMEOUT)／非 JSON（INVALID）／COMPLETE 但子 session 沒有成功的 oracle_execute_query／沒有 reportStatus／PARTIAL——都不算完成
 $g4a = ($ta -replace '"callID":"t1"', '"callID":"g1"' -replace '"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportStatus":"BLOCKED","blockedReason":"QUERY_TIMEOUT"')
 $g4b = ($ta -replace '"callID":"t1"', '"callID":"g2"' -replace '"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportValid":false,"reportStatus":"INVALID"')
 $g4c = ($ta -replace '"callID":"t1"', '"callID":"g3"' -replace '"childSessionID":"ses_child_ok"', '"childSessionID":"ses_child_nosql"')
 $g4d = ($ta -replace '"callID":"t1"', '"callID":"g4"' -replace ',"reportValid":true,"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE","taskState":"completed","childSessionID":"ses_child_ok"', '')
 $g4e = ($ta -replace '"callID":"t1"', '"callID":"g5"' -replace '"reportStatus":"COMPLETE","blockedReason":"NOT_APPLICABLE"', '"reportStatus":"PARTIAL","blockedReason":"NO_EVIDENCE"')
-New-GateLog 'ses_g4' @($chat, $connB, $connA, (Set-Call $tb 't1' 'g1'), $g4a, (Set-Call $tb 't1' 'g2'), $g4b, (Set-Call $tb 't1' 'g3'), $g4c, (Set-Call $tb 't1' 'g4'), $g4d, (Set-Call $tb 't1' 'g5'), $g4e)
+New-GateLog 'ses_g4' @($chat, (Set-Call $tb 't1' 'g1'), $g4a, (Set-Call $tb 't1' 'g2'), $g4b, (Set-Call $tb 't1' 'g3'), $g4c, (Set-Call $tb 't1' 'g4'), $g4d, (Set-Call $tb 't1' 'g5'), $g4e)
 $v = Get-SessionVerdict 'ses_g4' ''
 Assert ($v.dbTasksCompleted -eq 0 -and $v.dbTasksBlocked -eq 1 -and $v.dbTasksInvalid -eq 2 -and $v.dbTasksCompletedNoSql -eq 1 -and $v.dbTasksPartial -eq 1) "假成功反例：BLOCKED(QUERY_TIMEOUT)、非 JSON、COMPLETE 無 SQL、無 reportStatus、PARTIAL 都不計為完成（dbOk=0）"
-# 路由錯誤：skill 名當 agent 被擋（沒有 after）；suggestedNext 無效目標附註；connect 被 guard 擋；invalid 呼叫
+# 路由錯誤：skill 名當 agent 被擋（沒有 after）；suggestedNext 無效目標附註；invalid 呼叫（含 SQLcl 時代的舊工具名）
 $tbSkill = '{"hook":"before","tool":"task","callID":"t9","agent":"ps-orchestrator","messageID":"m1","target":"ps-security-flow","dbCapable":true,"basis":"unknown-agent(default:DB)","decision":"block","note":"PS_TASK_TARGET_INVALID:skill","carrier":"ps-metadata-flow"}'
 $taSug = ($ta -replace '"childSessionID":"ses_child_ok"', '"childSessionID":"ses_child_ok","suggestedNextInvalid":[{"agent":"ps-security-flow","kind":"skill","carrier":"ps-metadata-flow"}]')
-$cblk = '{"hook":"before","tool":"oracleMCP_connect","callID":"c9","agent":"ps-orchestrator","messageID":"m1","connection":"HR_UAT","profileConnection":"HR_DEV","mode":"enforce","decision":"block","note":"ORACLE_CONNECTION_MISMATCH"}'
-$inv = '{"hook":"invalid","tool":"invalid","callID":"i1","agent":"ps-orchestrator","messageID":"m1","attempted":"oracleMCP_connect","allowedByAgent":true,"seenBefore":true,"note":"catalog loss"}'
-New-GateLog 'ses_routing' @($chat, $cblk, $inv, $connB, $connA, $tbSkill, $tb, $taSug)
+$inv = '{"hook":"invalid","tool":"invalid","callID":"i1","agent":"ps-orchestrator","messageID":"m1","attempted":"oracleMCP_oracle_execute_query","allowedByAgent":false,"seenBefore":false,"note":"permission-filtered"}'
+$invOld = '{"hook":"invalid","tool":"invalid","callID":"i2","agent":"ps-orchestrator","messageID":"m1","attempted":"oracleMCP_connect","allowedByAgent":true,"seenBefore":false,"note":"wrong name"}'
+New-GateLog 'ses_routing' @($chat, $inv, $invOld, $tbSkill, $tb, $taSug)
 $v = Get-SessionVerdict 'ses_routing' ''
-Assert ($v.routingBlocks -eq 1 -and $v.taskAttempts -eq 2 -and $v.executed -eq 1 -and $v.tasksNotReturned -eq 0 -and $v.suggestedNextInvalid -eq 1 -and $v.connectBlocks -eq 1 -and $v.invalidOracleCalls -eq 1 -and $v.dbTasksCompleted -eq 1 -and $v.reconnectLoops -eq 0) "路由錯誤與 guard 擋下都是觀察值：routingBlocks=1（被擋的 task 不算未返回）、suggestedNextInvalid=1、connectBlocks=1、invalidOracleCalls=1；不影響完成判定"
+Assert ($v.routingBlocks -eq 1 -and $v.taskAttempts -eq 2 -and $v.executed -eq 1 -and $v.tasksNotReturned -eq 0 -and $v.suggestedNextInvalid -eq 1 -and $v.invalidOracleCalls -eq 2 -and $v.oldToolCalls -eq 1 -and $v.dbTasksCompleted -eq 1 -and $v.redispatchLoops -eq 0) "路由錯誤與 invalid 呼叫都是觀察值：routingBlocks=1（被擋的 task 不算未返回）、suggestedNextInvalid=1、invalidOracleCalls=2、oldToolCalls=1（憑記憶呼叫舊 connect）；不影響完成判定"
 # 不查 DB 的委派不計入 DB 判定
-$noDb = ($ta -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"sql_run:enabled"', '"basis":"sql_run:disabled"' -replace '"dbCapable":true', '"dbCapable":false')
-New-GateLog 'ses_nodb' @($chat, ($tb -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"dbCapable":true', '"dbCapable":false' -replace '"basis":"sql_run:enabled"', '"basis":"sql_run:disabled"'), $noDb)
+$noDb = ($ta -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"basis":"execute_query:enabled"', '"basis":"execute_query:disabled"' -replace '"dbCapable":true', '"dbCapable":false')
+New-GateLog 'ses_nodb' @($chat, ($tb -replace '"target":"ps-ui-flow"', '"target":"ps-peoplecode-flow"' -replace '"dbCapable":true', '"dbCapable":false' -replace '"basis":"execute_query:enabled"', '"basis":"execute_query:disabled"'), $noDb)
 $v = Get-SessionVerdict 'ses_nodb' ''
 Assert ($v.executed -eq 1 -and $v.executedDb -eq 0 -and $v.dbTasksCompleted -eq 0) "不查 DB 的委派（dbCapable=false）不計入 DB 判定"
 # export 交叉比對：真實題目 id ↔ chat.message messageID；compaction／synthetic 訊息不算題；task 所屬題目 ↔ before 列 messageID；/undo 的孤兒只觀察
 $chat2 = ($chat -replace '"messageID":"m1"', '"messageID":"m2"')
 $tb2 = ($tb -replace '"messageID":"m1"', '"messageID":"m2"' -replace '"callID":"t1"', '"callID":"t3"')
 $ta2 = ($ta -replace '"messageID":"m1"', '"messageID":"m2"' -replace '"callID":"t1"', '"callID":"t3"')
-New-GateLog 'ses_twoturn' @($chat, $connB, $connA, $tb, $ta, $chat2, (Set-Call $connB 'c1' 'c2'), (Set-Call $connA 'c1' 'c2'), $tb2, $ta2)
+New-GateLog 'ses_twoturn' @($chat, $tb, $ta, $chat2, $tb2, $ta2)
 $exportFx = @'
 {"messages":[
  {"info":{"id":"m1","role":"user"},"parts":[{"type":"text","text":"Q1"}]},
@@ -5480,7 +5507,7 @@ Assert ($v.turns -eq 2 -and $v.exportedTasks -eq 2 -and $v.exportedTurns -eq 2 -
 New-GateLog 'ses_swapped' @($chat, $chat2, ($tb -replace '"messageID":"m1"', '"messageID":"m2"'), ($ta -replace '"messageID":"m1"', '"messageID":"m2"'), ($tb2 -replace '"messageID":"m2"', '"messageID":"m1"'), ($ta2 -replace '"messageID":"m2"', '"messageID":"m1"'))
 $v = Get-SessionVerdict 'ses_swapped' '' $exportPath
 Assert ($v.callMismatch -eq 2) "guard 把 t1 標成 m2、t3 標成 m1，export 說相反 → callMismatch=2（歸屬被改標，不只比件數）"
-New-GateLog 'ses_onlym1' @($chat, $connB, $connA, $tb, $ta)
+New-GateLog 'ses_onlym1' @($chat, $tb, $ta)
 $v = Get-SessionVerdict 'ses_onlym1' '' $exportPath
 Assert ($v.turnMismatch -eq 1 -and $v.orphanTurns -eq 0 -and $v.hookMismatch -eq 1) "m2 沒有 chat.message → turnMismatch=1；guard 只看到 1 個 task、export 有 2 → hookMismatch=1"
 $undoFx = '{"messages":[{"info":{"id":"m1","role":"user"},"parts":[{"type":"text","text":"Q1"}]}]}'
@@ -5489,7 +5516,7 @@ $undoPath = Join-Path $dir 'export-undo.json'
 $v = Get-SessionVerdict 'ses_twoturn' '' $undoPath
 Assert ($v.turnMismatch -eq 0 -and $v.orphanTurns -eq 1) "/undo 刪掉 m2 → 不算漏（turnMismatch=0）、只記 orphanTurns=1"
 $synth = '{"hook":"chat.message","agent":"ps-orchestrator","messageID":"m1","synthetic":true}'
-New-GateLog 'ses_synth' @($chat, $synth, $connB, $connA, $tb, $ta)
+New-GateLog 'ses_synth' @($chat, $synth, $tb, $ta)
 $v = Get-SessionVerdict 'ses_synth' ''
 Assert ($v.turns -eq 1 -and $v.dbTasksCompleted -eq 1) "synthetic 訊息不算一題：turns=1"
 $sum = @($v, (Get-SessionVerdict 'ses_ok' '')) | Measure-Object -Property dbTasksCompleted -Sum
@@ -5549,7 +5576,7 @@ Assert ($null -ne $capJ -and @($capJ.factKinds.PSObject.Properties).Count -eq 16
 $sw = Join-Path $repoRoot '.opencode/agent/ps-spec-worker.md'
 if (Test-Path -LiteralPath $sw) {
     $swt = [System.IO.File]::ReadAllText($sw)
-    Assert ($swt -match '(?m)^\s+grep: false' -and $swt -match '(?m)^\s+glob: false' -and $swt -match '(?m)^\s+task: false' -and $swt -match '(?m)^\s+bash: false' -and $swt -match '"oracleMCP_sql_run": false' -and $swt -match '"PeoplecodeSource_\*": false' -and $swt -match '(?m)^permission:' -and $swt -match '\.ps-runtime/spec/\*') "ps-spec-worker：grep／glob／task／bash 關、MCP 全 deny、permission 逐路徑只開 .ps-runtime/spec"
+    Assert ($swt -match '(?m)^\s+grep: false' -and $swt -match '(?m)^\s+glob: false' -and $swt -match '(?m)^\s+task: false' -and $swt -match '(?m)^\s+bash: false' -and $swt -match '"oracleMCP_oracle_execute_query": false' -and $swt -match '"PeoplecodeSource_\*": false' -and $swt -match '(?m)^permission:' -and $swt -match '\.ps-runtime/spec/\*') "ps-spec-worker：grep／glob／task／bash 關、MCP 全 deny、permission 逐路徑只開 .ps-runtime/spec"
     Assert ($swt -match '(?m)^\s+websearch: false' -and $swt -match '(?m)^\s+skill: false' -and $swt -match '(?m)^\s+todowrite: false' -and $swt -match '(?m)^\s+lsp: false') "ps-spec-worker：websearch／skill／todowrite／lsp 也關（片段內容不得外流、不得召 skill）"
     Assert ($swt -match '"\*\.ps-runtime/spec/\*/attempts/\*": allow' -and $swt -match '"\*\.ps-runtime/spec/\*/attempts/\*/fragment\.md": allow' -and $swt -notmatch '"\.ps-runtime/spec/\*": allow') "ps-spec-worker：讀寫圍欄縮到 attempts 子樹（不含 receipts／plans／outputs／job.json）；pattern 以 * 開頭，巢狀或非 git 目錄的前綴也能命中"
 }
@@ -5657,7 +5684,7 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-auto-loop.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-bundle.ps1|263|8654be69b8d8c5689c00e0fe6a427da25cf978aeb3db9c79987f8a583e84550f|1
+@@@PSBUNDLE-FILE|scripts/tests/test-bundle.ps1|263|959fc4c89aa9846aeb4a7c92b656602a3c07227863af1ad6b7487f46c98f7273|1
 # scripts/tests/test-bundle.ps1 — 搬運包（ps-bundle.ps1 打包／解開）的功能測試（維護端；PowerShell 7 或 5.1）
 # 範圍（臨時目錄，結束自刪）：repo 的搬運包各份是最新（與現況重新打包逐字相同、每份不超過上限、舊式單一檔已不在）；
 #   全新安裝（各份以 CRLF＋BOM、任意檔名、打亂順序另存在同一資料夾，其中一份存成 UTF-16）→ fs-doctor G；只給其中一份＝同資料夾自動找齊；
@@ -5813,12 +5840,12 @@ try {
     $agentB = Join-Path $t '.claude/agents/ps-sql-flow.md'
     $prof = Join-Path $t '.claude/peoplesoft/customization-profile.yaml'
     Write-Text $agentA ((Read-Text $agentA) + "`n本機教訓新增一行`n")
-    Write-Text $prof ((Read-Text $prof) -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV')
+    Write-Text $prof ((Read-Text $prof) -replace '(?m)^  currentSchema: FILL_ME', '  currentSchema: DEMOOWN')
     $scr = Join-Path $t 'scripts/ps-cli-lib.ps1'
     Write-Text $scr ((Read-Text $scr) + "`n# 本機亂改`n") $true
     $o = Invoke-Unpack $t $in
     Assert ((Read-Text $scr) -notmatch '本機亂改') "scripts 本機改過 → 一律更新回維護端版本（舊檔備份）"
-    Assert ((Get-Code $o) -eq 'G' -and $o -match '保留本機 2' -and (Read-Text $agentA) -match '本機教訓新增一行' -and (Read-Text $prof) -match 'connectionName: HR_DEV') "本機改過、搬運包沒動 → 保留本機（agent 與已回填的 profile 都不被蓋）"
+    Assert ((Get-Code $o) -eq 'G' -and $o -match '保留本機 2' -and (Read-Text $agentA) -match '本機教訓新增一行' -and (Read-Text $prof) -match 'currentSchema: DEMOOWN') "本機改過、搬運包沒動 → 保留本機（agent 與已回填的 profile 都不被蓋）"
     # 上游：改 A（本機也改過）、B（本機沒改）、profile（本機改過）
     $srcRoot = Join-Path $work 'src'
     foreach ($d in @('scripts', 'claude-code')) { Copy-Item -LiteralPath (Join-Path $repoRoot $d) -Destination (Join-Path $srcRoot $d) -Recurse }
@@ -5838,7 +5865,7 @@ try {
     Assert ((Get-Code $o) -eq 'C' -and $script:lastExit -eq 0) "兩邊都改 → 結論 C（有衝突待合併）"
     Assert ((Read-Text $agentB) -match '# 上游新增') "本機沒改、上游改 → 更新"
     Assert ((Read-Text $agentA) -match '本機教訓新增一行' -and (Read-Text $agentA) -notmatch '# 上游新增' -and (Test-Path -LiteralPath ($agentA + '.incoming')) -and (Read-Text ($agentA + '.incoming')) -match '# 上游新增') "兩邊都改 → 本機不動、新版另存 .incoming"
-    Assert ((Read-Text $prof) -match 'connectionName: HR_DEV' -and (Test-Path -LiteralPath ($prof + '.incoming'))) "profile 兩邊都改 → 回填值保留、新版 .incoming"
+    Assert ((Read-Text $prof) -match 'currentSchema: DEMOOWN' -and (Test-Path -LiteralPath ($prof + '.incoming'))) "profile 兩邊都改 → 回填值保留、新版 .incoming"
     Assert (-not (Test-Path -LiteralPath (Join-Path $t '.claude/agents/ps-legacy-old.md'))) "必刪舊檔已移除"
     $bk = @(Get-ChildItem -LiteralPath (Join-Path $t 'auto-loop-logs/ps-bundle-backup') -Recurse -File -Force | ForEach-Object { $_.Name })
     Assert ($bk -contains 'ps-sql-flow.md' -and $bk -contains 'ps-legacy-old.md') "被覆寫與刪除的舊檔都在備份目錄"
@@ -5850,9 +5877,9 @@ try {
     Write-Text $cut ($all.Substring(0, [int]($all.Length * 0.6)))
     $o = Invoke-Unpack $t2 $cut
     Assert ((Get-Code $o) -eq 'T' -and $script:lastExit -ne 0 -and (Get-FileCount $t2) -eq 1) "舊式單一檔截斷 → T、沒寫任何檔"
-    $ix = $all.IndexOf('connectionName: FILL_ME')
+    $ix = $all.IndexOf('currentSchema: FILL_ME')
     $bad = Join-Path $work 'bad.txt'
-    Write-Text $bad ($all.Substring(0, $ix) + 'connectionName: FILL_ME?' + $all.Substring($ix + 'connectionName: FILL_ME'.Length))
+    Write-Text $bad ($all.Substring(0, $ix) + 'currentSchema: FILL_ME?' + $all.Substring($ix + 'currentSchema: FILL_ME'.Length))
     $o = Invoke-Unpack $t2 $bad
     Assert ((Get-Code $o) -eq 'H' -and (Get-FileCount $t2) -eq 1) "舊式單一檔內容被改 → H、沒寫任何檔"
     $trav = Join-Path $work 'trav.txt'
@@ -5922,7 +5949,7 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-bundle.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|595|68d87f544bd09bfbb89032e023613b2aa980e9f201e5e2a18670e8e8b02e6afe|1
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|589|3641964a5c6c66cebdc6c9ab4998fdfb0a750401fd6e2d173928b0b2b236d08b|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
 #       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
@@ -5930,7 +5957,7 @@ exit 0
 # 範圍：合成「公司機部署」臨時目錄（scripts＋claude-code/* 去前綴，結束自刪）：
 #   A 兩版對照（agent／command／skill／契約一一對應、資料檔逐字相同、profile 鍵值相同）、不得殘留另一版字樣、frontmatter 形狀、
 #     settings.json、路徑與 MCP 工具名可解析；
-#   B hook（connect 目標、Agent 委派目標、suggestedNext 註記、worker 路徑白名單、Bash 命令形狀）；
+#   B hook（oracleMCP 工具不攔、Agent 委派目標、suggestedNext 註記、worker 路徑白名單、Bash 命令形狀）；
 #   C 外環版本層（版本判定、Claude Code 命令列、stream-json 抽最終回覆、搬運 manifest 與 generic manifest 是最新、知識索引用法行、能力目錄路徑）。
 param([switch]$WriteGenericManifest)
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -6090,10 +6117,9 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/agents') -Fi
     if ($toolList.Count -eq 0) { $fmBad += ($n + ':tools') }
     if ($subagents -contains $n) {
         if ($toolList -contains 'Agent' -or $toolList -contains 'Task') { $fmBad += ($n + ':子代理不得再委派') }
-        if (@($toolList | Where-Object { $_ -match '^mcp__oracleMCP__(connect|list_connections|disconnect|sqlcl_run)$' }).Count -gt 0) { $fmBad += ($n + ':子代理不開連線工具') }
+        if (@($toolList | Where-Object { $_ -match '^mcp__oracleMCP' -and $_ -ne 'mcp__oracleMCP__oracle_execute_query' }).Count -gt 0) { $fmBad += ($n + ':子代理的 oracleMCP 只開 oracle_execute_query') }
     }
-    if ($dbMain -contains $n -and $toolList -notcontains 'mcp__oracleMCP__connect') { $fmBad += ($n + ':主代理要能 connect') }
-    if (@($toolList | Where-Object { $_ -match '^mcp__oracleMCP__(disconnect|sqlcl_run)$' }).Count -gt 0) { $fmBad += ($n + ':disconnect／sqlcl_run 不開') }
+    if ($dbMain -contains $n -and @($toolList | Where-Object { $_ -match '^mcp__oracleMCP' }).Count -gt 0) { $fmBad += ($n + ':主代理不開 oracleMCP 工具（沒有開線步驟）') }
     if ($pathProfiles.ContainsKey($n)) {
         if ($fm -notmatch ('-Mode path -PathProfile ' + $pathProfiles[$n] + '"')) { $fmBad += ($n + ':路徑 hook') }
     }
@@ -6125,8 +6151,10 @@ if ($null -ne $settings) {
     $preCmd = [string]$settings.hooks.PreToolUse[0].hooks[0].command
     $postCmd = [string]$settings.hooks.PostToolUse[0].hooks[0].command
     Assert ([string]$settings.model -eq 'sonnet' -and $null -eq $settings.PSObject.Properties['agent']) "settings：模型 sonnet、不設預設主代理（直接 claude＝一般 session，可做維護排錯）"
-    Assert ($allow -contains 'mcp__oracleMCP__connect' -and $allow -contains 'mcp__oracleMCP__sql_run' -and $allow -contains 'Edit(./docs/ps-research/**)' -and $deny -contains 'mcp__oracleMCP__sqlcl_run' -and $allow -notcontains 'mcp__oracleMCP__disconnect') "settings：headless 需要的工具在允許清單、sqlcl_run 拒絕、disconnect 不預先允許"
-    Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'mcp__oracleMCP__connect' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 掛 connect 與 Agent"
+    $oracleAllow = @($allow | Where-Object { [string]$_ -match '^mcp__oracleMCP' })
+    $oracleDenyNeed = @('mcp__oracleMCP__oracle_list_schemas', 'mcp__oracleMCP__oracle_list_tables', 'mcp__oracleMCP__oracle_describe_table', 'mcp__oracleMCP__oracle_get_table_data')
+    Assert ($oracleAllow.Count -eq 1 -and $oracleAllow[0] -eq 'mcp__oracleMCP__oracle_execute_query' -and $allow -contains 'Edit(./docs/ps-research/**)' -and @($oracleDenyNeed | Where-Object { $deny -notcontains $_ }).Count -eq 0) "settings：oracleMCP 只允許 oracle_execute_query、其餘四個工具拒絕；headless 需要的寫入在允許清單"
+    Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -notmatch 'oracleMCP' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 只掛 Agent（oracleMCP 沒有 connect 可比對）"
     Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
     Assert ([string]$settings.env.BASH_MAX_TIMEOUT_MS -eq '7200000') "settings：Bash 上限 2 小時（ps-spec-author 的 ps-sdoc 長跑）"
     Assert ($allow -contains 'Bash(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'Edit(./.ps-runtime/sdoc/**)') "settings：ps-spec-author 可跑 ps-sdoc、headless worker 可寫 .ps-runtime/sdoc"
@@ -6137,7 +6165,7 @@ Assert ($hb.Length -ge 3 -and $hb[0] -eq 0xEF -and $hb[1] -eq 0xBB -and $hb[2] -
 
 $modelFiles = @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude') -File -Recurse -Include '*.md') + @(Get-Item -LiteralPath (Join-Path $cc 'CLAUDE.md'))
 $badRef = @()
-$knownTools = @('mcp__oracleMCP__list_connections', 'mcp__oracleMCP__connect', 'mcp__oracleMCP__disconnect', 'mcp__oracleMCP__sql_run', 'mcp__oracleMCP__sqlcl_run',
+$knownTools = @('mcp__oracleMCP__oracle_execute_query', 'mcp__oracleMCP__oracle_list_schemas', 'mcp__oracleMCP__oracle_list_tables', 'mcp__oracleMCP__oracle_describe_table', 'mcp__oracleMCP__oracle_get_table_data',
     'mcp__PeoplecodeElasticSearch__search_chunks', 'mcp__PeoplecodeSource__get_chunks_details', 'mcp__PeoplecodeSource__get_file_structure',
     'mcp__PeoplecodeMetadata__find_field_usage', 'mcp__PeoplecodeMetadata__search_component_metadata', 'mcp__PeoplecodeMetadata__get_ae_sql_metadata')
 $badTool = @()
@@ -6153,7 +6181,7 @@ foreach ($f in $modelFiles) {
         if ($knownTools -notcontains $m.Value) { $badTool += ((Get-RelUnder $cc $f.FullName) + '→' + $m.Value) }
     }
 }
-# oracleMCP 工具實名是底線拼法 sql_run／sqlcl_run／list_connections（舊錯名與連字號拼法不得回流，同 test-auto-loop 情境 31）
+# oracleMCP（@vdeserto/oracle-mcp-server）的工具實名是 oracle_execute_query 等底線拼法；SQLcl 時代的錯名與連字號拼法不得回流（同 test-auto-loop 情境 31）
 $wrongPat = ('run_' + 'sql') + '|' + ('list' + '-connections') + '|' + ('run' + '-sql') + '|' + ('sql' + '-run') + '|' + ('sqlcl' + '-run')
 $wrongName = @($ccAll | Where-Object { (Read-Norm $_.FullName) -match $wrongPat } | ForEach-Object { Get-RelUnder $cc $_.FullName })
 Assert ($wrongName.Count -eq 0) ("oracleMCP 工具名一律底線實名（無舊錯名、無連字號拼法）" + $(if ($wrongName.Count -gt 0) { '：' + ($wrongName -join ', ') } else { '' }))
@@ -6177,21 +6205,14 @@ try {
         return $o
     }
     function Get-Deny { if ($null -eq $script:hookObj) { return '' }; return [string]$script:hookObj.hookSpecificOutput.permissionDecisionReason }
-    $connect = '{"tool_name":"mcp__oracleMCP__connect","tool_input":{"connection_name":"HR_UAT"},"agent_type":"ps-orchestrator","session_id":"t"}'
-    $null = Invoke-Hook $connect
-    Assert ((Get-Deny) -like 'ORACLE_CONNECTION_NOT_CONFIGURED*' -and $script:hookExit -eq 0) "connect：profile FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED（deny JSON、exit 0）"
+    $q = '{"tool_name":"mcp__oracleMCP__oracle_execute_query","tool_input":{"sql":"SELECT 1 AS OK FROM DUAL","limit":1},"agent_type":"ps-ui-flow","session_id":"t"}'
+    $o = Invoke-Hook $q
+    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "oracleMCP 查詢：hook 不攔（沒有 connect 目標可比對；放行＝無輸出、exit 0）"
+    $o = Invoke-Hook '{"tool_name":"mcp__oracleMCP__connect","tool_input":{"connection_name":"HR_UAT"},"agent_type":"ps-orchestrator","session_id":"t"}'
+    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "舊的 connect 工具名：hook 不再比對 profile（新 server 沒有這個工具）"
+    $hookSrc = [System.IO.File]::ReadAllText($hook)
+    Assert ($hookSrc -notmatch 'ORACLE_CONNECTION_' -and $hookSrc -notmatch 'connectionName' -and $hookSrc -notmatch 'PS_ORACLE_CONNECT_GUARD') "hook 原始碼沒有連線目標比對的殘留（錯誤碼、profile 鍵、observe 開關）"
     $pf = Join-Path $dep '.claude/peoplesoft/customization-profile.yaml'
-    [System.IO.File]::WriteAllText($pf, ([System.IO.File]::ReadAllText($pf) -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV'), (New-Object System.Text.UTF8Encoding($false)))
-    $null = Invoke-Hook $connect
-    Assert ((Get-Deny) -like 'ORACLE_CONNECTION_MISMATCH*HR_DEV*') "connect：目標≠profile → ORACLE_CONNECTION_MISMATCH（訊息帶 profile 值）"
-    $o = Invoke-Hook ($connect -replace 'HR_UAT', 'HR_DEV')
-    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "connect：目標＝profile → 放行（無輸出）"
-    $null = Invoke-Hook '{"tool_name":"mcp__oracleMCP__connect","tool_input":{},"session_id":"t"}'
-    Assert ((Get-Deny) -like 'ORACLE_CONNECTION_MISMATCH*') "connect：沒帶 connection_name → MISMATCH"
-    $env:PS_ORACLE_CONNECT_GUARD = 'observe'
-    $o = Invoke-Hook $connect
-    Remove-Item -Path Env:\PS_ORACLE_CONNECT_GUARD -ErrorAction SilentlyContinue
-    Assert ($o.Trim() -eq '') "connect：PS_ORACLE_CONNECT_GUARD=observe → 只記錄不擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-security-flow","prompt":"x"}}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow（一般 session 也擋）"
     $o = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","prompt":"x"}}'
@@ -6475,7 +6496,7 @@ try {
     $imd = [System.IO.File]::ReadAllText((Join-Path $dep 'docs/ps-research/knowledge/index.md'))
     $omd = [System.IO.File]::ReadAllText((Join-Path $dep 'docs/ps-research/knowledge/objects.md'))
     Assert ($pub.published -and $imd -match '\.claude/peoplesoft/knowledge-retrieval-contract\.md' -and $imd -match 'path=docs/ps-research/knowledge/index\.md，output_mode=content' -and $omd -match 'path=docs/ps-research/knowledge/objects\.md' -and $imd -notmatch '(?i)opencode') "知識索引：用法行是 Claude Code 的 Grep／Read 形狀與 .claude 契約路徑"
-    # B 段把 profile 的 connectionName 改成測試值——先還原再驗搬運完整性
+    # 先還原 profile 再驗搬運完整性
     Copy-Item -LiteralPath (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml') -Destination $pf -Force
     $fsd = ((& (Join-Path $dep 'scripts/ps-fs-doctor.ps1') *>&1 | ForEach-Object { [string]$_ }) -join "`n")
     Assert ($fsd -match '檢查 M\] 搬運完整性（Claude Code 版' -and $fsd -match '結論代號：G') "fs-doctor：部署模擬目錄對 Claude Code 版 manifest 全部一致（scripts/ps-transfer-manifest.claude.json 是最新）"
@@ -6497,8 +6518,8 @@ try {
     }
     try {
         $doc1 = ((& (Join-Path $dep 'scripts/ps-claude-doctor.ps1') -Offline *>&1 | ForEach-Object { [string]$_ }) -join "`n")
-        Assert ($doc1 -match '結論代號：F$' -or $doc1 -match '結論代號：F\s') "ps-claude-doctor -Offline：profile 未回填 → 只報 F（版本判定、powershell、hook 自測都過）"
-        [System.IO.File]::WriteAllText($pf, ([System.IO.File]::ReadAllText($pf) -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV'), (New-Object System.Text.UTF8Encoding($false)))
+        Assert ($doc1 -match '結論代號：F$' -or $doc1 -match '結論代號：F\s') "ps-claude-doctor -Offline：profile currentSchema 未回填 → 只報 F（版本判定、powershell、hook 自測都過）"
+        [System.IO.File]::WriteAllText($pf, ([System.IO.File]::ReadAllText($pf) -replace '(?m)^  currentSchema: FILL_ME', '  currentSchema: DEMOOWN'), (New-Object System.Text.UTF8Encoding($false)))
         $doc2 = ((& (Join-Path $dep 'scripts/ps-claude-doctor.ps1') -Offline *>&1 | ForEach-Object { [string]$_ }) -join "`n")
         Assert ($doc2 -match '結論代號：G') "ps-claude-doctor -Offline：回填後 → G"
         Copy-Item -LiteralPath (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml') -Destination $pf -Force
@@ -6519,4 +6540,4 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-claude-variant.ps1
-@@@PSBUNDLE-PART-END|21c8777b245dacfd|5|6
+@@@PSBUNDLE-PART-END|83f90a34982efa76|5|6

@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 78eef7e）第 2／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5cb35d7）第 2／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|78eef7e|72075d48cff62b8e|2|8|6140|9a15d314e1ddca9d4f32439318777deb0503427faba5e2afc01567b60351f6fd
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4219|7039c79341e9ac963d99f60978117b0da51956b6428766fe8fb6904312f66330|0
+@@@PSBUNDLE-PART|1|opencode|5cb35d7|7e86621cb27f0577|2|8|5850|8d913e3bb6083ee2d369f7b7bb5734a69ca62612db7abc70db64776c428fdc5b
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4266|c2c9939f9235ab46db3be78e69b953a1b21ee0374a75c9ae560d0fb7b5765a24|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4221,6 +4221,53 @@
 - 落點：AGENTS.md 協作鐵律加「只改文件的併回不跑 5.1 CI」：只動 `docs/**`、`HANDOFF.md`、AGENTS.md 維護版線時，併回 `main` 的最後一筆 commit
   訊息加 `[skip ci]`（GitHub 對 push 事件看 head commit 訊息，就不啟動 workflow）；本機照跑 test-bundle、test-claude-variant。
   動到腳本、`.opencode/**`、`claude-code/**` 或 workflow 的不加。workflow 本身不改。
+
+### L160 oracleMCP 換成 @vdeserto/oracle-mcp-server——沒有 connect、SQL 有送出前檢查、外層包 FETCH FIRST；開線步驟拿掉、cookbook 21 段 SQL 重寫（2026-10-22）
+
+- 症狀：管理者換了 Oracle MCP（`@vdeserto/oracle-mcp-server`），要專案裡用到的工具全部配合。舊框架整套建立在 SQLcl MCP 上：
+  主 agent 第 0 步 `oracleMCP_connect`（profile `oracle.connectionName`）、subagent `oracleMCP_sql_run`、guard 比對 connect 目標、
+  analyzer 數 connect 之後的重連；新 server 一個都沒有。
+- 新 server 的實際行為（讀 npm 上 1.0.0 的 dist 原始碼，不是 README 推的）：
+  1. 工具五個：`oracle_list_schemas`／`oracle_list_tables`／`oracle_describe_table`／`oracle_execute_query`／`oracle_get_table_data`；
+     沒有 connect／disconnect。連線＝啟動時的環境變數 `ORACLE_USER`／`ORACLE_PASSWORD`／`ORACLE_CONNECTION_STRING`，第一次查詢建連線池
+     （最多 5 條、排隊 10 秒），每次查詢取一條、`SET TRANSACTION READ ONLY`、查完歸還。不呼叫 `initOracleClient`＝node-oracledb Thin 模式。
+  2. `oracle_execute_query` 送出前檢查（`validateReadOnlySql`）：整段有 `;` 就擋（字串裡也算）、有 `--` 或 `/*` 就擋、不是 SELECT／WITH 開頭擋、
+     `FOR UPDATE`、`SELECT…INTO` 擋；整段文字（含字串常值、別名）整字比對 INSERT／UPDATE／DELETE／MERGE／UPSERT／DROP／CREATE／ALTER／TRUNCATE／
+     RENAME／COMMENT／GRANT／REVOKE／EXECUTE／EXEC／CALL／ANYDATA／XMLTYPE，子字串比對 DBMS_／UTL_／OWA_／XMLDB／XDB_／CTXSYS／HTTPURITYPE／URIFACTORY。
+     拒絕訊息是葡萄牙文、以 `Error:` 開頭、不設 isError。
+  3. 執行時把 SQL 包成 `SELECT * FROM (<SQL>) FETCH FIRST <limit> ROWS ONLY`：輸出欄名重複就失敗（ORA-00918）；limit 預設 50、最大 500；
+     驅動層 maxRows 500、單句 30 秒逾時、輸出超過 25,000 字截斷加 `[truncado`。成功回 markdown 表格，第一行 `**N linha(s) retornada(s)**`。
+  4. 錯誤不轉發原始 ORA 訊息：942／904／933／936／1017／12541／12154／1031／1456／逾時各有一句英文，其他（含連線池建立失敗、ORA-00918、
+     型別不合）一律 `Error: Database query failed.`——連不上和 SQL 本身錯分不出來。
+- 量出來的衝擊：cookbook 33 段 SQL 有 21 段會被擋（多句用 `;` 串、`--` 註解、§2k-C 與 2k-3 的 `DBMS_LOB.SUBSTR`、§2l 的字串 `'Drop-Down List Box'`
+  撞到 DROP）。用套件本身的 `validateReadOnlySql` 逐段驗出來。
+- 決定：
+  1. MCP 鍵名維持 `oracleMCP`（tools 表、plugin、analyzer 都認前綴；公司機的 opencode.json 換 command 與 environment 即可，SOP-21 步驟 0）。
+  2. **拿掉開線步驟**：連線由 MCP 設定決定，主 agent 已沒有可開的東西。主 agent（orchestrator／deep-research／audit-orchestrator／clone-worker／
+     sdoc-worker）五個工具全關、不呼叫 oracleMCP；查詢 subagent（ui／metadata／ae／auditor）只開 `oracle_execute_query`，其餘四個明寫 false
+     （`get_table_data` 會 `SELECT *` 撈業務資料、`describe_table`／`list_*` 的功能 cookbook 的 ALL_ 查詢已涵蓋——介面面積維持跟以前只開 sql_run 一樣）。
+  3. ORACLE_MCP_DOWN 改由 subagent 偵測（主 agent 本來就看不到工具）；主 agent 收到不重派。NOT_CONNECTED 改成「DB 連不上」：subagent 遇到
+     `Error: Database query failed.` 先送 `SELECT 1 AS OK FROM DUAL`，也失敗才回 NOT_CONNECTED（成功＝SQL 本身的問題，修一次重送）；
+     主 agent 重派一輪、第二次仍是就回報「DB 連線失敗」交 SOP-21。
+  4. guard 拿掉 connect 目標比對（`ORACLE_CONNECTION_NOT_CONFIGURED`／`MISMATCH`、`connectGuard`／`PS_ORACLE_CONNECT_GUARD`），DB 能力判定改看
+     `oracle_execute_query`，重掛附註改成 `SELECT 1 AS OK FROM DUAL`；Claude Code hook 同步拿掉 connect 分支，settings 的 PreToolUse matcher 只剩 Agent|Task。
+     不另加「SQL 形狀預檢」guard：server 自己會擋，guard 再擋一次只是重複；規則寫在 cookbook 7b，模型讀得到。
+  5. cookbook：規則 2 加「limit 帶 FETCH FIRST 的數」、7 改工具名、新增 7b（送出前形狀：一句、無分號與註解、DML 字與套件名、欄名不重複、`:參數` 換實值、
+     重跑文件證據先去分號與註解）與 7c（回覆判讀：列數＝limit 可能還有、`[truncado`、CLOB 用 json）；「連線生命週期」整節改成「連線與錯誤處理」
+     （主 agent 段＋subagent 錯誤對照表）；21 段 SQL 拆成一句一段、說明移到 SQL 外面；DBMS_LOB.SUBSTR → `TO_CHAR(SUBSTR(欄, 1, 100))`；
+     §2l 代碼 5 的字串改 `'DropDown List Box'`，轉寫規則寫回 App Designer 的 Drop-Down List Box。改完 56 段全部過得了 server 的檢查。
+     DML 字的反制不做「拆字串湊關鍵字」：那是繞 server 的防護；要找原始碼裡的 DML 改走 ES＋Source。
+  6. profile 拿掉 `oracle.connectionName`、`oracle.connectGuard`；ps-sdoc 的提醒與 ps-claude-doctor 的 F 檢查改看 `oracle.currentSchema`；
+     ps-claude-doctor -Live 改成 `--agent ps-metadata-flow` 只送一句 `SELECT 1 AS OK FROM DUAL`（這個 server 的錯誤不設 is_error，看回覆文字）。
+  7. analyzer（test-oracle-runtime）：reconnects／reconnectLoops／downThenConnect／connectBlocks／listCalls 拿掉；新增 redispatchLoops
+     （NOT_CONNECTED → 重派 → 又 NOT_CONNECTED 之後還派 DB task＝違反）、redispatches、oldToolCalls（憑記憶呼叫 SQLcl 舊工具名）。
+  8. 沙箱測試：假 oracleMCP 改仿新 server（五個工具、同一組送出前檢查與葡萄牙文拒絕、DB 連不上模式）；e2e 情境改成 compliant／db-flaky／db-down／
+     nodb／stale-connect／mcp-down／mcp-failed／skill-as-agent／suggested-skill／vanish-auto／vanish-observe／transport-close（12 個）；
+     test-auto-loop 情境 31 加「兩版 cookbook 每個 sql 區塊都過得了 server 檢查」的守衛、舊工具名不得留在模型讀的檔。
+- 驗證（沙箱）：plugin 單元 10/10、e2e 12/12（真 OpenCode 1.18.29）、clone／sdoc smoke、test-auto-loop、test-claude-variant、test-bundle、
+  test-sdoc-run、test-ps51-static 全過；Claude Code 真 CLI e2e（花 API 費用）沒跑。沒有真 Oracle：外層包 FETCH FIRST 之後 §2k-C 的 WITH／CONNECT BY、
+  §7e 的子查詢能不能跑，靠公司機 R44 驗。
+- 待公司機：opencode.json 換 command／environment（SOP-21 步驟 0）、搬兩版搬運包、R0／R1／R3／R44、ps-claude-doctor -Live（Claude Code 版）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -4249,7 +4296,7 @@
 ---
 <!-- 從這行以下登錄 -->
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/pending.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/mcp-tool-contracts.md|129|870fb8f81b2b909268c8ff98cb5c2eb8fbc5d3e4562bd213eb0d475103386227|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/mcp-tool-contracts.md|129|7fdb72277164bfba1f0cd0c5c55eb6ae583837f8f30a508e007d4a036004f164|0
 # PeopleSoft MCP Tool Contracts（工具契約總覽）
 
 `ps_*` 名稱一律是**協定角色**，不是可呼叫的工具。呼叫前對照下表與
@@ -4263,7 +4310,7 @@
 | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取回——僅供稽核交叉檢查，非解引用路徑 |
 | `PeoplecodeSource` | `get_chunks_details` | **解引用（唯一的正式證據來源）** |
 | `PeoplecodeSource` | `get_file_structure` | 檔案結構（先看目錄再定向取段） |
-| `oracleMCP` | （SQLcl 唯讀查詢） | PeopleTools metadata——**一律照 `oracle-query-cookbook.md` 樣板** |
+| `oracleMCP` | `oracle_execute_query`（唯讀 SELECT；同一個 MCP 的其他四個工具已關閉） | PeopleTools metadata——**一律照 `oracle-query-cookbook.md` 樣板**（規則 7b 的 SQL 形狀） |
 | `PeoplecodeMetadata` | find_field_usage 等 | 只作定位線索，**不得作 evidence** |
 
 工具身分＝server 前綴＋工具名，兩個都對才叫對；`unavailable tool`
@@ -4380,10 +4427,10 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|869|260eae6a9a6bebd6f358312ca0577ae4434807741971be08582aec0d2f0ece3f|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/oracle-query-cookbook.md|992|a267fc8f15a9899f871d17e73e99cf35601a49420566e965ee44f7f3425ed653|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
-`oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
+`oracleMCP` 是唯讀的 Oracle 查詢 MCP（@vdeserto/oracle-mcp-server），連 PeopleSoft 資料庫。
 本手冊提供各**協定角色**對應的 PeopleTools metadata 查詢樣板——
 需要查 metadata 時**照抄樣板帶入參數**，不要自己發明 SQL。
 
@@ -4396,25 +4443,48 @@ UNRESOLVED
    自己組的查詢（實體表 PS_<RECNAME>、Prompt 表、規則 8 驗過欄位後的查詢）每個 FROM／JOIN／子查詢的 PeopleSoft 表與 view 也一樣帶。
    DUAL 與 ALL_ 開頭的資料字典（ALL_TABLES／ALL_TAB_COLUMNS／ALL_OBJECTS）不加前綴；查資料字典改加 OWNER = UPPER('<schema>') 條件。
    值為 FILL_ME → 拿掉 `<schema>.` 與 OWNER 條件，用裸表名。不執行 ALTER SESSION（唯讀帳號不准，表名帶前綴就不需要）。
-2. 每個查詢都要有列數上限：加 FETCH FIRST 200 ROWS ONLY（或 ROWNUM <= 200）。
+2. 每個查詢都要有列數上限：加 FETCH FIRST 200 ROWS ONLY（或 ROWNUM <= 200），呼叫時 `limit` 帶同一個數
+   （沒帶 limit 工具只回 50 列；limit 最大 500）。
 3. 可能高基數的查詢（值清單、使用者清單）先跑 COUNT(*)，超過 200 只回彙總。
 4. 使用者層級資料只回彙總（COUNT / 角色名），不列具名清單（遮罩原則）。
 5. 查詢結果屬 metadata evidence：報告引用時附上「用的 SQL + 關鍵列」。
 6. 下列表名 / 欄位為 PeopleTools 8.5x 常見結構；實際環境第一次使用前
    先驗證（查不到表 / 欄位時記入 gaps，不要瞎改表名硬湊）。
-7. oracleMCP 的實際工具名以 OpenCode /mcp 清單為準（目前：list_connections／connect／disconnect／
-   sql_run／sqlcl_run），查詢一律用 sql_run（唯讀）。
+7. 查詢工具是 `oracleMCP_oracle_execute_query`（參數 `sql`、`limit`、`response_format`；只收 SELECT）。
+   同一個 MCP 的 oracle_list_schemas／oracle_list_tables／oracle_describe_table／oracle_get_table_data 已關閉、不用；
+   沒有 connect／disconnect——連哪個資料庫、用哪個帳號由 oracleMCP 的設定決定，查詢直接送。
 7a. **通道前置檢查（L103）**：可用工具清單裡**一個 `oracleMCP_` 前綴
    工具都沒有**＝oracleMCP 掛載故障（OpenCode 到 MCP server 的 client／transport／工具目錄失效；
    管理者在該視窗 `/mcps` 對 oracleMCP disconnect→connect 可恢復，SOP-21）。**不是工具名記錯**：
-   不猜名、不換拼法重試、不用 DB connect 補救（實案：模型自創 `oracle_sql_run` 反覆撞牆到被 doom_loop 攔截）。
-   處置：**立即回報 FAIL(ORACLE_MCP_DOWN) 並結束本委派**；恢復後要重新 connect、重新驗證，不沿用舊 DOWN 結論。
+   不猜名、不換拼法重試（實案：模型自創 `oracle_sql_run` 反覆撞牆到被 doom_loop 攔截）。
+   處置：**立即回報 FAIL(ORACLE_MCP_DOWN) 並結束本委派**；恢復後先送 SELECT 1 AS OK FROM DUAL 驗證，不沿用舊 DOWN 結論。
    **換路查可以、冒充不行**：ES／Source／metadata MCP 有等價線索
    （程式碼、註解、metadata 定位）照常可查——但產物**只能以
    INFERRED＋CHUNK 證據**入報告，並記「DB 實際狀態待通道恢復驗證」；
    **不得**寫成 SQL 型證據（DB 狀態事實只有可重跑的 SELECT 驗得動，
    chunk 只能證明程式碼怎麼寫）、不得憑它宣稱查無、
    原 SQL 型待辦不因此視為完成。
+7b. **送出前的 SQL 形狀**（oracleMCP 在執行前檢查，不符就回 `Error:` 開頭的拒絕訊息、不執行）：
+   - 一次只送一句：整段不得出現分號 `;`（字串裡也不行、結尾不加）。本手冊一個 sql 區塊＝一句。
+   - 不得有註解：`--` 與 `/*` 在任何位置都不行（字串裡也不行）。說明寫在 SQL 外面。
+   - 開頭必須是 SELECT 或 WITH；SELECT 後面不得出現 INTO 這個字；不得有 FOR UPDATE。
+   - 整段文字（含字串常值、別名）不得出現這些字（整個字比對、大小寫不分）：INSERT、UPDATE、DELETE、MERGE、UPSERT、
+     DROP、CREATE、ALTER、TRUNCATE、RENAME、COMMENT、GRANT、REVOKE、EXECUTE、EXEC、CALL、ANYDATA、XMLTYPE；
+     也不得含 DBMS_、UTL_、OWA_、XMLDB、XDB_、CTXSYS、HTTPURITYPE、URIFACTORY（子字串比對）。
+     例：字串 `'Drop-Down'`、`'Update/Display'` 會被擋；`AUTO_UPDATE`、`LASTUPDDTTM`、`UPDATE_DISPLAY` 不會。
+     CLOB 取片段用 `TO_CHAR(SUBSTR(欄, 1, n))`（不用 DBMS_LOB）。
+     要找原始碼裡的 DML 字（例：誰 UPDATE 某表）→ 走 ES＋Source，不在 oracleMCP 的 SQL 裡寫這些字；
+     表名或欄位名本身就是上列的字 → 這句送不出去，記 gaps。
+   - 輸出欄名不得重複：工具把整句包成 `SELECT * FROM (<SQL>) FETCH FIRST <limit> ROWS ONLY` 再執行，
+     兩欄同名（例：A.FIELDNAME 與 B.FIELDNAME）就失敗——同名欄一律加 AS 別名，運算式欄也加別名。
+   - 樣板的 `:參數` 一律換成實際值（字串加單引號、數字直接寫）再送，送出的 SQL 不留 `:參數`，不用 binds。
+   - 重跑文件裡的 SQL 證據：去掉結尾分號與註解、多句拆開逐句送，其他部分照原樣。
+7c. **回覆怎麼讀**：
+   - 成功＝markdown 表格，第一行 `**N linha(s) retornada(s)**`（N＝回傳列數）；0 列＝`Nenhum resultado encontrado.`。
+   - 回傳列數＝`limit` → 可能還有：照該節的續查規則分批或加條件縮小，不得當成全部。
+   - 結尾有 `[truncado` → 輸出超過約 25,000 字被截斷：減少欄位或分批再查，不得引用被截掉的部分。
+   - 查 CLOB／長文字欄（內容可能換行）時 `response_format` 用 `json`：markdown 表格遇到換行會斷列。
+   - 錯誤一律是一行 `Error: …`（不含原始 ORA 訊息），處置見下方「連線與錯誤處理」。
 8. **查詢前欄位驗證**：要用「樣板裡沒有的
    欄位名」或不確定欄位存不存在時，先跑
    SELECT column_name FROM all_tab_columns WHERE owner = UPPER('<schema>') AND table_name='<大寫表名>'
@@ -4433,63 +4503,61 @@ UNRESOLVED
    要當證據，就得用本 cookbook 的 SELECT 取得並附「SQL＋關鍵列」。
 ```
 
-## 連線生命週期（硬性；連線的擁有者是主 agent）
+## 連線與錯誤處理（硬性）
 
-SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線」，指令依序執行。
-**定案**：這條連線是 MCP server 全域單例——main 與所有 subagent 共用同一個開關，
-任何一方 `disconnect` 就把其他人一起斷線。所以：**開，只有主 agent 做；關，誰都不做；查，subagent 做。**
+oracleMCP 連的資料庫與帳號由 MCP 的設定（環境變數）決定，沒有 connect／disconnect 可呼叫；每次查詢自己取連線、查完歸還，
+沒有「目前連線」要維護，也不會有人把別人斷線。
 
-**主 agent（ps-orchestrator／ps-deep-research／ps-audit-orchestrator）——每題／每批開場，無條件；做完才准查 wiki、委派、作答**：
+**主 agent（ps-orchestrator／ps-deep-research／ps-audit-orchestrator）——不查 DB（oracleMCP 工具全關），沒有開線步驟**：
 
 ```text
-（建議先 todowrite 列步驟、一次做一項，等 connect 回覆再派；非強制——沒有執行期閘門替你擋順序）
-0. 工具清單裡沒有任何 oracleMCP_ 工具 → ORACLE_MCP_DOWN（規則 7a）：不猜名、不試 connect、不派 DB 委派，如實回報並交管理者重掛。
-   工具名（底線）：list_connections／connect／sql_run／disconnect／sqlcl_run
-1. connect（帶連線名）   → 開場就做（無條件、不判斷本題會不會用到 DB）；連線名＝profile oracle.connectionName **原樣照抄**，
-                          **不先 list_connections、不從清單挑名字**（清單回傳的名稱與連線字串黏在一起，會讀錯）；
-                          profile 未填／FILL_ME → 不 connect → CONNECT_FAILED（CONNECTION_NOT_CONFIGURED），如實回報
-                          「Oracle 連線未設定（profile 值）」；回「已連線」也視為成功；失敗再 connect 一次；>30 秒無回應 → CONNECT_TIMEOUT
-2. list_connections     → 只在 connect 兩次都失敗時做：把清單**原文**附在回報裡讓管理者核對 profile 值（不要自己改名字）；
-                          清單為空 → CONNECT_FAILED（NO_SAVED_CONNECTION），如實回報「SQLcl 沒有已儲存連線」
-3. 之後本題／本批的委派都不必再 connect。subagent 回 BLOCKED(NOT_CONNECTED) → 收齊受影響的委派後再 connect 一次、
-   重派一次（只一次）；第二次仍 NOT_CONNECTED → 對使用者／收據如實寫「DB 連線建立失敗（<connect 的錯誤>）」，
-   不得說成「DB 通道忙碌」。subagent 回 ORACLE_MCP_DOWN ≠ NOT_CONNECTED：不 connect、不重派（規則 7a）
-4. 主 agent 永遠不自己 sql_run、不 disconnect
-5. 執行期 guard（ps-runtime-guard）只擋兩件事：connect 的 connection_name ≠ profile 值（ORACLE_CONNECTION_MISMATCH／
-   NOT_CONFIGURED，不執行、不換名字重試）、task 的 subagent_type 是 skill 名（PS_TASK_TARGET_INVALID）。派工順序不靠它
+1. 會查 DB 的工作一律委派查詢 subagent（ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor），派之前不必做任何連線動作
+2. subagent 回 BLOCKED(NOT_CONNECTED) → 收齊本批受影響的委派後重派一次（只一次）；第二次仍 NOT_CONNECTED →
+   對使用者／收據如實寫「DB 連線失敗（<報告裡 oracleMCP 回的 Error 原文>）——請管理者依 SOP-21 檢查 oracleMCP 的連線設定」，
+   本題／本批不再派會查 DB 的委派，不得說成「DB 通道忙碌」
+3. subagent 回 ORACLE_MCP_DOWN ≠ NOT_CONNECTED：不重派會查 DB 的委派，如實回報並交管理者依 SOP-21 重掛（規則 7a）
+4. 執行期 guard（ps-runtime-guard）只擋一件事：task 的 subagent_type 是 skill 名（PS_TASK_TARGET_INVALID）。派工順序不靠它
 ```
 
 **subagent（ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）——每次委派**：
 
 ```text
-0. 取前綴              → read customization-profile.yaml 取 oracle.currentSchema；本次每個查詢的 `<schema>` 都換成這個值
+0. 工具清單裡沒有 oracleMCP_oracle_execute_query → status=BLOCKED、blockedReason=ORACLE_MCP_DOWN（規則 7a），結束本委派
+1. 取前綴              → read customization-profile.yaml 取 oracle.currentSchema；本次每個查詢的 `<schema>` 都換成這個值
                           （規則 1a）。值為 FILL_ME → 拿掉 `<schema>.` 前綴與 OWNER 條件，用裸表名
-1. 直接發本次任務的第一個 SELECT（連線已由主 agent 建好；表名已帶前綴）
-2. 回「未連線／not connected／no connection」類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED，
-   結束本委派。不 list_connections、不 connect（工具已關）、不重試
-3. 表名找不到          → view/table not found：逐一檢查 FROM／JOIN／子查詢的 PeopleSoft 表都寫成 `<schema>.表名`、
-                          `<schema>` 已換成 profile 值（規則 1a），補齊後重發一次；補齊仍查不到 → 表名不對或唯讀帳號
-                          沒有這張表的權限，記 gaps（寫表名），不換表名硬湊。值為 FILL_ME 而查不到表 →
-                          blockedReason=SCHEMA_UNRESOLVED，不是 NOT_CONNECTED。不執行 ALTER SESSION
+2. 直接送本次任務的第一個 SELECT（規則 7b 的形狀、帶 limit；表名已帶前綴）
+3. 依回覆處理（每種錯誤只修一次、重送一次；同一句修過仍錯 → 記 gaps 寫 SQL 與錯誤原文，不換表名、欄位名硬湊）：
+   Error: Table or view does not exist.
+                        → 逐一檢查 FROM／JOIN／子查詢的 PeopleSoft 表都寫成 `<schema>.表名`、`<schema>` 已換成 profile 值
+                          （規則 1a），補齊後重送；補齊仍查不到 → 表名不對或唯讀帳號沒有這張表的權限，記 gaps（寫表名）。
+                          值為 FILL_ME 而查不到表 → blockedReason=SCHEMA_UNRESOLVED，不是 NOT_CONNECTED
+   Error: Invalid column name.        → 規則 8 驗欄位後重送
+   Error: Insufficient privileges.    → 唯讀帳號沒有這張表的權限：記 gaps（寫表名），不重送
+   Error: SQL command not properly ended.／Error: Missing expression in SQL.
+                                      → SQL 語法錯：改好重送
+   其他葡萄牙文的拒絕訊息（Múltiplos statements／Comentários SQL／Somente SELECT／Operação proibida／FOR UPDATE／SELECT INTO）
+                                      → SQL 形狀不符規則 7b：照規則改好重送
+   Error: Query timed out. …          → status: BLOCKED、blockedReason=QUERY_TIMEOUT（該節另有逾時規則的照該節）
+   Error: Authentication failed.／Error: Cannot reach database …／Error: Cannot resolve Oracle connection identifier.
+                                      → DB 連不上：blockedReason=NOT_CONNECTED，gaps 寫錯誤原文，結束本委派
+   Error: Database query failed.（不說原因）
+                                      → 先送 SELECT 1 AS OK FROM DUAL（limit 1）：也失敗＝DB 連不上 → blockedReason=NOT_CONNECTED，
+                                        結束本委派；成功＝這句 SQL 本身的問題（多半是輸出欄名重複、型別不合、括號）→ 照規則 7b 檢查、修一次重送
 4. 查詢                 → 本次任務的查詢全部做完（PeopleSoft 表名都帶 `<schema>.` 前綴）
-5. 不得 disconnect      → 工具已關；逾時、BLOCKED 回報前也一樣不斷線
+5. 不執行 ALTER SESSION（會被擋，表名帶前綴就不需要）
 ```
 
 逾時與平行規則：
 
 ```text
-- connect 或任何查詢超過約 30 秒沒返回 → 停手：主 agent 記 CONNECT_TIMEOUT；subagent 回
-  status: BLOCKED、blockedReason=QUERY_TIMEOUT，gaps 註明「oracleMCP 無回應」。
-- 不准重試迴圈：卡住的呼叫重發只會排在後面繼續卡，還會佔住 server 禍及其他 agent。
-- 不要假設可以同時有第二條連線——「目前連線」是行程級全域狀態，交錯使用會把查詢跑在錯的連線上。
-- 會查 oracleMCP 的委派同時 ≤ 3（單一連線內 SQL 仍是排隊執行，再多只會撞 30 秒逾時）；
-  連線由主 agent 先建好，第一個 DB 委派不必等前一個回報，可與其餘同時派出。純 ES＋Source 的委派不受此限。
-- 任何情況都不呼叫 disconnect——斷線會把 main 與其他 subagent 一起拆掉。
+- 單一查詢上限 30 秒（server 端），逾時回 Error: Query timed out.；同一句不准原樣重送迴圈。
+- 每個委派一次只送一句、等回覆再送下一句（不並行呼叫 oracleMCP）。
+- 會查 oracleMCP 的委派同時 ≤ 3（server 最多 5 條連線、排隊等 10 秒就放棄）；純 ES＋Source 的委派不受此限。
 ```
 
-## Effective Date 標準樣式（有 EFFDT 的表都要套）
+## Effective Date 標準樣式（有 EFFDT 的表都要套；以下是接在 WHERE 後面的片段，不單獨送）
 
-```sql
+```text
 AND A.EFF_STATUS = 'A'
 AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM <schema>.<同表> B
                 WHERE B.<同鍵> = A.<同鍵> AND B.EFFDT <= SYSDATE)
@@ -4580,15 +4648,24 @@ FETCH FIRST 200 ROWS ONLY
 
 **2e. Component ↔ Page ↔ Menu**
 
+Component 含哪些 Page：
+
 ```sql
--- Component 含哪些 Page
-SELECT PNLGRPNAME, PNLNAME, ITEMLABEL FROM <schema>.PSPNLGROUP WHERE PNLGRPNAME = :componentName;
--- Page 屬於哪些 Component
-SELECT PNLGRPNAME FROM <schema>.PSPNLGROUP WHERE PNLNAME = :pageName;
--- Component 掛在哪些 Menu（**technicalMenuLocation**：App Designer 技術選單 metadata，
--- 8.4 之後 BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級——**不得串成使用者導覽路徑**；
--- 使用者看得到的入口走 §2k Portal Registry。本段亦是 §2k-2 的 seed（menu＋component＋market）
-SELECT MENUNAME, BARNAME, ITEMNAME FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :componentName;
+SELECT PNLGRPNAME, PNLNAME, ITEMLABEL FROM <schema>.PSPNLGROUP WHERE PNLGRPNAME = :componentName
+```
+
+Page 屬於哪些 Component：
+
+```sql
+SELECT PNLGRPNAME FROM <schema>.PSPNLGROUP WHERE PNLNAME = :pageName
+```
+
+Component 掛在哪些 Menu（**technicalMenuLocation**：App Designer 技術選單 metadata，
+8.4 之後 BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級——**不得串成使用者導覽路徑**；
+使用者看得到的入口走 §2k Portal Registry。本段亦是 §2k-2 的 seed（menu＋component＋market）：
+
+```sql
+SELECT MENUNAME, BARNAME, ITEMNAME FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :componentName
 ```
 
 **2f. Prompt Table 與基數**
@@ -4596,15 +4673,20 @@ SELECT MENUNAME, BARNAME, ITEMNAME FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :
 ```sql
 SELECT RECNAME, FIELDNAME, EDITTABLE
   FROM <schema>.PSRECFIELDDB
- WHERE RECNAME = :recName AND FIELDNAME = :fieldName;
--- 先估基數再決定要不要列值（實體表名：SQLTABLENAME 空白時為 PS_<RECNAME>）
-SELECT COUNT(*) FROM <schema>.PS_<EDITTABLE>;
+ WHERE RECNAME = :recName AND FIELDNAME = :fieldName
+```
+
+先估基數再決定要不要列值（實體表名：SQLTABLENAME 空白時為 PS_<RECNAME>）：
+
+```sql
+SELECT COUNT(*) AS CNT FROM <schema>.PS_<EDITTABLE>
 ```
 
 **2g. 選項使用實況（「哪些選項還在用？」）**
 
+各值的實際資料分布（只回彙總，不撈明細；實體表名規則見 §6）：
+
 ```sql
--- 各值的實際資料分布（只回彙總，不撈明細；實體表名規則見 §6）
 SELECT <FIELDNAME>, COUNT(*) AS CNT
   FROM <schema>.PS_<RECNAME>
  GROUP BY <FIELDNAME>
@@ -4612,8 +4694,9 @@ SELECT <FIELDNAME>, COUNT(*) AS CNT
 FETCH FIRST 50 ROWS ONLY
 ```
 
+含停用的完整選項清單（判斷廢棄選項時不要過濾 EFF_STATUS）：
+
 ```sql
--- 含停用的完整選項清單（判斷廢棄選項時不要過濾 EFF_STATUS）
 SELECT A.FIELDVALUE, A.EFF_STATUS, A.EFFDT, A.XLATLONGNAME
   FROM <schema>.PSXLATITEM A
  WHERE A.FIELDNAME = :fieldName
@@ -4669,20 +4752,24 @@ FETCH FIRST 200 ROWS ONLY
 
 **2j. Subpage 展開與向上解析**
 
+展開：Subpage 內有哪些控制項（結果中 FIELDTYPE=11 者以其 SUBPNLNAME 遞迴展開）：
+
 ```sql
--- 展開：Subpage 內有哪些控制項（結果中 FIELDTYPE=11 者以其 SUBPNLNAME 遞迴展開）
 SELECT PNLNAME, PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME,
        RECNAME, FIELDNAME, SUBPNLNAME, LBLTEXT, OCCURSLEVEL
   FROM <schema>.PSPNLFIELD
  WHERE PNLNAME = :subpageName
  ORDER BY FIELDNUM
-FETCH FIRST 200 ROWS ONLY;
--- 向上：這個 Subpage 被哪些 Page 掛載。PSPNLGROUP 只登記真正的 Page——
--- 變異目標長在 Subpage 上時，先向上找到掛載 Page（必要時遞迴），
--- 才能用 §2e 對映 Component。
+FETCH FIRST 200 ROWS ONLY
+```
+
+向上：這個 Subpage 被哪些 Page 掛載。PSPNLGROUP 只登記真正的 Page——
+變異目標長在 Subpage 上時，先向上找到掛載 Page（必要時遞迴），才能用 §2e 對映 Component：
+
+```sql
 SELECT PNLNAME FROM <schema>.PSPNLFIELD
  WHERE SUBPNLNAME = :subpageName AND FIELDTYPE = 11
-FETCH FIRST 50 ROWS ONLY;
+FETCH FIRST 50 ROWS ONLY
 ```
 
 Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 §2c。
@@ -4700,29 +4787,51 @@ Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 
 
 **2k-0. 前置欄位驗證（必跑，其餘 2k-* 的前提）**
 
+(1) 表名（規則 8a：樣板沒有的表先確認實際表名，禁止自行加減 PS_）：
+
 ```sql
--- (1) 表名（規則 8a：樣板沒有的表先確認實際表名，禁止自行加減 PS_）
 SELECT TABLE_NAME FROM ALL_TABLES
  WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMPERM','PSPRSMSYSATTRVL',
                       'PSPRSMATTRVAL','PSPRSMNAVINFO','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
    AND OWNER = UPPER('<schema>')
-FETCH FIRST 20 ROWS ONLY;
--- (2) 欄位名／型別（規則 8：禁止憑記憶寫欄位名）
+FETCH FIRST 20 ROWS ONLY
+```
+
+(2) 欄位名／型別（規則 8：禁止憑記憶寫欄位名）：
+
+```sql
 SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, COLUMN_ID
   FROM ALL_TAB_COLUMNS
  WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
    AND OWNER = UPPER('<schema>')
  ORDER BY TABLE_NAME, COLUMN_ID
-FETCH FIRST 200 ROWS ONLY;
--- (2b) base language（決定 2k-4 的 fallbackLanguageCode；不得憑 delivered convention 填 ENG）——表名／欄位同樣先看 (1)(2) 有沒有列出
-SELECT LANGUAGE_CD FROM <schema>.PSOPTIONS FETCH FIRST 1 ROWS ONLY;
--- (3) 代碼值域（不得憑記憶填，觀察後回填本節）
--- (3) 必須在讀完 (1)(2) 回傳之後才發：(1) 未列出的表、(2) 未列出的欄位，其對應的 (3) 查詢直接跳過並記 gap
-SELECT PORTAL_REFTYPE, COUNT(*) FROM <schema>.PSPRSMDEFN GROUP BY PORTAL_REFTYPE FETCH FIRST 20 ROWS ONLY;
-SELECT PORTAL_CREF_USGT, COUNT(*) FROM <schema>.PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
- GROUP BY PORTAL_CREF_USGT ORDER BY 2 DESC FETCH FIRST 20 ROWS ONLY;
-SELECT DISTINCT PORTAL_ATTR_NAM FROM <schema>.PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY;
-SELECT PORTAL_NAME FROM <schema>.PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
+```
+
+(2b) base language（決定 2k-4 的 fallbackLanguageCode；不得憑 delivered convention 填 ENG）——表名／欄位同樣先看 (1)(2) 有沒有列出：
+
+```sql
+SELECT LANGUAGE_CD FROM <schema>.PSOPTIONS FETCH FIRST 1 ROWS ONLY
+```
+
+(3) 代碼值域（不得憑記憶填，觀察後回填本節）。必須在讀完 (1)(2) 回傳之後才發：(1) 未列出的表、(2) 未列出的欄位，
+其對應的 (3) 查詢直接跳過並記 gap。以下四句逐句送：
+
+```sql
+SELECT PORTAL_REFTYPE, COUNT(*) AS CNT FROM <schema>.PSPRSMDEFN GROUP BY PORTAL_REFTYPE FETCH FIRST 20 ROWS ONLY
+```
+
+```sql
+SELECT PORTAL_CREF_USGT, COUNT(*) AS CNT FROM <schema>.PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
+ GROUP BY PORTAL_CREF_USGT ORDER BY 2 DESC FETCH FIRST 20 ROWS ONLY
+```
+
+```sql
+SELECT DISTINCT PORTAL_ATTR_NAM FROM <schema>.PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY
+```
+
+```sql
+SELECT PORTAL_NAME FROM <schema>.PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY
 ```
 
 > **未驗前的降級規則**：(1)(2) 任一表／欄位查無 → 該筆記 gaps，**該 2k 步驟停止**（含本步驟的 (3)），
@@ -4752,7 +4861,7 @@ WITH NAV_TREE AS (
            CASE WHEN EXISTS (SELECT 1 FROM <schema>.PSPRSMSYSATTRVL A
                               WHERE A.PORTAL_NAME = D.PORTAL_NAME AND A.PORTAL_REFTYPE = D.PORTAL_REFTYPE
                                 AND A.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND A.PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV'
-                                AND UPPER(TRIM(DBMS_LOB.SUBSTR(A.PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1'))
+                                AND UPPER(TRIM(TO_CHAR(SUBSTR(A.PORTAL_ATTR_VAL, 1, 100)))) IN ('TRUE','Y','1'))
                 THEN 1 ELSE 0 END AS IS_HIDDEN,
            CASE WHEN D.PORTAL_EXPIRE_DT IS NOT NULL AND D.PORTAL_EXPIRE_DT < SYSDATE THEN 1 ELSE 0 END AS IS_EXPIRED,
            CASE WHEN D.PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT' OR TRIM(D.PORTAL_PRNTOBJNAME) IS NULL THEN 1 ELSE 0 END AS IS_ROOT,
@@ -4823,24 +4932,36 @@ FETCH FIRST 200 ROWS ONLY
 
 **2k-2. Portal CREF 識別（診斷用：§2k-C 回 0 列時排查；identity 含 MARKET 時才比 SEG3）**
 
+首選：structured URI 欄位（三欄同時比對，且限定 content reference）。最後一行 SEG3 條件只在
+identity=MENU_COMPONENT_MARKET 時保留：
+
 ```sql
--- 首選：structured URI 欄位（三欄同時比對，且限定 content reference）
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
   FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(TRIM(PORTAL_URI_SEG1)) = UPPER(:menuName)
    AND UPPER(TRIM(PORTAL_URI_SEG2)) = UPPER(:componentName)
-   AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)   -- identity=MENU_COMPONENT_MARKET 時才保留本行
-FETCH FIRST 200 ROWS ONLY;
--- 次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對
+   AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)
+FETCH FIRST 200 ROWS ONLY
+```
+
+次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對：
+
+```sql
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
   FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(PORTAL_URLTEXT) LIKE '%/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market) || '%'
-   -- 或（避免 `_` 被 LIKE 當單字元萬用字元）：AND INSTR(UPPER(PORTAL_URLTEXT), '/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market)) > 0
-FETCH FIRST 200 ROWS ONLY;
--- 診斷（前兩條皆 0 列時才跑）：menu＋component 命中但 market 不符／空白 ⇒ PARTIAL_IDENTITY_MATCH（永不 CONFIRMED）
+FETCH FIRST 200 ROWS ONLY
+```
+
+（避免 `_` 被 LIKE 當單字元萬用字元時，LIKE 那行改成
+`AND INSTR(UPPER(PORTAL_URLTEXT), '/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market)) > 0`。）
+
+診斷（前兩條皆 0 列時才跑）：menu＋component 命中但 market 不符／空白 ⇒ PARTIAL_IDENTITY_MATCH（永不 CONFIRMED）：
+
+```sql
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
   FROM <schema>.PSPRSMDEFN
@@ -4886,7 +5007,7 @@ FETCH FIRST 200 ROWS ONLY
 > 路徑標 `UNRESOLVED` 並記 gap；**絕不得**用物件名、delivered 慣例或印象補上缺掉的段。
 > 祖先一律是 Folder：`CONNECT BY` 必須加 `PORTAL_REFTYPE = 'F'`，否則同名的 Folder 與 CREF 會讓走訪分叉。
 > 隱藏旗標是 attribute 列（不是 PSPRSMDEFN 的欄位），鍵含 `PORTAL_REFTYPE`，值欄 `PORTAL_ATTR_VAL` 是 **CLOB**（直接比對＝ORA-00932）：
-> `SELECT PORTAL_OBJNAME FROM <schema>.PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
+> `SELECT PORTAL_OBJNAME FROM <schema>.PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(TO_CHAR(SUBSTR(PORTAL_ATTR_VAL, 1, 100)))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY`
 > ——target CREF 或**任一祖先**命中 ＝ 整條路徑在 Classic 選單看不到 → canonical 不回該列（診斷形 `PATH_HIDDEN=1`），gaps 記一行。
 > 同理，target 或**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → canonical 不回該列（診斷形 `PATH_EXPIRED=1`），gaps 記一行。
 > 平台可攜性：非 Oracle 環境改用遞迴 CTE＋顯式 depth 計數＋visited 反連接，行為必須完全一致（待驗）。
@@ -4920,17 +5041,25 @@ FETCH FIRST 200 ROWS ONLY
 
 **2k-5. CREF Link 與其他入口 surface（複數入口；`navigation.surfaces: CLASSIC_ONLY` 時其他 surface 為 NOT_APPLICABLE）**
 
+(1) LINK 的指向機制**未證實**，先探測：LINK 列是否也帶 URI 三段？
+
 ```sql
--- (1) LINK 的指向機制**未證實**，先探測：LINK 列是否也帶 URI 三段？
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_PRNTOBJNAME
   FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT = 'LINK'
-FETCH FIRST 20 ROWS ONLY;
--- (2) 其他 surface 是否存在（存在與否都要回 gap，見下）
-SELECT PORTAL_CREF_USGT, COUNT(*) FROM <schema>.PSPRSMDEFN
+FETCH FIRST 20 ROWS ONLY
+```
+
+(2) 其他 surface 是否存在（存在與否都要回 gap，見下），兩句逐句送：
+
+```sql
+SELECT PORTAL_CREF_USGT, COUNT(*) AS CNT FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT IN ('GRPT','HPGT','HPGC')
- GROUP BY PORTAL_CREF_USGT FETCH FIRST 20 ROWS ONLY;
+ GROUP BY PORTAL_CREF_USGT FETCH FIRST 20 ROWS ONLY
+```
+
+```sql
 SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'F'
    AND (UPPER(PORTAL_LABEL) LIKE '%FLUID%' OR UPPER(PORTAL_LABEL) LIKE '%NAVIGATION COLLECTION%')
@@ -4963,7 +5092,7 @@ FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
 
 ```sql
 SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
-       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List Box' WHEN 6 THEN 'Long Edit Box'
+       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'DropDown List Box' WHEN 6 THEN 'Long Edit Box'
                         WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
                         WHEN 10 THEN 'Scroll Bar' WHEN 11 THEN 'Subpage'
                         WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
@@ -5005,7 +5134,8 @@ FETCH FIRST 40 ROWS ONLY
 轉寫規則（照輸出原樣抄，不加不減、不解讀）：
 
 - 欄位：`RECNAME.FIELDNAME`；沒綁 Record 的元件寫 LBLTEXT（沒有就留空）。
-- 元件：CONTROL；OTHER 寫 `OTHER（代碼 <CODE>）`，不猜是什麼元件。
+- 元件：CONTROL；`DropDown List Box` 寫成 App Designer 的 `Drop-Down List Box`（SQL 裡不能寫 Drop-Down，規則 7b）；
+  OTHER 寫 `OTHER（代碼 <CODE>）`，不猜是什麼元件。
 - 屬性：DO、INV、DC、KEY_FLAG、REQ、RDATE、AUPD 各欄有值的依序以空白串起，再接 `RELATED_TO=<RELATED_TO>`、
   `LEVEL=<LVL>`（LVL 大於 0 才寫）、`GOTO=<GOTO_COMPONENT>`、`PAGE=<SUBPAGE>`（有值才寫）。
 - 查值：PROMPT_REC 有值寫 `PROMPT <PROMPT_REC> <PROMPT_EDIT>`，PROMPT_KIND／PROMPT_KEYS 有值再接
@@ -5065,58 +5195,89 @@ SELECT TRIM(G.PNLGRPNAME) AS COMPONENT, G.ACTIONS AS CODE,
 
 ## 3. Process / 排程（協定角色：ps_get_process_usage）
 
+程式 → Process Definition：
+
 ```sql
--- 程式 → Process Definition
-SELECT PRCSTYPE, PRCSNAME, DESCR FROM <schema>.PS_PRCSDEFN WHERE PRCSNAME = :name;
--- 允許執行它的 Component（Run Control 頁面所在）
-SELECT PRCSNAME, PNLGRPNAME FROM <schema>.PS_PRCSDEFNPNL WHERE PRCSNAME = :name;
--- 被哪些 Job 包含
-SELECT PRCSJOBNAME, PRCSNAME, PRCSJOBSEQ FROM <schema>.PS_PRCSJOBITEM WHERE PRCSNAME = :name;
--- 已排程的請求（recurrence 名稱在此）
+SELECT PRCSTYPE, PRCSNAME, DESCR FROM <schema>.PS_PRCSDEFN WHERE PRCSNAME = :name
+```
+
+允許執行它的 Component（Run Control 頁面所在）：
+
+```sql
+SELECT PRCSNAME, PNLGRPNAME FROM <schema>.PS_PRCSDEFNPNL WHERE PRCSNAME = :name
+```
+
+被哪些 Job 包含：
+
+```sql
+SELECT PRCSJOBNAME, PRCSNAME, PRCSJOBSEQ FROM <schema>.PS_PRCSJOBITEM WHERE PRCSNAME = :name
+```
+
+已排程的請求（recurrence 名稱在此）：
+
+```sql
 SELECT PRCSNAME, RECURNAME, RUNSTATUS, RUNDTTM
   FROM <schema>.PSPRCSRQST WHERE PRCSNAME = :name AND RECURNAME <> ' '
-FETCH FIRST 50 ROWS ONLY;
--- Recurrence 定義
-SELECT * FROM <schema>.PS_PRCSRECUR WHERE RECURNAME = :recurName;
+FETCH FIRST 50 ROWS ONLY
+```
+
+Recurrence 定義：
+
+```sql
+SELECT * FROM <schema>.PS_PRCSRECUR WHERE RECURNAME = :recurName
 ```
 
 ---
 
 ## 4. Security（協定角色：ps_get_security_path）
 
+Component → Permission List（經由 Menu Item）。本句回傳的 MENUNAME 是 **technical authorization metadata**，不是導覽路徑；
+「某角色實際看得到哪個入口」需另外接 §2k 的 Portal Registry 入口與 CREF 權限，本節不足以回答：
+
 ```sql
--- Component → Permission List（經由 Menu Item）
--- 本節回傳的 MENUNAME 是 **technical authorization metadata**，不是導覽路徑；
--- 「某角色實際看得到哪個入口」需另外接 §2k 的 Portal Registry 入口與 CREF 權限，本節不足以回答
 SELECT DISTINCT A.CLASSID, A.MENUNAME, A.AUTHORIZEDACTIONS
   FROM <schema>.PSAUTHITEM A
   JOIN <schema>.PSMENUITEM M
     ON A.MENUNAME = M.MENUNAME AND A.BARITEMNAME = M.ITEMNAME
  WHERE M.PNLGRPNAME = :componentName
-FETCH FIRST 100 ROWS ONLY;
+FETCH FIRST 100 ROWS ONLY
+```
 
--- Permission List → Roles
-SELECT ROLENAME, CLASSID FROM <schema>.PSROLECLASS WHERE CLASSID = :classId;
+Permission List → Roles：
 
--- Role → 使用者「數量」（只回彙總，不列名單）
+```sql
+SELECT ROLENAME, CLASSID FROM <schema>.PSROLECLASS WHERE CLASSID = :classId
+```
+
+Role → 使用者「數量」（只回彙總，不列名單）：
+
+```sql
 SELECT ROLENAME, COUNT(*) AS USER_CNT
-  FROM <schema>.PSROLEUSER WHERE ROLENAME = :roleName GROUP BY ROLENAME;
+  FROM <schema>.PSROLEUSER WHERE ROLENAME = :roleName GROUP BY ROLENAME
+```
 
--- Row-level：Component 的 Search Record
+Row-level：Component 的 Search Record：
+
+```sql
 SELECT PNLGRPNAME, SEARCHRECNAME, ADDSRCHRECNAME
-  FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME = :componentName;
+  FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME = :componentName
 ```
 
 ---
 
 ## 5. AE 結構（協定角色：ps_get_ae_graph 近似）
 
+AE 有哪些 Section：
+
 ```sql
--- AE 有哪些 Section
-SELECT AE_APPLID, AE_SECTION, DESCR FROM <schema>.PSAESECTDEFN WHERE AE_APPLID = :aeName;
--- Section 有哪些 Step
+SELECT AE_APPLID, AE_SECTION, DESCR FROM <schema>.PSAESECTDEFN WHERE AE_APPLID = :aeName
+```
+
+Section 有哪些 Step：
+
+```sql
 SELECT AE_SECTION, AE_STEP, AE_STMT_TYPE
-  FROM <schema>.PSAESTEPDEFN WHERE AE_APPLID = :aeName AND AE_SECTION = :section;
+  FROM <schema>.PSAESTEPDEFN WHERE AE_APPLID = :aeName AND AE_SECTION = :section
 ```
 
 > Step 的 SQL / PeopleCode **內容**不從這裡撈——照長文本協定走
@@ -5126,16 +5287,25 @@ SELECT AE_SECTION, AE_STEP, AE_STMT_TYPE
 
 ## 6. Record / Field 基本盤
 
+Record 定義與實體表名（SQLTABLENAME 空白 → PS_<RECNAME>）：
+
 ```sql
--- Record 定義與實體表名（SQLTABLENAME 空白 → PS_<RECNAME>）
-SELECT RECNAME, RECTYPE, SQLTABLENAME, RECDESCR FROM <schema>.PSRECDEFN WHERE RECNAME = :recName;
--- Record 欄位清單（含 subrecord 展開）
+SELECT RECNAME, RECTYPE, SQLTABLENAME, RECDESCR FROM <schema>.PSRECDEFN WHERE RECNAME = :recName
+```
+
+Record 欄位清單（含 subrecord 展開）：
+
+```sql
 SELECT RECNAME, FIELDNAME, FIELDNUM, EDITTABLE
   FROM <schema>.PSRECFIELDDB WHERE RECNAME = :recName ORDER BY FIELDNUM
-FETCH FIRST 200 ROWS ONLY;
--- 欄位被哪些 Record 使用（血緣輔助）
+FETCH FIRST 200 ROWS ONLY
+```
+
+欄位被哪些 Record 使用（血緣輔助）：
+
+```sql
 SELECT RECNAME FROM <schema>.PSRECFIELDDB WHERE FIELDNAME = :fieldName
-FETCH FIRST 100 ROWS ONLY;
+FETCH FIRST 100 ROWS ONLY
 ```
 
 ---
@@ -5157,7 +5327,7 @@ SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE
                        'OBJECTVALUE1', 'OBJECTVALUE2', 'OBJECTVALUE3')
    AND OWNER = UPPER('<schema>')
  ORDER BY TABLE_NAME, COLUMN_NAME
-FETCH FIRST 50 ROWS ONLY;
+FETCH FIRST 50 ROWS ONLY
 ```
 
 - PSRECFIELDDB 缺 DEFRECNAME 或 DEFFIELDNAME → 7c 不比對預設常數（有預設常數的欄位一律保留）。
@@ -5170,7 +5340,7 @@ SELECT FIELDNAME, FIELDNUM, DEFRECNAME, DEFFIELDNAME
   FROM <schema>.PSRECFIELDDB
  WHERE RECNAME = :recName
  ORDER BY FIELDNUM
-FETCH FIRST 200 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
 ```
 
 - 預設常數＝DEFRECNAME 空白、DEFFIELDNAME 非空白且不以 `%` 開頭時的 DEFFIELDNAME 值；其他情況視為沒有預設常數。
@@ -5186,7 +5356,7 @@ SELECT OWNER, COLUMN_NAME, DATA_TYPE, NUM_DISTINCT, NUM_NULLS, LAST_ANALYZED
   FROM ALL_TAB_COLUMNS
  WHERE TABLE_NAME = :physicalTable
  ORDER BY OWNER, COLUMN_ID
-FETCH FIRST 200 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
 ```
 
 - 回 0 列 → 沒有實體表（View、Derived／Work），整個 Record 判不了、全部保留。
@@ -5204,7 +5374,7 @@ SELECT COUNT(*) AS TOTAL_ROWS,
        SUM(CASE WHEN <NUM_FIELD> NOT IN (0, <預設常數>) THEN 1 ELSE 0 END) AS <NUM_FIELD>,
        SUM(CASE WHEN <DATE_FIELD> IS NOT NULL THEN 1 ELSE 0 END) AS <DATE_FIELD>
   FROM <schema>.<physicalTable>
-FETCH FIRST 1 ROWS ONLY;
+FETCH FIRST 1 ROWS ONLY
 ```
 
 - 字元欄：不是單一空白、也不是預設常數才算有值（NULL 算沒值）；數值欄：不是 0、也不是預設常數才算有值；
@@ -5224,7 +5394,7 @@ SELECT OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME, COUNT(*) AS C
  WHERE REFNAME IN (<7c 為 0 的欄位>)
  GROUP BY OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME
  ORDER BY OBJECTVALUE1
-FETCH FIRST 200 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
 ```
 
 逐列判讀，算「核心路徑引用」的欄位一律保留：
@@ -5245,7 +5415,7 @@ SELECT * FROM (
   SELECT 'COMPONENT' AS KIND, PNLGRPNAME AS NAME FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME IN (<名稱清單>)
   UNION ALL
   SELECT 'RECORD' AS KIND, RECNAME AS NAME FROM <schema>.PSRECDEFN WHERE RECNAME IN (<名稱清單>)
-) FETCH FIRST 200 ROWS ONLY;
+) FETCH FIRST 200 ROWS ONLY
 ```
 
 - 名稱清單＝7d 結果中的 OBJECTVALUE1 與本 Record 以外的 RECNAME。
@@ -5681,464 +5851,4 @@ Search results are candidates only.
 Retrieve exact database chunks before concluding.
 ```
 @@@PSBUNDLE-END|.opencode/peoplesoft/progressive-source-retrieval.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/README.md|342|7d5658bf81155890c866b7dac87d09504422ae1436be873fb37c970da6a4cd5b|0
-# PeopleSoft Skills：客製化優先、UI 業務語意與長文本檢索
-
-依《PeopleSoft Skill Plan Addendum：客製化優先、UI 業務語意與長文本檢索》實作
-（原始需求見 `docs/superpowers/specs/2026-07-16-peoplesoft-skill-custom-ui-source-addendum.md`）。
-
-## 三個核心概念
-
-1. **Customization Profile** — 環境客製規則獨立成設定檔，`TW_` 是強訊號但非唯一判斷。
-2. **UI Semantic Index** — Page 最終顯示文字與選項文字是第一級業務語意，優先於技術物件名稱。
-3. **Unified Progressive Source Retrieval** — PeopleCode / SQL / SQR / SQC 共用
-   「搜尋候選 → 精確取段 → 定向展開 → 停止」協定；Search Index 只定位，DB Chunk 才是 Evidence。
-
-## 目錄結構
-
-```text
-.opencode/
-├─ peoplesoft/
-│  ├─ README.md                        本檔
-│  ├─ SOP.md                           管理者人工作業 SOP（教訓 PR 審查/lint/git/回滾…）
-│  ├─ customization-profile.yaml       環境規則與 TW_（Prefix、Registry、searchPolicy）
-│  ├─ business-domain-map.yaml         兵役等全客製業務領域（alias、rootObjectPolicy）
-│  ├─ progressive-source-retrieval.md  PeopleCode/SQL/SQR/SQC 共用檢索規則 + 長文本工具契約
-│  ├─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
-│  ├─ oracle-query-cookbook.md         oracleMCP 的 PeopleTools 查詢樣板（SELECT-only）
-│  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
-│  ├─ knowledge-retrieval-contract.md  問答讀取 wiki＋NN 研究文件的契約（索引定位、片段讀取、來源表）
-│  ├─ supplemental-contract.md         補研究收據契約（事實類別→委派鏈、三張表、硬規則）
-│  ├─ spec/                            Spec 引擎公開部分：capabilities.json（能力目錄）、pack.schema.json、
-│  │                                   support-codes.md（KNOW1／SUPP1／SPEC1／CLONE1／DOC1 結論碼＋CAP-REQ）、troubleshooting-matrix.md、examples/
-│  ├─ sdoc/                            Spec 文件流程（/ps-spec → scripts/ps-sdoc.ps1 -Cli opencode）：狀態圖解讀、研究、覆核、
-│  │                                   乾淨讀者、判定的契約，schemas／schemas-runtime、每單元範例、ai-instructions.json；
-│  │                                   model.yaml＝外環 session 用的模型（唯一要填的地方）
-│  ├─ report-templates/
-│  │  ├─ overview-template.md          Deep research 總覽模板（階段一寫完即凍結）
-│  │  ├─ checklist-template.md         調查進度狀態檔模板（唯一反覆改寫的小檔）
-│  │  ├─ function-detail-template.md   Deep research 單功能細查模板
-│  │  ├─ entity-template.md            Entity wiki 物件檔模板（Observations/Relations）
-│  │  └─ audit-template.md             稽核報告（90-audit）模板
-│  ├─ lessons/
-│  │  ├─ pending.md                    例外案件（agent 無把握判斷落點時才進這裡）
-│  │  └─ applied.md                    已套用教訓的逐筆記錄（不進 context）
-│  ├─ test-scenarios.md                本地模型準確度測試情境（30 題 + 評分規則）
-│  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
-├─ agent/
-│  ├─ ps-orchestrator.md               Primary：問答模式（domain 解析 + 委派 + 彙整，唯讀）
-│  ├─ ps-deep-research.md              Primary：文件生成模式（盤點 + 逐項深查 + 寫檔，可續跑）
-│  ├─ ps-ui-flow.md                    Subagent：UI 語意檢索
-│  ├─ ps-peoplecode-flow.md            Subagent：PeopleCode
-│  ├─ ps-sql-flow.md                   Subagent：SQL
-│  ├─ ps-sqr-flow.md                   Subagent：SQR / SQC
-│  ├─ ps-ae-flow.md                    Subagent：Application Engine
-│  ├─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
-│  ├─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
-│  ├─ ps-spec-worker.md                Primary（只由 ps-spec 外環以 --command ps-spec-batch 啟動）：Spec 片段組表，只讀 .ps-runtime/spec、只寫 fragment.md
-│  ├─ ps-spec-author.md                All：/ps-spec 入口，只准執行 scripts/ps-sdoc.ps1 -Cli opencode …，回報文件位置與缺口
-│  ├─ ps-status-reader.md              Primary（只由 ps-sdoc 外環以 --agent 啟動）：狀態圖讀者，只讀 inbox 與 status.md、只寫 inbox 的解讀檔
-│  ├─ ps-sdoc-worker.md                Primary（同上）：一頁研究或獨立覆核，委派 flow subagent 查證，只寫該 attempt 的 output.json
-│  ├─ ps-spec-reader.md                Primary（同上）：L5 乾淨讀者，只讀 inbox 的渲染後文件
-│  └─ ps-spec-judge.md                 Primary（同上）：L5 文字題判定，只讀 inbox 工單
-├─ plugin/
-│  └─ ps-runtime-guard.js             OpenCode 執行期無狀態 guard＋診斷：connect 的 connection_name 必須等於 profile 值
-│                                      （ORACLE_CONNECTION_MISMATCH／NOT_CONFIGURED）、task 的 subagent_type 不得是 skill 名
-│                                      （PS_TASK_TARGET_INVALID）、oracleMCP 掛載診斷與受控重掛（預設關）；沒有派工前置閘門
-├─ .npmrc                              offline=true——OpenCode 有 plugin 時啟動會等 @opencode-ai/plugin 安裝，斷網要它秒失敗
-├─ command/
-│  ├─ ps-research.md                   /ps-research <領域> — 文件生成（可續跑）
-│  ├─ ps-audit.md                      /ps-audit <領域> — 稽核 + 回灌 checklist
-│  ├─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓並本機立即生效（團隊走 PR）
-│  ├─ ps-correct.md                    /ps-correct <正確知識> — 人工指正的業務知識更新 wiki（human 來源＋verified）
-│  ├─ ps-supplement.md                 /ps-supplement <領域> — 補研究（auto-loop -SupplementalOnly 專用；依工單只寫收據）
-│  ├─ ps-spec-batch.md                 /ps-spec-batch <jobId>-<attemptId> — Spec 片段（ps-spec -Run 專用；只寫 fragment.md）
-│  └─ ps-spec.md                       /ps-spec <Component...> — Spec 文件（00-index＋14 份＋90；交 ps-spec-author）
-└─ skills/
-   ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
-   ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
-   ├─ ps-peoplecode-flow/SKILL.md      PeopleCode 邏輯
-   ├─ ps-sql-flow/SKILL.md             SQL 分析
-   ├─ ps-sqr-flow/SKILL.md             SQR / SQC 分析
-   ├─ ps-ae-flow/SKILL.md              Application Engine
-   ├─ ps-data-lineage/SKILL.md         資料血緣
-   ├─ ps-process-flow/SKILL.md         Process Scheduler
-   ├─ ps-security-flow/SKILL.md        安全性
-   ├─ ps-business-explain/SKILL.md     業務說明產出（終點）
-   └─ ps-impact-analysis/SKILL.md      變更影響分析（選配）
-```
-
-各 Skill 只描述該分析領域的決策與輸出；環境規則、共用檢索協定、工具契約
-獨立維護，避免單一 SKILL.md 過大（目標模型 Qwen3.6-35B-A3B——
-MoE，每 token 活躍參數約 3B，**程序紀律屬小模型等級**）。
-
-## 整合流程
-
-```text
-使用者業務問題
-  ↓ ps-business-discovery：載入 Profile → 解析 Domain → 決定
-    CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED / DELIVERED_ALLOWED
-  ↓ ps-ui-flow：搜尋 UI 顯示文字 / 選項文字 → 映射 Component / Page / Record.Field
-  ↓ ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow / ps-ae-flow：
-    搜尋客製 Chunk → 取精確 DB Chunk（共用 progressive-source-retrieval）
-  ↓ ps-data-lineage / ps-process-flow / ps-security-flow：
-    追蹤資料、執行、安全，必要時加入 Delivered Dependency
-  ↓ ps-business-explain：產出業務說明
-```
-
-## Subagent 架構（地端模型）
-
-針對地端模型（Qwen3.6-35B-A3B，262K：MoE active ~3B——程序紀律屬
-小模型等級；名目 context 大，但長 context 中段品質與 KV cache 成本
-仍受限），提供 OpenCode agent 部署（`.opencode/agent/`，OpenCode 1.x）：
-
-```text
-ps-orchestrator（primary，TUI 中 Tab 切換選用）
-  主 context 只保留：業務問題、domain/policy 摘要、各 subagent 的 JSON 報告
-  ├─ @ps-ui-flow          （只掛 UI 三工具 + origin）
-  ├─ @ps-peoplecode-flow  （只掛長文本五工具 + origin）
-  ├─ @ps-sql-flow         （同上）
-  ├─ @ps-sqr-flow         （同上）
-  ├─ @ps-ae-flow          （+ ps_get_ae_graph）
-  └─ @ps-metadata-flow    （血緣 / 排程 / 授權三合一）
-```
-
-省 context 的三個層次：
-
-1. **Raw source chunks 只存在 subagent context**——回報依
-   `subagent-report-contract.md` 只帶結論 + evidence IDs（單段引用 ≤ 5 行）。
-2. **每個 subagent 的 tools 白名單只開它需要的 MCP 工具**，tool schema 不疊加。
-3. **Skill 全文只在對應 subagent 內載入**，orchestrator 不疊五份 skill 全文。
-
-使用方式與注意事項：
-
-- OpenCode 開在本專案 → Tab 切到 `ps-orchestrator` 問業務問題；
-  或在對話中 `@ps-sqr-flow` 手動指派單項檢索。
-- 專案根目錄的 `AGENTS.md`（常駐 context）提供路由安全網：
-  即使沒切 orchestrator、skill 沒觸發，也會導向正確流程並強制兩條長文本鐵律。
-- **現行 MCP 對映（三個）**：`PeoplecodeElasticSearch`（搜 chunk ids，候選）、
-  `PeoplecodeSource`（chunk id → 完整上下文，Evidence）、`oracleMCP`
-  （PeopleTools metadata：translate values / label / Page 對映 / 排程 / 授權 /
-  origin / AE 結構——查詢一律照 `oracle-query-cookbook.md` 樣板，SELECT-only）。
-  tools 白名單用 `"<註冊名>_*"` wildcard，前綴必須與 opencode.json 的
-  mcp 註冊 key 完全一致（含大小寫）。**注意：OpenCode 的 tools 是覆寫表，
-  沒列出的工具預設開啟——不該用某 server 的 agent 必須明確設 `false`，
-  不能靠不列**（orchestrator 對三個 MCP 全 deny，主 context 物理上碰不到
-  chunk / SQL）。UI 全文語意搜尋（Semantic Index）仍未建，
-  相關查詢會以 gaps / BLOCKED 回報。
-- Skill / 協定文件內的 `ps_*` 工具名是**協定角色名**；實際工具對映見各 agent
-  檔的「工具對映（現行環境）」與 progressive-source-retrieval.md §6.0。
-- Subagent 看不到主對話——orchestrator 的委派 prompt 模板會自帶
-  domain / searchMode / prefixes，這是規則不是選項。
-- 若 orchestrator 的 task 委派在你的版本不可用，改用 @ 提及手動委派，
-  流程與委派 prompt 模板相同。
-- Trade-off：subagent 每次啟動需重載 system prompt，總 token 較高、延遲較長；
-  換取主 context 峰值小、各階段 context 乾淨——對地端模型幾乎必然
-  划算（主 context 乾淨的價值不因名目 262K 而消失：中段記憶劣化與
-  KV cache 成本仍在）。
-
-## Deep Research 文件生成模式
-
-問答模式（ps-orchestrator，唯讀）之外的第二個入口：對**任一**業務領域
-產出人類可讀的 markdown 文件集——領域**不必**先登錄在 domain map
-（30 年系統，多數領域沒登錄是常態）。
-
-```text
-/ps-research 轉職        ← 或 Tab 切到 ps-deep-research 直接下指令
-  ↓ 階段一：多角度盤點 → docs/ps-research/轉職/00-overview.md ＋ checklist.md
-    （總覽：功能地圖、批次、核心表、掃描範圍聲明；進度只在 checklist.md）
-  ↓ 階段二：逐項深查（復用問答模式的深度鏈）→ NN-<物件>.md、逐項打勾
-```
-
-特性：
-
-- **可中斷續跑**：狀態就是 checklist.md——中斷後重跑
-  `/ps-research <領域>`，從第一個未勾選項繼續，不重查已完成項。
-- **checklist 可人工編輯**：覺得盤點漏了功能，直接在 checklist.md 的
-  「調查進度」加一行，系統照著查。
-- **領域未登錄照樣跑**：未命中 domain map 時自展同義詞＋CUSTOM_FIRST，
-  完成後總覽附「建議 domain 登錄」YAML 片段，人工決定是否收錄對照表。
-- **輸出進「內部」git**：`docs/ps-research/` commit 到內部 repo
-  （**嚴禁外部 remote**，見 SOP-3）；git diff / blame 提供審閱與溯源。
-- **逐項自動快驗**：每檔寫完、打勾前先委派 ps-auditor 驗證據；
-  全部打勾後自動接一輪完整稽核＋回灌（單次 run 最多一輪；本 run
-  處理量 > 5 項的長 run 改為提示開新 session 稽核——長對話尾端
-  品質差；稽核新回灌項由下一次 run 處理，輪次記錄於 checklist.md）。
-- **知識歸戶**：每項深查完成即把核心物件寫入 Entity Wiki（見下節）。
-- **操作日誌**：每次 run 追加 `log.md` 一行（不依賴 git 的時間軸）。
-- **全跑注意**：一次跑到底可能中斷（serving 端 context 上限、當機）
-  ——沒關係，斷了就重跑指令續跑；每項完成即寫檔＋打勾，進度不會遺失。
-
-## Entity Wiki 層（知識歸戶與問答飛輪）
-
-領域敘事文件之上的**跨領域物件層**：`docs/ps-research/wiki/`，
-一個 PeopleSoft 物件一個檔（**檔名＝物件名**），
-格式見 `report-templates/entity-template.md`
-（frontmatter：aliases / status / confidence / last_verified / sources /
-reviewed；內容：Observations ＋ typed Relations `[[wikilink]]`）。
-
-```text
-研究：deep-research 每查完一項 → 物件發現「歸戶」到 wiki
-      （先查重 grep 檔名＋aliases → 就地更新，同物件永遠一個檔）
-問答：orchestrator 依 knowledge-retrieval-contract 以 knowledge/index.md 定位 wiki 與 NN
-      → verified／AUDITED_CLEAN 直接引用 → 不足才委派現查 → 回答標來源＋## 來源表
-修正：答錯的事實修在 entity 檔（作廢不刪除）→ 之後每次問答都對
-CR：系統改版上線 → 重建 ES 索引 → audit 找出失效證據 → research 更新（SOP-11）
-```
-
-設計依據（2026-07 研究結論）：編譯過的互連 wiki 對多跳檢索勝過
-flat RAG 約 6~8 F1；確定性 index-first 檢索是地端模型的可靠路徑；
-`[[wikilink]]` 是純文字，backlink 用 grep 即可重建——**不需要任何工具**。
-Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
-見 SOP-7；`.obsidian/` 要 gitignore）。
-
-## 知識索引、補研究與 Spec（三個確定性外環，公司機只回報結論碼）
-
-```text
-知識索引  scripts/ps-knowledge.ps1 -Rebuild|-Check|-Find|-Slice
-          docs/ps-research/knowledge/{index.md,objects.md,index.json}＝本機快取（gitignore）；只記定位與等級，
-          內容永遠讀原檔；auto-loop safe point 自動重建；pull 後／ps-correct 後手跑 -Rebuild
-補研究    scripts/ps-supplemental.ps1 -New|-Submit|-Status|-Result  → docs/ps-research/supplemental/requests/（進內部 git）
-          scripts/ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly → /ps-supplement 收據 → 外環合併 NN → results/（exit 4）
-          目標尚無 NN → checklist D 列（等研究相位）；ps-auto-all 在收據判定前自動先跑迷你圈
-Spec      scripts/ps-spec.ps1 -ValidatePack|-Plan|-Run|-Render|-Gate|-Doctor（需求包在 .ps-private/spec/<packId>/，
-          狀態在 .ps-runtime/spec/<jobId>/，兩者 gitignore）；分母＝Component＋私有需求包，不是整個領域
-Spec 文件 scripts/ps-sdoc.ps1 -Cli opencode -Components '<清單>'（/ps-spec 的外環；狀態圖在 .ps-private/sdoc-opencode/<jobId>/，
-          狀態在 .ps-runtime/sdoc-opencode/<jobId>/，產出 docs/ps-spec-opencode/<jobId>/，皆 gitignore）；
-          外環 session 的模型只讀 sdoc/model.yaml；Claude Code 版同一個外環（不帶 -Cli、目錄不加 -opencode）
-結論碼    KNOW1／SUPP1／SPEC1／CLONE1／DOC1-<stage>-<code>[-<count>]（spec/support-codes.md）——維護端只看這一行
-```
-
-## 稽核與教訓迴路
-
-**稽核**（`/ps-audit <領域>`）——不信模型說了什麼，驗它引用了什麼：
-
-1. **證據解引用**：每筆 CHUNK 證據以 ChunkId 重查、quote 做子字串比對；
-   SQL 證據重跑比對 keyRows；非 UUID 的 id 直接判捏造。
-2. **反駁抽驗**：每檔抽 3~5 條重要 claim，由乾淨 context 的 ps-auditor
-   以「反駁為目標」重新取證判定 VERIFIED / DISPUTED / UNVERIFIABLE。
-3. **換角度完整性**：從核心資料表反推物件清單，與功能地圖 diff 抓遺漏。
-4. 產 `90-audit.md` 記分卡；**問題回灌 checklist**（標「（稽核）」），
-   下次 `/ps-research` 續跑自動補查——研究→稽核→補查閉環。
-5. 格式層另有確定性 lint：`.\scripts\ps-doc-lint.ps1 -Domain <領域>`
-   （checklist 對帳、必要章節、confidence 標註、UUID 格式）。
-
-**教訓迴路**（跨 session 記取教訓）——模型不會學習，教訓必須外部化：
-
-```text
-被指正 / 稽核發現系統性錯誤
-  → /ps-lesson <描述>   登錄＋分類＋**本機立即套用**（行為類錯誤）
-  → /ps-correct <正確知識>   業務知識指正直寫 wiki（human 來源＋verified）
-                        （事實類修文件·作廢不刪除；規則類最小新增·只加不刪）
-  → 記錄 applied.md ＋ 對應測試檢查點（防回歸）
-  → commit / push → 內部 git PR ── 人工審 diff 把關（SOP-1）
-  → merge 後全員 pull ＋ 重啟 → 教訓擴散到所有機器
-```
-
-原則：**本機即時生效、團隊生效必經 PR 人審**——AI 的規則修改永遠有人
-守在合併關卡；套用限「最小新增」（只加不刪，改壞可 revert）。
-能機械化的教訓優先機械化（lint / 稽核判定 / tools deny），
-prose 規則是最後手段。
-
-## 兵役案例（端到端）
-
-使用者：「免役這個選項在哪裡維護？選了以後會執行什麼？」
-
-```text
-1. ps-business-discovery   命中 military_service，Search Mode = CUSTOM_ONLY_ROOTS
-2. ps_search_ui_semantics  命中 Choice Label「免役」→ TW_MILITARY_DATA /
-                           TW_MILITARY_PG / TW_MILITARY.MIL_STATUS，Stored Value = E
-3. ps-ui-flow              取 Component、Page、Control、Field 與
-                           FieldChange / SavePreChange / SavePostChange Event
-4. ps-peoplecode-flow      搜 TW_ 客製 PeopleCode → 取精確 Chunk → 分析選 E 後的分支
-5. ps-sql-flow             分析相關 SQL Definition 或動態 SQL
-6. ps-sqr-flow             若後續 Process 執行 TW_ SQR，追蹤必要 Procedure
-7. ps-data-lineage         整理讀取、更新資料
-8. ps-business-explain     產出業務說明
-```
-
-最終結論必須區分：畫面文字（免役）/ 儲存值（E）/ 業務根物件（TW_MILITARY_DATA，
-CUSTOM_PREFIX）/ PeopleCode 分支與 SQL 更新的 CONFIRMED / INFERRED / DYNAMIC_RUNTIME /
-原生物件僅列 Dependency。
-
-## 最重要的 Skill 防呆（全 Skill 適用）
-
-```text
-Do not assume a delivered PeopleSoft object implements the customer's business
-process when the customization profile marks the domain as custom-only.
-
-Do not treat TW_ as the only way to identify customization.
-
-Do not ignore page display text.
-User-visible labels are primary business search signals.
-
-Do not ignore option labels.
-Choice display text and stored values are part of the business logic.
-
-Do not use Elastic Search snippets as final evidence.
-
-Do not retrieve complete PeopleCode, SQL, SQR, or SQC source by default.
-
-Do not return all prompt values from a high-cardinality table.
-
-Do not call a delivered object the root business implementation when it is only
-a dependency of a TW_ custom object.
-```
-
-## Definition of Done 對照
-
-### Customization
-
-- [x] 支援 `TW_` Prefix → `customization-profile.yaml` `customPrefixes`
-- [x] Prefix 來自環境設定，不是散落在 Prompt → 各 Skill 一律先載入 profile
-- [x] 支援 Custom Object Registry → `customObjectRegistry` + `ps_get_object_origin`
-- [x] 支援 Modified Delivered Object → origin `MODIFIED_DELIVERED`
-- [x] 支援 Business Domain Alias → `business-domain-map.yaml`
-- [x] 支援 CUSTOM_ONLY_ROOTS / CUSTOM_FIRST → domain `rootObjectPolicy` + discovery 規則
-- [x] 報告 Delivered Fallback 是否發生 → discovery 輸出 `deliveredFallbackUsed`
-
-### UI Semantic
-
-- [x] 索引 Page 最終靜態顯示文字 / Grid Column / Tab / Group Box / Button / Static Text
-      → ps-ui-flow「應索引的 UI 文字」
-- [x] 保留語系 → `languageCode` / `fallbackLanguageCode`
-- [x] 可由顯示文字反查 Component / Page / Record.Field → `ps_search_ui_semantics`
-- [x] 動態 Label 標記 DYNAMIC_RUNTIME → ps-ui-flow 規則
-
-### Choice
-
-- [x] Translate Value / Prompt Table / Radio / Drop-down / Checkbox → `ps_get_field_choices`
-- [x] 低基數索引、高基數 on-demand → ps-ui-flow「選項」節
-- [x] 動態 Choice 標記 DYNAMIC_RUNTIME
-- [x] 可由「免役」反查儲存值與 Field → `ps_search_ui_semantics`（CHOICE_LABEL）
-
-### Long Text
-
-- [x] PeopleCode / SQL / SQR / SQC 採 Progressive Retrieval → 四個 flow Skill 皆引用共用協定
-- [x] Search Index 只作 Candidate；Database Chunk 作正式 Evidence
-- [x] 支援 Outline → `ps_get_source_outline`
-- [x] 支援 Neighbor / Symbol Expansion → `ps_expand_source_context`
-- [x] 支援防重 / Context Budget → progressive-source-retrieval.md §5
-- [x] 支援 DYNAMIC_RUNTIME → 全協定與各 Skill 規則
-
-> 註：以上為 Skill / 設定層的完成定義。`mcp-tool-contracts.md` 中標 *(proposed)*
-> 的工具（如 `ps_search_ui_semantics`、`ps_get_field_choices` 的伺服器端實作與
-> UI Semantic Index 的建置）屬 MCP Server / Indexer 端工作，不在本次範圍。
-@@@PSBUNDLE-END|.opencode/peoplesoft/README.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/audit-template.md|87|db6a2a3a5ea31209cb739b01b6fbac0244d83c4de3bef760efc287a4c32bd741|0
-# <領域> 稽核報告（90-audit）
-
-> 稽核輪次：<N>　稽核日期：<YYYY-MM-DD>　範圍：<已完成的 N 個檔案>　執行：/ps-audit
-
-<!-- 本報告每輪整檔重寫：判定只來自本輪 auditor 回報，禁止沿用上一輪
-     的數字或內容；輪次未較上一輪 +1 ＝未重驗。 -->
-
-## 總覽記分卡
-
-| 檔案 | 證據 PASS | FAIL | UNVERIFIABLE | Claim VERIFIED | DISPUTED | 燈號 |
-|---|---|---|---|---|---|---|
-| 01-… | 8 | 0 | 1 | 4 | 0 | 🟡 |
-| **合計** | **8** | **0** | **1** | **4** | **0** | 🟢x／🟡y／🔴z |
-
-<!-- 最後一列必為「合計」：各欄加總＋燈號分佈——趨勢追蹤靠它。 -->
-
-燈號：🟢 無 FAIL / DISPUTED；🟡 僅 UNVERIFIABLE；🔴 有 FAIL 或 DISPUTED；⛔ 未稽核（分批稽核 BLOCKED 的檔——lint 判違規，不得畢業）
-
-<!-- 分批稽核（L107）：auto-loop 由外環合併 audit-parts/ 產生本報告；
-     記分卡的 UNVERIFIABLE 欄含 PENDING_MANUAL（待人工SQL）筆數，
-     但 A 列的 UNVERIFIABLE 計數不含它。「未稽核」列＝該檔兩次嘗試
-     仍無合格收據，出路＝拆續篇縮小單檔證據或修正後刪 audit-ledger.json 重跑。 -->
-
-## FAIL / DISPUTED / UNVERIFIABLE 明細
-
-<!-- 三種非過判定**每一筆都要有一列**，UNVERIFIABLE 不得只出現在
-     記分卡數字——原因欄逐字取自 auditor 回報（逾時／連線失敗／
-     chunk 查無／工具不可用…），這是判斷環境問題 vs 資料問題的依據。
-     DISPUTED 列的原因欄必含三要素：原 claim 一句、稽核取到的證據
-     （ChunkId:行號）、矛盾點一句——缺任一＝不可裁決＝不合格判定。
-     FAIL 類型詞彙表（原因欄使用）：TRUNCATED_ID／FABRICATED／
-     WRONG_KIND／STALE_DATA／ID_RELINK／NOT_FOUND／MISSING_CHUNK_ID／
-     INCOMPLETE_CHUNK；行號漂移但 quote 命中＝PASS(LINE_DRIFT) 附
-     新行號，不是 FAIL。
-     UNVERIFIABLE(PENDING_MANUAL)＝待人工SQL 申報列——照列進明細與
-     記分卡，**不回灌 A 項**（人工待辦不是新問題）。 -->
-
-<!-- 「處置」欄＝下一輪的可執行工單。稽核已經查到答案的類型，答案
-     必須寫在這一欄，否則下一輪只拿得到 A 行的計數、要再付一次檢索成本：
-       ID_RELINK  → `換 id：<完整舊 UUID> → <完整新 UUID>`（**兩個都要完整
-                    36 字元**；lint 會機械解析這一欄開成 [回灌] 工單，
-                    舊值是修復者定位「哪一列」的唯一線索）
-       LINE_DRIFT → `更新行號 → <新行號>`
-       STALE_DATA → `更新數值 → <新值>`
-     其餘（NOT_FOUND／FABRICATED／WRONG_KIND…）才寫「回灌補查」。 -->
-
-| 檔案 | 類型 | 內容 | 原因 | 處置 |
-|---|---|---|---|---|
-| 01-… | 證據 FAIL | ChunkId … | quote 非 ChunkText 子字串 | 回灌補查 |
-| 02-… | 證據 UNVERIFIABLE | SQL … | oracleMCP 逾時（~30s） | 回灌重驗 |
-| 03-… | 證據 FAIL(ID_RELINK) | 舊 ChunkId | id 失聯，二次定位已取得新 id | 換 id：<完整舊 UUID> → <完整新 UUID> |
-
-## 上輪回灌項覆核（第 2 輪起必填；首輪寫「無上輪」）
-
-<!-- 上輪 A 項逐項覆核：原判定屬實？誤報數是「稽核員品質指標」，
-     長期追蹤。本節**不取代**總覽記分卡——記分卡永遠是本輪全量
-     重驗的數字。 -->
-
-| A 項 | 原判定 | 覆核結果 | 處置 |
-|---|---|---|---|
-| A6 … | 證據 FAIL | 屬實（已修）\| 誤報 \| 不可查 | <一句話> |
-
-## 完整性（換角度 diff）
-
-<!-- 覆蓋率必填（L81）：任務 C 是**分批委派**的，而委派會失敗
-     （subagent 只回報「已讀取契約」就結束＝委派卡死的指紋）。
-     **「查了沒發現」與「根本沒查成」不得共用同一格**——有未完成批次卻
-     只寫「無」＝假陰性的完整性宣稱，比不寫更糟。
-     覆蓋率那行沒填＝本節結論不可信（lint -StrictAudit 會擋）。 -->
-
-- 任務 C 覆蓋：<完成 N／共 M 批>（未完成批次：<逐批列出，或「無」>）
-- 資料角度發現、功能地圖沒有的物件：<清單，或「無」>
-
-## 已回灌 checklist 的行動項
-
-<!-- 順序約束：這些行必須「先」實際寫進 checklist.md，再抄錄到本節。
-     任何非 PASS／VERIFIED 判定 ≥ 1 而 checklist.md 沒有對應 A<n> 行
-     ＝流程錯誤，不得產出本報告。回灌以「檔」為單位彙整（一檔一行），
-     禁止逐筆開項。判定詞彙限契約五詞：PASS/FAIL/UNVERIFIABLE（證據）、
-     VERIFIED/DISPUTED/UNVERIFIABLE（claim）；auditor 自創詞就近映射
-     （claim→DISPUTED、證據→FAIL）。 -->
-
-- [ ] A1 補查 01-<物件名>.md：FAIL 2／DISPUTED 3／UNVERIFIABLE 1（稽核）
-
-## 系統性錯誤觀察（同類 FAIL ≥ 2 → 建議 /ps-lesson）
-
-- <觀察，或「無」>
-@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/audit-template.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/checklist-template.md|25|366e97a7097a3e6165789d4a8ba5afa918e1a43f35a0d227db9050045a800f92|0
-# <領域顯示名> 調查進度
-
-> 本檔是唯一的進度狀態檔：打勾、⚠、稽核補查、Gaps 都只改這裡。
-> 00-overview.md 階段一寫完後凍結；本檔保持小、一律整檔覆寫。
-> 已打勾項會在每輪稽核回灌時搬到 checklist-archive-r<輪次>.md
-> （每輪一個新檔、永不回讀、不改寫舊 archive）——
-> 本檔常態只有輪次行＋未勾項＋Gaps。
-
-稽核輪次：0
-
-## 調查進度
-
-<!-- 每項格式固定：勾選框、編號、功能名、物件、目標檔名。
-     深查完成打 [x]；BLOCKED 打 [x] 並在行尾加 ⚠（原因）。
-     稽核回灌（修既有檔）：- [ ] A<n> 補查 <說明>（稽核）。
-     稽核新發現（建新檔）：- [ ] D<n>-<序號> 新發現 <物件名>：<來源>（稽核）。
-     人工可直接加列，系統會照著查。
-     檔頭標題、輪次行、旗標行與兩個 ## 節標題是固定骨架——
-     任何改寫都不得刪除（外環每 session 後會機械重建＋調帳）。 -->
-
-- [ ] 01 <功能名> `<TW_XXX>` → 01-<TW_XXX>.md
-
-## Gaps 彙整（隨深查更新）
-
-- <各功能深查後的重大未解事項彙整到此>
-@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/checklist-template.md
-@@@PSBUNDLE-PART-END|72075d48cff62b8e|2|8
+@@@PSBUNDLE-PART-END|7e86621cb27f0577|2|8

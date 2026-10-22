@@ -1,6 +1,465 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 78eef7e）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5cb35d7）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|78eef7e|72075d48cff62b8e|3|8|13127|94a86ba4ebf002d4a15d3dd42bd8e9bcaaf0032b7975b14efcfc28d1538ed24b
+@@@PSBUNDLE-PART|1|opencode|5cb35d7|7e86621cb27f0577|3|8|13586|608b26ef91d1529725c77ab4c8879f9cdd91226eba3744290e14265fc1ced0c3
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/README.md|341|d2d0bfb14925d8d071a758239d4a337ac4a57f5efdb76bf62fb93ef1dd3208c8|0
+# PeopleSoft Skills：客製化優先、UI 業務語意與長文本檢索
+
+依《PeopleSoft Skill Plan Addendum：客製化優先、UI 業務語意與長文本檢索》實作
+（原始需求見 `docs/superpowers/specs/2026-07-16-peoplesoft-skill-custom-ui-source-addendum.md`）。
+
+## 三個核心概念
+
+1. **Customization Profile** — 環境客製規則獨立成設定檔，`TW_` 是強訊號但非唯一判斷。
+2. **UI Semantic Index** — Page 最終顯示文字與選項文字是第一級業務語意，優先於技術物件名稱。
+3. **Unified Progressive Source Retrieval** — PeopleCode / SQL / SQR / SQC 共用
+   「搜尋候選 → 精確取段 → 定向展開 → 停止」協定；Search Index 只定位，DB Chunk 才是 Evidence。
+
+## 目錄結構
+
+```text
+.opencode/
+├─ peoplesoft/
+│  ├─ README.md                        本檔
+│  ├─ SOP.md                           管理者人工作業 SOP（教訓 PR 審查/lint/git/回滾…）
+│  ├─ customization-profile.yaml       環境規則與 TW_（Prefix、Registry、searchPolicy）
+│  ├─ business-domain-map.yaml         兵役等全客製業務領域（alias、rootObjectPolicy）
+│  ├─ progressive-source-retrieval.md  PeopleCode/SQL/SQR/SQC 共用檢索規則 + 長文本工具契約
+│  ├─ mcp-tool-contracts.md            全部 MCP Tool 契約總覽
+│  ├─ oracle-query-cookbook.md         oracleMCP 的 PeopleTools 查詢樣板（SELECT-only）
+│  ├─ subagent-report-contract.md      Subagent 回報契約（JSON 格式與硬規則）
+│  ├─ knowledge-retrieval-contract.md  問答讀取 wiki＋NN 研究文件的契約（索引定位、片段讀取、來源表）
+│  ├─ supplemental-contract.md         補研究收據契約（事實類別→委派鏈、三張表、硬規則）
+│  ├─ spec/                            Spec 引擎公開部分：capabilities.json（能力目錄）、pack.schema.json、
+│  │                                   support-codes.md（KNOW1／SUPP1／SPEC1／CLONE1／DOC1 結論碼＋CAP-REQ）、troubleshooting-matrix.md、examples/
+│  ├─ sdoc/                            Spec 文件流程（/ps-spec → scripts/ps-sdoc.ps1 -Cli opencode）：狀態圖解讀、研究、覆核、
+│  │                                   乾淨讀者、判定的契約，schemas／schemas-runtime、每單元範例、ai-instructions.json；
+│  │                                   model.yaml＝外環 session 用的模型（唯一要填的地方）
+│  ├─ report-templates/
+│  │  ├─ overview-template.md          Deep research 總覽模板（階段一寫完即凍結）
+│  │  ├─ checklist-template.md         調查進度狀態檔模板（唯一反覆改寫的小檔）
+│  │  ├─ function-detail-template.md   Deep research 單功能細查模板
+│  │  ├─ entity-template.md            Entity wiki 物件檔模板（Observations/Relations）
+│  │  └─ audit-template.md             稽核報告（90-audit）模板
+│  ├─ lessons/
+│  │  ├─ pending.md                    例外案件（agent 無把握判斷落點時才進這裡）
+│  │  └─ applied.md                    已套用教訓的逐筆記錄（不進 context）
+│  ├─ test-scenarios.md                本地模型準確度測試情境（30 題 + 評分規則）
+│  └─ test-fixtures.yaml               測試用假想環境資料（mock MCP 標準答案）
+├─ agent/
+│  ├─ ps-orchestrator.md               Primary：問答模式（domain 解析 + 委派 + 彙整，唯讀）
+│  ├─ ps-deep-research.md              Primary：文件生成模式（盤點 + 逐項深查 + 寫檔，可續跑）
+│  ├─ ps-ui-flow.md                    Subagent：UI 語意檢索
+│  ├─ ps-peoplecode-flow.md            Subagent：PeopleCode
+│  ├─ ps-sql-flow.md                   Subagent：SQL
+│  ├─ ps-sqr-flow.md                   Subagent：SQR / SQC
+│  ├─ ps-ae-flow.md                    Subagent：Application Engine
+│  ├─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
+│  ├─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
+│  ├─ ps-spec-worker.md                Primary（只由 ps-spec 外環以 --command ps-spec-batch 啟動）：Spec 片段組表，只讀 .ps-runtime/spec、只寫 fragment.md
+│  ├─ ps-spec-author.md                All：/ps-spec 入口，只准執行 scripts/ps-sdoc.ps1 -Cli opencode …，回報文件位置與缺口
+│  ├─ ps-status-reader.md              Primary（只由 ps-sdoc 外環以 --agent 啟動）：狀態圖讀者，只讀 inbox 與 status.md、只寫 inbox 的解讀檔
+│  ├─ ps-sdoc-worker.md                Primary（同上）：一頁研究或獨立覆核，委派 flow subagent 查證，只寫該 attempt 的 output.json
+│  ├─ ps-spec-reader.md                Primary（同上）：L5 乾淨讀者，只讀 inbox 的渲染後文件
+│  └─ ps-spec-judge.md                 Primary（同上）：L5 文字題判定，只讀 inbox 工單
+├─ plugin/
+│  └─ ps-runtime-guard.js             OpenCode 執行期無狀態 guard＋診斷：task 的 subagent_type 不得是 skill 名
+│                                      （PS_TASK_TARGET_INVALID）、oracleMCP 掛載診斷與受控重掛（預設關）；沒有派工前置閘門
+├─ .npmrc                              offline=true——OpenCode 有 plugin 時啟動會等 @opencode-ai/plugin 安裝，斷網要它秒失敗
+├─ command/
+│  ├─ ps-research.md                   /ps-research <領域> — 文件生成（可續跑）
+│  ├─ ps-audit.md                      /ps-audit <領域> — 稽核 + 回灌 checklist
+│  ├─ ps-lesson.md                     /ps-lesson <描述> — 登錄教訓並本機立即生效（團隊走 PR）
+│  ├─ ps-correct.md                    /ps-correct <正確知識> — 人工指正的業務知識更新 wiki（human 來源＋verified）
+│  ├─ ps-supplement.md                 /ps-supplement <領域> — 補研究（auto-loop -SupplementalOnly 專用；依工單只寫收據）
+│  ├─ ps-spec-batch.md                 /ps-spec-batch <jobId>-<attemptId> — Spec 片段（ps-spec -Run 專用；只寫 fragment.md）
+│  └─ ps-spec.md                       /ps-spec <Component...> — Spec 文件（00-index＋14 份＋90；交 ps-spec-author）
+└─ skills/
+   ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
+   ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
+   ├─ ps-peoplecode-flow/SKILL.md      PeopleCode 邏輯
+   ├─ ps-sql-flow/SKILL.md             SQL 分析
+   ├─ ps-sqr-flow/SKILL.md             SQR / SQC 分析
+   ├─ ps-ae-flow/SKILL.md              Application Engine
+   ├─ ps-data-lineage/SKILL.md         資料血緣
+   ├─ ps-process-flow/SKILL.md         Process Scheduler
+   ├─ ps-security-flow/SKILL.md        安全性
+   ├─ ps-business-explain/SKILL.md     業務說明產出（終點）
+   └─ ps-impact-analysis/SKILL.md      變更影響分析（選配）
+```
+
+各 Skill 只描述該分析領域的決策與輸出；環境規則、共用檢索協定、工具契約
+獨立維護，避免單一 SKILL.md 過大（目標模型 Qwen3.6-35B-A3B——
+MoE，每 token 活躍參數約 3B，**程序紀律屬小模型等級**）。
+
+## 整合流程
+
+```text
+使用者業務問題
+  ↓ ps-business-discovery：載入 Profile → 解析 Domain → 決定
+    CUSTOM_ONLY_ROOTS / CUSTOM_FIRST / MIXED / DELIVERED_ALLOWED
+  ↓ ps-ui-flow：搜尋 UI 顯示文字 / 選項文字 → 映射 Component / Page / Record.Field
+  ↓ ps-peoplecode-flow / ps-sql-flow / ps-sqr-flow / ps-ae-flow：
+    搜尋客製 Chunk → 取精確 DB Chunk（共用 progressive-source-retrieval）
+  ↓ ps-data-lineage / ps-process-flow / ps-security-flow：
+    追蹤資料、執行、安全，必要時加入 Delivered Dependency
+  ↓ ps-business-explain：產出業務說明
+```
+
+## Subagent 架構（地端模型）
+
+針對地端模型（Qwen3.6-35B-A3B，262K：MoE active ~3B——程序紀律屬
+小模型等級；名目 context 大，但長 context 中段品質與 KV cache 成本
+仍受限），提供 OpenCode agent 部署（`.opencode/agent/`，OpenCode 1.x）：
+
+```text
+ps-orchestrator（primary，TUI 中 Tab 切換選用）
+  主 context 只保留：業務問題、domain/policy 摘要、各 subagent 的 JSON 報告
+  ├─ @ps-ui-flow          （只掛 UI 三工具 + origin）
+  ├─ @ps-peoplecode-flow  （只掛長文本五工具 + origin）
+  ├─ @ps-sql-flow         （同上）
+  ├─ @ps-sqr-flow         （同上）
+  ├─ @ps-ae-flow          （+ ps_get_ae_graph）
+  └─ @ps-metadata-flow    （血緣 / 排程 / 授權三合一）
+```
+
+省 context 的三個層次：
+
+1. **Raw source chunks 只存在 subagent context**——回報依
+   `subagent-report-contract.md` 只帶結論 + evidence IDs（單段引用 ≤ 5 行）。
+2. **每個 subagent 的 tools 白名單只開它需要的 MCP 工具**，tool schema 不疊加。
+3. **Skill 全文只在對應 subagent 內載入**，orchestrator 不疊五份 skill 全文。
+
+使用方式與注意事項：
+
+- OpenCode 開在本專案 → Tab 切到 `ps-orchestrator` 問業務問題；
+  或在對話中 `@ps-sqr-flow` 手動指派單項檢索。
+- 專案根目錄的 `AGENTS.md`（常駐 context）提供路由安全網：
+  即使沒切 orchestrator、skill 沒觸發，也會導向正確流程並強制兩條長文本鐵律。
+- **現行 MCP 對映（三個）**：`PeoplecodeElasticSearch`（搜 chunk ids，候選）、
+  `PeoplecodeSource`（chunk id → 完整上下文，Evidence）、`oracleMCP`
+  （PeopleTools metadata：translate values / label / Page 對映 / 排程 / 授權 /
+  origin / AE 結構——查詢一律照 `oracle-query-cookbook.md` 樣板，SELECT-only）。
+  tools 白名單用 `"<註冊名>_*"` wildcard，前綴必須與 opencode.json 的
+  mcp 註冊 key 完全一致（含大小寫）。**注意：OpenCode 的 tools 是覆寫表，
+  沒列出的工具預設開啟——不該用某 server 的 agent 必須明確設 `false`，
+  不能靠不列**（orchestrator 對三個 MCP 全 deny，主 context 物理上碰不到
+  chunk / SQL）。UI 全文語意搜尋（Semantic Index）仍未建，
+  相關查詢會以 gaps / BLOCKED 回報。
+- Skill / 協定文件內的 `ps_*` 工具名是**協定角色名**；實際工具對映見各 agent
+  檔的「工具對映（現行環境）」與 progressive-source-retrieval.md §6.0。
+- Subagent 看不到主對話——orchestrator 的委派 prompt 模板會自帶
+  domain / searchMode / prefixes，這是規則不是選項。
+- 若 orchestrator 的 task 委派在你的版本不可用，改用 @ 提及手動委派，
+  流程與委派 prompt 模板相同。
+- Trade-off：subagent 每次啟動需重載 system prompt，總 token 較高、延遲較長；
+  換取主 context 峰值小、各階段 context 乾淨——對地端模型幾乎必然
+  划算（主 context 乾淨的價值不因名目 262K 而消失：中段記憶劣化與
+  KV cache 成本仍在）。
+
+## Deep Research 文件生成模式
+
+問答模式（ps-orchestrator，唯讀）之外的第二個入口：對**任一**業務領域
+產出人類可讀的 markdown 文件集——領域**不必**先登錄在 domain map
+（30 年系統，多數領域沒登錄是常態）。
+
+```text
+/ps-research 轉職        ← 或 Tab 切到 ps-deep-research 直接下指令
+  ↓ 階段一：多角度盤點 → docs/ps-research/轉職/00-overview.md ＋ checklist.md
+    （總覽：功能地圖、批次、核心表、掃描範圍聲明；進度只在 checklist.md）
+  ↓ 階段二：逐項深查（復用問答模式的深度鏈）→ NN-<物件>.md、逐項打勾
+```
+
+特性：
+
+- **可中斷續跑**：狀態就是 checklist.md——中斷後重跑
+  `/ps-research <領域>`，從第一個未勾選項繼續，不重查已完成項。
+- **checklist 可人工編輯**：覺得盤點漏了功能，直接在 checklist.md 的
+  「調查進度」加一行，系統照著查。
+- **領域未登錄照樣跑**：未命中 domain map 時自展同義詞＋CUSTOM_FIRST，
+  完成後總覽附「建議 domain 登錄」YAML 片段，人工決定是否收錄對照表。
+- **輸出進「內部」git**：`docs/ps-research/` commit 到內部 repo
+  （**嚴禁外部 remote**，見 SOP-3）；git diff / blame 提供審閱與溯源。
+- **逐項自動快驗**：每檔寫完、打勾前先委派 ps-auditor 驗證據；
+  全部打勾後自動接一輪完整稽核＋回灌（單次 run 最多一輪；本 run
+  處理量 > 5 項的長 run 改為提示開新 session 稽核——長對話尾端
+  品質差；稽核新回灌項由下一次 run 處理，輪次記錄於 checklist.md）。
+- **知識歸戶**：每項深查完成即把核心物件寫入 Entity Wiki（見下節）。
+- **操作日誌**：每次 run 追加 `log.md` 一行（不依賴 git 的時間軸）。
+- **全跑注意**：一次跑到底可能中斷（serving 端 context 上限、當機）
+  ——沒關係，斷了就重跑指令續跑；每項完成即寫檔＋打勾，進度不會遺失。
+
+## Entity Wiki 層（知識歸戶與問答飛輪）
+
+領域敘事文件之上的**跨領域物件層**：`docs/ps-research/wiki/`，
+一個 PeopleSoft 物件一個檔（**檔名＝物件名**），
+格式見 `report-templates/entity-template.md`
+（frontmatter：aliases / status / confidence / last_verified / sources /
+reviewed；內容：Observations ＋ typed Relations `[[wikilink]]`）。
+
+```text
+研究：deep-research 每查完一項 → 物件發現「歸戶」到 wiki
+      （先查重 grep 檔名＋aliases → 就地更新，同物件永遠一個檔）
+問答：orchestrator 依 knowledge-retrieval-contract 以 knowledge/index.md 定位 wiki 與 NN
+      → verified／AUDITED_CLEAN 直接引用 → 不足才委派現查 → 回答標來源＋## 來源表
+修正：答錯的事實修在 entity 檔（作廢不刪除）→ 之後每次問答都對
+CR：系統改版上線 → 重建 ES 索引 → audit 找出失效證據 → research 更新（SOP-11）
+```
+
+設計依據（2026-07 研究結論）：編譯過的互連 wiki 對多跳檢索勝過
+flat RAG 約 6~8 F1；確定性 index-first 檢索是地端模型的可靠路徑；
+`[[wikilink]]` 是純文字，backlink 用 grep 即可重建——**不需要任何工具**。
+Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
+見 SOP-7；`.obsidian/` 要 gitignore）。
+
+## 知識索引、補研究與 Spec（三個確定性外環，公司機只回報結論碼）
+
+```text
+知識索引  scripts/ps-knowledge.ps1 -Rebuild|-Check|-Find|-Slice
+          docs/ps-research/knowledge/{index.md,objects.md,index.json}＝本機快取（gitignore）；只記定位與等級，
+          內容永遠讀原檔；auto-loop safe point 自動重建；pull 後／ps-correct 後手跑 -Rebuild
+補研究    scripts/ps-supplemental.ps1 -New|-Submit|-Status|-Result  → docs/ps-research/supplemental/requests/（進內部 git）
+          scripts/ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly → /ps-supplement 收據 → 外環合併 NN → results/（exit 4）
+          目標尚無 NN → checklist D 列（等研究相位）；ps-auto-all 在收據判定前自動先跑迷你圈
+Spec      scripts/ps-spec.ps1 -ValidatePack|-Plan|-Run|-Render|-Gate|-Doctor（需求包在 .ps-private/spec/<packId>/，
+          狀態在 .ps-runtime/spec/<jobId>/，兩者 gitignore）；分母＝Component＋私有需求包，不是整個領域
+Spec 文件 scripts/ps-sdoc.ps1 -Cli opencode -Components '<清單>'（/ps-spec 的外環；狀態圖在 .ps-private/sdoc-opencode/<jobId>/，
+          狀態在 .ps-runtime/sdoc-opencode/<jobId>/，產出 docs/ps-spec-opencode/<jobId>/，皆 gitignore）；
+          外環 session 的模型只讀 sdoc/model.yaml；Claude Code 版同一個外環（不帶 -Cli、目錄不加 -opencode）
+結論碼    KNOW1／SUPP1／SPEC1／CLONE1／DOC1-<stage>-<code>[-<count>]（spec/support-codes.md）——維護端只看這一行
+```
+
+## 稽核與教訓迴路
+
+**稽核**（`/ps-audit <領域>`）——不信模型說了什麼，驗它引用了什麼：
+
+1. **證據解引用**：每筆 CHUNK 證據以 ChunkId 重查、quote 做子字串比對；
+   SQL 證據重跑比對 keyRows；非 UUID 的 id 直接判捏造。
+2. **反駁抽驗**：每檔抽 3~5 條重要 claim，由乾淨 context 的 ps-auditor
+   以「反駁為目標」重新取證判定 VERIFIED / DISPUTED / UNVERIFIABLE。
+3. **換角度完整性**：從核心資料表反推物件清單，與功能地圖 diff 抓遺漏。
+4. 產 `90-audit.md` 記分卡；**問題回灌 checklist**（標「（稽核）」），
+   下次 `/ps-research` 續跑自動補查——研究→稽核→補查閉環。
+5. 格式層另有確定性 lint：`.\scripts\ps-doc-lint.ps1 -Domain <領域>`
+   （checklist 對帳、必要章節、confidence 標註、UUID 格式）。
+
+**教訓迴路**（跨 session 記取教訓）——模型不會學習，教訓必須外部化：
+
+```text
+被指正 / 稽核發現系統性錯誤
+  → /ps-lesson <描述>   登錄＋分類＋**本機立即套用**（行為類錯誤）
+  → /ps-correct <正確知識>   業務知識指正直寫 wiki（human 來源＋verified）
+                        （事實類修文件·作廢不刪除；規則類最小新增·只加不刪）
+  → 記錄 applied.md ＋ 對應測試檢查點（防回歸）
+  → commit / push → 內部 git PR ── 人工審 diff 把關（SOP-1）
+  → merge 後全員 pull ＋ 重啟 → 教訓擴散到所有機器
+```
+
+原則：**本機即時生效、團隊生效必經 PR 人審**——AI 的規則修改永遠有人
+守在合併關卡；套用限「最小新增」（只加不刪，改壞可 revert）。
+能機械化的教訓優先機械化（lint / 稽核判定 / tools deny），
+prose 規則是最後手段。
+
+## 兵役案例（端到端）
+
+使用者：「免役這個選項在哪裡維護？選了以後會執行什麼？」
+
+```text
+1. ps-business-discovery   命中 military_service，Search Mode = CUSTOM_ONLY_ROOTS
+2. ps_search_ui_semantics  命中 Choice Label「免役」→ TW_MILITARY_DATA /
+                           TW_MILITARY_PG / TW_MILITARY.MIL_STATUS，Stored Value = E
+3. ps-ui-flow              取 Component、Page、Control、Field 與
+                           FieldChange / SavePreChange / SavePostChange Event
+4. ps-peoplecode-flow      搜 TW_ 客製 PeopleCode → 取精確 Chunk → 分析選 E 後的分支
+5. ps-sql-flow             分析相關 SQL Definition 或動態 SQL
+6. ps-sqr-flow             若後續 Process 執行 TW_ SQR，追蹤必要 Procedure
+7. ps-data-lineage         整理讀取、更新資料
+8. ps-business-explain     產出業務說明
+```
+
+最終結論必須區分：畫面文字（免役）/ 儲存值（E）/ 業務根物件（TW_MILITARY_DATA，
+CUSTOM_PREFIX）/ PeopleCode 分支與 SQL 更新的 CONFIRMED / INFERRED / DYNAMIC_RUNTIME /
+原生物件僅列 Dependency。
+
+## 最重要的 Skill 防呆（全 Skill 適用）
+
+```text
+Do not assume a delivered PeopleSoft object implements the customer's business
+process when the customization profile marks the domain as custom-only.
+
+Do not treat TW_ as the only way to identify customization.
+
+Do not ignore page display text.
+User-visible labels are primary business search signals.
+
+Do not ignore option labels.
+Choice display text and stored values are part of the business logic.
+
+Do not use Elastic Search snippets as final evidence.
+
+Do not retrieve complete PeopleCode, SQL, SQR, or SQC source by default.
+
+Do not return all prompt values from a high-cardinality table.
+
+Do not call a delivered object the root business implementation when it is only
+a dependency of a TW_ custom object.
+```
+
+## Definition of Done 對照
+
+### Customization
+
+- [x] 支援 `TW_` Prefix → `customization-profile.yaml` `customPrefixes`
+- [x] Prefix 來自環境設定，不是散落在 Prompt → 各 Skill 一律先載入 profile
+- [x] 支援 Custom Object Registry → `customObjectRegistry` + `ps_get_object_origin`
+- [x] 支援 Modified Delivered Object → origin `MODIFIED_DELIVERED`
+- [x] 支援 Business Domain Alias → `business-domain-map.yaml`
+- [x] 支援 CUSTOM_ONLY_ROOTS / CUSTOM_FIRST → domain `rootObjectPolicy` + discovery 規則
+- [x] 報告 Delivered Fallback 是否發生 → discovery 輸出 `deliveredFallbackUsed`
+
+### UI Semantic
+
+- [x] 索引 Page 最終靜態顯示文字 / Grid Column / Tab / Group Box / Button / Static Text
+      → ps-ui-flow「應索引的 UI 文字」
+- [x] 保留語系 → `languageCode` / `fallbackLanguageCode`
+- [x] 可由顯示文字反查 Component / Page / Record.Field → `ps_search_ui_semantics`
+- [x] 動態 Label 標記 DYNAMIC_RUNTIME → ps-ui-flow 規則
+
+### Choice
+
+- [x] Translate Value / Prompt Table / Radio / Drop-down / Checkbox → `ps_get_field_choices`
+- [x] 低基數索引、高基數 on-demand → ps-ui-flow「選項」節
+- [x] 動態 Choice 標記 DYNAMIC_RUNTIME
+- [x] 可由「免役」反查儲存值與 Field → `ps_search_ui_semantics`（CHOICE_LABEL）
+
+### Long Text
+
+- [x] PeopleCode / SQL / SQR / SQC 採 Progressive Retrieval → 四個 flow Skill 皆引用共用協定
+- [x] Search Index 只作 Candidate；Database Chunk 作正式 Evidence
+- [x] 支援 Outline → `ps_get_source_outline`
+- [x] 支援 Neighbor / Symbol Expansion → `ps_expand_source_context`
+- [x] 支援防重 / Context Budget → progressive-source-retrieval.md §5
+- [x] 支援 DYNAMIC_RUNTIME → 全協定與各 Skill 規則
+
+> 註：以上為 Skill / 設定層的完成定義。`mcp-tool-contracts.md` 中標 *(proposed)*
+> 的工具（如 `ps_search_ui_semantics`、`ps_get_field_choices` 的伺服器端實作與
+> UI Semantic Index 的建置）屬 MCP Server / Indexer 端工作，不在本次範圍。
+@@@PSBUNDLE-END|.opencode/peoplesoft/README.md
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/audit-template.md|87|db6a2a3a5ea31209cb739b01b6fbac0244d83c4de3bef760efc287a4c32bd741|0
+# <領域> 稽核報告（90-audit）
+
+> 稽核輪次：<N>　稽核日期：<YYYY-MM-DD>　範圍：<已完成的 N 個檔案>　執行：/ps-audit
+
+<!-- 本報告每輪整檔重寫：判定只來自本輪 auditor 回報，禁止沿用上一輪
+     的數字或內容；輪次未較上一輪 +1 ＝未重驗。 -->
+
+## 總覽記分卡
+
+| 檔案 | 證據 PASS | FAIL | UNVERIFIABLE | Claim VERIFIED | DISPUTED | 燈號 |
+|---|---|---|---|---|---|---|
+| 01-… | 8 | 0 | 1 | 4 | 0 | 🟡 |
+| **合計** | **8** | **0** | **1** | **4** | **0** | 🟢x／🟡y／🔴z |
+
+<!-- 最後一列必為「合計」：各欄加總＋燈號分佈——趨勢追蹤靠它。 -->
+
+燈號：🟢 無 FAIL / DISPUTED；🟡 僅 UNVERIFIABLE；🔴 有 FAIL 或 DISPUTED；⛔ 未稽核（分批稽核 BLOCKED 的檔——lint 判違規，不得畢業）
+
+<!-- 分批稽核（L107）：auto-loop 由外環合併 audit-parts/ 產生本報告；
+     記分卡的 UNVERIFIABLE 欄含 PENDING_MANUAL（待人工SQL）筆數，
+     但 A 列的 UNVERIFIABLE 計數不含它。「未稽核」列＝該檔兩次嘗試
+     仍無合格收據，出路＝拆續篇縮小單檔證據或修正後刪 audit-ledger.json 重跑。 -->
+
+## FAIL / DISPUTED / UNVERIFIABLE 明細
+
+<!-- 三種非過判定**每一筆都要有一列**，UNVERIFIABLE 不得只出現在
+     記分卡數字——原因欄逐字取自 auditor 回報（逾時／連線失敗／
+     chunk 查無／工具不可用…），這是判斷環境問題 vs 資料問題的依據。
+     DISPUTED 列的原因欄必含三要素：原 claim 一句、稽核取到的證據
+     （ChunkId:行號）、矛盾點一句——缺任一＝不可裁決＝不合格判定。
+     FAIL 類型詞彙表（原因欄使用）：TRUNCATED_ID／FABRICATED／
+     WRONG_KIND／STALE_DATA／ID_RELINK／NOT_FOUND／MISSING_CHUNK_ID／
+     INCOMPLETE_CHUNK；行號漂移但 quote 命中＝PASS(LINE_DRIFT) 附
+     新行號，不是 FAIL。
+     UNVERIFIABLE(PENDING_MANUAL)＝待人工SQL 申報列——照列進明細與
+     記分卡，**不回灌 A 項**（人工待辦不是新問題）。 -->
+
+<!-- 「處置」欄＝下一輪的可執行工單。稽核已經查到答案的類型，答案
+     必須寫在這一欄，否則下一輪只拿得到 A 行的計數、要再付一次檢索成本：
+       ID_RELINK  → `換 id：<完整舊 UUID> → <完整新 UUID>`（**兩個都要完整
+                    36 字元**；lint 會機械解析這一欄開成 [回灌] 工單，
+                    舊值是修復者定位「哪一列」的唯一線索）
+       LINE_DRIFT → `更新行號 → <新行號>`
+       STALE_DATA → `更新數值 → <新值>`
+     其餘（NOT_FOUND／FABRICATED／WRONG_KIND…）才寫「回灌補查」。 -->
+
+| 檔案 | 類型 | 內容 | 原因 | 處置 |
+|---|---|---|---|---|
+| 01-… | 證據 FAIL | ChunkId … | quote 非 ChunkText 子字串 | 回灌補查 |
+| 02-… | 證據 UNVERIFIABLE | SQL … | oracleMCP 逾時（~30s） | 回灌重驗 |
+| 03-… | 證據 FAIL(ID_RELINK) | 舊 ChunkId | id 失聯，二次定位已取得新 id | 換 id：<完整舊 UUID> → <完整新 UUID> |
+
+## 上輪回灌項覆核（第 2 輪起必填；首輪寫「無上輪」）
+
+<!-- 上輪 A 項逐項覆核：原判定屬實？誤報數是「稽核員品質指標」，
+     長期追蹤。本節**不取代**總覽記分卡——記分卡永遠是本輪全量
+     重驗的數字。 -->
+
+| A 項 | 原判定 | 覆核結果 | 處置 |
+|---|---|---|---|
+| A6 … | 證據 FAIL | 屬實（已修）\| 誤報 \| 不可查 | <一句話> |
+
+## 完整性（換角度 diff）
+
+<!-- 覆蓋率必填（L81）：任務 C 是**分批委派**的，而委派會失敗
+     （subagent 只回報「已讀取契約」就結束＝委派卡死的指紋）。
+     **「查了沒發現」與「根本沒查成」不得共用同一格**——有未完成批次卻
+     只寫「無」＝假陰性的完整性宣稱，比不寫更糟。
+     覆蓋率那行沒填＝本節結論不可信（lint -StrictAudit 會擋）。 -->
+
+- 任務 C 覆蓋：<完成 N／共 M 批>（未完成批次：<逐批列出，或「無」>）
+- 資料角度發現、功能地圖沒有的物件：<清單，或「無」>
+
+## 已回灌 checklist 的行動項
+
+<!-- 順序約束：這些行必須「先」實際寫進 checklist.md，再抄錄到本節。
+     任何非 PASS／VERIFIED 判定 ≥ 1 而 checklist.md 沒有對應 A<n> 行
+     ＝流程錯誤，不得產出本報告。回灌以「檔」為單位彙整（一檔一行），
+     禁止逐筆開項。判定詞彙限契約五詞：PASS/FAIL/UNVERIFIABLE（證據）、
+     VERIFIED/DISPUTED/UNVERIFIABLE（claim）；auditor 自創詞就近映射
+     （claim→DISPUTED、證據→FAIL）。 -->
+
+- [ ] A1 補查 01-<物件名>.md：FAIL 2／DISPUTED 3／UNVERIFIABLE 1（稽核）
+
+## 系統性錯誤觀察（同類 FAIL ≥ 2 → 建議 /ps-lesson）
+
+- <觀察，或「無」>
+@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/audit-template.md
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/checklist-template.md|25|366e97a7097a3e6165789d4a8ba5afa918e1a43f35a0d227db9050045a800f92|0
+# <領域顯示名> 調查進度
+
+> 本檔是唯一的進度狀態檔：打勾、⚠、稽核補查、Gaps 都只改這裡。
+> 00-overview.md 階段一寫完後凍結；本檔保持小、一律整檔覆寫。
+> 已打勾項會在每輪稽核回灌時搬到 checklist-archive-r<輪次>.md
+> （每輪一個新檔、永不回讀、不改寫舊 archive）——
+> 本檔常態只有輪次行＋未勾項＋Gaps。
+
+稽核輪次：0
+
+## 調查進度
+
+<!-- 每項格式固定：勾選框、編號、功能名、物件、目標檔名。
+     深查完成打 [x]；BLOCKED 打 [x] 並在行尾加 ⚠（原因）。
+     稽核回灌（修既有檔）：- [ ] A<n> 補查 <說明>（稽核）。
+     稽核新發現（建新檔）：- [ ] D<n>-<序號> 新發現 <物件名>：<來源>（稽核）。
+     人工可直接加列，系統會照著查。
+     檔頭標題、輪次行、旗標行與兩個 ## 節標題是固定骨架——
+     任何改寫都不得刪除（外環每 session 後會機械重建＋調帳）。 -->
+
+- [ ] 01 <功能名> `<TW_XXX>` → 01-<TW_XXX>.md
+
+## Gaps 彙整（隨深查更新）
+
+- <各功能深查後的重大未解事項彙整到此>
+@@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/checklist-template.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/entity-template.md|34|de2a989eba864ef30cf837956e9b09ac774822fd85522cbb2869c4fd0fdcf34a|0
 ---
 aliases: []                # 中英文別名、口語簡稱——查重與反查靠這個，必填
@@ -3775,7 +4234,7 @@ model: anthropic/claude-haiku-4-5
 - 文件沒寫就答 `NOT_IN_SPEC`（`text` 可寫你找了哪裡，`ids` 空陣列）。文件明確寫了「沒有」（例如「不適用：…」）是 `ANSWERED`，`ids` 空陣列，`text` 寫文件的說法。
 - 寫完 read 回 output.json 確認是合法 JSON；回覆只說「已寫工單指定產物」。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/reader-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/research-contract.md|279|83d510c2aee54d96ff24c26dce142c72a491e0afb583f351731b3dca866614d6|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/research-contract.md|279|dca5e430f7cd99531ee6d34b5f13df02819702914b636f1891fe86ea543588df|0
 # Spec 文件研究契約
 
 讀者是看不到原 PeopleSoft 程式、但能用現代語言與架構開發的獨立 LLM。它要能只讀 00-index 與 14 份文件，就實作指定 Component 的可觀測核心行為，並以保留的原始識別字回查 PeopleSoft。文件描述行為契約，不替讀者選框架，不要求照搬 Component Processor。
@@ -3914,7 +4373,7 @@ model: anthropic/claude-haiku-4-5
 
 - 先用知識索引定位已稽核的 NN／wiki：grep 的 path 給 `docs/ps-research/knowledge`、include 給 `index.md`，只讀相關節。知識不存在時直接針對確切物件委派查證。
 - 以 task 委派既有 subagent，每次一件事、限定物件名／Record.Field／事件：畫面與 layout 派 `ps-ui-flow`；PeopleCode 派 `ps-peoplecode-flow`；metadata、資料、授權、排程派 `ps-metadata-flow`（授權、血緣、排程類的 skill 名寫進 prompt，skill 不是可委派的 agent）；AE、SQR、SQL 分別派 `ps-ae-flow`、`ps-sqr-flow`、`ps-sql-flow`。
-- 會查 DB 的委派前，先讀 `.opencode/peoplesoft/customization-profile.yaml`，以 `oracleMCP_connect(connection_name＝oracle.connectionName)` 原樣開線，等成功才派；不先 list、不猜連線名、不 disconnect。subagent 回 NOT_CONNECTED 時重連、重派一次；工具清單沒有 `oracleMCP_` 工具時不重派，寫 unresolved 並在 summary 說明 ORACLE_MCP_DOWN。
+- 會查 DB 的委派前不必開線：oracleMCP 的連線由 MCP 設定決定，沒有 connect 可呼叫，你也不呼叫任何 `oracleMCP_` 工具。subagent 回 NOT_CONNECTED 時重派一次；工具清單沒有 `oracleMCP_` 工具時不重派，寫 unresolved 並在 summary 說明 ORACLE_MCP_DOWN。
 - DB 委派同時最多 3 個；全部委派最多 6 個。
 - 搜尋到的 snippet 只是候選，必須以 chunk id 取回完整段落才能當證據；不可一次載入整支 PeopleCode／SQL／SQR／SQC。
 - 至少追實際相關的事件（Activate、PostBuild、RowInit、FieldDefault、FieldChange、FieldEdit、SaveEdit、SavePreChange、SavePostChange、Workflow 等）；不要因 NN 沒提到就推論不存在，也不要要求每個事件一定存在。
@@ -4056,7 +4515,7 @@ model: anthropic/claude-haiku-4-5
 - 每個案例寫具體的前置資料、步驟、輸入欄位與值、預期的畫面、資料變動或原始訊息，讓重建者能實作成自動測試。
 - 前置資料（`preconditions.data`）一律是合成資料，`preconditions.synthetic` 寫 `true`，不冒充公司真實資料。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/research-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/review-contract.md|55|d94f6b62e2cb397f1373ee5d48a597a253fb11209ef69e19c64fa60854fba7f8|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/review-contract.md|55|4b7ac11a6f2c7849f7277ccb8628a405104b9f555f89751ca87480d73ba15d99|0
 # Spec 文件覆核契約
 
 你是獨立 session 的覆核者。另一個 session 寫了一頁研究包（工單 input.json 的 `packet`）；外環已驗過格式、參照、分母與上游需求的處置。你要核對的是內容：每個項目有沒有證據、對不對、完不完整。通過的研究包才會寫進文件。
@@ -4064,7 +4523,7 @@ model: anthropic/claude-haiku-4-5
 ## 怎麼覆核
 
 - 先讀本契約、`.opencode/peoplesoft/sdoc/research-contract.md` 的通用規則與本單元一節、工單的 `fields.md`、可引用清單與已驗收文件中相關的部分。
-- 不沿用研究者的 `summary` 與自評。逐項重取決策性原始證據：CHUNK 用 PeoplecodeSource 取回該段落、SQL 重查（同樣只准單一 SELECT／WITH）、NN／wiki 讀該行。委派、開線、上限與禁止事項照研究契約的「查證方法」。
+- 不沿用研究者的 `summary` 與自評。逐項重取決策性原始證據：CHUNK 用 PeoplecodeSource 取回該段落、SQL 重查（同樣只准單一 SELECT／WITH）、NN／wiki 讀該行。委派、上限與禁止事項照研究契約的「查證方法」。
 - 逐項核對：
   - 證據真的支持項目內容（不是只有相關）；摘錄與原始來源一致。
   - 條件、儲存值、Record.Field、事件、訊息原文正確；AND／OR、優先序、空白／0／NULL／日期邊界沒有漏。
@@ -13128,4 +13587,4 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-PART-END|72075d48cff62b8e|3|8
+@@@PSBUNDLE-PART-END|7e86621cb27f0577|3|8

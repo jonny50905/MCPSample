@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 78eef7e）第 4／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5cb35d7）第 4／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|78eef7e|72075d48cff62b8e|4|8|5813|47e1cd3f6895526adf36191cad1dc47d978510d725698db3c4153739db47b595
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1266|6545c4b87db7ea526c72b4da52c790ed32f883655020f71e28dfee482856c9a3|0
+@@@PSBUNDLE-PART|1|opencode|5cb35d7|7e86621cb27f0577|4|8|5788|d51869c1de0eae371bbbaaf0461bf4d1994e12c2684926693fd4eec531605031
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1302|2466f695feb26ce968e236821001bdd2de530d5ba5b4fbfd35e40086ded43105|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -462,7 +462,16 @@ list_connections／connect／disconnect／sqlcl_run 對 subagent 不可見；coo
 
 ## SOP-12 oracleMCP 單通道操作紀律
 
-oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
+**2026-10-22 起（L160）oracleMCP＝@vdeserto/oracle-mcp-server**：每個 opencode 行程起自己的 server，server 內是連線池（最多 5 條、排隊等 10 秒），
+每次查詢自己取連線、查完歸還——沒有「目前連線」可共用或互拆，也沒有 disconnect 可呼叫；主 agent 不呼叫 oracleMCP。
+本節下面的「單工連線」「disconnect 互拆」是 SQLcl 時代的紀錄；仍然有效的是：**重載期間錯開**（資料庫負載與 30 秒查詢上限）、
+**會查 oracleMCP 的委派同時 ≤ 3**（三個委派各送一句，池子還有餘裕；更多就可能排隊 10 秒逾時，回 `Error: Database query failed.`）、
+**每個委派一次只送一句、不並行呼叫**（cookbook「連線與錯誤處理」）。
+快篩改成：(1) 派 ps-ui-flow 問 R33（工具在嗎）；(2) 派一個 DB 委派只送 SELECT 1 AS OK FROM DUAL（DB 連得上嗎）；
+(3) 只有並發時失敗＝負載或池子排隊，錯開時間即可。`Error: Database query failed.` 而 SELECT 1 AS OK FROM DUAL 也失敗＝DB 連不上，
+查 opencode.json 的三個環境變數（SOP-21 步驟 0）。
+
+舊紀錄：oracleMCP＝VS Code SQL Developer extension 的 SQLcl。實測（2026-08）
 **輕量查詢可並發**（3 subagent 同呼成功）；問題出在**重載**：
 稽核 SQL 風暴期間並行查詢會排隊逾時（>30s → BLOCKED），
 且各 session 的 disconnect 可能互拆共用連線。
@@ -572,54 +581,76 @@ client／transport／工具目錄失效（可能是暫時的），**不再推論
 `_mcp-diag.jsonl`（SOP-21）。(3) `ps-security-flow` 是 skill 不是 agent（issue #32）：授權問題派 `ps-metadata-flow`、skill 寫進 task 文字；
 guard 在執行前擋 `subagent_type=<skill 名>`，報告 `suggestedNext` 含 skill 名時在回覆附註——都是路由錯誤，不算 Oracle 問題。
 
-## SOP-21 Oracle 執行期 guard、MCP 掛載診斷與人工恢復（issue #30／#31／#32；L116～L118）
+## SOP-21 oracleMCP 掛載設定、執行期 guard、MCP 掛載診斷與人工恢復（L116～L118；2026-10-22 換 MCP，L160）
 
-現況一句話：**沒有派工前置閘門、沒有 todo 閘門**（issue #30 移除，理由：公司機已能按流程連線，流程控制不該再是連線的必要條件）。
-執行期只剩 `.opencode/plugin/ps-runtime-guard.js` 三件**無狀態**的小事——不保存 READY／turn／連線世代、不查 task 能力、不代模型 connect、
-不拿回覆文字決定能不能派工：
+現況一句話：oracleMCP＝**@vdeserto/oracle-mcp-server**（唯讀 Oracle MCP）。連哪個資料庫、用哪個帳號寫在 MCP 設定的環境變數，
+**沒有 connect／disconnect 工具、沒有開線步驟**；主 agent 不呼叫 oracleMCP，查詢只由 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor
+以 `oracleMCP_oracle_execute_query` 照 cookbook 做。**沒有派工前置閘門、沒有 todo 閘門**。執行期只剩 `.opencode/plugin/ps-runtime-guard.js`
+兩件**無狀態**的小事——不保存 READY／turn／連線世代、不查 task 能力、不拿回覆文字決定能不能派工：
 
 | 事 | 做什麼 | 不做什麼 |
 |---|---|---|
-| connect 目標 guard | `oracleMCP_connect` 執行前比對本次 `connection_name` 與 profile `oracle.connectionName`：未填／FILL_ME → `ORACLE_CONNECTION_NOT_CONFIGURED`；不一致 → `ORACLE_CONNECTION_MISMATCH`（throw，工具不執行、不改參數）。`oracle.connectGuard: observe`／env `PS_ORACLE_CONNECT_GUARD=observe` 只記不擋 | 不驗清單成員資格、不擋 task、不看 connect 回覆 |
 | task 目標檢查 | `subagent_type` 是 `.opencode/skills/<名>` 而非 `.opencode/agent/<名>.md` → `PS_TASK_TARGET_INVALID`（訊息指出承載 agent：ps-security-flow／ps-data-lineage／ps-process-flow → ps-metadata-flow）；task 回覆的報告 `suggestedNext[].agent` 是 skill 名或不存在的 agent → 回覆末尾附 `[ps-runtime-guard]` 註記 | 不改參數、不 alias、不新增 agent；不把路由錯誤當 Oracle 問題 |
-| oracleMCP 診斷 | session jsonl（chat.message／oracleMCP_* before-after／task before-after／invalid）＋主機 `_mcp-diag.jsonl`（`mcp.tools.changed` 事件、/mcp 狀態快照、模型呼叫看不到的工具、工具 part 錯誤遮罩摘要、受控重掛決定與世代）。只記工具名、計數、事件、遮罩後的錯誤摘要 | 不記 SQL／結果／prompt／密碼／完整連線字串 |
-| 受控重掛（**預設 off**） | 只在 host 證據觸發：/mcp 狀態 `failed`（transport 關閉），或 tools.changed 之後某個**先前執行過**的 oracleMCP_ 工具對**允許它**的 agent 變成 invalid（OpenCode 判定，不是 LLM 字串）；同 host 同一故障事件只重掛一次（disconnect→connect，與 `/mcps` 相同）；有 oracleMCP_ 呼叫在途先等（≤60 秒）；disabled／needs_auth／未設定不碰；一次失敗即停；恢復後在下一次回覆附註「已重掛：重新 connect、SELECT 1 FROM DUAL」 | 不憑 ORACLE_MCP_DOWN 字串重啟；不重啟其他 host／共用服務；不回放寫入；plugin 拿不到「呼叫工具」的 API，DB 層驗證由 agent 做 |
+| oracleMCP 診斷 | session jsonl（chat.message／oracleMCP_* before-after／task before-after／invalid）＋主機 `_mcp-diag.jsonl`（`mcp.tools.changed` 事件、/mcp 狀態快照、模型呼叫看不到的工具、工具 part 錯誤遮罩摘要、受控重掛決定與世代）。只記工具名、計數、事件、遮罩後的錯誤摘要；oracleMCP 回覆以 `Error:` 開頭記 ok:false | 不記 SQL／結果／prompt／密碼／完整連線字串；不攔任何 oracleMCP 工具 |
+| 受控重掛（**預設 off**） | 只在 host 證據觸發：/mcp 狀態 `failed`（transport 關閉），或 tools.changed 之後某個**先前執行過**的 oracleMCP_ 工具對**允許它**的 agent 變成 invalid（OpenCode 判定，不是 LLM 字串）；同 host 同一故障事件只重掛一次（disconnect→connect，與 `/mcps` 相同）；有 oracleMCP_ 呼叫在途先等（≤60 秒）；disabled／needs_auth／未設定不碰；一次失敗即停；恢復後在下一次回覆附註「已重掛：先以 SELECT 1 AS OK FROM DUAL 驗證」 | 不憑 ORACLE_MCP_DOWN 字串重啟；不重啟其他 host／共用服務；不回放寫入；plugin 拿不到「呼叫工具」的 API，DB 層驗證由查詢 subagent 做 |
 
 ```text
-□ 1. 搬檔與「舊 plugin 不再載入」：照搬運清單搬 ps-runtime-guard.js、agent 檔、profile（只合併 oracle 區塊：拿掉 preflightGate／
-     preflightReminder／todoFirst，加 connectGuard: enforce、mcpAutoRecover: off；已填的 connectionName／currentSchema 不動）、
-     cookbook、契約、skill、scripts；**刪除** .opencode\plugin\ps-oracle-preflight-gate.js 與 scripts\tests\test-oracle-gate-runtime.ps1
-     （manifest 的 removed 清單；fs-doctor 檢查 M 若報 R＝舊檔還在）。.opencode\.npmrc 的 offline=true 保留。
-     舊 plugin 只貼入新檔不刪＝兩個 plugin 一起載入。搬完**重新啟動 opencode 行程**（/new 不會重載 plugin）。
+□ 0. 掛載設定（opencode.json；Claude Code 版見 claude-code/README.md 第 3 步，同樣三個環境變數）：
+     "mcp": {
+       "oracleMCP": {
+         "type": "local",
+         "command": ["node", "<安裝目錄>\\node_modules\\@vdeserto\\oracle-mcp-server\\dist\\index.js"],
+         "enabled": true,
+         "environment": {
+           "ORACLE_USER": "<唯讀帳號>", "ORACLE_PASSWORD": "<密碼>", "ORACLE_CONNECTION_STRING": "<主機>:<埠>/<服務名>"
+         }
+       }
+     }
+     (a) 鍵名**必須是 oracleMCP**（大小寫一致）：agent 的 tools 表、plugin、analyzer 都認 `oracleMCP_` 前綴，換名＝工具全部對不上。
+     (b) 工具實名（/mcp 清單）：oracle_list_schemas／oracle_list_tables／oracle_describe_table／oracle_execute_query／oracle_get_table_data；
+         框架只開 oracle_execute_query 給四個查詢 subagent，其餘四個在每個 agent 的 tools 表明寫 false。
+     (c) ORACLE_USER 用 agent 的唯讀帳號（SOP-30）；profile oracle.currentSchema 填 PeopleTools 表的擁有者。profile 沒有連線名要填
+         （舊的 oracle.connectionName／connectGuard 兩鍵已拿掉；搬運包解開時本機改過的 profile 會出 .incoming，照新版合併即可）。
+     (d) 公司網路封鎖 npm：不要用 npx 下載，command 指向已安裝的 dist\index.js。這個版本不呼叫 initOracleClient（node-oracledb Thin 模式），
+         讀原始碼的結果是不需要 Instant Client、也不讀 NLS_LANG；要 Oracle 12c 以上（外層包 FETCH FIRST）。
+     (e) server 的固定限制（1.0.0 原始碼）：每次查詢上限 30 秒、最多回 500 列（limit 預設 50）、輸出超過約 25,000 字截斷、連線池最多 5 條、
+         排隊等 10 秒；SQL 送出前檢查（一句、無分號與註解、SELECT／WITH 開頭、DML／DDL 字與 DBMS_ 等套件名都擋）；錯誤只回一行 `Error: …`，
+         原始 ORA 訊息只寫到 server 的 stderr——cookbook 規則 7b／7c 與「連線與錯誤處理」是照這些行為寫的。
+     (f) opencode.json 的 permission 若對 oracleMCP 逐工具設定過（舊的 oracleMCP_connect: allow 之類），改成
+         oracleMCP_oracle_execute_query: allow——headless 下 ask 等於擋，症狀是查詢 subagent 卡住、DB 委派逾時。
+□ 1. 搬檔與「舊 plugin 不再載入」：照搬運清單搬 ps-runtime-guard.js、agent 檔、profile、cookbook、契約、skill、scripts；
+     **刪除** .opencode\plugin\ps-oracle-preflight-gate.js 與 scripts\tests\test-oracle-gate-runtime.ps1（manifest 的 removed 清單；
+     fs-doctor 檢查 M 若報 R＝舊檔還在）。.opencode\.npmrc 的 offline=true 保留。搬完**重新啟動 opencode 行程**（/new 不會重載 plugin 與 MCP 設定）。
 □ 2. 有載入嗎：開任一 session 後看 auto-loop-logs\ps-runtime-guard\_plugin.log 出現
-     「loaded … connectGuard=enforce autoRecover=off diag=on agents=[…] skills=[…] wildcardDenyMix=[]」。
+     「loaded … autoRecover=off diag=on agents=[…] skills=[…] wildcardDenyMix=[]」（沒有 connectGuard；agents 裡只有四個查詢 subagent 是 DB）。
      沒有 ps-runtime-guard 的 loaded 行＝沒載到（檔名／目錄／JS 語法），用 opencode --print-logs --log-level DEBUG 看 plugin 錯誤；
      還看得到舊目錄 auto-loop-logs\ps-oracle-gate 在長新檔＝舊 plugin 沒刪乾淨。
 □ 3. 快篩（一題＋同視窗第二題，ps-orchestrator）：看 auto-loop-logs\ps-runtime-guard\<sessionID>.jsonl——
-     - 正常：before connect（decision=allow、connection＝profileConnection＝profile 值）→ after connect（ok:true）→ before task（allow）
-       → after task（reportStatus=COMPLETE、childSessionID）；子 session 的 jsonl 有 sql_run after 列 ok:true
-     - 先派後連（沒有閘門，不會被擋）：after task notConnected=true → before connect → after task COMPLETE；`-AnalyzeSession` 的
-       reconnects=1、reconnectLoops=0。連兩次以上＝reconnectLoops>0＝agent 規則沒被遵守，回報維護 session
-     - 連線名設定錯誤（R32）：profile 暫改成 SQLcl 沒有的名字 → before connect decision=block、note=ORACLE_CONNECTION_MISMATCH／
-       NOT_CONFIGURED、沒有 after 列、SQLcl 沒收到；模型回報「Oracle 連線未設定」、不換名字重試
-     - 工具可見性（R33）：問主 agent「列出所有名稱含 oracleMCP 的工具全名」→ 只有 list_connections、connect；派 ps-ui-flow 問同一句 → 只有 sql_run
+     - 正常：before task（allow、dbCapable=true、basis=execute_query:enabled）→ after task（reportStatus=COMPLETE、childSessionID）；
+       子 session 的 jsonl 有 oracleMCP_oracle_execute_query after 列 ok:true；主 session 沒有任何 oracleMCP_ 列
+     - DB 連不上（R3／R5）：子 session 兩列 ok:false（業務查詢＋SELECT 1 AS OK FROM DUAL），after task notConnected=true → 主 agent 重派一次；
+       `-AnalyzeSession` 的 redispatches=1、redispatchLoops=0。兩輪以上＝redispatchLoops>0＝agent 規則沒被遵守，回報維護 session
+     - 舊工具名不殘留（R32）：jsonl 沒有 oracleMCP_connect／list_connections／sql_run 的 before 或 invalid 列；有＝agent／cookbook 還是舊版
+     - 工具可見性（R33）：問主 agent「列出所有名稱含 oracleMCP 的工具全名」→ 一個都沒有；派 ps-ui-flow 問同一句 → 只有 oracleMCP_oracle_execute_query
      - skill 名誤派（R36）：誘導主 agent 派 subagent_type=ps-security-flow → transcript 該 task 件是 error、含 PS_TASK_TARGET_INVALID 與
-       ps-metadata-flow；模型改派 ps-metadata-flow；jsonl 的 before task decision=block note=PS_TASK_TARGET_INVALID:skill；沒有多 connect
+       ps-metadata-flow；模型改派 ps-metadata-flow；jsonl 的 before task decision=block note=PS_TASK_TARGET_INVALID:skill
+     - SQL 被 server 擋（R44）：子 session 有 ok:false 列、回覆是葡萄牙文 Error（Múltiplos statements／Comentários SQL／Operação proibida…）
+       ＝SQL 形狀不符 cookbook 規則 7b；同一句修一次重送成功即正常，反覆被擋回報維護 session（附 SQL 的樣板節號，不貼物件名）
 □ 4. 人工恢復 SOP（Oracle MCP 工具在同一視窗消失；/new 無效；另一視窗仍正常）——每一步做完再做下一步：
      (1) 停止派新的 Oracle 工作（不要再問 DB 題、不要開新批）
      (2) 等現有工作結束，或確認取消完成——Timeout 不等於底層 SQL 已停止；無法確認在途工作安全狀態時，維持人工處置、不重掛
      (3) 保留精簡故障紀錄：_mcp-diag.jsonl 末段、該 session 的 jsonl、/mcps 畫面上 oracleMCP 的狀態（全部留內網）
      (4) 只對受影響 instance 的 oracleMCP 重掛一次：在**那個視窗** /mcps → oracleMCP → disconnect → connect（不要另開 opencode serve、
-         不要動其他視窗、不要全域殺 Java／SQLcl；若背後是共用遠端服務，先核對影響範圍，不為單一 client 重啟整個服務）
-     (5) 確認該角色必要工具恢復：問主 agent「列出所有名稱含 oracleMCP 的工具全名」（R33）
-     (6) 主 agent connect 到 profile 指定目標（重掛前的「已連線」不再有效）
-     (7) 查詢 subagent 執行 SELECT 1 FROM DUAL（重掛後的第一個 DB 委派）
-     (8) 再繼續業務查詢（表名帶 `<schema>.` 前綴，沒有 session 層的 schema 設定要恢復）
-     (9) 僅重派尚未完成的唯讀工作一次；寫入類、完成狀態不明的一律人工判斷
-     重掛失敗／工具仍不見 → 第二層排查（SOP-12 快篩：VS Code／extension 活著？無並發直通測試）；不要反覆 disconnect／connect
+         不要動其他視窗）。這裡的 disconnect／connect 是 OpenCode 對 MCP server 行程的重掛，不是資料庫連線
+     (5) 確認該角色必要工具恢復：派 ps-ui-flow 問「列出所有名稱含 oracleMCP 的工具全名」（R33）
+     (6) 查詢 subagent 執行 SELECT 1 AS OK FROM DUAL（重掛後的第一個 DB 委派；沒有 connect 步驟）
+     (7) 再繼續業務查詢（表名帶 `<schema>.` 前綴，沒有 session 層的 schema 設定要恢復）
+     (8) 僅重派尚未完成的唯讀工作一次；完成狀態不明的一律人工判斷
+     重掛後仍 `Error: Database query failed.`＝MCP 在、DB 連不上：查 opencode.json 的三個環境變數、DB 是否在維護、帳號是否被鎖
+     （server 的 stderr 只印 ORA 代碼，用 opencode --print-logs 看）；不要反覆 disconnect／connect
 □ 5. 診斷怎麼看（模型說「沒有 oracleMCP 工具」時先分三種）：
-     - 權限過濾：session jsonl 有 invalid 列且 allowedByAgent=false（該 agent 的 tools 表本來就關）→ 改 tools 表，不是掛載故障
-     - 錯名：invalid 列 seenBefore=false（這個名字在本主機從沒執行過）→ 模型猜名，對照 /mcp 實名（SOP-12 再追記）
+     - 權限過濾：session jsonl 有 invalid 列且 allowedByAgent=false（該 agent 的 tools 表本來就關，例如主 agent）→ 改派查詢 subagent，不是掛載故障
+     - 錯名：invalid 列 seenBefore=false（這個名字在本主機從沒執行過，例如憑記憶呼叫舊的 oracleMCP_connect）→ 對照 /mcp 實名（步驟 0(b)）
      - 目錄遺失／transport：_mcp-diag.jsonl 有 event（mcp.tools.changed）＋ snapshot（runtimeStatus=failed、statusError=Connection closed；
        或 connected＋catalog suspect）＋ invalid-tool（seenBefore=true、allowedByAgent=true）＋ recovery（faultReason=transport-closed／
        catalog-lost；auto off 時 decision=would-remount）→ 走步驟 4
@@ -629,24 +660,25 @@ guard 在執行前擋 `subagent_type=<skill 名>`，報告 `suggestedNext` 含 s
      （本主機執行過的 oracleMCP_ 工具名）、faultReason／evidence／decision／faultId／gen（恢復世代）。
      「最終送給模型的工具清單」在 1.18.29 沒有 API 可取：用 R33 問法或 invalid 列反推。
 □ 6. 受控自動重掛（預設 off；公司機驗過下列三點才開）：
-     (a) 同 host 管理入口存在：/mcps 對 oracleMCP disconnect→connect 有效（管理者已驗）＝ host 有 /mcp/{name}/connect、/disconnect 路由，
+     (a) 同 host 管理入口存在：/mcps 對 oracleMCP disconnect→connect 有效＝ host 有 /mcp/{name}/connect、/disconnect 路由，
          guard 用 plugin 的同 host client 呼叫同一組路由（沙箱 1.18.29 已驗 e2e vanish-auto／transport-close）；
      (b) 先在 off 狀態跑一次真實故障，_mcp-diag.jsonl 出現 decision=would-remount 且 faultReason 正確（不是權限過濾、不是錯名）；
      (c) 開：profile oracle.mcpAutoRecover: on（或 $env:PS_ORACLE_MCP_AUTO_RECOVER='on' 該次啟動）；再重現一次故障，
          應看到 remount-start → remount-ok →（下一次 oracleMCP 呼叫）verified-by-call，下一題第一個 oracleMCP 回覆附「已重掛」註記，
-         主 agent 依註記重新 connect、subagent SELECT 1 FROM DUAL；另一視窗的 _mcp-diag.jsonl 沒有 recovery 列。
+         subagent 依註記先送 SELECT 1 AS OK FROM DUAL；另一視窗的 _mcp-diag.jsonl 沒有 recovery 列。
      出現 remount-failed／suppressed／gave-up＝自動恢復停了，走步驟 4；不要為了讓它再試而反覆製造事件。
 □ 7. 驗收腳本：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -AnalyzeAll -Since "<開始時間>"
-     覆蓋與行為六項都要 0：hookMismatch、turnMismatch、callMismatch、reconnectLoops、downThenConnect、downThenRedispatch；
-     可用看 sessionsWithDbTaskOk 與 dbTasks completed／partial／blocked／invalid／completedNoSql；觀察值 notConnectedReports（模型錯序機率）、
-     routingBlocks、suggestedNextInvalid、connectBlocks、invalidOracleCalls、listCalls；主機診斷摘要（tools.changed／快照狀態／重掛決定）。
+     覆蓋與行為五項都要 0：hookMismatch、turnMismatch、callMismatch、redispatchLoops、downThenRedispatch；
+     可用看 sessionsWithDbTaskOk 與 dbTasks completed／partial／blocked／invalid／completedNoSql；觀察值 notConnectedReports（DB 連不上）、
+     redispatches、routingBlocks、suggestedNextInvalid、invalidOracleCalls、oldToolCalls（正常 0）；主機診斷摘要（tools.changed／快照狀態／重掛決定）。
      30 次回歸：-Scenario B1 -Runs 30（需 DB 的題：每 session ≥1 個完成的 DB task）／B2／B3（純 PeopleCode：0 個 DB task）。
 □ 8. 已知限制（誠實記載不等於已修復）：
-     (a) 派工順序沒有機械保證：模型先派後連會多一次 NOT_CONNECTED 來回（analyzer 只擋「超過一次」）；
+     (a) 派工順序沒有機械保證：analyzer 只擋「NOT_CONNECTED 後重派超過一輪」；
      (b) 工具消失的根因未定：只做了「降低故障影響」（診斷、人工 SOP、受控重掛），沒有「找到並修正根因」；
      (c) 1.18.29 拿不到 MCP 工具目錄與每個 agent 的最終工具清單；
-     (d) 受控重掛只驗「工具恢復（下一次 oracleMCP 呼叫執行得到）」，DB 層（profile 目標、SELECT 1 FROM DUAL、schema）由 agent 依附註做；
-     (e) 共用連線的有效性、跨 session 集中復原、真 SQLcl repeated-connect 契約仍是另案（topology 實驗 T1～T3 見 R42）。
+     (d) 受控重掛只驗「工具恢復（下一次 oracleMCP 呼叫執行得到）」，DB 層（SELECT 1 AS OK FROM DUAL、schema）由 subagent 依附註做；
+     (e) server 不轉發原始 ORA 訊息：`Error: Database query failed.` 可能是連不上，也可能是 SQL 本身（欄名重複、型別不合）——
+         subagent 以 SELECT 1 AS OK FROM DUAL 區分；真正原因只在 server 的 stderr。
 □ 9. 可選硬化（不隨本批啟用；公司機先驗證語法與效果）：主 agent 的 task 目標可用 OpenCode 原生 permission 縮成白名單，
      例如在 ps-orchestrator.md frontmatter 加
        permission:
@@ -656,6 +688,10 @@ guard 在執行前擋 `subagent_type=<skill 名>`，報告 `suggestedNext` 含 s
      沙箱 1.18.29 語法可用；skill 名（ps-security-flow）仍會匹配 "ps-*"，所以它擋不住誤派——擋誤派靠 guard；
      這條只用來禁掉 general／explore／scout。版本不同 permission 語法可能不同，config 驗證失敗會讓 agent 載入失敗（L60 症狀），先在測試目錄驗。
 ```
+
+**2026-10-22 換 MCP（L160）前的 SOP-21**：當時 oracleMCP 是 SQLcl（list_connections／connect／disconnect／sql_run／sqlcl_run），
+guard 第三件事是 connect 目標比對（ORACLE_CONNECTION_NOT_CONFIGURED／MISMATCH、`oracle.connectGuard`／`PS_ORACLE_CONNECT_GUARD`），主 agent 第 0 步
+connect profile 的 `oracle.connectionName`；這些在新 server 下都不存在，已從現行程序拿掉（git 歷史可查）。
 
 ## SOP-11 系統 CR 上線後的知識庫對齊
 
@@ -982,8 +1018,8 @@ PS 7 跑 `test-ps51-static.ps1`。改 agent 工具權限時，另跑 runtime-gua
 □ 2. profile：`.claude/peoplesoft/customization-profile.yaml` 的鍵值與 OpenCode 版逐行相同，把本機已回填的值抄過去。
 □ 3. MCP：`claude mcp add --scope user` 註冊 oracleMCP／PeoplecodeElasticSearch／PeoplecodeSource／PeoplecodeMetadata（名字逐字相同）。
 □ 4. 在專案資料夾執行一次 `claude` 接受信任詢問（否則專案權限允許清單被忽略，headless 工具全部被拒）。
-□ 5. `ps-fs-doctor` 應顯示「Claude Code 版」且結論 G；再跑 `scripts\ps-claude-doctor.ps1 -Live`（hook 自測、MCP 註冊、
-     真 session 第 0 步開線）結論 G。外環照舊跑；它們依 `.claude/peoplesoft` 是否存在改開 `claude -p --agent …`；
+□ 5. `ps-fs-doctor` 應顯示「Claude Code 版」且結論 G；再跑 `scripts\ps-claude-doctor.ps1 -Live`（hook 自測、profile currentSchema、MCP 註冊、
+     真 session 只送一句 SELECT 1 AS OK FROM DUAL）結論 G（oracleMCP 註冊方式見 claude-code/README.md 第 3 步、SOP-21 步驟 0）。外環照舊跑；它們依 `.claude/peoplesoft` 是否存在改開 `claude -p --agent …`；
      同一資料夾要跑 OpenCode 版外環先設 `$env:PS_CLI='opencode'`。
 
 啟動方式：業務問答 `claude --agent ps-orchestrator`；產文件／稽核／教訓 `claude --agent ps-deep-research`；直接 `claude` 是一般 session
@@ -1238,7 +1274,7 @@ Windows 另以假 `opencode.cmd`／`claude.cmd` 真的經 cmd.exe 走預檢、se
 
 ## SOP-30 agent 唯讀帳號：表名帶擁有者前綴與授權檢查（L150）
 
-agent 連 DB 用的是唯讀帳號。這個帳號不能 `ALTER SESSION SET CURRENT_SCHEMA`（ORA-02421），也沒有同義字，裸表名一律 ORA-00942；
+agent 連 DB 用的是唯讀帳號（2026-10-22 起就是 oracleMCP 設定裡的 ORACLE_USER，SOP-21 步驟 0）。這個帳號不能 `ALTER SESSION SET CURRENT_SCHEMA`（ORA-02421），也沒有同義字，裸表名一律 ORA-00942；
 DBA 不動。所以 cookbook 規則 1a：PeopleSoft 的表與 view 一律寫成 `<擁有者>.表名`（DUAL、ALL_ 開頭的資料字典不加），擁有者＝profile `oracle.currentSchema`，不執行 ALTER SESSION。
 
 □ 1. profile `oracle.currentSchema` 填擁有者名稱本身（不加引號；兩版 profile 都一樣）。沒填（FILL_ME）時 agent 用裸表名，
@@ -1267,7 +1303,7 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
      帶了仍查不到＝第 2 步那張表沒授權，或本環境沒有這張表。
 □ 6. 舊研究文件的 SQL 證據多半是裸表名：auditor 重跑前自己補前綴（只補前綴、其餘一字不改），文件不必改。
 □ 7. 端對端（OpenCode 版，test-scenarios R43）：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`
-     ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 sql_run 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。
+     ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 oracle_execute_query 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。
 @@@PSBUNDLE-END|.opencode/peoplesoft/SOP.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/capabilities.json|38|6514e5d73ca2568acea32f9c3a4ff6c288b4964e92b7244b929c23049df86bc8|0
 {
@@ -1309,7 +1345,7 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
   }
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/capabilities.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/clone-contract.md|97|7206c4672c8348aec36b97dbc84872c7f1343d415fcd8f453887890b7c2f7594|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/clone-contract.md|97|e86d6513079da1a2cd9afb52b5e78f4cac6c479f6613a262fcb0a882e16849a2|0
 # 核心功能重建 Spec 契約
 
 ## 目標與範圍
@@ -1373,7 +1409,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 ## 研究與證據
 
 - 先用知識索引定位既有 NN／wiki，只讀 topic 相關節；索引是入口不是原始碼正確性的保證。知識不存在時可直接針對確切 Component 委派，不要求先研究整個領域。
-- UI／layout 派 ps-ui-flow；欄位驅動條件派 ps-peoplecode-flow；metadata／資料／授權派 ps-metadata-flow；AE、SQR、SQL 分別派對應 flow。metadata 類先 connect；ps-security-flow 等是 skill，不是 agent。
+- UI／layout 派 ps-ui-flow；欄位驅動條件派 ps-peoplecode-flow；metadata／資料／授權派 ps-metadata-flow；AE、SQR、SQL 分別派對應 flow。metadata 類派之前不必連線；ps-security-flow 等是 skill，不是 agent。
 - 關鍵條件、UI 動態變異、assignment、狀態與交易需原始來源；至少追 Activate／PostBuild／FieldChange／FieldEdit／SaveEdit／SavePreChange／SavePostChange 等實際相關事件，不能因 NN 沒提到就推論不存在。不要要求每個事件一定存在，查無也須查法收據。
 - CHUNK locator 是完整 UUID，且必須已透過 PeoplecodeSource 取回精確段落；SQL locator 是已執行的 SELECT 查詢，必須保留 FROM 及限定目標，excerpt 記關鍵回傳列；NN locator 是本機研究檔與明確行段，excerpt 是實際內容。單筆 excerpt ≤5 行。
 - evidence 的 ID 僅在該 packet 內使用；每筆 item 的 evidenceIds 都要可解析。NN 可作來源路標／已記錄事實，獨立覆核仍須追到決策性原始證據，不因 NN 標 AUDITED_CLEAN 就跳過。
@@ -1655,24 +1691,24 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 （無）
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|0be19e632b2f643a3991f4c43057d674a64e3609e2ade236e132e943dafc8353|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|a0ca9a554c39ad637ce3fb6a64453e001eff0587c54d4f297c42f62c9819800a|0
 {
   "schemaVersion": 1,
   "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
   "files": [
     {
       "path": ".opencode/agent/ps-clone-worker.md",
-      "sha256": "A1BE7DCE95ABC62E2E422AF3BCF0E267E8CA233027CE72A2B586A7290EF1065A",
+      "sha256": "35F7DCCBD47FB9FC6B3A9A77D2FDA337F2A51D78ECCF7EE50D0D85E380DD7050",
       "lines": 73
     },
     {
       "path": ".opencode/agent/ps-spec-author.md",
-      "sha256": "87A27FD99C8D647192991B139FF72138EBE320DA01287AE1BAC539D81F238868",
+      "sha256": "3FC22300CB9E1DF1833FB34E0713D2E86B028C4C6A5DC16C29E2582C135B2334",
       "lines": 85
     },
     {
       "path": ".opencode/agent/ps-spec-worker.md",
-      "sha256": "2C881C2D9D47EF7BFF7D15595A4940B0550D26BB791984A3DFAF2BC736D0DEB8",
+      "sha256": "E47F4963198D592CA5836BC6266BB1632BFBDB2EF3C62EC75A10427160F72737",
       "lines": 79
     },
     {
@@ -1697,7 +1733,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".opencode/peoplesoft/spec/clone-contract.md",
-      "sha256": "7206C4672C8348AEC36B97DBC84872C7F1343D415FCD8F453887890B7C2F7594",
+      "sha256": "E86D6513079DA1A2CD9AFB52B5E78F4CAC6C479F6613A262FCB0A882E16849A2",
       "lines": 98
     },
     {
@@ -2107,7 +2143,7 @@ CAP-REQ: sources=[行為邏輯, Evidence 附錄], subject=COMPONENT, output=[tri
 - 綁定（bindingMode／章節標題／佔位符）進 bindingHash：改綁定與改模板同級，會換一個 generation；改 requirements 才是 contentHash（2-08 重跑 `-Plan`）。
 - gate／render 的等級看現況知識索引（每個動詞都先重建 STALE 索引）：規劃後等級低於政策＝7-22，不會發 SPEC_COMPLETE；ENTITY.DETAIL 規劃與 gate 都只看 wiki 等級（引用它的 NN 等級不算），所以 NN 未稽核不會誤開 7-22。
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/troubleshooting-matrix.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/subagent-report-contract.md|193|533fdada04cd35b172a75f1f3a7ce361935592e8e21d22c9b59e1c94ae241465|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/subagent-report-contract.md|193|964fa97e5f3c5280c82a94cd3cab535d8219f16b29aa449616b78455bc20402c|0
 # Subagent Report Contract（回報契約）
 
 所有 ps-* subagent 的**最終輸出只能是一份符合本契約的 JSON**，
@@ -2133,7 +2169,7 @@ orchestrator 主 context 只累積小而結構化的報告。
    `labels[].fallbackLanguageCode`：有覆寫而未回退＝`NOT_APPLICABLE`，回退＝實際採用的 base language
    （cookbook §2k-0 (2b)），查不到＝`UNRESOLVED`——**不得留空字串、不得預設 ENG**。
 4. 查無 / 不確定 / 超出 budget：用 status=PARTIAL 或 BLOCKED + gaps 說明，並填 `blockedReason`
-   （封閉值，見欄位表）；未連線一律 NOT_CONNECTED，不得寫成逾時或查無。不得編造物件名稱或執行期結果。
+   （封閉值，見欄位表）；DB 連不上一律 NOT_CONNECTED，不得寫成逾時或查無。不得編造物件名稱或執行期結果。
 5. 報告目標長度 ≤ 600 tokens（軟性）；findings 依相關性排序，最多 8 筆。
 6. delivered 物件一律進 dependencies，不進 findings 的主要實作敘述
    （CUSTOM_ONLY_ROOTS 模式下尤其如此）。
@@ -2283,7 +2319,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 | `agent` | ✔ | 回報的 subagent 名稱 |
 | `task` | ✔ | 一句話重述任務（供 orchestrator 對帳） |
 | `status` | ✔ | COMPLETE：已回答；PARTIAL：部分回答（見 gaps）；BLOCKED：無法進行（工具失敗 / 查無） |
-| `blockedReason` | status≠COMPLETE 時必填 | 封閉值：NOT_CONNECTED（SQL 工具回未連線；由主 agent 重連後重派一次）／ORACLE_MCP_DOWN（工具清單無 oracleMCP_：掛載故障，不猜名、不重試，由管理者重掛後重新驗證；不是 NOT_CONNECTED）／QUERY_TIMEOUT（>30 秒無回應）／SCHEMA_UNRESOLVED（view/table not found 且 profile currentSchema=FILL_ME）／TOOL_ERROR／NO_EVIDENCE（查無）／BUDGET_EXCEEDED；COMPLETE 時 NOT_APPLICABLE |
+| `blockedReason` | status≠COMPLETE 時必填 | 封閉值：NOT_CONNECTED（DB 連不上：查詢回連線類錯誤，或 `Error: Database query failed.` 且 `SELECT 1 AS OK FROM DUAL` 也失敗；主 agent 重派一次）／ORACLE_MCP_DOWN（工具清單無 oracleMCP_：掛載故障，不猜名、不重試，由管理者重掛後重新驗證；不是 NOT_CONNECTED）／QUERY_TIMEOUT（>30 秒無回應）／SCHEMA_UNRESOLVED（view/table not found 且 profile currentSchema=FILL_ME）／TOOL_ERROR／NO_EVIDENCE（查無）／BUDGET_EXCEEDED；COMPLETE 時 NOT_APPLICABLE |
 | `searchScope` | ✔ | 實際使用的搜尋模式；用了 delivered fallback 必須在此如實回報 |
 | `coverage[]` | 長文本必填 | 程式單位、結構行號範圍、已分析行號區間；未覆蓋區間必同時列於 gaps |
 | `findings[]` | ✔（可為空陣列） | 每筆 = 一個可獨立驗證的 claim；`operations` 僅資料操作類 finding 需要 |
@@ -2302,7 +2338,7 @@ orchestrator 主 context 只累積小而結構化的報告。
 - 引用報告時帶 evidence IDs；需要原文時按 ID 定向補取，不重跑檢索。
 - 多份報告衝突時：以 confidence 高者為準；同級衝突如實並陳並標 INFERRED。
 @@@PSBUNDLE-END|.opencode/peoplesoft/subagent-report-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/supplemental-contract.md|102|90e66c2e99069bfb11749223dd5c49af0ede183963d6c526df2bec965556885d|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/supplemental-contract.md|101|b4b9a7a566ea0a53e4fc211887d1c5424d876e6ee10bdf1037c68bbbc24d536c|0
 # 補研究契約（Supplemental Research：指定 NN＋指定問題的定向補查）
 
 適用：`/ps-supplement <領域>` 指令（由 ps-auto-loop 的補研究迷你圈啟動；不是給人手動下的指令）。
@@ -2334,8 +2370,8 @@ orchestrator 主 context 只累積小而結構化的報告。
 | RELATED.OBJECTS | @ps-metadata-flow（帶 ps-data-lineage skill）→ @ps-peoplecode-flow | 同上 |
 
 工單類別不在表內（GAPS、EVIDENCE.APPENDIX、ENTITY.DETAIL 由外環直接抽取，不會發工單）→ 處置 `UNSUPPORTED`。
-會查 oracleMCP 的委派同時 ≤3；Oracle 連線由你在第 0 步建立（照你 system prompt 的第 0 步，比 read 工單更早）；
-BLOCKED(NOT_CONNECTED) 只重連重派一次。
+會查 oracleMCP 的委派同時 ≤3；派之前不必連線（連線由 oracleMCP 的設定決定，沒有 connect 可呼叫）；
+BLOCKED(NOT_CONNECTED) 只重派一次。
 
 ## 3. 收據（唯一可寫；路徑照工單「## 輸出」）
 
@@ -2403,8 +2439,7 @@ BLOCKED(NOT_CONNECTED) 只重連重派一次。
 - 本指令**不是研究模式**：不讀 checklist、不從未勾項續跑、不寫 checklist／90-audit／log／NN／wiki。
 - **必須** read 工單列出的 NN 節（系統提示的「不回讀已完成 NN」在此不適用）——補研究就是要知道既有寫了什麼。
 - 寫收據用整檔 write，寫完 read 回來確認三張表都在，再結束。最終回覆只准一行：「已寫 <收據路徑>」。
-- 不得反問、不得婉拒、不得先輸出計畫；第 0 步（Oracle 連線）照你 system prompt 先做，接著就 read 工單
-  （兩者之間不做別的事）。
+- 不得反問、不得婉拒、不得先輸出計畫；第一個動作就是 read 工單（不必先連線）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/supplemental-contract.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/test-fixtures.yaml|355|193656cae454115ed68731005fbfd64b8dee4446037ee632e545b50e8a940536|0
 # =============================================================================
@@ -2763,7 +2798,7 @@ employeeNameSync:
     客製證據只涵蓋同步觸發與寫入 HR_NAME_SYNC；
     姓名原始欄位定義需查 PERSONAL_DATA（delivered fallback，使用時必須回報）。
 @@@PSBUNDLE-END|.opencode/peoplesoft/test-fixtures.yaml
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/test-scenarios.md|733|186049455efc2c610ea2fc82d3d05f7f636780f4fcf493153530875d09473da9|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/test-scenarios.md|737|32162800e47d6d394fb63f12699fb8e24ae481183b4f7a96d4052a84f05d212e|0
 # PeopleSoft Skills 測試情境（本地模型準確度驗收）
 
 用來測試本地模型（目標：Qwen3.6-35B-A3B，262K——MoE active ~3B，
@@ -3439,42 +3474,46 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
   改為檢查「先 COUNT、只回 metadata」。語意搜尋類仍需 mock 或等 UI
   Semantic Index 上線。
 
-## 7. oracleMCP 連線擁有權（issue #28；只能在公司機跑，手動）
+## 7. oracleMCP 查詢與連線（只能在公司機跑，手動）
 
-前置：主 agent 的 opencode.json 對 `oracleMCP_connect` 為 allow；`/mcp` 清單有 oracleMCP；profile `oracle.connectionName` 已回填（實際連得上的名字、原樣）。第 0 步＝直接 connect 這個名字，不先 list_connections、不從清單挑名字（清單把名稱與連線字串黏在一起，會讀錯）；agent tools 表逐工具明寫、不用 `oracleMCP_*` 萬用字元 deny 再開個別工具。**沒有派工前置閘門**：順序是 agent 規則，subagent 回 NOT_CONNECTED 由主 agent 重連、重派一次。
+前置：opencode.json 的 `mcp.oracleMCP` 是 @vdeserto/oracle-mcp-server，`environment` 設好 ORACLE_USER（唯讀帳號）／ORACLE_PASSWORD／
+ORACLE_CONNECTION_STRING（SOP-21）；`/mcp` 清單有 oracleMCP；profile `oracle.currentSchema` 已回填。沒有 connect 步驟：主 agent 不呼叫 oracleMCP，
+查詢只由 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor 以 `oracleMCP_oracle_execute_query` 做；agent tools 表逐工具明寫、不用
+`oracleMCP_*` 萬用字元 deny 再開個別工具。**沒有派工前置閘門**：subagent 回 NOT_CONNECTED 由主 agent 重派一次。
 
 | # | 情境 | 操作 | 預期訊號 |
 |---|---|---|---|
-| R0 | 工具可見性 | 問主 agent「列出所有名稱含 oracleMCP 的工具全名」 | 看到 connect 與 list_connections；看不到 sql_run／disconnect／sqlcl_run。只看到 connect＝tools 表拼法對不上；兩個都看不到（模型說「沒有掛載」）＝tools 表用了 `oracleMCP_*` 萬用字元 deny（R23）或掛載故障（R38） |
-| R1 | 冷啟動問答 | 新 session，問一題需 DB 的問題 | 主 agent 開場即 connect（connection_name＝profile 值原樣；在任何委派之前、不先 list），等回覆成功再派 subagent；subagent 第一個 SELECT 直接成功；答案含 SQL 證據 |
-| R2 | 冷啟動研究 | `/ps-research <領域>` 新 session | deep-research 派第一個 oracleMCP 類委派前 connect 一次；不出現 NOT_CONNECTED |
-| R3 | 連線中途斷 | 對話中手動 disconnect（管理者 session）再問 DB 題 | subagent 回 BLOCKED(NOT_CONNECTED) → 主 agent connect → 重派（只一次）→ 成功；使用者看不到「沒有連線」 |
-| R4 | 併發 | 一題觸發 ≥2 個 DB 委派 | 只有主 agent connect 一次；subagent 端零 connect／disconnect 呼叫 |
-| R5 | 連線建不起來 | 停掉 SQLcl 端再問 | 主 agent connect 兩次都失敗 → list_connections 一次、把清單原文附在答覆、回「DB 連線建立失敗（原因）」；不說「通道忙碌」、不自己換名字重連 |
+| R0 | 工具可見性 | 問主 agent「列出所有名稱含 oracleMCP 的工具全名」 | 主 agent 一個都看不到（五個工具全關）；派 ps-ui-flow 問同一句只看到 `oracleMCP_oracle_execute_query`。ps-ui-flow 也看不到＝tools 表拼法對不上、用了 `oracleMCP_*` 萬用字元 deny（R23）或掛載故障（R38） |
+| R1 | 冷啟動問答 | 新 session，問一題需 DB 的問題 | 主 agent 零 oracleMCP 呼叫、直接派 subagent；subagent 第一個 SELECT 帶 `<currentSchema>.` 前綴與 limit、直接成功；答案含 SQL 證據 |
+| R2 | 冷啟動研究 | `/ps-research <領域>` 新 session | deep-research 零 oracleMCP 呼叫；DB 委派不出現 NOT_CONNECTED |
+| R3 | DB 連不上 | 把 opencode.json 的 ORACLE_CONNECTION_STRING 暫改成錯的服務名、重開 OpenCode 再問 DB 題 | subagent 回 `Error: Database query failed.`、`SELECT 1 AS OK FROM DUAL` 也失敗 → BLOCKED(NOT_CONNECTED) → 主 agent 重派一次 → 仍 NOT_CONNECTED → 回「DB 連線失敗（Error 原文）」、請管理者依 SOP-21 檢查；不說「通道忙碌」；改回後恢復 |
+| R4 | 併發 | 一題觸發 ≥2 個 DB 委派 | 各 subagent 各自查詢成功；沒有任何 connect／disconnect 呼叫（工具不存在） |
+| R5 | 帳密錯誤 | ORACLE_PASSWORD 暫改錯、重開 OpenCode 再問 DB 題 | 同 R3 的路徑與答覆；改回後恢復 |
 | R6 | schema 未回填 | profile currentSchema=FILL_ME 時查 PeopleTools 表 | blockedReason=SCHEMA_UNRESOLVED，答覆說「currentSchema 未回填」 |
-| R43 | 唯讀帳號表名前綴 | agent 用唯讀帳號（不能 ALTER SESSION、沒有同義字）、profile currentSchema 已填，問一題要查 PSXLATITEM 的選項題 | subagent 的 sql_run 每個表名都是 `<currentSchema>.表名`、零 ALTER SESSION；漏帶前綴撞 ORA-00942 時補齊重發一次就成功；報告 COMPLETE |
+| R43 | 唯讀帳號表名前綴 | agent 用唯讀帳號（不能 ALTER SESSION、沒有同義字）、profile currentSchema 已填，問一題要查 PSXLATITEM 的選項題 | subagent 的 oracle_execute_query 每個表名都是 `<currentSchema>.表名`、零 ALTER SESSION；漏帶前綴回 `Error: Table or view does not exist.` 時補齊重發一次就成功；報告 COMPLETE |
+| R44 | SQL 形狀 | 問一題要查 §2e、§2l 或 §2k-C 的題目，看 subagent 送出的 SQL（session transcript） | 一次一句、沒有分號與註解、`:參數` 已換成實際值、帶 limit、輸出欄名不重複；被 server 擋（葡萄牙文 Error）時照 cookbook 規則 7b 改好重送一次成功；回滿 limit 時照該節分批續查 |
 | R7 | 轉譯 | 上述各種 BLOCKED | orchestrator 依 blockedReason 用對應句型；NOT_CONNECTED 不會直接出現在對使用者的答覆；ORACLE_MCP_DOWN → 「oracleMCP 工具目前不可用（掛載故障，請管理者重掛）」 |
-| R8 | 無條件 | 問一題完全不需要 DB 的問題（例如純 PeopleCode 流程） | 主 agent 仍在開場 connect（第一個 oracleMCP 呼叫就是 connect，且在第一個 task 之前；零 list_connections）；答覆不受影響 |
+| R8 | 不需要 DB 的題 | 問一題完全不需要 DB 的問題（例如純 PeopleCode 流程） | 零 oracleMCP 呼叫、零 invalid 列；答覆不受影響 |
 
-### 7a. 執行期 guard、MCP 掛載故障與路由邊界（issue #30／#31／#32；plugin `.opencode/plugin/ps-runtime-guard.js`）
+### 7a. 執行期 guard、MCP 掛載故障與路由邊界（plugin `.opencode/plugin/ps-runtime-guard.js`）
 
-沒有派工閘門可驗（issue #30 已移除）：判定看 guard 的紀錄 `auto-loop-logs\ps-runtime-guard\<sessionID>.jsonl` 與主機診斷 `_mcp-diag.jsonl`（不看 prompt）；沙箱已用真 OpenCode 1.18.29＋假 oracleMCP（含工具目錄變空、transport 關閉兩種故障注入）＋假模型跑過 13 情境（`tests/runtime-guard/run-e2e.mjs`）。guard 做什麼／不做什麼、人工恢復 SOP、診斷欄位見 SOP-21。
+沒有派工閘門可驗：判定看 guard 的紀錄 `auto-loop-logs\ps-runtime-guard\<sessionID>.jsonl` 與主機診斷 `_mcp-diag.jsonl`（不看 prompt）；沙箱已用真 OpenCode 1.18.29＋假 oracleMCP（含工具目錄變空、transport 關閉兩種故障注入）＋假模型跑過（`tests/runtime-guard/run-e2e.mjs`）。guard 做什麼／不做什麼、人工恢復 SOP、診斷欄位見 SOP-21。
 
 | # | 情境 | 操作 | 預期訊號 |
 |---|---|---|---|
-| R30 | 舊 plugin 不再載入 | 搬完後開任一 session | `ps-fs-doctor` 沒有 R；`_plugin.log` 的 loaded 行是 ps-runtime-guard（connectGuard=enforce、autoRecover=off、wildcardDenyMix=[]）；`auto-loop-logs\ps-oracle-gate\` 不再長新檔；session jsonl 沒有 state／next／turnId 欄位、沒有 synthetic 提醒 part |
-| R31 | 先派後連（不擋） | 新 session 問 DB 題，模型若先派 task | task 不會被擋；subagent 回 NOT_CONNECTED（jsonl after task notConnected=true）→ 主 agent connect 一次 → 重派一次 → COMPLETE；`-AnalyzeSession` 的 reconnects=1、reconnectLoops=0；第二次仍 NOT_CONNECTED → 回報「DB 連線建立失敗」、不再重派（reconnectLoops 必為 0） |
-| R32 | 連線名設定錯誤 | 把 profile `oracle.connectionName` 暫改成 SQLcl 沒有的名字（或不填）再問一題 | 主 agent 照 profile 值 connect、SQLcl 回錯、再一次仍錯 → list 一次附原文、回「DB 連線建立失敗」；模型若改用別的名字 connect → jsonl before connect `decision=block`、note=`ORACLE_CONNECTION_MISMATCH`（未填則 `NOT_CONFIGURED`）、沒有 after 列、SQLcl 沒收到；模型回報「Oracle 連線未設定／連線名不一致」、不派 DB 委派；改回後恢復 |
-| R33 | 工具可見性（允許清單） | 問主 agent「列出所有名稱含 oracleMCP 的工具全名」；再讓它派 ps-ui-flow 問同一句 | 主 agent：只有 `oracleMCP_list_connections`、`oracleMCP_connect`；ps-ui-flow：只有 `oracleMCP_sql_run`；`_plugin.log` wildcardDenyMix=[] |
-| R34 | 正向驗收反例 | 故意讓 subagent 回 BLOCKED（例如暫時把 profile currentSchema 改壞 → SCHEMA_UNRESOLVED）或非契約 JSON，再 `-AnalyzeSession <id>` | dbTasksCompleted=0、dbTasksBlocked／dbTasksInvalid ≥ 1（完成＝報告 COMPLETE 且子 session sql_run 成功，宣稱不算；空報告、非法 JSON 不算） |
-| R35 | 一開多用 | 主 agent 開線後連派三個 DB 委派（固定探測 SELECT 1 FROM DUAL） | 三個子 session 的 jsonl 各有 `sql_run` after 列 `ok:true`；任一結束不影響其餘；`-AnalyzeSession` 的 dbTasksCompleted=3 |
-| R36 | skill 名誤派 | 在題目裡誘導「請用 ps-security-flow 查授權」 | transcript 該 task 件是 error、含 `PS_TASK_TARGET_INVALID`、`ps-metadata-flow`、`skills/ps-security-flow/SKILL.md`，不含 ORACLE_MCP_DOWN；模型改派 ps-metadata-flow（task 文字指定讀該 SKILL.md）並完成；jsonl before task `decision=block`、note=`PS_TASK_TARGET_INVALID:skill`、carrier=ps-metadata-flow；沒有多 connect、沒有 recovery 列；`-AnalyzeAll` routingBlocks 計數 |
-| R37 | suggestedNext 無效目標 | 沙箱已驗（suggested-skill）；公司機看 `-AnalyzeAll` 的 suggestedNextInvalid | task 回覆末尾出現 `[ps-runtime-guard] 報告的 suggestedNext 含無效委派目標…改派 ps-metadata-flow`；主 agent 依註記改派，從未派 ps-security-flow；不 connect、不重掛 |
-| R38 | 工具消失（診斷） | 前一題正常，下一題主／子 agent 都看不到 oracleMCP 工具（同視窗 /new 仍失敗） | `_mcp-diag.jsonl`：event（mcp.tools.changed）、snapshot（runtimeStatus=failed＋statusError，或 connected＋catalog suspect）、invalid-tool（seenBefore=true、allowedByAgent=true）、recovery decision=would-remount；session jsonl 的 invalid 列；模型回報 ORACLE_MCP_DOWN、不猜名、不 connect、不重派（`-AnalyzeSession` downThenConnect=0、downThenRedispatch=0） |
-| R39 | 人工恢復 | 依 SOP-21 步驟 4：該視窗 /mcps → oracleMCP → disconnect → connect | 工具恢復（R33）→ 主 agent connect profile 目標 → subagent SELECT 1 FROM DUAL 成功 → 再繼續業務查詢；只重派未完成的唯讀工作一次；另一視窗全程不受影響；`_mcp-diag.jsonl` 沒有 remount-*（auto off） |
-| R40 | 受控自動重掛 | 只在 SOP-21 步驟 6 驗證通過後 `oracle.mcpAutoRecover: on`，再重現 R38 | `_mcp-diag.jsonl`：remount-start → remount-ok（gen=1）→ verified-by-call；下一題第一個 oracleMCP 回覆附「已重掛（恢復世代 1）…重新 connect…SELECT 1 FROM DUAL」註記，主 agent 照做；多個 agent 同時報錯只一次（merged）；remount-failed／suppressed 出現＝停止，走 R39；另一視窗沒有 recovery 列 |
-| R41 | 權限過濾不重掛 | 誘導主 agent（tools 表 sql_run false）呼叫 oracleMCP_sql_run | session jsonl invalid 列 `allowedByAgent=false`、note 含 permission-filtered；`_mcp-diag.jsonl` 沒有 recovery 候選；模型改派 subagent |
-| R42 | Topology 實驗 | SOP-21 步驟 8(e)／原 T1～T3：兩個 opencode 行程（A 已 connect，B 用 build agent 不 connect 直接 sql_run `SELECT SYS_CONTEXT('USERENV','DB_NAME') FROM DUAL`）；同一行程 /new 第二個 session；記 oracleMCP type、同名再 connect 的回覆、B 換連線名後 A 查到的 DB_NAME | 三組結果回報維護 session、寫回 SOP-12——共用連線防護依結果另案設計 |
+| R30 | 舊 plugin 不再載入 | 搬完後開任一 session | `ps-fs-doctor` 沒有 R；`_plugin.log` 的 loaded 行是 ps-runtime-guard（autoRecover=off、wildcardDenyMix=[]，沒有 connectGuard）；`auto-loop-logs\ps-oracle-gate\` 不再長新檔；session jsonl 沒有 state／next／turnId 欄位、沒有 synthetic 提醒 part |
+| R31 | 重派上限 | R3／R5 時跑 `-AnalyzeSession <id>` | notConnectedReports ≥ 1、redispatchLoops=0（NOT_CONNECTED 之後至多重派一次）；第二次仍 NOT_CONNECTED → 回報「DB 連線失敗」、不再派會查 DB 的委派 |
+| R32 | 舊工具名不殘留 | 新 session 問 DB 題 | jsonl 沒有 `oracleMCP_connect`／`oracleMCP_list_connections`／`oracleMCP_sql_run` 的 before 或 invalid 列（模型沒有憑記憶呼叫舊工具）；有＝搬運不完整（agent／cookbook 還是舊版），先跑 ps-fs-doctor |
+| R33 | 工具可見性（允許清單） | 問主 agent「列出所有名稱含 oracleMCP 的工具全名」；再讓它派 ps-ui-flow 問同一句 | 主 agent：沒有任何 oracleMCP_ 工具；ps-ui-flow：只有 `oracleMCP_oracle_execute_query`；`_plugin.log` wildcardDenyMix=[] |
+| R34 | 正向驗收反例 | 故意讓 subagent 回 BLOCKED（例如暫時把 profile currentSchema 改壞 → SCHEMA_UNRESOLVED）或非契約 JSON，再 `-AnalyzeSession <id>` | dbTasksCompleted=0、dbTasksBlocked／dbTasksInvalid ≥ 1（完成＝報告 COMPLETE 且子 session oracle_execute_query 成功，宣稱不算；空報告、非法 JSON 不算） |
+| R35 | 多個委派同時查 | 主 agent 連派三個 DB 委派（固定探測 SELECT 1 AS OK FROM DUAL） | 三個子 session 的 jsonl 各有 `oracleMCP_oracle_execute_query` after 列 `ok:true`；任一結束不影響其餘；`-AnalyzeSession` 的 dbTasksCompleted=3 |
+| R36 | skill 名誤派 | 在題目裡誘導「請用 ps-security-flow 查授權」 | transcript 該 task 件是 error、含 `PS_TASK_TARGET_INVALID`、`ps-metadata-flow`、`skills/ps-security-flow/SKILL.md`，不含 ORACLE_MCP_DOWN；模型改派 ps-metadata-flow（task 文字指定讀該 SKILL.md）並完成；jsonl before task `decision=block`、note=`PS_TASK_TARGET_INVALID:skill`、carrier=ps-metadata-flow；沒有 recovery 列；`-AnalyzeAll` routingBlocks 計數 |
+| R37 | suggestedNext 無效目標 | 沙箱已驗（suggested-skill）；公司機看 `-AnalyzeAll` 的 suggestedNextInvalid | task 回覆末尾出現 `[ps-runtime-guard] 報告的 suggestedNext 含無效委派目標…改派 ps-metadata-flow`；主 agent 依註記改派，從未派 ps-security-flow；不重掛 |
+| R38 | 工具消失（診斷） | 前一題正常，下一題 subagent 看不到 oracleMCP 工具（同視窗 /new 仍失敗） | `_mcp-diag.jsonl`：event（mcp.tools.changed）、snapshot（runtimeStatus=failed＋statusError，或 connected＋catalog suspect）、invalid-tool（seenBefore=true、allowedByAgent=true）、recovery decision=would-remount；session jsonl 的 invalid 列；subagent 回報 ORACLE_MCP_DOWN、不猜名、主 agent 不重派（`-AnalyzeSession` downThenRedispatch=0） |
+| R39 | 人工恢復 | 依 SOP-21 步驟 4：該視窗 /mcps → oracleMCP → disconnect → connect | 工具恢復（R33）→ subagent SELECT 1 AS OK FROM DUAL 成功 → 再繼續業務查詢；只重派未完成的唯讀工作一次；另一視窗全程不受影響；`_mcp-diag.jsonl` 沒有 remount-*（auto off） |
+| R40 | 受控自動重掛 | 只在 SOP-21 步驟 6 驗證通過後 `oracle.mcpAutoRecover: on`，再重現 R38 | `_mcp-diag.jsonl`：remount-start → remount-ok（gen=1）→ verified-by-call；下一題第一個 oracleMCP 回覆附「已重掛（恢復世代 1）…SELECT 1 AS OK FROM DUAL」註記，subagent 照做；多個 agent 同時報錯只一次（merged）；remount-failed／suppressed 出現＝停止，走 R39；另一視窗沒有 recovery 列 |
+| R41 | 權限過濾不重掛 | 誘導主 agent（oracleMCP 工具全關）呼叫 oracleMCP_oracle_execute_query | session jsonl invalid 列 `allowedByAgent=false`、note 含 permission-filtered；`_mcp-diag.jsonl` 沒有 recovery 候選；模型改派 subagent |
+| R42 | 兩個視窗同時查 | 兩個 opencode 行程各問一題 DB 題（重疊時間） | 兩邊都成功（每個行程有自己的 oracleMCP 與連線池，互不斷線）；結果寫回 SOP-12 |
 
 ### 7b. 知識索引／補研究／Spec（issue #33～#36；公司機手動，只回報 PASS／FAIL、結論碼、enum）
 
@@ -3498,19 +3537,17 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 | P6 | 機密邊界 | 任何回報 | 只回報結論碼與 drill tuple（opaque id、factKind、模式、計數、enum）；不貼 spec.md、不貼 pack.json、不貼 NN 內容 |
 | D1 | 兩版同時跑 | 同一資料夾：Claude Code 版 `ps-sdoc.ps1 -Components …` 跑著時，另一個視窗跑 `ps-sdoc.ps1 -Cli opencode -Components …` | 兩邊都開得了 session（OpenCode 版沒有 DOC1-3-03）；同一版再開第二個外環才 DOC1-3-03 |
 @@@PSBUNDLE-END|.opencode/peoplesoft/test-scenarios.md
-@@@PSBUNDLE-FILE|.opencode/plugin/ps-runtime-guard.js|813|c128f486f3b5077b94483438dd7e4f95944953344fb2cbda8fb42d7327550be4|0
-// ps-runtime-guard.js — OpenCode plugin：三件小事，沒有派工閘門、沒有 READY／todo 狀態機
+@@@PSBUNDLE-FILE|.opencode/plugin/ps-runtime-guard.js|749|fcc0657970e4b57986fd379cfa44e46d69f1cb1dd5a8b917d84108e125d0953d|0
+// ps-runtime-guard.js — OpenCode plugin：兩件小事，沒有派工閘門、沒有 READY／todo 狀態機
 //
-// (1) Oracle connect 目標 guard（無狀態）：oracleMCP_connect 執行前只比對「本次呼叫的 connection_name」與 profile
-//     oracle.connectionName：未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；不一致 → ORACLE_CONNECTION_MISMATCH。
-//     擋＝throw（工具不執行、不改參數；模型收到錯誤碼與下一步）。不保存 READY／turnId／連線世代、不查 task 能力、
-//     不代模型 connect、不拿回覆文字決定能不能派工。這是參數限制，不是前置閘門。
-//     env PS_ORACLE_CONNECT_GUARD=observe 或 profile oracle.connectGuard: observe → 只記錄不擋（enforce 為預設）。
-// (2) task 目標檢查（無狀態）：subagent_type 是 .opencode/skills/<名>/SKILL.md 而不是 .opencode/agent/<名>.md
+// oracleMCP＝@vdeserto/oracle-mcp-server（唯讀；連線由 opencode.json 的 environment 決定，沒有 connect／disconnect 工具）。
+// 查詢工具 oracleMCP_oracle_execute_query；其餘 oracle_list_schemas／list_tables／describe_table／get_table_data 一律由 agent 的 tools 表關閉。
+//
+// (1) task 目標檢查（無狀態）：subagent_type 是 .opencode/skills/<名>/SKILL.md 而不是 .opencode/agent/<名>.md
 //     → PS_TASK_TARGET_INVALID（throw；訊息指出承載 agent：ps-security-flow／ps-data-lineage／ps-process-flow → ps-metadata-flow；
 //     主 agent 自讀的 skill 不委派）。task 的 after：報告 suggestedNext[].agent 是 skill 名或不存在的 agent → 在工具輸出末尾
-//     附一行驗證註記（報告本文不動、不轉發）。這是路由錯誤，訊息不提 ORACLE_MCP_DOWN、不引發 connect 或重掛。
-// (3) oracleMCP 診斷（觀察，不參與任何派工決策）：
+//     附一行驗證註記（報告本文不動、不轉發）。這是路由錯誤，訊息不提 ORACLE_MCP_DOWN、不引發重掛。
+// (2) oracleMCP 診斷（觀察，不參與任何派工決策）：
 //     - session 紀錄 <專案>/auto-loop-logs/ps-runtime-guard/<sessionID>.jsonl：chat.message（訊息 id、agent）、oracleMCP_* 的
 //       before／after（ok 三態＝回覆文字的事實，不是連線有效性證明）、task 的 before／after（target、dbCapable、報告
 //       status／blockedReason／childSessionID、suggestedNext 驗證）、invalid（模型呼叫了它看不到的工具名）。
@@ -3521,8 +3558,8 @@ context 紀律。任何一題觸發 [致命] 都代表規則層有洞，先修 S
 //       /mcp 狀態 failed（transport 關閉），或 tools.changed 之後某個先前執行過的 oracleMCP_ 工具對允許它的 agent 變成不可見
 //       （OpenCode 把呼叫改判成 invalid）；LLM 的 ORACLE_MCP_DOWN 字串不算證據。同一故障事件只重掛一次；有 oracleMCP_ 呼叫在途
 //       先等（有界）；disabled／needs_auth／needs_client_registration 不重掛；一次失敗即停（人工 SOP）；每列帶恢復世代，
-//       舊掛載上的回覆不推翻新恢復；恢復後在下一次 oracleMCP_／task 回覆附註「已重掛，舊 DB 連線與 schema 不再有效」——
-//       plugin 拿不到「呼叫工具」的 API，profile 目標 connect 與 SELECT 1 FROM DUAL 的驗證由主 agent／subagent 做。
+//       舊掛載上的回覆不推翻新恢復；恢復後在下一次 oracleMCP_／task 回覆附註「已重掛，重掛前的結論不再有效」——
+//       plugin 拿不到「呼叫工具」的 API，SELECT 1 AS OK FROM DUAL 的驗證由查詢 subagent 做。
 //       off 時同樣判定、只記 would-remount（診斷先行）。
 //     整個 tools 表混寫「oracleMCP_* 萬用字元 deny＋個別 true」的 agent 在載入時記 WARN（某些版本會把整個 MCP 對它隱藏）。
 //
@@ -3534,8 +3571,7 @@ import path from "node:path"
 
 const MCP_NAME = "oracleMCP"
 const MCP_PREFIX = MCP_NAME + "_"
-const TOOL_CONNECT = MCP_PREFIX + "connect"
-const TOOL_SQL_RUN = MCP_PREFIX + "sql_run"
+const TOOL_QUERY = MCP_PREFIX + "oracle_execute_query"
 const TOOL_TASK = "task"
 const TOOL_INVALID = "invalid"
 const CODE_TARGET = "PS_TASK_TARGET_INVALID"
@@ -3560,8 +3596,8 @@ const REMOUNT_DEFER_MAX_MS = msEnv("PS_GUARD_REMOUNT_DEFER_MAX_MS", 60000)
 const REMOUNT_POLL_MS = msEnv("PS_GUARD_REMOUNT_POLL_MS", 1000)
 const REMOUNT_VERIFY_MS = msEnv("PS_GUARD_REMOUNT_VERIFY_MS", 10000)
 
-// connect／sql_run 回傳文字若命中以下樣式，記為 ok:false（只是紀錄，不驅動任何狀態）。
-// 不列 ORA-nnnnn：SQLcl connect 成功的回覆帶說明文字、裡面引用 ORA-nnnnn（公司機實測）。
+// oracleMCP 回傳文字若命中以下樣式，記為 ok:false（只是紀錄，不驅動任何狀態）。
+// 這個 server 的錯誤一律以「Error:」開頭（含 SQL 檢查不過的拒絕訊息）；不列 ORA-nnnnn（server 不轉發原始 ORA 訊息）。
 const FAILURE_PATTERNS = [
   /\bconnection not (?:connected|established|found)\b/i,
   /\bTNS-\d{5}\b/,
@@ -3652,7 +3688,7 @@ function loadAgentCatalog(directory) {
       const tools = parseToolsMap(fm)
       catalog.set(file.slice(0, -3), {
         mode: frontmatterValue(fm, "mode") ?? "all",
-        db: toolEnabled(tools, TOOL_SQL_RUN),
+        db: toolEnabled(tools, TOOL_QUERY),
         tools,
         wildcardDenyMix: wildcardDenyMix(tools),
       })
@@ -3706,7 +3742,6 @@ function readSwitch(directory, envName, profileKey, values, fallback) {
   if (values.includes(v)) return v
   return fallback
 }
-const readConnectGuard = (d) => readSwitch(d, "PS_ORACLE_CONNECT_GUARD", "connectGuard", ["enforce", "observe"], "enforce")
 const readAutoRecover = (d) => readSwitch(d, "PS_ORACLE_MCP_AUTO_RECOVER", "mcpAutoRecover", ["on", "off"], "off")
 const readDiag = (d) => readSwitch(d, "PS_ORACLE_MCP_DIAG", "mcpDiag", ["on", "off"], "on")
 
@@ -3775,52 +3810,6 @@ function parseReport(text) {
   return { valid: false, status: "INVALID", blockedReason: undefined, taskState, taskId, suggestedNext: [] }
 }
 
-function connectionNameOf(args) {
-  if (!args || typeof args !== "object") return undefined
-  for (const k of ["connection_name", "connectionName", "name", "connection"]) {
-    if (typeof args[k] === "string" && args[k].trim()) return args[k].trim()
-  }
-  return undefined
-}
-
-function profileUnset(profileName) {
-  return !profileName || profileName.toUpperCase() === "FILL_ME"
-}
-
-// connect 的目標檢查：回 undefined＝可以執行；否則回 { code, message }
-function connectProblem(profileName, target) {
-  const tail =
-    "模型：不要猜、不要從 list_connections 的清單挑名字（清單把名稱和連線字串黏在一起）；本題不派會查 DB 的委派，" +
-    "向使用者回報「Oracle 連線未設定／連線名不一致（profile oracle.connectionName＝<值>）」，其餘部分照常作答。這不是 oracleMCP 掛載故障，不要重掛。"
-  if (profileUnset(profileName)) {
-    return {
-      code: "ORACLE_CONNECTION_NOT_CONFIGURED",
-      message:
-        `ORACLE_CONNECTION_NOT_CONFIGURED：本次 oracleMCP_connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。profile oracle.connectionName 未填` +
-        `（目前＝${profileName || "空"}）——請管理者在 .opencode/peoplesoft/customization-profile.yaml 回填 SQLcl 已儲存連線名（實際連得上的那個名字）。` +
-        tail,
-    }
-  }
-  if (!target) {
-    return {
-      code: "ORACLE_CONNECTION_MISMATCH",
-      message:
-        `ORACLE_CONNECTION_MISMATCH：本次 oracleMCP_connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。呼叫沒有帶 connection_name；` +
-        `只准連 profile oracle.connectionName 指定的「${profileName}」——用 connection_name＝「${profileName}」重新呼叫。`,
-    }
-  }
-  if (target !== profileName) {
-    return {
-      code: "ORACLE_CONNECTION_MISMATCH",
-      message:
-        `ORACLE_CONNECTION_MISMATCH：本次 oracleMCP_connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。connect 目標「${target}」≠ profile oracle.connectionName「${profileName}」。` +
-        `只准連 profile 指定的連線：用 connection_name＝「${profileName}」原樣重新呼叫 connect。` +
-        tail,
-    }
-  }
-  return undefined
-}
-
 function targetProblem(target, agentNames, skillNames) {
   if (!target || agentNames.has(target) || BUILTIN_AGENTS.has(target)) return undefined
   if (!skillNames.has(target)) return undefined
@@ -3841,7 +3830,7 @@ function targetProblem(target, agentNames, skillNames) {
     message:
       `${CODE_TARGET}：本次 task 未執行——「${target}」是 skill（${where}），不是可委派的 agent。` +
       next +
-      "這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要 connect、不要重掛 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。",
+      "這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要重掛 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。",
   }
 }
 
@@ -3938,7 +3927,7 @@ export const PsRuntimeGuard = async (input) => {
   function classifyTarget(target) {
     const entry = fresh().get(target)
     if (!entry) return { db: true, basis: "unknown-agent(default:DB)" }
-    return { db: entry.db, basis: entry.db ? "sql_run:enabled" : "sql_run:disabled" }
+    return { db: entry.db, basis: entry.db ? "execute_query:enabled" : "execute_query:disabled" }
   }
 
   function agentAllows(agent, tool) {
@@ -4103,7 +4092,7 @@ export const PsRuntimeGuard = async (input) => {
       recovery.phase = "recovered-unverified"
       recovery.catalogSuspect = false
       recovery.noticeGen = gen
-      diag({ ...base, decision: "remount-ok", faultId: recovery.faultId, gen, ms: Date.now() - t0, disconnect: d.ok, connect: c.ok, runtimeStatus: st.status, verify: "tools restored is verified by the next executed oracleMCP_ call; DB verification (connect to the profile target, then SELECT 1 FROM DUAL) is the agents' job" })
+      diag({ ...base, decision: "remount-ok", faultId: recovery.faultId, gen, ms: Date.now() - t0, disconnect: d.ok, connect: c.ok, runtimeStatus: st.status, verify: "tools restored is verified by the next executed oracleMCP_ call; DB verification (SELECT 1 AS OK FROM DUAL) is the query subagents' job" })
     } else {
       recovery.phase = "failed"
       diag({ ...base, decision: "remount-failed", faultId: recovery.faultId, gen, ms: Date.now() - t0, disconnect: d.ok, connect: c.ok, connectError: c.error, runtimeStatus: st.status, statusError: st.error, note: "stopping after one attempt; follow the manual SOP" })
@@ -4112,8 +4101,8 @@ export const PsRuntimeGuard = async (input) => {
 
   function recoveryNotice() {
     return (
-      `\n\n[ps-runtime-guard] oracleMCP 已在本主機重掛（恢復世代 ${recovery.noticeGen}）。重掛前的 DB 連線、CURRENT_SCHEMA 設定與「已連線」結論都不再有效：` +
-      "主 agent 先 oracleMCP_connect（connection_name＝profile oracle.connectionName 原樣），再由查詢 subagent 執行 SELECT 1 FROM DUAL 確認，之後才繼續業務查詢；" +
+      `\n\n[ps-runtime-guard] oracleMCP 已在本主機重掛（恢復世代 ${recovery.noticeGen}）。重掛前的查詢結果狀態與失敗回報都不再有效：` +
+      "查詢 subagent 先以 oracleMCP_oracle_execute_query 執行 SELECT 1 AS OK FROM DUAL 確認，之後才繼續業務查詢；" +
       "只重派尚未完成的唯讀工作一次；重掛前的失敗回報不代表現況。"
     )
   }
@@ -4155,14 +4144,14 @@ export const PsRuntimeGuard = async (input) => {
   }
 
   pluginLog(
-    `loaded directory=${directory} execPath=${process.execPath} platform=${process.platform} connectGuard=${readConnectGuard(directory)} autoRecover=${readAutoRecover(directory)} diag=${readDiag(directory)} agents=${JSON.stringify(
+    `loaded directory=${directory} execPath=${process.execPath} platform=${process.platform} autoRecover=${readAutoRecover(directory)} diag=${readDiag(directory)} agents=${JSON.stringify(
       [...catalog.entries()].map(([name, v]) => `${name}:${v.db ? "DB" : "noDB"}`),
     )} skills=${JSON.stringify([...skills].sort())} wildcardDenyMix=${JSON.stringify([...catalog.entries()].filter(([, v]) => v.wildcardDenyMix).map(([name]) => name))}`,
   )
   for (const [name, v] of catalog.entries()) {
     if (v.wildcardDenyMix) pluginLog(`WARN agent ${name}: tools 表混寫 oracleMCP_* deny ＋ 個別工具 true——某些版本會把整個 MCP 對它隱藏；請逐工具明寫`)
   }
-  diag({ kind: "loaded", execPath: process.execPath, platform: process.platform, connectGuard: readConnectGuard(directory), autoRecover: readAutoRecover(directory) })
+  diag({ kind: "loaded", execPath: process.execPath, platform: process.platform, autoRecover: readAutoRecover(directory) })
 
   return {
     "chat.message": async (msg, out) => {
@@ -4253,20 +4242,6 @@ export const PsRuntimeGuard = async (input) => {
         recovery.catalogSuspect = false
         diag({ kind: "event", type: "catalog-proven", tool, note: "an oracleMCP_ call executed after the catalog refresh: tools are visible" })
       }
-      if (tool === TOOL_CONNECT) {
-        const mode = readConnectGuard(directory)
-        const profileName = String(readProfileOracle(directory).connectionName ?? "").trim()
-        const target = connectionNameOf(args)
-        const problem = connectProblem(profileName, target)
-        const head = { hook: "before", tool, callID, ...stamp(s), connection: target, profileConnection: profileName, mode }
-        if (problem && mode !== "observe") {
-          record(sessionID, { ...head, decision: "block", note: problem.code })
-          throw new Error(problem.message)
-        }
-        inflightAdd(sessionID, callID, tool)
-        record(sessionID, { ...head, decision: problem ? "observe-would-block" : "allow", note: problem ? problem.code : undefined })
-        return
-      }
       inflightAdd(sessionID, callID, tool)
       record(sessionID, { hook: "before", tool, callID, ...stamp(s), decision: "observe" })
     },
@@ -4307,7 +4282,7 @@ export const PsRuntimeGuard = async (input) => {
       const annotated = maybeAnnotate(sessionID, out)
       record(sessionID, {
         hook: "after", tool, callID, ...stamp(s), ok: r.ok, failureMatch: r.failureMatch || undefined, outputLength: r.textLength,
-        ...(tool === TOOL_CONNECT ? { connection: connectionNameOf(info?.args) } : {}), recoveryGen: recovery.gen || undefined, recoveryNotice: annotated || undefined,
+        recoveryGen: recovery.gen || undefined, recoveryNotice: annotated || undefined,
       })
     },
   }
@@ -4973,7 +4948,7 @@ dependencies of the custom root.
 - `.opencode/peoplesoft/customization-profile.yaml`
 - `.opencode/peoplesoft/mcp-tool-contracts.md`
 @@@PSBUNDLE-END|.opencode/skills/ps-process-flow/SKILL.md
-@@@PSBUNDLE-FILE|.opencode/skills/ps-security-flow/SKILL.md|84|395ff6cb6684c3a4ba6a6b1afe5cdaa4e3671b24502bcdd9204b93d3fd027ce3|0
+@@@PSBUNDLE-FILE|.opencode/skills/ps-security-flow/SKILL.md|84|2196520e09c3e9bb1c34c27d5870888aaa08d48ffdc5c2693c7bca4c59216a8e|0
 ---
 name: ps-security-flow
 description: >-
@@ -5013,7 +4988,7 @@ description: >-
 
 ```text
 Resolve access paths from metadata (cookbook §4 SELECTs over PSAUTHITEM / PSMENUITEM /
-PSROLECLASS via oracleMCP_sql_run), not from guesses based on object names.
+PSROLECLASS via oracleMCP_oracle_execute_query), not from guesses based on object names.
 
 For each access path, preserve:
 - menu, component, and page
@@ -5040,13 +5015,13 @@ CREF/folder security and runtime context — not implemented in this version,
 so answer with a gap rather than an inferred entry point.
 ```
 
-## 實際可執行的途徑（唯一可呼叫的工具是 `oracleMCP_sql_run`）
+## 實際可執行的途徑（唯一可呼叫的工具是 `oracleMCP_oracle_execute_query`）
 
 | 職責 | 現行途徑 |
 |---|---|
-| 授權鏈查證 | ps-metadata-flow 用 `oracleMCP_sql_run`，照 `oracle-query-cookbook.md` §4 的樣板（只 SELECT、有列數上限） |
+| 授權鏈查證 | ps-metadata-flow 用 `oracleMCP_oracle_execute_query`，照 `oracle-query-cookbook.md` §4 的樣板（只 SELECT、有列數上限） |
 | 物件 origin 查證 | 同一承載 agent，照 cookbook §1 |
-| 未連線 | SQL 工具回未連線 → 報告 `status: BLOCKED`、`blockedReason: NOT_CONNECTED`，不 connect、不重試 |
+| DB 連不上 | 查詢回 `Error: Database query failed.` 且 `SELECT 1 AS OK FROM DUAL` 也失敗（或回 Authentication failed／Cannot reach database）→ 報告 `status: BLOCKED`、`blockedReason: NOT_CONNECTED`，不重試（cookbook「連線與錯誤處理」） |
 | 工具清單沒有 oracleMCP_ 工具 | 報告 `blockedReason: ORACLE_MCP_DOWN`，不猜工具名（cookbook 7a） |
 
 `ps_get_security_path`／`ps_get_object_origin` 是 `mcp-tool-contracts.md` 的**協定角色**，目前**不是可呼叫的工具**——
@@ -5814,4 +5789,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|72075d48cff62b8e|4|8
+@@@PSBUNDLE-PART-END|7e86621cb27f0577|4|8

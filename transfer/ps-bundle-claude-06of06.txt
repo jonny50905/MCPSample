@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 78eef7e）第 6／6 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5cb35d7）第 6／6 份
 # 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|78eef7e|21c8777b245dacfd|6|6|5764|f28972b9ad607eb37ab26592f36fd761bd564b188baa36f6bf105c5546fcce1e
+@@@PSBUNDLE-PART|1|claude|5cb35d7|83f90a34982efa76|6|6|5764|bb91f9b266393b0d08797021fc3bf1e28b26a2928908fe238b9e810a9540388f
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|341|78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -344,10 +344,11 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-knowledge.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-oracle-runtime.ps1|470|6adfc52fc82001ac8165f6fefb23fec99bfaf4abc964ea61919a8cf73b2a775a|1
+@@@PSBUNDLE-FILE|scripts/tests/test-oracle-runtime.ps1|470|af286e5fe59f20ec31af3396aab2cd1a0b2dbc4bde0ba231fb651d0f5d876290|1
 # test-oracle-runtime.ps1 — Oracle 委派的「執行紀錄」驗收（公司機；PowerShell 5.1 可跑）
-# 目的：不是看 prompt 文字，而是看每個 session 真正發生的事——DB 委派是否真的查到 DB（合法報告＋子 session 有成功的 sql_run）、
-#       NOT_CONNECTED 是否只重連重派一次、工具不可用時有沒有多 connect／重派、路由錯誤有沒有被擋。沒有「READY 順序」「todo 順序」判定。
+# 目的：不是看 prompt 文字，而是看每個 session 真正發生的事——DB 委派是否真的查到 DB（合法報告＋子 session 有成功的 oracle_execute_query）、
+#       NOT_CONNECTED 之後是否只重派一次、工具不可用時有沒有重派、路由錯誤有沒有被擋。沒有「READY 順序」「todo 順序」判定。
+#       oracleMCP＝@vdeserto/oracle-mcp-server：沒有 connect；連線由 MCP 設定決定。
 # 資料來源：ps-runtime-guard 的紀錄 auto-loop-logs\ps-runtime-guard\<sessionID>.jsonl（每筆 hook 事件一行）、
 #           主機診斷 auto-loop-logs\ps-runtime-guard\_mcp-diag.jsonl（掛載事件／快照／重掛），
 #           並用 opencode export <sessionID> 的正式 transcript 交叉比對 task 件數、真實題目 id、每個 task 所屬的題目（hook 覆蓋率）。
@@ -364,18 +365,18 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
 #   hookMismatch（guard 看到的 task 次數 ≠ transcript 的 task 件數）＝ 0（task hook 覆蓋率 100%）
 #   turnMismatch（transcript 裡的真實 user 訊息——有非 synthetic 的 text／file／agent／subtask part——找不到同 id 的 chat.message）＝ 0
 #   callMismatch（同一 callID 的 before／after 列 messageID 不一致，或 transcript 裡該 task 所屬的 user 訊息 id ≠ before 列的 messageID）＝ 0
-#   reconnectLoops（同一題內 subagent 回 NOT_CONNECTED 之後 connect 超過 1 次，或重連後又重派超過 1 次）＝ 0（至多重連＋重派一次）
-#   downThenConnect／downThenRedispatch（同一題內 subagent 回 ORACLE_MCP_DOWN 之後主 agent 又 connect／又派會查 DB 的 task）＝ 0
+#   redispatchLoops（同一題內：NOT_CONNECTED → 重派 → 又 NOT_CONNECTED 之後，主 agent 還派會查 DB 的 task）＝ 0（至多重派一輪）
+#   downThenRedispatch（同一題內 subagent 回 ORACLE_MCP_DOWN 之後主 agent 又派會查 DB 的 task）＝ 0
 #   另：export 失敗（exportFailures）與 run 結束碼非 0／逾時（runsWithBadExit）也判 FAIL——否則覆蓋率判定是空的
 #   可用（依情境；-ExpectDbTask 覆寫）：
 #   Yes（B1 預設）＝每個 session 至少 1 個「完成」的 DB task：子 agent 報告 status=COMPLETE，且其子 session 的紀錄裡至少一個
-#     oracleMCP_sql_run 成功（after 列 ok=true）——只有報告宣稱成功不算、「沒回 NOT_CONNECTED」不算；BLOCKED（任何 blockedReason）、
+#     oracleMCP_oracle_execute_query 成功（after 列 ok=true）——只有報告宣稱成功不算、「沒回 NOT_CONNECTED」不算；BLOCKED（任何 blockedReason）、
 #     INVALID（非契約 JSON／task_error）都不算完成，PARTIAL 另計。零違規但零完成不算過。B1 的題目要用預期能 COMPLETE 的固定題
 #   No（B3 預設）＝0 個會查 DB 的 task 執行；Any（B2／CUSTOM／-AnalyzeAll 預設）＝不判、只列數字
-# 觀察值（不判定）：notConnectedReports（subagent 回 NOT_CONNECTED 次數＝模型錯序機率）、reconnects、downReports、
+# 觀察值（不判定）：notConnectedReports（subagent 回 NOT_CONNECTED 次數＝DB 連不上）、redispatches（NOT_CONNECTED 之後派的 DB task）、downReports、
 #   routingBlocks（task 用 skill 名當 agent 被擋：PS_TASK_TARGET_INVALID）、suggestedNextInvalid（報告建議了無效目標，guard 已附註）、
-#   connectBlocks（connect 在執行前被擋：profile 未填或目標不一致）、invalidOracleCalls（模型呼叫了看不到的 oracleMCP_ 工具）、
-#   listCalls（list_connections 呼叫數；正常為 0）、unknownResults（connect／sql_run 回空輸出）、tasksNotReturned（沒有 after 的 task）；
+#   invalidOracleCalls（模型呼叫了看不到的 oracleMCP_ 工具）、oldToolCalls（呼叫 SQLcl 時代的舊工具名 connect／list_connections／sql_run 等；正常為 0）、
+#   unknownResults（oracle_execute_query 回空輸出）、tasksNotReturned（沒有 after 的 task）；
 #   -AnalyzeAll 另印主機診斷摘要：tools.changed 事件、快照狀態分布、重掛決定（would-remount／remount-ok／remount-failed／suppressed）
 # 注意：prompt 走 cmd.exe 命令列——題目禁用半形雙引號與 > < & | % ^（中文引號「」不受限）。
 param(
@@ -463,11 +464,11 @@ function Get-ExportCounts($Obj, [string]$SessionId) {
 # -ExportPath：測試用，直接讀 export JSON 檔而不呼叫 opencode
 function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$ExportPath = '') {
     $rows = @(Read-Jsonl (Join-Path $gateDir ($SessionId + '.jsonl')))
-    # 會查 DB：guard 的機械欄位 dbCapable；沒有欄位時由 basis 推導——只有明確的 sql_run:disabled 才算不會查（不認識的 agent＝會查）
+    # 會查 DB：guard 的機械欄位 dbCapable；沒有欄位時由 basis 推導——只有明確的 execute_query:disabled 才算不會查（不認識的 agent＝會查）
     function Test-DbCapable($row) {
         $p = $row.PSObject.Properties['dbCapable']
         if ($null -ne $p -and $null -ne $p.Value) { return [bool]$p.Value }
-        if ([string]$row.basis -eq 'sql_run:disabled') { return $false }
+        if ([string]$row.basis -eq 'execute_query:disabled' -or [string]$row.basis -eq 'sql_run:disabled') { return $false }
         return $true
     }
     function Get-MsgKey($row) { if ($row.messageID) { return [string]$row.messageID } return '' }
@@ -475,11 +476,11 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
     $routingBlocks = @($before | Where-Object { $_.decision -eq 'block' -and [string]$_.note -match '^PS_TASK_TARGET_INVALID' })
     $executed = @($rows | Where-Object { $_.hook -eq 'after' -and $_.tool -eq 'task' -and $_.executed -eq $true })
     $executedDb = @($executed | Where-Object { Test-DbCapable $_ })
-    # 可用：子 agent 報告 status=COMPLETE，且其子 session 的紀錄裡至少一個 sql_run 成功（ok=true）——「沒回 NOT_CONNECTED」不算成功
+    # 可用：子 agent 報告 status=COMPLETE，且其子 session 的紀錄裡至少一個 oracle_execute_query 成功（ok=true）——「沒回 NOT_CONNECTED」不算成功
     function Get-ChildSqlOk([string]$Child) {
         if ($Child -eq '') { return 0 }
         $rows2 = @(Read-Jsonl (Join-Path $gateDir ($Child + '.jsonl')))
-        return @($rows2 | Where-Object { $_.hook -eq 'after' -and $_.tool -eq 'oracleMCP_sql_run' -and $_.ok -eq $true }).Count
+        return @($rows2 | Where-Object { $_.hook -eq 'after' -and $_.tool -eq 'oracleMCP_oracle_execute_query' -and $_.ok -eq $true }).Count
     }
     $dbOk = @(); $dbPartial = @(); $dbBlocked = @(); $dbInvalid = @(); $dbNoSql = @()
     foreach ($e in $executedDb) {
@@ -495,17 +496,18 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
     $afterIds = @{}
     foreach ($e in $executed) { if ($e.callID) { $afterIds[[string]$e.callID] = $true } }
     $notReturned = @($before | Where-Object { $_.decision -ne 'block' -and $_.callID -and -not $afterIds.ContainsKey([string]$_.callID) }).Count
-    $connectBlocks = @($rows | Where-Object { $_.hook -eq 'before' -and $_.tool -eq 'oracleMCP_connect' -and $_.decision -eq 'block' }).Count
     $invalidOracle = @($rows | Where-Object { $_.hook -eq 'invalid' }).Count
+    $oldNames = @('oracleMCP_connect', 'oracleMCP_disconnect', 'oracleMCP_list_connections', 'oracleMCP_sql_run', 'oracleMCP_sqlcl_run')
+    $oldToolCalls = @($rows | Where-Object { ($_.hook -eq 'before' -and $oldNames -contains [string]$_.tool) -or ($_.hook -eq 'invalid' -and $oldNames -contains [string]$_.attempted) }).Count
     $suggestedBad = 0
     foreach ($e in $executed) { $sp = $e.PSObject.Properties['suggestedNextInvalid']; if ($null -ne $sp -and $null -ne $sp.Value) { $suggestedBad += @($sp.Value).Count } }
     $afters = @($rows | Where-Object { $_.hook -eq 'after' })
-    $listCalls = @($afters | Where-Object { $_.tool -eq 'oracleMCP_list_connections' }).Count
-    $unknownRes = @($afters | Where-Object { ($_.tool -eq 'oracleMCP_connect' -or $_.tool -eq 'oracleMCP_sql_run') -and [string]$_.ok -eq 'unknown' }).Count
+    $unknownRes = @($afters | Where-Object { $_.tool -eq 'oracleMCP_oracle_execute_query' -and [string]$_.ok -eq 'unknown' }).Count
     $notConnectedReports = @($executed | Where-Object { $_.notConnected -eq $true }).Count
     $downReports = @($executed | Where-Object { [string]$_.blockedReason -eq 'ORACLE_MCP_DOWN' }).Count
-    # 同一題內的行為：NOT_CONNECTED 之後至多 connect 一次、重派一次；ORACLE_MCP_DOWN 之後不 connect、不重派會查 DB 的 task
-    $reconnects = 0; $loops = 0; $downConn = 0; $downRedispatch = 0
+    # 同一題內的行為：NOT_CONNECTED 之後至多重派一輪（重派後又 NOT_CONNECTED 就不再派 DB task）；ORACLE_MCP_DOWN 之後不重派會查 DB 的 task
+    # 階段：0＝還沒 NOT_CONNECTED；1＝收到 NOT_CONNECTED（可重派）；2＝已重派；3＝重派後又 NOT_CONNECTED（之後再派 DB task＝迴圈）
+    $redispatches = 0; $loops = 0; $downRedispatch = 0
     $byMsg = @{}
     foreach ($r in $rows) {
         if ($r.hook -eq 'chat.message') { continue }
@@ -515,23 +517,23 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
     }
     foreach ($k in @($byMsg.Keys)) {
         $seq = @($byMsg[$k])
-        $ncSeen = 0; $connAfterNc = 0; $redispatchAfterNc = 0; $downSeen = $false
+        $phase = 0; $loopHere = $false; $downSeen = $false
         foreach ($r in $seq) {
             if ($r.hook -eq 'after' -and $r.tool -eq 'task' -and $r.executed -eq $true) {
-                if ($r.notConnected -eq $true) { $ncSeen++; continue }
+                if ($r.notConnected -eq $true) {
+                    if ($phase -eq 0) { $phase = 1 } elseif ($phase -eq 2) { $phase = 3 }
+                    continue
+                }
                 if ([string]$r.blockedReason -eq 'ORACLE_MCP_DOWN') { $downSeen = $true; continue }
             }
-            if ($r.hook -eq 'before' -and $r.tool -eq 'oracleMCP_connect' -and $r.decision -ne 'block') {
-                if ($ncSeen -gt 0) { $connAfterNc++ }
-                if ($downSeen) { $downConn++ }
-            }
             if ($r.hook -eq 'before' -and $r.tool -eq 'task' -and $r.decision -ne 'block' -and (Test-DbCapable $r)) {
-                if ($ncSeen -gt 0 -and $connAfterNc -gt 0) { $redispatchAfterNc++ }
+                if ($phase -ge 1) { $redispatches++ }
+                if ($phase -eq 1) { $phase = 2 }
+                elseif ($phase -eq 3) { $loopHere = $true }
                 if ($downSeen) { $downRedispatch++ }
             }
         }
-        $reconnects += $connAfterNc
-        if ($connAfterNc -gt 1 -or $redispatchAfterNc -gt 1) { $loops++ }
+        if ($loopHere) { $loops++ }
     }
     # 呼叫歸屬：同一 callID 的 before／after 列 messageID 必須一致
     $callMis = 0
@@ -587,10 +589,10 @@ function Get-SessionVerdict([string]$SessionId, [string]$OcPath, [string]$Export
         sessionID = $SessionId; rows = $rows.Count; taskAttempts = $before.Count; routingBlocks = $routingBlocks.Count
         executed = $executed.Count; executedDb = $executedDb.Count; dbTasksCompleted = $dbOk.Count
         dbTasksPartial = $dbPartial.Count; dbTasksBlocked = $dbBlocked.Count; dbTasksInvalid = $dbInvalid.Count; dbTasksCompletedNoSql = $dbNoSql.Count
-        notConnectedReports = $notConnectedReports; reconnects = $reconnects; reconnectLoops = $loops
-        downReports = $downReports; downThenConnect = $downConn; downThenRedispatch = $downRedispatch
-        tasksNotReturned = $notReturned; connectBlocks = $connectBlocks; invalidOracleCalls = $invalidOracle; suggestedNextInvalid = $suggestedBad
-        listCalls = $listCalls; unknownResults = $unknownRes
+        notConnectedReports = $notConnectedReports; redispatches = $redispatches; redispatchLoops = $loops
+        downReports = $downReports; downThenRedispatch = $downRedispatch
+        tasksNotReturned = $notReturned; invalidOracleCalls = $invalidOracle; oldToolCalls = $oldToolCalls; suggestedNextInvalid = $suggestedBad
+        unknownResults = $unknownRes
         exportedTasks = $exportedTasks; hookMismatch = $mismatch; exportError = $exportErr
         turns = @($chatRows | ForEach-Object { [string]$_.messageID } | Sort-Object -Unique).Count; exportedTurns = $exportedTurns; turnMismatch = $missingTurns; orphanTurns = $orphanTurns
         callMismatch = $callMis; unmatchedCalls = $unmatched
@@ -602,8 +604,8 @@ function New-EmptyVerdict([string]$Label, [string]$Err) {
     return [pscustomobject]@{
         sessionID = $Label; rows = 0; taskAttempts = 0; routingBlocks = 0; executed = 0; executedDb = 0; dbTasksCompleted = 0
         dbTasksPartial = 0; dbTasksBlocked = 0; dbTasksInvalid = 0; dbTasksCompletedNoSql = 0
-        notConnectedReports = 0; reconnects = 0; reconnectLoops = 0; downReports = 0; downThenConnect = 0; downThenRedispatch = 0
-        tasksNotReturned = 0; connectBlocks = 0; invalidOracleCalls = 0; suggestedNextInvalid = 0; listCalls = 0; unknownResults = 0
+        notConnectedReports = 0; redispatches = 0; redispatchLoops = 0; downReports = 0; downThenRedispatch = 0
+        tasksNotReturned = 0; invalidOracleCalls = 0; oldToolCalls = 0; suggestedNextInvalid = 0; unknownResults = 0
         exportedTasks = -1; hookMismatch = 0; exportError = $Err; turns = 0; exportedTurns = -1; turnMismatch = 0; orphanTurns = 0
         callMismatch = 0; unmatchedCalls = 0; exportFailures = 0; exitCode = -1; timedOut = $false
     }
@@ -614,7 +616,7 @@ function Show-Table($verdicts) {
     $fmt = '{0,-32} {1,4} {2,4} {3,5} {4,4} {5,5} {6,5} {7,4} {8,5} {9,6} {10,7} {11,5}'
     Write-Host ($fmt -f 'sessionID', 'try', 'exec', 'dbOk', 'nc', 'loops', 'down', 'rout', 'turns', 'xTurns', 'callMis', 'mism')
     foreach ($v in $verdicts) {
-        Write-Host ($fmt -f $v.sessionID, $v.taskAttempts, $v.executed, $v.dbTasksCompleted, $v.notConnectedReports, $v.reconnectLoops, $v.downReports, $v.routingBlocks, $v.turns, $v.exportedTurns, $v.callMismatch, $v.hookMismatch)
+        Write-Host ($fmt -f $v.sessionID, $v.taskAttempts, $v.executed, $v.dbTasksCompleted, $v.notConnectedReports, $v.redispatchLoops, $v.downReports, $v.routingBlocks, $v.turns, $v.exportedTurns, $v.callMismatch, $v.hookMismatch)
     }
 }
 
@@ -643,8 +645,7 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     $mism = ($verdicts | Measure-Object -Property hookMismatch -Sum).Sum
     $tmism = ($verdicts | Measure-Object -Property turnMismatch -Sum).Sum
     $cmis = ($verdicts | Measure-Object -Property callMismatch -Sum).Sum
-    $loops = ($verdicts | Measure-Object -Property reconnectLoops -Sum).Sum
-    $dconn = ($verdicts | Measure-Object -Property downThenConnect -Sum).Sum
+    $loops = ($verdicts | Measure-Object -Property redispatchLoops -Sum).Sum
     $dred = ($verdicts | Measure-Object -Property downThenRedispatch -Sum).Sum
     $orphan = ($verdicts | Measure-Object -Property orphanTurns -Sum).Sum
     $unmatched = ($verdicts | Measure-Object -Property unmatchedCalls -Sum).Sum
@@ -660,10 +661,9 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     $dbInv = ($verdicts | Measure-Object -Property dbTasksInvalid -Sum).Sum
     $dbNoSql = ($verdicts | Measure-Object -Property dbTasksCompletedNoSql -Sum).Sum
     $notRet = ($verdicts | Measure-Object -Property tasksNotReturned -Sum).Sum
-    $cblk = ($verdicts | Measure-Object -Property connectBlocks -Sum).Sum
-    $lcalls = ($verdicts | Measure-Object -Property listCalls -Sum).Sum
+    $oldc = ($verdicts | Measure-Object -Property oldToolCalls -Sum).Sum
     $nc = ($verdicts | Measure-Object -Property notConnectedReports -Sum).Sum
-    $rc = ($verdicts | Measure-Object -Property reconnects -Sum).Sum
+    $rc = ($verdicts | Measure-Object -Property redispatches -Sum).Sum
     $down = ($verdicts | Measure-Object -Property downReports -Sum).Sum
     $rout = ($verdicts | Measure-Object -Property routingBlocks -Sum).Sum
     $sug = ($verdicts | Measure-Object -Property suggestedNextInvalid -Sum).Sum
@@ -675,43 +675,43 @@ function Write-Summary($verdicts, [string]$Label, [string]$Expect) {
     $summary = [pscustomobject]@{
         label = $Label; sessions = $verdicts.Count; expectDbTask = $Expect
         hookMismatch = [int]$mism; turnMismatch = [int]$tmism; callMismatch = [int]$cmis
-        reconnectLoops = [int]$loops; downThenConnect = [int]$dconn; downThenRedispatch = [int]$dred
+        redispatchLoops = [int]$loops; downThenRedispatch = [int]$dred
         exportFailures = [int]$xfail; runsWithBadExit = $exitBad; usabilityFailures = $usabilityFail
         sessionsWithoutTask = $noTask; sessionsWithDbTaskOk = $dbOkRuns; sessionsWithDbTask = $dbRuns; sessionsWithNotConnected = $ncRuns
         dbTasksCompleted = [int]$dbDone; dbTasksPartial = [int]$dbPart; dbTasksBlocked = [int]$dbBlk; dbTasksInvalid = [int]$dbInv
         dbTasksCompletedNoSql = [int]$dbNoSql; tasksNotReturned = [int]$notRet
-        notConnectedReports = [int]$nc; reconnects = [int]$rc; downReports = [int]$down; routingBlocks = [int]$rout; suggestedNextInvalid = [int]$sug
-        connectBlocks = [int]$cblk; invalidOracleCalls = [int]$inv; listCalls = [int]$lcalls; unknownResults = [int]$unknown; orphanTurns = [int]$orphan; unmatchedCalls = [int]$unmatched
+        notConnectedReports = [int]$nc; redispatches = [int]$rc; downReports = [int]$down; routingBlocks = [int]$rout; suggestedNextInvalid = [int]$sug
+        invalidOracleCalls = [int]$inv; oldToolCalls = [int]$oldc; unknownResults = [int]$unknown; orphanTurns = [int]$orphan; unmatchedCalls = [int]$unmatched
         stamp = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     }
     $out = Join-Path $gateDir ('summary-' + $Label + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')
     [System.IO.File]::WriteAllText($out, (ConvertTo-Json $summary -Depth 3), (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ''
     Write-Host ('覆蓋與行為：sessions=' + $verdicts.Count + '  hookMismatch=' + [int]$mism + '  turnMismatch=' + [int]$tmism + '  callMismatch=' + [int]$cmis +
-        '  reconnectLoops=' + [int]$loops + '  downThenConnect=' + [int]$dconn + '  downThenRedispatch=' + [int]$dred)
+        '  redispatchLoops=' + [int]$loops + '  downThenRedispatch=' + [int]$dred)
     Write-Host ('可用（ExpectDbTask=' + $Expect + '）：sessionsWithDbTaskOk=' + $dbOkRuns + '/' + $verdicts.Count + '  sessionsWithDbTask=' + $dbRuns + '  usabilityFailures=' + $usabilityFail +
         '  dbTasks completed=' + [int]$dbDone + ' partial=' + [int]$dbPart + ' blocked=' + [int]$dbBlk + ' invalid=' + [int]$dbInv + ' completedNoSql=' + [int]$dbNoSql +
         '  tasksNotReturned=' + [int]$notRet)
-    if ([int]$dbNoSql -gt 0) { Write-Host ('注意：' + [int]$dbNoSql + ' 個 DB task 報告 COMPLETE 但子 session 沒有成功的 sql_run——只是宣稱成功，不計為完成') -ForegroundColor Yellow }
-    if ([int]$cblk -gt 0) { Write-Host ('注意：' + [int]$cblk + ' 次 connect 在執行前被擋（profile oracle.connectionName 未填或與 connect 目標不一致）——看 jsonl 的 note') -ForegroundColor Yellow }
-    Write-Host ('觀察：sessionsWithNotConnected=' + $ncRuns + '（模型錯序：先派後連）  notConnectedReports=' + [int]$nc + '  reconnects=' + [int]$rc + '  downReports=' + [int]$down +
-        '  routingBlocks=' + [int]$rout + '（skill 名當 agent 被擋）  suggestedNextInvalid=' + [int]$sug + '  invalidOracleCalls=' + [int]$inv + '  listCalls=' + [int]$lcalls +
+    if ([int]$dbNoSql -gt 0) { Write-Host ('注意：' + [int]$dbNoSql + ' 個 DB task 報告 COMPLETE 但子 session 沒有成功的 oracle_execute_query——只是宣稱成功，不計為完成') -ForegroundColor Yellow }
+    if ([int]$oldc -gt 0) { Write-Host ('注意：' + [int]$oldc + ' 次呼叫 SQLcl 時代的舊工具名（connect／list_connections／sql_run 等）——agent／cookbook 可能還是舊版，先跑 ps-fs-doctor') -ForegroundColor Yellow }
+    Write-Host ('觀察：sessionsWithNotConnected=' + $ncRuns + '（DB 連不上）  notConnectedReports=' + [int]$nc + '  redispatches=' + [int]$rc + '  downReports=' + [int]$down +
+        '  routingBlocks=' + [int]$rout + '（skill 名當 agent 被擋）  suggestedNextInvalid=' + [int]$sug + '  invalidOracleCalls=' + [int]$inv + '  oldToolCalls=' + [int]$oldc +
         '（正常為 0）  unknownResults=' + [int]$unknown + '  sessionsWithoutTask=' + $noTask + '  orphanTurns=' + [int]$orphan + '  unmatchedCalls=' + [int]$unmatched)
     Write-Host ('摘要已寫：' + $out)
-    if ([int]$unknown -gt 0) { Write-Host ('注意：有 ' + [int]$unknown + ' 次 connect／sql_run 回空輸出——真 SQLcl 若如此回覆，把 jsonl 那列回報維護 session') -ForegroundColor Yellow }
+    if ([int]$unknown -gt 0) { Write-Host ('注意：有 ' + [int]$unknown + ' 次 oracle_execute_query 回空輸出——把 jsonl 那列回報維護 session') -ForegroundColor Yellow }
     if ([int]$xfail -gt 0) { Write-Host ('注意：' + [int]$xfail + ' 個 session 的 opencode export 失敗（看各列 exportError）——覆蓋率判定對這些 session 是空的') -ForegroundColor Yellow }
     if ($exitBad -gt 0) { Write-Host ('注意：' + $exitBad + ' 次 run 結束碼非 0 或逾時強殺（看 runs\*.err.txt）') -ForegroundColor Yellow }
-    $behaviourFail = ([int]$mism -gt 0 -or [int]$tmism -gt 0 -or [int]$cmis -gt 0 -or [int]$loops -gt 0 -or [int]$dconn -gt 0 -or [int]$dred -gt 0 -or [int]$xfail -gt 0 -or $exitBad -gt 0)
+    $behaviourFail = ([int]$mism -gt 0 -or [int]$tmism -gt 0 -or [int]$cmis -gt 0 -or [int]$loops -gt 0 -or [int]$dred -gt 0 -or [int]$xfail -gt 0 -or $exitBad -gt 0)
     if ($behaviourFail) {
-        Write-Host '判定：FAIL（覆蓋與行為：task hook 覆蓋率不足／有題沒收到 chat.message／呼叫歸屬被改標／NOT_CONNECTED 後重連重派超過一次／ORACLE_MCP_DOWN 後又 connect 或重派／export 失敗／run 異常結束）' -ForegroundColor Red
+        Write-Host '判定：FAIL（覆蓋與行為：task hook 覆蓋率不足／有題沒收到 chat.message／呼叫歸屬被改標／NOT_CONNECTED 後重派超過一輪／ORACLE_MCP_DOWN 後又重派／export 失敗／run 異常結束）' -ForegroundColor Red
         return 1
     }
     if ($usabilityFail -gt 0) {
-        if ($Expect -eq 'Yes') { Write-Host ('判定：FAIL（可用：' + $usabilityFail + ' 個 session 沒有任何「報告 COMPLETE 且子 session sql_run 成功」的 DB task——零違規不等於可用）') -ForegroundColor Red }
+        if ($Expect -eq 'Yes') { Write-Host ('判定：FAIL（可用：' + $usabilityFail + ' 個 session 沒有任何「報告 COMPLETE 且子 session oracle_execute_query 成功」的 DB task——零違規不等於可用）') -ForegroundColor Red }
         else { Write-Host ('判定：FAIL（可用：' + $usabilityFail + ' 個 session 派了會查 DB 的 task，但本情境預期不查 DB）') -ForegroundColor Red }
         return 1
     }
-    Write-Host ('判定：PASS（覆蓋與行為六項全 0' + $(if ($Expect -eq 'Yes') { '；每個 session 都有會查 DB 的 task 完成' } elseif ($Expect -eq 'No') { '；沒有會查 DB 的 task 執行' } else { '' }) + '）') -ForegroundColor Green
+    Write-Host ('判定：PASS（覆蓋與行為五項全 0' + $(if ($Expect -eq 'Yes') { '；每個 session 都有會查 DB 的 task 完成' } elseif ($Expect -eq 'No') { '；沒有會查 DB 的 task 執行' } else { '' }) + '）') -ForegroundColor Green
     return 0
 }
 
@@ -809,8 +809,8 @@ for ($i = 1; $i -le $Runs; $i++) {
     $v.exitCode = $exitCode
     $v.timedOut = $timedOut
     $verdicts += $v
-    Write-Host ('  ' + $sessionId + '  exit=' + $exitCode + '  task嘗試=' + $v.taskAttempts + ' 執行=' + $v.executed + ' DB完成=' + $v.dbTasksCompleted + ' NOT_CONNECTED=' + $v.notConnectedReports + ' 重連=' + $v.reconnects + ' 迴圈=' + $v.reconnectLoops + ' DOWN=' + $v.downReports + ' 路由擋=' + $v.routingBlocks + ' transcript task=' + $v.exportedTasks + ' turns=' + $v.turns + '/' + $v.exportedTurns + ' callMis=' + $v.callMismatch)
-    if (($v.reconnectLoops -gt 0 -or $v.downThenConnect -gt 0 -or $v.downThenRedispatch -gt 0 -or $v.callMismatch -gt 0) -and -not $KeepGoing) { Write-Host '  違反：重連迴圈／DOWN 後又 connect 或重派／呼叫歸屬錯誤——停止（加 -KeepGoing 可續跑）' -ForegroundColor Red; break }
+    Write-Host ('  ' + $sessionId + '  exit=' + $exitCode + '  task嘗試=' + $v.taskAttempts + ' 執行=' + $v.executed + ' DB完成=' + $v.dbTasksCompleted + ' NOT_CONNECTED=' + $v.notConnectedReports + ' 重派=' + $v.redispatches + ' 迴圈=' + $v.redispatchLoops + ' DOWN=' + $v.downReports + ' 路由擋=' + $v.routingBlocks + ' transcript task=' + $v.exportedTasks + ' turns=' + $v.turns + '/' + $v.exportedTurns + ' callMis=' + $v.callMismatch)
+    if (($v.redispatchLoops -gt 0 -or $v.downThenRedispatch -gt 0 -or $v.callMismatch -gt 0) -and -not $KeepGoing) { Write-Host '  違反：重派迴圈／DOWN 後又重派／呼叫歸屬錯誤——停止（加 -KeepGoing 可續跑）' -ForegroundColor Red; break }
 }
 Show-Table $verdicts
 Show-Diag
@@ -1325,7 +1325,7 @@ Write-Host ('sdoc assemble tests: PASS=' + $script:passed + ' FAIL=' + $script:f
 if ($script:failed -gt 0) { exit 1 }
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-sdoc-assemble.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|862|c177ad9ef1bf6fcaf0afa8aa1f7f87a18a33c649f5c148465fd2b08941064228|1
+@@@PSBUNDLE-FILE|scripts/tests/test-sdoc-run.ps1|862|5cc89c122594ae8ceed9e9f45f7236740198bc488906d638407c7e99d27df949|1
 # test-sdoc-run.ps1 — Spec 文件流程外環（ps-sdoc.ps1）端到端：合成 worker 依工單回狀態圖解讀、研究包、覆核；不查 MCP、不呼叫模型。
 # 以設計範例（walkthrough、gate）為來源：從空目錄跑到發布，比對發布的 canonical 與範例，並驗結論碼、中斷、重試、重跑、裁決與核准。
 # 用法：pwsh -NoProfile -File scripts/tests/test-sdoc-run.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
@@ -1975,7 +1975,7 @@ try {
             $r = Invoke-SdRun $rootO $gComps $fxO
             Assert-Sd ($r.Code -eq 'DOC1-0-01' -and [System.IO.File]::Exists((Join-Path $inO 'status.md')) -and -not [System.IO.Directory]::Exists((Join-Path $rootO '.ps-private/sdoc'))) 'OpenCode 版：人工輸入骨架建在 .ps-private/sdoc-opencode/<job>/，不碰 .ps-private/sdoc/' $r.Output
             Assert-Sd ($r.Output.Contains('OpenCode 模型：anthropic/claude-haiku-4-5（.opencode/peoplesoft/sdoc/model.yaml）') -and $r.Output.Contains("-Components 'TW_DEMO_CASE,TW_DEMO_DOCREV,TW_DEMO_PAYMNT' -Cli opencode")) 'OpenCode 版：印出模型與唯一設定檔；續跑命令帶 -Cli opencode' $r.Output
-            Assert-Sd ($r.Output.Contains('提醒：.opencode/peoplesoft/customization-profile.yaml 的 oracle.connectionName 還沒填') -and $r.Code -eq 'DOC1-0-01') 'OpenCode 版：profile 沒填連線名 → 只提醒、不擋' $r.Output
+            Assert-Sd ($r.Output.Contains('提醒：.opencode/peoplesoft/customization-profile.yaml 的 oracle.currentSchema 還沒填') -and $r.Code -eq 'DOC1-0-01') 'OpenCode 版：profile 沒填表的擁有者 → 只提醒、不擋' $r.Output
             # 貫穿範例跑到 REVIEW_READY（含 L5 讀者與判定）：目錄、工單、與 Claude Code 版逐位元相同的產出
             $fxOW = New-SdRunFixtures 'walkthrough' 'status-REQ_STATUS.md' $wkPages $wkRecords $false 'oc-walk'
             $rootOW = New-SdRunRootOc 'oc-walk'
@@ -2029,7 +2029,7 @@ try {
                 # Claude Code 版的 profile 已填、OpenCode 版還是 FILL_ME：提醒裡給複製方法
                 $pfSrc = Join-Path $repo '.opencode/peoplesoft/customization-profile.yaml'
                 $pfText = [System.IO.File]::ReadAllText($pfSrc, [System.Text.Encoding]::UTF8)
-                Write-SdFx (Join-Path $rootB '.claude/peoplesoft/customization-profile.yaml') ($pfText -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV')
+                Write-SdFx (Join-Path $rootB '.claude/peoplesoft/customization-profile.yaml') ($pfText -replace '(?m)^  currentSchema: FILL_ME', '  currentSchema: DEMOOWN')
                 Write-SdFx (Join-Path $rootB '.opencode/peoplesoft/customization-profile.yaml') $pfText
                 $r = Invoke-SdRun $rootB $gComps $fxB '' @{ Cli = 'opencode'; MaxSessions = 2 }
                 Assert-Sd ($r.Output.Contains('copy .claude\peoplesoft\customization-profile.yaml .opencode\peoplesoft\customization-profile.yaml')) '兩版並存：OpenCode 版 profile 沒填、Claude Code 版填好了 → 提醒裡給整份複製的命令' $r.Output
@@ -2049,9 +2049,9 @@ try {
             [System.IO.File]::WriteAllText($mY, ("# 測試`r`nmodel: 'company-gw/qwen3.6-35b-a3b:latest'   # 地端`r`n"), (New-Object System.Text.UTF8Encoding($true)))
             $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true }
             Assert-Sd ($r.Output.Contains('OpenCode 模型：company-gw/qwen3.6-35b-a3b:latest（.opencode/peoplesoft/sdoc/model.yaml）')) 'model.yaml：引號、行尾註解、CRLF、BOM 都讀得懂' $r.Output
-            Write-SdFx (Join-Path $rootO '.opencode/peoplesoft/customization-profile.yaml') ("oracle:`n  connectionName: HR_DEV   # 已填`n")
+            Write-SdFx (Join-Path $rootO '.opencode/peoplesoft/customization-profile.yaml') ("oracle:`n  currentSchema: DEMOOWN   # 已填`n")
             $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true; Model = 'other/x-1' }
-            Assert-Sd (-not $r.Output.Contains('oracle.connectionName 還沒填')) 'profile 已填連線名 → 不提醒' $r.Output
+            Assert-Sd (-not $r.Output.Contains('oracle.currentSchema 還沒填')) 'profile 已填表的擁有者 → 不提醒' $r.Output
             Assert-Sd ($r.Output.Contains('OpenCode 模型：other/x-1（-Model）') -and $r.Output.Contains("-Cli opencode -Model 'other/x-1'")) '-Model 臨時覆寫 model.yaml，續跑命令帶著它' $r.Output
             $plainO = New-SdRunRootOc 'oc-badmodel'
             [System.IO.File]::WriteAllText((Join-Path $plainO '.opencode/peoplesoft/sdoc/model.yaml'), "model: FILL_ME`n", (New-Object System.Text.UTF8Encoding($false)))
@@ -4759,50 +4759,50 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1003|1efae1f5c1730e3637283b538a904fe51473561b8ca9b26192a8bf535cbba900|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1003|999b5db09e538ad4a43c535f7ac8eaa864f6d0b4bc37d1c64c3146882fa01f72|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "78eef7e",
+  "commit": "5cb35d7",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
-      "lines": 68,
-      "sha256": "b7b6725e509225672e72ae400dacacd60b3f543da361335aaf4e886221fd1aa2",
+      "lines": 69,
+      "sha256": "36003ba655cf8c3c815fadb8637d52d4c12ddfa3a06be6af66439c7426603be2",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-ae-flow.md"
     },
     {
       "path": ".claude/agents/ps-auditor.md",
       "lines": 244,
-      "sha256": "5658bad5958fbca0def058f826dc7026ebfa0783a30f6d83ce8afb537c18721a",
+      "sha256": "67a8408bc61cce39475c010b2c4586df4dcdebbaab9f16bb691533b14f85970e",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-auditor.md"
     },
     {
       "path": ".claude/agents/ps-clone-worker.md",
       "lines": 34,
-      "sha256": "ee0c2c94c9faa2e4c543bc26de10f641862169c0116421ac688dadf58bd77cb5",
+      "sha256": "3c3c964991136c1a64c7d38959fb47646eed99f9af1522b39b386c33eca4203c",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-clone-worker.md"
     },
     {
       "path": ".claude/agents/ps-deep-research.md",
-      "lines": 517,
-      "sha256": "e49288ae1084deddf6d7b6feba5e6f14fbe889c611ebf27c7c100b0aac17e58d",
+      "lines": 510,
+      "sha256": "1fdf3fe80889d787d2661109bdac47267a33737dbfa46e7adf16786331074f45",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-deep-research.md"
     },
     {
       "path": ".claude/agents/ps-metadata-flow.md",
       "lines": 87,
-      "sha256": "16119559df331e5a6802b294901f3f6f1c06df87e8f25e37e898a75a26cddc9c",
+      "sha256": "748e90d5e59dfc3dae986a4467da0579d2983422147abef060bb63f2fc941771",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-metadata-flow.md"
     },
     {
       "path": ".claude/agents/ps-orchestrator.md",
-      "lines": 213,
-      "sha256": "b9e2ea32132cb2805310b2848406d7173d67c3e2256aa1fb7f5f810fb19376ee",
+      "lines": 206,
+      "sha256": "afa2353c59bf6a03057b20e1f17169fb8528d9812d7dee3279e83479583d0229",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-orchestrator.md"
     },
@@ -4816,7 +4816,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/agents/ps-sdoc-worker.md",
       "lines": 35,
-      "sha256": "c858fad9bc2d49443796cfd879d5fbaddacf4732e2e3ebb3511ff31972c342b4",
+      "sha256": "a3f51dca023ef59db0f47f40f8a4ea89f745c5866f9e18645a6ae7e1e3d71ff8",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-sdoc-worker.md"
     },
@@ -4872,21 +4872,21 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/agents/ps-ui-flow.md",
       "lines": 125,
-      "sha256": "4a07a7eb70f6e840739e0737760110d642831cdd4cf14837d0e56e9db4971226",
+      "sha256": "5c0b30a7e9465a57c4c82a52206788d6811eadf6859ef909819ba8669561a009",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-ui-flow.md"
     },
     {
       "path": ".claude/commands/ps-audit-batch.md",
-      "lines": 115,
-      "sha256": "53b6fd9064b934e232d16c933765c80babb89ce887600a7e7eaa206380a7e879",
+      "lines": 114,
+      "sha256": "6142d6740a2f9f7136d9d05ee19eb3de964fc4afc39e5b5cafc7081af87b54b3",
       "bom": false,
       "repo": "claude-code/.claude/commands/ps-audit-batch.md"
     },
     {
       "path": ".claude/commands/ps-audit.md",
-      "lines": 78,
-      "sha256": "b5ca4e22eab7f76c997529316e76b6b5741f19e6a25aa1f359072788f76661cc",
+      "lines": 77,
+      "sha256": "b5d7d2f792096d46cb55666a0f99006db648669a1d3164029f8ee74c2b78b31a",
       "bom": false,
       "repo": "claude-code/.claude/commands/ps-audit.md"
     },
@@ -4935,14 +4935,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/commands/ps-supplement.md",
       "lines": 32,
-      "sha256": "6b7e1b0cec46346a97abdce1c8253d47033c57dc88ff73199333ac60928e3b4f",
+      "sha256": "c9caccfd7b7111c8f08f1d4be0cb85c319ae805678f4619a1dc0ca5df713048a",
       "bom": false,
       "repo": "claude-code/.claude/commands/ps-supplement.md"
     },
     {
       "path": ".claude/hooks/ps-runtime-guard.ps1",
-      "lines": 400,
-      "sha256": "c7d79c992550515fe0f2ff2c484cf5db7db8899923760211aab3f424564e5597",
+      "lines": 337,
+      "sha256": "63e48c1c20756b6ee81bb0e265a0db1af7e36066abb990572b8b89f46aa64bd5",
       "bom": true,
       "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
     },
@@ -4955,8 +4955,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/peoplesoft/customization-profile.yaml",
-      "lines": 109,
-      "sha256": "1fa65a03fb99c53c98c2a7013626cc0f96a02e4d0187bb9308571b3fc9ad3370",
+      "lines": 102,
+      "sha256": "f8c863cb667b285b7c13f5f96c7fea63a716bef03515c8f2b8724da6263e9908",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/customization-profile.yaml"
     },
@@ -4984,14 +4984,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/mcp-tool-contracts.md",
       "lines": 129,
-      "sha256": "2cf7273c9f090db99bf0770e5e60623eeb9f1d0bea8f6e6b3de9fc439ce888ba",
+      "sha256": "9eb42df7badf73e0e108920a41cfcde0e6bd104a39152eb3c23fb37e7ce3fb29",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/mcp-tool-contracts.md"
     },
     {
       "path": ".claude/peoplesoft/oracle-query-cookbook.md",
-      "lines": 869,
-      "sha256": "52a5cbc2c2b9eca7b84f37481d67b3e1f9ff13ace4c16869f709bf6e142d5004",
+      "lines": 992,
+      "sha256": "bade42a4dccf1685714cb4ad73e5930a469278f189f89c67c2e4944c9d41529b",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/oracle-query-cookbook.md"
     },
@@ -5145,14 +5145,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/sdoc/research-contract.md",
       "lines": 279,
-      "sha256": "c0041f65d065d781dccc7f9f3d8c3977161a99b0ba9973792be3b81cc8b8857b",
+      "sha256": "1959dff0a53b751e89cd3b6ed111a38e93894476c6e8b771010eee0844aa272b",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/research-contract.md"
     },
     {
       "path": ".claude/peoplesoft/sdoc/review-contract.md",
       "lines": 55,
-      "sha256": "57360b70c60885f3500b41faaaa80aa0d492acd4d022069800857ffff8c16c29",
+      "sha256": "68088a56a0f0992d05a44188d4776922c312eba17e943e0c93b201417fee6c5a",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/review-contract.md"
     },
@@ -5334,7 +5334,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/spec/clone-contract.md",
       "lines": 97,
-      "sha256": "7206c4672c8348aec36b97dbc84872c7f1343d415fcd8f453887890b7c2f7594",
+      "sha256": "e86d6513079da1a2cd9afb52b5e78f4cac6c479f6613a262fcb0a882e16849a2",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/clone-contract.md"
     },
@@ -5390,7 +5390,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "c913e67128656219abb54111868ce38726ff12fb607f4fe6e16e7fa2fa60b8a5",
+      "sha256": "be3a18c1b35dc799270649bd4ee1aa5324f397243a4a41865944b9156d7c6c02",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
     },
@@ -5418,21 +5418,21 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/subagent-report-contract.md",
       "lines": 193,
-      "sha256": "50d3ef7707b0ba625982e71287041b5fe38043bc80267cc03eae676efb07bced",
+      "sha256": "3e2f7e785aa0c2f6b046be6f6bb2c86557aef06b4e8ee38aa83d9133f6a41ec9",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/subagent-report-contract.md"
     },
     {
       "path": ".claude/peoplesoft/supplemental-contract.md",
-      "lines": 102,
-      "sha256": "d28d83484060518cd8996f6daa6914330bb69cba925f079016de08a4dc3932da",
+      "lines": 101,
+      "sha256": "25900a79d056932d7a89738d2d419341112c54133829b8fb5fd62adc0fbda414",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/supplemental-contract.md"
     },
     {
       "path": ".claude/settings.json",
-      "lines": 57,
-      "sha256": "0a7a1f4ce23c74f15759ce5b71cf858421b6f24cc3f8fb110c427b04d803f7f9",
+      "lines": 58,
+      "sha256": "f86f451657a35b65518361539058bb3dc884676b5094951a56a234608e17afab",
       "bom": false,
       "repo": "claude-code/.claude/settings.json"
     },
@@ -5488,7 +5488,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/skills/ps-security-flow/SKILL.md",
       "lines": 84,
-      "sha256": "4c71eabe0832f4e8f2d0e9417bc56f1e2f287b65c436b2da98c54613eb803a09",
+      "sha256": "b83540be47b5b66c8b6e1aba74f40129c021ca198a202eb443a47fe1cae41c56",
       "bom": false,
       "repo": "claude-code/.claude/skills/ps-security-flow/SKILL.md"
     },
@@ -5515,8 +5515,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "CLAUDE.md",
-      "lines": 83,
-      "sha256": "1a6c25a3ec7323bbba68eec8ae98da4f300768b97df93d82896098603a67a890",
+      "lines": 81,
+      "sha256": "b6a01d369cb4994a218ff8e190e854d23150221c9789089a70e24a3e144cef60",
       "bom": false,
       "repo": "claude-code/CLAUDE.md"
     },
@@ -5546,8 +5546,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-claude-doctor.ps1",
-      "lines": 160,
-      "sha256": "8ab86d52a8ccbdc5557283fbd0422ef63c6b4fd2714dd46c854cbd2525083ff7",
+      "lines": 168,
+      "sha256": "accc0e0aa9f38a3890dab118d9330485fab9b139fa4ccf1532eabfda6f1b7560",
       "bom": true
     },
     {
@@ -5631,7 +5631,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-sdoc.ps1",
       "lines": 1501,
-      "sha256": "f15b7d2e24675462854fe77239109e097064d275d792194a644626c48a9256ae",
+      "sha256": "84fca0e92eb86f7a0dd3874617f2241d2f2c68a14148f706528b7967271535be",
       "bom": true
     },
     {
@@ -5684,20 +5684,20 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-auto-loop.ps1",
-      "lines": 1029,
-      "sha256": "0cadab25c68c0b58a3e2f2feb9fa338014aa4dc1882d40e20d407992da771fd6",
+      "lines": 1056,
+      "sha256": "1c2909efbc3122337405013df7e76f5641624dae31edf3f54b6069c73e18db69",
       "bom": true
     },
     {
       "path": "scripts/tests/test-bundle.ps1",
       "lines": 263,
-      "sha256": "8654be69b8d8c5689c00e0fe6a427da25cf978aeb3db9c79987f8a583e84550f",
+      "sha256": "959fc4c89aa9846aeb4a7c92b656602a3c07227863af1ad6b7487f46c98f7273",
       "bom": true
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 595,
-      "sha256": "68d87f544bd09bfbb89032e023613b2aa980e9f201e5e2a18670e8e8b02e6afe",
+      "lines": 589,
+      "sha256": "3641964a5c6c66cebdc6c9ab4998fdfb0a750401fd6e2d173928b0b2b236d08b",
       "bom": true
     },
     {
@@ -5709,7 +5709,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/tests/test-oracle-runtime.ps1",
       "lines": 470,
-      "sha256": "6adfc52fc82001ac8165f6fefb23fec99bfaf4abc964ea61919a8cf73b2a775a",
+      "sha256": "af286e5fe59f20ec31af3396aab2cd1a0b2dbc4bde0ba231fb651d0f5d876290",
       "bom": true
     },
     {
@@ -5727,7 +5727,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/tests/test-sdoc-run.ps1",
       "lines": 862,
-      "sha256": "c177ad9ef1bf6fcaf0afa8aa1f7f87a18a33c649f5c148465fd2b08941064228",
+      "sha256": "5cc89c122594ae8ceed9e9f45f7236740198bc488906d638407c7e99d27df949",
       "bom": true
     },
     {
@@ -5764,5 +5764,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|149|8afb84d90805f9f0af2435ae7d86ad367428db3ee52906824950358692b5a70c
-@@@PSBUNDLE-PART-END|21c8777b245dacfd|6|6
+@@@PSBUNDLE-EOF|149|ffc486f1f02ee1506cb3384473f160d792ab1d3cea17a808655cc93ca01c936b
+@@@PSBUNDLE-PART-END|83f90a34982efa76|6|6
