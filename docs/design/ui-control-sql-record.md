@@ -243,7 +243,7 @@ ADD_SEARCH_REC＝新增用的搜尋 Record（沒有＝新增也用 SEARCH_REC）
 ## 5. 還沒定案
 
 - 代碼 15 External Link 的網址存在哪個欄位：沒查。
-- 權限表 PSAUTHITEM.AUTHORIZEDACTIONS：和 ACTIONS 同一組位元，但 128 的意思各家說法不一，還沒解碼。
+- 權限表 PSAUTHITEM.AUTHORIZEDACTIONS：和 ACTIONS 同一組位元；128 社群多寫 Data Entry，沒在公司環境確認，還沒解碼。
 - 搜尋 Record 的搜尋鍵與清單欄位：§2m 只給 Record 名。
 
 ## 6. SQL 原文位置（repo）

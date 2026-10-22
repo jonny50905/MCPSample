@@ -4194,3 +4194,16 @@
   該節已有列會判 ALREADY_COVERED，不會重寫——要嘛重跑 /ps-research，要嘛先把那一節整節刪掉、再照 SOP-23 送 `-FactKind UI.CONTROLS`。
 - 驗證：§2l 合成資料改成「ASSOCFIELDNUM 從 0 起算」並加一個指到第 1 欄（存 0）的相關顯示：控制欄標 DISPLAY_CONTROL、相關顯示 RELATED_TO＝4 與 1；
   ps-agent-doc-lint、test-auto-loop、test-claude-variant、test-bundle 全過。
+
+### L158 給主管的報告經兩個獨立 subagent 查核後修正（2026-10-22）
+
+- 管理者要求查驗報告 `docs/design/ui-control-verification-report.md` 的「難在哪裡」是否屬實：一個 subagent 對 repo 證據（教訓帳本、各輪說明檔、
+  備忘、commit），一個查網路（Oracle 文件、社群整理）。兩個都只讀不改。
+- 修正：「61 段查詢樣板」→ 兩版查詢手冊 SQL 樣板裡的 61 處表名（單位錯）；「每輪都由管理者手動執行」→ 第一到第六輪，第七輪是公司機的 Claude；
+  「每段 SQL 輸出一行、只有代碼與比例、不含頁名」→ 是回報內容的原則（R2B、R2C、R5A 會列名稱給管理者自己對 App Designer）；
+  「推翻 3 次」→ 推翻或修正 4 個判斷（補上控制欄位元 8），並寫明第四輪 R4A 其實已算過正解 H1、最可能是抄錄少一行被記成 H0；
+  「不能切換 schema」→ 切換時報 ORA-02421；「沒有官方對照」→ 公開文件沒有完整對照（Oracle 只在 PeopleCode API 的 Query 類別 Flag 屬性列了 USEEDIT 位元；
+  Component 動作另有需登入的 Oracle Support 文件 617051.1）；「社群說法不一（例如 128）」→ 三份社群資料都寫 128＝Data Entry，
+  真正不一的是元件代碼名稱與缺漏（例如代碼 18）；§3 對照列「4 個代碼與社群不一致」→ 第三輪判不出、無法印證；R7 列 → 備案（實際跑的是 R7K）。
+- 連帶：代碼確認紀錄未定案事項的 128 改寫；第五輪說明檔加查核補註。
+- 做法上的教訓：給第三方看的報告，數字要附單位、主詞要精確（誰執行、哪幾輪）；從搜尋摘要得來的「說法不一」要有兩個以上來源才寫。

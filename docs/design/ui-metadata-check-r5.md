@@ -114,6 +114,9 @@ B8_N／B16_N＝FIELDUSE 帶 8／16 的欄位數；BOTH8＝控制欄裡帶 8 的�
 - R5B＝CTL_N 1105、B8_N 2044、BOTH8 84、REL_N 1984（B16_N、BOTH16 沒回）：以 tab order 找到的控制欄只有 8% 帶 8。帶 8 的欄位數和相關顯示個數相近，
   懷疑 ASSOCFIELDNUM 存的是控制欄的 Field ID（PNLFLDID）而不是 tab order → 第六輪 `ui-metadata-check-r6.md`。
 
+> 2026-10-22 查核補註：hankinfotec、peoplesoftdba、psoftsearch 三份社群資料都寫 AUTHORIZEDACTIONS 128＝Data Entry；上表「128 各家說法不一」
+> 來自當時的搜尋摘要，不採用。真正各家寫法不一的是元件代碼的名稱與缺漏（例如代碼 18）。
+
 ## 回報範本
 
 ```
