@@ -652,3 +652,4 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   同日續：R6 收——tab order、Field ID 都不對；有一批相關顯示的 ASSOCFIELDNUM 是 0 → 改測「從 0 起算」（L156），第七輪 SQL
   `docs/design/ui-metadata-check-r7.md` 待跑。§2l 的 RELATED_TO／DISPLAY_CONTROL 等第七輪再改。
   同日續：第七輪收（公司機 Claude 查 DB：控制欄 FIELDNUM＝ASSOCFIELDNUM＋1、FIELDUSE 8＝Display Control）→ §2l 改（L157）。
+  2026-10-22：管理者要一份給主管的報告 → `docs/design/ui-control-verification-report.md`（為什麼做、難在哪、七輪 39 段 SQL 各自用途、結果、品質保證；不寫數量）。
