@@ -58,8 +58,7 @@
 │  ├─ ps-spec-reader.md                Primary（同上）：L5 乾淨讀者，只讀 inbox 的渲染後文件
 │  └─ ps-spec-judge.md                 Primary（同上）：L5 文字題判定，只讀 inbox 工單
 ├─ plugin/
-│  └─ ps-runtime-guard.js             OpenCode 執行期無狀態 guard＋診斷：connect 的 connection_name 必須等於 profile 值
-│                                      （ORACLE_CONNECTION_MISMATCH／NOT_CONFIGURED）、task 的 subagent_type 不得是 skill 名
+│  └─ ps-runtime-guard.js             OpenCode 執行期無狀態 guard＋診斷：task 的 subagent_type 不得是 skill 名
 │                                      （PS_TASK_TARGET_INVALID）、oracleMCP 掛載診斷與受控重掛（預設關）；沒有派工前置閘門
 ├─ .npmrc                              offline=true——OpenCode 有 plugin 時啟動會等 @opencode-ai/plugin 安裝，斷網要它秒失敗
 ├─ command/

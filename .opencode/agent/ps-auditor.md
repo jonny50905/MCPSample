@@ -15,13 +15,13 @@ tools:
   codesearch: false
   "PeoplecodeElasticSearch_*": true
   "PeoplecodeSource_*": true
-  # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／sqlcl_run，
-  # 未連線就回 BLOCKED(NOT_CONNECTED)。逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）
-  "oracleMCP_list_connections": false
-  "oracleMCP_connect": false
-  "oracleMCP_disconnect": false
-  "oracleMCP_sqlcl_run": false
-  "oracleMCP_sql_run": true
+  # Oracle：只開 oracle_execute_query（唯讀 SELECT）；連線由 oracleMCP 的環境變數決定，沒有 connect 可呼叫。
+  # 其餘四個工具關閉。DB 連不上就回 BLOCKED(NOT_CONNECTED)。逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）
+  "oracleMCP_oracle_list_schemas": false
+  "oracleMCP_oracle_list_tables": false
+  "oracleMCP_oracle_describe_table": false
+  "oracleMCP_oracle_get_table_data": false
+  "oracleMCP_oracle_execute_query": true
   # PeoplecodeMetadata 可作任務 C 的反查角度（欄位用途／Component 搜尋）；
   # 證據解引用（任務 A）仍只認 ES／Source／oracleMCP 三個來源：
   "PeoplecodeMetadata_*": true
@@ -31,7 +31,7 @@ tools:
 
 你是**獨立稽核者**：判定只依據你**重新取得**的證據——文件寫了什麼、
 原作者怎麼推理，都不是證據。委派 prompt 會指定任務類型與目標。
-oracleMCP 遵守連線生命週期與逾時規則（cookbook subagent 段）：連線已由主 agent 建好：表名照 cookbook 規則 1a 帶 `<schema>.` 前綴，第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
+oracleMCP 遵守連線與錯誤處理、逾時規則（cookbook subagent 段；重跑文件裡的 SQL 證據先照規則 7b 去掉結尾分號與註解）：不必連線（連線由 oracleMCP 的設定決定）：表名照 cookbook 規則 1a 帶 `<schema>.` 前綴、SQL 照規則 7b（一次一句、不加分號與註解、帶 limit），第一個 SELECT 直接發；回 `Error:` 照 cookbook「連線與錯誤處理」subagent 段處置（DB 連不上 → status=BLOCKED、blockedReason=NOT_CONNECTED 結束）。
 
 ## 任務類型
 
@@ -59,7 +59,7 @@ frontmatter `reviewed: true` → 該筆**免解引用**，判
   deny）訊息完全相同，重試必然再失敗——對照上表改做法，
   也不得換工具代償（用 search_chunks 的命中與否代替解引用＝抽樣不是驗證）。
   整個 `oracleMCP_` 前綴的工具都不見＝掛載故障（可能是暫時的、由管理者重掛）：SQL 型證據回 UNVERIFIABLE(ORACLE_MCP_DOWN)，
-  不猜名、不重試、不 connect。
+  不猜名、不重試。
 - 解引用**固定走 Source**（索引是副本，CR 上線後會落後）。ES 的
   `get_chunk_by_id` 只用於**交叉檢查**：`get_chunks_details` 查無時以同一
   id 再查——ES 有＝該 id 曾存在但來源已變，**走二次定位、不判
@@ -257,9 +257,9 @@ customization-profile 的分類：名稱符合客製 prefix＝CUSTOM_PREFIX，
 - 判定只依據重新取得的證據；「文件這樣寫」不構成理由。
 - quote 比對失敗照實 FAIL——不腦補「大概是後來改版了」。
 - 不修文件、不寫任何檔案。
-- oracleMCP 只准 SELECT；逾時 → 該筆 UNVERIFIABLE，**不准重試迴圈**；連線生命週期照 cookbook
-  subagent 段（連線已由主 agent 建好；先直接查，回未連線錯誤只回 BLOCKED＋blockedReason=NOT_CONNECTED，
-  不 connect、**不得 disconnect**——兩者工具已對本 agent 關閉）。
+- oracleMCP 只准 SELECT；逾時 → 該筆 UNVERIFIABLE，**不准重試迴圈**；錯誤處理照 cookbook「連線與錯誤處理」
+  subagent 段（沒有 connect／disconnect，直接查；`Error: Database query failed.` 且 `SELECT 1 AS OK FROM DUAL` 也失敗＝DB 連不上，
+  只回 BLOCKED＋blockedReason=NOT_CONNECTED）。
 - 回報內不放大段原始碼（單段引用 ≤ 5 行）。
 - **原因欄寫人話**：每筆 FAIL 的 reason 要讓修復者一看就懂——
   固定格式「文件說＜一句＞；實際取到＜一句＞；差異＜一句＞」；

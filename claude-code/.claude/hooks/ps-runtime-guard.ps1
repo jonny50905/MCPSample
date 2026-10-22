@@ -1,18 +1,16 @@
 ﻿# ps-runtime-guard.ps1 — Claude Code hook：無狀態 guard，沒有派工閘門、沒有 READY／todo 狀態機
 #
-# -Mode pre（.claude/settings.json 的 PreToolUse，matcher：mcp__oracleMCP__connect|Agent|Task）
-#   (1) Oracle connect 目標：本次 connection_name 必須等於 profile oracle.connectionName。
-#       未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；不一致或沒帶 → ORACLE_CONNECTION_MISMATCH；工具不執行、不改參數。
-#       env PS_ORACLE_CONNECT_GUARD=observe 或 profile oracle.connectGuard: observe → 只記錄不擋（enforce 為預設）。
-#   (2) Agent 委派目標：skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker／Spec 文件的讀者、worker、判定）一律擋；
+# oracleMCP＝@vdeserto/oracle-mcp-server（唯讀；連線由 MCP 設定的環境變數決定，沒有 connect／disconnect 工具，hook 不攔任何 oracleMCP 工具）。
+# -Mode pre（.claude/settings.json 的 PreToolUse，matcher：Agent|Task）
+#   (1) Agent 委派目標：skill 名、主代理專用名（ps-orchestrator／ps-deep-research／ps-spec-worker／ps-clone-worker／Spec 文件的讀者、worker、判定）一律擋；
 #       呼叫者是 ps-* 主代理（hook 輸入的 agent_type）時更嚴：只准 .claude/agents 裡可當子代理的 ps-* agent——內建或不存在的代理、
 #       沒帶 subagent_type（＝內建 general-purpose）也擋。一般 session（沒有 --agent，agent_type 空）可用內建代理做維護／排錯。
 #       擋＝PS_TASK_TARGET_INVALID（訊息指出該派誰）。
 # -Mode post（PostToolUse，matcher：Agent|Task）
-#   (3) 子代理報告的 suggestedNext[].agent 是 skill 名或不是可委派的 agent → 以 additionalContext 附一段
+#   (2) 子代理報告的 suggestedNext[].agent 是 skill 名或不是可委派的 agent → 以 additionalContext 附一段
 #       「[ps-runtime-guard] …」註記（報告本文不動）。
 # -Mode path -PathProfile <spec-worker|clone-worker|status-reader|sdoc-worker|spec-reader|spec-judge|spec-author>（worker agent 的 frontmatter hooks）
-#   (4) 讀寫路徑白名單與 Bash 命令形狀；不在白名單 → PS_PATH_DENIED。hook 自己出錯也擋（fail-closed）。
+#   (3) 讀寫路徑白名單與 Bash 命令形狀；不在白名單 → PS_PATH_DENIED。hook 自己出錯也擋（fail-closed）。
 #
 # 擋＝stdout 印 PreToolUse 的 permissionDecision=deny JSON（理由文字就是模型看到的工具錯誤）；放行＝不印、exit 0。
 # 輸出 JSON 全部 \u 轉義成 ASCII（PS 5.1 主控台碼頁不影響）；stdin 以位元組讀入再 UTF-8 解碼。
@@ -92,52 +90,6 @@ function Get-PsGuardProp {
     return $p.Value
 }
 
-# profile 的 oracle: 區塊 → @{ key = value }（只需支援「  key: value」與 # 註解）
-function Read-PsGuardProfileOracle {
-    $out = @{}
-    $p = Join-Path $script:ClaudeDir (Join-Path 'peoplesoft' 'customization-profile.yaml')
-    if (-not (Test-Path -LiteralPath $p)) { return $out }
-    $text = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
-    if ($text.Length -gt 0 -and [int]$text[0] -eq 0xFEFF) { $text = $text.Substring(1) }
-    $inOracle = $false
-    foreach ($ln in ($text -split "`r?`n")) {
-        if ($ln -match '^oracle:\s*(#.*)?$') { $inOracle = $true; continue }
-        if (-not $inOracle) { continue }
-        if ($ln.Trim() -eq '' -or $ln.Trim().StartsWith('#')) { continue }
-        if ($ln -notmatch '^\s') { break }
-        $m = [regex]::Match($ln, '^\s+([A-Za-z_][A-Za-z0-9_]*):\s*([^#]*?)\s*(#.*)?$')
-        if ($m.Success) { $out[$m.Groups[1].Value] = ($m.Groups[2].Value -replace '^["'']|["'']$', '') }
-    }
-    return $out
-}
-
-function Get-PsGuardConnectMode {
-    param($Oracle)
-    $e = ([string]$env:PS_ORACLE_CONNECT_GUARD).Trim().ToLowerInvariant()
-    if ($e -eq 'enforce' -or $e -eq 'observe') { return $e }
-    $v = ([string]$Oracle['connectGuard']).Trim().ToLowerInvariant()
-    if ($v -eq 'enforce' -or $v -eq 'observe') { return $v }
-    return 'enforce'
-}
-
-function Get-PsGuardConnectProblem {
-    param([string]$ProfileName, [string]$Target)
-    $tail = '模型：不要猜、不要從 list_connections 的清單挑名字（清單把名稱和連線字串黏在一起）；本題不派會查 DB 的委派，' +
-        '向使用者回報「Oracle 連線未設定／連線名不一致（profile oracle.connectionName＝<值>）」，其餘部分照常作答。這不是 oracleMCP 掛載故障，不要重新連線 MCP。'
-    if ($ProfileName -eq '' -or $ProfileName.ToUpperInvariant() -eq 'FILL_ME') {
-        $shown = $ProfileName
-        if ($shown -eq '') { $shown = '空' }
-        return @{ Code = 'ORACLE_CONNECTION_NOT_CONFIGURED'; Message = ('ORACLE_CONNECTION_NOT_CONFIGURED：本次 mcp__oracleMCP__connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。profile oracle.connectionName 未填（目前＝' + $shown + '）——請管理者在 .claude/peoplesoft/customization-profile.yaml 回填 SQLcl 已儲存連線名（實際連得上的那個名字）。' + $tail) }
-    }
-    if ($Target -eq '') {
-        return @{ Code = 'ORACLE_CONNECTION_MISMATCH'; Message = ('ORACLE_CONNECTION_MISMATCH：本次 mcp__oracleMCP__connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。呼叫沒有帶 connection_name；只准連 profile oracle.connectionName 指定的「' + $ProfileName + '」——用 connection_name＝「' + $ProfileName + '」重新呼叫。') }
-    }
-    if ($Target -cne $ProfileName) {
-        return @{ Code = 'ORACLE_CONNECTION_MISMATCH'; Message = ('ORACLE_CONNECTION_MISMATCH：本次 mcp__oracleMCP__connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。connect 目標「' + $Target + '」≠ profile oracle.connectionName「' + $ProfileName + '」。只准連 profile 指定的連線：用 connection_name＝「' + $ProfileName + '」原樣重新呼叫 connect。' + $tail) }
-    }
-    return $null
-}
-
 function Get-PsGuardAgentNames {
     $names = @{}
     $d = Join-Path $script:ClaudeDir 'agents'
@@ -171,7 +123,7 @@ function Get-PsGuardTargetProblem {
     $agents = Get-PsGuardAgentNames
     $skills = Get-PsGuardSkillNames
     $list = (Get-PsGuardDelegatable) -join '／'
-    $tail = '這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要 connect、不要重新連線 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。'
+    $tail = '這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要重新連線 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。'
     if ($Target -eq '') {
         if (-not $Strict) { return $null }
         return @{ Code = $script:CodeTarget; Kind = 'missing'; Carrier = ''; Message = ($script:CodeTarget + '：本次 Agent 委派未執行——沒有指定 subagent_type（會落到內建 general-purpose，查不到 PeopleSoft）。可委派的 agent：' + $list + '。' + $tail) }
@@ -305,21 +257,6 @@ function Invoke-PsGuardPre {
     $ti = Get-PsGuardProp $In 'tool_input'
     $agent = [string](Get-PsGuardProp $In 'agent_type')
     $session = [string](Get-PsGuardProp $In 'session_id')
-    if ($tool -eq 'mcp__oracleMCP__connect') {
-        $oracle = Read-PsGuardProfileOracle
-        $profileName = ([string]$oracle['connectionName']).Trim()
-        $target = ''
-        foreach ($k in @('connection_name', 'connectionName', 'name', 'connection')) {
-            $v = Get-PsGuardProp $ti $k
-            if ($v -is [string] -and $v.Trim() -ne '') { $target = $v.Trim(); break }
-        }
-        $prob = Get-PsGuardConnectProblem -ProfileName $profileName -Target $target
-        if ($null -eq $prob) { Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'allow' -Code '' -Session $session; return }
-        if ((Get-PsGuardConnectMode -Oracle $oracle) -eq 'observe') { Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'observe' -Code $prob.Code -Session $session; return }
-        Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'deny' -Code $prob.Code -Session $session
-        Write-PsGuardDeny -Reason $prob.Message
-        return
-    }
     if ($tool -eq 'Agent' -or $tool -eq 'Task') {
         $target = ([string](Get-PsGuardProp $ti 'subagent_type')).Trim()
         # ps-* 主代理（--agent 啟動，hook 輸入帶 agent_type）走嚴格白名單；一般 session 只擋 skill 名與主代理專用名

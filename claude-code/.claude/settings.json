@@ -10,9 +10,7 @@
       "mcp__PeoplecodeElasticSearch",
       "mcp__PeoplecodeSource",
       "mcp__PeoplecodeMetadata",
-      "mcp__oracleMCP__list_connections",
-      "mcp__oracleMCP__connect",
-      "mcp__oracleMCP__sql_run",
+      "mcp__oracleMCP__oracle_execute_query",
       "Edit(./docs/ps-research/**)",
       "Edit(./.ps-runtime/spec/**)",
       "Edit(./.ps-runtime/clone-spec/**)",
@@ -23,7 +21,10 @@
       "PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)"
     ],
     "deny": [
-      "mcp__oracleMCP__sqlcl_run",
+      "mcp__oracleMCP__oracle_list_schemas",
+      "mcp__oracleMCP__oracle_list_tables",
+      "mcp__oracleMCP__oracle_describe_table",
+      "mcp__oracleMCP__oracle_get_table_data",
       "WebFetch",
       "WebSearch"
     ]
@@ -31,7 +32,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "mcp__oracleMCP__connect|Agent|Task",
+        "matcher": "Agent|Task",
         "hooks": [
           {
             "type": "command",

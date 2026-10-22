@@ -5,7 +5,7 @@
 # 範圍：合成「公司機部署」臨時目錄（scripts＋claude-code/* 去前綴，結束自刪）：
 #   A 兩版對照（agent／command／skill／契約一一對應、資料檔逐字相同、profile 鍵值相同）、不得殘留另一版字樣、frontmatter 形狀、
 #     settings.json、路徑與 MCP 工具名可解析；
-#   B hook（connect 目標、Agent 委派目標、suggestedNext 註記、worker 路徑白名單、Bash 命令形狀）；
+#   B hook（oracleMCP 工具不攔、Agent 委派目標、suggestedNext 註記、worker 路徑白名單、Bash 命令形狀）；
 #   C 外環版本層（版本判定、Claude Code 命令列、stream-json 抽最終回覆、搬運 manifest 與 generic manifest 是最新、知識索引用法行、能力目錄路徑）。
 param([switch]$WriteGenericManifest)
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -165,10 +165,9 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/agents') -Fi
     if ($toolList.Count -eq 0) { $fmBad += ($n + ':tools') }
     if ($subagents -contains $n) {
         if ($toolList -contains 'Agent' -or $toolList -contains 'Task') { $fmBad += ($n + ':子代理不得再委派') }
-        if (@($toolList | Where-Object { $_ -match '^mcp__oracleMCP__(connect|list_connections|disconnect|sqlcl_run)$' }).Count -gt 0) { $fmBad += ($n + ':子代理不開連線工具') }
+        if (@($toolList | Where-Object { $_ -match '^mcp__oracleMCP' -and $_ -ne 'mcp__oracleMCP__oracle_execute_query' }).Count -gt 0) { $fmBad += ($n + ':子代理的 oracleMCP 只開 oracle_execute_query') }
     }
-    if ($dbMain -contains $n -and $toolList -notcontains 'mcp__oracleMCP__connect') { $fmBad += ($n + ':主代理要能 connect') }
-    if (@($toolList | Where-Object { $_ -match '^mcp__oracleMCP__(disconnect|sqlcl_run)$' }).Count -gt 0) { $fmBad += ($n + ':disconnect／sqlcl_run 不開') }
+    if ($dbMain -contains $n -and @($toolList | Where-Object { $_ -match '^mcp__oracleMCP' }).Count -gt 0) { $fmBad += ($n + ':主代理不開 oracleMCP 工具（沒有開線步驟）') }
     if ($pathProfiles.ContainsKey($n)) {
         if ($fm -notmatch ('-Mode path -PathProfile ' + $pathProfiles[$n] + '"')) { $fmBad += ($n + ':路徑 hook') }
     }
@@ -200,8 +199,10 @@ if ($null -ne $settings) {
     $preCmd = [string]$settings.hooks.PreToolUse[0].hooks[0].command
     $postCmd = [string]$settings.hooks.PostToolUse[0].hooks[0].command
     Assert ([string]$settings.model -eq 'sonnet' -and $null -eq $settings.PSObject.Properties['agent']) "settings：模型 sonnet、不設預設主代理（直接 claude＝一般 session，可做維護排錯）"
-    Assert ($allow -contains 'mcp__oracleMCP__connect' -and $allow -contains 'mcp__oracleMCP__sql_run' -and $allow -contains 'Edit(./docs/ps-research/**)' -and $deny -contains 'mcp__oracleMCP__sqlcl_run' -and $allow -notcontains 'mcp__oracleMCP__disconnect') "settings：headless 需要的工具在允許清單、sqlcl_run 拒絕、disconnect 不預先允許"
-    Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'mcp__oracleMCP__connect' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 掛 connect 與 Agent"
+    $oracleAllow = @($allow | Where-Object { [string]$_ -match '^mcp__oracleMCP' })
+    $oracleDenyNeed = @('mcp__oracleMCP__oracle_list_schemas', 'mcp__oracleMCP__oracle_list_tables', 'mcp__oracleMCP__oracle_describe_table', 'mcp__oracleMCP__oracle_get_table_data')
+    Assert ($oracleAllow.Count -eq 1 -and $oracleAllow[0] -eq 'mcp__oracleMCP__oracle_execute_query' -and $allow -contains 'Edit(./docs/ps-research/**)' -and @($oracleDenyNeed | Where-Object { $deny -notcontains $_ }).Count -eq 0) "settings：oracleMCP 只允許 oracle_execute_query、其餘四個工具拒絕；headless 需要的寫入在允許清單"
+    Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -notmatch 'oracleMCP' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 只掛 Agent（oracleMCP 沒有 connect 可比對）"
     Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
     Assert ([string]$settings.env.BASH_MAX_TIMEOUT_MS -eq '7200000') "settings：Bash 上限 2 小時（ps-spec-author 的 ps-sdoc 長跑）"
     Assert ($allow -contains 'Bash(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'Edit(./.ps-runtime/sdoc/**)') "settings：ps-spec-author 可跑 ps-sdoc、headless worker 可寫 .ps-runtime/sdoc"
@@ -212,7 +213,7 @@ Assert ($hb.Length -ge 3 -and $hb[0] -eq 0xEF -and $hb[1] -eq 0xBB -and $hb[2] -
 
 $modelFiles = @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude') -File -Recurse -Include '*.md') + @(Get-Item -LiteralPath (Join-Path $cc 'CLAUDE.md'))
 $badRef = @()
-$knownTools = @('mcp__oracleMCP__list_connections', 'mcp__oracleMCP__connect', 'mcp__oracleMCP__disconnect', 'mcp__oracleMCP__sql_run', 'mcp__oracleMCP__sqlcl_run',
+$knownTools = @('mcp__oracleMCP__oracle_execute_query', 'mcp__oracleMCP__oracle_list_schemas', 'mcp__oracleMCP__oracle_list_tables', 'mcp__oracleMCP__oracle_describe_table', 'mcp__oracleMCP__oracle_get_table_data',
     'mcp__PeoplecodeElasticSearch__search_chunks', 'mcp__PeoplecodeSource__get_chunks_details', 'mcp__PeoplecodeSource__get_file_structure',
     'mcp__PeoplecodeMetadata__find_field_usage', 'mcp__PeoplecodeMetadata__search_component_metadata', 'mcp__PeoplecodeMetadata__get_ae_sql_metadata')
 $badTool = @()
@@ -228,7 +229,7 @@ foreach ($f in $modelFiles) {
         if ($knownTools -notcontains $m.Value) { $badTool += ((Get-RelUnder $cc $f.FullName) + '→' + $m.Value) }
     }
 }
-# oracleMCP 工具實名是底線拼法 sql_run／sqlcl_run／list_connections（舊錯名與連字號拼法不得回流，同 test-auto-loop 情境 31）
+# oracleMCP（@vdeserto/oracle-mcp-server）的工具實名是 oracle_execute_query 等底線拼法；SQLcl 時代的錯名與連字號拼法不得回流（同 test-auto-loop 情境 31）
 $wrongPat = ('run_' + 'sql') + '|' + ('list' + '-connections') + '|' + ('run' + '-sql') + '|' + ('sql' + '-run') + '|' + ('sqlcl' + '-run')
 $wrongName = @($ccAll | Where-Object { (Read-Norm $_.FullName) -match $wrongPat } | ForEach-Object { Get-RelUnder $cc $_.FullName })
 Assert ($wrongName.Count -eq 0) ("oracleMCP 工具名一律底線實名（無舊錯名、無連字號拼法）" + $(if ($wrongName.Count -gt 0) { '：' + ($wrongName -join ', ') } else { '' }))
@@ -252,21 +253,14 @@ try {
         return $o
     }
     function Get-Deny { if ($null -eq $script:hookObj) { return '' }; return [string]$script:hookObj.hookSpecificOutput.permissionDecisionReason }
-    $connect = '{"tool_name":"mcp__oracleMCP__connect","tool_input":{"connection_name":"HR_UAT"},"agent_type":"ps-orchestrator","session_id":"t"}'
-    $null = Invoke-Hook $connect
-    Assert ((Get-Deny) -like 'ORACLE_CONNECTION_NOT_CONFIGURED*' -and $script:hookExit -eq 0) "connect：profile FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED（deny JSON、exit 0）"
+    $q = '{"tool_name":"mcp__oracleMCP__oracle_execute_query","tool_input":{"sql":"SELECT 1 AS OK FROM DUAL","limit":1},"agent_type":"ps-ui-flow","session_id":"t"}'
+    $o = Invoke-Hook $q
+    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "oracleMCP 查詢：hook 不攔（沒有 connect 目標可比對；放行＝無輸出、exit 0）"
+    $o = Invoke-Hook '{"tool_name":"mcp__oracleMCP__connect","tool_input":{"connection_name":"HR_UAT"},"agent_type":"ps-orchestrator","session_id":"t"}'
+    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "舊的 connect 工具名：hook 不再比對 profile（新 server 沒有這個工具）"
+    $hookSrc = [System.IO.File]::ReadAllText($hook)
+    Assert ($hookSrc -notmatch 'ORACLE_CONNECTION_' -and $hookSrc -notmatch 'connectionName' -and $hookSrc -notmatch 'PS_ORACLE_CONNECT_GUARD') "hook 原始碼沒有連線目標比對的殘留（錯誤碼、profile 鍵、observe 開關）"
     $pf = Join-Path $dep '.claude/peoplesoft/customization-profile.yaml'
-    [System.IO.File]::WriteAllText($pf, ([System.IO.File]::ReadAllText($pf) -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV'), (New-Object System.Text.UTF8Encoding($false)))
-    $null = Invoke-Hook $connect
-    Assert ((Get-Deny) -like 'ORACLE_CONNECTION_MISMATCH*HR_DEV*') "connect：目標≠profile → ORACLE_CONNECTION_MISMATCH（訊息帶 profile 值）"
-    $o = Invoke-Hook ($connect -replace 'HR_UAT', 'HR_DEV')
-    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "connect：目標＝profile → 放行（無輸出）"
-    $null = Invoke-Hook '{"tool_name":"mcp__oracleMCP__connect","tool_input":{},"session_id":"t"}'
-    Assert ((Get-Deny) -like 'ORACLE_CONNECTION_MISMATCH*') "connect：沒帶 connection_name → MISMATCH"
-    $env:PS_ORACLE_CONNECT_GUARD = 'observe'
-    $o = Invoke-Hook $connect
-    Remove-Item -Path Env:\PS_ORACLE_CONNECT_GUARD -ErrorAction SilentlyContinue
-    Assert ($o.Trim() -eq '') "connect：PS_ORACLE_CONNECT_GUARD=observe → 只記錄不擋"
     $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-security-flow","prompt":"x"}}'
     Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow（一般 session 也擋）"
     $o = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","prompt":"x"}}'
@@ -550,7 +544,7 @@ try {
     $imd = [System.IO.File]::ReadAllText((Join-Path $dep 'docs/ps-research/knowledge/index.md'))
     $omd = [System.IO.File]::ReadAllText((Join-Path $dep 'docs/ps-research/knowledge/objects.md'))
     Assert ($pub.published -and $imd -match '\.claude/peoplesoft/knowledge-retrieval-contract\.md' -and $imd -match 'path=docs/ps-research/knowledge/index\.md，output_mode=content' -and $omd -match 'path=docs/ps-research/knowledge/objects\.md' -and $imd -notmatch '(?i)opencode') "知識索引：用法行是 Claude Code 的 Grep／Read 形狀與 .claude 契約路徑"
-    # B 段把 profile 的 connectionName 改成測試值——先還原再驗搬運完整性
+    # 先還原 profile 再驗搬運完整性
     Copy-Item -LiteralPath (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml') -Destination $pf -Force
     $fsd = ((& (Join-Path $dep 'scripts/ps-fs-doctor.ps1') *>&1 | ForEach-Object { [string]$_ }) -join "`n")
     Assert ($fsd -match '檢查 M\] 搬運完整性（Claude Code 版' -and $fsd -match '結論代號：G') "fs-doctor：部署模擬目錄對 Claude Code 版 manifest 全部一致（scripts/ps-transfer-manifest.claude.json 是最新）"
@@ -572,8 +566,8 @@ try {
     }
     try {
         $doc1 = ((& (Join-Path $dep 'scripts/ps-claude-doctor.ps1') -Offline *>&1 | ForEach-Object { [string]$_ }) -join "`n")
-        Assert ($doc1 -match '結論代號：F$' -or $doc1 -match '結論代號：F\s') "ps-claude-doctor -Offline：profile 未回填 → 只報 F（版本判定、powershell、hook 自測都過）"
-        [System.IO.File]::WriteAllText($pf, ([System.IO.File]::ReadAllText($pf) -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV'), (New-Object System.Text.UTF8Encoding($false)))
+        Assert ($doc1 -match '結論代號：F$' -or $doc1 -match '結論代號：F\s') "ps-claude-doctor -Offline：profile currentSchema 未回填 → 只報 F（版本判定、powershell、hook 自測都過）"
+        [System.IO.File]::WriteAllText($pf, ([System.IO.File]::ReadAllText($pf) -replace '(?m)^  currentSchema: FILL_ME', '  currentSchema: DEMOOWN'), (New-Object System.Text.UTF8Encoding($false)))
         $doc2 = ((& (Join-Path $dep 'scripts/ps-claude-doctor.ps1') -Offline *>&1 | ForEach-Object { [string]$_ }) -join "`n")
         Assert ($doc2 -match '結論代號：G') "ps-claude-doctor -Offline：回填後 → G"
         Copy-Item -LiteralPath (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml') -Destination $pf -Force

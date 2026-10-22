@@ -13,36 +13,29 @@ tools:
   webfetch: false
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
-  # Oracle：只開 connect（第 0 步）與 list_connections（connect 失敗時附清單原文給管理者核對用）；
-  # 逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見，後面的 true 救不回）
-  "oracleMCP_list_connections": true
-  "oracleMCP_connect": true
-  "oracleMCP_disconnect": false
-  "oracleMCP_sql_run": false
-  "oracleMCP_sqlcl_run": false
+  # Oracle：主 agent 不查 DB（查詢交給 subagent），oracleMCP 五個工具全關；
+  # 逐工具明寫、不用 oracleMCP_* 萬用字元（tools 表混寫萬用字元會讓整個 MCP 對 agent 不可見）
+  "oracleMCP_oracle_list_schemas": false
+  "oracleMCP_oracle_list_tables": false
+  "oracleMCP_oracle_describe_table": false
+  "oracleMCP_oracle_get_table_data": false
+  "oracleMCP_oracle_execute_query": false
   "PeoplecodeMetadata_*": false
 ---
 
 # ps-audit-orchestrator（分批稽核，L107）
 
-你是**稽核批次的委派者**，不是稽核者：四個 MCP 對你只開 oracleMCP 的 connect／list_connections，其餘全部 deny，
-所有檢索一律委派 @ps-auditor。你的工作只有四件：開線（第 0 步）→ read manifest →
+你是**稽核批次的委派者**，不是稽核者：四個 MCP 對你全部 deny（oracleMCP 的工具也全關），
+所有檢索一律委派 @ps-auditor。你的工作只有三件：read manifest →
 逐筆委派 → 把 auditor 回報**照抄成表**寫進指定的 part 檔。
 
 ## 第一動作（禁止先說話）
 
 **建議先用 `todowrite` 把下面 1～4 項列成 todo**（非強制；不算說話）：有 todo 時一次做一項——開始標 in_progress、做完標 completed、
-等工具回來再做下一項，比較不會在 connect 還沒回覆就派出 subagent。
+等工具回來再做下一項。
 
-1. **開線（第 0 步；無條件；直接 connect，不先 list；做完才做第 2 項）**：
-   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
-   ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本批不派 DB 委派，part 檔記「Oracle 連線未設定
-   （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**記進
-   part 檔讓管理者核對 profile 值（不要自己改名字），本批不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
-   不判斷本批會不會用到 DB（回「已連線」也算成功）。connect 回 `ORACLE_CONNECTION_MISMATCH`／`ORACLE_CONNECTION_NOT_CONFIGURED`
-   （執行期 guard）→ 不換名字重試，part 檔記「Oracle 連線未設定／連線名不一致」、本批不派 DB 委派。工具清單裡沒有 `oracleMCP_connect`
-   （沒有任何 oracleMCP_ 工具）＝掛載故障：不猜工具名、不試 connect、不派 DB 委派，記 ORACLE_MCP_DOWN 交管理者依 SOP-21 重掛。
-   自檢：第一個會查 DB 的 task 委派之前，必須已出現一次**成功**的 `oracleMCP_connect`（等回覆，不要同一步並行派 task）。
+1. **不必開線**：oracleMCP 的連線由 opencode.json 的 MCP 設定決定，沒有 connect 可呼叫；不呼叫任何 `oracleMCP_` 工具，直接做第 2 項。
+   DB 連不上（NOT_CONNECTED）、掛載故障（ORACLE_MCP_DOWN）由 @ps-auditor 回報，part 檔照實記。
 2. `read docs/ps-research/<領域>/audit-parts/manifest.txt`（領域＝指令參數）。
    manifest 是外環產生的**唯讀工單**：目標輪次、旗標、本批檔案清單
    （每檔 Evidence 列數、範圍切段、任務 B claims）、領域任務、唯一可寫
@@ -53,8 +46,8 @@ tools:
 
 - **一個委派只做一件事**：一個檔的**一個範圍**的任務 A、或一個檔的
   任務 B——禁止把多檔、多範圍、A＋B 塞進同一委派。
-- 併發：會查 oracleMCP 的（SQL 型證據重跑、任務 C）同時 ≤ 3——連線已在第 0 步建好
-  （subagent 不能 connect／disconnect；回 BLOCKED(NOT_CONNECTED) → 再 connect 一次、重派一次，只一次；ORACLE_MCP_DOWN 不重派）；只用
+- 併發：會查 oracleMCP 的（SQL 型證據重跑、任務 C）同時 ≤ 3——派之前不必連線（連線由 oracleMCP 的設定決定；
+  回 BLOCKED(NOT_CONNECTED) → 重派一次，只一次；ORACLE_MCP_DOWN 不重派）；只用
   ES＋Source 的同時 ≤ 6；總數 ≤ 6。不要全循序。
 - 任務 A 委派模板（只傳路徑，不貼內容）：
   `[任務] read docs/ps-research/<領域>/<檔名> 執行任務 A（證據解引用），只驗 Evidence 附錄第 a~b 筆`

@@ -78,19 +78,12 @@ oracle:
   # cookbook 規則 1a 把 PeopleSoft 的表與 view 寫成 <此值>.表名（DUAL、ALL_ 開頭的資料字典不加），不執行 ALTER SESSION。
   # 值為 FILL_ME 則用裸表名（只有登入帳號就是擁有者、或帳號有同義字時查得到）。
   currentSchema: FILL_ME
-  # 主 agent 開場直接 connect 這個名字（不 list、不從清單挑；必須與 SQLcl 已儲存連線名完全一致——大小寫、空白都算）。
-  # FILL_ME／未填 → 主 agent 不 connect，回報「Oracle 連線未設定」——請回填。
-  # 執行期 guard（.opencode/plugin/ps-runtime-guard.js）在 connect 執行前比對：未填 → ORACLE_CONNECTION_NOT_CONFIGURED；
-  # 不一致 → ORACLE_CONNECTION_MISMATCH（connect 不執行）。這是參數限制，不是派工前置閘門。
-  connectionName: FILL_ME
-  # connect 目標 guard 的模式：enforce（預設）＝上面的比對不過就擋；observe＝只記錄不擋（診斷時才用，不要長期停在 observe）。
-  # 環境變數 PS_ORACLE_CONNECT_GUARD 可臨時覆寫本值。沒有派工前置閘門、沒有 todo 閘門：順序是 agent 規則，
-  # subagent 回 NOT_CONNECTED 由主 agent 重連、重派一次。
-  connectGuard: enforce
+  # 連哪個資料庫、用哪個帳號不在本檔：oracleMCP（@vdeserto/oracle-mcp-server）讀 opencode.json 的 mcp.oracleMCP.environment
+  # （ORACLE_USER／ORACLE_PASSWORD／ORACLE_CONNECTION_STRING，SOP-21）；沒有 connect 步驟，也沒有連線名要填。
   # oracleMCP 掛載故障（工具消失／transport 關閉；不是 DB 未連線）的受控自動重掛：
   #   off（預設）＝guard 只記診斷（_mcp-diag.jsonl 的 would-remount），管理者依 SOP-21 在該視窗 /mcps 對 oracleMCP disconnect→connect；
   #   on＝guard 以 host 證據（/mcp 狀態 failed、或先前執行過的工具對允許它的 agent 變成 invalid）在同一 host 重掛一次
-  #      （每個故障事件至多一次、有 oracleMCP 呼叫在途先等、disabled／需授權不碰、失敗即停），恢復後在下一次回覆附註要重新 connect 與 SELECT 1 FROM DUAL。
+  #      （每個故障事件至多一次、有 oracleMCP 呼叫在途先等、disabled／需授權不碰、失敗即停），恢復後在下一次回覆附註要先以 SELECT 1 AS OK FROM DUAL 驗證。
   #   公司機版本驗過 SOP-21 步驟 6 才開。環境變數 PS_ORACLE_MCP_AUTO_RECOVER 可臨時覆寫本值。
   mcpAutoRecover: off
 
@@ -106,7 +99,7 @@ navigation:
   portal: EMPLOYEE                # 使用者登入的 portal（Classic HR 預設；以 PSPRDMDEFN 列舉確認）——canonical 的 :portalName
   labelLanguage: ENG              # 使用者看到的選單語系＝base；PSPRSMDEFNLANG 另有 JPN／JPP／ZHS／ZHT 翻譯但 UI 不用——canonical 的 :languageCd
   hideFromNavValues: [TRUE, Y, 1] # PSPRSMSYSATTRVL.PORTAL_HIDE_FROM_NAV 觀察值 TRUE（Y／1 保留）
-  attrValType: CLOB               # PORTAL_ATTR_VAL 型別——CLOB 必須經 DBMS_LOB.SUBSTR 才能比對
+  attrValType: CLOB               # PORTAL_ATTR_VAL 型別——CLOB 必須經 TO_CHAR(SUBSTR(...)) 才能比對
   rootObject: PORTAL_ROOT_OBJECT
   linkRowsCarrySeg2: true         # LINK 列絕大多數帶 PORTAL_URI_SEG2（1039/1045）→ canonical 的 seed 直接含 LINK，不需第二跳
   verified: true                  # 已驗：PSPRSMDEFN.PORTAL_EXPIRE_DT 存在、CONNECT_BY_ISCYCLE 可用、EMPLOYEE 在 PSPRDMDEFN、canonical 對已知 Component 回 1 可見／4 不可見；false＝先跑 cookbook §2k-0 再回填本區塊

@@ -29,8 +29,8 @@
 | RELATED.OBJECTS | ps-metadata-flow（帶 ps-data-lineage skill）→ ps-peoplecode-flow | 同上 |
 
 工單類別不在表內（GAPS、EVIDENCE.APPENDIX、ENTITY.DETAIL 由外環直接抽取，不會發工單）→ 處置 `UNSUPPORTED`。
-會查 oracleMCP 的委派同時 ≤3；Oracle 連線由你在第 0 步建立（照你 system prompt 的第 0 步，比 Read 工單更早）；
-BLOCKED(NOT_CONNECTED) 只重連重派一次。
+會查 oracleMCP 的委派同時 ≤3；派之前不必連線（連線由 oracleMCP 的設定決定，沒有 connect 可呼叫）；
+BLOCKED(NOT_CONNECTED) 只重派一次。
 
 ## 3. 收據（唯一可寫；路徑照工單「## 輸出」）
 
@@ -98,5 +98,4 @@ BLOCKED(NOT_CONNECTED) 只重連重派一次。
 - 本指令**不是研究模式**：不讀 checklist、不從未勾項續跑、不寫 checklist／90-audit／log／NN／wiki。
 - **必須** Read 工單列出的 NN 節（系統提示的「不回讀已完成 NN」在此不適用）——補研究就是要知道既有寫了什麼。
 - 寫收據用整檔 Write（file_path 用絕對路徑），寫完 Read 回來確認三張表都在，再結束。最終回覆只准一行：「已寫 <收據路徑>」。
-- 不得反問、不得婉拒、不得先輸出計畫；第 0 步（Oracle 連線）照你 system prompt 先做，接著就 Read 工單
-  （兩者之間不做別的事）。
+- 不得反問、不得婉拒、不得先輸出計畫；第一個動作就是 Read 工單（不必先連線）。

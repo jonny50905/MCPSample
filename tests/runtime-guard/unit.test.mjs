@@ -1,8 +1,8 @@
 // unit.test.mjs — ps-runtime-guard 的單元測試（node --test；零相依）
 // 用法：node --test tests/runtime-guard/unit.test.mjs   （repo 根目錄執行）
-// 受測：(1) connect 目標 guard（無狀態、只比對本次參數）；(2) task 目標檢查（skill 名擋下並指出承載 agent；suggestedNext 驗證附註）；
-//       (3) oracleMCP 診斷與受控重掛（host 證據觸發、每個故障事件一次、在途不重掛、disabled 不覆蓋、失敗即停、恢復附註一次）。
-// 沒有派工閘門可測：task 在 connect 之前一律放行，紀錄列上沒有 state／next／READY。
+// 受測：(1) task 目標檢查（skill 名擋下並指出承載 agent；suggestedNext 驗證附註）；
+//       (2) oracleMCP 診斷與受控重掛（host 證據觸發、每個故障事件一次、在途不重掛、disabled 不覆蓋、失敗即停、恢復附註一次）。
+// oracleMCP＝@vdeserto/oracle-mcp-server：沒有 connect 工具、guard 不擋任何 oracleMCP_ 呼叫（只記錄）；紀錄列上沒有 state／next／READY。
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import fs from "node:fs"
@@ -57,15 +57,15 @@ function copyDir(src, dst) {
   }
 }
 
-function tempProject({ connectionName = "HR", connectGuard, autoRecover, extraAgent } = {}) {
+function tempProject({ autoRecover, extraAgent } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guard-unit-"))
   copyDir(path.join(repoRoot, ".opencode", "agent"), path.join(dir, ".opencode", "agent"))
   copyDir(path.join(repoRoot, ".opencode", "skills"), path.join(dir, ".opencode", "skills"))
   fs.mkdirSync(path.join(dir, ".opencode", "peoplesoft"), { recursive: true })
   if (extraAgent) fs.writeFileSync(path.join(dir, ".opencode", "agent", extraAgent.name + ".md"), extraAgent.text)
   const profile =
-    "searchPolicy:\n  defaultMode: CUSTOM_FIRST\noracle:\n  currentSchema: FILL_ME\n  connectionName: " + connectionName + "\n" +
-    (connectGuard ? `  connectGuard: ${connectGuard}\n` : "") + (autoRecover ? `  mcpAutoRecover: ${autoRecover}\n` : "") +
+    "searchPolicy:\n  defaultMode: CUSTOM_FIRST\noracle:\n  currentSchema: FILL_ME\n" +
+    (autoRecover ? `  mcpAutoRecover: ${autoRecover}\n` : "") +
     "businessDomainMap: business-domain-map.yaml\n"
   fs.writeFileSync(path.join(dir, ".opencode", "peoplesoft", "customization-profile.yaml"), profile)
   return dir
@@ -85,7 +85,8 @@ async function call(hooks, sid, tool, callID, out, args = {}) {
   await before(hooks, sid, tool, callID, args)
   await after(hooks, sid, tool, callID, out, args)
 }
-const connect = (hooks, sid, id = "c", text = "Successfully connected to HR", name = "HR") => call(hooks, sid, "oracleMCP_connect", id, mcpOk(text), { connection_name: name })
+const Q = "oracleMCP_oracle_execute_query"
+const query = (hooks, sid, id, text = "**1 linha(s) retornada(s)**\n\n| OK |\n| --- |\n| 1 |", sql = "SELECT 1 AS OK FROM DUAL") => call(hooks, sid, Q, id, mcpOk(text), { sql, limit: 1 })
 const task = (hooks, sid, id, target = "ps-ui-flow") => hooks["tool.execute.before"]({ tool: "task", sessionID: sid, callID: id }, taskArgs(target))
 function taskOut(child, body, state) { return { title: "t", metadata: { parentSessionId: S, sessionId: child }, output: wrap(child, body, state) } }
 async function taskDone(hooks, sid, id, body, { target = "ps-ui-flow", child = "ses_child_" + id, state = "completed" } = {}) {
@@ -113,51 +114,33 @@ const last = (dir, session) => readLog(dir, session).at(-1)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const noState = (rows) => rows.every((r) => !("state" in r) && !("next" in r) && !("turnId" in r) && !("gen" in r))
 
-test("connect 目標 guard：一致放行；不一致／沒帶名字／profile 未填在執行前擋（無狀態，訊息不提閘門／READY／todo）", async () => {
+test("oracleMCP_ 呼叫一律只記錄、不擋（沒有 connect 工具也沒有連線目標可比對）；回覆三態：Error: 開頭／isError＝false、空＝unknown", async () => {
   const dir = tempProject()
   const hooks = await PsRuntimeGuard({ directory: dir, client: fakeClient() })
-  await chat(hooks, S, "m1")
-  await connect(hooks, S, "c1")
-  let log = readLog(dir, S)
-  const b1 = log.find((l) => l.hook === "before" && l.callID === "c1")
-  const a1 = log.find((l) => l.hook === "after" && l.callID === "c1")
-  assert.ok(b1.decision === "allow" && b1.mode === "enforce" && b1.connection === "HR" && b1.profileConnection === "HR" && b1.messageID === "m1", JSON.stringify(b1))
-  assert.ok(a1.ok === true && a1.connection === "HR" && a1.outputLength > 0, JSON.stringify(a1))
-  await assert.rejects(() => before(hooks, S, "oracleMCP_connect", "c2", { connection_name: "HR_UAT" }), (e) =>
-    /ORACLE_CONNECTION_MISMATCH/.test(e.message) && /「HR_UAT」≠/.test(e.message) && !/READY/.test(e.message) && !/PREFLIGHT/.test(e.message) && !/todowrite/.test(e.message) && !/閘門/.test(e.message))
-  await assert.rejects(() => before(hooks, S, "oracleMCP_connect", "c3", {}), /ORACLE_CONNECTION_MISMATCH/)
-  log = readLog(dir, S)
-  assert.deepEqual(log.filter((l) => l.callID === "c2" || l.callID === "c3").map((l) => [l.hook, l.decision, l.note]), [["before", "block", "ORACLE_CONNECTION_MISMATCH"], ["before", "block", "ORACLE_CONNECTION_MISMATCH"]])
+  await chat(hooks, S, "m1", "ps-ui-flow")
+  await query(hooks, S, "q1")
+  await query(hooks, S, "q2", "Error: Database query failed.")
+  await query(hooks, S, "q3", "Error: Múltiplos statements (;) não são permitidos.", "SELECT 1 FROM DUAL;")
+  await query(hooks, S, "q4", "Error: Failed to connect to Oracle database. Check your connection settings.")
+  await call(hooks, S, Q, "q5", { content: [] }, { sql: "SELECT 1 AS OK FROM DUAL" })
+  await call(hooks, S, Q, "q6", { content: [{ type: "text", text: "x" }], isError: true }, { sql: "SELECT 1 AS OK FROM DUAL" })
+  // 舊名（SQLcl 的 connect）若被呼叫也只記錄、不擋——工具不存在時 OpenCode 自己會改判成 invalid
+  await call(hooks, S, "oracleMCP_connect", "c1", mcpOk("x"), { connection_name: "HR" })
+  const log = readLog(dir, S)
+  const row = (id, hook) => log.find((l) => l.hook === hook && l.callID === id)
+  assert.ok(["q1", "q2", "q3", "q4", "q5", "q6", "c1"].every((id) => row(id, "before").decision === "observe" && row(id, "before").messageID === "m1"))
+  assert.equal(row("q1", "after").ok, true)
+  for (const id of ["q2", "q3", "q4"]) assert.equal(row(id, "after").ok, false, id)
+  assert.match(row("q4", "after").failureMatch, /error|connect/i)
+  assert.equal(row("q5", "after").ok, "unknown")
+  assert.equal(row("q6", "after").ok, false)
+  assert.ok(log.every((l) => l.decision !== "block"), "nothing on oracleMCP is blocked")
+  assert.ok(log.every((l) => !("connection" in l) && !("profileConnection" in l) && !("mode" in l)), "no connect-target fields")
   assert.ok(noState(log), "rows carry no dispatch state")
-  // profile 未填
-  const dir2 = tempProject({ connectionName: "FILL_ME" })
-  const hooks2 = await PsRuntimeGuard({ directory: dir2, client: fakeClient() })
-  await chat(hooks2, S, "m1")
-  await assert.rejects(() => before(hooks2, S, "oracleMCP_connect", "c1", { connection_name: "HR" }), (e) => /ORACLE_CONNECTION_NOT_CONFIGURED/.test(e.message) && /不要重掛/.test(e.message))
-  assert.equal(last(dir2, S).note, "ORACLE_CONNECTION_NOT_CONFIGURED")
-  // observe：只記錄不擋（profile 與 env 都能設）
-  const dir3 = tempProject({ connectGuard: "observe" })
-  const hooks3 = await PsRuntimeGuard({ directory: dir3, client: fakeClient() })
-  await chat(hooks3, S, "m1")
-  await call(hooks3, S, "oracleMCP_connect", "c1", mcpOk("Successfully connected to HR_UAT"), { connection_name: "HR_UAT" })
-  const rows3 = readLog(dir3, S).filter((l) => l.callID === "c1")
-  assert.deepEqual(rows3.map((l) => [l.hook, l.decision, l.note, l.mode]), [["before", "observe-would-block", "ORACLE_CONNECTION_MISMATCH", "observe"], ["after", undefined, undefined, undefined]])
-  process.env.PS_ORACLE_CONNECT_GUARD = "observe"
-  try {
-    await call(hooks, S, "oracleMCP_connect", "c9", mcpOk("ok"), { connection_name: "HR_UAT" })
-    assert.equal(readLog(dir, S).find((l) => l.hook === "before" && l.callID === "c9").decision, "observe-would-block")
-  } finally {
-    delete process.env.PS_ORACLE_CONNECT_GUARD
-  }
-  // 成功回覆引用 ORA-nnnnn 不算失敗；失敗句型記 ok:false；空輸出記 unknown——都只是紀錄
-  await connect(hooks, S, "c4", "Successfully connected to HR. (Note: ORA-12170 timeouts are reported as errors)")
-  await connect(hooks, S, "c5", "Connection not established: ORA-12541 TNS:no listener")
-  await call(hooks, S, "oracleMCP_connect", "c6", { content: [] }, { connection_name: "HR" })
-  const afters = (id) => readLog(dir, S).find((l) => l.hook === "after" && l.callID === id)
-  assert.equal(afters("c4").ok, true); assert.equal(afters("c5").ok, false); assert.match(afters("c5").failureMatch, /connection not/); assert.equal(afters("c6").ok, "unknown")
+  assert.equal(readDiag(dir).filter((d) => d.kind === "recovery").length, 0, "DB-level errors are never MCP recovery evidence")
 })
 
-test("沒有派工閘門：task 在 connect 之前一律放行；能力只是紀錄欄位（dbCapable）；sql_run after 三態只記錄", async () => {
+test("沒有派工閘門：task 一律放行（不擋 DB 委派）；能力只是紀錄欄位（dbCapable＝tools 表開 oracle_execute_query）；查詢 after 三態只記錄", async () => {
   const dir = tempProject()
   const hooks = await PsRuntimeGuard({ directory: dir, client: fakeClient() })
   await chat(hooks, S, "m1")
@@ -173,9 +156,9 @@ test("沒有派工閘門：task 在 connect 之前一律放行；能力只是紀
   assert.ok(noState(log))
   const C = "ses_child"
   await chat(hooks, C, "mc", "ps-ui-flow")
-  await call(hooks, C, "oracleMCP_sql_run", "q1", mcpOk("ROW_COUNT\n1"))
-  await call(hooks, C, "oracleMCP_sql_run", "q2", { content: [{ type: "text", text: "x" }], isError: true })
-  await call(hooks, C, "oracleMCP_sql_run", "q3", { content: [] })
+  await call(hooks, C, Q, "q1", mcpOk("**1 linha(s) retornada(s)**\n\n| ROW_COUNT |\n| --- |\n| 1 |"))
+  await call(hooks, C, Q, "q2", { content: [{ type: "text", text: "x" }], isError: true })
+  await call(hooks, C, Q, "q3", { content: [] })
   const q = (id) => readLog(dir, C).find((l) => l.hook === "after" && l.callID === id)
   assert.equal(q("q1").ok, true); assert.equal(q("q2").ok, false); assert.equal(q("q3").ok, "unknown")
   assert.ok(readLog(dir, C).filter((l) => l.hook === "before").every((l) => l.decision === "observe"))
@@ -257,11 +240,11 @@ test("診斷（auto off）：tools.changed→狀態 failed 記 would-remount、�
   assert.match(diag.at(-1).note, /marked suspect/)
   assert.equal(diag.at(-2).catalogSuspect, false)
   await chat(hooks, S, "m1")
-  await call(hooks, S, "oracleMCP_sql_run", "q1", mcpOk("1"))
+  await query(hooks, S, "q1")
   assert.equal(readDiag(dir).at(-1).type, "catalog-proven")
-  await partError(hooks, S, "oracleMCP_sql_run", "q2", "MCP error -32000: transport closed jdbc:oracle:thin:@//db.internal:1521/HR password=secret")
+  await partError(hooks, S, Q, "q2", "MCP error -32000: transport closed jdbc:oracle:thin:@//db.internal:1521/HR password=secret")
   const te = readDiag(dir).find((d) => d.kind === "tool-error")
-  assert.ok(te && te.error === "MCP error -32000: transport closed jdbc:*** password=***" && te.tool === "oracleMCP_sql_run", JSON.stringify(te))
+  assert.ok(te && te.error === "MCP error -32000: transport closed jdbc:*** password=***" && te.tool === Q, JSON.stringify(te))
   assert.equal(last(dir, S).hook, "part-error")
 })
 
@@ -271,21 +254,21 @@ test("invalid 呼叫的判讀：從沒執行過的名字＝可能錯名（不重
   const hooks = await PsRuntimeGuard({ directory: dir, client })
   const U = "ses_ui"
   await chat(hooks, U, "mu", "ps-ui-flow")
-  await invalid(hooks, U, "oracleMCP_run_sql", "i1")
+  await invalid(hooks, U, "oracleMCP_sql_run", "i1")
   let row = last(dir, U)
-  assert.ok(row.hook === "invalid" && row.attempted === "oracleMCP_run_sql" && row.seenBefore === false && row.allowedByAgent === true && /wrong name/.test(row.note), JSON.stringify(row))
+  assert.ok(row.hook === "invalid" && row.attempted === "oracleMCP_sql_run" && row.seenBefore === false && row.allowedByAgent === true && /wrong name/.test(row.note), JSON.stringify(row))
   assert.equal(readDiag(dir).filter((d) => d.kind === "recovery").length, 0)
   await chat(hooks, S, "m1", "ps-orchestrator")
-  await invalid(hooks, S, "oracleMCP_sql_run", "i2")
+  await invalid(hooks, S, Q, "i2")
   row = last(dir, S)
   assert.ok(row.allowedByAgent === false && /permission-filtered/.test(row.note), JSON.stringify(row))
   assert.equal(readDiag(dir).filter((d) => d.kind === "recovery").length, 0)
-  await call(hooks, U, "oracleMCP_sql_run", "q1", mcpOk("1"))
-  await invalid(hooks, U, "oracleMCP_sql_run", "i3")
+  await query(hooks, U, "q1")
+  await invalid(hooks, U, Q, "i3")
   row = last(dir, U)
   assert.ok(row.seenBefore === true && row.allowedByAgent === true && /catalog loss/.test(row.note), JSON.stringify(row))
   const rec = readDiag(dir).filter((d) => d.kind === "recovery")
-  assert.equal(rec.length, 1); assert.ok(rec[0].faultReason === "catalog-lost" && rec[0].decision === "would-remount" && rec[0].evidence.attempted === "oracleMCP_sql_run" && rec[0].evidence.agent === "ps-ui-flow")
+  assert.equal(rec.length, 1); assert.ok(rec[0].faultReason === "catalog-lost" && rec[0].decision === "would-remount" && rec[0].evidence.attempted === Q && rec[0].evidence.agent === "ps-ui-flow")
 })
 
 test("受控重掛（auto on）：failed → disconnect+connect 各一次 → remount-ok；恢復附註每 session 一次；verified-by-call 關閉故障事件；新事件才再重掛", async () => {
@@ -296,17 +279,17 @@ test("受控重掛（auto on）：failed → disconnect+connect 各一次 → re
   await toolsChanged(hooks)
   let rec = readDiag(dir).filter((d) => d.kind === "recovery")
   assert.deepEqual(rec.map((r) => r.decision), ["remount-start", "remount-ok"])
-  assert.ok(rec[1].gen === 1 && rec[1].disconnect === true && rec[1].connect === true && rec[1].runtimeStatus === "connected" && /SELECT 1 FROM DUAL/.test(rec[1].verify), JSON.stringify(rec[1]))
+  assert.ok(rec[1].gen === 1 && rec[1].disconnect === true && rec[1].connect === true && rec[1].runtimeStatus === "connected" && /SELECT 1 AS OK FROM DUAL/.test(rec[1].verify), JSON.stringify(rec[1]))
   assert.deepEqual(client.state.calls.filter((c) => /connect/.test(c)), ['disconnect:{"path":{"name":"oracleMCP"}}', 'connect:{"path":{"name":"oracleMCP"}}'])
   // 恢復附註：本 session 的下一次 oracleMCP_／task 回覆附一次
-  const out = mcpOk("Successfully connected to HR")
-  await before(hooks, S, "oracleMCP_connect", "c1", { connection_name: "HR" })
-  await after(hooks, S, "oracleMCP_connect", "c1", out, { connection_name: "HR" })
-  assert.ok(out.content.length === 2 && /恢復世代 1/.test(out.content[1].text) && /SELECT 1 FROM DUAL/.test(out.content[1].text) && /重新 connect|先 oracleMCP_connect/.test(out.content[1].text), JSON.stringify(out))
+  const out = mcpOk("**1 linha(s) retornada(s)**\n\n| OK |\n| --- |\n| 1 |")
+  await before(hooks, S, Q, "c1", { sql: "SELECT 1 AS OK FROM DUAL" })
+  await after(hooks, S, Q, "c1", out, { sql: "SELECT 1 AS OK FROM DUAL" })
+  assert.ok(out.content.length === 2 && /恢復世代 1/.test(out.content[1].text) && /SELECT 1 AS OK FROM DUAL/.test(out.content[1].text) && !/connect/.test(out.content[1].text), JSON.stringify(out))
   assert.ok(last(dir, S).recoveryNotice === true && last(dir, S).recoveryGen === 1)
   assert.equal(readDiag(dir).at(-1).decision, "verified-by-call")
   const out2 = mcpOk("1")
-  await call(hooks, S, "oracleMCP_sql_run", "q1", out2)
+  await call(hooks, S, Q, "q1", out2)
   assert.equal(out2.content.length, 1, "notice only once per session")
   const o3 = await taskDone(hooks, "ses_other", "t9", COMPLETE_JSON)
   assert.match(o3.output, /恢復世代 1/, "another session gets the notice once, on a task reply")
@@ -325,7 +308,7 @@ test("受控重掛的邊界：同時多個證據只重掛一次；重掛後未�
     const dir = tempProject()
     const client = fakeClient({ status: "failed", error: "Connection closed" })
     const hooks = await PsRuntimeGuard({ directory: dir, client })
-    await Promise.all([toolsChanged(hooks), toolsChanged(hooks), partError(hooks, S, "oracleMCP_sql_run", "q1", "MCP error: transport closed")])
+    await Promise.all([toolsChanged(hooks), toolsChanged(hooks), partError(hooks, S, Q, "q1", "MCP error: transport closed")])
     let rec = readDiag(dir).filter((d) => d.kind === "recovery")
     assert.equal(rec.filter((r) => r.decision === "remount-ok").length, 1)
     assert.ok(rec.some((r) => r.decision === "merged"))
@@ -340,7 +323,7 @@ test("受控重掛的邊界：同時多個證據只重掛一次；重掛後未�
     assert.equal(client.state.calls.filter((c) => c.startsWith("connect:")).length, 1, "no reconnect loop")
     // 人工恢復後有一次呼叫成功 → 故障事件關閉
     await chat(hooks, S, "m1")
-    await call(hooks, S, "oracleMCP_sql_run", "q2", mcpOk("1"))
+    await call(hooks, S, Q, "q2", mcpOk("1"))
     assert.match(readDiag(dir).at(-1).note, /manual recovery happened/)
     // remount 本身失敗 → remount-failed、之後 suppressed
     const dir2 = tempProject()
@@ -368,14 +351,14 @@ test("受控重掛的邊界：同時多個證據只重掛一次；重掛後未�
     const client4 = fakeClient({ status: "connected" })
     const hooks4 = await PsRuntimeGuard({ directory: dir4, client: client4 })
     await chat(hooks4, S, "m1")
-    await before(hooks4, S, "oracleMCP_sql_run", "q1", { sql: "SELECT 1 FROM DUAL" })
+    await before(hooks4, S, Q, "q1", { sql: "SELECT 1 AS OK FROM DUAL" })
     client4.state.status = "failed"; client4.state.error = "Connection closed"
     const pending = toolsChanged(hooks4)
     await sleep(300)
     let rec4 = readDiag(dir4).filter((d) => d.kind === "recovery")
     assert.ok(rec4.at(-1).decision === "deferred" && /in flight/.test(rec4.at(-1).note), JSON.stringify(rec4))
     assert.equal(client4.state.calls.filter((c) => c.startsWith("connect:")).length, 0, "not remounting over in-flight work")
-    await after(hooks4, S, "oracleMCP_sql_run", "q1", mcpOk("1"), { sql: "SELECT 1 FROM DUAL" })
+    await after(hooks4, S, Q, "q1", mcpOk("1"), { sql: "SELECT 1 AS OK FROM DUAL" })
     await pending
     rec4 = readDiag(dir4).filter((d) => d.kind === "recovery")
     assert.equal(rec4.at(-1).decision, "remount-ok")
@@ -385,11 +368,12 @@ test("受控重掛的邊界：同時多個證據只重掛一次；重掛後未�
   }
 })
 
-test("載入紀錄：連線 guard／自動重掛／診斷開關；tools 表混寫萬用字元 deny＋個別 true 記 WARN；skills 清單", async () => {
-  const dir = tempProject({ extraAgent: { name: "ps-mixed", text: '---\nmode: subagent\ntools:\n  "oracleMCP_*": false\n  "oracleMCP_sql_run": true\n---\n# mixed\n' } })
+test("載入紀錄：自動重掛／診斷開關（沒有連線 guard 開關）；tools 表混寫萬用字元 deny＋個別 true 記 WARN；skills 清單", async () => {
+  const dir = tempProject({ extraAgent: { name: "ps-mixed", text: '---\nmode: subagent\ntools:\n  "oracleMCP_*": false\n  "oracleMCP_oracle_execute_query": true\n---\n# mixed\n' } })
   await PsRuntimeGuard({ directory: dir, client: fakeClient() })
   const log = pluginLog(dir)
-  assert.match(log, /loaded .*connectGuard=enforce autoRecover=off diag=on/)
+  assert.match(log, /loaded .* autoRecover=off diag=on/)
+  assert.doesNotMatch(log, /connectGuard/)
   assert.match(log, /wildcardDenyMix=\["ps-mixed"\]/)
   assert.match(log, /WARN agent ps-mixed/)
   assert.match(log, /skills=\[.*"ps-security-flow".*\]/)

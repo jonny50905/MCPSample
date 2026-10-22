@@ -2,9 +2,10 @@
 // 需要：已登入的 claude CLI、node ≥ 22、pwsh（以 powershell 名稱放進臨時 PATH，供 hook 執行）。不在搬運 manifest 內。
 // 用法：node tests/claude-code/run-e2e.mjs [--model haiku|sonnet] [--only qa,cmd,worker] [--keep]
 // 部署模擬：<tmp>/proj＝scripts＋claude-code/*（去前綴）；.mcp.json 掛假 oracleMCP／PeoplecodeElasticSearch／PeoplecodeSource；
-//   profile oracle.connectionName＝HR_DEV；在 ~/.claude.json 把該目錄標為已信任（未信任時專案 settings 的 permissions.allow 會被忽略）。
+//   假 oracleMCP 仿 @vdeserto/oracle-mcp-server（沒有 connect）；profile oracle.currentSchema＝DEMOOWN；
+//   在 ~/.claude.json 把該目錄標為已信任（未信任時專案 settings 的 permissions.allow 會被忽略）。
 // 情境：
-//   qa      claude --agent ps-orchestrator 問業務問題 → 第 0 步 connect＝profile 值、之後才有 sql_run；主對話不直接用檢索 MCP；
+//   qa      claude --agent ps-orchestrator 問業務問題 → 沒有 connect；查詢只在子代理（oracle_execute_query 的 SQL 過得了 server 檢查）；主對話不直接用檢索 MCP；
 //           Agent 委派目標都是 ps-* 子代理且至少一次；hook 無誤擋；有最終回覆
 //   cmd     ps-orchestrator 下 /ps-research → 前提段生效：只回「請以 claude --agent ps-deep-research …」、不寫檔
 //   worker  claude -p --agent ps-spec-worker "/ps-spec-batch <job>-<attempt>"（外環的實際命令形狀）→ 只讀工單、寫 fragment.md；
@@ -35,11 +36,11 @@ fs.copyFileSync(path.join(repo, "claude-code", "CLAUDE.md"), path.join(proj, "CL
 fs.mkdirSync(path.join(proj, "docs", "ps-research", "wiki"), { recursive: true })
 fs.writeFileSync(path.join(proj, "docs", "ps-research", "wiki", "DECOY.md"), "# DECOY\n不應被 spec worker 讀到\n")
 const prof = path.join(proj, ".claude", "peoplesoft", "customization-profile.yaml")
-fs.writeFileSync(prof, fs.readFileSync(prof, "utf8").replace(/^  connectionName: FILL_ME/m, "  connectionName: HR_DEV"))
+fs.writeFileSync(prof, fs.readFileSync(prof, "utf8").replace(/^  currentSchema: FILL_ME/m, "  currentSchema: DEMOOWN"))
 const logs = { oracle: path.join(work, "oracle.log"), source: path.join(work, "source.log") }
 const mock = (file, extra, env) => ({ type: "stdio", command: process.execPath, args: [path.join(repo, "tests", file), ...extra], env })
 fs.writeFileSync(path.join(proj, ".mcp.json"), JSON.stringify({ mcpServers: {
-  oracleMCP: mock("runtime-guard/mock-oracle-mcp.mjs", [], { MOCK_ORACLE_LOG: logs.oracle }),
+  oracleMCP: mock("runtime-guard/mock-oracle-mcp.mjs", [], { MOCK_ORACLE_LOG: logs.oracle, ORACLE_USER: "ps_readonly", ORACLE_PASSWORD: "mock", ORACLE_CONNECTION_STRING: "localhost:1521/MOCK" }),
   PeoplecodeElasticSearch: mock("claude-code/mock-source-mcp.mjs", ["es"], { MOCK_SOURCE_LOG: logs.source }),
   PeoplecodeSource: mock("claude-code/mock-source-mcp.mjs", ["source"], { MOCK_SOURCE_LOG: logs.source }),
 } }, null, 2))
@@ -78,12 +79,11 @@ if (only.includes("qa")) {
   console.log(`qa（model=${model}）`)
   const r = run("qa", ["--agent", "ps-orchestrator"], "兵役資料的「免役」選項選了以後，系統會做什麼？請照流程查證後回答。")
   const ora = readLines(logs.oracle).filter((x) => x.tool)
-  const firstConnect = ora.findIndex((x) => x.tool === "connect")
-  const firstSql = ora.findIndex((x) => x.tool === "sql_run")
-  check(firstConnect >= 0 && ora[firstConnect].args.connection_name === "HR_DEV", "第 0 步 connect 的 connection_name＝profile 值（HR_DEV）")
-  check(firstSql < 0 || firstSql > firstConnect, "sql_run 只出現在 connect 之後")
+  check(ora.every((x) => /^oracle_execute_query$/.test(x.tool)), "oracleMCP 只收到 oracle_execute_query（沒有 connect 或其他工具）：" + JSON.stringify([...new Set(ora.map((x) => x.tool))]))
+  const sqls = ora.map((x) => String(x.args?.sql ?? ""))
+  check(sqls.every((q) => !q.includes(";") && !/--|\/\*/.test(q) && /^\s*(SELECT|WITH)\b/i.test(q)), "送出的 SQL 一次一句、沒有分號與註解、SELECT／WITH 開頭（cookbook 規則 7b）")
   const main = r.uses.filter((u) => !u.sub)
-  check(!main.some((u) => /^mcp__(PeoplecodeElasticSearch|PeoplecodeSource|PeoplecodeMetadata)__|^mcp__oracleMCP__sql_run$/.test(u.name)), "主對話不直接呼叫檢索 MCP（只委派）")
+  check(!main.some((u) => /^mcp__(PeoplecodeElasticSearch|PeoplecodeSource|PeoplecodeMetadata|oracleMCP)__/.test(u.name)), "主對話不直接呼叫檢索 MCP 或 oracleMCP（只委派）")
   const agents = main.filter((u) => u.name === "Agent" || u.name === "Task").map((u) => u.input?.subagent_type)
   check(agents.length > 0 && agents.every((a) => SUB.has(a)), "Agent 委派至少一次且目標都是 ps-* 子代理：" + JSON.stringify(agents))
   const denies = hookLog().filter((x) => x.decision === "deny")

@@ -37,16 +37,14 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
    重的檢索用 task 委派給 ps-* **agent**（`.opencode/agent/*.md` 裡的名字）。
    `.opencode/skills/*` 是 skill、不是可委派的 agent：授權／血緣／排程類（ps-security-flow／
    ps-data-lineage／ps-process-flow）一律派 `ps-metadata-flow`，要用的 skill 寫進 task 文字。
-   主 agent 工作流的**開線步驟（第 0 步）**（查 wiki、委派、作答之前）固定
-   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 原樣，不先 list、
-   不從清單挑名字；無條件，見 agent 定義），等 connect 回覆成功才派會查 DB 的 subagent。
-   執行期只有 `.opencode/plugin/ps-runtime-guard.js` 的兩個無狀態檢查：connect 的 connection_name
-   必須等於 profile 值（否則 `ORACLE_CONNECTION_NOT_CONFIGURED`／`ORACLE_CONNECTION_MISMATCH`，
-   工具不執行）、task 的 subagent_type 不得是 skill 名（`PS_TASK_TARGET_INVALID`）。**沒有派工前置
-   閘門**——順序是你的責任：先派 subagent 而 DB 未連 → 它回 `NOT_CONNECTED`，你再 connect 一次、
-   重派一次，只一次、不迴圈。工具清單裡沒有 oracleMCP_ 工具＝掛載故障 → 不猜工具名、不重派、
-   不多 connect，回報 ORACLE_MCP_DOWN，交管理者依 SOP-21 重掛；重掛後重新 connect，不沿用舊結論。
-   第 0 步之後，問答一律**先查知識層**——`docs/ps-research/wiki/`（已歸戶的已驗證知識）與
+   oracleMCP（@vdeserto/oracle-mcp-server，唯讀）的連線由 opencode.json 的 MCP 設定決定，**沒有開線步驟**：
+   主 agent 不呼叫任何 `oracleMCP_` 工具（工具全關），查詢只由 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor 以
+   `oracleMCP_oracle_execute_query` 照 cookbook 做（規則 7b：一次一句、不加分號與註解、帶 limit）。
+   執行期只有 `.opencode/plugin/ps-runtime-guard.js` 的無狀態檢查：task 的 subagent_type 不得是 skill 名
+   （`PS_TASK_TARGET_INVALID`）。**沒有派工前置閘門**——subagent 回 `NOT_CONNECTED`（DB 連不上）→ 重派一次，
+   只一次、不迴圈；第二次仍是就回報「DB 連線失敗」交管理者依 SOP-21 檢查 oracleMCP 設定。subagent 回 ORACLE_MCP_DOWN
+   （工具清單沒有 oracleMCP_ 工具＝掛載故障）→ 不猜工具名、不重派，交管理者依 SOP-21 重掛，不沿用舊結論。
+   問答一律**先查知識層**——`docs/ps-research/wiki/`（已歸戶的已驗證知識）與
    `docs/ps-research/<領域>/NN-*.md`（已稽核的研究文件），照
    `.opencode/peoplesoft/knowledge-retrieval-contract.md`：以 `docs/ps-research/knowledge/index.md`
    定位（grep 用 `path=目錄`＋`include=檔名`）、只讀對應節、標來源等級、答覆附 `## 來源表`；
@@ -79,7 +77,10 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-10-22 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+4. **維護版線**：`main` 是正式版線（最近一次：2026-10-22 由 `claude/stoic-archimedes-q40rng` 快轉併入
+   oracleMCP 換成 @vdeserto/oracle-mcp-server（L160：主 agent 開線步驟拿掉、查詢 subagent 只開 `oracle_execute_query`、guard／hook 拿掉 connect 目標比對、
+   cookbook 加規則 7b／7c 與「連線與錯誤處理」並把 21 段 SQL 改成一句一段、profile 拿掉 connectionName／connectGuard、analyzer 與沙箱 e2e 改仿新 server），
+   兩版搬運包重生，併入前 `main` 頭 `09e62df`；同日稍早由 `claude/blissful-edison-7hbeqr` 快轉併入
    主管報告拿掉第 1、7、8 章（其餘章節重新編號），框架檔未動，各份重生，併入前 `main` 頭 `b2347c4`；同日稍早同一分支併入
    主管報告第 5 章加例子與 5.8 完整例子，框架檔未動，各份重生，併入前 `main` 頭 `91c7fb2`；同日稍早同一分支併入
    主管報告第 5 章改成完整代碼一覽、協作鐵律加「只改文件的併回不跑 5.1 CI」（L159），框架檔未動，各份重生，併入前 `main` 頭 `4f0121c`；
@@ -172,7 +173,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   不回報路徑、物件名、hash、requestId。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。
-- `.opencode/plugin/*.js` 是 OpenCode 執行期的無狀態 guard 與診斷（connect 目標比對、task 目標
+- `.opencode/plugin/*.js` 是 OpenCode 執行期的無狀態 guard 與診斷（task 目標
   是不是 agent、oracleMCP 掛載診斷；**不是派工閘門**，不保存 READY／todo 狀態）：
   **零外部 import**（只准 `node:` 內建；公司網路封鎖 npm）、只擋不改參數；
   `.opencode/.npmrc` 的 `offline=true` 不可拿掉（否則有 plugin 時啟動會等

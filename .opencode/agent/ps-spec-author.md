@@ -22,11 +22,11 @@ tools:
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
   "PeoplecodeMetadata_*": false
-  "oracleMCP_list_connections": false
-  "oracleMCP_connect": false
-  "oracleMCP_disconnect": false
-  "oracleMCP_sql_run": false
-  "oracleMCP_sqlcl_run": false
+  "oracleMCP_oracle_list_schemas": false
+  "oracleMCP_oracle_list_tables": false
+  "oracleMCP_oracle_describe_table": false
+  "oracleMCP_oracle_get_table_data": false
+  "oracleMCP_oracle_execute_query": false
 permission:
   bash:
     "*": deny

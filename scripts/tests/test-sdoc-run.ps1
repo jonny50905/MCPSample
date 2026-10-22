@@ -647,7 +647,7 @@ try {
             $r = Invoke-SdRun $rootO $gComps $fxO
             Assert-Sd ($r.Code -eq 'DOC1-0-01' -and [System.IO.File]::Exists((Join-Path $inO 'status.md')) -and -not [System.IO.Directory]::Exists((Join-Path $rootO '.ps-private/sdoc'))) 'OpenCode 版：人工輸入骨架建在 .ps-private/sdoc-opencode/<job>/，不碰 .ps-private/sdoc/' $r.Output
             Assert-Sd ($r.Output.Contains('OpenCode 模型：anthropic/claude-haiku-4-5（.opencode/peoplesoft/sdoc/model.yaml）') -and $r.Output.Contains("-Components 'TW_DEMO_CASE,TW_DEMO_DOCREV,TW_DEMO_PAYMNT' -Cli opencode")) 'OpenCode 版：印出模型與唯一設定檔；續跑命令帶 -Cli opencode' $r.Output
-            Assert-Sd ($r.Output.Contains('提醒：.opencode/peoplesoft/customization-profile.yaml 的 oracle.connectionName 還沒填') -and $r.Code -eq 'DOC1-0-01') 'OpenCode 版：profile 沒填連線名 → 只提醒、不擋' $r.Output
+            Assert-Sd ($r.Output.Contains('提醒：.opencode/peoplesoft/customization-profile.yaml 的 oracle.currentSchema 還沒填') -and $r.Code -eq 'DOC1-0-01') 'OpenCode 版：profile 沒填表的擁有者 → 只提醒、不擋' $r.Output
             # 貫穿範例跑到 REVIEW_READY（含 L5 讀者與判定）：目錄、工單、與 Claude Code 版逐位元相同的產出
             $fxOW = New-SdRunFixtures 'walkthrough' 'status-REQ_STATUS.md' $wkPages $wkRecords $false 'oc-walk'
             $rootOW = New-SdRunRootOc 'oc-walk'
@@ -701,7 +701,7 @@ try {
                 # Claude Code 版的 profile 已填、OpenCode 版還是 FILL_ME：提醒裡給複製方法
                 $pfSrc = Join-Path $repo '.opencode/peoplesoft/customization-profile.yaml'
                 $pfText = [System.IO.File]::ReadAllText($pfSrc, [System.Text.Encoding]::UTF8)
-                Write-SdFx (Join-Path $rootB '.claude/peoplesoft/customization-profile.yaml') ($pfText -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV')
+                Write-SdFx (Join-Path $rootB '.claude/peoplesoft/customization-profile.yaml') ($pfText -replace '(?m)^  currentSchema: FILL_ME', '  currentSchema: DEMOOWN')
                 Write-SdFx (Join-Path $rootB '.opencode/peoplesoft/customization-profile.yaml') $pfText
                 $r = Invoke-SdRun $rootB $gComps $fxB '' @{ Cli = 'opencode'; MaxSessions = 2 }
                 Assert-Sd ($r.Output.Contains('copy .claude\peoplesoft\customization-profile.yaml .opencode\peoplesoft\customization-profile.yaml')) '兩版並存：OpenCode 版 profile 沒填、Claude Code 版填好了 → 提醒裡給整份複製的命令' $r.Output
@@ -721,9 +721,9 @@ try {
             [System.IO.File]::WriteAllText($mY, ("# 測試`r`nmodel: 'company-gw/qwen3.6-35b-a3b:latest'   # 地端`r`n"), (New-Object System.Text.UTF8Encoding($true)))
             $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true }
             Assert-Sd ($r.Output.Contains('OpenCode 模型：company-gw/qwen3.6-35b-a3b:latest（.opencode/peoplesoft/sdoc/model.yaml）')) 'model.yaml：引號、行尾註解、CRLF、BOM 都讀得懂' $r.Output
-            Write-SdFx (Join-Path $rootO '.opencode/peoplesoft/customization-profile.yaml') ("oracle:`n  connectionName: HR_DEV   # 已填`n")
+            Write-SdFx (Join-Path $rootO '.opencode/peoplesoft/customization-profile.yaml') ("oracle:`n  currentSchema: DEMOOWN   # 已填`n")
             $r = Invoke-SdRun $rootO $gComps $fxO '' @{ Status = $true; Model = 'other/x-1' }
-            Assert-Sd (-not $r.Output.Contains('oracle.connectionName 還沒填')) 'profile 已填連線名 → 不提醒' $r.Output
+            Assert-Sd (-not $r.Output.Contains('oracle.currentSchema 還沒填')) 'profile 已填表的擁有者 → 不提醒' $r.Output
             Assert-Sd ($r.Output.Contains('OpenCode 模型：other/x-1（-Model）') -and $r.Output.Contains("-Cli opencode -Model 'other/x-1'")) '-Model 臨時覆寫 model.yaml，續跑命令帶著它' $r.Output
             $plainO = New-SdRunRootOc 'oc-badmodel'
             [System.IO.File]::WriteAllText((Join-Path $plainO '.opencode/peoplesoft/sdoc/model.yaml'), "model: FILL_ME`n", (New-Object System.Text.UTF8Encoding($false)))

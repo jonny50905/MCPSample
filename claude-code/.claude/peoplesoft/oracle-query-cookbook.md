@@ -1,6 +1,6 @@
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
-`oracleMCP` 是通用 Oracle 查詢 MCP，連 PeopleSoft 資料庫。
+`oracleMCP` 是唯讀的 Oracle 查詢 MCP（@vdeserto/oracle-mcp-server），連 PeopleSoft 資料庫。
 本手冊提供各**協定角色**對應的 PeopleTools metadata 查詢樣板——
 需要查 metadata 時**照抄樣板帶入參數**，不要自己發明 SQL。
 
@@ -13,25 +13,48 @@
    自己組的查詢（實體表 PS_<RECNAME>、Prompt 表、規則 8 驗過欄位後的查詢）每個 FROM／JOIN／子查詢的 PeopleSoft 表與 view 也一樣帶。
    DUAL 與 ALL_ 開頭的資料字典（ALL_TABLES／ALL_TAB_COLUMNS／ALL_OBJECTS）不加前綴；查資料字典改加 OWNER = UPPER('<schema>') 條件。
    值為 FILL_ME → 拿掉 `<schema>.` 與 OWNER 條件，用裸表名。不執行 ALTER SESSION（唯讀帳號不准，表名帶前綴就不需要）。
-2. 每個查詢都要有列數上限：加 FETCH FIRST 200 ROWS ONLY（或 ROWNUM <= 200）。
+2. 每個查詢都要有列數上限：加 FETCH FIRST 200 ROWS ONLY（或 ROWNUM <= 200），呼叫時 `limit` 帶同一個數
+   （沒帶 limit 工具只回 50 列；limit 最大 500）。
 3. 可能高基數的查詢（值清單、使用者清單）先跑 COUNT(*)，超過 200 只回彙總。
 4. 使用者層級資料只回彙總（COUNT / 角色名），不列具名清單（遮罩原則）。
 5. 查詢結果屬 metadata evidence：報告引用時附上「用的 SQL + 關鍵列」。
 6. 下列表名 / 欄位為 PeopleTools 8.5x 常見結構；實際環境第一次使用前
    先驗證（查不到表 / 欄位時記入 gaps，不要瞎改表名硬湊）。
-7. oracleMCP 的實際工具名以 Claude Code `/mcp` 清單為準（全名 `mcp__oracleMCP__<tool>`；目前：list_connections／connect／disconnect／
-   sql_run／sqlcl_run），查詢一律用 sql_run（唯讀）。
+7. 查詢工具是 `mcp__oracleMCP__oracle_execute_query`（Claude Code `/mcp` 清單的全名；參數 `sql`、`limit`、`response_format`；只收 SELECT）。
+   同一個 MCP 的 oracle_list_schemas／oracle_list_tables／oracle_describe_table／oracle_get_table_data 已關閉、不用；
+   沒有 connect／disconnect——連哪個資料庫、用哪個帳號由 oracleMCP 的設定決定，查詢直接送。
 7a. **通道前置檢查（L103）**：可用工具清單裡**一個 `mcp__oracleMCP__` 前綴
    工具都沒有**＝oracleMCP 掛載故障（Claude Code 到 MCP server 的 client／transport／工具目錄失效；
    管理者在該 session 打 `/mcp`、選 oracleMCP 重新連線可恢復，沒有自動重掛，SOP-21）。**不是工具名記錯**：
-   不猜名、不換拼法重試、不用 DB connect 補救（實案：模型自創 `oracle_sql_run` 反覆撞牆）。
-   處置：**立即回報 FAIL(ORACLE_MCP_DOWN) 並結束本委派**；恢復後要重新 connect、重新驗證，不沿用舊 DOWN 結論。
+   不猜名、不換拼法重試（實案：模型自創 `oracle_sql_run` 反覆撞牆）。
+   處置：**立即回報 FAIL(ORACLE_MCP_DOWN) 並結束本委派**；恢復後先送 SELECT 1 AS OK FROM DUAL 驗證，不沿用舊 DOWN 結論。
    **換路查可以、冒充不行**：ES／Source／metadata MCP 有等價線索
    （程式碼、註解、metadata 定位）照常可查——但產物**只能以
    INFERRED＋CHUNK 證據**入報告，並記「DB 實際狀態待通道恢復驗證」；
    **不得**寫成 SQL 型證據（DB 狀態事實只有可重跑的 SELECT 驗得動，
    chunk 只能證明程式碼怎麼寫）、不得憑它宣稱查無、
    原 SQL 型待辦不因此視為完成。
+7b. **送出前的 SQL 形狀**（oracleMCP 在執行前檢查，不符就回 `Error:` 開頭的拒絕訊息、不執行）：
+   - 一次只送一句：整段不得出現分號 `;`（字串裡也不行、結尾不加）。本手冊一個 sql 區塊＝一句。
+   - 不得有註解：`--` 與 `/*` 在任何位置都不行（字串裡也不行）。說明寫在 SQL 外面。
+   - 開頭必須是 SELECT 或 WITH；SELECT 後面不得出現 INTO 這個字；不得有 FOR UPDATE。
+   - 整段文字（含字串常值、別名）不得出現這些字（整個字比對、大小寫不分）：INSERT、UPDATE、DELETE、MERGE、UPSERT、
+     DROP、CREATE、ALTER、TRUNCATE、RENAME、COMMENT、GRANT、REVOKE、EXECUTE、EXEC、CALL、ANYDATA、XMLTYPE；
+     也不得含 DBMS_、UTL_、OWA_、XMLDB、XDB_、CTXSYS、HTTPURITYPE、URIFACTORY（子字串比對）。
+     例：字串 `'Drop-Down'`、`'Update/Display'` 會被擋；`AUTO_UPDATE`、`LASTUPDDTTM`、`UPDATE_DISPLAY` 不會。
+     CLOB 取片段用 `TO_CHAR(SUBSTR(欄, 1, n))`（不用 DBMS_LOB）。
+     要找原始碼裡的 DML 字（例：誰 UPDATE 某表）→ 走 ES＋Source，不在 oracleMCP 的 SQL 裡寫這些字；
+     表名或欄位名本身就是上列的字 → 這句送不出去，記 gaps。
+   - 輸出欄名不得重複：工具把整句包成 `SELECT * FROM (<SQL>) FETCH FIRST <limit> ROWS ONLY` 再執行，
+     兩欄同名（例：A.FIELDNAME 與 B.FIELDNAME）就失敗——同名欄一律加 AS 別名，運算式欄也加別名。
+   - 樣板的 `:參數` 一律換成實際值（字串加單引號、數字直接寫）再送，送出的 SQL 不留 `:參數`，不用 binds。
+   - 重跑文件裡的 SQL 證據：去掉結尾分號與註解、多句拆開逐句送，其他部分照原樣。
+7c. **回覆怎麼讀**：
+   - 成功＝markdown 表格，第一行 `**N linha(s) retornada(s)**`（N＝回傳列數）；0 列＝`Nenhum resultado encontrado.`。
+   - 回傳列數＝`limit` → 可能還有：照該節的續查規則分批或加條件縮小，不得當成全部。
+   - 結尾有 `[truncado` → 輸出超過約 25,000 字被截斷：減少欄位或分批再查，不得引用被截掉的部分。
+   - 查 CLOB／長文字欄（內容可能換行）時 `response_format` 用 `json`：markdown 表格遇到換行會斷列。
+   - 錯誤一律是一行 `Error: …`（不含原始 ORA 訊息），處置見下方「連線與錯誤處理」。
 8. **查詢前欄位驗證**：要用「樣板裡沒有的
    欄位名」或不確定欄位存不存在時，先跑
    SELECT column_name FROM all_tab_columns WHERE owner = UPPER('<schema>') AND table_name='<大寫表名>'
@@ -50,63 +73,61 @@
    要當證據，就得用本 cookbook 的 SELECT 取得並附「SQL＋關鍵列」。
 ```
 
-## 連線生命週期（硬性；連線的擁有者是主 agent）
+## 連線與錯誤處理（硬性）
 
-SQLcl MCP 是**單工、有狀態**的：一個行程只有一條「目前連線」，指令依序執行。
-**定案**：這條連線是 MCP server 全域單例——main 與所有 subagent 共用同一個開關，
-任何一方 `disconnect` 就把其他人一起斷線。所以：**開，只有主 agent 做；關，誰都不做；查，subagent 做。**
+oracleMCP 連的資料庫與帳號由 MCP 的設定（環境變數）決定，沒有 connect／disconnect 可呼叫；每次查詢自己取連線、查完歸還，
+沒有「目前連線」要維護，也不會有人把別人斷線。
 
-**主 agent（ps-orchestrator／ps-deep-research／ps-clone-worker）——每題／每批開場，無條件；做完才准查 wiki、委派、作答**：
+**主 agent（ps-orchestrator／ps-deep-research／ps-clone-worker）——不查 DB（oracleMCP 工具全關），沒有開線步驟**：
 
 ```text
-（建議先用待辦工具（TodoWrite／TaskCreate，有哪個用哪個）列步驟、一次做一項，等 connect 回覆再派；非強制——沒有執行期閘門替你擋順序）
-0. 工具清單裡沒有任何 mcp__oracleMCP__ 工具 → ORACLE_MCP_DOWN（規則 7a）：不猜名、不試 connect、不派 DB 委派，如實回報並交管理者重掛。
-   工具名（底線）：list_connections／connect／sql_run／disconnect／sqlcl_run
-1. connect（帶連線名）   → 開場就做（無條件、不判斷本題會不會用到 DB）；連線名＝profile oracle.connectionName **原樣照抄**，
-                          **不先 list_connections、不從清單挑名字**（清單回傳的名稱與連線字串黏在一起，會讀錯）；
-                          profile 未填／FILL_ME → 不 connect → CONNECT_FAILED（CONNECTION_NOT_CONFIGURED），如實回報
-                          「Oracle 連線未設定（profile 值）」；回「已連線」也視為成功；失敗再 connect 一次；>30 秒無回應 → CONNECT_TIMEOUT
-2. list_connections     → 只在 connect 兩次都失敗時做：把清單**原文**附在回報裡讓管理者核對 profile 值（不要自己改名字）；
-                          清單為空 → CONNECT_FAILED（NO_SAVED_CONNECTION），如實回報「SQLcl 沒有已儲存連線」
-3. 之後本題／本批的委派都不必再 connect。subagent 回 BLOCKED(NOT_CONNECTED) → 收齊受影響的委派後再 connect 一次、
-   重派一次（只一次）；第二次仍 NOT_CONNECTED → 對使用者／收據如實寫「DB 連線建立失敗（<connect 的錯誤>）」，
-   不得說成「DB 通道忙碌」。subagent 回 ORACLE_MCP_DOWN ≠ NOT_CONNECTED：不 connect、不重派（規則 7a）
-4. 主 agent 永遠不自己 sql_run、不 disconnect
-5. 執行期 guard（ps-runtime-guard）只擋兩件事：connect 的 connection_name ≠ profile 值（ORACLE_CONNECTION_MISMATCH／
-   NOT_CONFIGURED，不執行、不換名字重試）、Agent 工具的 subagent_type 是 skill 名／主代理專用名／非 ps-* 內建代理（PS_TASK_TARGET_INVALID）。派工順序不靠它
+1. 會查 DB 的工作一律委派查詢 subagent（ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor），派之前不必做任何連線動作
+2. subagent 回 BLOCKED(NOT_CONNECTED) → 收齊本批受影響的委派後重派一次（只一次）；第二次仍 NOT_CONNECTED →
+   對使用者／收據如實寫「DB 連線失敗（<報告裡 oracleMCP 回的 Error 原文>）——請管理者依 SOP-21 檢查 oracleMCP 的連線設定」，
+   本題／本批不再派會查 DB 的委派，不得說成「DB 通道忙碌」
+3. subagent 回 ORACLE_MCP_DOWN ≠ NOT_CONNECTED：不重派會查 DB 的委派，如實回報並交管理者依 SOP-21 重掛（規則 7a）
+4. 執行期 guard（ps-runtime-guard）只擋一件事：Agent 工具的 subagent_type 是 skill 名／主代理專用名／非 ps-* 內建代理（PS_TASK_TARGET_INVALID）。派工順序不靠它
 ```
 
 **subagent（ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor）——每次委派**：
 
 ```text
-0. 取前綴              → Read customization-profile.yaml 取 oracle.currentSchema；本次每個查詢的 `<schema>` 都換成這個值
+0. 工具清單裡沒有 mcp__oracleMCP__oracle_execute_query → status=BLOCKED、blockedReason=ORACLE_MCP_DOWN（規則 7a），結束本委派
+1. 取前綴              → Read customization-profile.yaml 取 oracle.currentSchema；本次每個查詢的 `<schema>` 都換成這個值
                           （規則 1a）。值為 FILL_ME → 拿掉 `<schema>.` 前綴與 OWNER 條件，用裸表名
-1. 直接發本次任務的第一個 SELECT（連線已由主 agent 建好；表名已帶前綴）
-2. 回「未連線／not connected／no connection」類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED，
-   結束本委派。不 list_connections、不 connect（工具已關）、不重試
-3. 表名找不到          → view/table not found：逐一檢查 FROM／JOIN／子查詢的 PeopleSoft 表都寫成 `<schema>.表名`、
-                          `<schema>` 已換成 profile 值（規則 1a），補齊後重發一次；補齊仍查不到 → 表名不對或唯讀帳號
-                          沒有這張表的權限，記 gaps（寫表名），不換表名硬湊。值為 FILL_ME 而查不到表 →
-                          blockedReason=SCHEMA_UNRESOLVED，不是 NOT_CONNECTED。不執行 ALTER SESSION
+2. 直接送本次任務的第一個 SELECT（規則 7b 的形狀、帶 limit；表名已帶前綴）
+3. 依回覆處理（每種錯誤只修一次、重送一次；同一句修過仍錯 → 記 gaps 寫 SQL 與錯誤原文，不換表名、欄位名硬湊）：
+   Error: Table or view does not exist.
+                        → 逐一檢查 FROM／JOIN／子查詢的 PeopleSoft 表都寫成 `<schema>.表名`、`<schema>` 已換成 profile 值
+                          （規則 1a），補齊後重送；補齊仍查不到 → 表名不對或唯讀帳號沒有這張表的權限，記 gaps（寫表名）。
+                          值為 FILL_ME 而查不到表 → blockedReason=SCHEMA_UNRESOLVED，不是 NOT_CONNECTED
+   Error: Invalid column name.        → 規則 8 驗欄位後重送
+   Error: Insufficient privileges.    → 唯讀帳號沒有這張表的權限：記 gaps（寫表名），不重送
+   Error: SQL command not properly ended.／Error: Missing expression in SQL.
+                                      → SQL 語法錯：改好重送
+   其他葡萄牙文的拒絕訊息（Múltiplos statements／Comentários SQL／Somente SELECT／Operação proibida／FOR UPDATE／SELECT INTO）
+                                      → SQL 形狀不符規則 7b：照規則改好重送
+   Error: Query timed out. …          → status: BLOCKED、blockedReason=QUERY_TIMEOUT（該節另有逾時規則的照該節）
+   Error: Authentication failed.／Error: Cannot reach database …／Error: Cannot resolve Oracle connection identifier.
+                                      → DB 連不上：blockedReason=NOT_CONNECTED，gaps 寫錯誤原文，結束本委派
+   Error: Database query failed.（不說原因）
+                                      → 先送 SELECT 1 AS OK FROM DUAL（limit 1）：也失敗＝DB 連不上 → blockedReason=NOT_CONNECTED，
+                                        結束本委派；成功＝這句 SQL 本身的問題（多半是輸出欄名重複、型別不合、括號）→ 照規則 7b 檢查、修一次重送
 4. 查詢                 → 本次任務的查詢全部做完（PeopleSoft 表名都帶 `<schema>.` 前綴）
-5. 不得 disconnect      → 工具已關；逾時、BLOCKED 回報前也一樣不斷線
+5. 不執行 ALTER SESSION（會被擋，表名帶前綴就不需要）
 ```
 
 逾時與平行規則：
 
 ```text
-- connect 或任何查詢超過約 30 秒沒返回 → 停手：主 agent 記 CONNECT_TIMEOUT；subagent 回
-  status: BLOCKED、blockedReason=QUERY_TIMEOUT，gaps 註明「oracleMCP 無回應」。
-- 不准重試迴圈：卡住的呼叫重發只會排在後面繼續卡，還會佔住 server 禍及其他 agent。
-- 不要假設可以同時有第二條連線——「目前連線」是行程級全域狀態，交錯使用會把查詢跑在錯的連線上。
-- 會查 oracleMCP 的委派同時 ≤ 3（單一連線內 SQL 仍是排隊執行，再多只會撞 30 秒逾時）；
-  連線由主 agent 先建好，第一個 DB 委派不必等前一個回報，可與其餘同時派出。純 ES＋Source 的委派不受此限。
-- 任何情況都不呼叫 disconnect——斷線會把 main 與其他 subagent 一起拆掉。
+- 單一查詢上限 30 秒（server 端），逾時回 Error: Query timed out.；同一句不准原樣重送迴圈。
+- 每個委派一次只送一句、等回覆再送下一句（不並行呼叫 oracleMCP）。
+- 會查 oracleMCP 的委派同時 ≤ 3（server 最多 5 條連線、排隊等 10 秒就放棄）；純 ES＋Source 的委派不受此限。
 ```
 
-## Effective Date 標準樣式（有 EFFDT 的表都要套）
+## Effective Date 標準樣式（有 EFFDT 的表都要套；以下是接在 WHERE 後面的片段，不單獨送）
 
-```sql
+```text
 AND A.EFF_STATUS = 'A'
 AND A.EFFDT = (SELECT MAX(B.EFFDT) FROM <schema>.<同表> B
                 WHERE B.<同鍵> = A.<同鍵> AND B.EFFDT <= SYSDATE)
@@ -197,15 +218,24 @@ FETCH FIRST 200 ROWS ONLY
 
 **2e. Component ↔ Page ↔ Menu**
 
+Component 含哪些 Page：
+
 ```sql
--- Component 含哪些 Page
-SELECT PNLGRPNAME, PNLNAME, ITEMLABEL FROM <schema>.PSPNLGROUP WHERE PNLGRPNAME = :componentName;
--- Page 屬於哪些 Component
-SELECT PNLGRPNAME FROM <schema>.PSPNLGROUP WHERE PNLNAME = :pageName;
--- Component 掛在哪些 Menu（**technicalMenuLocation**：App Designer 技術選單 metadata，
--- 8.4 之後 BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級——**不得串成使用者導覽路徑**；
--- 使用者看得到的入口走 §2k Portal Registry。本段亦是 §2k-2 的 seed（menu＋component＋market）
-SELECT MENUNAME, BARNAME, ITEMNAME FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :componentName;
+SELECT PNLGRPNAME, PNLNAME, ITEMLABEL FROM <schema>.PSPNLGROUP WHERE PNLGRPNAME = :componentName
+```
+
+Page 屬於哪些 Component：
+
+```sql
+SELECT PNLGRPNAME FROM <schema>.PSPNLGROUP WHERE PNLNAME = :pageName
+```
+
+Component 掛在哪些 Menu（**technicalMenuLocation**：App Designer 技術選單 metadata，
+8.4 之後 BARNAME（USE／PROCESS／INQUIRE…）在 PIA 沒有對應層級——**不得串成使用者導覽路徑**；
+使用者看得到的入口走 §2k Portal Registry。本段亦是 §2k-2 的 seed（menu＋component＋market）：
+
+```sql
+SELECT MENUNAME, BARNAME, ITEMNAME FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :componentName
 ```
 
 **2f. Prompt Table 與基數**
@@ -213,15 +243,20 @@ SELECT MENUNAME, BARNAME, ITEMNAME FROM <schema>.PSMENUITEM WHERE PNLGRPNAME = :
 ```sql
 SELECT RECNAME, FIELDNAME, EDITTABLE
   FROM <schema>.PSRECFIELDDB
- WHERE RECNAME = :recName AND FIELDNAME = :fieldName;
--- 先估基數再決定要不要列值（實體表名：SQLTABLENAME 空白時為 PS_<RECNAME>）
-SELECT COUNT(*) FROM <schema>.PS_<EDITTABLE>;
+ WHERE RECNAME = :recName AND FIELDNAME = :fieldName
+```
+
+先估基數再決定要不要列值（實體表名：SQLTABLENAME 空白時為 PS_<RECNAME>）：
+
+```sql
+SELECT COUNT(*) AS CNT FROM <schema>.PS_<EDITTABLE>
 ```
 
 **2g. 選項使用實況（「哪些選項還在用？」）**
 
+各值的實際資料分布（只回彙總，不撈明細；實體表名規則見 §6）：
+
 ```sql
--- 各值的實際資料分布（只回彙總，不撈明細；實體表名規則見 §6）
 SELECT <FIELDNAME>, COUNT(*) AS CNT
   FROM <schema>.PS_<RECNAME>
  GROUP BY <FIELDNAME>
@@ -229,8 +264,9 @@ SELECT <FIELDNAME>, COUNT(*) AS CNT
 FETCH FIRST 50 ROWS ONLY
 ```
 
+含停用的完整選項清單（判斷廢棄選項時不要過濾 EFF_STATUS）：
+
 ```sql
--- 含停用的完整選項清單（判斷廢棄選項時不要過濾 EFF_STATUS）
 SELECT A.FIELDVALUE, A.EFF_STATUS, A.EFFDT, A.XLATLONGNAME
   FROM <schema>.PSXLATITEM A
  WHERE A.FIELDNAME = :fieldName
@@ -286,20 +322,24 @@ FETCH FIRST 200 ROWS ONLY
 
 **2j. Subpage 展開與向上解析**
 
+展開：Subpage 內有哪些控制項（結果中 FIELDTYPE=11 者以其 SUBPNLNAME 遞迴展開）：
+
 ```sql
--- 展開：Subpage 內有哪些控制項（結果中 FIELDTYPE=11 者以其 SUBPNLNAME 遞迴展開）
 SELECT PNLNAME, PNLFLDID, FIELDNUM, FIELDTYPE, PNLFIELDNAME,
        RECNAME, FIELDNAME, SUBPNLNAME, LBLTEXT, OCCURSLEVEL
   FROM <schema>.PSPNLFIELD
  WHERE PNLNAME = :subpageName
  ORDER BY FIELDNUM
-FETCH FIRST 200 ROWS ONLY;
--- 向上：這個 Subpage 被哪些 Page 掛載。PSPNLGROUP 只登記真正的 Page——
--- 變異目標長在 Subpage 上時，先向上找到掛載 Page（必要時遞迴），
--- 才能用 §2e 對映 Component。
+FETCH FIRST 200 ROWS ONLY
+```
+
+向上：這個 Subpage 被哪些 Page 掛載。PSPNLGROUP 只登記真正的 Page——
+變異目標長在 Subpage 上時，先向上找到掛載 Page（必要時遞迴），才能用 §2e 對映 Component：
+
+```sql
 SELECT PNLNAME FROM <schema>.PSPNLFIELD
  WHERE SUBPNLNAME = :subpageName AND FIELDTYPE = 11
-FETCH FIRST 50 ROWS ONLY;
+FETCH FIRST 50 ROWS ONLY
 ```
 
 Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 §2c。
@@ -317,29 +357,51 @@ Page → Component 對映用 §2e；控制項缺 LBLTEXT 時補中文 label 用 
 
 **2k-0. 前置欄位驗證（必跑，其餘 2k-* 的前提）**
 
+(1) 表名（規則 8a：樣板沒有的表先確認實際表名，禁止自行加減 PS_）：
+
 ```sql
--- (1) 表名（規則 8a：樣板沒有的表先確認實際表名，禁止自行加減 PS_）
 SELECT TABLE_NAME FROM ALL_TABLES
  WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMPERM','PSPRSMSYSATTRVL',
                       'PSPRSMATTRVAL','PSPRSMNAVINFO','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
    AND OWNER = UPPER('<schema>')
-FETCH FIRST 20 ROWS ONLY;
--- (2) 欄位名／型別（規則 8：禁止憑記憶寫欄位名）
+FETCH FIRST 20 ROWS ONLY
+```
+
+(2) 欄位名／型別（規則 8：禁止憑記憶寫欄位名）：
+
+```sql
 SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, COLUMN_ID
   FROM ALL_TAB_COLUMNS
  WHERE TABLE_NAME IN ('PSPRSMDEFN','PSPRSMDEFNLANG','PSPRSMSYSATTRVL','PSPRDMDEFN','PSMENUITEM','PSOPTIONS')
    AND OWNER = UPPER('<schema>')
  ORDER BY TABLE_NAME, COLUMN_ID
-FETCH FIRST 200 ROWS ONLY;
--- (2b) base language（決定 2k-4 的 fallbackLanguageCode；不得憑 delivered convention 填 ENG）——表名／欄位同樣先看 (1)(2) 有沒有列出
-SELECT LANGUAGE_CD FROM <schema>.PSOPTIONS FETCH FIRST 1 ROWS ONLY;
--- (3) 代碼值域（不得憑記憶填，觀察後回填本節）
--- (3) 必須在讀完 (1)(2) 回傳之後才發：(1) 未列出的表、(2) 未列出的欄位，其對應的 (3) 查詢直接跳過並記 gap
-SELECT PORTAL_REFTYPE, COUNT(*) FROM <schema>.PSPRSMDEFN GROUP BY PORTAL_REFTYPE FETCH FIRST 20 ROWS ONLY;
-SELECT PORTAL_CREF_USGT, COUNT(*) FROM <schema>.PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
- GROUP BY PORTAL_CREF_USGT ORDER BY 2 DESC FETCH FIRST 20 ROWS ONLY;
-SELECT DISTINCT PORTAL_ATTR_NAM FROM <schema>.PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY;
-SELECT PORTAL_NAME FROM <schema>.PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
+```
+
+(2b) base language（決定 2k-4 的 fallbackLanguageCode；不得憑 delivered convention 填 ENG）——表名／欄位同樣先看 (1)(2) 有沒有列出：
+
+```sql
+SELECT LANGUAGE_CD FROM <schema>.PSOPTIONS FETCH FIRST 1 ROWS ONLY
+```
+
+(3) 代碼值域（不得憑記憶填，觀察後回填本節）。必須在讀完 (1)(2) 回傳之後才發：(1) 未列出的表、(2) 未列出的欄位，
+其對應的 (3) 查詢直接跳過並記 gap。以下四句逐句送：
+
+```sql
+SELECT PORTAL_REFTYPE, COUNT(*) AS CNT FROM <schema>.PSPRSMDEFN GROUP BY PORTAL_REFTYPE FETCH FIRST 20 ROWS ONLY
+```
+
+```sql
+SELECT PORTAL_CREF_USGT, COUNT(*) AS CNT FROM <schema>.PSPRSMDEFN WHERE PORTAL_REFTYPE = 'C'
+ GROUP BY PORTAL_CREF_USGT ORDER BY 2 DESC FETCH FIRST 20 ROWS ONLY
+```
+
+```sql
+SELECT DISTINCT PORTAL_ATTR_NAM FROM <schema>.PSPRSMSYSATTRVL ORDER BY 1 FETCH FIRST 100 ROWS ONLY
+```
+
+```sql
+SELECT PORTAL_NAME FROM <schema>.PSPRDMDEFN ORDER BY 1 FETCH FIRST 50 ROWS ONLY
 ```
 
 > **未驗前的降級規則**：(1)(2) 任一表／欄位查無 → 該筆記 gaps，**該 2k 步驟停止**（含本步驟的 (3)），
@@ -369,7 +431,7 @@ WITH NAV_TREE AS (
            CASE WHEN EXISTS (SELECT 1 FROM <schema>.PSPRSMSYSATTRVL A
                               WHERE A.PORTAL_NAME = D.PORTAL_NAME AND A.PORTAL_REFTYPE = D.PORTAL_REFTYPE
                                 AND A.PORTAL_OBJNAME = D.PORTAL_OBJNAME AND A.PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV'
-                                AND UPPER(TRIM(DBMS_LOB.SUBSTR(A.PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1'))
+                                AND UPPER(TRIM(TO_CHAR(SUBSTR(A.PORTAL_ATTR_VAL, 1, 100)))) IN ('TRUE','Y','1'))
                 THEN 1 ELSE 0 END AS IS_HIDDEN,
            CASE WHEN D.PORTAL_EXPIRE_DT IS NOT NULL AND D.PORTAL_EXPIRE_DT < SYSDATE THEN 1 ELSE 0 END AS IS_EXPIRED,
            CASE WHEN D.PORTAL_OBJNAME = 'PORTAL_ROOT_OBJECT' OR TRIM(D.PORTAL_PRNTOBJNAME) IS NULL THEN 1 ELSE 0 END AS IS_ROOT,
@@ -440,24 +502,36 @@ FETCH FIRST 200 ROWS ONLY
 
 **2k-2. Portal CREF 識別（診斷用：§2k-C 回 0 列時排查；identity 含 MARKET 時才比 SEG3）**
 
+首選：structured URI 欄位（三欄同時比對，且限定 content reference）。最後一行 SEG3 條件只在
+identity=MENU_COMPONENT_MARKET 時保留：
+
 ```sql
--- 首選：structured URI 欄位（三欄同時比對，且限定 content reference）
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
   FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(TRIM(PORTAL_URI_SEG1)) = UPPER(:menuName)
    AND UPPER(TRIM(PORTAL_URI_SEG2)) = UPPER(:componentName)
-   AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)   -- identity=MENU_COMPONENT_MARKET 時才保留本行
-FETCH FIRST 200 ROWS ONLY;
--- 次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對
+   AND UPPER(TRIM(PORTAL_URI_SEG3)) = UPPER(:market)
+FETCH FIRST 200 ROWS ONLY
+```
+
+次選（structured 欄位空白時）：對 PORTAL_URLTEXT 做**整段錨定**比對，不是子字串比對：
+
+```sql
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
   FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C'
    AND UPPER(PORTAL_URLTEXT) LIKE '%/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market) || '%'
-   -- 或（避免 `_` 被 LIKE 當單字元萬用字元）：AND INSTR(UPPER(PORTAL_URLTEXT), '/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market)) > 0
-FETCH FIRST 200 ROWS ONLY;
--- 診斷（前兩條皆 0 列時才跑）：menu＋component 命中但 market 不符／空白 ⇒ PARTIAL_IDENTITY_MATCH（永不 CONFIRMED）
+FETCH FIRST 200 ROWS ONLY
+```
+
+（避免 `_` 被 LIKE 當單字元萬用字元時，LIKE 那行改成
+`AND INSTR(UPPER(PORTAL_URLTEXT), '/C/' || UPPER(:menuName) || '.' || UPPER(:componentName) || '.' || UPPER(:market)) > 0`。）
+
+診斷（前兩條皆 0 列時才跑）：menu＋component 命中但 market 不符／空白 ⇒ PARTIAL_IDENTITY_MATCH（永不 CONFIRMED）：
+
+```sql
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT, PORTAL_LABEL, PORTAL_PRNTOBJNAME,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_EXPIRE_DT
   FROM <schema>.PSPRSMDEFN
@@ -503,7 +577,7 @@ FETCH FIRST 200 ROWS ONLY
 > 路徑標 `UNRESOLVED` 並記 gap；**絕不得**用物件名、delivered 慣例或印象補上缺掉的段。
 > 祖先一律是 Folder：`CONNECT BY` 必須加 `PORTAL_REFTYPE = 'F'`，否則同名的 Folder 與 CREF 會讓走訪分叉。
 > 隱藏旗標是 attribute 列（不是 PSPRSMDEFN 的欄位），鍵含 `PORTAL_REFTYPE`，值欄 `PORTAL_ATTR_VAL` 是 **CLOB**（直接比對＝ORA-00932）：
-> `SELECT PORTAL_OBJNAME FROM <schema>.PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(DBMS_LOB.SUBSTR(PORTAL_ATTR_VAL, 100, 1))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY;`
+> `SELECT PORTAL_OBJNAME FROM <schema>.PSPRSMSYSATTRVL WHERE PORTAL_NAME = :portalName AND PORTAL_REFTYPE = 'F' AND PORTAL_ATTR_NAM = 'PORTAL_HIDE_FROM_NAV' AND UPPER(TRIM(TO_CHAR(SUBSTR(PORTAL_ATTR_VAL, 1, 100)))) IN ('TRUE','Y','1') AND PORTAL_OBJNAME IN (<ancestor list>) FETCH FIRST 100 ROWS ONLY`
 > ——target CREF 或**任一祖先**命中 ＝ 整條路徑在 Classic 選單看不到 → canonical 不回該列（診斷形 `PATH_HIDDEN=1`），gaps 記一行。
 > 同理，target 或**任一祖先** `PORTAL_EXPIRE_DT < SYSDATE` → canonical 不回該列（診斷形 `PATH_EXPIRED=1`），gaps 記一行。
 > 平台可攜性：非 Oracle 環境改用遞迴 CTE＋顯式 depth 計數＋visited 反連接，行為必須完全一致（待驗）。
@@ -537,17 +611,25 @@ FETCH FIRST 200 ROWS ONLY
 
 **2k-5. CREF Link 與其他入口 surface（複數入口；`navigation.surfaces: CLASSIC_ONLY` 時其他 surface 為 NOT_APPLICABLE）**
 
+(1) LINK 的指向機制**未證實**，先探測：LINK 列是否也帶 URI 三段？
+
 ```sql
--- (1) LINK 的指向機制**未證實**，先探測：LINK 列是否也帶 URI 三段？
 SELECT PORTAL_NAME, PORTAL_OBJNAME, PORTAL_CREF_USGT,
        PORTAL_URI_SEG1, PORTAL_URI_SEG2, PORTAL_URI_SEG3, PORTAL_URLTEXT, PORTAL_PRNTOBJNAME
   FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT = 'LINK'
-FETCH FIRST 20 ROWS ONLY;
--- (2) 其他 surface 是否存在（存在與否都要回 gap，見下）
-SELECT PORTAL_CREF_USGT, COUNT(*) FROM <schema>.PSPRSMDEFN
+FETCH FIRST 20 ROWS ONLY
+```
+
+(2) 其他 surface 是否存在（存在與否都要回 gap，見下），兩句逐句送：
+
+```sql
+SELECT PORTAL_CREF_USGT, COUNT(*) AS CNT FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'C' AND PORTAL_CREF_USGT IN ('GRPT','HPGT','HPGC')
- GROUP BY PORTAL_CREF_USGT FETCH FIRST 20 ROWS ONLY;
+ GROUP BY PORTAL_CREF_USGT FETCH FIRST 20 ROWS ONLY
+```
+
+```sql
 SELECT PORTAL_OBJNAME, PORTAL_LABEL FROM <schema>.PSPRSMDEFN
  WHERE PORTAL_REFTYPE = 'F'
    AND (UPPER(PORTAL_LABEL) LIKE '%FLUID%' OR UPPER(PORTAL_LABEL) LIKE '%NAVIGATION COLLECTION%')
@@ -580,7 +662,7 @@ FIELDNUM 再跑一次，直到不滿 40 列（第一次填 0）。
 
 ```sql
 SELECT P.FIELDNUM, P.OCCURSLEVEL AS LVL, P.FIELDTYPE AS CODE,
-       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'Drop-Down List Box' WHEN 6 THEN 'Long Edit Box'
+       CASE P.FIELDTYPE WHEN 4 THEN 'Edit Box' WHEN 5 THEN 'DropDown List Box' WHEN 6 THEN 'Long Edit Box'
                         WHEN 7 THEN 'Check Box' WHEN 8 THEN 'Radio Button' WHEN 9 THEN 'Image'
                         WHEN 10 THEN 'Scroll Bar' WHEN 11 THEN 'Subpage'
                         WHEN 12 THEN 'Push Button/Hyperlink: PeopleCode Command'
@@ -622,7 +704,8 @@ FETCH FIRST 40 ROWS ONLY
 轉寫規則（照輸出原樣抄，不加不減、不解讀）：
 
 - 欄位：`RECNAME.FIELDNAME`；沒綁 Record 的元件寫 LBLTEXT（沒有就留空）。
-- 元件：CONTROL；OTHER 寫 `OTHER（代碼 <CODE>）`，不猜是什麼元件。
+- 元件：CONTROL；`DropDown List Box` 寫成 App Designer 的 `Drop-Down List Box`（SQL 裡不能寫 Drop-Down，規則 7b）；
+  OTHER 寫 `OTHER（代碼 <CODE>）`，不猜是什麼元件。
 - 屬性：DO、INV、DC、KEY_FLAG、REQ、RDATE、AUPD 各欄有值的依序以空白串起，再接 `RELATED_TO=<RELATED_TO>`、
   `LEVEL=<LVL>`（LVL 大於 0 才寫）、`GOTO=<GOTO_COMPONENT>`、`PAGE=<SUBPAGE>`（有值才寫）。
 - 查值：PROMPT_REC 有值寫 `PROMPT <PROMPT_REC> <PROMPT_EDIT>`，PROMPT_KIND／PROMPT_KEYS 有值再接
@@ -682,58 +765,89 @@ SELECT TRIM(G.PNLGRPNAME) AS COMPONENT, G.ACTIONS AS CODE,
 
 ## 3. Process / 排程（協定角色：ps_get_process_usage）
 
+程式 → Process Definition：
+
 ```sql
--- 程式 → Process Definition
-SELECT PRCSTYPE, PRCSNAME, DESCR FROM <schema>.PS_PRCSDEFN WHERE PRCSNAME = :name;
--- 允許執行它的 Component（Run Control 頁面所在）
-SELECT PRCSNAME, PNLGRPNAME FROM <schema>.PS_PRCSDEFNPNL WHERE PRCSNAME = :name;
--- 被哪些 Job 包含
-SELECT PRCSJOBNAME, PRCSNAME, PRCSJOBSEQ FROM <schema>.PS_PRCSJOBITEM WHERE PRCSNAME = :name;
--- 已排程的請求（recurrence 名稱在此）
+SELECT PRCSTYPE, PRCSNAME, DESCR FROM <schema>.PS_PRCSDEFN WHERE PRCSNAME = :name
+```
+
+允許執行它的 Component（Run Control 頁面所在）：
+
+```sql
+SELECT PRCSNAME, PNLGRPNAME FROM <schema>.PS_PRCSDEFNPNL WHERE PRCSNAME = :name
+```
+
+被哪些 Job 包含：
+
+```sql
+SELECT PRCSJOBNAME, PRCSNAME, PRCSJOBSEQ FROM <schema>.PS_PRCSJOBITEM WHERE PRCSNAME = :name
+```
+
+已排程的請求（recurrence 名稱在此）：
+
+```sql
 SELECT PRCSNAME, RECURNAME, RUNSTATUS, RUNDTTM
   FROM <schema>.PSPRCSRQST WHERE PRCSNAME = :name AND RECURNAME <> ' '
-FETCH FIRST 50 ROWS ONLY;
--- Recurrence 定義
-SELECT * FROM <schema>.PS_PRCSRECUR WHERE RECURNAME = :recurName;
+FETCH FIRST 50 ROWS ONLY
+```
+
+Recurrence 定義：
+
+```sql
+SELECT * FROM <schema>.PS_PRCSRECUR WHERE RECURNAME = :recurName
 ```
 
 ---
 
 ## 4. Security（協定角色：ps_get_security_path）
 
+Component → Permission List（經由 Menu Item）。本句回傳的 MENUNAME 是 **technical authorization metadata**，不是導覽路徑；
+「某角色實際看得到哪個入口」需另外接 §2k 的 Portal Registry 入口與 CREF 權限，本節不足以回答：
+
 ```sql
--- Component → Permission List（經由 Menu Item）
--- 本節回傳的 MENUNAME 是 **technical authorization metadata**，不是導覽路徑；
--- 「某角色實際看得到哪個入口」需另外接 §2k 的 Portal Registry 入口與 CREF 權限，本節不足以回答
 SELECT DISTINCT A.CLASSID, A.MENUNAME, A.AUTHORIZEDACTIONS
   FROM <schema>.PSAUTHITEM A
   JOIN <schema>.PSMENUITEM M
     ON A.MENUNAME = M.MENUNAME AND A.BARITEMNAME = M.ITEMNAME
  WHERE M.PNLGRPNAME = :componentName
-FETCH FIRST 100 ROWS ONLY;
+FETCH FIRST 100 ROWS ONLY
+```
 
--- Permission List → Roles
-SELECT ROLENAME, CLASSID FROM <schema>.PSROLECLASS WHERE CLASSID = :classId;
+Permission List → Roles：
 
--- Role → 使用者「數量」（只回彙總，不列名單）
+```sql
+SELECT ROLENAME, CLASSID FROM <schema>.PSROLECLASS WHERE CLASSID = :classId
+```
+
+Role → 使用者「數量」（只回彙總，不列名單）：
+
+```sql
 SELECT ROLENAME, COUNT(*) AS USER_CNT
-  FROM <schema>.PSROLEUSER WHERE ROLENAME = :roleName GROUP BY ROLENAME;
+  FROM <schema>.PSROLEUSER WHERE ROLENAME = :roleName GROUP BY ROLENAME
+```
 
--- Row-level：Component 的 Search Record
+Row-level：Component 的 Search Record：
+
+```sql
 SELECT PNLGRPNAME, SEARCHRECNAME, ADDSRCHRECNAME
-  FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME = :componentName;
+  FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME = :componentName
 ```
 
 ---
 
 ## 5. AE 結構（協定角色：ps_get_ae_graph 近似）
 
+AE 有哪些 Section：
+
 ```sql
--- AE 有哪些 Section
-SELECT AE_APPLID, AE_SECTION, DESCR FROM <schema>.PSAESECTDEFN WHERE AE_APPLID = :aeName;
--- Section 有哪些 Step
+SELECT AE_APPLID, AE_SECTION, DESCR FROM <schema>.PSAESECTDEFN WHERE AE_APPLID = :aeName
+```
+
+Section 有哪些 Step：
+
+```sql
 SELECT AE_SECTION, AE_STEP, AE_STMT_TYPE
-  FROM <schema>.PSAESTEPDEFN WHERE AE_APPLID = :aeName AND AE_SECTION = :section;
+  FROM <schema>.PSAESTEPDEFN WHERE AE_APPLID = :aeName AND AE_SECTION = :section
 ```
 
 > Step 的 SQL / PeopleCode **內容**不從這裡撈——照長文本協定走
@@ -743,16 +857,25 @@ SELECT AE_SECTION, AE_STEP, AE_STMT_TYPE
 
 ## 6. Record / Field 基本盤
 
+Record 定義與實體表名（SQLTABLENAME 空白 → PS_<RECNAME>）：
+
 ```sql
--- Record 定義與實體表名（SQLTABLENAME 空白 → PS_<RECNAME>）
-SELECT RECNAME, RECTYPE, SQLTABLENAME, RECDESCR FROM <schema>.PSRECDEFN WHERE RECNAME = :recName;
--- Record 欄位清單（含 subrecord 展開）
+SELECT RECNAME, RECTYPE, SQLTABLENAME, RECDESCR FROM <schema>.PSRECDEFN WHERE RECNAME = :recName
+```
+
+Record 欄位清單（含 subrecord 展開）：
+
+```sql
 SELECT RECNAME, FIELDNAME, FIELDNUM, EDITTABLE
   FROM <schema>.PSRECFIELDDB WHERE RECNAME = :recName ORDER BY FIELDNUM
-FETCH FIRST 200 ROWS ONLY;
--- 欄位被哪些 Record 使用（血緣輔助）
+FETCH FIRST 200 ROWS ONLY
+```
+
+欄位被哪些 Record 使用（血緣輔助）：
+
+```sql
 SELECT RECNAME FROM <schema>.PSRECFIELDDB WHERE FIELDNAME = :fieldName
-FETCH FIRST 100 ROWS ONLY;
+FETCH FIRST 100 ROWS ONLY
 ```
 
 ---
@@ -774,7 +897,7 @@ SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE
                        'OBJECTVALUE1', 'OBJECTVALUE2', 'OBJECTVALUE3')
    AND OWNER = UPPER('<schema>')
  ORDER BY TABLE_NAME, COLUMN_NAME
-FETCH FIRST 50 ROWS ONLY;
+FETCH FIRST 50 ROWS ONLY
 ```
 
 - PSRECFIELDDB 缺 DEFRECNAME 或 DEFFIELDNAME → 7c 不比對預設常數（有預設常數的欄位一律保留）。
@@ -787,7 +910,7 @@ SELECT FIELDNAME, FIELDNUM, DEFRECNAME, DEFFIELDNAME
   FROM <schema>.PSRECFIELDDB
  WHERE RECNAME = :recName
  ORDER BY FIELDNUM
-FETCH FIRST 200 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
 ```
 
 - 預設常數＝DEFRECNAME 空白、DEFFIELDNAME 非空白且不以 `%` 開頭時的 DEFFIELDNAME 值；其他情況視為沒有預設常數。
@@ -803,7 +926,7 @@ SELECT OWNER, COLUMN_NAME, DATA_TYPE, NUM_DISTINCT, NUM_NULLS, LAST_ANALYZED
   FROM ALL_TAB_COLUMNS
  WHERE TABLE_NAME = :physicalTable
  ORDER BY OWNER, COLUMN_ID
-FETCH FIRST 200 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
 ```
 
 - 回 0 列 → 沒有實體表（View、Derived／Work），整個 Record 判不了、全部保留。
@@ -821,7 +944,7 @@ SELECT COUNT(*) AS TOTAL_ROWS,
        SUM(CASE WHEN <NUM_FIELD> NOT IN (0, <預設常數>) THEN 1 ELSE 0 END) AS <NUM_FIELD>,
        SUM(CASE WHEN <DATE_FIELD> IS NOT NULL THEN 1 ELSE 0 END) AS <DATE_FIELD>
   FROM <schema>.<physicalTable>
-FETCH FIRST 1 ROWS ONLY;
+FETCH FIRST 1 ROWS ONLY
 ```
 
 - 字元欄：不是單一空白、也不是預設常數才算有值（NULL 算沒值）；數值欄：不是 0、也不是預設常數才算有值；
@@ -841,7 +964,7 @@ SELECT OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME, COUNT(*) AS C
  WHERE REFNAME IN (<7c 為 0 的欄位>)
  GROUP BY OBJECTVALUE1, OBJECTVALUE2, OBJECTVALUE3, RECNAME, REFNAME
  ORDER BY OBJECTVALUE1
-FETCH FIRST 200 ROWS ONLY;
+FETCH FIRST 200 ROWS ONLY
 ```
 
 逐列判讀，算「核心路徑引用」的欄位一律保留：
@@ -862,7 +985,7 @@ SELECT * FROM (
   SELECT 'COMPONENT' AS KIND, PNLGRPNAME AS NAME FROM <schema>.PSPNLGRPDEFN WHERE PNLGRPNAME IN (<名稱清單>)
   UNION ALL
   SELECT 'RECORD' AS KIND, RECNAME AS NAME FROM <schema>.PSRECDEFN WHERE RECNAME IN (<名稱清單>)
-) FETCH FIRST 200 ROWS ONLY;
+) FETCH FIRST 200 ROWS ONLY
 ```
 
 - 名稱清單＝7d 結果中的 OBJECTVALUE1 與本 Record 以外的 RECNAME。

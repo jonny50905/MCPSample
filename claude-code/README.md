@@ -48,19 +48,23 @@ OpenCode 版（repo 根的 `.opencode/`＋`AGENTS.md`）保留不動、照常可
    改用 Claude Code 版之後，這個資料夾就不要再開 OpenCode（OpenCode 也會讀到 `.claude/skills`，兩套同名 skill 會混在一起）；
    兩版要並存請另開資料夾。
 2. **profile**：`.claude/peoplesoft/customization-profile.yaml` 的鍵與值和 OpenCode 版逐行相同（只有註解不同）——
-   把舊檔已回填的值（`oracle.connectionName`、`oracle.currentSchema`、`navigation` 區塊…）照抄過來，或直接把舊檔整份複製過來。
+   把舊檔已回填的值（`oracle.currentSchema`、`navigation` 區塊…）照抄過來，或直接把舊檔整份複製過來。
    `business-domain-map.yaml`、`research-domains.txt` 若本機改過，同樣複製過來。
 3. **註冊 MCP（名字一個字都不能差）**：`oracleMCP`、`PeoplecodeElasticSearch`、`PeoplecodeSource`、`PeoplecodeMetadata`。
    用 user scope 註冊，內部主機名就不會落在專案檔裡：
-   - stdio 型：`claude mcp add --scope user oracleMCP -- <原本 opencode.json 裡該 server 的 command 與 args>`
+   - oracleMCP（@vdeserto/oracle-mcp-server，stdio）：連線帳密放在註冊時的 env，例：
+     `claude mcp add --scope user oracleMCP -e ORACLE_USER=<唯讀帳號> -e ORACLE_PASSWORD=<密碼> -e ORACLE_CONNECTION_STRING=<主機:埠/服務名> -- <原本 opencode.json 裡該 server 的 command 與 args>`
+     （ORACLE_USER 用唯讀帳號；沒有 connect 工具、profile 也沒有連線名要填；SOP-21）
+   - 其他 stdio 型：`claude mcp add --scope user <名字> -- <command 與 args>`
    - http／sse 型：`claude mcp add --scope user --transport http PeoplecodeSource <URL>`（sse 改 `--transport sse`）
-   - 確認：`claude mcp list` 四個都 connected；工具全名會是 `mcp__oracleMCP__connect` 這種形狀。
+   - 確認：`claude mcp list` 四個都 connected；工具全名會是 `mcp__oracleMCP__oracle_execute_query` 這種形狀。
 4. **信任資料夾**：在專案資料夾執行一次 `claude`，接受信任詢問。沒信任時，專案 `settings.json` 的權限允許清單會被忽略，
    外環 headless session 的工具會全部被拒。
 5. **驗收**：`powershell -NoProfile -File .\scripts\ps-claude-doctor.ps1 -Live`——檢查版本判定、claude 版本、powershell、
-   hook 自測、profile、四個 MCP 註冊，並開一個真 headless session 只做第 0 步開線；結論代號 `G` 才算裝好
-   （代號：V 版本判定／C claude／P powershell／H hook／F profile／N MCP／T 工具被拒＝多半沒信任／L connect 沒成功）。
-   之後 `claude --agent ps-orchestrator` 問一題業務問題，第一個動作應是 `mcp__oracleMCP__connect`（connection_name＝profile 值）。
+   hook 自測、profile（`oracle.currentSchema`）、四個 MCP 註冊，並開一個真 headless session 只送一句 `SELECT 1 AS OK FROM DUAL`；
+   結論代號 `G` 才算裝好（代號：V 版本判定／C claude／P powershell／H hook／F profile／N MCP／T 工具被拒＝多半沒信任／
+   L 測試查詢沒成功＝多半是 oracleMCP 註冊的 env 或 DB 連不上）。
+   之後 `claude --agent ps-orchestrator` 問一題業務問題：主代理不呼叫 oracleMCP，查 DB 的工作直接委派 ps-ui-flow／ps-metadata-flow 等子代理。
 
 需求：Claude Code CLI 2.1 以上（用到 `--agent`、`--permission-mode dontAsk`、agent frontmatter 的 hooks）；
 hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`，`powershell` 要在 PATH 上（Git Bash 與 PowerShell 都能執行這行）。
@@ -86,12 +90,12 @@ hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`�
 | 主代理 | Tab 切換 | `claude --agent <名>`；不設預設主代理（直接 `claude` 是一般 session，供維護與排錯） |
 | 委派 | task 工具 | Agent 工具（`subagent_type` 參數名不變）；子代理不能再委派 |
 | 工具權限 | tools 覆寫表（沒列＝開） | agent `tools:` 白名單（沒列＝沒有）＋`settings.json` 權限允許清單 |
-| MCP 工具名 | `oracleMCP_connect` | `mcp__oracleMCP__connect` |
+| MCP 工具名 | `oracleMCP_oracle_execute_query` | `mcp__oracleMCP__oracle_execute_query` |
 | MCP 註冊 | 全域 opencode.json | `claude mcp add --scope user`（或專案 `.mcp.json`，含主機名時不建議） |
-| 執行期 guard | plugin（JS） | hook（PowerShell）：connect 目標＝profile、Agent 目標不得是 skill 名或主代理名；ps-* 主代理下只准 ps-* 子代理（內建代理也擋），一般 session 可用內建代理維護排錯、suggestedNext 註記、worker 讀寫路徑白名單 |
+| 執行期 guard | plugin（JS） | hook（PowerShell）：Agent 目標不得是 skill 名或主代理名；ps-* 主代理下只准 ps-* 子代理（內建代理也擋），一般 session 可用內建代理維護排錯、suggestedNext 註記、worker 讀寫路徑白名單 |
 | oracleMCP 掛載故障 | `/mcps` 重掛；plugin 可受控自動重掛 | 該 session 打 `/mcp` 選 oracleMCP 重新連線；**沒有自動重掛**（profile 的 `mcpAutoRecover` 不使用） |
 | 外環 headless | `opencode run --command X "<參數>"` | `claude -p --agent <主代理> --permission-mode dontAsk --output-format stream-json --verbose "/X <參數>"` |
-| headless 權限 | 全域 opencode.json 的 permission | `.claude/settings.json`：允許 MCP 查詢工具、寫 `docs/ps-research/**`／`.ps-runtime/spec/**`／`.ps-runtime/clone-spec/**`／`.ps-runtime/sdoc/**`、ps-spec-build 與 ps-sdoc 命令；拒絕 `sqlcl_run`、WebFetch、WebSearch；其餘在 headless 一律自動拒絕 |
+| headless 權限 | 全域 opencode.json 的 permission | `.claude/settings.json`：允許 MCP 查詢工具、寫 `docs/ps-research/**`／`.ps-runtime/spec/**`／`.ps-runtime/clone-spec/**`／`.ps-runtime/sdoc/**`、ps-spec-build 與 ps-sdoc 命令；拒絕 oracleMCP 的 `oracle_list_schemas`／`oracle_list_tables`／`oracle_describe_table`／`oracle_get_table_data`、WebFetch、WebSearch；其餘在 headless 一律自動拒絕 |
 | `/ps-spec` | ps-spec-build（CLONE1：單一 spec.md） | ps-sdoc（DOC1：00-index＋14 份文件＋90 問題清單；本版獨有） |
 | session 紀錄 | out／err／rc | 另有 `<時間>-<tag>.stream.jsonl`（完整事件流）；`.out.txt` 是抽出的最終回覆（稽核 stdout 回收照舊） |
 | 教訓帳本 | `lessons/applied.md`（L 編號） | 本機帳本 `.claude/peoplesoft/lessons/applied.md`（C 編號；維護端主帳本另計） |

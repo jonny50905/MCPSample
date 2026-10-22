@@ -299,7 +299,7 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-sdoc.ps1 -Cli opencode`（＋`ps-sdoc-*-lib.ps1`） | Spec 文件（`/ps-spec` 的外環）：狀態圖解讀、依序研究與獨立覆核、乾淨讀者、組裝發布；模型讀 `.opencode/peoplesoft/sdoc/model.yaml` | `.ps-private/sdoc-opencode/`、`.ps-runtime/sdoc-opencode/`、`docs/ps-spec-opencode/`（皆 gitignore） |
 | `ps-session-lib.ps1` | headless session 啟動（`opencode run`／`claude -p --agent`）＋session slot 互斥鎖（兩版各一把；函式庫） | log |
 | `ps-cli-lib.ps1` | 前端版本描述：`.claude/peoplesoft` 存在＝Claude Code 版（`PS_CLI` 可強制），決定框架目錄、CLI 與搬運 manifest（函式庫） | — |
-| `ps-claude-doctor.ps1` | Claude Code 版安裝健檢（hook 自測、MCP 註冊、`-Live` 第 0 步開線） | 唯讀（`-Live` 寫 log） |
+| `ps-claude-doctor.ps1` | Claude Code 版安裝健檢（hook 自測、MCP 註冊、`-Live` 測試查詢 `SELECT 1 AS OK FROM DUAL`） | 唯讀（`-Live` 寫 log） |
 | `ps-bundle.ps1` | 搬運包：維護端 `-Pack`（由 `ps-fs-doctor -WriteManifest` 呼叫，切成每份約 500 KB 的幾份）、公司機 `-Bundle <資料夾>` 解開（逐份與整包驗證、三方比對、衝突另存 .incoming） | 解開時寫框架檔、備份 |
 | `tests/test-*.ps1` | 測試組：auto-loop、knowledge、supplemental、spec、ps51-static、oracle-runtime、claude-variant、bundle | 臨時目錄 |
 
@@ -544,10 +544,10 @@ G  全部正常
   會產生「看得到、程式找不到」的假缺檔。
 - **檔案搬運後跑 `ps-fs-doctor`**：檢查 D 抓 BOM 污染、檢查 S 比對腳本行數，
   貼上被截斷會在這裡現形。
-- **執行期只擋參數，不擋順序**：`.opencode/plugin/ps-runtime-guard.js` 在執行前比對
-  `oracleMCP_connect` 的 connection_name 與 profile（`ORACLE_CONNECTION_MISMATCH`／`NOT_CONFIGURED`）、
+- **執行期只擋參數，不擋順序**：`.opencode/plugin/ps-runtime-guard.js` 在執行前
   擋 `task` 把 skill 名當 agent（`PS_TASK_TARGET_INVALID`），並記 oracleMCP 掛載診斷；派工順序是 agent 規則
-  （subagent 回 NOT_CONNECTED → 主 agent 重連重派一次）。plugin 零外部相依，`.opencode/.npmrc` 的
+  （subagent 回 NOT_CONNECTED → 主 agent 重派一次）。oracleMCP 是 @vdeserto/oracle-mcp-server（唯讀），
+  連線帳密在 MCP 設定的環境變數（SOP-21），沒有 connect 步驟。plugin 零外部相依，`.opencode/.npmrc` 的
   `offline=true` 讓斷網下的相依安裝秒失敗（實測少等 70 秒）。
 
 ## 資安邊界

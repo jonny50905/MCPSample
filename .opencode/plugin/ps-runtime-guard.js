@@ -1,15 +1,13 @@
-// ps-runtime-guard.js — OpenCode plugin：三件小事，沒有派工閘門、沒有 READY／todo 狀態機
+// ps-runtime-guard.js — OpenCode plugin：兩件小事，沒有派工閘門、沒有 READY／todo 狀態機
 //
-// (1) Oracle connect 目標 guard（無狀態）：oracleMCP_connect 執行前只比對「本次呼叫的 connection_name」與 profile
-//     oracle.connectionName：未填／FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED；不一致 → ORACLE_CONNECTION_MISMATCH。
-//     擋＝throw（工具不執行、不改參數；模型收到錯誤碼與下一步）。不保存 READY／turnId／連線世代、不查 task 能力、
-//     不代模型 connect、不拿回覆文字決定能不能派工。這是參數限制，不是前置閘門。
-//     env PS_ORACLE_CONNECT_GUARD=observe 或 profile oracle.connectGuard: observe → 只記錄不擋（enforce 為預設）。
-// (2) task 目標檢查（無狀態）：subagent_type 是 .opencode/skills/<名>/SKILL.md 而不是 .opencode/agent/<名>.md
+// oracleMCP＝@vdeserto/oracle-mcp-server（唯讀；連線由 opencode.json 的 environment 決定，沒有 connect／disconnect 工具）。
+// 查詢工具 oracleMCP_oracle_execute_query；其餘 oracle_list_schemas／list_tables／describe_table／get_table_data 一律由 agent 的 tools 表關閉。
+//
+// (1) task 目標檢查（無狀態）：subagent_type 是 .opencode/skills/<名>/SKILL.md 而不是 .opencode/agent/<名>.md
 //     → PS_TASK_TARGET_INVALID（throw；訊息指出承載 agent：ps-security-flow／ps-data-lineage／ps-process-flow → ps-metadata-flow；
 //     主 agent 自讀的 skill 不委派）。task 的 after：報告 suggestedNext[].agent 是 skill 名或不存在的 agent → 在工具輸出末尾
-//     附一行驗證註記（報告本文不動、不轉發）。這是路由錯誤，訊息不提 ORACLE_MCP_DOWN、不引發 connect 或重掛。
-// (3) oracleMCP 診斷（觀察，不參與任何派工決策）：
+//     附一行驗證註記（報告本文不動、不轉發）。這是路由錯誤，訊息不提 ORACLE_MCP_DOWN、不引發重掛。
+// (2) oracleMCP 診斷（觀察，不參與任何派工決策）：
 //     - session 紀錄 <專案>/auto-loop-logs/ps-runtime-guard/<sessionID>.jsonl：chat.message（訊息 id、agent）、oracleMCP_* 的
 //       before／after（ok 三態＝回覆文字的事實，不是連線有效性證明）、task 的 before／after（target、dbCapable、報告
 //       status／blockedReason／childSessionID、suggestedNext 驗證）、invalid（模型呼叫了它看不到的工具名）。
@@ -20,8 +18,8 @@
 //       /mcp 狀態 failed（transport 關閉），或 tools.changed 之後某個先前執行過的 oracleMCP_ 工具對允許它的 agent 變成不可見
 //       （OpenCode 把呼叫改判成 invalid）；LLM 的 ORACLE_MCP_DOWN 字串不算證據。同一故障事件只重掛一次；有 oracleMCP_ 呼叫在途
 //       先等（有界）；disabled／needs_auth／needs_client_registration 不重掛；一次失敗即停（人工 SOP）；每列帶恢復世代，
-//       舊掛載上的回覆不推翻新恢復；恢復後在下一次 oracleMCP_／task 回覆附註「已重掛，舊 DB 連線與 schema 不再有效」——
-//       plugin 拿不到「呼叫工具」的 API，profile 目標 connect 與 SELECT 1 FROM DUAL 的驗證由主 agent／subagent 做。
+//       舊掛載上的回覆不推翻新恢復；恢復後在下一次 oracleMCP_／task 回覆附註「已重掛，重掛前的結論不再有效」——
+//       plugin 拿不到「呼叫工具」的 API，SELECT 1 AS OK FROM DUAL 的驗證由查詢 subagent 做。
 //       off 時同樣判定、只記 would-remount（診斷先行）。
 //     整個 tools 表混寫「oracleMCP_* 萬用字元 deny＋個別 true」的 agent 在載入時記 WARN（某些版本會把整個 MCP 對它隱藏）。
 //
@@ -33,8 +31,7 @@ import path from "node:path"
 
 const MCP_NAME = "oracleMCP"
 const MCP_PREFIX = MCP_NAME + "_"
-const TOOL_CONNECT = MCP_PREFIX + "connect"
-const TOOL_SQL_RUN = MCP_PREFIX + "sql_run"
+const TOOL_QUERY = MCP_PREFIX + "oracle_execute_query"
 const TOOL_TASK = "task"
 const TOOL_INVALID = "invalid"
 const CODE_TARGET = "PS_TASK_TARGET_INVALID"
@@ -59,8 +56,8 @@ const REMOUNT_DEFER_MAX_MS = msEnv("PS_GUARD_REMOUNT_DEFER_MAX_MS", 60000)
 const REMOUNT_POLL_MS = msEnv("PS_GUARD_REMOUNT_POLL_MS", 1000)
 const REMOUNT_VERIFY_MS = msEnv("PS_GUARD_REMOUNT_VERIFY_MS", 10000)
 
-// connect／sql_run 回傳文字若命中以下樣式，記為 ok:false（只是紀錄，不驅動任何狀態）。
-// 不列 ORA-nnnnn：SQLcl connect 成功的回覆帶說明文字、裡面引用 ORA-nnnnn（公司機實測）。
+// oracleMCP 回傳文字若命中以下樣式，記為 ok:false（只是紀錄，不驅動任何狀態）。
+// 這個 server 的錯誤一律以「Error:」開頭（含 SQL 檢查不過的拒絕訊息）；不列 ORA-nnnnn（server 不轉發原始 ORA 訊息）。
 const FAILURE_PATTERNS = [
   /\bconnection not (?:connected|established|found)\b/i,
   /\bTNS-\d{5}\b/,
@@ -151,7 +148,7 @@ function loadAgentCatalog(directory) {
       const tools = parseToolsMap(fm)
       catalog.set(file.slice(0, -3), {
         mode: frontmatterValue(fm, "mode") ?? "all",
-        db: toolEnabled(tools, TOOL_SQL_RUN),
+        db: toolEnabled(tools, TOOL_QUERY),
         tools,
         wildcardDenyMix: wildcardDenyMix(tools),
       })
@@ -205,7 +202,6 @@ function readSwitch(directory, envName, profileKey, values, fallback) {
   if (values.includes(v)) return v
   return fallback
 }
-const readConnectGuard = (d) => readSwitch(d, "PS_ORACLE_CONNECT_GUARD", "connectGuard", ["enforce", "observe"], "enforce")
 const readAutoRecover = (d) => readSwitch(d, "PS_ORACLE_MCP_AUTO_RECOVER", "mcpAutoRecover", ["on", "off"], "off")
 const readDiag = (d) => readSwitch(d, "PS_ORACLE_MCP_DIAG", "mcpDiag", ["on", "off"], "on")
 
@@ -274,52 +270,6 @@ function parseReport(text) {
   return { valid: false, status: "INVALID", blockedReason: undefined, taskState, taskId, suggestedNext: [] }
 }
 
-function connectionNameOf(args) {
-  if (!args || typeof args !== "object") return undefined
-  for (const k of ["connection_name", "connectionName", "name", "connection"]) {
-    if (typeof args[k] === "string" && args[k].trim()) return args[k].trim()
-  }
-  return undefined
-}
-
-function profileUnset(profileName) {
-  return !profileName || profileName.toUpperCase() === "FILL_ME"
-}
-
-// connect 的目標檢查：回 undefined＝可以執行；否則回 { code, message }
-function connectProblem(profileName, target) {
-  const tail =
-    "模型：不要猜、不要從 list_connections 的清單挑名字（清單把名稱和連線字串黏在一起）；本題不派會查 DB 的委派，" +
-    "向使用者回報「Oracle 連線未設定／連線名不一致（profile oracle.connectionName＝<值>）」，其餘部分照常作答。這不是 oracleMCP 掛載故障，不要重掛。"
-  if (profileUnset(profileName)) {
-    return {
-      code: "ORACLE_CONNECTION_NOT_CONFIGURED",
-      message:
-        `ORACLE_CONNECTION_NOT_CONFIGURED：本次 oracleMCP_connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。profile oracle.connectionName 未填` +
-        `（目前＝${profileName || "空"}）——請管理者在 .opencode/peoplesoft/customization-profile.yaml 回填 SQLcl 已儲存連線名（實際連得上的那個名字）。` +
-        tail,
-    }
-  }
-  if (!target) {
-    return {
-      code: "ORACLE_CONNECTION_MISMATCH",
-      message:
-        `ORACLE_CONNECTION_MISMATCH：本次 oracleMCP_connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。呼叫沒有帶 connection_name；` +
-        `只准連 profile oracle.connectionName 指定的「${profileName}」——用 connection_name＝「${profileName}」重新呼叫。`,
-    }
-  }
-  if (target !== profileName) {
-    return {
-      code: "ORACLE_CONNECTION_MISMATCH",
-      message:
-        `ORACLE_CONNECTION_MISMATCH：本次 oracleMCP_connect 未執行（被 Oracle 連線目標 guard 擋下，不是權限問題）。connect 目標「${target}」≠ profile oracle.connectionName「${profileName}」。` +
-        `只准連 profile 指定的連線：用 connection_name＝「${profileName}」原樣重新呼叫 connect。` +
-        tail,
-    }
-  }
-  return undefined
-}
-
 function targetProblem(target, agentNames, skillNames) {
   if (!target || agentNames.has(target) || BUILTIN_AGENTS.has(target)) return undefined
   if (!skillNames.has(target)) return undefined
@@ -340,7 +290,7 @@ function targetProblem(target, agentNames, skillNames) {
     message:
       `${CODE_TARGET}：本次 task 未執行——「${target}」是 skill（${where}），不是可委派的 agent。` +
       next +
-      "這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要 connect、不要重掛 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。",
+      "這是路由錯誤，不是 Oracle 掛載或 DB 連線問題：不要重掛 MCP、不要當成 Oracle 掛載故障回報，用正確的 subagent_type 重新委派即可。",
   }
 }
 
@@ -437,7 +387,7 @@ export const PsRuntimeGuard = async (input) => {
   function classifyTarget(target) {
     const entry = fresh().get(target)
     if (!entry) return { db: true, basis: "unknown-agent(default:DB)" }
-    return { db: entry.db, basis: entry.db ? "sql_run:enabled" : "sql_run:disabled" }
+    return { db: entry.db, basis: entry.db ? "execute_query:enabled" : "execute_query:disabled" }
   }
 
   function agentAllows(agent, tool) {
@@ -602,7 +552,7 @@ export const PsRuntimeGuard = async (input) => {
       recovery.phase = "recovered-unverified"
       recovery.catalogSuspect = false
       recovery.noticeGen = gen
-      diag({ ...base, decision: "remount-ok", faultId: recovery.faultId, gen, ms: Date.now() - t0, disconnect: d.ok, connect: c.ok, runtimeStatus: st.status, verify: "tools restored is verified by the next executed oracleMCP_ call; DB verification (connect to the profile target, then SELECT 1 FROM DUAL) is the agents' job" })
+      diag({ ...base, decision: "remount-ok", faultId: recovery.faultId, gen, ms: Date.now() - t0, disconnect: d.ok, connect: c.ok, runtimeStatus: st.status, verify: "tools restored is verified by the next executed oracleMCP_ call; DB verification (SELECT 1 AS OK FROM DUAL) is the query subagents' job" })
     } else {
       recovery.phase = "failed"
       diag({ ...base, decision: "remount-failed", faultId: recovery.faultId, gen, ms: Date.now() - t0, disconnect: d.ok, connect: c.ok, connectError: c.error, runtimeStatus: st.status, statusError: st.error, note: "stopping after one attempt; follow the manual SOP" })
@@ -611,8 +561,8 @@ export const PsRuntimeGuard = async (input) => {
 
   function recoveryNotice() {
     return (
-      `\n\n[ps-runtime-guard] oracleMCP 已在本主機重掛（恢復世代 ${recovery.noticeGen}）。重掛前的 DB 連線、CURRENT_SCHEMA 設定與「已連線」結論都不再有效：` +
-      "主 agent 先 oracleMCP_connect（connection_name＝profile oracle.connectionName 原樣），再由查詢 subagent 執行 SELECT 1 FROM DUAL 確認，之後才繼續業務查詢；" +
+      `\n\n[ps-runtime-guard] oracleMCP 已在本主機重掛（恢復世代 ${recovery.noticeGen}）。重掛前的查詢結果狀態與失敗回報都不再有效：` +
+      "查詢 subagent 先以 oracleMCP_oracle_execute_query 執行 SELECT 1 AS OK FROM DUAL 確認，之後才繼續業務查詢；" +
       "只重派尚未完成的唯讀工作一次；重掛前的失敗回報不代表現況。"
     )
   }
@@ -654,14 +604,14 @@ export const PsRuntimeGuard = async (input) => {
   }
 
   pluginLog(
-    `loaded directory=${directory} execPath=${process.execPath} platform=${process.platform} connectGuard=${readConnectGuard(directory)} autoRecover=${readAutoRecover(directory)} diag=${readDiag(directory)} agents=${JSON.stringify(
+    `loaded directory=${directory} execPath=${process.execPath} platform=${process.platform} autoRecover=${readAutoRecover(directory)} diag=${readDiag(directory)} agents=${JSON.stringify(
       [...catalog.entries()].map(([name, v]) => `${name}:${v.db ? "DB" : "noDB"}`),
     )} skills=${JSON.stringify([...skills].sort())} wildcardDenyMix=${JSON.stringify([...catalog.entries()].filter(([, v]) => v.wildcardDenyMix).map(([name]) => name))}`,
   )
   for (const [name, v] of catalog.entries()) {
     if (v.wildcardDenyMix) pluginLog(`WARN agent ${name}: tools 表混寫 oracleMCP_* deny ＋ 個別工具 true——某些版本會把整個 MCP 對它隱藏；請逐工具明寫`)
   }
-  diag({ kind: "loaded", execPath: process.execPath, platform: process.platform, connectGuard: readConnectGuard(directory), autoRecover: readAutoRecover(directory) })
+  diag({ kind: "loaded", execPath: process.execPath, platform: process.platform, autoRecover: readAutoRecover(directory) })
 
   return {
     "chat.message": async (msg, out) => {
@@ -752,20 +702,6 @@ export const PsRuntimeGuard = async (input) => {
         recovery.catalogSuspect = false
         diag({ kind: "event", type: "catalog-proven", tool, note: "an oracleMCP_ call executed after the catalog refresh: tools are visible" })
       }
-      if (tool === TOOL_CONNECT) {
-        const mode = readConnectGuard(directory)
-        const profileName = String(readProfileOracle(directory).connectionName ?? "").trim()
-        const target = connectionNameOf(args)
-        const problem = connectProblem(profileName, target)
-        const head = { hook: "before", tool, callID, ...stamp(s), connection: target, profileConnection: profileName, mode }
-        if (problem && mode !== "observe") {
-          record(sessionID, { ...head, decision: "block", note: problem.code })
-          throw new Error(problem.message)
-        }
-        inflightAdd(sessionID, callID, tool)
-        record(sessionID, { ...head, decision: problem ? "observe-would-block" : "allow", note: problem ? problem.code : undefined })
-        return
-      }
       inflightAdd(sessionID, callID, tool)
       record(sessionID, { hook: "before", tool, callID, ...stamp(s), decision: "observe" })
     },
@@ -806,7 +742,7 @@ export const PsRuntimeGuard = async (input) => {
       const annotated = maybeAnnotate(sessionID, out)
       record(sessionID, {
         hook: "after", tool, callID, ...stamp(s), ok: r.ok, failureMatch: r.failureMatch || undefined, outputLength: r.textLength,
-        ...(tool === TOOL_CONNECT ? { connection: connectionNameOf(info?.args) } : {}), recoveryGen: recovery.gen || undefined, recoveryNotice: annotated || undefined,
+        recoveryGen: recovery.gen || undefined, recoveryNotice: annotated || undefined,
       })
     },
   }

@@ -11,7 +11,7 @@
 | `PeoplecodeElasticSearch` | `get_chunk_by_id` | 依 id 取回——僅供稽核交叉檢查，非解引用路徑 |
 | `PeoplecodeSource` | `get_chunks_details` | **解引用（唯一的正式證據來源）** |
 | `PeoplecodeSource` | `get_file_structure` | 檔案結構（先看目錄再定向取段） |
-| `oracleMCP` | （SQLcl 唯讀查詢） | PeopleTools metadata——**一律照 `oracle-query-cookbook.md` 樣板** |
+| `oracleMCP` | `oracle_execute_query`（唯讀 SELECT；同一個 MCP 的其他四個工具已關閉） | PeopleTools metadata——**一律照 `oracle-query-cookbook.md` 樣板**（規則 7b 的 SQL 形狀） |
 | `PeoplecodeMetadata` | find_field_usage 等 | 只作定位線索，**不得作 evidence** |
 
 工具身分＝server 前綴＋工具名，兩個都對才叫對；`unavailable tool`

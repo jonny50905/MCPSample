@@ -38,17 +38,15 @@ project.md、decisions.md、approvals.md。研究規則依 `.claude/peoplesoft/s
    重的檢索用 Agent 工具委派給 ps-* **子代理**（`.claude/agents/*.md` 裡的名字）。
    `.claude/skills/*` 是 skill、不是可委派的 agent：授權／血緣／排程類（ps-security-flow／
    ps-data-lineage／ps-process-flow）一律派 `ps-metadata-flow`，要用的 skill 寫進委派的 prompt。
-   主代理工作流的**開線步驟（第 0 步）**（查 wiki、委派、作答之前）固定
-   `mcp__oracleMCP__connect`（connection_name＝profile `oracle.connectionName` 原樣，不先 list、
-   不從清單挑名字；無條件，見 agent 定義），等 connect 回覆成功才派會查 DB 的子代理。
-   執行期只有 `.claude/hooks/ps-runtime-guard.ps1` 的無狀態檢查：connect 的 connection_name
-   必須等於 profile 值（否則 `ORACLE_CONNECTION_NOT_CONFIGURED`／`ORACLE_CONNECTION_MISMATCH`，
-   工具不執行）、Agent 工具的 subagent_type 不得是 skill 名或主代理專用名；在 ps-* 主代理下還必須是可委派的
-   ps-* 子代理（內建代理也擋）（`PS_TASK_TARGET_INVALID`）。**沒有派工前置閘門**——順序是你的責任：先派子代理而 DB 未連 → 它回
-   `NOT_CONNECTED`，你再 connect 一次、重派一次，只一次、不迴圈。工具清單裡沒有 `mcp__oracleMCP__` 工具＝掛載故障
-   → 不猜工具名、不重派、不多 connect，回報 ORACLE_MCP_DOWN，交管理者在該 session 以 `/mcp` 重新連線 oracleMCP（SOP-21）；
-   重新連線後重新 connect，不沿用舊結論。
-   第 0 步之後，問答一律**先查知識層**——`docs/ps-research/wiki/`（已歸戶的已驗證知識）與
+   oracleMCP（@vdeserto/oracle-mcp-server，唯讀）的連線由 Claude Code 的 MCP 設定決定，**沒有開線步驟**：
+   主代理不呼叫任何 `mcp__oracleMCP__` 工具，查詢只由 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor 以
+   `mcp__oracleMCP__oracle_execute_query` 照 cookbook 做（規則 7b：一次一句、不加分號與註解、帶 limit）。
+   執行期只有 `.claude/hooks/ps-runtime-guard.ps1` 的無狀態檢查：Agent 工具的 subagent_type 不得是 skill 名或主代理專用名；
+   在 ps-* 主代理下還必須是可委派的 ps-* 子代理（內建代理也擋）（`PS_TASK_TARGET_INVALID`）。**沒有派工前置閘門**——
+   子代理回 `NOT_CONNECTED`（DB 連不上）→ 重派一次，只一次、不迴圈；第二次仍是就回報「DB 連線失敗」交管理者依 SOP-21 檢查
+   oracleMCP 設定。工具清單裡沒有 `mcp__oracleMCP__` 工具＝掛載故障 → 不猜工具名、不重派，回報 ORACLE_MCP_DOWN，
+   交管理者在該 session 以 `/mcp` 重新連線 oracleMCP（SOP-21），不沿用舊結論。
+   問答一律**先查知識層**——`docs/ps-research/wiki/`（已歸戶的已驗證知識）與
    `docs/ps-research/<領域>/NN-*.md`（已稽核的研究文件），照
    `.claude/peoplesoft/knowledge-retrieval-contract.md`：以 `docs/ps-research/knowledge/index.md`
    定位（Grep 的 path 給該索引檔、`output_mode="content"`）、只讀對應節、標來源等級、答覆附 `## 來源表`；
@@ -67,7 +65,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.claude/peoplesoft/s
 ## 一般 session（沒有 `--agent`）
 
 - 用途是框架維護與排錯（看 log、跑腳本、修設定）。PeopleSoft 業務問題仍照上方流程：建議改用 `claude --agent ps-orchestrator`；
-  在一般 session 回答時同樣先開線、查知識層、委派 ps-* 子代理，不自己直接檢索原始碼或查 DB。
+  在一般 session 回答時同樣先查知識層、委派 ps-* 子代理，不自己直接檢索原始碼或查 DB。
 - 維護排錯（讀框架檔、看 log、查腳本）可委派內建子代理（general-purpose／Explore／Plan），hook 不擋；
   PeopleSoft 業務檢索仍只派 ps-* 子代理。
 - 改了框架檔（`.claude/**`、`scripts/**`、`CLAUDE.md`）要告訴使用者改了哪個檔、為什麼，請使用者回報維護端：

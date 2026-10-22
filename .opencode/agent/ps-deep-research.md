@@ -14,13 +14,13 @@ tools:
   webfetch: false
   "PeoplecodeElasticSearch_*": false
   "PeoplecodeSource_*": false
-  # Oracle：只開 connect（第 0 步）與 list_connections（connect 失敗時附清單原文給管理者核對用）；
-  # 逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見，後面的 true 救不回）
-  "oracleMCP_list_connections": true
-  "oracleMCP_connect": true
-  "oracleMCP_disconnect": false
-  "oracleMCP_sql_run": false
-  "oracleMCP_sqlcl_run": false
+  # Oracle：主 agent 不查 DB（查詢交給 subagent），oracleMCP 五個工具全關；
+  # 逐工具明寫、不用 oracleMCP_* 萬用字元（tools 表混寫萬用字元會讓整個 MCP 對 agent 不可見）
+  "oracleMCP_oracle_list_schemas": false
+  "oracleMCP_oracle_list_tables": false
+  "oracleMCP_oracle_describe_table": false
+  "oracleMCP_oracle_get_table_data": false
+  "oracleMCP_oracle_execute_query": false
   # 尚未整合的新 MCP 一律先 deny（tools map 是覆寫表：沒列＝預設開）：
   "PeoplecodeMetadata_*": false
 ---
@@ -49,8 +49,8 @@ docs/ps-research/<領域>/
 - **併發上限看「這個委派會呼叫哪個 server」**（不是任務類型——同樣是
   任務 A，純 chunk 解引用不碰 DB，SQL 型證據重跑會碰）：
   · 會呼叫 oracleMCP 的（SQL 重跑、任務 C 反查、metadata 類）：同時 ≤ 3。
-    **連線已在第 0 步建好**（subagent 不能 connect 也不能 disconnect）。subagent 回 BLOCKED(NOT_CONNECTED) →
-    收齊受影響的委派後再 connect 一次、重派一次（只一次）；第二次仍失敗 → 該筆收據記「DB 連線建立失敗（原因）」，不寫「通道未掛」。
+    派之前不必連線（連線由 oracleMCP 的設定決定）。subagent 回 BLOCKED(NOT_CONNECTED) →
+    收齊受影響的委派後重派一次（只一次）；第二次仍失敗 → 該筆收據記「DB 連線失敗（原因）」，不寫「通道未掛」。
   · 只用 ES＋Source 的（ChunkId 解引用、多數任務 B）：同時 ≤ 6。
   同時派出總數 ≤ 6，其中會查 DB 的 ≤ 3。
 - 不要全循序：一個卡住只該損失那一個委派。
@@ -58,18 +58,11 @@ docs/ps-research/<領域>/
 ## 啟動與續跑（每次被呼叫先做這個）
 
 **建議先用 `todowrite` 把本節 0～N 項與後續要做的事列成 todo**（非強制）：有 todo 時一次做一項——開始標 in_progress、做完標 completed、
-等工具回來再做下一項，比較不會在 connect 還沒回覆就派出 subagent。
+等工具回來再做下一項。
 
-0. **開線（第 0 步；每次被呼叫、無條件；直接 connect，不先 list；比本節其餘動作更早）**：
-   `oracleMCP_connect`（connection_name＝profile `oracle.connectionName` 的值，**原樣照抄**）。**不要先呼叫 list_connections、不要從清單挑名字**
-   ——清單回傳的名稱和連線字串黏在一起，會讀錯名字。profile 未填／FILL_ME → 不 connect，本次不派 DB 委派，checklist／收據記「Oracle 連線未設定
-   （profile oracle.connectionName＝<值>）」。connect 回錯誤 → 再 connect 一次；仍失敗 → 呼叫 `oracleMCP_list_connections` 把清單**原文**記進
-   收據讓管理者核對 profile 值（不要自己改名字），本次不派 DB 委派，記「DB 連線建立失敗（<錯誤>）」。
-   不判斷本次會不會用到 DB、不因為同一 session 已連過就省略（回「已連線」也算成功）。connect 回 `ORACLE_CONNECTION_MISMATCH`／
-   `ORACLE_CONNECTION_NOT_CONFIGURED`（執行期 guard：connection_name 與 profile 不一致或未填）→ 不換名字重試，收據記「Oracle 連線未設定／
-   連線名不一致」、本次不派 DB 委派。工具清單裡沒有 `oracleMCP_connect`（沒有任何 oracleMCP_ 工具）＝掛載故障：不猜工具名、不試 connect、
-   不派 DB 委派，記 ORACLE_MCP_DOWN 並在結束總結請管理者依 SOP-21 重掛；重掛後要重新 connect。
-   自檢：第一個會查 DB 的 task 委派之前，必須已出現一次**成功**的 `oracleMCP_connect`（等回覆，不要同一步並行派 task）。
+0. **不必開線（DB 連線由 oracleMCP 的設定決定）**：oracleMCP 是唯讀查詢 MCP，連哪個資料庫、用哪個帳號寫在 opencode.json 的
+   MCP 設定裡，沒有 connect 可呼叫；你的 oracleMCP 工具全關。不呼叫任何 `oracleMCP_` 工具、不先「確認連線」，會查 DB 的工作直接委派。
+   DB 連不上（NOT_CONNECTED）、掛載故障（ORACLE_MCP_DOWN）由查詢 subagent 回報，處置見「委派顆粒度與併發上限」與硬規則。
 1. 指令含「歸戶提煉」或「entity 升級」→ **直接進提煉模式**，跳過本節其餘。
 2. 檢查 `docs/ps-research/<領域>/00-overview.md`：
    - **不存在** → 執行階段一（總覽）。
@@ -86,7 +79,7 @@ docs/ps-research/<領域>/
    `business-domain-map.yaml`。命中 → 用該 domain 的 aliases / policy；
    **未命中 → 不拒答**：自行展開 3~6 個同義詞（中英文），用
    `searchPolicy.defaultMode`，並在「掃描範圍聲明」記錄用了哪些詞。
-2. 多角度盤點（各角度一個委派；oracleMCP 類同時 ≤ 3，派前先 connect）：
+2. 多角度盤點（各角度一個委派；oracleMCP 類同時 ≤ 3）：
    - @ps-ui-flow：以 aliases 反查 UI 文字 / Component 描述 → 功能清單。
      「選單」在本階段只取 **technicalMenuLocation**（cookbook §2e）當定位線索，
      **不寫進 00-overview 的任何路徑欄**；使用者導覽入口屬階段二（cookbook §2k）。
@@ -116,7 +109,7 @@ docs/ps-research/<領域>/
    task 的 `subagent_type` 只能是 `.opencode/agent/` 裡的名字：授權／血緣／排程的工作派 **ps-metadata-flow**，
    要讀的 skill（`.opencode/skills/ps-security-flow/SKILL.md` 等）寫進 task 文字——skill 目錄名不是 agent，
    `subagent_type=ps-security-flow` 會在執行前被擋（`PS_TASK_TARGET_INVALID`，改派即可；不是 Oracle 問題）。
-   oracleMCP 類委派同時 ≤ 3（派前先 connect）；
+   oracleMCP 類委派同時 ≤ 3；
    報告的 suggestedNext 屬深度規則者必須執行。
    **主角是 Component 的項目**：peoplecode-flow 委派必含一次
    Activate／PostBuild 定位（ObjectName＋eventName 結構化搜尋——
@@ -236,7 +229,7 @@ docs/ps-research/<領域>/
   **委派回報 FAIL(ORACLE_MCP_DOWN)**（flow 端工具不可用，cookbook 7a）
   → 該筆記收據「oracleMCP 工具不可用（掛載故障），待管理者重掛後重試」；**不得**因此
   寫 `待人工SQL`——通道故障≠查無，寫出口會把暫時性停電變成永久
-  人工債；也不得增加 connect 次數或改派猜工具名，你只是轉述子報告，不得寫成你已獨立驗證環境故障；
+  人工債；也不得改派猜工具名，你只是轉述子報告，不得寫成你已獨立驗證環境故障；
   重掛後不沿用舊 DOWN 結論。**換路部分推進合法**（cookbook 7a）：程式碼側查得到的
   等價線索可先以 INFERRED＋CHUNK 寫入、gaps 註明「DB 實際狀態
   待通道恢復驗證」——但該列的 SQL 型主張未驗＝**列保持未完成**。

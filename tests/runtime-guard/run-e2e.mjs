@@ -1,20 +1,21 @@
-// run-e2e.mjs — 用真 OpenCode（預設 PATH 上的 opencode；或 OPENCODE_BIN）＋假 oracleMCP＋假模型，
+// run-e2e.mjs — 用真 OpenCode（預設 PATH 上的 opencode；或 OPENCODE_BIN）＋假 oracleMCP（仿 @vdeserto/oracle-mcp-server）＋假模型，
 // 端到端驗證 ps-runtime-guard 在 opencode run（headless）與 opencode serve（同行程多 session、兩個 host）路徑的行為。只給維護沙箱用。
 // 用法：node tests/runtime-guard/run-e2e.mjs [--repeat N] [--only <scenario>] [--keep]
-//   沒有派工閘門：task 在 connect 之前一律放行；順序只是模型劇本。驗的是——
-//   compliant        connect → task → subagent sql_run → COMPLETE（可用的定義：報告 COMPLETE 且子 session 有成功的 sql_run）；工具允許清單
-//   task-first       先派 task（DB 未連）→ subagent 回 BLOCKED(NOT_CONNECTED) → 主 agent 重連一次、重派一次 → COMPLETE；只有一次 connect（不迴圈）
+//   沒有派工閘門、沒有 connect：主 agent 看不到 oracleMCP 工具，查詢只由 subagent 以 oracleMCP_oracle_execute_query 做。驗的是——
+//   compliant        task → subagent oracle_execute_query → COMPLETE（可用的定義：報告 COMPLETE 且子 session 有成功的查詢）；工具允許清單
+//   db-flaky         DB 前兩次查詢失敗：subagent 業務查詢與 SELECT 1 AS OK FROM DUAL 都回 Database query failed → BLOCKED(NOT_CONNECTED)
+//                    → 主 agent 重派一次 → COMPLETE
+//   db-down          DB 一直連不上：NOT_CONNECTED → 重派一次 → 又 NOT_CONNECTED → 回報「DB 連線失敗」、不再派（不迴圈）；不觸發重掛
 //   nodb             派 ps-peoplecode-flow：零 oracleMCP 呼叫、報告 COMPLETE（dbCapable=false 只是紀錄）
-//   connect-fail     connect 一律 isError：connect 兩次 → list 一次附原文 → 回報「DB 連線建立失敗」；零 task；tool-error 不是重掛證據
-//   wrong-target     profile=HR_UAT、模型 connect(HR_DEV) → 執行前被 guard 擋（ORACLE_CONNECTION_MISMATCH）、假 MCP 沒收到、模型回報設定錯誤
-//   not-configured   profile=FILL_ME → ORACLE_CONNECTION_NOT_CONFIGURED
-//   mcp-down         oracleMCP enabled:false → 模型看不到 oracleMCP_ 工具 → 回報 ORACLE_MCP_DOWN、不猜名、不 connect、不派 DB 委派
+//   stale-connect    主 agent 憑記憶呼叫 SQLcl 時代的 oracleMCP_connect → OpenCode 判 invalid（guard 記「多半是錯名」、不重掛、不擋）→ 照常完成
+//   mcp-down         oracleMCP enabled:false → subagent 看不到 oracleMCP_ 工具 → 回 ORACLE_MCP_DOWN、不猜名；主 agent 不重派、回報 DOWN
 //   mcp-failed       oracleMCP 指令不存在（/mcp 狀態 failed）→ 同上
-//   skill-as-agent   task(subagent_type=ps-security-flow) 執行前被擋（PS_TASK_TARGET_INVALID，指出 ps-metadata-flow）→ 改派 ps-metadata-flow → COMPLETE；不觸發 connect／重掛
+//   skill-as-agent   task(subagent_type=ps-security-flow) 執行前被擋（PS_TASK_TARGET_INVALID，指出 ps-metadata-flow）→ 改派 ps-metadata-flow → COMPLETE；不觸發重掛
 //   suggested-skill  subagent 報告 suggestedNext 帶 ps-security-flow → task 回覆末尾附 guard 註記 → 主 agent 改派 ps-metadata-flow
-//   vanish-auto      （serve；自動重掛 on；host A＋host B）A1 正常後假 MCP 工具目錄變空（list_changed）→ A2 新 session 看不到工具、模型憑記憶呼叫 connect
-//                    → OpenCode 判 invalid → guard 以 host 證據重掛一次 → A3 新 session 恢復、connect 回覆附「已重掛」註記；host B 全程正常、從未重掛
-//   vanish-observe   （serve；自動重掛 off）同上但只記 would-remount；A3 仍看不到工具、模型回報 DOWN；假 MCP 只起過一次
+//   vanish-auto      （serve；自動重掛 on；host A＋host B）A1 正常後假 MCP 工具目錄變空（list_changed）→ A2 新 session 的 subagent 看不到工具、
+//                    憑記憶呼叫查詢 → OpenCode 判 invalid → guard 以 host 證據重掛一次 → A3 新 session 恢復、第一個查詢回覆附「已重掛」註記；
+//                    host B 全程正常、從未重掛
+//   vanish-observe   （serve；自動重掛 off）同上但只記 would-remount；A3 仍看不到工具、回報 DOWN；假 MCP 只起過一次
 //   transport-close  （serve；自動重掛 on）假 MCP 行程結束（狀態 failed: Connection closed）→ 事件觸發重掛 → A2 新 session 恢復
 // 每個情境：建臨時專案（複製 .opencode＋AGENTS.md）、寫 opencode.json、跑 opencode（run 或 serve）、
 //   讀 guard 的 jsonl／_mcp-diag.jsonl、opencode export 取正式 transcript 交叉比對（task 件數、訊息 id 歸屬）、斷言。
@@ -35,20 +36,20 @@ const OPENCODE = process.env.OPENCODE_BIN || "opencode"
 const MODEL_PORT = Number(process.env.MOCK_MODEL_PORT || 18081)
 const LOG_DIR = path.join("auto-loop-logs", "ps-runtime-guard")
 
+const Q = "oracleMCP_oracle_execute_query"
 const SCENARIOS = {
   compliant: { model: "compliant", mcp: true },
-  "task-first": { model: "task-first", mcp: true },
+  "db-flaky": { model: "redispatch-once", mcp: true, dbDownCalls: 2 },
+  "db-down": { model: "redispatch-once", mcp: true, dbDown: true },
   nodb: { model: "nodb", mcp: true },
-  "connect-fail": { model: "connect-fail", mcp: true, connectFail: true },
-  "wrong-target": { model: "connect-fail", mcp: true, profileConnection: "HR_UAT" },
-  "not-configured": { model: "connect-fail", mcp: true, profileConnection: "FILL_ME" },
+  "stale-connect": { model: "stale-connect", mcp: true },
   "mcp-down": { model: "down-aware", mcp: false },
   "mcp-failed": { model: "down-aware", mcp: true, mcpBroken: true },
   "skill-as-agent": { model: "skill-as-agent", mcp: true },
   "suggested-skill": { model: "suggested-skill", mcp: true, suggestSkill: true },
-  "vanish-auto": { model: "down-probe", mcp: true, vanishAfter: 2, autoRecover: "on", hostB: true, serve: ["A:A1", "B:B1", "A:wait:tools-changed", "A:A2", "A:wait:remount-ok", "A:A3", "B:B2"] },
-  "vanish-observe": { model: "down-probe", mcp: true, vanishAfter: 2, autoRecover: "off", serve: ["A:A1", "A:wait:tools-changed", "A:A2", "A:wait:would-remount", "A:A3"] },
-  "transport-close": { model: "down-probe", mcp: true, exitAfter: 2, autoRecover: "on", serve: ["A:A1", "A:wait:remount-ok", "A:A2"] },
+  "vanish-auto": { model: "down-probe", mcp: true, vanishAfter: 1, autoRecover: "on", hostB: true, serve: ["A:A1", "B:B1", "A:wait:tools-changed", "A:A2", "A:wait:remount-ok", "A:A3", "B:B2"] },
+  "vanish-observe": { model: "down-probe", mcp: true, vanishAfter: 1, autoRecover: "off", serve: ["A:A1", "A:wait:tools-changed", "A:A2", "A:wait:would-remount", "A:A3"] },
+  "transport-close": { model: "down-probe", mcp: true, exitAfter: 1, autoRecover: "on", serve: ["A:A1", "A:wait:remount-ok", "A:A2"] },
 }
 
 function copyDir(src, dst) {
@@ -66,11 +67,13 @@ function makeProject(base, sc, name, { fault = true } = {}) {
   fs.mkdirSync(path.join(project, "docs", "ps-research", "wiki"), { recursive: true })
   const profilePath = path.join(project, ".opencode", "peoplesoft", "customization-profile.yaml")
   const profile = fs.readFileSync(profilePath, "utf8")
-  if (!/^\s*connectionName:/m.test(profile)) throw new Error("profile has no oracle.connectionName")
-  fs.writeFileSync(profilePath, profile.replace(/^(\s*connectionName:)\s*\S+/m, `$1 ${sc.profileConnection ?? "HR_DEV"}`))
+  if (/^\s*connectionName:/m.test(profile)) throw new Error("profile still has oracle.connectionName (the new oracleMCP has no connect)")
+  fs.writeFileSync(profilePath, profile.replace(/^(\s*currentSchema:)\s*\S+/m, "$1 DEMOOWN"))
   const mcpLog = path.join(base, name, "mcp.jsonl")
-  const mcpEnv = { MOCK_ORACLE_LOG: mcpLog }
-  if (sc.connectFail) mcpEnv.MOCK_ORACLE_CONNECT_FAIL = "1"
+  // 真 server 讀這三個環境變數（假 server 不檢查，寫上是為了讓 opencode.json 的形狀與公司機一致）
+  const mcpEnv = { MOCK_ORACLE_LOG: mcpLog, ORACLE_USER: "ps_readonly", ORACLE_PASSWORD: "mock", ORACLE_CONNECTION_STRING: "localhost:1521/MOCK" }
+  if (sc.dbDown) mcpEnv.MOCK_ORACLE_DB_DOWN = "1"
+  if (sc.dbDownCalls) mcpEnv.MOCK_ORACLE_DB_DOWN_CALLS = String(sc.dbDownCalls)
   if (fault && sc.vanishAfter) { mcpEnv.MOCK_ORACLE_VANISH_AFTER_CALLS = String(sc.vanishAfter); mcpEnv.MOCK_ORACLE_FAULT_MARKER = path.join(base, name, "fault.marker") }
   if (fault && sc.exitAfter) { mcpEnv.MOCK_ORACLE_EXIT_AFTER_CALLS = String(sc.exitAfter); mcpEnv.MOCK_ORACLE_FAULT_MARKER = path.join(base, name, "fault.marker") }
   const config = {
@@ -231,25 +234,25 @@ function assertEq(actual, expected, label, failures) {
 }
 function assertOk(cond, label, failures) { if (!cond) failures.push(label) }
 
-// 可用的定義：已執行的 DB task 列 reportStatus=COMPLETE、reportValid、childSessionID 指向子 session，且子 session 的 jsonl 有成功的 sql_run
+// 可用的定義：已執行的 DB task 列 reportStatus=COMPLETE、reportValid、childSessionID 指向子 session，且子 session 的 jsonl 有成功的查詢
 function childSqlOk(project, child) {
   if (!child) return 0
-  return sessionLog(project, child).filter((g) => g.hook === "after" && g.tool === "oracleMCP_sql_run" && g.ok === true).length
+  return sessionLog(project, child).filter((g) => g.hook === "after" && g.tool === Q && g.ok === true).length
 }
 function assertCompleted(project, executed, failures, label = "") {
   assertOk(executed.length >= 1 && executed.every((e) => e.reportValid === true && e.reportStatus === "COMPLETE" && e.blockedReason === "NOT_APPLICABLE" && typeof e.childSessionID === "string" && e.childSessionID.startsWith("ses_") && e.taskState === "completed"),
     `${label}executed DB task rows carry a parsed COMPLETE report and child session id; got ` + JSON.stringify(executed.map((e) => [e.reportStatus, e.blockedReason, e.childSessionID, e.taskState])), failures)
-  assertOk(executed.every((e) => childSqlOk(project, e.childSessionID) >= 1), `${label}every completed DB task has a successful sql_run in its child session log`, failures)
+  assertOk(executed.every((e) => childSqlOk(project, e.childSessionID) >= 1), `${label}every completed DB task has a successful oracle_execute_query in its child session log`, failures)
 }
 
-// 允許清單：假模型記下每次請求可見的工具名；沒有 task 的請求＝subagent（Oracle 只有 sql_run）；主 agent（有 task）只有 list_connections＋connect
+// 允許清單：假模型記下每次請求可見的工具名；沒有 task 的請求＝subagent（Oracle 只有 oracle_execute_query）；主 agent（有 task）看不到任何 oracleMCP_ 工具
 function assertToolLists(modelLog, failures) {
   const rows = jsonl(modelLog).filter((r) => Array.isArray(r.tools))
   const sub = rows.filter((r) => !r.tools.includes("task") && r.tools.some((t) => t.startsWith("oracleMCP_")))
   const oracle = (r) => r.tools.filter((t) => t.startsWith("oracleMCP_")).sort()
-  assertOk(sub.length >= 1 && sub.every((r) => JSON.stringify(oracle(r)) === JSON.stringify(["oracleMCP_sql_run"])), "subagent sees only oracleMCP_sql_run (allowlist); got " + JSON.stringify(sub.map(oracle)), failures)
+  assertOk(sub.length >= 1 && sub.every((r) => JSON.stringify(oracle(r)) === JSON.stringify([Q])), "subagent sees only oracleMCP_oracle_execute_query (allowlist); got " + JSON.stringify(sub.map(oracle)), failures)
   const primary = rows.filter((r) => r.tools.includes("task"))
-  assertOk(primary.length >= 1 && primary.every((r) => JSON.stringify(oracle(r)) === JSON.stringify(["oracleMCP_connect", "oracleMCP_list_connections"])), "primary agent sees list_connections + connect only; got " + JSON.stringify(primary.map(oracle)), failures)
+  assertOk(primary.length >= 1 && primary.every((r) => oracle(r).length === 0), "primary agent sees no oracleMCP_ tool; got " + JSON.stringify(primary.map(oracle)), failures)
 }
 
 // 一個 session 的共通斷言：紀錄列沒有派工狀態；task hook 覆蓋率；訊息 id 歸屬；沒有 synthetic 提醒 part
@@ -315,77 +318,67 @@ async function runScenario(name, sc, base, iteration) {
     const v = commonSessionChecks(project, sessionID, exported, failures, "")
     const executed = v.g.filter((x) => x.hook === "after" && x.tool === "task" && x.executed)
     const blocks = v.before.filter((b) => b.decision === "block")
-    const connB = v.g.filter((x) => x.hook === "before" && x.tool === "oracleMCP_connect")
-    const connA = v.g.filter((x) => x.hook === "after" && x.tool === "oracleMCP_connect")
     const invalids = v.g.filter((x) => x.hook === "invalid")
     const errParts = v.taskParts.filter((p) => p.state?.status === "error")
     const okParts = v.taskParts.filter((p) => p.state?.status === "completed")
     const text = exported ? assistantText(exported, sessionID) : ""
+    const noConnectRows = () => assertOk(v.g.every((x) => !("connection" in x) && !("profileConnection" in x) && !("mode" in x)), "guard rows carry no connect-target fields", failures)
     switch (name) {
       case "compliant": {
         assertEq(blocks.length, 0, "task blocks", failures)
-        assertEq(mcpSeq, ["connect", "sql_run"], "mcp call order", failures)
-        assertOk(connB.length === 1 && connB[0].decision === "allow" && connB[0].connection === "HR_DEV" && connB[0].profileConnection === "HR_DEV" && connB[0].mode === "enforce", "connect before row validated against profile; got " + JSON.stringify(connB), failures)
-        assertOk(connA.length === 1 && connA[0].ok === true, "connect after row ok; got " + JSON.stringify(connA), failures)
-        assertEq(executed.map((e) => [e.target, e.dbCapable, e.reportStatus]), [["ps-ui-flow", true, "COMPLETE"]], "executed task rows", failures)
+        assertEq(mcpSeq, ["oracle_execute_query"], "mcp call order (no connect; the subagent queries directly)", failures)
+        assertEq(executed.map((e) => [e.target, e.dbCapable, e.basis, e.reportStatus]), [["ps-ui-flow", true, "execute_query:enabled", "COMPLETE"]], "executed task rows", failures)
         assertCompleted(project, executed, failures)
         assertToolLists(modelLog, failures)
         assertEq(invalids.length, 0, "no invalid tool calls", failures)
         assertEq(recoveries.length, 0, "no recovery rows", failures)
+        noConnectRows()
         assertOk(/^DONE/.test(text.trim()), "model finished normally; got " + text.slice(0, 120), failures)
         break
       }
-      case "task-first": {
+      case "db-flaky":
+      case "db-down": {
+        const flaky = name === "db-flaky"
         assertEq(blocks.length, 0, "no task blocks (there is no dispatch gate)", failures)
-        assertEq(mcpSeq, ["sql_run", "connect", "sql_run"], "mcp call order: first sql_run before any connect, then one reconnect", failures)
-        assertOk(mcp.find((m) => m.tool === "sql_run")?.connectedBefore === null, "first sql_run ran unconnected", failures)
-        assertEq(executed.map((e) => [e.reportStatus, e.blockedReason, e.notConnected]), [["BLOCKED", "NOT_CONNECTED", true], ["COMPLETE", "NOT_APPLICABLE", false]], "task after rows: NOT_CONNECTED then COMPLETE", failures)
-        assertEq(connB.length, 1, "exactly one connect (reconnect once, no loop)", failures)
-        assertCompleted(project, [executed[1]].filter(Boolean), failures)
+        assertEq(mcpSeq, flaky ? ["oracle_execute_query", "oracle_execute_query", "oracle_execute_query"] : ["oracle_execute_query", "oracle_execute_query", "oracle_execute_query", "oracle_execute_query"], "mcp calls: business query + SELECT 1 AS OK FROM DUAL probe per failed attempt", failures)
+        const probes = mcp.filter((m) => m.tool === "oracle_execute_query" && /SELECT 1 AS OK FROM DUAL/.test(m.args?.sql ?? ""))
+        assertEq(probes.length, flaky ? 1 : 2, "the subagent probed the connection with SELECT 1 AS OK FROM DUAL after Database query failed", failures)
+        const expected = flaky ? [["BLOCKED", "NOT_CONNECTED", true], ["COMPLETE", "NOT_APPLICABLE", false]] : [["BLOCKED", "NOT_CONNECTED", true], ["BLOCKED", "NOT_CONNECTED", true]]
+        assertEq(executed.map((e) => [e.reportStatus, e.blockedReason, e.notConnected]), expected, "task after rows (redispatched exactly once)", failures)
+        if (flaky) assertCompleted(project, [executed[1]].filter(Boolean), failures)
+        const childErr = executed.length ? sessionLog(project, executed[0].childSessionID).filter((g) => g.hook === "after" && g.tool === Q) : []
+        assertOk(childErr.length === 2 && childErr.every((g) => g.ok === false && /error/i.test(g.failureMatch ?? "")), "the failed attempt's child session logged two ok:false queries (Error: …); got " + JSON.stringify(childErr.map((g) => [g.ok, g.failureMatch])), failures)
         assertEq(okParts.length, 2, "both task parts completed (a BLOCKED report is still a completed tool call)", failures)
-        assertOk(/^DONE/.test(text.trim()), "model finished after one reconnect; got " + text.slice(0, 120), failures)
-        assertEq(recoveries.length, 0, "NOT_CONNECTED never triggers MCP recovery", failures)
+        if (flaky) assertOk(/^DONE/.test(text.trim()), "model finished after one redispatch; got " + text.slice(0, 120), failures)
+        else assertOk(/DB 連線失敗/.test(text) && /SOP-21/.test(text), "model reported the DB connection failure after one redispatch; got " + text.slice(0, 160), failures)
+        assertEq(recoveries.length, 0, "a DB-level failure is never MCP recovery evidence", failures)
+        noConnectRows()
         break
       }
       case "nodb": {
-        assertOk(v.before.length === 1 && v.before[0].target === "ps-peoplecode-flow" && v.before[0].dbCapable === false && v.before[0].basis === "sql_run:disabled" && v.before[0].decision === "allow", "nodb target recorded as not DB-capable; got " + JSON.stringify(v.before), failures)
+        assertOk(v.before.length === 1 && v.before[0].target === "ps-peoplecode-flow" && v.before[0].dbCapable === false && v.before[0].basis === "execute_query:disabled" && v.before[0].decision === "allow", "nodb target recorded as not DB-capable; got " + JSON.stringify(v.before), failures)
         assertEq(mcpSeq, [], "no mcp calls", failures)
         assertEq(executed.map((e) => e.reportStatus), ["COMPLETE"], "report", failures)
         assertEq(okParts.length, 1, "completed task parts", failures)
         break
       }
-      case "connect-fail": {
-        assertEq(mcpSeq, ["connect", "connect", "list_connections"], "mcp call order (connect twice; list only when giving up; no sql_run)", failures)
-        assertOk(connB.length === 2 && connB.every((b) => b.decision === "allow"), "two connect attempts admitted by the guard", failures)
-        assertEq(connA.length, 0, "no connect after rows (isError throws before the after hook)", failures)
-        assertOk(v.g.filter((x) => x.hook === "part-error" && x.tool === "oracleMCP_connect").length === 2, "two masked part-error rows for connect; got " + JSON.stringify(v.g.filter((x) => x.hook === "part-error")), failures)
-        assertEq(v.taskParts.length, 0, "no task dispatched", failures)
-        assertEq(recoveries.length, 0, "an ORA/TNS connect error is not MCP-mount evidence: no recovery rows", failures)
-        assertOk(/DB 連線建立失敗/.test(text) && /清單原文：Name:HR_DEVConnect string/.test(text), "model reported the connection failure with the raw list; got " + text.slice(0, 200), failures)
-        break
-      }
-      case "wrong-target":
-      case "not-configured": {
-        const code = name === "wrong-target" ? "ORACLE_CONNECTION_MISMATCH" : "ORACLE_CONNECTION_NOT_CONFIGURED"
-        assertOk(connB.length >= 1 && connB.every((b) => b.decision === "block" && b.note === code), `connect blocked before execution (${code}); got ` + JSON.stringify(connB.map((b) => [b.decision, b.note, b.connection, b.profileConnection])), failures)
-        if (name === "wrong-target") assertOk(connB.every((b) => b.connection === "HR_DEV" && b.profileConnection === "HR_UAT"), "mismatch rows name both sides", failures)
-        assertEq(mcpSeq, [], "mock MCP never received connect (and the model never listed)", failures)
-        assertEq(connA.length, 0, "no connect after rows (tool never ran)", failures)
-        const connParts = v.parts.filter((p) => p.tool === "oracleMCP_connect")
-        assertOk(connParts.length >= 1 && connParts.every((p) => p.state?.status === "error" && new RegExp(code).test(p.state?.error ?? "")), "connect tool parts are errors carrying the code; got " + JSON.stringify(connParts.map((p) => [p.state?.status, (p.state?.error ?? "").slice(0, 60)])), failures)
-        assertEq(v.taskParts.length, 0, "no DB task dispatched", failures)
-        assertOk(/Oracle 連線未設定/.test(text), "model reported the configuration error instead of guessing; got " + text.slice(0, 160), failures)
-        assertEq(recoveries.length, 0, "no recovery rows", failures)
+      case "stale-connect": {
+        assertOk(invalids.length === 1 && invalids[0].attempted === "oracleMCP_connect" && invalids[0].seenBefore === false && /wrong name/.test(invalids[0].note ?? ""), "the remembered SQLcl connect became invalid = likely a wrong name (not an MCP fault); got " + JSON.stringify(invalids), failures)
+        assertEq(v.g.filter((x) => x.hook === "before" && x.tool === "oracleMCP_connect").length, 0, "the guard never saw an executed connect", failures)
+        assertEq(mcpSeq, ["oracle_execute_query"], "mock MCP got only the subagent query (no connect tool exists)", failures)
+        assertEq(executed.map((e) => [e.target, e.reportStatus]), [["ps-ui-flow", "COMPLETE"]], "the question still completed", failures)
+        assertCompleted(project, executed, failures)
+        assertEq(recoveries.length, 0, "a wrong tool name is not recovery evidence", failures)
+        assertOk(/staleRejected":true/.test(text), "model saw the stale call rejected; got " + text.slice(0, 160), failures)
         break
       }
       case "mcp-down":
       case "mcp-failed": {
-        const primaryRows = jsonl(modelLog).filter((r) => Array.isArray(r.tools) && r.tools.includes("task"))
-        assertOk(primaryRows.length >= 1 && primaryRows.every((r) => !r.tools.some((t) => t.startsWith("oracleMCP_"))), "primary agent saw no oracleMCP_ tools", failures)
+        const rows = jsonl(modelLog).filter((r) => Array.isArray(r.tools))
+        assertOk(rows.length >= 1 && rows.every((r) => !r.tools.some((t) => t.startsWith("oracleMCP_"))), "no agent saw oracleMCP_ tools", failures)
         assertEq(mcpSeq, [], "no mcp calls", failures)
-        assertEq(v.taskParts.length, 0, "no DB task dispatched", failures)
+        assertEq(executed.map((e) => [e.target, e.reportStatus, e.blockedReason]), [["ps-ui-flow", "BLOCKED", "ORACLE_MCP_DOWN"]], "the DB subagent reported ORACLE_MCP_DOWN once and was not redispatched", failures)
         assertEq(invalids.length, 0, "model did not guess a tool name", failures)
-        assertEq(connB.length, 0, "no connect attempts", failures)
         assertOk(/ORACLE_MCP_DOWN/.test(text) && /不猜工具名/.test(text), "model reported ORACLE_MCP_DOWN and stopped; got " + text.slice(0, 160), failures)
         assertEq(recoveries.length, 0, "nothing to recover automatically (never mounted / disabled): no recovery rows", failures)
         break
@@ -396,7 +389,7 @@ async function runScenario(name, sc, base, iteration) {
         assertEq(blocks.map((b) => [b.target, b.note, b.carrier]), [["ps-security-flow", "PS_TASK_TARGET_INVALID:skill", "ps-metadata-flow"]], "guard block row", failures)
         assertEq(executed.map((e) => [e.target, e.reportStatus]), [["ps-metadata-flow", "COMPLETE"]], "corrected dispatch executed", failures)
         assertCompleted(project, executed, failures)
-        assertEq(mcpSeq, ["connect", "sql_run"], "routing error caused no extra connect/list", failures)
+        assertEq(mcpSeq, ["oracle_execute_query"], "routing error caused no extra oracleMCP call", failures)
         assertEq(recoveries.length, 0, "routing error caused no recovery", failures)
         assertOk(/^DONE/.test(text.trim()), "model finished; got " + text.slice(0, 120), failures)
         break
@@ -427,12 +420,26 @@ async function runScenario(name, sc, base, iteration) {
       const ex = exportSession(h.project, h.env, id)
       if (ex) fs.writeFileSync(path.join(base, tag, `export-${host}-${label}.json`), JSON.stringify(ex, null, 1))
       const v = commonSessionChecks(h.project, id, ex, failures, `${host}:${label}: `)
-      views[host][label] = { ...v, id, ex, text: ex ? assistantText(ex, id) : "", executed: v.g.filter((x) => x.hook === "after" && x.tool === "task" && x.executed), invalids: v.g.filter((x) => x.hook === "invalid"), connA: v.g.filter((x) => x.hook === "after" && x.tool === "oracleMCP_connect") }
+      const executed = v.g.filter((x) => x.hook === "after" && x.tool === "task" && x.executed)
+      // 子 session（subagent）的紀錄：查詢的 after 列與 invalid 列都在子 session 的 jsonl
+      const childRows = executed.flatMap((e) => sessionLog(h.project, e.childSessionID))
+      const childParts = executed.flatMap((e) => (ex ? toolParts(exportSession(h.project, h.env, e.childSessionID) ?? {}, e.childSessionID) : []))
+      views[host][label] = { ...v, id, ex, text: ex ? assistantText(ex, id) : "", executed, invalids: childRows.filter((x) => x.hook === "invalid"), queryA: childRows.filter((x) => x.hook === "after" && x.tool === Q), childParts }
     }
   }
   const initA = mcp.filter((m) => m.event === "initialize")
   const modelRows = jsonl(modelLog).filter((r) => Array.isArray(r.tools) && r.tools.includes("task"))
-  const sawOracle = (label) => modelRows.filter((r) => (r.userText ?? "").includes(`${label} 題`)).map((r) => r.tools.some((t) => t.startsWith("oracleMCP_")))
+  // 該題的 subagent 請求（沒有 task 工具、委派 prompt 含 [DB]）有沒有看到 oracleMCP_ 工具：主 agent 請求的 userText 定位題號，其後的 subagent 請求屬於該題
+  const allRows = jsonl(modelLog).filter((r) => Array.isArray(r.tools))
+  const sawOracle = (label) => {
+    const out = []
+    let inLabel = false
+    for (const r of allRows) {
+      if (r.tools.includes("task")) { inLabel = (r.userText ?? "").includes(`${label} 題`); continue }
+      if (inLabel && /\[DB\]/.test(r.userText ?? "")) out.push(r.tools.some((t) => t.startsWith("oracleMCP_")))
+    }
+    return out
+  }
   const A = views.A ?? {}
   switch (name) {
     case "vanish-auto":
@@ -442,20 +449,20 @@ async function runScenario(name, sc, base, iteration) {
       if (A.A1) assertCompleted(project, A.A1.executed, failures, "A1: ")
       assertOk(mcp.some((m) => m.fault === "vanish"), "mock MCP injected the vanish fault once", failures)
       assertOk(diag.some((d) => d.kind === "event" && d.type === "mcp.tools.changed") && diag.some((d) => d.kind === "snapshot" && d.reason === "tools-changed" && d.runtimeStatus === "connected") && diag.some((d) => /marked suspect/.test(d.note ?? "")), "guard saw the tools.changed event while connected and marked the catalog suspect", failures)
-      // A2 的第一個模型請求看不到工具；auto on 時重掛在同一題內完成，後續請求可能已看得到（劇本仍回報 DOWN、不重試）
-      assertOk(A.A2 && sawOracle("A2").length >= 1 && sawOracle("A2")[0] === false, "A2 (new session, same host) saw no oracleMCP_ tools on its first request; got " + JSON.stringify(sawOracle("A2")), failures)
-      assertOk(A.A2 && A.A2.invalids.length === 1 && A.A2.invalids[0].attempted === "oracleMCP_connect" && A.A2.invalids[0].seenBefore === true && A.A2.invalids[0].allowedByAgent === true && /catalog loss/.test(A.A2.invalids[0].note), "A2: the remembered connect call became invalid = host-side catalog loss; got " + JSON.stringify(A.A2?.invalids), failures)
-      assertOk(A.A2 && A.A2.taskParts.length === 0 && A.A2.connA.length === 0 && /ORACLE_MCP_DOWN/.test(A.A2.text), "A2: model reported ORACLE_MCP_DOWN without dispatching or retrying; got " + (A.A2?.text ?? "").slice(0, 160), failures)
+      // A2 的 subagent 第一個請求看不到工具；auto on 時重掛在同一題內完成，後續請求可能已看得到（劇本仍回報 DOWN、不重試）
+      assertOk(A.A2 && sawOracle("A2").length >= 1 && sawOracle("A2")[0] === false, "A2 (new session, same host): the subagent saw no oracleMCP_ tools on its first request; got " + JSON.stringify(sawOracle("A2")), failures)
+      assertOk(A.A2 && A.A2.invalids.length === 1 && A.A2.invalids[0].attempted === Q && A.A2.invalids[0].seenBefore === true && A.A2.invalids[0].allowedByAgent !== false && /catalog loss/.test(A.A2.invalids[0].note), "A2: the remembered query call became invalid = host-side catalog loss; got " + JSON.stringify(A.A2?.invalids), failures)
+      assertOk(A.A2 && A.A2.executed.length === 1 && A.A2.executed[0].blockedReason === "ORACLE_MCP_DOWN" && A.A2.queryA.length === 0 && /ORACLE_MCP_DOWN/.test(A.A2.text), "A2: subagent reported ORACLE_MCP_DOWN, the main agent did not redispatch; got " + (A.A2?.text ?? "").slice(0, 160), failures)
       const cand = recoveries.find((r) => r.faultReason === "catalog-lost")
-      assertOk(cand && cand.evidence?.attempted === "oracleMCP_connect", "recovery candidate carries the evidence; got " + JSON.stringify(recoveries.map((r) => [r.faultReason, r.decision])), failures)
+      assertOk(cand && cand.evidence?.attempted === Q, "recovery candidate carries the evidence; got " + JSON.stringify(recoveries.map((r) => [r.faultReason, r.decision])), failures)
       if (auto) {
         assertEq(recoveries.filter((r) => r.decision !== "merged").map((r) => r.decision), ["remount-start", "remount-ok", "verified-by-call"], "recovery decisions (exactly one remount, verified by A3's first call)", failures)
         assertOk(initA.length === 2 && new Set(initA.map((m) => m.pid)).size === 2, "mock MCP mounted twice on host A (new process after remount); got " + JSON.stringify(initA.map((m) => m.pid)), failures)
         assertOk(A.A3 && sawOracle("A3").length >= 1 && sawOracle("A3").every((x) => x === true), "A3 saw oracleMCP_ tools again", failures)
         if (A.A3) { assertCompleted(project, A.A3.executed, failures, "A3: ") }
-        assertOk(A.A3 && A.A3.connA.length === 1 && A.A3.connA[0].recoveryNotice === true && A.A3.connA[0].recoveryGen === 1, "A3: first oracleMCP reply carries the recovery notice; got " + JSON.stringify(A.A3?.connA), failures)
-        const a3conn = A.A3 ? A.A3.parts.find((p) => p.tool === "oracleMCP_connect") : null
-        assertOk(a3conn && /恢復世代 1/.test(a3conn.state?.output ?? "") && /SELECT 1 FROM DUAL/.test(a3conn.state?.output ?? ""), "A3: the notice is in the tool output the model reads", failures)
+        assertOk(A.A3 && A.A3.queryA.length >= 1 && A.A3.queryA[0].recoveryNotice === true && A.A3.queryA[0].recoveryGen === 1, "A3: the first query reply carries the recovery notice; got " + JSON.stringify(A.A3?.queryA), failures)
+        const a3q = A.A3 ? A.A3.childParts.find((p) => p.tool === Q) : null
+        assertOk(a3q && /恢復世代 1/.test(a3q.state?.output ?? "") && /SELECT 1 AS OK FROM DUAL/.test(a3q.state?.output ?? "") && !/connect/.test(a3q.state?.output ?? ""), "A3: the notice is in the tool output the subagent reads (verify with SELECT 1 AS OK FROM DUAL, no connect)", failures)
         // host B：全程正常、從未重掛
         const B = views.B ?? {}
         const initB = jsonl(hosts.B?.mcpLog ?? "").filter((m) => m.event === "initialize")
@@ -466,7 +473,7 @@ async function runScenario(name, sc, base, iteration) {
       } else {
         assertOk(recoveries.length >= 1 && recoveries.every((r) => r.decision === "would-remount"), "auto off: only would-remount rows (one per probe), never a remount; got " + JSON.stringify(recoveries.map((r) => r.decision)), failures)
         assertEq(initA.length, 1, "mock MCP mounted once (no remount)", failures)
-        assertOk(A.A3 && sawOracle("A3").length >= 1 && sawOracle("A3").every((x) => x === false) && /ORACLE_MCP_DOWN/.test(A.A3.text) && A.A3.taskParts.length === 0, "A3 still sees no tools and reports DOWN without retrying", failures)
+        assertOk(A.A3 && sawOracle("A3").length >= 1 && sawOracle("A3").every((x) => x === false) && /ORACLE_MCP_DOWN/.test(A.A3.text) && A.A3.taskParts.length === 1, "A3 still sees no tools and reports DOWN without redispatching", failures)
       }
       break
     }
@@ -480,7 +487,7 @@ async function runScenario(name, sc, base, iteration) {
       assertOk(initA.length === 2 && new Set(initA.map((m) => m.pid)).size === 2, "mock MCP mounted twice (new process after remount)", failures)
       assertOk(A.A2 && sawOracle("A2").every((x) => x === true) && A.A2.invalids.length === 0, "A2 (new session) saw the tools without any invalid call", failures)
       if (A.A2) assertCompleted(project, A.A2.executed, failures, "A2: ")
-      assertOk(A.A2 && A.A2.connA.length === 1 && A.A2.connA[0].recoveryNotice === true, "A2: first oracleMCP reply carries the recovery notice", failures)
+      assertOk(A.A2 && A.A2.queryA.length >= 1 && A.A2.queryA[0].recoveryNotice === true, "A2: the first query reply carries the recovery notice", failures)
       break
     }
   }

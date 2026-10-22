@@ -4217,3 +4217,50 @@
 - 落點：AGENTS.md 協作鐵律加「只改文件的併回不跑 5.1 CI」：只動 `docs/**`、`HANDOFF.md`、AGENTS.md 維護版線時，併回 `main` 的最後一筆 commit
   訊息加 `[skip ci]`（GitHub 對 push 事件看 head commit 訊息，就不啟動 workflow）；本機照跑 test-bundle、test-claude-variant。
   動到腳本、`.opencode/**`、`claude-code/**` 或 workflow 的不加。workflow 本身不改。
+
+### L160 oracleMCP 換成 @vdeserto/oracle-mcp-server——沒有 connect、SQL 有送出前檢查、外層包 FETCH FIRST；開線步驟拿掉、cookbook 21 段 SQL 重寫（2026-10-22）
+
+- 症狀：管理者換了 Oracle MCP（`@vdeserto/oracle-mcp-server`），要專案裡用到的工具全部配合。舊框架整套建立在 SQLcl MCP 上：
+  主 agent 第 0 步 `oracleMCP_connect`（profile `oracle.connectionName`）、subagent `oracleMCP_sql_run`、guard 比對 connect 目標、
+  analyzer 數 connect 之後的重連；新 server 一個都沒有。
+- 新 server 的實際行為（讀 npm 上 1.0.0 的 dist 原始碼，不是 README 推的）：
+  1. 工具五個：`oracle_list_schemas`／`oracle_list_tables`／`oracle_describe_table`／`oracle_execute_query`／`oracle_get_table_data`；
+     沒有 connect／disconnect。連線＝啟動時的環境變數 `ORACLE_USER`／`ORACLE_PASSWORD`／`ORACLE_CONNECTION_STRING`，第一次查詢建連線池
+     （最多 5 條、排隊 10 秒），每次查詢取一條、`SET TRANSACTION READ ONLY`、查完歸還。不呼叫 `initOracleClient`＝node-oracledb Thin 模式。
+  2. `oracle_execute_query` 送出前檢查（`validateReadOnlySql`）：整段有 `;` 就擋（字串裡也算）、有 `--` 或 `/*` 就擋、不是 SELECT／WITH 開頭擋、
+     `FOR UPDATE`、`SELECT…INTO` 擋；整段文字（含字串常值、別名）整字比對 INSERT／UPDATE／DELETE／MERGE／UPSERT／DROP／CREATE／ALTER／TRUNCATE／
+     RENAME／COMMENT／GRANT／REVOKE／EXECUTE／EXEC／CALL／ANYDATA／XMLTYPE，子字串比對 DBMS_／UTL_／OWA_／XMLDB／XDB_／CTXSYS／HTTPURITYPE／URIFACTORY。
+     拒絕訊息是葡萄牙文、以 `Error:` 開頭、不設 isError。
+  3. 執行時把 SQL 包成 `SELECT * FROM (<SQL>) FETCH FIRST <limit> ROWS ONLY`：輸出欄名重複就失敗（ORA-00918）；limit 預設 50、最大 500；
+     驅動層 maxRows 500、單句 30 秒逾時、輸出超過 25,000 字截斷加 `[truncado`。成功回 markdown 表格，第一行 `**N linha(s) retornada(s)**`。
+  4. 錯誤不轉發原始 ORA 訊息：942／904／933／936／1017／12541／12154／1031／1456／逾時各有一句英文，其他（含連線池建立失敗、ORA-00918、
+     型別不合）一律 `Error: Database query failed.`——連不上和 SQL 本身錯分不出來。
+- 量出來的衝擊：cookbook 33 段 SQL 有 21 段會被擋（多句用 `;` 串、`--` 註解、§2k-C 與 2k-3 的 `DBMS_LOB.SUBSTR`、§2l 的字串 `'Drop-Down List Box'`
+  撞到 DROP）。用套件本身的 `validateReadOnlySql` 逐段驗出來。
+- 決定：
+  1. MCP 鍵名維持 `oracleMCP`（tools 表、plugin、analyzer 都認前綴；公司機的 opencode.json 換 command 與 environment 即可，SOP-21 步驟 0）。
+  2. **拿掉開線步驟**：連線由 MCP 設定決定，主 agent 已沒有可開的東西。主 agent（orchestrator／deep-research／audit-orchestrator／clone-worker／
+     sdoc-worker）五個工具全關、不呼叫 oracleMCP；查詢 subagent（ui／metadata／ae／auditor）只開 `oracle_execute_query`，其餘四個明寫 false
+     （`get_table_data` 會 `SELECT *` 撈業務資料、`describe_table`／`list_*` 的功能 cookbook 的 ALL_ 查詢已涵蓋——介面面積維持跟以前只開 sql_run 一樣）。
+  3. ORACLE_MCP_DOWN 改由 subagent 偵測（主 agent 本來就看不到工具）；主 agent 收到不重派。NOT_CONNECTED 改成「DB 連不上」：subagent 遇到
+     `Error: Database query failed.` 先送 `SELECT 1 AS OK FROM DUAL`，也失敗才回 NOT_CONNECTED（成功＝SQL 本身的問題，修一次重送）；
+     主 agent 重派一輪、第二次仍是就回報「DB 連線失敗」交 SOP-21。
+  4. guard 拿掉 connect 目標比對（`ORACLE_CONNECTION_NOT_CONFIGURED`／`MISMATCH`、`connectGuard`／`PS_ORACLE_CONNECT_GUARD`），DB 能力判定改看
+     `oracle_execute_query`，重掛附註改成 `SELECT 1 AS OK FROM DUAL`；Claude Code hook 同步拿掉 connect 分支，settings 的 PreToolUse matcher 只剩 Agent|Task。
+     不另加「SQL 形狀預檢」guard：server 自己會擋，guard 再擋一次只是重複；規則寫在 cookbook 7b，模型讀得到。
+  5. cookbook：規則 2 加「limit 帶 FETCH FIRST 的數」、7 改工具名、新增 7b（送出前形狀：一句、無分號與註解、DML 字與套件名、欄名不重複、`:參數` 換實值、
+     重跑文件證據先去分號與註解）與 7c（回覆判讀：列數＝limit 可能還有、`[truncado`、CLOB 用 json）；「連線生命週期」整節改成「連線與錯誤處理」
+     （主 agent 段＋subagent 錯誤對照表）；21 段 SQL 拆成一句一段、說明移到 SQL 外面；DBMS_LOB.SUBSTR → `TO_CHAR(SUBSTR(欄, 1, 100))`；
+     §2l 代碼 5 的字串改 `'DropDown List Box'`，轉寫規則寫回 App Designer 的 Drop-Down List Box。改完 56 段全部過得了 server 的檢查。
+     DML 字的反制不做「拆字串湊關鍵字」：那是繞 server 的防護；要找原始碼裡的 DML 改走 ES＋Source。
+  6. profile 拿掉 `oracle.connectionName`、`oracle.connectGuard`；ps-sdoc 的提醒與 ps-claude-doctor 的 F 檢查改看 `oracle.currentSchema`；
+     ps-claude-doctor -Live 改成 `--agent ps-metadata-flow` 只送一句 `SELECT 1 AS OK FROM DUAL`（這個 server 的錯誤不設 is_error，看回覆文字）。
+  7. analyzer（test-oracle-runtime）：reconnects／reconnectLoops／downThenConnect／connectBlocks／listCalls 拿掉；新增 redispatchLoops
+     （NOT_CONNECTED → 重派 → 又 NOT_CONNECTED 之後還派 DB task＝違反）、redispatches、oldToolCalls（憑記憶呼叫 SQLcl 舊工具名）。
+  8. 沙箱測試：假 oracleMCP 改仿新 server（五個工具、同一組送出前檢查與葡萄牙文拒絕、DB 連不上模式）；e2e 情境改成 compliant／db-flaky／db-down／
+     nodb／stale-connect／mcp-down／mcp-failed／skill-as-agent／suggested-skill／vanish-auto／vanish-observe／transport-close（12 個）；
+     test-auto-loop 情境 31 加「兩版 cookbook 每個 sql 區塊都過得了 server 檢查」的守衛、舊工具名不得留在模型讀的檔。
+- 驗證（沙箱）：plugin 單元 10/10、e2e 12/12（真 OpenCode 1.18.29）、clone／sdoc smoke、test-auto-loop、test-claude-variant、test-bundle、
+  test-sdoc-run、test-ps51-static 全過；Claude Code 真 CLI e2e（花 API 費用）沒跑。沒有真 Oracle：外層包 FETCH FIRST 之後 §2k-C 的 WITH／CONNECT BY、
+  §7e 的子查詢能不能跑，靠公司機 R44 驗。
+- 待公司機：opencode.json 換 command／environment（SOP-21 步驟 0）、搬兩版搬運包、R0／R1／R3／R44、ps-claude-doctor -Live（Claude Code 版）。

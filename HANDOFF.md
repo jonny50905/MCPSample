@@ -5,6 +5,14 @@
 
 ## 0. 一句話現況
 
+**oracleMCP 換成 @vdeserto/oracle-mcp-server（2026-10-22，L160，分支 `claude/stoic-archimedes-q40rng`）**：新 server 沒有 connect／disconnect（連線＝MCP 設定的
+ORACLE_USER／ORACLE_PASSWORD／ORACLE_CONNECTION_STRING），查詢工具 `oracle_execute_query` 有送出前檢查（分號、註解、DML 字、DBMS_ 都擋）、外層包
+`SELECT * FROM (...) FETCH FIRST n ROWS ONLY`、錯誤只回一句 `Error: …`。框架：主 agent 的開線步驟拿掉（五個工具全關）、查詢 subagent 只開
+`oracle_execute_query`、`Database query failed` 先送 `SELECT 1 AS OK FROM DUAL` 判 NOT_CONNECTED；guard／hook 拿掉 connect 目標比對；profile 拿掉
+`connectionName`／`connectGuard`；cookbook 加規則 7b／7c、「連線與錯誤處理」、21 段 SQL 改成一句一段（56 段都過 server 檢查）；analyzer 改 redispatchLoops／oldToolCalls；
+假 MCP 與 e2e 改仿新 server。待公司機：opencode.json 換 command／environment（SOP-21 步驟 0；鍵名維持 oracleMCP）、搬兩版搬運包、R0／R1／R3／R44、
+Claude Code 版 `ps-claude-doctor -Live`。沒有真 Oracle：WITH／CONNECT BY 包進 FETCH FIRST 後能不能跑靠 R44。
+
 **相關顯示定案、§2l 改用旗標（2026-10-21，L157，分支 `claude/blissful-edison-7hbeqr`）**：公司機的 Claude 查 DB 確認控制欄 FIELDNUM＝ASSOCFIELDNUM＋1、
 FIELDUSE 8＝Display Control → 兩版 cookbook §2l：相關顯示看 FIELDUSE 16、RELATED_TO＝ASSOCFIELDNUM＋1、DISPLAY_CONTROL 看 FIELDUSE 8。
 畫面元件的代碼對照全部定案（`docs/design/ui-control-sql-record.md`）。待公司機：搬兩版搬運包；用舊版寫過「## 畫面元件」的 NN 要重跑 /ps-research，

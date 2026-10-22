@@ -1289,8 +1289,8 @@ function Test-SdOpencodeModelName([string]$Name) {
     if ($Name -match '(?i)FILL_ME') { return $false }
     return ($Name -cmatch '^[A-Za-z0-9_][A-Za-z0-9_.@-]*/[A-Za-z0-9_][A-Za-z0-9_.:/@-]*$')
 }
-function Get-SdProfileConnection([string]$Path) {
-    # profile 的 oracle.connectionName（與 runtime guard 同一種讀法）；沒有檔或沒有這一行回空字串
+function Get-SdProfileSchema([string]$Path) {
+    # profile 的 oracle.currentSchema（PeopleTools 表的擁有者；cookbook 規則 1a）；沒有檔或沒有這一行回空字串
     $t = Get-SdText $Path
     if ($null -eq $t) { return '' }
     $inOracle = $false
@@ -1299,7 +1299,7 @@ function Get-SdProfileConnection([string]$Path) {
         if (-not $inOracle) { continue }
         if ($ln.Trim() -eq '' -or $ln.Trim().StartsWith('#')) { continue }
         if ($ln -notmatch '^\s') { break }
-        $m = [regex]::Match($ln, '^\s+connectionName:\s*([^#]*?)\s*(#.*)?$')
+        $m = [regex]::Match($ln, '^\s+currentSchema:\s*([^#]*?)\s*(#.*)?$')
         if ($m.Success) { return ($m.Groups[1].Value -replace '^["'']|["'']$', '') }
     }
     return ''
@@ -1375,13 +1375,13 @@ try {
         if ($J.Model -eq '') { $J.Model = Get-SdOpencodeModel; $J.ModelFrom = $J.SdocRel + '/model.yaml' }
         if (-not (Test-SdOpencodeModelName $J.Model)) { throw 'SDOC_MODEL_INVALID' }
         Write-Host ('OpenCode 模型：' + $J.Model + '（' + $J.ModelFrom + '）')
-        # 研究要查資料庫：OpenCode 版的 profile 沒填連線名時提醒（只提醒、不擋）；同一資料夾的 Claude Code 版填好了就給複製方法
-        $profConn = Get-SdProfileConnection (Join-Path $Root ($fe.PsDir + '/customization-profile.yaml'))
-        if ($profConn -eq '' -or $profConn -eq 'FILL_ME') {
+        # 研究要查資料庫：OpenCode 版的 profile 沒填表的擁有者時提醒（只提醒、不擋）；同一資料夾的 Claude Code 版填好了就給複製方法
+        $profSchema = Get-SdProfileSchema (Join-Path $Root ($fe.PsDir + '/customization-profile.yaml'))
+        if ($profSchema -eq '' -or $profSchema -eq 'FILL_ME') {
             $profHint = ''
-            $claudeConn = Get-SdProfileConnection (Join-Path $Root '.claude/peoplesoft/customization-profile.yaml')
-            if ($claudeConn -ne '' -and $claudeConn -ne 'FILL_ME') { $profHint = '同一資料夾的 Claude Code 版已填好（兩版的 profile 鍵值相同），可以整份複製過來：copy .claude\peoplesoft\customization-profile.yaml .opencode\peoplesoft\customization-profile.yaml' }
-            Write-Host ('提醒：' + $fe.PsDir + '/customization-profile.yaml 的 oracle.connectionName 還沒填，研究查不了資料庫。' + $profHint)
+            $claudeSchema = Get-SdProfileSchema (Join-Path $Root '.claude/peoplesoft/customization-profile.yaml')
+            if ($claudeSchema -ne '' -and $claudeSchema -ne 'FILL_ME') { $profHint = '同一資料夾的 Claude Code 版已填好（兩版的 profile 鍵值相同），可以整份複製過來：copy .claude\peoplesoft\customization-profile.yaml .opencode\peoplesoft\customization-profile.yaml' }
+            Write-Host ('提醒：' + $fe.PsDir + '/customization-profile.yaml 的 oracle.currentSchema 還沒填，唯讀帳號查不到沒帶擁有者的表名。' + $profHint)
         }
     }
     $rootLockId = (Get-PsKnTextHash -Text $Root.ToUpperInvariant()).Substring(0, 16)

@@ -153,12 +153,12 @@ try {
     $agentB = Join-Path $t '.claude/agents/ps-sql-flow.md'
     $prof = Join-Path $t '.claude/peoplesoft/customization-profile.yaml'
     Write-Text $agentA ((Read-Text $agentA) + "`n本機教訓新增一行`n")
-    Write-Text $prof ((Read-Text $prof) -replace '(?m)^  connectionName: FILL_ME', '  connectionName: HR_DEV')
+    Write-Text $prof ((Read-Text $prof) -replace '(?m)^  currentSchema: FILL_ME', '  currentSchema: DEMOOWN')
     $scr = Join-Path $t 'scripts/ps-cli-lib.ps1'
     Write-Text $scr ((Read-Text $scr) + "`n# 本機亂改`n") $true
     $o = Invoke-Unpack $t $in
     Assert ((Read-Text $scr) -notmatch '本機亂改') "scripts 本機改過 → 一律更新回維護端版本（舊檔備份）"
-    Assert ((Get-Code $o) -eq 'G' -and $o -match '保留本機 2' -and (Read-Text $agentA) -match '本機教訓新增一行' -and (Read-Text $prof) -match 'connectionName: HR_DEV') "本機改過、搬運包沒動 → 保留本機（agent 與已回填的 profile 都不被蓋）"
+    Assert ((Get-Code $o) -eq 'G' -and $o -match '保留本機 2' -and (Read-Text $agentA) -match '本機教訓新增一行' -and (Read-Text $prof) -match 'currentSchema: DEMOOWN') "本機改過、搬運包沒動 → 保留本機（agent 與已回填的 profile 都不被蓋）"
     # 上游：改 A（本機也改過）、B（本機沒改）、profile（本機改過）
     $srcRoot = Join-Path $work 'src'
     foreach ($d in @('scripts', 'claude-code')) { Copy-Item -LiteralPath (Join-Path $repoRoot $d) -Destination (Join-Path $srcRoot $d) -Recurse }
@@ -178,7 +178,7 @@ try {
     Assert ((Get-Code $o) -eq 'C' -and $script:lastExit -eq 0) "兩邊都改 → 結論 C（有衝突待合併）"
     Assert ((Read-Text $agentB) -match '# 上游新增') "本機沒改、上游改 → 更新"
     Assert ((Read-Text $agentA) -match '本機教訓新增一行' -and (Read-Text $agentA) -notmatch '# 上游新增' -and (Test-Path -LiteralPath ($agentA + '.incoming')) -and (Read-Text ($agentA + '.incoming')) -match '# 上游新增') "兩邊都改 → 本機不動、新版另存 .incoming"
-    Assert ((Read-Text $prof) -match 'connectionName: HR_DEV' -and (Test-Path -LiteralPath ($prof + '.incoming'))) "profile 兩邊都改 → 回填值保留、新版 .incoming"
+    Assert ((Read-Text $prof) -match 'currentSchema: DEMOOWN' -and (Test-Path -LiteralPath ($prof + '.incoming'))) "profile 兩邊都改 → 回填值保留、新版 .incoming"
     Assert (-not (Test-Path -LiteralPath (Join-Path $t '.claude/agents/ps-legacy-old.md'))) "必刪舊檔已移除"
     $bk = @(Get-ChildItem -LiteralPath (Join-Path $t 'auto-loop-logs/ps-bundle-backup') -Recurse -File -Force | ForEach-Object { $_.Name })
     Assert ($bk -contains 'ps-sql-flow.md' -and $bk -contains 'ps-legacy-old.md') "被覆寫與刪除的舊檔都在備份目錄"
@@ -190,9 +190,9 @@ try {
     Write-Text $cut ($all.Substring(0, [int]($all.Length * 0.6)))
     $o = Invoke-Unpack $t2 $cut
     Assert ((Get-Code $o) -eq 'T' -and $script:lastExit -ne 0 -and (Get-FileCount $t2) -eq 1) "舊式單一檔截斷 → T、沒寫任何檔"
-    $ix = $all.IndexOf('connectionName: FILL_ME')
+    $ix = $all.IndexOf('currentSchema: FILL_ME')
     $bad = Join-Path $work 'bad.txt'
-    Write-Text $bad ($all.Substring(0, $ix) + 'connectionName: FILL_ME?' + $all.Substring($ix + 'connectionName: FILL_ME'.Length))
+    Write-Text $bad ($all.Substring(0, $ix) + 'currentSchema: FILL_ME?' + $all.Substring($ix + 'currentSchema: FILL_ME'.Length))
     $o = Invoke-Unpack $t2 $bad
     Assert ((Get-Code $o) -eq 'H' -and (Get-FileCount $t2) -eq 1) "舊式單一檔內容被改 → H、沒寫任何檔"
     $trav = Join-Path $work 'trav.txt'

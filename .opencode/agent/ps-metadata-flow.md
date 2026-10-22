@@ -19,13 +19,13 @@ tools:
   "PeoplecodeSource_*": true
   # PeopleTools metadata（排程 / 授權 / origin / Record 結構）用 oracleMCP 查，
   # 查詢一律照 oracle-query-cookbook.md 的樣板，只准 SELECT：
-  # Oracle：只開 sql_run（查詢）。連線由主 agent 建；subagent 不 list_connections／connect／disconnect／sqlcl_run，
-  # 未連線就回 BLOCKED(NOT_CONNECTED)。逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）
-  "oracleMCP_list_connections": false
-  "oracleMCP_connect": false
-  "oracleMCP_disconnect": false
-  "oracleMCP_sqlcl_run": false
-  "oracleMCP_sql_run": true
+  # Oracle：只開 oracle_execute_query（唯讀 SELECT）；連線由 oracleMCP 的環境變數決定，沒有 connect 可呼叫。
+  # 其餘四個工具關閉。DB 連不上就回 BLOCKED(NOT_CONNECTED)。逐工具明寫、不用 oracleMCP_* 萬用字元（萬用字元 deny 會讓整個 MCP 對 agent 不可見）
+  "oracleMCP_oracle_list_schemas": false
+  "oracleMCP_oracle_list_tables": false
+  "oracleMCP_oracle_describe_table": false
+  "oracleMCP_oracle_get_table_data": false
+  "oracleMCP_oracle_execute_query": true
   # PeoplecodeMetadata：欄位用途反查（find_field_usage）／Component 關鍵字
   # 搜尋（search_component_metadata）——回傳只作定位線索，證據仍走 SQL／CHUNK：
   "PeoplecodeMetadata_*": true
@@ -47,7 +47,7 @@ tools:
 | 授權（誰能進哪個畫面） | `.opencode/skills/ps-security-flow/SKILL.md` |
 
 本 agent 是這三份 skill 的**承載 agent**：委派方用 `subagent_type=ps-metadata-flow` 派工、在 task 文字指定要讀的
-SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被執行期 guard 擋下）。授權鏈用 `oracleMCP_sql_run`
+SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被執行期 guard 擋下）。授權鏈用 `oracleMCP_oracle_execute_query`
 照 cookbook §4 查、物件 origin 照 §1——`ps_get_security_path`／`ps_get_object_origin` 只是協定角色，不是可呼叫的工具。
 
 ## 執行
@@ -64,7 +64,7 @@ SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被
 3. 排程 / 授權 / origin / Record 結構：**Read
    `.opencode/peoplesoft/oracle-query-cookbook.md`，照樣板用 oracleMCP 查**
    （§3 Process、§4 Security、§1 Origin、§6 Record、§7 欄位使用剖析），不要自己發明 SQL。
-   連線已由主 agent 建好：表名照 cookbook 規則 1a 帶 `<schema>.` 前綴，第一個 SELECT 直接發；回未連線類錯誤 → 立即回報 status=BLOCKED、blockedReason=NOT_CONNECTED 結束（不 connect、不重試；cookbook「連線生命週期」subagent 段）。
+   不必連線（連線由 oracleMCP 的設定決定）：表名照 cookbook 規則 1a 帶 `<schema>.` 前綴、SQL 照規則 7b（一次一句、不加分號與註解、帶 limit），第一個 SELECT 直接發；回 `Error:` 照 cookbook「連線與錯誤處理」subagent 段處置（DB 連不上 → status=BLOCKED、blockedReason=NOT_CONNECTED 結束）。
 4. 血緣邊需要原始碼佐證時，以 table / 欄位名搜 PeoplecodeElasticSearch
    取 chunk ids，再用 PeoplecodeSource 取段確認（遵守
    `.opencode/peoplesoft/progressive-source-retrieval.md`）。
@@ -85,15 +85,15 @@ SKILL.md；skill 名本身不是 agent（`subagent_type=ps-security-flow` 會被
 
 - **oracleMCP 只准 SELECT**——禁止任何寫入 / DDL；每個查詢都要有列數上限
   （FETCH FIRST 200 ROWS ONLY）。
-- **oracleMCP 連線生命週期（連線是全域共用單例；開只有主 agent 做、關誰都不做）**：連線已由主 agent
-  建好；先 read customization-profile.yaml 的 oracle.currentSchema，**PeopleSoft 的表與 view 一律寫成 `<該值>.表名`**
-  （cookbook 規則 1a：樣板的 `<schema>` 換成該值；DUAL、ALL_ 開頭的資料字典不加；值為 FILL_ME 就用裸表名；不執行 ALTER SESSION），
-  再直接發本次第一個 SELECT；回「未連線」類錯誤 → 立即回報 `status: BLOCKED`、
-  `blockedReason: NOT_CONNECTED` 結束本委派（不 list_connections、不 connect——兩者工具已對本 agent
-  關閉、不重試）；查完**不得 `disconnect`**（會把 main 與其他 subagent 一起斷線）；
-  查詢逾時（~30 秒）→ 停手回報 `status: BLOCKED`、`blockedReason: QUERY_TIMEOUT`，**不准重試迴圈**、
-  也不 disconnect。view/table not found 先查「PeopleSoft 表名都帶 `<schema>.` 前綴了沒」，補齊後重發一次；
-  值為 FILL_ME 而查不到表 → `blockedReason: SCHEMA_UNRESOLVED`。
+- **oracleMCP 查詢與錯誤處理（cookbook「連線與錯誤處理」subagent 段）**：只用 `oracleMCP_oracle_execute_query`（沒有 connect／disconnect，
+  連線由 oracleMCP 的設定決定）；工具清單裡沒有它 → `status: BLOCKED`、`blockedReason: ORACLE_MCP_DOWN`。
+  先 read customization-profile.yaml 的 oracle.currentSchema，**PeopleSoft 的表與 view 一律寫成 `<該值>.表名`**
+  （cookbook 規則 1a：樣板的 `<schema>` 換成該值；DUAL、ALL_ 開頭的資料字典不加；值為 FILL_ME 就用裸表名；不執行 ALTER SESSION）；
+  SQL 照規則 7b（一次一句、不加分號與註解、輸出欄名不重複、`:參數` 換成實際值、`limit` 帶 FETCH FIRST 的數），送一句等回覆再送下一句。
+  `Error: Table or view does not exist.` 先查「PeopleSoft 表名都帶 `<schema>.` 前綴了沒」，補齊後重發一次；
+  值為 FILL_ME 而查不到表 → `blockedReason: SCHEMA_UNRESOLVED`。`Error: Database query failed.` → 先送 `SELECT 1 AS OK FROM DUAL`：
+  也失敗＝DB 連不上 → `blockedReason: NOT_CONNECTED` 結束本委派（gaps 寫錯誤原文）；成功＝SQL 本身的問題，照規則 7b 修一次重送。
+  查詢逾時（`Error: Query timed out.`）→ 停手回報 `status: BLOCKED`、`blockedReason: QUERY_TIMEOUT`，**不准重試迴圈**。
 
 - 排程 / 授權一律以 metadata 工具為準，不從程式註解或物件名稱推測。
 - 血緣每條邊必標操作類型與 evidence IDs；動態寫入標 DYNAMIC_RUNTIME。

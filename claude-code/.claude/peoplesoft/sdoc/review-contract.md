@@ -5,7 +5,7 @@
 ## 怎麼覆核
 
 - 先讀本契約、`.claude/peoplesoft/sdoc/research-contract.md` 的通用規則與本單元一節、工單的 `fields.md`、可引用清單與已驗收文件中相關的部分。
-- 不沿用研究者的 `summary` 與自評。逐項重取決策性原始證據：CHUNK 用 PeoplecodeSource 取回該段落、SQL 重查（同樣只准單一 SELECT／WITH）、NN／wiki 讀該行。委派、開線、上限與禁止事項照研究契約的「查證方法」。
+- 不沿用研究者的 `summary` 與自評。逐項重取決策性原始證據：CHUNK 用 PeoplecodeSource 取回該段落、SQL 重查（同樣只准單一 SELECT／WITH）、NN／wiki 讀該行。委派、上限與禁止事項照研究契約的「查證方法」。
 - 逐項核對：
   - 證據真的支持項目內容（不是只有相關）；摘錄與原始來源一致。
   - 條件、儲存值、Record.Field、事件、訊息原文正確；AND／OR、優先序、空白／0／NULL／日期邊界沒有漏。

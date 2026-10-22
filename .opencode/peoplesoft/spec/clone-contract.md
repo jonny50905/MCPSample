@@ -61,7 +61,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 ## 研究與證據
 
 - 先用知識索引定位既有 NN／wiki，只讀 topic 相關節；索引是入口不是原始碼正確性的保證。知識不存在時可直接針對確切 Component 委派，不要求先研究整個領域。
-- UI／layout 派 ps-ui-flow；欄位驅動條件派 ps-peoplecode-flow；metadata／資料／授權派 ps-metadata-flow；AE、SQR、SQL 分別派對應 flow。metadata 類先 connect；ps-security-flow 等是 skill，不是 agent。
+- UI／layout 派 ps-ui-flow；欄位驅動條件派 ps-peoplecode-flow；metadata／資料／授權派 ps-metadata-flow；AE、SQR、SQL 分別派對應 flow。metadata 類派之前不必連線；ps-security-flow 等是 skill，不是 agent。
 - 關鍵條件、UI 動態變異、assignment、狀態與交易需原始來源；至少追 Activate／PostBuild／FieldChange／FieldEdit／SaveEdit／SavePreChange／SavePostChange 等實際相關事件，不能因 NN 沒提到就推論不存在。不要要求每個事件一定存在，查無也須查法收據。
 - CHUNK locator 是完整 UUID，且必須已透過 PeoplecodeSource 取回精確段落；SQL locator 是已執行的 SELECT 查詢，必須保留 FROM 及限定目標，excerpt 記關鍵回傳列；NN locator 是本機研究檔與明確行段，excerpt 是實際內容。單筆 excerpt ≤5 行。
 - evidence 的 ID 僅在該 packet 內使用；每筆 item 的 evidenceIds 都要可解析。NN 可作來源路標／已記錄事實，獨立覆核仍須追到決策性原始證據，不因 NN 標 AUDITED_CLEAN 就跳過。

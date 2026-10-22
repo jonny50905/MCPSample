@@ -136,7 +136,7 @@
 
 - 先用知識索引定位已稽核的 NN／wiki：grep 的 path 給 `docs/ps-research/knowledge`、include 給 `index.md`，只讀相關節。知識不存在時直接針對確切物件委派查證。
 - 以 task 委派既有 subagent，每次一件事、限定物件名／Record.Field／事件：畫面與 layout 派 `ps-ui-flow`；PeopleCode 派 `ps-peoplecode-flow`；metadata、資料、授權、排程派 `ps-metadata-flow`（授權、血緣、排程類的 skill 名寫進 prompt，skill 不是可委派的 agent）；AE、SQR、SQL 分別派 `ps-ae-flow`、`ps-sqr-flow`、`ps-sql-flow`。
-- 會查 DB 的委派前，先讀 `.opencode/peoplesoft/customization-profile.yaml`，以 `oracleMCP_connect(connection_name＝oracle.connectionName)` 原樣開線，等成功才派；不先 list、不猜連線名、不 disconnect。subagent 回 NOT_CONNECTED 時重連、重派一次；工具清單沒有 `oracleMCP_` 工具時不重派，寫 unresolved 並在 summary 說明 ORACLE_MCP_DOWN。
+- 會查 DB 的委派前不必開線：oracleMCP 的連線由 MCP 設定決定，沒有 connect 可呼叫，你也不呼叫任何 `oracleMCP_` 工具。subagent 回 NOT_CONNECTED 時重派一次；工具清單沒有 `oracleMCP_` 工具時不重派，寫 unresolved 並在 summary 說明 ORACLE_MCP_DOWN。
 - DB 委派同時最多 3 個；全部委派最多 6 個。
 - 搜尋到的 snippet 只是候選，必須以 chunk id 取回完整段落才能當證據；不可一次載入整支 PeopleCode／SQL／SQR／SQC。
 - 至少追實際相關的事件（Activate、PostBuild、RowInit、FieldDefault、FieldChange、FieldEdit、SaveEdit、SavePreChange、SavePostChange、Workflow 等）；不要因 NN 沒提到就推論不存在，也不要要求每個事件一定存在。

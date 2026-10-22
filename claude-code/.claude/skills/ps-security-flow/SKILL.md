@@ -37,7 +37,7 @@ description: >-
 
 ```text
 Resolve access paths from metadata (cookbook §4 SELECTs over PSAUTHITEM / PSMENUITEM /
-PSROLECLASS via mcp__oracleMCP__sql_run), not from guesses based on object names.
+PSROLECLASS via mcp__oracleMCP__oracle_execute_query), not from guesses based on object names.
 
 For each access path, preserve:
 - menu, component, and page
@@ -64,13 +64,13 @@ CREF/folder security and runtime context — not implemented in this version,
 so answer with a gap rather than an inferred entry point.
 ```
 
-## 實際可執行的途徑（唯一可呼叫的工具是 `mcp__oracleMCP__sql_run`）
+## 實際可執行的途徑（唯一可呼叫的工具是 `mcp__oracleMCP__oracle_execute_query`）
 
 | 職責 | 現行途徑 |
 |---|---|
-| 授權鏈查證 | ps-metadata-flow 用 `mcp__oracleMCP__sql_run`，照 `oracle-query-cookbook.md` §4 的樣板（只 SELECT、有列數上限） |
+| 授權鏈查證 | ps-metadata-flow 用 `mcp__oracleMCP__oracle_execute_query`，照 `oracle-query-cookbook.md` §4 的樣板（只 SELECT、有列數上限） |
 | 物件 origin 查證 | 同一承載 agent，照 cookbook §1 |
-| 未連線 | SQL 工具回未連線 → 報告 `status: BLOCKED`、`blockedReason: NOT_CONNECTED`，不 connect、不重試 |
+| DB 連不上 | 查詢回 `Error: Database query failed.` 且 `SELECT 1 AS OK FROM DUAL` 也失敗（或回 Authentication failed／Cannot reach database）→ 報告 `status: BLOCKED`、`blockedReason: NOT_CONNECTED`，不重試（cookbook「連線與錯誤處理」） |
 | 工具清單沒有 mcp__oracleMCP__ 工具 | 報告 `blockedReason: ORACLE_MCP_DOWN`，不猜工具名（cookbook 7a） |
 
 `ps_get_security_path`／`ps_get_object_origin` 是 `mcp-tool-contracts.md` 的**協定角色**，目前**不是可呼叫的工具**——
