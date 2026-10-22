@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 367d186）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 78eef7e）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|367d186|49d3507d78ea813b|8|8|5911|f3f4381e18e193b61c1342aead70d1965d717765bb6d217407a7f4550b5d4392
+@@@PSBUNDLE-PART|1|opencode|78eef7e|72075d48cff62b8e|8|8|5912|4f7c28d737142b594bf6d4ed5ae0e6a313083634d3a004c9711dee8c06bbce8e
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|341|78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4759,10 +4759,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|54f698ee7eff836b594af5ba2fb29975039628c920067449ef5b4a0e3fdbe51b|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|b17ad3acf779411f57904c5442a6c3518f9588538e994bc9ccca68bf6419f340|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "367d186",
+  "commit": "78eef7e",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -5721,7 +5721,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|188|b314132273e72fa8c04274890460392e400e42dc7a2e81b5ef50e5179c4ca6e4|0
+@@@PSBUNDLE-FILE|AGENTS.md|189|459cc147f01f22292ae009182db5a7010c6d90736c103743b6c6991fc0051644|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -5804,6 +5804,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-22 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   主管報告拿掉第 1、7、8 章（其餘章節重新編號），框架檔未動，各份重生，併入前 `main` 頭 `b2347c4`；同日稍早同一分支併入
    主管報告第 5 章加例子與 5.8 完整例子，框架檔未動，各份重生，併入前 `main` 頭 `91c7fb2`；同日稍早同一分支併入
    主管報告第 5 章改成完整代碼一覽、協作鐵律加「只改文件的併回不跑 5.1 CI」（L159），框架檔未動，各份重生，併入前 `main` 頭 `4f0121c`；
    同日稍早同一分支併入
@@ -5911,5 +5912,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|6773570e56e2f7890f46675fa994a7677dcb09571204e932c13874a298eb6ed1
-@@@PSBUNDLE-PART-END|49d3507d78ea813b|8|8
+@@@PSBUNDLE-EOF|158|a1b22884a3e013adf7e4fb5786d56ff7b8f1591ff2b4419921f67f2a8a69b3f3
+@@@PSBUNDLE-PART-END|72075d48cff62b8e|8|8

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 367d186）第 3／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 78eef7e）第 3／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|367d186|49d3507d78ea813b|3|8|13127|94a86ba4ebf002d4a15d3dd42bd8e9bcaaf0032b7975b14efcfc28d1538ed24b
+@@@PSBUNDLE-PART|1|opencode|78eef7e|72075d48cff62b8e|3|8|13127|94a86ba4ebf002d4a15d3dd42bd8e9bcaaf0032b7975b14efcfc28d1538ed24b
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/entity-template.md|34|de2a989eba864ef30cf837956e9b09ac774822fd85522cbb2869c4fd0fdcf34a|0
 ---
 aliases: []                # 中英文別名、口語簡稱——查重與反查靠這個，必填
@@ -13128,4 +13128,4 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-PART-END|49d3507d78ea813b|3|8
+@@@PSBUNDLE-PART-END|72075d48cff62b8e|3|8
