@@ -654,3 +654,4 @@ ENTITY.DETAIL 誤報 7-22），一項自打嘴巴（非合成名寫進 HANDOFF�
   同日續：第七輪收（公司機 Claude 查 DB：控制欄 FIELDNUM＝ASSOCFIELDNUM＋1、FIELDUSE 8＝Display Control）→ §2l 改（L157）。
   2026-10-22：管理者要一份給主管的報告 → `docs/design/ui-control-verification-report.md`（為什麼做、難在哪、七輪 39 段 SQL 各自用途、結果、品質保證；不寫數量）。
   同日續：「難在哪裡」交兩個獨立 subagent 查核（repo 證據、網路文件），照查核修正 8 處（L158）。
+  同日續：管理者要「難在哪裡」只留三條（沒有完整官方對照、一個數字藏好幾個勾選、假設會錯）。
