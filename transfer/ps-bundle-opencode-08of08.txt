@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit a390795）第 8／8 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit bdc09b2）第 8／8 份
 # 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|a390795|d2a40df25cc9414e|8|8|5905|a4a682d86874743d5a99fb001e07583e9f88d6366c41f1d9d4031ece4ec973b2
+@@@PSBUNDLE-PART|1|opencode|bdc09b2|9613799aa07a4f95|8|8|5910|81fdd3a9f480fe53f82e10c00a850e67f96b88d1dfb5c744632e55cf06c3c384
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|341|78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4759,10 +4759,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|4d552b73d9ff0902dddc0e98dd5c5c97bb702b62a1f27a071011184473ece8dc|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|7103a4279a550d95199bdaf2fc865a7ab66fa0803a026216c0eb2d0bff292901|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "a390795",
+  "commit": "bdc09b2",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -4964,8 +4964,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4209,
-      "sha256": "d3294f9eb91e746add7297f3ae45d1235ff4ecf713ed8ed18bcabd6d4d5c8743",
+      "lines": 4219,
+      "sha256": "7039c79341e9ac963d99f60978117b0da51956b6428766fe8fb6904312f66330",
       "bom": false
     },
     {
@@ -5721,7 +5721,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|182|3050dad6ac9929534ac62525602a158ff091a153245283712122e3be91896532|0
+@@@PSBUNDLE-FILE|AGENTS.md|187|fb45f5c8a84f186cb37af23140d450f17e48c9dce40ea0b05c6c2338ead9fb11|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -5804,6 +5804,8 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
 4. **維護版線**：`main` 是正式版線（最近一次：2026-10-22 再由 `claude/blissful-edison-7hbeqr` 快轉併入
+   主管報告第 5 章改成完整代碼一覽、協作鐵律加「只改文件的併回不跑 5.1 CI」（L159），框架檔未動，各份重生，併入前 `main` 頭 `4f0121c`；
+   同日稍早同一分支併入
    主管報告「難在哪裡」精簡為三條，框架檔未動，各份重生，併入前 `main` 頭 `46d09bc`；同日稍早同一分支併入
    主管報告經兩個 subagent 查核後的修正（L158；代碼確認紀錄的 128、第五輪說明檔補註），框架檔未動，各份重生，併入前 `main` 頭 `afba9a5`；
    同日稍早同一分支併入
@@ -5857,6 +5859,9 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 
 - **併回 `main` 已授權**（2026-10-13 管理者）：改動在本機測試（需要時加 5.1 CI）驗證過，就直接快轉併回 `main`，
   不必等管理者說「併回 main」；照樣更新上面的維護版線、重產搬運包，回覆裡說明併回了什麼並附搬運清單。
+- **只改文件的併回不跑 5.1 CI**（2026-10-22 管理者）：只動 `docs/**`、`HANDOFF.md`、`AGENTS.md` 維護版線時，搬運包與 manifest 只因維護版線與檔頭戳記重產；
+  併回 `main` 的最後一筆 commit 訊息加 `[skip ci]`，GitHub 就不啟動 ps51-tests（本機照跑 test-bundle、test-claude-variant）。
+  動到 `scripts/**` 的腳本、`.opencode/**`、`claude-code/**` 或 workflow 的併回不加。
 - 使用者在**公司內網 Windows＋PowerShell 5.1＋OpenCode CLI** 操作，
   目標模型是本機部署（見 applied.md L6）；一切只經 opencode cli，
   沒有任何 web UI。
@@ -5905,5 +5910,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|1a9d9cc95d9735fd52e5e88e9489a4c1f7607d80b3536d7771958081d79b80b5
-@@@PSBUNDLE-PART-END|d2a40df25cc9414e|8|8
+@@@PSBUNDLE-EOF|158|20c0aef1a657e1a45f781c73d255d042848da2c37ba56bb3dbb073518042e38e
+@@@PSBUNDLE-PART-END|9613799aa07a4f95|8|8
