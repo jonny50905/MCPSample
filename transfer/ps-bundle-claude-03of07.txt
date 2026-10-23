@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5cb35d7）第 5／8 份
-# 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|5cb35d7|7e86621cb27f0577|5|8|7732|6e9b9bc848bb6fdfa9224ed7c256012664ff5d851f98579a57410896c6a29f60
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3c33eb1）第 3／7 份
+# 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
+@@@PSBUNDLE-PART|1|claude|3c33eb1|8a4882d3261ff6c9|3|7|7736|a41270ff19d8bb958d23ca9f4570c42733fc61781ff3636f524bec8c63a9d692
 @@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2647|32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d|1
 # ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
 # 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
@@ -3379,7 +3379,7 @@ function Get-PsCliCommandAgent {
     return ''
 }
 @@@PSBUNDLE-END|scripts/ps-cli-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1612|87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365|1
+@@@PSBUNDLE-FILE|scripts/ps-doc-lint.ps1|1616|55a074ce6364913224721ea27fc454b06e3d1a0e64a1861bb1a091cb69287bde|1
 # ps-doc-lint.ps1 — deep-research 文件的確定性格式稽核（第 1 層 lint）
 # 用法：.\scripts\ps-doc-lint.ps1 -Domain 轉職
 #       .\scripts\ps-doc-lint.ps1 -Domain 轉職 -StrictAudit
@@ -3831,7 +3831,11 @@ $sectionLoose = @{
     '## 執行方式'      = '執行方式'
     '## 未解事項'      = '未解事項'
     '## Evidence 附錄' = 'Evidence[ \t]*附錄'
+    '## 畫面元件'      = '畫面元件'
+    '## 條件 UI'       = '條件[ \t]*UI'
 }
+# 選填章節：不算缺章節，只在 -FixHeadings 正規化變體標題（知識索引、補研究、Spec 只認 `## ` 正典標題）
+$optionalSections = @('## 畫面元件', '## 條件 UI')
 function Get-VariantLinePattern {
     param([string]$Sec)
     return '^[ \t]{0,3}(?:#{1,6}[ \t]*)?(?:\*\*)?[ \t]*' + $sectionLoose[$Sec] +
@@ -3875,7 +3879,7 @@ if ($FixHeadings) {
             if ($fhText.Length -gt 0 -and [int]$fhText[0] -eq 0xFEFF) { $fhText = $fhText.Substring(1) }
             $fhLines = @($fhText -split "`r?`n")
             $fhChanged = $false
-            foreach ($sec in $requiredSections) {
+            foreach ($sec in ($requiredSections + $optionalSections)) {
                 if ($fhText -match (Get-SectionAnchor $sec)) { continue }   # 正典已在＝不動
                 $vp = Get-VariantLinePattern $sec
                 $hits = @()
@@ -7733,4 +7737,4 @@ Write-Host ($sum2 + ' NEXT=' + $next)
 Write-Host ('NEXT' + $next + '：' + $why)
 exit 0
 @@@PSBUNDLE-END|scripts/ps-sdoc-diag.ps1
-@@@PSBUNDLE-PART-END|7e86621cb27f0577|5|8
+@@@PSBUNDLE-PART-END|8a4882d3261ff6c9|3|7

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5cb35d7）第 2／6 份
-# 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|5cb35d7|83f90a34982efa76|2|6|9971|5a133c3dac006e404c160a4ba8290deb3abe3ba2e9f7951c542e480f7271585e
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3c33eb1）第 2／7 份
+# 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
+@@@PSBUNDLE-PART|1|claude|3c33eb1|8a4882d3261ff6c9|2|7|9971|5a133c3dac006e404c160a4ba8290deb3abe3ba2e9f7951c542e480f7271585e
 @@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/schemas/04-workflow.schema.json|1211|d534c59ff293a11cccae0eb3187848380bf036e7fecf92a80d987cf5bb8256f2|0
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -9972,4 +9972,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|83f90a34982efa76|2|6
+@@@PSBUNDLE-PART-END|8a4882d3261ff6c9|2|7

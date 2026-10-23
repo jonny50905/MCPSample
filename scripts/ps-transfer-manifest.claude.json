@@ -1,6 +1,6 @@
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "5cb35d7",
+  "commit": "3c33eb1",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -26,7 +26,7 @@
     {
       "path": ".claude/agents/ps-deep-research.md",
       "lines": 510,
-      "sha256": "1fdf3fe80889d787d2661109bdac47267a33737dbfa46e7adf16786331074f45",
+      "sha256": "3b3a479dbc98488bb8a9c17b3d23c47ba58b4148603d0dcd78bf935ca550a34e",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-deep-research.md"
     },
@@ -229,7 +229,7 @@
     {
       "path": ".claude/peoplesoft/oracle-query-cookbook.md",
       "lines": 992,
-      "sha256": "bade42a4dccf1685714cb4ad73e5930a469278f189f89c67c2e4944c9d41529b",
+      "sha256": "cf7a3383c662b408c904f972574cb84a1e9d0acf24f29ed548d6da53df7feaf2",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/oracle-query-cookbook.md"
     },
@@ -263,8 +263,8 @@
     },
     {
       "path": ".claude/peoplesoft/report-templates/function-detail-template.md",
-      "lines": 131,
-      "sha256": "48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972",
+      "lines": 138,
+      "sha256": "7f0ff3a7d1051a88180161fc9f07f8e3f79c7b617f3a8c494a272cfff1bad737",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/report-templates/function-detail-template.md"
     },
@@ -382,8 +382,8 @@
     },
     {
       "path": ".claude/peoplesoft/sdoc/research-contract.md",
-      "lines": 279,
-      "sha256": "1959dff0a53b751e89cd3b6ed111a38e93894476c6e8b771010eee0844aa272b",
+      "lines": 280,
+      "sha256": "f64186ecd7ec57acdb92387a9885acf9fafc0d210535fadba27eb1359f02dc07",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/sdoc/research-contract.md"
     },
@@ -796,8 +796,8 @@
     },
     {
       "path": "scripts/ps-doc-lint.ps1",
-      "lines": 1612,
-      "sha256": "87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365",
+      "lines": 1616,
+      "sha256": "55a074ce6364913224721ea27fc454b06e3d1a0e64a1861bb1a091cb69287bde",
       "bom": true
     },
     {
@@ -904,8 +904,8 @@
     },
     {
       "path": "scripts/ps-supplemental-lib.ps1",
-      "lines": 1197,
-      "sha256": "6dd300916a4281a4f843fce5687a48271ce4d0b27b732dafbbc168489493ef11",
+      "lines": 1211,
+      "sha256": "0552fee9ad1d89aba82e230f616acf87edf777f944c863a565898063f40652c0",
       "bom": true
     },
     {
@@ -922,8 +922,8 @@
     },
     {
       "path": "scripts/tests/test-auto-loop.ps1",
-      "lines": 1056,
-      "sha256": "1c2909efbc3122337405013df7e76f5641624dae31edf3f54b6069c73e18db69",
+      "lines": 1060,
+      "sha256": "3740d1de41327678087766238100efbca636ec6f71b3d36697c6cfed22a9f38b",
       "bom": true
     },
     {
@@ -994,8 +994,8 @@
     },
     {
       "path": "scripts/tests/test-supplemental.ps1",
-      "lines": 546,
-      "sha256": "1e02eea5bed7f6cb97e190cfd0b00ce9b79a8c7e7079b9e6e488e8a59bc13154",
+      "lines": 554,
+      "sha256": "cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225",
       "bom": true
     }
   ],

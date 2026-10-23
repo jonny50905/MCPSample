@@ -1,6 +1,597 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5cb35d7）第 8／8 份
-# 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|5cb35d7|7e86621cb27f0577|8|8|5913|43e1b30121d5dc501a4c10332a4fb1d1b3005cf2675cde13cfbd2c20cd5bc325
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3c33eb1）第 6／7 份
+# 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
+@@@PSBUNDLE-PART|1|claude|3c33eb1|8a4882d3261ff6c9|6|7|4801|5486ce3a1a4e288c3ad6e663e1844c269f1be4f2693689aa022669f4c6874ac7
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|589|3641964a5c6c66cebdc6c9ab4998fdfb0a750401fd6e2d173928b0b2b236d08b|1
+# scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
+# 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
+#       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
+#       （generic 集合含 scripts/ps-spec*.ps1：改了 Spec 引擎或 Claude Code 版的 spec／worker 檔都要重生；之後再跑 ps-fs-doctor -WriteManifest）
+# 範圍：合成「公司機部署」臨時目錄（scripts＋claude-code/* 去前綴，結束自刪）：
+#   A 兩版對照（agent／command／skill／契約一一對應、資料檔逐字相同、profile 鍵值相同）、不得殘留另一版字樣、frontmatter 形狀、
+#     settings.json、路徑與 MCP 工具名可解析；
+#   B hook（oracleMCP 工具不攔、Agent 委派目標、suggestedNext 註記、worker 路徑白名單、Bash 命令形狀）；
+#   C 外環版本層（版本判定、Claude Code 命令列、stream-json 抽最終回覆、搬運 manifest 與 generic manifest 是最新、知識索引用法行、能力目錄路徑）。
+param([switch]$WriteGenericManifest)
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$ErrorActionPreference = 'Stop'
+$cc = Join-Path $repoRoot 'claude-code'
+$oc = Join-Path $repoRoot '.opencode'
+$pwshExe = (Get-Process -Id $PID).Path
+
+$failCount = 0
+function Assert([bool]$Cond, [string]$Name) {
+    if ($Cond) { Write-Host "  PASS：$Name" }
+    else { Write-Host "  FAIL：$Name" -ForegroundColor Red; $script:failCount++ }
+}
+function Read-Norm([string]$Path) {
+    $t = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+    if ($t.Length -gt 0 -and [int]$t[0] -eq 0xFEFF) { $t = $t.Substring(1) }
+    return (($t -replace "`r", '') -replace '\s+$', '')
+}
+function Get-RelUnder([string]$Base, [string]$Full) {
+    return (($Full.Substring($Base.Length).TrimStart('\', '/')) -replace '\\', '/')
+}
+function Get-NameSet([string]$Dir, [string]$Filter, [switch]$Dirs) {
+    $h = @{}
+    if (-not (Test-Path -LiteralPath $Dir)) { return $h }
+    if ($Dirs) { foreach ($d in @(Get-ChildItem -LiteralPath $Dir -Directory)) { $h[$d.Name] = $true } }
+    else { foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File -Filter $Filter)) { $h[$f.BaseName] = $true } }
+    return $h
+}
+function Get-Frontmatter([string]$Path) {
+    $lines = @((Read-Norm $Path) -split "`n")
+    $fm = @()
+    if ($lines.Count -gt 0 -and $lines[0] -eq '---') {
+        for ($i = 1; $i -lt $lines.Count; $i++) { if ($lines[$i] -eq '---') { break }; $fm += $lines[$i] }
+    }
+    return ($fm -join "`n")
+}
+
+# ── 部署模擬：<tmp>/scripts＝repo scripts；<tmp>/{.claude,CLAUDE.md}＝claude-code/ 去前綴（README.md 不部署）
+function New-DeployRoot {
+    $d = Join-Path ([System.IO.Path]::GetTempPath()) ('claude-deploy-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $d -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts') -Destination (Join-Path $d 'scripts') -Recurse
+    Copy-Item -LiteralPath (Join-Path $cc '.claude') -Destination (Join-Path $d '.claude') -Recurse
+    Copy-Item -LiteralPath (Join-Path $cc 'CLAUDE.md') -Destination (Join-Path $d 'CLAUDE.md')
+    New-Item -ItemType Directory -Path (Join-Path $d (Join-Path 'docs' (Join-Path 'ps-research' 'wiki'))) -Force | Out-Null
+    return $d
+}
+
+if ($WriteGenericManifest) {
+    $dep = New-DeployRoot
+    try {
+        $o = ((& (Join-Path $dep 'scripts/ps-spec.ps1') -Doctor -WriteGenericManifest -Root $dep *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+        $src = Join-Path $dep '.claude/peoplesoft/spec/generic.manifest.json'
+        if (-not (Test-Path -LiteralPath $src)) { Write-Host $o; Write-Host '重生失敗：部署模擬目錄沒有產生 generic.manifest.json' -ForegroundColor Red; exit 1 }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $cc '.claude/peoplesoft/spec/generic.manifest.json') -Force
+        Write-Host '已重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json（接著跑 ps-fs-doctor -WriteManifest）' -ForegroundColor Green
+        exit 0
+    }
+    finally { Remove-Item -LiteralPath $dep -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Host "A：兩版對照與檔案衛生"
+# claude-code/README.md 是給人看的對照說明（不部署），其餘部署檔不得出現另一版字樣
+$ccAll = @(Get-ChildItem -LiteralPath $cc -File -Recurse -Force | Where-Object { (Get-RelUnder $cc $_.FullName) -ne 'README.md' })
+$leak = @($ccAll | Where-Object { (Read-Norm $_.FullName) -match '(?i)opencode' } | ForEach-Object { Get-RelUnder $cc $_.FullName })
+Assert ($leak.Count -eq 0) ("claude-code/ 的部署檔不含另一版字樣（opencode）" + $(if ($leak.Count -gt 0) { '：' + ($leak -join ', ') } else { '' }))
+
+$excludedAgents = @('explore', 'general', 'scout', 'ps-audit-orchestrator')
+# Spec 文件流程（scripts/ps-sdoc.ps1）兩版都有：Claude Code 版照舊，OpenCode 版以 -Cli opencode 跑（目錄各加 -opencode）
+$sdocAgents = @('ps-status-reader', 'ps-sdoc-worker', 'ps-spec-reader', 'ps-spec-judge')
+$ocAgents = Get-NameSet (Join-Path $oc 'agent') '*.md'
+$ccAgents = Get-NameSet (Join-Path $cc '.claude/agents') '*.md'
+$missA = @($ocAgents.Keys | Where-Object { $excludedAgents -notcontains $_ -and -not $ccAgents.ContainsKey($_) })
+$extraA = @($ccAgents.Keys | Where-Object { -not $ocAgents.ContainsKey($_) })
+Assert ($missA.Count -eq 0 -and $extraA.Count -eq 0) ("agent 一一對應（OpenCode 內建覆寫 explore／general／scout、備用 ps-audit-orchestrator 除外）" + $(if ($missA.Count + $extraA.Count -gt 0) { '：缺 ' + ($missA -join ',') + '／多 ' + ($extraA -join ',') } else { '' }))
+$coBad = @($sdocAgents | Where-Object { -not $ccAgents.ContainsKey($_) -or -not $ocAgents.ContainsKey($_) })
+Assert ($coBad.Count -eq 0) ("Spec 文件的讀者／worker／判定 agent 兩版都有" + $(if ($coBad.Count -gt 0) { '：' + ($coBad -join ',') } else { '' }))
+$ocCmds = Get-NameSet (Join-Path $oc 'command') '*.md'
+$ccCmds = Get-NameSet (Join-Path $cc '.claude/commands') '*.md'
+$d1 = @($ocCmds.Keys | Where-Object { -not $ccCmds.ContainsKey($_) }) + @($ccCmds.Keys | Where-Object { -not $ocCmds.ContainsKey($_) })
+Assert ($d1.Count -eq 0) ("指令一一對應" + $(if ($d1.Count -gt 0) { '：' + ($d1 -join ',') } else { '' }))
+$ocSk = Get-NameSet (Join-Path $oc 'skills') '' -Dirs
+$ccSk = Get-NameSet (Join-Path $cc '.claude/skills') '' -Dirs
+$d2 = @($ocSk.Keys | Where-Object { -not $ccSk.ContainsKey($_) }) + @($ccSk.Keys | Where-Object { -not $ocSk.ContainsKey($_) })
+Assert ($d2.Count -eq 0) ("skill 一一對應" + $(if ($d2.Count -gt 0) { '：' + ($d2 -join ',') } else { '' }))
+$contractMiss = @()
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft') -File -Filter '*.md')) {
+    if (@('SOP.md', 'README.md', 'test-scenarios.md') -contains $f.Name) { continue }
+    if (-not (Test-Path -LiteralPath (Join-Path $cc ('.claude/peoplesoft/' + $f.Name)))) { $contractMiss += $f.Name }
+}
+# sdoc/model.yaml 只有 OpenCode 版（Claude Code 版的模型在 .claude/settings.json）
+$ocOnly = @('sdoc/model.yaml')
+foreach ($sub in @('report-templates', 'spec', 'sdoc')) {
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc ('peoplesoft/' + $sub)) -File -Recurse)) {
+        $rel = Get-RelUnder (Join-Path $oc 'peoplesoft') $f.FullName
+        if ($ocOnly -contains $rel) { continue }
+        if (-not (Test-Path -LiteralPath (Join-Path $cc ('.claude/peoplesoft/' + $rel)))) { $contractMiss += $rel }
+    }
+}
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/peoplesoft/sdoc') -File -Recurse)) {
+    $rel = Get-RelUnder (Join-Path $cc '.claude/peoplesoft') $f.FullName
+    if (-not (Test-Path -LiteralPath (Join-Path $oc ('peoplesoft/' + $rel)))) { $contractMiss += ('OpenCode 版缺 ' + $rel) }
+}
+Assert ($contractMiss.Count -eq 0) ("契約／模板／spec／sdoc 檔一一對應（SOP.md、README.md、test-scenarios.md 為人讀文件，不部署；sdoc/model.yaml 只有 OpenCode 版）" + $(if ($contractMiss.Count -gt 0) { '：缺 ' + ($contractMiss -join ',') } else { '' }))
+
+$dataDiff = @()
+$dataFiles = @('business-domain-map.yaml', 'research-domains.txt')
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/spec') -File -Recurse)) {
+    if ($f.Extension -eq '.md' -or $f.Name -eq 'generic.manifest.json') { continue }
+    $dataFiles += ('spec/' + (Get-RelUnder (Join-Path $oc 'peoplesoft/spec') $f.FullName))
+}
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/sdoc') -File -Recurse)) {
+    if ($f.Extension -eq '.md' -or $f.Name -eq 'model.yaml') { continue }
+    $dataFiles += ('sdoc/' + (Get-RelUnder (Join-Path $oc 'peoplesoft/sdoc') $f.FullName))
+}
+foreach ($rel in $dataFiles) {
+    $a = Join-Path $oc ('peoplesoft/' + $rel)
+    $b = Join-Path $cc ('.claude/peoplesoft/' + $rel)
+    if (-not (Test-Path -LiteralPath $b) -or (Read-Norm $a) -cne (Read-Norm $b)) { $dataDiff += $rel }
+}
+Assert ($dataDiff.Count -eq 0) ("資料檔兩版逐字相同（domain map、研究佇列、spec 的 JSON 與範例 pack、sdoc 的 schema／範例／AI 指引）" + $(if ($dataDiff.Count -gt 0) { '：' + ($dataDiff -join ',') } else { '' }))
+# sdoc 契約兩版只差機制用語：標題逐行相同，OpenCode 版不出現 Claude Code 的工具名與路徑
+$sdocBad = @()
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/sdoc') -File -Filter '*.md')) {
+    $ccf = Join-Path $cc ('.claude/peoplesoft/sdoc/' + $f.Name)
+    if (-not (Test-Path -LiteralPath $ccf)) { continue }
+    $ho = @((Read-Norm $f.FullName) -split "`n" | Where-Object { $_ -match '^#' }) -join "`n"
+    $hc = @((Read-Norm $ccf) -split "`n" | Where-Object { $_ -match '^#' }) -join "`n"
+    if ($ho -cne $hc) { $sdocBad += ($f.Name + ':標題不同') }
+    if ((Read-Norm $f.FullName) -cmatch '\.claude/|mcp__|Agent 工具|子代理|\b(Read|Write|Grep|Glob|Bash)\b') { $sdocBad += ($f.Name + ':Claude Code 用語') }
+}
+Assert ($sdocBad.Count -eq 0) ("sdoc 契約兩版標題相同、OpenCode 版只用 OpenCode 的工具名與 .opencode 路徑" + $(if ($sdocBad.Count -gt 0) { '：' + ($sdocBad -join '，') } else { '' }))
+function Get-YamlKeyLines([string]$Path) {
+    $out = @()
+    foreach ($ln in @((Read-Norm $Path) -split "`n")) {
+        $t = ($ln -replace '\s+#.*$', '') -replace '\s+$', ''
+        if ($t.Trim() -eq '' -or $t.TrimStart().StartsWith('#')) { continue }
+        $out += $t
+    }
+    return ($out -join "`n")
+}
+Assert ((Get-YamlKeyLines (Join-Path $oc 'peoplesoft/customization-profile.yaml')) -ceq (Get-YamlKeyLines (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml'))) "customization-profile.yaml 去註解後鍵值逐行相同（公司機可把已回填的值原樣抄過去）"
+
+$subagents = @('ps-ui-flow', 'ps-peoplecode-flow', 'ps-sql-flow', 'ps-sqr-flow', 'ps-ae-flow', 'ps-metadata-flow', 'ps-auditor')
+$dbMain = @('ps-orchestrator', 'ps-deep-research', 'ps-clone-worker', 'ps-sdoc-worker')
+$pathProfiles = @{ 'ps-spec-worker' = 'spec-worker'; 'ps-clone-worker' = 'clone-worker'; 'ps-spec-author' = 'spec-author'; 'ps-status-reader' = 'status-reader'; 'ps-sdoc-worker' = 'sdoc-worker'; 'ps-spec-reader' = 'spec-reader'; 'ps-spec-judge' = 'spec-judge' }
+$fmBad = @()
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/agents') -File -Filter '*.md')) {
+    $fm = Get-Frontmatter $f.FullName
+    $n = $f.BaseName
+    $tools = ''
+    if ($fm -match '(?m)^tools:\s*(.+)$') { $tools = $Matches[1] }
+    $toolList = @($tools -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+    if ($fm -notmatch ('(?m)^name:\s*' + [regex]::Escape($n) + '\s*$')) { $fmBad += ($n + ':name') }
+    if ($fm -notmatch '(?m)^description:\s*\S') { $fmBad += ($n + ':description') }
+    if ($fm -notmatch '(?m)^model:\s*inherit\s*$') { $fmBad += ($n + ':model') }
+    if ($toolList.Count -eq 0) { $fmBad += ($n + ':tools') }
+    if ($subagents -contains $n) {
+        if ($toolList -contains 'Agent' -or $toolList -contains 'Task') { $fmBad += ($n + ':子代理不得再委派') }
+        if (@($toolList | Where-Object { $_ -match '^mcp__oracleMCP' -and $_ -ne 'mcp__oracleMCP__oracle_execute_query' }).Count -gt 0) { $fmBad += ($n + ':子代理的 oracleMCP 只開 oracle_execute_query') }
+    }
+    if ($dbMain -contains $n -and @($toolList | Where-Object { $_ -match '^mcp__oracleMCP' }).Count -gt 0) { $fmBad += ($n + ':主代理不開 oracleMCP 工具（沒有開線步驟）') }
+    if ($pathProfiles.ContainsKey($n)) {
+        if ($fm -notmatch ('-Mode path -PathProfile ' + $pathProfiles[$n] + '"')) { $fmBad += ($n + ':路徑 hook') }
+    }
+    elseif ($fm -match '(?m)^hooks:') { $fmBad += ($n + ':非 worker 不掛路徑 hook') }
+}
+Assert ($fmBad.Count -eq 0) ("agent frontmatter 形狀（name＝檔名、model inherit、tools 白名單、子代理不委派不連線、worker 掛路徑 hook）" + $(if ($fmBad.Count -gt 0) { '：' + ($fmBad -join '，') } else { '' }))
+
+. (Join-Path $repoRoot 'scripts/ps-cli-lib.ps1')
+$cmdBad = @()
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/commands') -File -Filter '*.md')) {
+    $t = Read-Norm $f.FullName
+    $fm = Get-Frontmatter $f.FullName
+    if ($fm -notmatch '(?m)^disable-model-invocation:\s*true\s*$') { $cmdBad += ($f.BaseName + ':disable-model-invocation') }
+    if ($fm -notmatch '(?m)^description:\s*\S') { $cmdBad += ($f.BaseName + ':description') }
+    if ($fm -match '(?m)^(agent|subtask):') { $cmdBad += ($f.BaseName + ':不得有 agent／subtask 鍵') }
+    $ag = Get-PsCliCommandAgent -Command $f.BaseName
+    if ($ag -eq '') { $cmdBad += ($f.BaseName + ':ps-cli-lib 沒有主代理對照') }
+    elseif ($t -notmatch ('claude --agent ' + [regex]::Escape($ag))) { $cmdBad += ($f.BaseName + ':前提段沒寫 claude --agent ' + $ag) }
+    if ($t -notmatch '\$ARGUMENTS') { $cmdBad += ($f.BaseName + ':$ARGUMENTS') }
+}
+Assert ($cmdBad.Count -eq 0) ("指令形狀（禁止模型自行觸發、前提段的主代理＝外環對照表、帶 `$ARGUMENTS）" + $(if ($cmdBad.Count -gt 0) { '：' + ($cmdBad -join '，') } else { '' }))
+
+$settings = $null
+try { $settings = [System.IO.File]::ReadAllText((Join-Path $cc '.claude/settings.json')) | ConvertFrom-Json } catch { }
+Assert ($null -ne $settings) "settings.json 可解析"
+if ($null -ne $settings) {
+    $allow = @($settings.permissions.allow)
+    $deny = @($settings.permissions.deny)
+    $preCmd = [string]$settings.hooks.PreToolUse[0].hooks[0].command
+    $postCmd = [string]$settings.hooks.PostToolUse[0].hooks[0].command
+    Assert ([string]$settings.model -eq 'sonnet' -and $null -eq $settings.PSObject.Properties['agent']) "settings：模型 sonnet、不設預設主代理（直接 claude＝一般 session，可做維護排錯）"
+    $oracleAllow = @($allow | Where-Object { [string]$_ -match '^mcp__oracleMCP' })
+    $oracleDenyNeed = @('mcp__oracleMCP__oracle_list_schemas', 'mcp__oracleMCP__oracle_list_tables', 'mcp__oracleMCP__oracle_describe_table', 'mcp__oracleMCP__oracle_get_table_data')
+    Assert ($oracleAllow.Count -eq 1 -and $oracleAllow[0] -eq 'mcp__oracleMCP__oracle_execute_query' -and $allow -contains 'Edit(./docs/ps-research/**)' -and @($oracleDenyNeed | Where-Object { $deny -notcontains $_ }).Count -eq 0) "settings：oracleMCP 只允許 oracle_execute_query、其餘四個工具拒絕；headless 需要的寫入在允許清單"
+    Assert ($preCmd -match '\.claude/hooks/ps-runtime-guard\.ps1 -Mode pre$' -and [string]$settings.hooks.PreToolUse[0].matcher -notmatch 'oracleMCP' -and [string]$settings.hooks.PreToolUse[0].matcher -match 'Agent') "settings：PreToolUse hook 只掛 Agent（oracleMCP 沒有 connect 可比對）"
+    Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
+    Assert ([string]$settings.env.BASH_MAX_TIMEOUT_MS -eq '7200000') "settings：Bash 上限 2 小時（ps-spec-author 的 ps-sdoc 長跑）"
+    Assert ($allow -contains 'Bash(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'Edit(./.ps-runtime/sdoc/**)') "settings：ps-spec-author 可跑 ps-sdoc、headless worker 可寫 .ps-runtime/sdoc"
+}
+$hookPath = Join-Path $cc '.claude/hooks/ps-runtime-guard.ps1'
+$hb = [System.IO.File]::ReadAllBytes($hookPath)
+Assert ($hb.Length -ge 3 -and $hb[0] -eq 0xEF -and $hb[1] -eq 0xBB -and $hb[2] -eq 0xBF) "hook 腳本 UTF-8 with BOM"
+
+$modelFiles = @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude') -File -Recurse -Include '*.md') + @(Get-Item -LiteralPath (Join-Path $cc 'CLAUDE.md'))
+$badRef = @()
+$knownTools = @('mcp__oracleMCP__oracle_execute_query', 'mcp__oracleMCP__oracle_list_schemas', 'mcp__oracleMCP__oracle_list_tables', 'mcp__oracleMCP__oracle_describe_table', 'mcp__oracleMCP__oracle_get_table_data',
+    'mcp__PeoplecodeElasticSearch__search_chunks', 'mcp__PeoplecodeSource__get_chunks_details', 'mcp__PeoplecodeSource__get_file_structure',
+    'mcp__PeoplecodeMetadata__find_field_usage', 'mcp__PeoplecodeMetadata__search_component_metadata', 'mcp__PeoplecodeMetadata__get_ae_sql_metadata')
+$badTool = @()
+foreach ($f in $modelFiles) {
+    $t = Read-Norm $f.FullName
+    foreach ($m in [regex]::Matches($t, '(?<![A-Za-z0-9_/-])\.claude/[A-Za-z0-9_./-]*[A-Za-z0-9_]')) {
+        $p = $m.Value
+        if ($p -match '\*|<') { continue }
+        if ($p -eq '.claude/agents/ps-security-flow.md') { continue }
+        if (-not (Test-Path -LiteralPath (Join-Path $cc $p))) { $badRef += ((Get-RelUnder $cc $f.FullName) + '→' + $p) }
+    }
+    foreach ($m in [regex]::Matches($t, 'mcp__[A-Za-z]+__[A-Za-z_]+')) {
+        if ($knownTools -notcontains $m.Value) { $badTool += ((Get-RelUnder $cc $f.FullName) + '→' + $m.Value) }
+    }
+}
+# oracleMCP（@vdeserto/oracle-mcp-server）的工具實名是 oracle_execute_query 等底線拼法；SQLcl 時代的錯名與連字號拼法不得回流（同 test-auto-loop 情境 31）
+$wrongPat = ('run_' + 'sql') + '|' + ('list' + '-connections') + '|' + ('run' + '-sql') + '|' + ('sql' + '-run') + '|' + ('sqlcl' + '-run')
+$wrongName = @($ccAll | Where-Object { (Read-Norm $_.FullName) -match $wrongPat } | ForEach-Object { Get-RelUnder $cc $_.FullName })
+Assert ($wrongName.Count -eq 0) ("oracleMCP 工具名一律底線實名（無舊錯名、無連字號拼法）" + $(if ($wrongName.Count -gt 0) { '：' + ($wrongName -join ', ') } else { '' }))
+$badRef = @($badRef | Sort-Object -Unique)
+$badTool = @($badTool | Sort-Object -Unique)
+Assert (-not (Test-Path -LiteralPath (Join-Path $cc '.claude/agents/ps-security-flow.md'))) "不新增 .claude/agents/ps-security-flow.md（skill 不以同名 agent 接受誤派；SKILL.md 明寫它不存在）"
+Assert ($badRef.Count -eq 0) ("模型檔引用的 .claude/ 路徑都存在" + $(if ($badRef.Count -gt 0) { '：' + ($badRef -join '，') } else { '' }))
+Assert ($badTool.Count -eq 0) ("模型檔的 MCP 工具全名都在已知清單（mcp__<註冊名>__<工具>）" + $(if ($badTool.Count -gt 0) { '：' + ($badTool -join '，') } else { '' }))
+$lint = ((& (Join-Path $repoRoot 'scripts/ps-agent-doc-lint.ps1') -Root $repoRoot *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+Assert ($LASTEXITCODE -eq 0 -and $lint -notmatch 'claude-code/.*\[(issue 編號|日期|變更敘述|Case 編號)\]') "agent-doc-lint 涵蓋 claude-code 樹且無阻擋項"
+
+$dep = New-DeployRoot
+try {
+    Write-Host "B：hook（部署模擬目錄）"
+    $hook = Join-Path $dep '.claude/hooks/ps-runtime-guard.ps1'
+    function Invoke-Hook([string]$Json, [string[]]$HookArgs = @()) {
+        $o = ($Json | & $pwshExe -NoProfile -File $hook @HookArgs 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
+        $script:hookExit = $LASTEXITCODE
+        $script:hookObj = $null
+        if ($o.Trim() -ne '') { try { $script:hookObj = $o | ConvertFrom-Json } catch { } }
+        return $o
+    }
+    function Get-Deny { if ($null -eq $script:hookObj) { return '' }; return [string]$script:hookObj.hookSpecificOutput.permissionDecisionReason }
+    $q = '{"tool_name":"mcp__oracleMCP__oracle_execute_query","tool_input":{"sql":"SELECT 1 AS OK FROM DUAL","limit":1},"agent_type":"ps-ui-flow","session_id":"t"}'
+    $o = Invoke-Hook $q
+    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "oracleMCP 查詢：hook 不攔（沒有 connect 目標可比對；放行＝無輸出、exit 0）"
+    $o = Invoke-Hook '{"tool_name":"mcp__oracleMCP__connect","tool_input":{"connection_name":"HR_UAT"},"agent_type":"ps-orchestrator","session_id":"t"}'
+    Assert ($o.Trim() -eq '' -and $script:hookExit -eq 0) "舊的 connect 工具名：hook 不再比對 profile（新 server 沒有這個工具）"
+    $hookSrc = [System.IO.File]::ReadAllText($hook)
+    Assert ($hookSrc -notmatch 'ORACLE_CONNECTION_' -and $hookSrc -notmatch 'connectionName' -and $hookSrc -notmatch 'PS_ORACLE_CONNECT_GUARD') "hook 原始碼沒有連線目標比對的殘留（錯誤碼、profile 鍵、observe 開關）"
+    $pf = Join-Path $dep '.claude/peoplesoft/customization-profile.yaml'
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-security-flow","prompt":"x"}}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-metadata-flow*') "Agent：skill 名 ps-security-flow → PS_TASK_TARGET_INVALID 並指出承載 ps-metadata-flow（一般 session 也擋）"
+    $o = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","prompt":"x"}}'
+    $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"}}'
+    Assert ($o.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：一般 session（沒有 agent_type）可用內建 Explore／general-purpose 做維護排錯"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"}}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：一般 session 委派主代理專用名 → 照樣擋"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-business-explain","prompt":"x"}}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*自己 Read*') "Agent：主代理自讀的 skill → 擋、說明不委派"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-deep-research","prompt":"x"},"agent_type":"ps-orchestrator"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：主代理專用名 → 擋"
+    $null = Invoke-Hook '{"tool_name":"Task","tool_input":{"subagent_type":"general-purpose","prompt":"x"},"agent_type":"ps-orchestrator"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*ps-ui-flow*') "Agent（舊名 Task）：ps-* 主代理委派內建 general-purpose → 擋、列出可委派清單"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"prompt":"x"},"agent_type":"ps-deep-research"}'
+    Assert ((Get-Deny) -like 'PS_TASK_TARGET_INVALID*subagent_type*') "Agent：ps-* 主代理沒帶 subagent_type → 擋"
+    $o1 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-ui-flow","prompt":"x"}}'
+    $o2 = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-author","prompt":"x"}}'
+    Assert ($o1.Trim() -eq '' -and $o2.Trim() -eq '') "Agent：ps-ui-flow／ps-spec-author → 放行"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-sdoc-worker","prompt":"x"}}'
+    $d1 = Get-Deny
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-status-reader","prompt":"x"},"agent_type":"ps-orchestrator"}'
+    $d2 = Get-Deny
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-reader","prompt":"x"}}'
+    $d3 = Get-Deny
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_input":{"subagent_type":"ps-spec-judge","prompt":"x"}}'
+    Assert ($d1 -like 'PS_TASK_TARGET_INVALID*主代理*' -and $d2 -like 'PS_TASK_TARGET_INVALID*主代理*' -and $d3 -like 'PS_TASK_TARGET_INVALID*主代理*' -and (Get-Deny) -like 'PS_TASK_TARGET_INVALID*主代理*') "Agent：Spec 文件的 worker、讀者、判定只由外環 headless 啟動，不能委派"
+    $null = Invoke-Hook '{"tool_name":"Agent","tool_response":{"content":[{"type":"text","text":"{\"status\":\"COMPLETE\",\"suggestedNext\":[{\"agent\":\"ps-data-lineage\",\"task\":\"x\"},{\"agent\":\"ps-sqr-flow\"},{\"agent\":\"nobody\"}]}"}]}}' @('-Mode', 'post')
+    $note = ''
+    if ($null -ne $script:hookObj) { $note = [string]$script:hookObj.hookSpecificOutput.additionalContext }
+    Assert ($note -like '`[ps-runtime-guard`]*ps-data-lineage*ps-metadata-flow*nobody*' -and $note -notmatch 'ps-sqr-flow') "post：suggestedNext 的 skill 名與未知名附註記、合法目標不提"
+    $o = Invoke-Hook '{"tool_name":"Agent","tool_response":"{\"status\":\"COMPLETE\",\"suggestedNext\":[{\"agent\":\"ps-ui-flow\"}]}"}' @('-Mode', 'post')
+    Assert ($o.Trim() -eq '') "post：全部合法 → 無輸出"
+    function Test-PathHook([string]$PathProfileName, [string]$Tool, [string]$Key, [string]$Value) {
+        $v = $Value -replace '\\', '\\\\'
+        $j = '{"tool_name":"' + $Tool + '","tool_input":{"' + $Key + '":"' + $v + '"},"cwd":"' + ($dep -replace '\\', '\\\\') + '"}'
+        $o = Invoke-Hook $j @('-Mode', 'path', '-PathProfile', $PathProfileName)
+        return ($o.Trim() -eq '')
+    }
+    $att = Join-Path $dep '.ps-runtime/spec/job-1/attempts/a0001'
+    Assert (Test-PathHook 'spec-worker' 'Read' 'file_path' (Join-Path $att 'manifest.md')) "path spec-worker：讀工單 → 放行"
+    Assert (Test-PathHook 'spec-worker' 'Read' 'file_path' '.claude/peoplesoft/spec/clone-contract.md') "path spec-worker：讀 spec 契約（相對路徑）→ 放行"
+    Assert (-not (Test-PathHook 'spec-worker' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/wiki/X.md'))) "path spec-worker：讀 wiki → 擋"
+    Assert (Test-PathHook 'spec-worker' 'Write' 'file_path' (Join-Path $att 'fragment.md')) "path spec-worker：寫 fragment.md → 放行"
+    Assert (-not (Test-PathHook 'spec-worker' 'Write' 'file_path' (Join-Path $att 'manifest.md'))) "path spec-worker：寫工單 → 擋"
+    Assert (-not (Test-PathHook 'spec-worker' 'Read' 'file_path' ($att + '/../../../../../CLAUDE.md'))) "path spec-worker：.. 跳出工單範圍 → 擋"
+    Assert (-not (Test-PathHook 'spec-worker' 'Bash' 'command' 'dir')) "path spec-worker：Bash → 擋"
+    Assert (Test-PathHook 'clone-worker' 'Grep' 'path' 'docs/ps-research') "path clone-worker：Grep 研究目錄 → 放行"
+    Assert (Test-PathHook 'clone-worker' 'Write' 'file_path' (Join-Path $dep '.ps-runtime/clone-spec/clone-0123456789abcdef/attempts/a1/packet.json')) "path clone-worker：寫 packet.json → 放行"
+    Assert (-not (Test-PathHook 'clone-worker' 'Write' 'file_path' (Join-Path $dep 'docs/ps-research/x/01-A.md'))) "path clone-worker：寫 NN → 擋"
+    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A,TW_B' -MaxSessions 4") "path spec-author：ps-sdoc 命令 → 放行"
+    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A,TW_B' -MaxSessions 1 -TimeoutMin 90") "path spec-author：ps-sdoc 帶 -MaxSessions 1 -TimeoutMin <n> → 放行"
+    $saTxt = Read-Norm (Join-Path $cc '.claude/agents/ps-spec-author.md')
+    Assert ($saTxt -match 'ps-sdoc\.ps1 -Components ''TW_DEMO_A,TW_DEMO_B'' -MaxSessions 1\D' -and $saTxt -notmatch '-MaxSessions [2-9]' -and $saTxt -match '1～110' -and $saTxt -match 'DOC1-3-04') "ps-spec-author：每次呼叫只跑一個 session、-TimeoutMin 上限 110（Bash 工具 2 小時內）、DOC1-3-04 轉述判讀"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A'; del x")) "path spec-author：串接命令 → 擋"
+    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A`$X,TW#B' -Status") "path spec-author：Component 名含 `$／#（單引號內）→ 放行"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components `$(whoami)")) "path spec-author：未加引號的變數／子命令 → 擋"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A' > out.txt")) "path spec-author：重導向 → 擋"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-spec-build.ps1 -Components 'TW_A'")) "path spec-author：舊的 ps-spec-build 命令 → 擋（Claude Code 版的 /ps-spec 只走 ps-sdoc）"
+    Assert (-not (Test-PathHook 'spec-author' 'PowerShell' 'command' 'Remove-Item x')) "path spec-author：其他命令 → 擋"
+    Assert (-not (Test-PathHook 'spec-author' 'Write' 'file_path' (Join-Path $dep 'docs/ps-spec/x.md'))) "path spec-author：任何寫檔 → 擋"
+    Assert (-not (Test-PathHook 'spec-author' 'Write' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/approvals.md'))) "path spec-author：不代寫人工輸入檔（核准、裁決）→ 擋"
+    Assert (Test-PathHook 'spec-author' 'Read' 'file_path' (Join-Path $dep 'docs/ps-spec/TW_A/spec.md')) "path spec-author：讀 Spec 產物 → 放行"
+    Assert (Test-PathHook 'spec-author' 'Read' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/decisions.md')) "path spec-author：讀人工輸入檔（說明怎麼填）→ 放行"
+    $sj = Join-Path $dep '.ps-runtime/sdoc/clone-0123456789abcdef'
+    Assert (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $sj 'inbox/manifest.md')) "path status-reader：讀 inbox 工單 → 放行"
+    Assert (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/status.md')) "path status-reader：讀 STATUS 檔 → 放行"
+    Assert (Test-PathHook 'status-reader' 'Read' 'file_path' '.claude/peoplesoft/sdoc/status-reading-contract.md') "path status-reader：讀解讀契約 → 放行"
+    Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：讀其他讀者的解讀 → 擋（三位讀者互相隔離）"
+    Assert (-not (Test-PathHook 'status-reader' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/wiki/X.md'))) "path status-reader：讀研究知識 → 擋（只看 STATUS 檔）"
+    Assert (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output.json')) "path status-reader：寫 inbox/output.json → 放行"
+    Assert ((Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output-part-03.json')) -and -not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output-part-x.json')) -and -not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/manifest.md'))) "path status-reader：寫分段檔 inbox/output-part-NN.json → 放行；其他檔名 → 擋"
+    Assert (-not (Test-PathHook 'status-reader' 'Write' 'file_path' (Join-Path $sj 'attempts/a0001/output.json'))) "path status-reader：寫 attempt 目錄 → 擋"
+    Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'attempts/a0004/manifest.md')) "path sdoc-worker：讀工單 → 放行"
+    Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $sj 'work/r0001/citeable.md')) "path sdoc-worker：讀可引用清單 → 放行"
+    Assert (Test-PathHook 'sdoc-worker' 'Grep' 'path' 'docs/ps-research') "path sdoc-worker：Grep 研究目錄 → 放行"
+    Assert (Test-PathHook 'sdoc-worker' 'Read' 'file_path' '.claude/peoplesoft/sdoc/examples/data.json') "path sdoc-worker：讀研究包範例 → 放行"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Read' 'file_path' (Join-Path $dep '.ps-private/sdoc/clone-0123456789abcdef/decisions.md'))) "path sdoc-worker：讀人工裁決檔 → 擋"
+    Assert (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'attempts/a0004/output.json')) "path sdoc-worker：寫 output.json → 放行"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'receipts/r0001/x.json'))) "path sdoc-worker：寫收據 → 擋"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Write' 'file_path' (Join-Path $sj 'attempts/a0004/candidate.json'))) "path sdoc-worker：寫候選快照 → 擋"
+    Assert (-not (Test-PathHook 'sdoc-worker' 'Bash' 'command' 'dir')) "path sdoc-worker：Bash → 擋"
+    Assert (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $sj 'inbox/docs/04-workflow.md')) "path spec-reader：讀工單附的文件 → 放行"
+    Assert (Test-PathHook 'spec-reader' 'Grep' 'path' (Join-Path $sj 'inbox/docs')) "path spec-reader：Grep 工單附的文件 → 放行"
+    Assert (-not (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $sj 'attempts/a0090/input.json'))) "path spec-reader：讀 attempt 工單（含標準答案）→ 擋"
+    Assert (-not (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $sj 'receipts/r0001/x.json'))) "path spec-reader：讀研究包收據 → 擋"
+    Assert (-not (Test-PathHook 'spec-reader' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/wiki/X.md'))) "path spec-reader：讀研究知識 → 擋"
+    Assert (Test-PathHook 'spec-reader' 'Write' 'file_path' (Join-Path $sj 'inbox/output.json')) "path spec-reader：寫 inbox/output.json → 放行"
+    Assert (Test-PathHook 'spec-judge' 'Read' 'file_path' (Join-Path $sj 'inbox/input.json')) "path spec-judge：讀判定工單 → 放行"
+    Assert (-not (Test-PathHook 'spec-judge' 'Read' 'file_path' (Join-Path $sj 'work/r0001/md/04-workflow.md'))) "path spec-judge：讀工作中文件 → 擋"
+    Assert (-not (Test-PathHook 'spec-judge' 'Write' 'file_path' (Join-Path $sj 'attempts/a0090/output.json'))) "path spec-judge：寫 attempt 目錄 → 擋"
+    Assert (-not (Test-PathHook 'no-such' 'Read' 'file_path' (Join-Path $att 'manifest.md'))) "path：未知設定 → 擋（hook 設定錯不放行）"
+
+    Write-Host "C：外環版本層（部署模擬目錄）"
+    . (Join-Path $dep 'scripts/ps-knowledge-lib.ps1')
+    . (Join-Path $dep 'scripts/ps-session-lib.ps1')
+    . (Join-Path $dep 'scripts/ps-supplemental-lib.ps1')
+    $v = Get-PsCliVariant -Root $dep
+    Assert ($v.Name -eq 'claude' -and $v.PsDir -eq '.claude/peoplesoft' -and $v.Exe -eq 'claude' -and $v.Manifest -eq 'ps-transfer-manifest.claude.json') "版本判定：.claude/peoplesoft 存在＝Claude Code"
+    Assert ((Get-PsCliVariant -Root $repoRoot).Name -eq 'opencode') "版本判定：維護端 repo 根＝OpenCode（Claude Code 版在 claude-code/ 子樹）"
+    $env:PS_CLI = 'opencode'
+    $vo = Get-PsCliVariant -Root $dep
+    Remove-Item -Path Env:\PS_CLI -ErrorAction SilentlyContinue
+    Assert ($vo.Name -eq 'opencode' -and $vo.Source -eq 'env') "版本判定：PS_CLI 環境變數優先"
+    $cl = New-PsOcCommandLine -Variant 'claude' -OcPath 'C:\bin\claude.exe' -ExtraArgs '--command ps-research' -PromptText '轉職' -Tag 't' -OutFile 'o.txt' -ErrFile 'e.txt' -StreamFile 's.jsonl'
+    Assert ($cl.Agent -eq 'ps-deep-research' -and $cl.Prompt -eq '/ps-research 轉職' -and $cl.Inner -like '"C:\bin\claude.exe" -p --agent ps-deep-research --permission-mode dontAsk --output-format stream-json --verbose "/ps-research 轉職" < NUL 1> "s.jsonl" 2> "e.txt"') "命令列：--command ps-research → claude -p --agent ps-deep-research「/ps-research <領域>」（dontAsk、stream-json）"
+    $cl2 = New-PsOcCommandLine -Variant 'claude' -OcPath 'claude.cmd' -Model 'sonnet' -ExtraArgs '--command ps-spec-batch' -PromptText 'job-a0001' -Tag 't' -OutFile 'o' -ErrFile 'e' -StreamFile 's'
+    Assert ($cl2.Agent -eq 'ps-spec-worker' -and $cl2.Inner -match '--model "sonnet"') "命令列：ps-spec-batch → ps-spec-worker；-Model 透傳"
+    Assert ((New-PsOcCommandLine -Variant 'claude' -OcPath 'claude.cmd' -ExtraArgs '--command ps-clone-batch' -PromptText 'x' -Tag 't' -OutFile 'o' -ErrFile 'e' -StreamFile 's').Agent -eq 'ps-clone-worker') "命令列：ps-clone-batch → ps-clone-worker"
+    $cl3 = New-PsOcCommandLine -Variant 'claude' -OcPath 'claude.cmd' -ExtraArgs '--agent ps-deep-research' -PromptText '手術工單' -Tag 't' -OutFile 'o' -ErrFile 'e' -StreamFile 's'
+    Assert ($cl3.Agent -eq 'ps-deep-research' -and $cl3.Prompt -eq '手術工單') "命令列：--agent 原樣、prompt 不加指令"
+    $env:PS_CLAUDE_PERMISSION_MODE = 'acceptEdits'
+    $cl4 = New-PsOcCommandLine -Variant 'claude' -OcPath 'claude.cmd' -ExtraArgs '--agent ps-deep-research' -PromptText 'x' -Tag 't' -OutFile 'o' -ErrFile 'e' -StreamFile 's'
+    $env:PS_CLAUDE_PERMISSION_MODE = 'rm -rf'
+    $cl5 = New-PsOcCommandLine -Variant 'claude' -OcPath 'claude.cmd' -ExtraArgs '--agent ps-deep-research' -PromptText 'x' -Tag 't' -OutFile 'o' -ErrFile 'e' -StreamFile 's'
+    Remove-Item -Path Env:\PS_CLAUDE_PERMISSION_MODE -ErrorAction SilentlyContinue
+    Assert ($cl4.Inner -match '--permission-mode acceptEdits' -and $cl5.Inner -match '--permission-mode dontAsk ') "命令列：PS_CLAUDE_PERMISSION_MODE 只接受已知值，其餘回 dontAsk"
+    $clo = New-PsOcCommandLine -Variant 'opencode' -OcPath 'opencode.cmd' -ExtraArgs '--command ps-research' -PromptText '轉職' -Tag 'r1' -OutFile 'o.txt' -ErrFile 'e.txt'
+    Assert ($clo.Inner -eq '"opencode.cmd" run --command ps-research --title "auto-r1" "轉職" 1> "o.txt" 2> "e.txt"') "命令列：OpenCode 版形狀不變"
+    $sf = Join-Path $dep 's.jsonl'
+    $of = Join-Path $dep 'o.txt'
+    [System.IO.File]::WriteAllText($sf, ('{"type":"system","subtype":"init"}' + "`n" + '{"type":"assistant","message":{"content":[{"type":"text","text":"中途"}]}}' + "`n" + '{"type":"result","subtype":"success","is_error":false,"num_turns":7,"result":"## 記分卡\n| 檔案 |\n已寫 docs/x.md"}' + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $r = Convert-PsOcClaudeStream -StreamFile $sf -OutFile $of
+    Assert ($r.Found -and -not $r.IsError -and $r.Turns -eq 7 -and ([System.IO.File]::ReadAllText($of)) -ceq ("## 記分卡`n| 檔案 |`n已寫 docs/x.md")) "stream-json：最後一個 result 事件的最終回覆抽進 OutFile（stdout 回收語意不變）"
+    [System.IO.File]::WriteAllText($sf, ('{"type":"result","subtype":"error_during_execution","is_error":true,"num_turns":2,"result":"Prompt is too long"}' + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $r = Convert-PsOcClaudeStream -StreamFile $sf -OutFile $of
+    Assert ($r.Found -and $r.IsError -and (Get-PsOcFailureKind -OutFile $of -ErrFile '') -eq 'CONTEXT_OVERFLOW') "stream-json：錯誤收場與 context 溢出字樣（Prompt is too long）可辨識"
+    [System.IO.File]::WriteAllText($sf, '{"type":"system","subtype":"init"}', (New-Object System.Text.UTF8Encoding($false)))
+    Assert (-not (Convert-PsOcClaudeStream -StreamFile $sf -OutFile (Join-Path $dep 'none.txt')).Found) "stream-json：沒有 result 事件 → Found=false"
+    # 模型端重試判讀：system/api_retry 事件與 result 的 api_error_status
+    function New-ApiRetryLine([int]$A, [string]$S) { return ('{"type":"system","subtype":"api_retry","attempt":' + $A + ',"max_retries":10,"retry_delay_ms":500,"error_status":' + $S + ',"error":"server_error","session_id":"s"}') }
+    function Test-ApiStream([string[]]$Lines) { [System.IO.File]::WriteAllText($sf, (($Lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false))); return (Get-PsOcClaudeApiRetry -StreamFile $sf) }
+    $inA = '{"type":"system","subtype":"init"}'
+    $okA = '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"x"}}]}}'
+    $usrA = '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"{\"error\":\"x\"}"}]}}'
+    $errA = '{"type":"assistant","message":{"content":[{"type":"text","text":"API Error: 504 Gateway Timeout"}]},"error":"server_error"}'
+    $a = Test-ApiStream @($inA, $okA, $usrA, $okA, '{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"ok"}')
+    Assert ($a.Kind -eq 'NONE' -and $a.Count -eq 0 -and $a.Progress -eq 2) "模型端判讀：沒有重試 → NONE（工具結果內容裡的 error 字樣不算）"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), $okA, $usrA, (New-ApiRetryLine 1 'null'), $okA)
+    Assert ($a.Kind -eq 'API_RETRY_SLOW' -and $a.Count -eq 3 -and $a.Trailing -eq 0 -and $a.Recovered -and $a.Statuses -eq '504×2、無回應×1') "模型端判讀：重試後有進展 → API_RETRY_SLOW（被拖慢），狀態碼分布含無回應"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'))
+    Assert ($a.Kind -eq 'API_RETRY_SLOW' -and $a.Trailing -eq 2) "模型端判讀：結尾連續失敗未達門檻（2＜3）→ 仍算被拖慢"
+    $a = Test-ApiStream @($inA, $okA, $usrA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), (New-ApiRetryLine 4 '504'))
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.Trailing -eq 4 -and $a.Progress -eq 2 -and -not $a.Recovered) "模型端判讀：最後同一個請求連續失敗 4 次 → API_RETRY_STUCK（卡住）"
+    $script:PsOcApiStuckAfter = 5
+    $a5 = Get-PsOcClaudeApiRetry -StreamFile $sf
+    $script:PsOcApiStuckAfter = 3
+    Assert ($a5.Kind -eq 'API_RETRY_SLOW') "模型端判讀：門檻 PsOcApiStuckAfter 可調（改 5 → 同一份 stream 改判被拖慢）"
+    $a = Test-ApiStream @($inA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '502'))
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.Progress -eq 0 -and $a.Statuses -eq '504×2、502×1') "模型端判讀：第一個請求就連續失敗 → 卡住且 Progress=0"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), $errA, '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":1,"result":"API Error: 504"}')
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.ApiErrorStatus -eq '504' -and $a.Trailing -eq 2) "模型端判讀：重試用完（result 帶 api_error_status）→ 卡住；API Error 訊息不算進展"
+    $a = Test-ApiStream @($inA, '{"type":"assistant","message":{"content":[{"type":"text","text":"API Error: 401 x"}]}}', '{"type":"result","subtype":"success","is_error":true,"api_error_status":401,"num_turns":0,"result":"API Error: 401"}')
+    Assert ($a.Kind -eq 'API_ERROR' -and $a.ApiErrorStatus -eq '401' -and $a.Progress -eq 0) "模型端判讀：沒有重試就以 API 錯誤收場 → API_ERROR"
+    Assert ((Get-PsOcClaudeApiRetry -StreamFile (Join-Path $dep 'no-such.jsonl')).Kind -eq 'NONE' -and (Get-PsOcClaudeApiRetry -StreamFile '').Kind -eq 'NONE') "模型端判讀：沒有 stream 檔（OpenCode 版）→ NONE"
+    Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_SLOW', 'API_RETRY_STUCK') -TimeoutMin 60) -like '卡在模型端*' -and (Get-PsOcApiHint -Kinds @('NONE', 'API_RETRY_SLOW') -TimeoutMin 45) -like '*上限 45 分*-TimeoutMin*' -and (Get-PsOcApiHint -Kinds @('NONE', '') -TimeoutMin 60) -eq '') "模型端判讀：下一步提示——卡住優先、拖慢帶目前上限、沒有模型端事件回空"
+    # 模型端數據：assistant 事件的 message.usage（同一個 message id 的幾個區塊算一個請求；usage 裡可能有巢狀物件）、result 的 duration_api_ms
+    function New-UsageLine([string]$Id, [int]$In, [int]$Cr, [int]$Cc, [int]$Out) { return ('{"type":"assistant","message":{"id":"' + $Id + '","type":"message","role":"assistant","model":"m","content":[{"type":"text","text":"usage: {\"usage\":{\"input_tokens\":9}}"}],"stop_reason":null,"usage":{"input_tokens":' + $In + ',"cache_creation_input_tokens":' + $Cc + ',"cache_read_input_tokens":' + $Cr + ',"cache_creation":{"ephemeral_5m_input_tokens":' + $Cc + ',"ephemeral_1h_input_tokens":0},"output_tokens":' + $Out + ',"service_tier":"standard"}},"session_id":"s"}') }
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1200 0 18000 5), (New-UsageLine 'msg_1' 1200 0 18000 900), $usrA, (New-UsageLine 'msg_2' 300 18000 2100 40), $usrA, (New-UsageLine 'msg_3' 50 20100 9000 3200), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":3,"duration_api_ms":412345,"result":"API Error: 504"}')
+    Assert ($a.Requests -eq 3 -and $a.LastContext -eq 29150 -and $a.MaxContext -eq 29150 -and $a.CacheRequests -eq 2 -and $a.MaxOutput -eq 3200 -and $a.DurationApiSec -eq 412 -and $a.Kind -eq 'API_RETRY_STUCK') "模型端數據：請求數依 message id 去重、輸入＝input＋cache_read＋cache_creation、快取命中次數、單次最多輸出取同一訊息最大值、API 累計秒數"
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 30000 0 0 700), $usrA, (New-UsageLine 'msg_2' 31000 0 0 900), $usrA, (New-ApiRetryLine 1 '504'))
+    Assert ($a.Requests -eq 2 -and $a.CacheRequests -eq 0 -and $a.LastContext -eq 31000 -and $a.MaxOutput -eq 900) "模型端數據：每個請求都沒有快取命中（cache_read=0）→ 快取命中 0 次（gateway 沒傳 prompt cache 的特徵）"
+    $a = Test-ApiStream @($inA, $okA, $usrA, $okA)
+    Assert ($a.Requests -eq 0 -and $a.LastContext -eq 0 -and (Get-PsOcApiMetricsLine $a 0) -eq '') "模型端數據：assistant 事件沒有 usage（舊版或合成 stream）→ 不算請求、數據行為空"
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1200 0 18000 900), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'))
+    $ml = Get-PsOcApiMetricsLine $a 95
+    Assert ($ml -match '^成功請求 1 次、主代理最後一次輸入 19200 token（最大 19200）、快取命中 0／1 次、單次最多輸出 900 token、模型端重試 2 次（504×2）、重試間隔約 95 秒' -and (Get-PsOcApiMetricsLine $a 0) -notmatch '重試間隔') "模型端數據行：成功請求、主代理輸入／快取／輸出、重試次數與量到的重試間隔；量不到就不寫間隔"
+    # 主代理與子代理分開：子代理的事件帶 parent_tool_use_id；message 物件的 id 不在第一個鍵也認得；工具輸入裡的 error 參數不算 API 錯誤
+    function New-SubLine([string]$Id, [int]$In, [int]$Out) { return ('{"type":"assistant","message":{"type":"message","id":"' + $Id + '","role":"assistant","content":[{"type":"tool_use","id":"t9","name":"mcp__x__q","input":{"error":"none"}}],"usage":{"input_tokens":' + $In + ',"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":' + $Out + '}},"parent_tool_use_id":"toolu_parent","session_id":"s"}') }
+    $a = Test-ApiStream @($inA, (New-UsageLine 'msg_1' 1000 0 119000 300), $usrA, (New-SubLine 'msg_s1' 8000 50), (New-SubLine 'msg_s1' 8500 90), $usrA, (New-ApiRetryLine 1 '504'))
+    Assert ($a.Requests -eq 2 -and $a.LastContextMain -eq 120000 -and $a.MaxContextMain -eq 120000 -and $a.MaxContextSub -eq 8500 -and $a.LastContext -eq 8500 -and $a.Progress -eq 3 -and $a.Trailing -eq 1 -and -not $a.IdFallback -and (Get-PsOcApiMetricsLine $a 0) -match '主代理最後一次輸入 120000 token（最大 120000）、子代理最大輸入 8500 token') "模型端數據：主代理與子代理分開記（數據行報主代理最後一次與子代理最大）；id 不在第一個鍵也去重；有 usage 的 error 參數算進展"
+    $a = Test-ApiStream @($inA, '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"x"}],"usage":{"input_tokens":10,"output_tokens":5}}}', '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"y"}],"usage":{"input_tokens":10,"output_tokens":9}}}')
+    Assert ($a.Requests -eq 2 -and $a.IdFallback -and (Get-PsOcApiMetricsLine $a 0) -match '^成功請求 2 次（依事件計）') "模型端數據：沒有 message id 時依事件計、數據行標示（依事件計）"
+    Assert ((Get-PsOcRetryGapSec @()) -eq 0 -and (Get-PsOcRetryGapSec @(60, 90, 120)) -eq 90 -and (Get-PsOcRetryGapSec @(61)) -eq 61) "重試間隔：沒量到回 0、多筆取平均"
+    $script:ps51AbortSaved = $env:PS_SESSION_API_ABORT_AFTER
+    Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
+    $ab0 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '0'; $ab1 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '3'; $ab2 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '99'; $ab3 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = 'x'; $ab4 = Get-PsOcApiAbortAfter
+    $env:PS_SESSION_API_ABORT_AFTER = '2'; $ab5 = Get-PsOcApiAbortAfter
+    Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue
+    if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved }
+    Assert ($ab0 -eq 5 -and $ab1 -eq 0 -and $ab2 -eq 3 -and $ab3 -eq 5 -and $ab4 -eq 5 -and $ab5 -eq 3) "卡住提前結束門檻：預設 5；PS_SESSION_API_ABORT_AFTER 0＝關、1～20 可調、小於判讀門檻 3 提高到 3、超出範圍或非數字用預設"
+    # 外環替 Claude Code 子行程設的環境預設
+    $envSaved = @{ D = $env:PS_SESSION_CLAUDE_ENV_DEFAULTS; S = $env:PS_SESSION_CLAUDE_ENV_SKIP }
+    try {
+        Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue; Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_SKIP -ErrorAction SilentlyContinue
+        function Get-EnvNames($Pairs) { return , @(@($Pairs) | ForEach-Object { [string]$_[0] }) }
+        $dR = Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader'; $nR = Get-EnvNames $dR
+        $dW = Get-PsOcClaudeEnvDefaults -Agent 'ps-sdoc-worker'; $nW = Get-EnvNames $dW
+        $dU = Get-PsOcClaudeEnvDefaults -Agent 'ps-deep-research'; $nU = Get-EnvNames $dU
+        $mtt = @(@($dR) | Where-Object { [string]$_[0] -eq 'MAX_THINKING_TOKENS' })
+        $eff = @(@($dR) | Where-Object { [string]$_[0] -eq 'CLAUDE_CODE_EFFORT_LEVEL' })
+        Assert (@($dR).Count -eq 5 -and $nR -contains 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK' -and $nR -contains 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC' -and $nR -contains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION' -and $mtt.Count -eq 1 -and [string]$mtt[0][1] -eq '0' -and $eff.Count -eq 1 -and [string]$eff[0][1] -eq 'low') "環境預設：狀態圖讀者＝共同三個＋MAX_THINKING_TOKENS=0＋CLAUDE_CODE_EFFORT_LEVEL=low"
+        Assert (@($dW).Count -eq 3 -and $nW -notcontains 'MAX_THINKING_TOKENS' -and $nW -notcontains 'CLAUDE_CODE_EFFORT_LEVEL' -and @($dU).Count -eq 3 -and $nU -notcontains 'MAX_THINKING_TOKENS') "環境預設：研究 worker 與其他代理只有共同三個（不關 thinking、不壓 effort）"
+        Assert ((Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-reader')) -contains 'CLAUDE_CODE_EFFORT_LEVEL' -and (Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-judge')) -contains 'CLAUDE_CODE_EFFORT_LEVEL') "環境預設：乾淨讀者與判定也關 thinking、壓 effort"
+        $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'
+        $dOff = Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader'
+        Assert (@($dOff).Count -eq 0) "環境預設：PS_SESSION_CLAUDE_ENV_DEFAULTS=0 → 整組不套"
+        Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue
+        $env:PS_SESSION_CLAUDE_ENV_SKIP = 'max_thinking_tokens, CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION'
+        $nS = Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader')
+        Assert (@($nS).Count -eq 3 -and $nS -notcontains 'MAX_THINKING_TOKENS' -and $nS -notcontains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION') "環境預設：PS_SESSION_CLAUDE_ENV_SKIP 剔除指定項（不分大小寫、可多個）"
+    }
+    finally {
+        if ($null -ne $envSaved.D) { $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = $envSaved.D } else { Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_DEFAULTS -ErrorAction SilentlyContinue }
+        if ($null -ne $envSaved.S) { $env:PS_SESSION_CLAUDE_ENV_SKIP = $envSaved.S } else { Remove-Item -Path Env:\PS_SESSION_CLAUDE_ENV_SKIP -ErrorAction SilentlyContinue }
+    }
+    Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '模型端數據' -and (Get-PsOcApiHint -Kinds @('API_RETRY_STUCK') -TimeoutMin 60) -match '另一版 CLI') "模型端判讀：卡住的提示要人交「判讀」與「模型端數據」兩行、提到另一版 CLI"
+    # 診斷報告 ps-sdoc-diag：合成一個 job（兩個 attempt：成功的解讀、卡住的研究頁）→ 只印代號與數字
+    $dgRoot = Join-Path $dep 'diag-root'
+    $dgJob = 'clone-0123456789abcdef'
+    $dgAtt = Join-Path $dgRoot ('.ps-runtime/sdoc/' + $dgJob + '/attempts')
+    $dgLogs = Join-Path $dgRoot '.ps-runtime/sdoc-logs'
+    foreach ($d in @((Join-Path $dgAtt 'a0001'), (Join-Path $dgAtt 'a0002'), $dgLogs)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0001') 'input.json'), '{"kind":"STATUS_READ","unit":"stage0","subject":"R1","outputParts":[{"part":1},{"part":2},{"part":3}]}', (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0001') 'outcome.json'), '{"status":"ACCEPTED","counted":false,"findings":[],"sessionFindings":["EXIT_1"]}', (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0002') 'input.json'), '{"kind":"RESEARCH","unit":"data","subject":"TW_X","pageItemCap":8}', (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path (Join-Path $dgAtt 'a0002') 'outcome.json'), '{"status":"SESSION_FAILED","counted":false,"findings":["API_ABORTED","API_RETRY_STUCK"],"diagnostics":["x"]}', (New-Object System.Text.UTF8Encoding($false)))
+    $dgModel = '{"type":"assistant","message":{"id":"msg_m","type":"message","role":"assistant","model":"claude-sonnet-4-5-20250929","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1000,"cache_read_input_tokens":0,"cache_creation_input_tokens":35000,"output_tokens":1500}},"parent_tool_use_id":null,"session_id":"s"}'
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-010203-' + $dgJob + '-a0001.stream.jsonl')), (($inA, $dgModel, $usrA, '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"duration_api_ms":90000,"usage":{"input_tokens":1000,"cache_creation_input_tokens":35000,"cache_read_input_tokens":0,"output_tokens":1500},"result":"ok"}') -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.stream.jsonl')), (($inA, (New-UsageLine 'msg_1' 2000 0 90000 700), $usrA, (New-SubLine 'msg_s1' 8000 50), $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 'null'), (New-ApiRetryLine 4 '504'), (New-ApiRetryLine 5 '504')) -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.err.txt')), "API Error: 504 Gateway Timeout`n", (New-Object System.Text.UTF8Encoding($false)))
+    # 時間軸（外環每 30 秒記一行）：兩個成功回應（相隔 90 秒）→ 卡住 300 秒後第一次 504 → 之後每 310 秒一次，共 5 次 → 提前結束
+    [System.IO.File]::WriteAllText((Join-Path $dgLogs ('20261014-020304-' + $dgJob + '-a0002.timeline.txt')), (@('2026-10-14 02:03:04|START', '2026-10-14 02:03:34|P=1|R=0|T=0|S=-', '2026-10-14 02:05:04|P=2|R=0|T=0|S=-', '2026-10-14 02:10:04|P=2|R=1|T=1|S=504x1', '2026-10-14 02:15:14|P=2|R=2|T=2|S=504x2', '2026-10-14 02:20:24|P=2|R=3|T=3|S=504x2,NRx1', '2026-10-14 02:25:34|P=2|R=4|T=4|S=504x3,NRx1', '2026-10-14 02:30:44|P=2|R=5|T=5|S=504x4,NRx1', '2026-10-14 02:31:14|END=ABORT') -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    $dgOut = ((& (Join-Path $repoRoot 'scripts/ps-sdoc-diag.ps1') -Root $dgRoot -Cli claude *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    Assert ($dgOut -match '(?m)^DIAG v2 \| V=N \| JOBS=1 \| ATT=2 \| SF=1 \| AFTEROK=1 \|' -and $dgOut -match '(?m)^J1 A0001 K=R U=S0 S=OK F=- SF=X1 Q=1 P=1 C=0/1 M=36k L=36k O=1500 RT=- TH=0 UZ=input:1000,cache_read:0,cache_creation:35000,output:1500 RU=36000/0/1500 ERR=E0 MD=S45 PT=3 DUR=\d+$' -and $dgOut -match '(?m)^J1 A0002 K=S U=DA S=SF F=A,K Q=2 P=2 C=0/2 M=92k L=92k O=700 RT=504x4,NRx1 MS=8k TH=0 LT=mcp__x__q LR=\d+ UZ=input:8000,cache_read:0,cache_creation:0,output:50 G=310 D1=300 LP=90 ERR=E504 MD=X CAP=8 DUR=\d+$' -and $dgOut -match '(?m)^SUM \| KF=S:1 \| RT=504:4,NR:1 \| CACHE=C0 \| MAXM=92k \| MAXO=1500 \| P0=0 \| MD=S45 \| AFTEROK=1$') "診斷報告：每個 attempt 一行代號（種類、單元、狀態、findings、請求數、快取、主／子代理輸入、輸出、狀態碼分布、thinking 數、卡住前的工具與結果大小、usage 欄、result usage、err 分類、模型家族、分段數、上限、分鐘）與 SUM 彙總" $dgOut
+    Assert ($dgOut -notmatch $dgJob -and $dgOut -notmatch 'TW_X' -and $dgOut -notmatch [regex]::Escape($dgRoot)) "診斷報告：不印 jobId、物件名、路徑"
+    Assert ($dgOut -match '(?m)^SUM2 N S45 S-A,K 504x4,NRx1 TH0 LT=M0k G=310 D1=300 NEXT=2$' -and $dgOut -match '(?m)^NEXT2：縮每次回應：\$env:PS_SDOC_RESEARCH_PAGE_ITEMS') "診斷報告：SUM2 一行（版本 模型 種類-findings 狀態碼 TH LT 量到的 G 與 D1 NEXT）與腳本自己判斷的下一步（研究頁卡住、沒 thinking → 縮每頁）"
+    if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+        # 真的經 cmd.exe 啟動：假 claude.cmd 吐出重試用完的 stream、exit 1
+        $fakeDir = Join-Path $dep 'fakecli'
+        New-Item -ItemType Directory -Path $fakeDir -Force | Out-Null
+        $fakeStream = Join-Path $fakeDir 'stream.jsonl'
+        [System.IO.File]::WriteAllText($fakeStream, ((@($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), (New-ApiRetryLine 3 '504'), $errA, '{"type":"result","subtype":"success","is_error":true,"api_error_status":504,"num_turns":1,"result":"API Error: 504"}') -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $fakeCmd = Join-Path $fakeDir 'claude.cmd'
+        [System.IO.File]::WriteAllText($fakeCmd, ("@echo off`r`necho NSF=%CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK% MTT=%MAX_THINKING_TOKENS% 1>&2`r`ntype " + '"' + $fakeStream + '"' + "`r`nexit /b 1`r`n"), (New-Object System.Text.ASCIIEncoding))
+        $script:sessLog = @()
+        $mttSaved = $env:MAX_THINKING_TOKENS; $nsfSaved = $env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK
+        try {
+            Remove-Item -Path Env:\CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK -ErrorAction SilentlyContinue
+            $env:MAX_THINKING_TOKENS = '999'
+            $sr504 = Invoke-PsOcSession -OcPath $fakeCmd -Root $dep -LogRoot (Join-Path $dep 'logs504') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0001' -TimeoutMin 2 -Tag 't504' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin' -EnvDefaults (Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader')
+            $nsfAfter = $env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK; $mttAfter = $env:MAX_THINKING_TOKENS
+        }
+        finally {
+            if ($null -ne $mttSaved) { $env:MAX_THINKING_TOKENS = $mttSaved } else { Remove-Item -Path Env:\MAX_THINKING_TOKENS -ErrorAction SilentlyContinue }
+            if ($null -ne $nsfSaved) { $env:CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK = $nsfSaved } else { Remove-Item -Path Env:\CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK -ErrorAction SilentlyContinue }
+        }
+        $logTxt = $script:sessLog -join "`n"
+        $errTxt = ''; if (Test-Path -LiteralPath $sr504.ErrFile) { $errTxt = [System.IO.File]::ReadAllText($sr504.ErrFile) }
+        Assert ($errTxt -match 'NSF=1 MTT=999' -and $logTxt -match '環境預設：.*CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK=1' -and $logTxt -match '沿用視窗已設：MAX_THINKING_TOKENS' -and $null -eq $nsfAfter -and $mttAfter -eq '999') "真 session：子行程看得到環境預設（NSF=1）、視窗已設的 MAX_THINKING_TOKENS=999 沿用、啟動後父行程還原（NSF 消失、MTT 仍 999）"
+        Assert (-not $sr504.TimedOut -and [int]$sr504.ExitCode -ne 0 -and $sr504.ApiKind -eq 'API_RETRY_STUCK' -and $logTxt -match '重試用完仍失敗（api_error_status=504）' -and $logTxt -match '卡在模型端') "真 session（cmd.exe＋假 claude.cmd）：重試用完 → ApiKind=API_RETRY_STUCK，判讀行說卡在模型端"
+        Assert ($logTxt -match '模型端數據：' -and $logTxt -match '模型端重試 3 次（504×3）') "真 session：結束時印模型端數據行（重試次數與狀態碼分布）"
+        # 卡住提前結束：假 claude.cmd 先吐一個成功請求，再每 2 秒吐一個 api_retry、共 8 個，然後停 10 分；門檻 2 → 外環在 TimeoutMin（5 分）之前就強殺
+        $fakeDir2 = Join-Path $dep 'fakecli2'
+        New-Item -ItemType Directory -Path $fakeDir2 -Force | Out-Null
+        $hdr2 = Join-Path $fakeDir2 'head.jsonl'
+        [System.IO.File]::WriteAllText($hdr2, ((@($inA, (New-UsageLine 'msg_1' 1000 0 20000 300), $usrA) -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $retry2 = Join-Path $fakeDir2 'retry.jsonl'
+        [System.IO.File]::WriteAllText($retry2, ((New-ApiRetryLine 1 '504') + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        $fakeCmd2 = Join-Path $fakeDir2 'claude.cmd'
+        $cmdTxt2 = "@echo off`r`ntype " + '"' + $hdr2 + '"' + "`r`nfor /L %%i in (1,1,8) do (`r`n  type " + '"' + $retry2 + '"' + "`r`n  ping -n 3 127.0.0.1 >nul`r`n)`r`nping -n 601 127.0.0.1 >nul`r`nexit /b 1`r`n"
+        [System.IO.File]::WriteAllText($fakeCmd2, $cmdTxt2, (New-Object System.Text.ASCIIEncoding))
+        $env:PS_SESSION_API_ABORT_AFTER = '2'
+        $script:sessLog = @()
+        $swA = [System.Diagnostics.Stopwatch]::StartNew()
+        try { $srAb = Invoke-PsOcSession -OcPath $fakeCmd2 -Root $dep -LogRoot (Join-Path $dep 'logsAbort') -ExtraArgs '--agent ps-status-reader' -PromptText 'job/a0002' -TimeoutMin 5 -Tag 'tabort' -Log { param($m) $script:sessLog += $m } -TimeoutParamName 'TimeoutMin' }
+        finally { Remove-Item -Path Env:\PS_SESSION_API_ABORT_AFTER -ErrorAction SilentlyContinue; if ($null -ne $script:ps51AbortSaved) { $env:PS_SESSION_API_ABORT_AFTER = $script:ps51AbortSaved } }
+        $swA.Stop()
+        $logAb = $script:sessLog -join "`n"
+        $tlAb = @(Get-ChildItem -LiteralPath (Join-Path $dep 'logsAbort') -File -Filter '*-tabort.timeline.txt')
+        $tlTxt = ''; if ($tlAb.Count -gt 0) { $tlTxt = [System.IO.File]::ReadAllText($tlAb[0].FullName) }
+        Assert ($tlAb.Count -eq 1 -and $tlTxt -match '(?m)^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\|START$' -and $tlTxt -match '(?m)\|P=1\|R=8\|T=8\|S=504x8$' -and $tlTxt -match '(?m)\|END=ABORT$') "真 session：時間軸檔記 START、P／R／T／S 的變化與 END=ABORT（只有數字與狀態碼）"
+        Assert ([bool]$srAb.Aborted -and -not $srAb.TimedOut -and [int]$srAb.ExitCode -eq -1 -and $srAb.FailureKind -eq 'API_ABORTED' -and $srAb.ApiKind -eq 'API_RETRY_STUCK' -and $swA.Elapsed.TotalSeconds -ge 60 -and $swA.Elapsed.TotalMinutes -lt 4 -and $logAb -match '提前結束' -and $logAb -match 'PS_SESSION_API_ABORT_AFTER=3' -and $logAb -match '模型端數據：成功請求 1 次、主代理最後一次輸入 21000 token') "真 session：同一個請求連續失敗達門檻且持續 60 秒以上 → 未到 TimeoutMin 就強殺（Aborted、FailureKind=API_ABORTED、ApiKind=API_RETRY_STUCK；門檻 2 提高到 3），數據行有主代理的輸入量"
+    }
+    else { Write-Host '  SKIP：真 session 判讀（需要 Windows cmd.exe）' }
+    Assert ((Get-PsSuppDirs -Root $dep).Capabilities -like '*.claude*peoplesoft*spec*capabilities.json' -and (Test-Path -LiteralPath (Get-PsSuppDirs -Root $dep).Capabilities)) "補研究：能力目錄取 .claude/peoplesoft/spec"
+    $pub = Publish-PsKnowledgeIndex -Root $dep
+    $imd = [System.IO.File]::ReadAllText((Join-Path $dep 'docs/ps-research/knowledge/index.md'))
+    $omd = [System.IO.File]::ReadAllText((Join-Path $dep 'docs/ps-research/knowledge/objects.md'))
+    Assert ($pub.published -and $imd -match '\.claude/peoplesoft/knowledge-retrieval-contract\.md' -and $imd -match 'path=docs/ps-research/knowledge/index\.md，output_mode=content' -and $omd -match 'path=docs/ps-research/knowledge/objects\.md' -and $imd -notmatch '(?i)opencode') "知識索引：用法行是 Claude Code 的 Grep／Read 形狀與 .claude 契約路徑"
+    # 先還原 profile 再驗搬運完整性
+    Copy-Item -LiteralPath (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml') -Destination $pf -Force
+    $fsd = ((& (Join-Path $dep 'scripts/ps-fs-doctor.ps1') *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    Assert ($fsd -match '檢查 M\] 搬運完整性（Claude Code 版' -and $fsd -match '結論代號：G') "fs-doctor：部署模擬目錄對 Claude Code 版 manifest 全部一致（scripts/ps-transfer-manifest.claude.json 是最新）"
+    Remove-Item -LiteralPath (Join-Path $dep '.claude/agents/ps-ui-flow.md') -Force
+    [System.IO.File]::WriteAllText((Join-Path $dep '.claude/hooks/old-guard.ps1'), '#', (New-Object System.Text.UTF8Encoding($true)))
+    $fsd2 = ((& (Join-Path $dep 'scripts/ps-fs-doctor.ps1') -ShowExtras *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    Assert ($fsd2 -match '漏搬：\.claude/agents/ps-ui-flow\.md' -and $fsd2 -match '未列管的多出檔：\.claude/hooks/old-guard\.ps1' -and $fsd2 -match '結論代號：.*M') "fs-doctor：漏搬 agent 與多出檔點名（M／X）"
+    Copy-Item -LiteralPath (Join-Path $cc '.claude/agents/ps-ui-flow.md') -Destination (Join-Path $dep '.claude/agents/ps-ui-flow.md')
+    Remove-Item -LiteralPath (Join-Path $dep '.claude/hooks/old-guard.ps1') -Force
+    # ps-claude-doctor -Offline：hook 以 powershell 名稱執行——維護端 PATH 只有 pwsh 時，臨時放一個同名連結
+    $shim = Join-Path $dep '.shim'
+    New-Item -ItemType Directory -Path $shim -Force | Out-Null
+    $savedPath = $env:PATH
+    if (@(Get-Command powershell -ErrorAction SilentlyContinue).Count -eq 0) {
+        $shimTarget = Join-Path $shim 'powershell'
+        if ($IsWindows) { $shimTarget = $shimTarget + '.exe' }
+        New-Item -ItemType SymbolicLink -Path $shimTarget -Target $pwshExe | Out-Null
+        $env:PATH = $shim + [System.IO.Path]::PathSeparator + $env:PATH
+    }
+    try {
+        $doc1 = ((& (Join-Path $dep 'scripts/ps-claude-doctor.ps1') -Offline *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+        Assert ($doc1 -match '結論代號：F$' -or $doc1 -match '結論代號：F\s') "ps-claude-doctor -Offline：profile currentSchema 未回填 → 只報 F（版本判定、powershell、hook 自測都過）"
+        [System.IO.File]::WriteAllText($pf, ([System.IO.File]::ReadAllText($pf) -replace '(?m)^  currentSchema: FILL_ME', '  currentSchema: DEMOOWN'), (New-Object System.Text.UTF8Encoding($false)))
+        $doc2 = ((& (Join-Path $dep 'scripts/ps-claude-doctor.ps1') -Offline *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+        Assert ($doc2 -match '結論代號：G') "ps-claude-doctor -Offline：回填後 → G"
+        Copy-Item -LiteralPath (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml') -Destination $pf -Force
+    }
+    finally { $env:PATH = $savedPath }
+    $sd = ((& (Join-Path $dep 'scripts/ps-spec.ps1') -Doctor -Root $dep *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    $sdLines = @(($sd -replace "`r", '') -split "`n" | Where-Object { $_.Trim() -ne '' })
+    $sdLast = ''
+    if ($sdLines.Count -gt 0) { $sdLast = $sdLines[$sdLines.Count - 1].Trim() }
+    Assert ($sdLast -eq 'SPEC1-0-03') ("ps-spec -Doctor：Claude Code 版 generic.manifest.json 是最新（SPEC1-0-03；實得 " + $sdLast + "；過期就跑本測試 -WriteGenericManifest）")
+}
+finally {
+    Remove-Item -LiteralPath $dep -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host ""
+if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
+Write-Host "全部情境 PASS" -ForegroundColor Green
+exit 0
+@@@PSBUNDLE-END|scripts/tests/test-claude-variant.ps1
 @@@PSBUNDLE-FILE|scripts/tests/test-knowledge.ps1|341|78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3|1
 # scripts/tests/test-knowledge.ps1 — 知識索引（ps-knowledge-lib／ps-knowledge CLI）的功能測試（issue #33）
 # 用法：pwsh -NoProfile -File scripts/tests/test-knowledge.ps1   （PowerShell 7 或 5.1 皆可）
@@ -4211,1707 +4802,4 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-spec.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|546|1e02eea5bed7f6cb97e190cfd0b00ce9b79a8c7e7079b9e6e488e8a59bc13154|1
-# scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
-# 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
-# 範圍：合成 fixtures（臨時目錄，結束自刪；無公司資料）：need 驗證負例、workKey／requestId 確定性、同 need 並行提交只一檔、
-#       路由三態（hint／索引／掃描／多候選／零候選）、-Resubmit 世代與 SUPERSEDED、工單內容（節位、callee、無 consumer／[[）、
-#       收據驗收負例、確定性合併（條列／表格／文字節、附錄編號承接、缺節插入、CRLF＋BOM 保留、冪等）、還原、
-#       attempts 由工單檔推導、目標無 NN → checklist D 列、result create-only 冪等、wiki stale／reviewed 標記、
-#       完成邊界（RESEARCHED／AUDITED）、CLI exit 與結論碼形狀。
-$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$ErrorActionPreference = 'Stop'
-. (Join-Path $repoRoot 'scripts/ps-knowledge-lib.ps1')
-. (Join-Path $repoRoot 'scripts/ps-supplemental-lib.ps1')
-$cli = Join-Path $repoRoot 'scripts/ps-supplemental.ps1'
-
-$failCount = 0
-function Assert([bool]$Cond, [string]$Name) {
-    if ($Cond) { Write-Host "  PASS：$Name" }
-    else { Write-Host "  FAIL：$Name" -ForegroundColor Red; $script:failCount++ }
-}
-function Write-Utf8([string]$Path, [string[]]$Lines, [bool]$Bom, [string]$Eol = "`n") {
-    $dir = Split-Path $Path -Parent
-    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    [System.IO.File]::WriteAllText($Path, ($Lines -join $Eol), (New-Object System.Text.UTF8Encoding($Bom)))
-}
-function Invoke-Cli([string[]]$CliArgs) {
-    # 同行程呼叫（& script）：exit 碼進 $LASTEXITCODE、Write-Host 走 information stream 以 [string] 取字；
-    # 不開子行程＝不受公司機執行原則（ExecutionPolicy）與主控台編碼影響，也不會被 Out-String 折行
-    # 陣列 splat 對 script 一律走位置繫結、不辨識 '-Name'（與外部程序命令列剖析不同）；
-    # 先轉成雜湊表再 splat，讓 -New 等 switch／具名參數正確繫結到 CLI 的 param()
-    $h = @{}
-    $i = 0
-    while ($i -lt $CliArgs.Count) {
-        $name = $CliArgs[$i] -replace '^-', ''
-        if (($i + 1) -lt $CliArgs.Count -and $CliArgs[$i + 1] -notmatch '^-') {
-            $h[$name] = $CliArgs[$i + 1]; $i += 2
-        } else {
-            $h[$name] = $true; $i += 1
-        }
-    }
-    $out = @(& $cli @h -Root $root *>&1 | ForEach-Object { [string]$_ })
-    $last = ''
-    if ($out.Count -gt 0) { $last = [string]$out[$out.Count - 1] }
-    return @{ Exit = $LASTEXITCODE; Lines = @($out); Last = $last }
-}
-function Test-CodeShape([string]$Line, [string]$Family) {
-    $code = $Line -replace '^結論代號：', ''
-    if ($code -notmatch ('^' + $Family + '1-\d-\d\d(-\d+)?$')) { return $false }
-    if ($code -match '/|\.md|TW_|[\u4e00-\u9fff]') { return $false }
-    return $true
-}
-
-$root = Join-Path ([System.IO.Path]::GetTempPath()) ('supp-test-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $root -Force | Out-Null
-$research = Join-Path $root 'docs/ps-research'
-$domA = Join-Path $research '職缺測試'
-$wiki = Join-Path $research 'wiki'
-$logs = Join-Path $root 'auto-loop-logs'
-New-Item -ItemType Directory -Path (Join-Path $root '.opencode/peoplesoft/spec') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $repoRoot '.opencode/peoplesoft/spec/capabilities.json') -Destination (Join-Path $root '.opencode/peoplesoft/spec/capabilities.json')
-$uuid1 = '3f2a9c1e-7b4d-4e8a-9c6f-1d2e3a4b5c6d'
-$uuid2 = '9b2f5c1e-4a3d-4f0a-8f21-7e5d0c9a1b2c'
-$cap = Get-PsSuppCapabilities -Root $root
-
-function New-NnLines([string]$Num, [string]$Obj, [string[]]$Related, [bool]$DropPermission = $false) {
-    $l = @(
-        "# $Num 功能$Obj（[[$Obj]]）",
-        '',
-        '> 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE',
-        '> Origin：CUSTOM_PREFIX　搜尋政策：CUSTOM_FIRST　Delivered fallback：未使用',
-        '',
-        '## 相關物件',
-        '',
-        '| 物件 | 角色 |',
-        '|---|---|',
-        "| [[$Obj]] | 主 Component |"
-    )
-    $l += $Related
-    $l += @(
-        '',
-        '## 功能定位',
-        '',
-        '誰在用、業務目的。',
-        '',
-        '### 導覽入口',
-        '',
-        'Portal Registry 導覽入口：未確認（navigation metadata 尚未查證）',
-        '',
-        '### Technical Menu',
-        '',
-        'MENU_A / USE / ITEM_A',
-        '',
-        '## 畫面與欄位',
-        '',
-        '| 欄位 | 顯示文字 | 類型 | 選項（label ↔ 儲存值） | 生命狀態 |',
-        '|---|---|---|---|---|',
-        '| DEMO_STATUS | 狀態 | Translate | 免役=E / 服役中=S | E：使用中（資料 3 筆） |',
-        '',
-        '## 行為邏輯',
-        '',
-        '- **CONFIRMED**：選 E 時開放原因並帶入日期（`a.pcode:12`）',
-        '- **INFERRED**：核准後回寫',
-        '',
-        '## 資料流',
-        '',
-        '| 表 | 操作 | 來源 | 信心 |',
-        '|---|---|---|---|',
-        '| PS_DEMO_TBL | UPDATE | 存檔 PeopleCode | CONFIRMED |',
-        '',
-        '## 執行方式',
-        '',
-        '線上操作。'
-    )
-    if (-not $DropPermission) { $l += @('', '## 權限', '', '<!-- 無 -->') }
-    $l += @(
-        '',
-        '## 未解事項（gaps）',
-        '',
-        '- 缺一',
-        '',
-        '## Evidence 附錄',
-        '',
-        '| # | 位置 | 說明 | 機器參照 |',
-        '|---|---|---|---|',
-        "| 1 | ``a.pcode:12-24`` | E 分支 | ChunkId ``$uuid1`` |",
-        '| 2 | SQL：`SELECT X FROM PSXLATITEM` | 選項 | keyRows：E=免役 |',
-        '| 3 | `PS_PRCSRECUR` | 排程 | 待人工SQL |'
-    )
-    return , $l
-}
-function Write-Fixture {
-    Write-Utf8 (Join-Path $domA '01-TW_DEMO_A.md') (New-NnLines '01' 'TW_DEMO_A' @('| [[PS_DEMO_TBL]] | 讀取來源 |', '| [[TWSQR_DEMO]] | 排程執行 |') $true) $false
-    Write-Utf8 (Join-Path $domA '02-TWSQR_DEMO.md') (New-NnLines '02' 'TWSQR_DEMO' @('| `PS_DEMO_STG` | 寫入目標 |')) $false
-    Write-Utf8 (Join-Path $domA '00-overview.md') @('# 職缺測試 業務總覽', '', '## 功能地圖', '', '| # | 功能 | Component / 物件 | 類型 | Origin | 一句話說明 |', '|---|---|---|---|---|---|', '| 01 | 功能甲 | [[TW_DEMO_A]] | 線上頁面 | CUSTOM_PREFIX | 說明 |', '| 02 | 批次乙 | [[TWSQR_DEMO]] | 批次 | CUSTOM_PREFIX | 說明 |') $false
-    Write-Utf8 (Join-Path $domA 'checklist.md') @('# 職缺測試 調查進度', '', '稽核輪次：2', '', '## 調查進度', '', '- [x] 01 功能甲 `TW_DEMO_A` → 01-TW_DEMO_A.md', '- [x] 02 批次乙 `TWSQR_DEMO` → 02-TWSQR_DEMO.md', '- [ ] 03 功能丙 `TW_DEMO_C` → 03-TW_DEMO_C.md', '', '## Gaps 彙整（隨深查更新）', '', '- x') $true "`r`n"
-    Write-Utf8 (Join-Path $domA 'checklist-archive-r1.md') @('# 歸檔 r1', '', '- [x] D1-03 新發現 TW_DEMO_OLD：任務C（稽核）') $false
-    Write-Utf8 (Join-Path $wiki 'TW_DEMO_A.md') @('---', 'aliases: [功能甲]', 'type: COMPONENT', 'origin: CUSTOM_PREFIX', 'status: draft', 'confidence: 0.6', 'last_verified: 2026-09-01', "sources: [$uuid1]", 'reviewed: false', '---', '# TW_DEMO_A', '', '## Observations', '', '- [結構] 事實一', '', '## Relations', '', '- part_of [[職缺測試]]') $false
-    Write-Utf8 (Join-Path $wiki 'PS_DEMO_TBL.md') @('---', 'aliases: [示範表]', 'type: RECORD', 'origin: CUSTOM_PREFIX', 'status: verified', 'confidence: 0.9', 'last_verified: 2026-09-10', "sources: [$uuid2]", 'reviewed: true', '---', '# PS_DEMO_TBL', '', '## Observations', '', '- [結構] x', '', '## Invalidated（作廢紀錄——只追加，不刪除）', '', '- 舊事實') $false
-    Write-Utf8 (Join-Path $wiki 'TWSQR_DEMO.md') @('---', 'aliases: []', 'type: SQR', 'origin: CUSTOM_PREFIX', 'status: draft', 'confidence: 0.5', 'last_verified: 2026-09-01', 'sources: []', 'reviewed: false', '---', '# TWSQR_DEMO', '', '## Observations', '', '- [排程] 每日') $false
-    Write-Utf8 (Join-Path $wiki 'index.md') @('# Entity Wiki 索引', '', '- [[TW_DEMO_A]]') $false
-}
-Write-Fixture
-$null = Publish-PsKnowledgeIndex -Root $root -LogRoot $logs
-$index = Read-PsKnowledgeIndex -Root $root
-
-# ── 情境 1：need 驗證與正規化、workKey 確定性 ─────────────────────
-Write-Host "情境 1：need 驗證負例、正規化、workKey／requestId 確定性"
-$bad = ConvertTo-PsSuppNeed -Target 'WIDGET:tw x' -FactKind 'NOPE' -Properties '' -Context 'foo=1;operation=BOGUS' -EvidencePolicy 'X' -Freshness 'Y'
-$vb = Test-PsSuppNeed -Need $bad -Capabilities $cap
-Assert ((-not $vb.Ok) -and $vb.Errors.Count -eq 8) "負例：型別／物件名文法／factKind／properties 空／未知 context 鍵／context 值域／evidencePolicy／freshness 各一條（共 8）"
-$bad2 = ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_DEMO_A' -FactKind 'DATA.FILE_INPUT' -Properties 'present,nope' -EvidencePolicy 'AUDITED'
-$vb2 = Test-PsSuppNeed -Need $bad2 -Capabilities $cap
-Assert ((-not $vb2.Ok) -and $vb2.Errors.Count -eq 1 -and $vb2.Errors[0] -match 'nope') "負例：property 不在該 factKind 目錄"
-$bad3 = [ordered]@{ target = [ordered]@{ type = 'COMPONENT'; name = 'TW_DEMO_A' }; context = [ordered]@{}; factKind = 'DATA.FLOW'; properties = @('reads'); evidencePolicy = 'ANY'; freshness = 'CURRENT'; extra = 1 }
-Assert (-not (Test-PsSuppNeed -Need $bad3 -Capabilities $cap).Ok) "負例：未知欄位拒收"
-$n1 = ConvertTo-PsSuppNeed -Target 'component:tw_demo_a' -FactKind 'DATA.FILE_INPUT' -Properties 'layout,present,present' -Context 'operation=import' -EvidencePolicy 'audited' -Freshness 'current'
-$v1 = Test-PsSuppNeed -Need $n1 -Capabilities $cap
-Assert ($v1.Ok -and $v1.Need.target.name -eq 'TW_DEMO_A' -and (@($v1.Need.properties) -join ',') -eq 'layout,present' -and $v1.Need.context['operation'] -eq 'IMPORT') "正規化：大寫、properties 去重 Ordinal 排序、context 值大寫"
-$n2 = ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_DEMO_A' -FactKind 'DATA.FILE_INPUT' -Properties 'present,layout' -Context 'operation=IMPORT' -EvidencePolicy 'AUDITED' -Freshness 'CURRENT'
-$wk1 = Get-PsSuppWorkKey -Need $v1.Need
-$wk2 = Get-PsSuppWorkKey -Need (Test-PsSuppNeed -Need $n2 -Capabilities $cap).Need
-Assert ($wk1 -ceq $wk2 -and $wk1 -match '^[0-9A-F]{64}$') "workKey：同 need 不同寫法 → 同一 SHA256"
-$rid1 = Get-PsSuppRequestId -WorkKey $wk1 -Generation 1
-Assert ($rid1 -match $PsSuppRequestIdRx -and $rid1 -eq ('S-' + $wk1.Substring(0, 24).ToLowerInvariant() + '-g1')) "requestId 文法 ^S-[0-9a-f]{24}-g\d+$"
-$vc = Test-PsSuppConsumer -Consumer @{ kind = 'SPEC'; jobId = 'demo-job'; requirementRef = '' }
-Assert ((-not $vc.Ok) -and $vc.Errors[0] -match 'SPEC') "consumer：SPEC 缺 requirementRef → 拒"
-Assert ((Test-PsSuppConsumer -Consumer @{ kind = 'spec'; jobId = 'Bad_Job'; requirementRef = 'R17' }).Errors.Count -eq 1) "consumer：jobId 大寫底線不符文法"
-Assert ((Test-PsSuppConsumer -Consumer $null).Ok -and (Test-PsSuppConsumer -Consumer $null).Consumer.kind -eq 'MANUAL') "consumer：省略＝MANUAL"
-
-# ── 情境 2：提交、去重、並行、路由 ────────────────────────────────
-Write-Host "情境 2：Submit（CREATED／PENDING／RACE）、路由（INDEX／HINT／BAD_HINT／NONE／MULTI）"
-$s1 = Submit-PsSupplementalRequest -Root $root -Need $n1 -Consumer @{ kind = 'QA' }
-Assert ($s1.state -eq 'CREATED' -and $s1.created -and $s1.domain -eq '職缺測試' -and $s1.reason -eq 'INDEX' -and (Test-Path -LiteralPath $s1.path)) "第一次提交 → CREATED、路由 INDEX（主物件所在領域）"
-$reqObj = Read-PsSuppJsonFile -LiteralPath $s1.path
-Assert ($reqObj.schemaVersion -eq 1 -and $reqObj.requestId -eq $rid1 -and $reqObj.generation -eq 1 -and $reqObj.consumer.kind -eq 'QA' -and $reqObj.need.target.name -eq 'TW_DEMO_A' -and $reqObj.workKey -ceq $wk1) "request 檔：schemaVersion／requestId／generation／consumer／need／workKey"
-$rawReq = Read-PsKnText -LiteralPath $s1.path
-Assert ($rawReq -notmatch '\r' -and $rawReq.EndsWith("`n") -and $rawReq -match '"createdAt": "\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"') "request 檔：LF、UTC 時間戳"
-$s2 = Submit-PsSupplementalRequest -Root $root -Need $n2 -Consumer @{ kind = 'MANUAL' }
-Assert ($s2.state -eq 'PENDING' -and -not $s2.created -and $s2.requestId -eq $rid1 -and $s2.reason -eq 'EXISTS') "同 need 再提交 → PENDING、同 requestId、不建檔"
-Assert ($s2.state -eq 'PENDING' -and (Submit-PsSupplementalRequest -Root $root -Need $n2 -Resubmit).state -eq 'PENDING') "-Resubmit 但既有尚未終局 → 仍 PENDING（不建新世代）"
-# 並行：4 個行程對同一 need 提交（不同 factKind 情境避免與上面撞）
-$jobs = @()
-for ($i = 0; $i -lt 4; $i++) {
-    $jobs += Start-Job -ScriptBlock {
-        param($RepoRoot, $Root)
-        . (Join-Path $RepoRoot 'scripts/ps-knowledge-lib.ps1')
-        . (Join-Path $RepoRoot 'scripts/ps-supplemental-lib.ps1')
-        $n = ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_DEMO_A' -FactKind 'SECURITY.ACCESS' -Properties 'roles' -EvidencePolicy 'ANY'
-        $r = Submit-PsSupplementalRequest -Root $Root -Need $n
-        return ($r.requestId + '|' + $r.state + '|' + $r.reason)
-    } -ArgumentList $repoRoot, $root
-}
-$jr = @($jobs | Wait-Job -Timeout 120 | Receive-Job)
-$jobs | Remove-Job -Force -ErrorAction SilentlyContinue
-$ids = @($jr | ForEach-Object { ([string]$_ -split '\|')[0] } | Sort-Object -Unique)
-$createdN = @($jr | Where-Object { ([string]$_ -split '\|')[1] -eq 'CREATED' }).Count
-$reqFiles = @(Get-ChildItem -LiteralPath (Join-Path $research 'supplemental/requests') -Filter '*.json')
-Assert ($jr.Count -eq 4 -and $ids.Count -eq 1 -and $createdN -eq 1 -and $reqFiles.Count -eq 2) "並行 4 次同 need 提交：只一個 CREATED、其餘 PENDING、requestId 相同、檔案只多一個"
-$sec = Submit-PsSupplementalRequest -Root $root -Need (ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_DEMO_A' -FactKind 'SECURITY.ACCESS' -Properties 'roles' -EvidencePolicy 'ANY')
-$ridSec = $sec.requestId
-# 路由
-$r1 = Resolve-PsSuppDomain -Root $root -TargetName 'TW_DEMO_A' -DomainHint 'nope'
-Assert ($r1.Domain -eq '' -and $r1.Reason -eq 'BAD_HINT') "路由：-DomainHint 的領域沒有 00-overview → BAD_HINT"
-$r2 = Resolve-PsSuppDomain -Root $root -TargetName 'TW_NOWHERE'
-Assert ($r2.Domain -eq '' -and $r2.Reason -eq 'NONE') "路由：任何領域都沒 NN → NONE"
-$s3 = Submit-PsSupplementalRequest -Root $root -Need (ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_NOWHERE' -FactKind 'DATA.FLOW' -Properties 'reads')
-Assert ($s3.state -eq 'ROUTING_REQUIRED' -and $s3.requestId -eq '' -and $reqFiles.Count -eq @(Get-ChildItem -LiteralPath (Join-Path $research 'supplemental/requests') -Filter '*.json').Count) "零候選且無 hint → ROUTING_REQUIRED、不建檔"
-$s4 = Submit-PsSupplementalRequest -Root $root -Need (ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_NOWHERE' -FactKind 'DATA.FLOW' -Properties 'reads') -DomainHint '職缺測試'
-Assert ($s4.state -eq 'CREATED' -and $s4.domain -eq '職缺測試' -and $s4.reason -eq 'HINT') "零候選但有 hint → CREATED（WAITING_RESEARCH 候選）"
-$ridNowhere = $s4.requestId
-Write-Utf8 (Join-Path (Join-Path $research 'aa-b') '01-TW_DEMO_A.md') (New-NnLines '01' 'TW_DEMO_A' @()) $false
-Write-Utf8 (Join-Path (Join-Path $research 'aa-b') '00-overview.md') @('# aa-b 總覽', '', '## 功能地圖', '', '| # | 功能 | Component / 物件 | 類型 | Origin | 一句話說明 |', '|---|---|---|---|---|---|') $false
-$null = Publish-PsKnowledgeIndex -Root $root -LogRoot $logs
-$r3 = Resolve-PsSuppDomain -Root $root -TargetName 'TW_DEMO_A'
-Assert ($r3.Reason -eq 'MULTI' -and $r3.Domain -eq 'aa-b' -and $r3.Candidates.Count -eq 2) "路由：兩領域都有主物件 NN → MULTI、取 Ordinal 最小"
-Remove-Item -LiteralPath (Join-Path $research 'aa-b') -Recurse -Force
-Remove-Item -LiteralPath (Join-Path $research 'knowledge') -Recurse -Force
-$r4 = Resolve-PsSuppDomain -Root $root -TargetName 'TW_DEMO_A'
-Assert ($r4.Reason -eq 'SCAN' -and $r4.Domain -eq '職缺測試') "路由：索引不存在 → 目錄掃描退路"
-$null = Publish-PsKnowledgeIndex -Root $root -LogRoot $logs
-$index = Read-PsKnowledgeIndex -Root $root
-
-# ── 情境 3：工單 ──────────────────────────────────────────────────
-Write-Host "情境 3：工單（節位／callee 一跳／無消費端識別／create-only）"
-$req1 = Get-PsSuppRequest -Root $root -RequestId $rid1
-$mf = New-PsSuppManifest -Root $root -Request $req1 -Domain '職缺測試' -DomainDir $domA -AttemptNo 1 -Index $index -Capabilities $cap
-$mfText = Read-PsKnText -LiteralPath $mf.ManifestPath
-$facts1 = Get-PsKnNnFacts -LiteralPath (Join-Path $domA '01-TW_DEMO_A.md') -Domain '職缺測試'
-$bh = Get-PsKnSectionRange -Sections $facts1.sections -Name '行為邏輯'
-Assert ($mf.Created -and (Test-Path -LiteralPath $mf.CurrentPath) -and ((Read-PsKnText -LiteralPath $mf.CurrentPath) -ceq $mfText)) "工單檔＋current.manifest.md 內容相同"
-Assert ($mfText -match ('\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 行為邏輯 \| ' + $bh.start + ' \| ' + ([int]$bh.end - [int]$bh.start + 1) + ' \|')) "工單：目標 NN 的節 offset／limit 與解析一致"
-Assert ($mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 資料流 \|' -and $mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| 執行方式 \|' -and $mfText -match '\| docs/ps-research/職缺測試/01-TW_DEMO_A\.md \| Evidence 附錄 \|' -and $mfText -notmatch '\| Evidence附錄 \|') "工單：DATA.FILE_INPUT 的三節＋Evidence 附錄都列（節名用實際標題名，worker 才對得上）"
-Assert ($mfText -match '02-TWSQR_DEMO\.md \| 執行方式（callee SQR，角色 排程執行） \|' -and $mf.CalleeFiles.Count -eq 1) "工單：follow 一跳 callee（角色排程、索引型別 SQR）的執行方式／資料流節"
-Assert ($mfText -notmatch '\[\[' -and $mfText -notmatch 'consumer' -and $mfText -notmatch 'requirementRef' -and $mfText -notmatch 'jobId' -and $mfText -match 'operation=IMPORT' -and $mfText -match '要補的屬性：layout、present') "工單：不含 [[／consumer／requirementRef／jobId；含情境與屬性"
-Assert ($mfText -match ('唯一可寫：docs/ps-research/職缺測試/supplemental-parts/' + [regex]::Escape($rid1) + '\.a1\.md')) "工單：唯一可寫的收據路徑"
-$mfDup = New-PsSuppManifest -Root $root -Request $req1 -Domain '職缺測試' -DomainDir $domA -AttemptNo 1 -Index $index -Capabilities $cap
-Assert (-not $mfDup.Created) "工單：同 attempt 再建 → create-only 拒絕"
-$reqSec = Get-PsSuppRequest -Root $root -RequestId $ridSec
-$mfSec = New-PsSuppManifest -Root $root -Request $reqSec -Domain '職缺測試' -DomainDir $domA -AttemptNo 1 -Index $index -Capabilities $cap
-Assert ((Read-PsKnText -LiteralPath $mfSec.ManifestPath) -match '\| 權限 \| @缺 \| 0 \|' -and $mfSec.CalleeFiles.Count -eq 0) "工單：目標缺「權限」節寫 @缺；SECURITY.ACCESS 不 follow"
-
-# ── 情境 4：收據驗收負例 ──────────────────────────────────────────
-Write-Host "情境 4：收據驗收（缺表／處置／證據#／[[／洩漏／識別字樣／分格／CONFIRMED 無證據／行數／圍欄）"
-$partsDir = Join-Path $domA 'supplemental-parts'
-function New-ReceiptLines([string]$Disp, [string[]]$Facts, [string[]]$Evidence) {
-    $l = @('## 處置', '| 處置 | 查法收據 |', '|---|---|', "| $Disp | ps-peoplecode-flow 搜 3 chunk |", '', '## 追加事實', '| 節 | 信心 | 敘述 | 證據# |', '|---|---|---|---|')
-    $l += $Facts
-    $l += @('', '## 追加證據', '| 位置 | 說明 | 機器參照 |', '|---|---|---|')
-    $l += $Evidence
-    return , $l
-}
-$ev2 = @("| ``a.pcode:40-58`` | File 讀取 | ChunkId ``$uuid2`` |", '| `sqr/x.sqr:1` | INSERT | SELECT 1 FROM DUAL |')
-$rc = Join-Path $partsDir 'rc.md'
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | 匯入時逐列讀取 CSV | 1 |') $ev2) $false
-$ok = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap
-Assert ($ok.Ok -and $ok.Disposition -eq 'RESEARCHED' -and $ok.Facts.Count -eq 1 -and $ok.Evidence.Count -eq 2 -and $ok.Facts[0].EvidenceRefs[0] -eq 1) "合格收據：三表齊、處置、事實、證據"
-Write-Utf8 $rc @('## 處置', '| 處置 | 查法收據 |', '|---|---|', '| RESEARCHED | x |', '', '## 追加證據', '| 位置 | 說明 | 機器參照 |', '|---|---|---|') $false
-$t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap
-Assert ((-not $t.Ok) -and ($t.Errors -join ';') -match '缺章節「## 追加事實」') "負例：缺追加事實表"
-Write-Utf8 $rc (New-ReceiptLines 'DONE' @() @()) $false
-Assert (($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap) -and (-not $t.Ok) -and ($t.Errors -join ';') -match '處置不在值域') "負例：處置不在值域"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x | 3 |') $ev2) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match '證據# 3 超出') "負例：證據# 越界"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | 讀 [[PS_X]] | 1 |') $ev2) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match '\[\[') "負例：含 [[ ]]"
-Write-Utf8 $rc ((New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x | 1 |') $ev2) + @('', '{"agent":"x","findings":[]}')) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match '洩漏') "負例：模型契約 JSON 洩漏"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | 依 requirementRef R17 | 1 |') $ev2) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'requirementRef') "負例：含消費端識別字樣"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 資料流 | CONFIRMED | PS_X｜INSERT | 1 |') $ev2) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match '分成 3 格（得 2）') "負例：表格節分格數不符"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x | 無 |') $ev2) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'CONFIRMED 必須有證據#') "負例：CONFIRMED 無證據#"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | MAYBE | x | 1 |', '| 摘要 | CONFIRMED | x | 1 |') $ev2) $false
-$t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap
-Assert ((-not $t.Ok) -and ($t.Errors -join ';') -match '信心「MAYBE」不在三值' -and ($t.Errors -join ';') -match '節名「摘要」不在能力目錄的 NN 節') "負例：信心值域、節名不在能力目錄的 NN 節"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @() $ev2) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'RESEARCHED 但追加事實為空') "負例：RESEARCHED 無事實"
-Write-Utf8 $rc (New-ReceiptLines 'RESEARCHED' @('| 行為邏輯 | CONFIRMED | x | 1 |') @('| a | b | ChunkId 3f2a9c1e |')) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match '機器參照須為') "負例：ChunkId 縮寫不是合法機器參照"
-$long = New-ReceiptLines 'NO_EVIDENCE' @() @()
-while ($long.Count -le 151) { $long += '' }
-Write-Utf8 $rc ($long + @('```')) $false
-$t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap
-Assert ((-not $t.Ok) -and ($t.Errors -join ';') -match '超過 150 行' -and ($t.Errors -join ';') -match '圍欄') "負例：>150 行、三反引號圍欄"
-Write-Utf8 $rc (New-ReceiptLines 'NOT_IN_DOMAIN' @('| 行為邏輯 | CONFIRMED | x | 1 |') $ev2) $false
-Assert ((($t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap).Errors -join ';') -match 'NOT_IN_DOMAIN 不得追加事實') "負例：NOT_IN_DOMAIN 帶事實"
-Write-Utf8 $rc (New-ReceiptLines 'NO_EVIDENCE' @('| 未解事項 | INFERRED | 查無檔案讀取邏輯 | 無 |') @('| `PS_X` | 排程 | 待人工SQL |')) $false
-$t = Test-PsSuppReceipt -LiteralPath $rc -Capabilities $cap
-Assert ($t.Ok -and $t.Disposition -eq 'NO_EVIDENCE') "NO_EVIDENCE：可帶未解事項與待人工SQL 證據列"
-Remove-Item -LiteralPath $rc -Force
-
-# ── 情境 5：確定性合併 ────────────────────────────────────────────
-Write-Host "情境 5：確定性合併（條列／表格／文字節、附錄編號承接、缺節插入、CRLF＋BOM、冪等、還原）"
-$factLines = @(
-    '| 行為邏輯 | CONFIRMED | 匯入時逐列讀取 CSV | 1 |',
-    '| 資料流 | CONFIRMED | PS_DEMO_STG｜INSERT｜SQR TWSQR_DEMO | 2 |',
-    '| 畫面與欄位 | INFERRED | FILE_NAME｜檔名｜Edit｜｜使用中 | 無 |',
-    '| 執行方式 | DYNAMIC_RUNTIME | 批次由 Run Control 觸發 | 無 |',
-    '| 未解事項 | INFERRED | 檔案編碼未指定 | 無 |',
-    '| 權限 | CONFIRMED | PL_DEMO 授權 | 1 |',
-    '| 相關物件 | CONFIRMED | PS_DEMO_STG｜寫入目標 | 2 |'
-)
-$rcGood = Join-Path $partsDir ($rid1 + '.a1.md')
-Write-Utf8 $rcGood (New-ReceiptLines 'RESEARCHED' $factLines $ev2) $false
-$recv = Test-PsSuppReceipt -LiteralPath $rcGood -Capabilities $cap
-Assert ($recv.Ok -and $recv.Facts.Count -eq 7) "合併用收據合格（7 條事實、2 列證據）"
-$nnPath = Join-Path $domA '01-TW_DEMO_A.md'
-$copyLf = Join-Path $root 'copy-lf.md'
-Copy-Item -LiteralPath $nnPath -Destination $copyLf
-$mg = Merge-PsSuppReceipt -NnPath $nnPath -Receipt $recv -RequestId $rid1
-$merged = Read-PsKnText -LiteralPath $nnPath
-$mLines = Get-PsKnLines -Text $merged
-Assert ($mg.Ok -and $mg.Changed -and $mg.HashBefore -cne $mg.HashAfter -and $mg.EvidenceRows.Count -eq 2 -and $mg.EvidenceRows[0] -eq 4 -and $mg.EvidenceRows[1] -eq 5) "合併：hash 改變、附錄新列編號承接 4、5"
-$iB = [array]::IndexOf($mLines, '- **INFERRED**：核准後回寫')
-Assert ($iB -ge 0 -and $mLines[$iB + 1] -eq '- **CONFIRMED**：匯入時逐列讀取 CSV（附錄 #4）' -and $mLines[$iB + 2] -eq '') "條列節：追加在最後一條之後、附錄參照換成新編號"
-$iD = [array]::IndexOf($mLines, '| PS_DEMO_TBL | UPDATE | 存檔 PeopleCode | CONFIRMED |')
-Assert ($iD -ge 0 -and $mLines[$iD + 1] -eq '| PS_DEMO_STG | INSERT | SQR TWSQR_DEMO（附錄 #5） | CONFIRMED |') "表格節（資料流）：表末追加列、信心欄補上"
-$iF = [array]::IndexOf($mLines, '| DEMO_STATUS | 狀態 | Translate | 免役=E / 服役中=S | E：使用中（資料 3 筆） |')
-Assert ($iF -ge 0 -and $mLines[$iF + 1] -eq '| FILE_NAME | 檔名 | Edit |  | 使用中 |') "表格節（畫面與欄位）：五格（含空格）"
-$iR = [array]::IndexOf($mLines, '| [[TWSQR_DEMO]] | 排程執行 |')
-Assert ($iR -ge 0 -and $mLines[$iR + 1] -eq '| PS_DEMO_STG | 寫入目標（附錄 #5） |') "表格節（相關物件）：兩格、無 [[（不進 WIKI_MISSING）"
-$iX = [array]::IndexOf($mLines, '線上操作。')
-Assert ($iX -ge 0 -and $mLines[$iX + 1] -eq '' -and $mLines[$iX + 2] -eq '批次由 Run Control 觸發（DYNAMIC_RUNTIME）') "文字節（執行方式）：節末追加段落"
-$iG = [array]::IndexOf($mLines, '- 缺一')
-Assert ($iG -ge 0 -and $mLines[$iG + 1] -eq '- 檔案編碼未指定（INFERRED；補研究）') "條列節（未解事項）：追加並標補研究"
-$iP = [array]::IndexOf($mLines, '## 權限')
-$iGap = [array]::IndexOf($mLines, '## 未解事項（gaps）')
-Assert ($iP -gt 0 -and $iP -lt $iGap -and $mLines[$iP - 1] -eq '' -and $mLines[$iP + 1] -eq '' -and $mLines[$iP + 2] -eq 'PL_DEMO 授權（CONFIRMED；附錄 #4）' -and $mLines[$iP + 3] -eq '' -and $mLines[$iP + 4] -eq '## 未解事項（gaps）') "缺節：在「## 未解事項」前插入「## 權限」＋段落，前後各留一個空行"
-$iE = [array]::IndexOf($mLines, '| 3 | `PS_PRCSRECUR` | 排程 | 待人工SQL |')
-Assert ($iE -ge 0 -and $mLines[$iE + 1] -eq "| 4 | ``a.pcode:40-58`` | File 讀取 | ChunkId ``$uuid2`` |" -and $mLines[$iE + 2] -eq '| 5 | `sqr/x.sqr:1` | INSERT | SELECT 1 FROM DUAL |') "附錄：新列緊接最後一列、編號 4、5"
-$fAfter = Get-PsKnNnFacts -LiteralPath $nnPath -Domain '職缺測試'
-Assert ($fAfter.missingSections.Count -eq 0 -and $fAfter.duplicateSections -eq 0 -and -not $fAfter.permissionHollow -and $fAfter.evidence.Count -eq 5 -and $fAfter.dataFlow.Count -eq 2 -and $fAfter.fieldRows -eq 2) "合併後 NN 仍可解析：九節齊、無重複、權限非空洞、附錄 5 列"
-# 冪等（同收據對同原檔再合併一次 → 內容相同）
-$mg2 = Merge-PsSuppReceipt -NnPath $copyLf -Receipt $recv -RequestId $rid1
-Assert ($mg2.HashAfter -ceq $mg.HashAfter) "確定性：同收據對同原檔再合併 → 相同 hash"
-# CRLF＋BOM 保留
-$copyCrlf = Join-Path $root 'copy-crlf.md'
-[System.IO.File]::WriteAllText($copyCrlf, ((Get-PsKnLines -Text (Read-PsKnText -LiteralPath $copyLf)) -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
-$origCrlf = Read-PsKnText -LiteralPath $copyCrlf
-Write-Utf8 $copyCrlf (New-NnLines '01' 'TW_DEMO_A' @('| [[PS_DEMO_TBL]] | 讀取來源 |', '| [[TWSQR_DEMO]] | 排程執行 |') $true) $true "`r`n"
-$mg3 = Merge-PsSuppReceipt -NnPath $copyCrlf -Receipt $recv -RequestId $rid1
-$bytes3 = [System.IO.File]::ReadAllBytes($copyCrlf)
-$text3 = [System.IO.File]::ReadAllText($copyCrlf)
-Assert ($bytes3[0] -eq 0xEF -and $bytes3[1] -eq 0xBB -and $text3 -match "`r`n" -and $text3 -notmatch "(?<!`r)`n" -and $mg3.HashAfter -ceq $mg.HashAfter) "CRLF＋BOM 原檔：合併後仍 CRLF＋BOM，正規化 hash 與 LF 版相同"
-# 合併痕跡在不在（外環判斷「已合併但 result 沒發布」的那次合併有沒有被回捲，用它取代 hash 相等）
-Assert ((Test-PsSuppMergePresent -NnPath $nnPath -Receipt $recv -Capabilities $cap) -and (Test-PsSuppMergePresent -NnPath $nnPath -ReceiptPath $rcGood -Capabilities $cap)) "合併痕跡：合併後機器參照與事實敘述都在 → present（收據物件／收據路徑兩種呼叫法皆可）"
-$nnTouched = Read-PsKnText -LiteralPath $nnPath
-Assert (Test-PsSuppMergePresent -NnText ($nnTouched + "`n- **INFERRED**：同 run 下一張 request 又追加的一條`n") -Receipt $recv -Capabilities $cap) "合併痕跡：檔案之後又被別張 request 合併過（hash 已不同）→ 內容仍在，present"
-Assert (-not (Test-PsSuppMergePresent -NnPath $nnPath -ReceiptPath (Join-Path $root 'no-such-receipt.md') -Capabilities $cap)) "合併痕跡：收據檔不在＝無法證明 → absent"
-# 還原
-Assert ((Restore-PsSuppBytes -LiteralPath $nnPath -Bytes $mg.BytesBefore) -and ((Get-PsKnFileHash -LiteralPath $nnPath) -ceq $mg.HashBefore)) "還原：BytesBefore 寫回 → hash 回到合併前"
-Assert (-not (Test-PsSuppMergePresent -NnPath $nnPath -Receipt $recv -Capabilities $cap)) "合併痕跡：合併被還原（回捲）→ absent，外環據此當成沒合併過、照常重派"
-$mgAgain = Merge-PsSuppReceipt -NnPath $nnPath -Receipt $recv -RequestId $rid1
-Assert ($mgAgain.HashAfter -ceq $mg.HashAfter) "還原後再合併 → 同一結果（合併只依原檔與收據）"
-$empty = @{ Facts = @(); Evidence = @() }
-Assert ((Merge-PsSuppReceipt -NnPath $nnPath -Receipt $empty -RequestId $rid1).Reason -eq 'NOTHING_TO_MERGE') "空收據 → NOTHING_TO_MERGE、不改檔"
-# 附錄不存在的 NN：在檔尾建節
-$noEv = Join-Path $root 'no-ev.md'
-Write-Utf8 $noEv @('# 09 x（[[TW_DEMO_X]]）', '', '## 行為邏輯', '', '- **CONFIRMED**：a', '', '## 未解事項（gaps）', '', '- b') $false
-$mg4 = Merge-PsSuppReceipt -NnPath $noEv -Receipt $recv -RequestId $rid1
-$t4 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $noEv)
-Assert ($mg4.Ok -and $mg4.EvidenceRows[0] -eq 1 -and ([array]::IndexOf($t4, '## Evidence 附錄') -gt [array]::IndexOf($t4, '## 未解事項（gaps）')) -and (@($t4 | Where-Object { $_ -match '^## ' }).Count -eq 8)) "無附錄／缺多節的 NN：附錄建在檔尾（編號從 1）、五個缺節在未解事項前建立（共 8 個 ## 節）"
-Assert ((Test-PsSuppAlreadyCovered -TargetFacts $fAfter -FactKind 'DATA.FILE_INPUT' -Capabilities $cap) -and -not (Test-PsSuppAlreadyCovered -TargetFacts $facts1 -FactKind 'SECURITY.ACCESS' -Capabilities $cap)) "ALREADY_COVERED 判定：相關節非空洞才成立（原檔無權限節 → 不成立）"
-
-# 畫面元件（表格節、六格）：缺節時建在「畫面與欄位」之後；已有節時表末追加；ALREADY_COVERED 看畫面元件列數
-$ctlNn = Join-Path $root 'ctl-nn.md'
-Write-Utf8 $ctlNn (New-NnLines '07' 'TW_DEMO_C' @() $false) $false
-$rcCtl = Join-Path $partsDir ($rid1 + '.ctl.md')
-Write-Utf8 $rcCtl (New-ReceiptLines 'RESEARCHED' @('| 畫面元件 | CONFIRMED | TW_DEMO_PG｜5｜TW_DEMO_DEPTVW.DESCR｜Edit Box｜DISPLAY_ONLY RELATED_TO=4｜ | 2 |') $ev2) $false
-$recvCtl = Test-PsSuppReceipt -LiteralPath $rcCtl -Capabilities $cap
-Assert ($recvCtl.Ok -and $recvCtl.Facts.Count -eq 1 -and $recvCtl.Facts[0].Section -eq '畫面元件') "畫面元件事實：六格敘述（末格可空）合格"
-$factsCtl0 = Get-PsKnNnFacts -LiteralPath $ctlNn -Domain '職缺測試'
-Assert (-not (Test-PsSuppAlreadyCovered -TargetFacts $factsCtl0 -FactKind 'UI.CONTROLS' -Capabilities $cap)) "UI.CONTROLS：NN 沒有畫面元件 → 不得 ALREADY_COVERED"
-$mgC = Merge-PsSuppReceipt -NnPath $ctlNn -Receipt $recvCtl -RequestId $rid1
-$cl1 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $ctlNn)
-$iFld = [array]::IndexOf($cl1, '| DEMO_STATUS | 狀態 | Translate | 免役=E / 服役中=S | E：使用中（資料 3 筆） |')
-$iCtl = [array]::IndexOf($cl1, '## 畫面元件')
-$iBeh = [array]::IndexOf($cl1, '## 行為邏輯')
-Assert ($mgC.Ok -and $iFld -gt 0 -and $iCtl -eq ($iFld + 2) -and $cl1[$iCtl + 2] -eq '| 頁面 | # | 欄位 | 元件 | 屬性 | 查值 |' -and $cl1[$iCtl + 4] -eq '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 | （附錄 #5） |' -and $cl1[$iCtl + 5] -eq '' -and $iBeh -eq ($iCtl + 6)) "缺「畫面元件」節：建在畫面與欄位之後、行為邏輯之前，六格，附錄參照接在查值格"
-$mgC2 = Merge-PsSuppReceipt -NnPath $ctlNn -Receipt $recvCtl -RequestId $rid1
-$cl2 = Get-PsKnLines -Text (Read-PsKnText -LiteralPath $ctlNn)
-$iCtl2 = [array]::IndexOf($cl2, '## 畫面元件')
-$factsCtl = Get-PsKnNnFacts -LiteralPath $ctlNn -Domain '職缺測試'
-Assert ($mgC2.Ok -and $cl2[$iCtl2 + 5] -eq '| TW_DEMO_PG | 5 | TW_DEMO_DEPTVW.DESCR | Edit Box | DISPLAY_ONLY RELATED_TO=4 | （附錄 #7） |' -and $factsCtl.controlRows -eq 2 -and $factsCtl.fieldRows -eq 1 -and (Test-PsSuppAlreadyCovered -TargetFacts $factsCtl -FactKind 'UI.CONTROLS' -Capabilities $cap)) "已有「畫面元件」節：表末追加；畫面元件 2 列、畫面與欄位列數不受影響；ALREADY_COVERED 成立"
-Remove-Item -LiteralPath $ctlNn, $rcCtl -Force
-
-# ── 情境 6：attempts、D 列、result、wiki 標記、搬移 ────────────────
-Write-Host "情境 6：attempts 推導、目標無 NN → D 列、result create-only、wiki stale／reviewed、parts 搬移"
-$att = Get-PsSuppAttempts -DomainDir $domA -RequestId $rid1
-Assert ($att.Count -eq 1 -and $att.LastN -eq 1 -and $null -eq $att.LastOutcome) "attempts＝工單檔數（1）；outcome 缺＝crash 語意（LastOutcome null）"
-$null = Write-PsSuppOutcome -DomainDir $domA -RequestId $rid1 -AttemptNo 1 -Outcome @{ timedOut = $false; exitCode = 0; failureKind = 'NONE'; receiptValid = $true; disposition = 'RESEARCHED'; merged = $true }
-$att = Get-PsSuppAttempts -DomainDir $domA -RequestId $rid1
-Assert ($null -ne $att.LastOutcome -and $att.LastOutcome.disposition -eq 'RESEARCHED' -and $att.LastOutcome.attempt -eq 1 -and ([string]$att.LastOutcome.completedAt) -ne '') "outcome 檔：attempt 與 completedAt 自動補"
-$pend = Get-PsSuppPending -Root $root -Domain '職缺測試' -DomainDir $domA
-$pendIds = @($pend | ForEach-Object { $_.RequestId })
-Assert ($pend.Count -eq 3 -and ($pendIds -contains $rid1) -and ($pendIds -contains $ridSec) -and ($pendIds -contains $ridNowhere) -and (@($pend | Where-Object { $_.RequestId -eq $rid1 })[0].Attempts -eq 1)) "pending：三張（含 WAITING_RESEARCH 候選）、attempts 帶出"
-$d1 = Add-PsSuppChecklistDRow -DomainDir $domA -ObjectName 'TW_NOWHERE' -RequestId $ridNowhere
-$clText = Read-PsKnText -LiteralPath (Join-Path $domA 'checklist.md')
-Assert ($d1.Added -and $d1.Row -eq ('- [ ] D2-01 新發現 TW_NOWHERE：補研究 ' + $ridNowhere + '（稽核）') -and $clText -match "`r`n" -and ([System.IO.File]::ReadAllBytes((Join-Path $domA 'checklist.md'))[0] -eq 0xEF)) "D 列：輪次 2、序號 01、插在調查進度末；checklist 的 CRLF＋BOM 保留"
-$clLines = Get-PsKnLines -Text $clText
-$iRow = [array]::IndexOf($clLines, $d1.Row)
-Assert ($iRow -gt 0 -and $clLines[$iRow - 1] -match 'TW_DEMO_C' -and $clLines[$iRow + 1] -eq '' -and $clLines[$iRow + 2] -match '^## Gaps') "D 列位置：最後一個調查項之後、Gaps 節之前"
-Assert ((Add-PsSuppChecklistDRow -DomainDir $domA -ObjectName 'tw_nowhere' -RequestId $ridNowhere).Reason -eq 'D_EXISTS' -and (Add-PsSuppChecklistDRow -DomainDir $domA -ObjectName 'TW_DEMO_A' -RequestId $ridNowhere).Reason -eq 'NN_EXISTS' -and (Add-PsSuppChecklistDRow -DomainDir $domA -ObjectName 'TW_DEMO_OLD' -RequestId $ridNowhere).Reason -eq 'D_EXISTS') "D 列去重：同物件（大小寫）／已有 NN／歸檔 D 列 → 不寫"
-$d2 = Add-PsSuppChecklistDRow -DomainDir $domA -ObjectName 'TW_ANOTHER' -RequestId $ridNowhere
-Assert ($d2.Row -match '^- \[ \] D2-02 ') "D 列序號承接同輪最大序號"
-$st = Get-PsSuppStatus -Root $root -Domain '職缺測試'
-$stMap = @{}
-foreach ($s in $st) { $stMap[$s.RequestId] = $s.State }
-Assert ($stMap[$rid1] -eq 'PENDING' -and $stMap[$ridNowhere] -eq 'WAITING_RESEARCH' -and $stMap[$ridSec] -eq 'PENDING') "狀態：PENDING／WAITING_RESEARCH"
-$affected = @(@{ file = '01-TW_DEMO_A.md'; hashBefore = $mg.HashBefore; hashAfter = $mg.HashAfter; sections = @($mg.Sections); evidenceRows = @($mg.EvidenceRows) })
-$res1 = New-PsSuppResult -Request $req1 -Outcome 'RESOLVED' -Disposition 'RESEARCHED' -AuditRound 2 -Affected $affected -Attempts 1
-$p1 = Publish-PsSuppResult -Root $root -Result $res1
-$p2 = Publish-PsSuppResult -Root $root -Result $res1
-Assert ($p1.Ok -and -not $p1.Existed -and $p2.Ok -and $p2.Existed -and (Test-Path -LiteralPath $p1.Path)) "result：create-only；再發布＝冪等成功"
-$resRead = Get-PsSupplementalResult -Root $root -RequestId $rid1
-Assert ($resRead.outcome -eq 'RESOLVED' -and $resRead.dispositionCode -eq 'RESEARCHED' -and $resRead.affected[0].hashAfter -ceq $mg.HashAfter -and $resRead.affected[0].evidenceRows.Count -eq 2 -and $resRead.auditRoundAtCompletion -eq 2) "result 檔：outcome／disposition／affected／auditRound"
-$threw = $false
-try { $null = New-PsSuppResult -Request $req1 -Outcome 'DONE' -Disposition 'RESEARCHED' -AuditRound 1 -Affected @() -Attempts 1 } catch { $threw = $true }
-Assert ($threw) "result：outcome 不在值域 → 拋錯（不寫）"
-Assert ((Get-PsSuppPending -Root $root -Domain '職缺測試' -DomainDir $domA).Count -eq 2) "有 result 的 request 不再 pending"
-$sTerm = Submit-PsSupplementalRequest -Root $root -Need $n1
-Assert ($sTerm.state -eq 'RESOLVED' -and $sTerm.reason -eq 'TERMINAL' -and -not $sTerm.created) "終局後同 need 再提交 → 回 outcome、不建檔"
-$sRe = Submit-PsSupplementalRequest -Root $root -Need $n1 -Resubmit
-Assert ($sRe.state -eq 'CREATED' -and $sRe.requestId -eq (Get-PsSuppRequestId -WorkKey $wk1 -Generation 2)) "-Resubmit：建 g2"
-$sup = Get-PsSuppSuperseded -Root $root -Domain '職缺測試'
-Assert ($sup.Count -eq 0) "g1 已有 result → 不算 superseded"
-$sRe3 = Submit-PsSupplementalRequest -Root $root -Need $n1 -Resubmit
-Assert ($sRe3.state -eq 'PENDING' -and $sRe3.requestId -eq $sRe.requestId) "g2 未終局時再 -Resubmit → PENDING（不建 g3）"
-$ws = Set-PsSuppWikiStale -Root $root -TargetName 'TW_DEMO_A' -LinkedNames @('PS_DEMO_TBL', 'TWSQR_DEMO', 'NOPE') -RequestId $rid1 -SourceLabel '職缺測試/01-TW_DEMO_A.md'
-$wikiA = Read-PsKnText -LiteralPath (Join-Path $wiki 'TW_DEMO_A.md')
-$wikiT = Read-PsKnText -LiteralPath (Join-Path $wiki 'PS_DEMO_TBL.md')
-$wikiS = Read-PsKnText -LiteralPath (Join-Path $wiki 'TWSQR_DEMO.md')
-Assert ($ws.Stale -eq 2 -and $ws.Invalidated -eq 1 -and $wikiA -match '(?m)^status: stale$' -and $wikiS -match '(?m)^status: stale$' -and $wikiT -match '(?m)^status: verified$' -and $wikiT -match ('來源 NN 已補研究 ' + [regex]::Escape($rid1)) -and $wikiT -match '(?m)^## Invalidated') "wiki：非 reviewed → stale；reviewed → 狀態不動、Invalidated 追加一行；不存在的名字略過"
-$ws2 = Set-PsSuppWikiStale -Root $root -TargetName 'TW_DEMO_A' -LinkedNames @() -RequestId $rid1 -SourceLabel 'x'
-Assert ($ws2.Stale -eq 0) "wiki：已 stale 不重複改"
-$moved = Move-PsSuppPartsDone -DomainDir $domA -LogDir (Join-Path $logs '職缺測試') -RequestId $rid1
-Assert ($moved -eq 3 -and (Test-Path -LiteralPath (Join-Path (Join-Path $logs '職缺測試') ('supplemental-done/' + $rid1 + '.a1.manifest.md'))) -and -not (Test-Path -LiteralPath $mf.ManifestPath)) "parts 搬移：manifest／收據／outcome 三檔搬到 auto-loop-logs/<領域>/supplemental-done/"
-
-# ── 情境 7：完成邊界 ──────────────────────────────────────────────
-Write-Host "情境 7：完成邊界（RESEARCHED → AUDITED：稽核輪次遞增＋AUDITED_CLEAN＋audit-done.json）"
-$null = Publish-PsKnowledgeIndex -Root $root -LogRoot $logs
-$c0 = Get-PsSuppCompletion -Root $root -RequestId $rid1
-Assert ($c0.Researched -and -not $c0.Audited -and -not $c0.Graduated) "尚未稽核：RESEARCHED=true、AUDITED=false"
-$hNow = Get-PsKnFileHash -LiteralPath $nnPath
-Write-Utf8 (Join-Path $domA '90-audit.md') @('# 職缺測試 稽核報告（90-audit）', '', '> 稽核輪次：3', '', '## 總覽記分卡', '', '| 檔案 | 證據 PASS | FAIL | UNVERIFIABLE | Claim VERIFIED | DISPUTED | 燈號 |', '|---|---|---|---|---|---|---|', '| 01-TW_DEMO_A.md | 5 | 0 | 0 | 2 | 0 | 🟢 |', '| 02-TWSQR_DEMO.md | 3 | 0 | 0 | 1 | 0 | 🟢 |', '', '## FAIL / DISPUTED / UNVERIFIABLE 明細', '', '| 檔案 | 類型 | 內容 | 原因 | 處置 |', '|---|---|---|---|---|', '', '## 完整性（換角度 diff）', '', '- 任務 C 覆蓋：全部完成') $false
-$clRaw = Read-PsKnText -LiteralPath (Join-Path $domA 'checklist.md')
-[System.IO.File]::WriteAllText((Join-Path $domA 'checklist.md'), ($clRaw -replace '稽核輪次：2', '稽核輪次：3'), (New-Object System.Text.UTF8Encoding($true)))
-[System.IO.File]::WriteAllText((Join-Path $domA 'audit-done.json'), ('{"round":3,"files":{"01-TW_DEMO_A.md":{"hash":"' + $hNow + '"},"02-TWSQR_DEMO.md":{"hash":"' + (Get-PsKnFileHash -LiteralPath (Join-Path $domA '02-TWSQR_DEMO.md')) + '"}}}'), (New-Object System.Text.UTF8Encoding($false)))
-$null = Publish-PsKnowledgeIndex -Root $root -LogRoot $logs
-$idx2 = Read-PsKnowledgeIndex -Root $root
-$e1 = @($idx2.nn | Where-Object { $_.file -eq '01-TW_DEMO_A.md' })[0]
-Assert ($e1.grade -eq 'AUDITED_CLEAN' -and $e1.auditRound -eq 3) "索引：合併後的 NN 經第 3 輪稽核 → AUDITED_CLEAN（audit-done.json 判稽核後未改）"
-$c1 = Get-PsSuppCompletion -Root $root -RequestId $rid1
-Assert ($c1.Researched -and $c1.Audited -and -not $c1.Graduated -and -not $c1.Projected) "AUDITED：affected 全 AUDITED_CLEAN 且 auditRound 3 > auditRoundAtCompletion 2；GRADUATED／PROJECTED 仍 false"
-Assert ((Get-PsSuppCompletion -Root $root -RequestId $ridSec).Reason -eq 'NO_RESULT') "無 result → NO_RESULT"
-
-# ── 情境 8：CLI ───────────────────────────────────────────────────
-Write-Host "情境 8：CLI exit 與結論碼形狀"
-$c = Invoke-Cli @('-New', '-Target', 'COMPONENT:TW_DEMO_A', '-FactKind', 'UI.NAVIGATION', '-Properties', 'entries')
-Assert ($c.Exit -eq 0 -and $c.Last -eq '結論代號：SUPP1-1-01' -and (($c.Lines -join "`n") -match 'state=CREATED')) "-New 合法 → exit 0、SUPP1-1-01"
-$c = Invoke-Cli @('-New', '-Target', 'COMPONENT:TW_DEMO_A', '-FactKind', 'UI.NAVIGATION', '-Properties', 'entries')
-Assert ($c.Exit -eq 0 -and $c.Last -eq '結論代號：SUPP1-1-02') "-New 重複 → SUPP1-1-02（PENDING）"
-$c = Invoke-Cli @('-New', '-Target', 'WIDGET:x y', '-FactKind', 'NOPE', '-Properties', 'a')
-Assert ($c.Exit -eq 2 -and $c.Last -match '^結論代號：SUPP1-1-04-\d+$') "-New 驗證失敗 → exit 2、SUPP1-1-04-<n>"
-$c = Invoke-Cli @('-New', '-Target', 'COMPONENT:TW_NOWHERE2', '-FactKind', 'DATA.FLOW', '-Properties', 'reads')
-Assert ($c.Exit -eq 2 -and $c.Last -eq '結論代號：SUPP1-1-05') "-New 零候選 → SUPP1-1-05"
-$c = Invoke-Cli @('-New', '-Target', 'COMPONENT:TW_DEMO_A', '-FactKind', 'DATA.FILE_INPUT', '-Properties', 'present,layout', '-Context', 'operation=IMPORT', '-EvidencePolicy', 'AUDITED')
-Assert ($c.Exit -eq 0 -and $c.Last -eq '結論代號：SUPP1-1-02') "-New 對已有 g2（未終局）的 need → PENDING"
-$needJson = Join-Path $root 'need.json'
-[System.IO.File]::WriteAllText($needJson, '{"target":{"type":"COMPONENT","name":"TW_DEMO_A"},"context":{},"factKind":"BEHAVIOR.RULES","properties":["rules"],"evidencePolicy":"STATIC","freshness":"CURRENT"}', (New-Object System.Text.UTF8Encoding($false)))
-$c = Invoke-Cli @('-Submit', '-NeedFile', $needJson, '-ConsumerKind', 'SPEC', '-JobId', 'demo-job', '-RequirementRef', 'R05')
-Assert ($c.Exit -eq 0 -and $c.Last -eq '結論代號：SUPP1-1-01') "-Submit -NeedFile（SPEC 消費者）→ CREATED"
-$c = Invoke-Cli @('-Submit', '-NeedFile', $needJson, '-ConsumerKind', 'SPEC')
-Assert ($c.Exit -eq 2 -and $c.Last -match '^結論代號：SUPP1-1-04-') "-Submit SPEC 缺 jobId／requirementRef → INVALID"
-$c = Invoke-Cli @('-Status', '-Domain', '職缺測試')
-Assert ($c.Exit -eq 0 -and $c.Last -match '^結論代號：SUPP1-2-01-\d+$') "-Status → SUPP1-2-01-<n>"
-$c = Invoke-Cli @('-Result', '-RequestId', $rid1)
-Assert ($c.Exit -eq 0 -and $c.Last -eq '結論代號：SUPP1-4-01-2' -and (($c.Lines -join "`n") -match 'AUDITED=True')) "-Result 有結果 → 完成層 2（AUDITED）"
-$c = Invoke-Cli @('-Result', '-RequestId', $ridSec)
-Assert ($c.Exit -eq 0 -and $c.Last -eq '結論代號：SUPP1-4-02') "-Result 無結果 → SUPP1-4-02"
-$c = Invoke-Cli @('-Status', '-New')
-Assert ($c.Exit -eq 2 -and $c.Last -eq '結論代號：SUPP1-9-01') "動詞衝突 → SUPP1-9-01"
-foreach ($code in @('結論代號：SUPP1-1-01', '結論代號：SUPP1-1-04-8', '結論代號：SUPP1-2-01-12', '結論代號：SUPP1-4-01-2')) { Assert (Test-CodeShape $code 'SUPP') "結論碼形狀：$code" }
-Assert (-not (Test-CodeShape '結論代號：SUPP1-1-01-TW_X' 'SUPP') -and -not (Test-CodeShape '結論代號：SUPP1-1-01-職缺' 'SUPP')) "結論碼形狀：含物件名／CJK 不合格"
-$allOut = @()
-foreach ($a in @(@('-Status'), @('-Result', '-RequestId', $rid1))) { $allOut += (Invoke-Cli $a).Lines }
-Assert (@($allOut | Where-Object { $_ -match '^結論代號：' }).Count -eq 2) "每個動詞恰一行結論代號"
-
-# ── 情境 9：intake 拒收／callee 反向角色／wiki 內文 status 不動／領域目錄消失 ─────
-Write-Host "情境 9：intake 驗證拒收（ID_MISMATCH／WORKKEY）、callee 角色開頭比對、wiki 只改 frontmatter、領域目錄消失 → DOMAIN_MISSING"
-$dirs = Get-PsSuppDirs -Root $root
-$badId = 'S-' + ('a' * 24) + '-g1'
-Write-Utf8 (Join-Path $dirs.Requests ($badId + '.json')) @('{"schemaVersion":"1","requestId":"S-' + ('b' * 24) + '-g1","workKey":"x","generation":1,"domain":"職缺測試","need":{}}') $false
-$raw1 = Read-PsKnText -LiteralPath (Join-Path $dirs.Requests ($rid1 + '.json'))
-$fakeId = 'S-' + ('c' * 24) + '-g1'
-Write-Utf8 (Join-Path $dirs.Requests ($fakeId + '.json')) @(($raw1 -replace [regex]::Escape($rid1), $fakeId)) $false
-$acceptedRaw = Get-PsSuppRequests -Root $root -Capabilities $cap
-$accepted = @($acceptedRaw)
-$ids = @($accepted | ForEach-Object { $_.RequestId })
-$rejTxt = ($PsSuppIntakeRejected -join ';')
-Assert (($ids -contains $rid1) -and ($ids -notcontains $badId) -and ($ids -notcontains $fakeId) -and $rejTxt -match ([regex]::Escape($badId) + '\.json：ID_MISMATCH') -and $rejTxt -match ([regex]::Escape($fakeId) + '\.json：WORKKEY')) "intake：requestId 與檔名不符 → ID_MISMATCH；requestId 與 workKey 對不上 → WORKKEY；兩者都不進清單、合法的照常"
-# 單檔版的同一把尺（迷你圈圍籬拿它判斷「session 期間新增的 request 是不是別的行程正常提交的」）
-$schemaId = 'S-' + ('d' * 24) + '-g1'
-Write-Utf8 (Join-Path $dirs.Requests ($schemaId + '.json')) @((($raw1 -replace [regex]::Escape($rid1), $schemaId) -replace '("schemaVersion"\s*:\s*)1', '${1}2')) $false
-$vGood = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($rid1 + '.json')) -Capabilities $cap
-$vBadId = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($badId + '.json')) -Capabilities $cap
-$vFake = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($fakeId + '.json')) -Capabilities $cap
-$vSchema = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests ($schemaId + '.json')) -Capabilities $cap
-$vName = Test-PsSuppRequestFile -LiteralPath (Join-Path $dirs.Requests 'not-a-request.json') -Capabilities $cap
-Assert ($vGood.Ok -and $vGood.RequestId -ceq $rid1 -and $vGood.Generation -eq 1 -and (-not $vBadId.Ok) -and $vBadId.Reason -eq 'ID_MISMATCH' -and (-not $vFake.Ok) -and $vFake.Reason -eq 'WORKKEY' -and (-not $vSchema.Ok) -and $vSchema.Reason -eq 'SCHEMA' -and (-not $vName.Ok) -and $vName.Reason -eq 'NAME') "Test-PsSuppRequestFile：合格／ID_MISMATCH／WORKKEY／SCHEMA／檔名文法不符——intake 與圍籬共用"
-$resOk = Join-Path $dirs.Results ($rid1 + '.json')
-$vResGood = Test-PsSuppResultFile -LiteralPath $resOk
-$badRes = 'S-' + ('e' * 24) + '-g1'
-Write-Utf8 (Join-Path $dirs.Results ($badRes + '.json')) @('{"schemaVersion":1,"requestId":"' + $badRes + '","outcome":"DONE"}') $false
-$vResBad = Test-PsSuppResultFile -LiteralPath (Join-Path $dirs.Results ($badRes + '.json'))
-Assert ($vResGood.Ok -and (-not $vResBad.Ok) -and $vResBad.Reason -eq 'OUTCOME') "Test-PsSuppResultFile：合格 result 過、outcome 不在值域 → OUTCOME"
-Remove-Item -LiteralPath (Join-Path $dirs.Results ($badRes + '.json')) -Force
-Remove-Item -LiteralPath (Join-Path $dirs.Requests ($schemaId + '.json')) -Force
-Remove-Item -LiteralPath (Join-Path $dirs.Requests ($badId + '.json')) -Force
-Remove-Item -LiteralPath (Join-Path $dirs.Requests ($fakeId + '.json')) -Force
-$factsRev = @{ relatedObjects = @(@{ name = 'TWSQR_DEMO'; role = '被呼叫（由排程執行的反向關係）' }) }
-$cRevRaw = Get-PsSuppCallees -TargetFacts $factsRev -DomainDir $domA -Domain '職缺測試' -Index $index -Capabilities $cap
-$cRev = @($cRevRaw)
-$factsFwd = @{ relatedObjects = @(@{ name = 'TWSQR_DEMO'; role = '排程執行' }) }
-$cFwdRaw = Get-PsSuppCallees -TargetFacts $factsFwd -DomainDir $domA -Domain '職缺測試' -Index $index -Capabilities $cap
-$cFwd = @($cFwdRaw)
-Assert ($cRev.Count -eq 0 -and $cFwd.Count -eq 1 -and $cFwd[0].Name -eq 'TWSQR_DEMO') "callee：角色以開頭比對——「被呼叫」不是 callee、「排程執行」是"
-Write-Utf8 (Join-Path $wiki 'TW_DEMO_B.md') @('---', 'name: TW_DEMO_B', 'type: COMPONENT', 'status: verified', 'sources:', '  - 職缺測試/01-TW_DEMO_A.md', '---', '', '# TW_DEMO_B', '', 'status: verified（內文說明文字，不是 frontmatter）', '', '| 欄位 | 值 |', '|---|---|', '| status | verified |', '') $false
-$wsB = Set-PsSuppWikiStale -Root $root -TargetName 'TW_DEMO_B' -LinkedNames @() -RequestId $rid1 -SourceLabel 'x'
-$wikiB = Read-PsKnText -LiteralPath (Join-Path $wiki 'TW_DEMO_B.md')
-Assert ($wsB.Stale -eq 1 -and $wikiB -match '(?m)^status: stale$' -and $wikiB -match '(?m)^status: verified（內文' -and $wikiB -match '\| status \| verified \|' -and ([regex]::Matches($wikiB, '(?m)^status: stale')).Count -eq 1) "wiki：只改 frontmatter 的第一個 status:；內文的 status: 字樣一個都不動"
-$domGone = Join-Path $research 'zz-gone'
-Write-Utf8 (Join-Path $domGone '00-overview.md') @('# zz-gone 總覽', '') $false
-$sGone = Submit-PsSupplementalRequest -Root $root -Need (ConvertTo-PsSuppNeed -Target 'COMPONENT:TW_DEMO_C' -FactKind 'UI.NAVIGATION' -Properties 'entries') -DomainHint 'zz-gone'
-Remove-Item -LiteralPath $domGone -Recurse -Force
-$stGoneRaw = Get-PsSuppStatus -Root $root -Domain 'zz-gone' -Capabilities $cap
-$stGone = @($stGoneRaw)
-Assert ($sGone.state -eq 'CREATED' -and $stGone.Count -eq 1 -and $stGone[0].State -eq 'DOMAIN_MISSING') "status：領域目錄不見（改名／刪除）→ DOMAIN_MISSING（不是 WAITING_RESEARCH）"
-$emptyRcpt = Join-Path $root 'empty-receipt.md'
-Write-Utf8 $emptyRcpt @('## 處置', '| 處置 | 查法收據 |', '|---|---|', '| NO_EVIDENCE | ps-peoplecode-flow 搜 TW_DEMO_A 全部事件 2 頁無 File 物件 |', '', '## 追加事實', '| 節 | 信心 | 敘述 | 證據# |', '|---|---|---|---|', '', '## 追加證據', '| 位置 | 說明 | 機器參照 |', '|---|---|---|', '') $false
-$vEmpty = Test-PsSuppReceipt -LiteralPath $emptyRcpt -Capabilities $cap
-Assert ($vEmpty.Ok -and $vEmpty.Disposition -eq 'NO_EVIDENCE' -and $vEmpty.Facts.Count -eq 0 -and $vEmpty.Evidence.Count -eq 0) "收據：查無時兩張空表（只有表頭與分隔列）合格（契約的空表規則）"
-
-Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
-Write-Host ""
-if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
-Write-Host "全部情境 PASS" -ForegroundColor Green
-@@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|d08137feb822c5199d9a312b074a25edcb4f861783b77a81b3d5b05832eee2c6|0
-{
-  "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "5cb35d7",
-  "files": [
-    {
-      "path": ".opencode/.npmrc",
-      "lines": 4,
-      "sha256": "1349f744a8e64738d89d54665a994d959b08524226f0ba32635e760ba3b49f92",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/explore.md",
-      "lines": 25,
-      "sha256": "8ed715aeb40c2c6740fdce1e6156100bcfcc51a98d65b1ba0ec6003cdf6962d6",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/general.md",
-      "lines": 25,
-      "sha256": "36f0e3083e1cc3f66698e4edb193a3d900c07eeef8977ec358444f21ad96459f",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-ae-flow.md",
-      "lines": 97,
-      "sha256": "89b5a8867a80842d03a83d1a4139a4b4987f8d8b30ac9689a87c0e0d83a5b1e9",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-audit-orchestrator.md",
-      "lines": 149,
-      "sha256": "9470bc6db121bea88fb7d8144aaf2ecdc875b967ecc38a9ec71173d2aea13636",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-auditor.md",
-      "lines": 266,
-      "sha256": "23db6a6c449c9dc0f9b58216d4099baa9ab12aadf6efad107296d8f5ef6aae6d",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-clone-worker.md",
-      "lines": 72,
-      "sha256": "35f7dccbd47fb9fc6b3a9a77d2fda337f2a51d78eccf7ee50d0d85e380dd7050",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-deep-research.md",
-      "lines": 529,
-      "sha256": "b386787d6ba846d3f16ba7b0071d697d13f825d604563af438c5754b158e1e90",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-metadata-flow.md",
-      "lines": 118,
-      "sha256": "d7149d31301b190c48601af2f6c1b7c832db6cd7c25eec228e891d6e06fb8af7",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-orchestrator.md",
-      "lines": 232,
-      "sha256": "2fee17f8b68a51c897b46294fee25ac1adbb6a1c9f4e01f6f0794f4510d5dc38",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-peoplecode-flow.md",
-      "lines": 87,
-      "sha256": "74b74eb9f25837b152749d71249662e4da1e47c52b5e79b8c4e986ec37518162",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-sdoc-worker.md",
-      "lines": 73,
-      "sha256": "2abf3050f289bc39a2634cb89710afc6edfedd0781e9e0eeb5b33bd105e213fd",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-spec-author.md",
-      "lines": 84,
-      "sha256": "3fc22300cb9e1df1833fb34e0713d2e86b028c4c6a5dc16c29e2582c135b2334",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-spec-judge.md",
-      "lines": 48,
-      "sha256": "130cc21070674a55aa0a23be48178d0c4072054a7020cd4415574cd5f61946f9",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-spec-reader.md",
-      "lines": 48,
-      "sha256": "c8cdefc05e9da8dbeed564473fd6a7345eca7c3232393c9a44b40eccb8657205",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-spec-worker.md",
-      "lines": 78,
-      "sha256": "e47f4963198d592ca5836bc6266bb1632bfbdb2ef3c62ec75a10427160f72737",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-sql-flow.md",
-      "lines": 70,
-      "sha256": "beda1f414a7281be703e75ad15dd761b1698487ab179e9aa334014c79df9a0f5",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-sqr-flow.md",
-      "lines": 78,
-      "sha256": "08dedc135ec5ff1ece45f1165b8a9a5fce4648541d9b3a42716d8a29543c0ce8",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-status-reader.md",
-      "lines": 52,
-      "sha256": "f754b6dd728bc1aa77e762cdc284b7d966f64a34bc375899fe65eb3562e4d396",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/ps-ui-flow.md",
-      "lines": 156,
-      "sha256": "7abb5bae4b352f6c2ba8b23b9c372626f9b76c552db37930f59ac5614b899741",
-      "bom": false
-    },
-    {
-      "path": ".opencode/agent/scout.md",
-      "lines": 24,
-      "sha256": "810f7dbed793b9b3976c16bbac17aae7ddf27029e109c4877b038096769675a6",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-audit-batch.md",
-      "lines": 109,
-      "sha256": "6a478b58a039a74c7e10de5e3b51fc98f5b272ec573c32191d9e1f96c14e100c",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-audit.md",
-      "lines": 72,
-      "sha256": "8a6f07baa6de64e7884018eaa3abcd687f5a3c4088e537553a47fa699cc67c6d",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-clone-batch.md",
-      "lines": 11,
-      "sha256": "f4e805cb87978683ddbbf8813a4acaa3007bea529a45320f46d4ca7fcd0321a9",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-correct.md",
-      "lines": 27,
-      "sha256": "dd729a048d3b7b0d458ef5e4728ff8085c8f8cfbe6ef2a0a80a975304947e363",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-lesson.md",
-      "lines": 26,
-      "sha256": "21f992f7d1add3d3be29a49b57723896ab109d26392ec810184afb2432fdf685",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-research.md",
-      "lines": 24,
-      "sha256": "cc7e4e2430a81b75a3c3e8487c50ac44080931b15b9570111045ba1a2f87dc32",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-spec-batch.md",
-      "lines": 18,
-      "sha256": "111b300b5eb1cb765480a85513b99522b9c7418a2793238751f1eb87af7b1736",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-spec.md",
-      "lines": 13,
-      "sha256": "d15dff3a59990f7069dc6858aeac242e6093db98ab147b370e8b32241bf6f24e",
-      "bom": false
-    },
-    {
-      "path": ".opencode/command/ps-supplement.md",
-      "lines": 27,
-      "sha256": "d6c09782829bb2723a4b66733296bbafa27ba13b661aec08a832fb2e58e0b4a7",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/business-domain-map.yaml",
-      "lines": 128,
-      "sha256": "881f35185296dc9da7f760b20e9522c95cc8dab3ac1e36740833bcda5d4f94b8",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/customization-profile.yaml",
-      "lines": 105,
-      "sha256": "72597fa80183808b2819e823e622078c8a0a1c522f427e57ba4e7b0606c93f3a",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/knowledge-retrieval-contract.md",
-      "lines": 129,
-      "sha256": "4e33ab6d2306f0fc38520a797082346f9619ded792cc5994d7ecc79344710ec9",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4266,
-      "sha256": "c2c9939f9235ab46db3be78e69b953a1b21ee0374a75c9ae560d0fb7b5765a24",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/lessons/pending.md",
-      "lines": 25,
-      "sha256": "9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/mcp-tool-contracts.md",
-      "lines": 129,
-      "sha256": "7fdb72277164bfba1f0cd0c5c55eb6ae583837f8f30a508e007d4a036004f164",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/oracle-query-cookbook.md",
-      "lines": 992,
-      "sha256": "a267fc8f15a9899f871d17e73e99cf35601a49420566e965ee44f7f3425ed653",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/progressive-source-retrieval.md",
-      "lines": 428,
-      "sha256": "620bc8f7479a6831390b55d9182c13a409175c0e632ed71cd414212fdc060b9c",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/README.md",
-      "lines": 341,
-      "sha256": "d2d0bfb14925d8d071a758239d4a337ac4a57f5efdb76bf62fb93ef1dd3208c8",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/report-templates/audit-template.md",
-      "lines": 87,
-      "sha256": "db6a2a3a5ea31209cb739b01b6fbac0244d83c4de3bef760efc287a4c32bd741",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/report-templates/checklist-template.md",
-      "lines": 25,
-      "sha256": "366e97a7097a3e6165789d4a8ba5afa918e1a43f35a0d227db9050045a800f92",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/report-templates/entity-template.md",
-      "lines": 34,
-      "sha256": "de2a989eba864ef30cf837956e9b09ac774822fd85522cbb2869c4fd0fdcf34a",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/report-templates/function-detail-template.md",
-      "lines": 131,
-      "sha256": "48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/report-templates/overview-template.md",
-      "lines": 49,
-      "sha256": "e2ccd269668daf8d0f7a059b3d1c8b3b00ca8f69e666439905339a69204a1e74",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/research-domains.txt",
-      "lines": 28,
-      "sha256": "6be65b50cee4d82d152301f4ed68cdf1a6d88d9e6d2fac4896cf109d8a393da8",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/ai-instructions.json",
-      "lines": 66,
-      "sha256": "5956d48dc50fc104ea8e79204254d910b04d6595355347159f09583b5f4a7640",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/data.json",
-      "lines": 385,
-      "sha256": "a72d79c2b3ab6f94ec9eb6371ab94ddcb93c8eb369a94048fbe82d0ddffbbd26",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/functions.json",
-      "lines": 202,
-      "sha256": "5e176f6a6507eef0a2e63cd6fea2f1811265858f9e848fe52822909783a10096",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/interfaces.json",
-      "lines": 76,
-      "sha256": "cde8875d457a8e2fd7f6604eca0f4b831e706616330319467115d471aa7bbcb7",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/operations.json",
-      "lines": 633,
-      "sha256": "f8243d8a0e4bd14a4cb1bf5235a04837ef9c56fd51c99f8798c6e722178f6a21",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/rules.json",
-      "lines": 440,
-      "sha256": "e4d547d5ff0d2ba50ba76ccfbce6bdd3219534321b0275bc7252efaf7f84b62d",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/scope.json",
-      "lines": 198,
-      "sha256": "6bd425f786318bf394b8e47e7643096e9bb05e4b00b17c049abf43573762ae8e",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/security.json",
-      "lines": 166,
-      "sha256": "32fc9ec132baca1041f0c885cecfeb71a699c390fd8f4cf457c3c062b30a24c8",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/testing.json",
-      "lines": 346,
-      "sha256": "b88a52e2c2605e7805f1e4f71bc5f35da4f6f5ffca36a836a14f34e162193784",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/texts.json",
-      "lines": 120,
-      "sha256": "5be6ecd5a0db23aac3d1250fa0160c31c4134829a4407814130ab1757a4c2a96",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/ui.json",
-      "lines": 174,
-      "sha256": "13ef2d8d077da4e40569128e4a245cad66ea954ccceebab377a81331ed832a43",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/examples/workflow.json",
-      "lines": 628,
-      "sha256": "f9205464c490aa926f2ad844104bc4ac76dfd0e00fa6b5d0111161b0b478bbbb",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/judge-contract.md",
-      "lines": 18,
-      "sha256": "fe65076058a9f9d3d5fdaf7a399f87e5604f7bb3805fa1c67527d20cd4520a49",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/model.yaml",
-      "lines": 6,
-      "sha256": "4ede20ce65a2dee835fdf88d6d79dc2cd4d0bc5fb9eb4e470d18108e15dccdf8",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/reader-contract.md",
-      "lines": 36,
-      "sha256": "73f60e5a2cade36e5311db72adbb22f249dc60bb2c1d555580e3df826a50110f",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/research-contract.md",
-      "lines": 279,
-      "sha256": "dca5e430f7cd99531ee6d34b5f13df02819702914b636f1891fe86ea543588df",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/review-contract.md",
-      "lines": 55,
-      "sha256": "4b7ac11a6f2c7849f7277ccb8628a405104b9f555f89751ca87480d73ba15d99",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas-runtime/l5-answers.schema.json",
-      "lines": 121,
-      "sha256": "c366518b85d521495ba4d54f45dce416dc77dd2097cbba0d026cd7fbf929d91b",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas-runtime/l5-judge.schema.json",
-      "lines": 31,
-      "sha256": "b9746e20798d01d1a7572b99dd53de486e9ddc9047aeeb97d88b5fc020087014",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas-runtime/research-packet.schema.json",
-      "lines": 562,
-      "sha256": "1dd46cad21ec1d42bf74b9a48294e89819732a300a98088263d84e2a964c4faa",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas-runtime/review.schema.json",
-      "lines": 117,
-      "sha256": "8bb3a1e0b3687740f6544addeb34da08872b13663e5d0fa0712a76244c93f085",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas-runtime/status-round2.schema.json",
-      "lines": 76,
-      "sha256": "361eff59bdeef8844d2c981c05d588a5f3ccece7e01d0fb25343393fcd110b2e",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/01-overview.schema.json",
-      "lines": 394,
-      "sha256": "f17aea0598d8f8d0f68b728c3b4c586546cc8d628d2528805f4818194d2a222b",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/02-functional-requirements.schema.json",
-      "lines": 256,
-      "sha256": "e486964e6c58145025a30da22e2b9375ccb6180d0f58bdd686619fd6a0e92d11",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/03-roles-permissions.schema.json",
-      "lines": 251,
-      "sha256": "baddb4a1f19591d88533c0dd8dfcff8375799f6b89690cc88120384539193e81",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/04-workflow.schema.json",
-      "lines": 1211,
-      "sha256": "d534c59ff293a11cccae0eb3187848380bf036e7fecf92a80d987cf5bb8256f2",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/05-ui.schema.json",
-      "lines": 519,
-      "sha256": "c15b5fc0970d536bea5f29f5adbfe4b90100696ebc1b9a41c37744c3d09924ff",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/06-architecture.schema.json",
-      "lines": 331,
-      "sha256": "73118810a24f60211d1ff00e49c6f664f36b40137c93ce3465f5bccbbfdc419f",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/07-database.schema.json",
-      "lines": 863,
-      "sha256": "152a03f87f279aefaeb50e16e89482834165e88f5daef4b9a02f34102cf80f83",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/08-api.schema.json",
-      "lines": 395,
-      "sha256": "513b1558791b8dd47ce4e48c5d81cb044c5aaabe693b56fc7c4c5c4f51c08db5",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/09-business-logic.schema.json",
-      "lines": 459,
-      "sha256": "7a1104efbe2b25a8a2ff0d3f59881fc6ab0796c68d7d32b62f9808591aea568a",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/14-testing.schema.json",
-      "lines": 332,
-      "sha256": "5dd3f9df20d1a33d1e4b5fb11862d0ef0736a74a8105dd1e28096ad96485572b",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/16-ai-instructions.schema.json",
-      "lines": 86,
-      "sha256": "226cfe34ea1068a4ff7c0a2a0951d616b5eb206acbf71a8d74f2955b9a27a91b",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/17-tasks.schema.json",
-      "lines": 222,
-      "sha256": "5139a050a5a4914021b35bd59c98a76a8e1e6a033d47421d0bc92bfa7db44875",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/18-definition-of-done.schema.json",
-      "lines": 173,
-      "sha256": "ad533ab4c971d362e407a8c878d14a479ad0733612db8c712cf554d8ffb61225",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/19-decision-log.schema.json",
-      "lines": 189,
-      "sha256": "ae6d84f0a7541d1de72ed541712934b535bd86d2275e1d50969fef511abf548d",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/90-questions.schema.json",
-      "lines": 433,
-      "sha256": "673ffdd381d97384d2bc1e8e9d79e9cb9a7d5c1c6c495f738cd115681ad51dfd",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/common.schema.json",
-      "lines": 1530,
-      "sha256": "8854187d47882acd3718d17ec316c8e0cc224d95547917fca40cd5f5e9b9733e",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/evidence.schema.json",
-      "lines": 33,
-      "sha256": "19ef087f75047b695a4b5c9e0cfcd52801f3b985aef9cc2a7c508d2624ca0c76",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/schemas/status-reading.schema.json",
-      "lines": 278,
-      "sha256": "06d8aeb523bfc8f690d5e0a94888b7dfb0fea5c1e93c552eb2a43ff7a86f5fea",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/sdoc/status-reading-contract.md",
-      "lines": 105,
-      "sha256": "4aa0abbbd9d7a3823393ba361e39a3a8b84bb45758e732b9b6cf09e5f5a09e59",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1302,
-      "sha256": "2466f695feb26ce968e236821001bdd2de530d5ba5b4fbfd35e40086ded43105",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/capabilities.json",
-      "lines": 38,
-      "sha256": "6514e5d73ca2568acea32f9c3a4ff6c288b4964e92b7244b929c23049df86bc8",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/clone-contract.md",
-      "lines": 97,
-      "sha256": "e86d6513079da1a2cd9afb52b5e78f4cac6c479f6613a262fcb0a882e16849a2",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/clone-profile.json",
-      "lines": 59,
-      "sha256": "93ff3d0fb58660c4aaad238f6fae89dab85952cf78647e5ae167ab262ad6fa08",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-a/pack.json",
-      "lines": 33,
-      "sha256": "a54bda5d2278a1cb1471c42c1ca5077703dd57af0dac5d3dd4915b5c7ea1d8e1",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-a/template-bound.md",
-      "lines": 31,
-      "sha256": "475b5714806f963a2e5a3a67b2a529994bea606f7d779fe2863f2a1872ecd518",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-b/pack.json",
-      "lines": 30,
-      "sha256": "0ad1597d1c7d7c3ac4bf5049b4b0391d7fd035c5b022b228a13e4137b8f6eb2e",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-b/template-bound.md",
-      "lines": 19,
-      "sha256": "5fd342f4b44049c596094c1dd80c8cae7f108f8204b5de89ba8c3efd8a863715",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-c/pack.json",
-      "lines": 33,
-      "sha256": "dcd712c256ecc6c8f4159409223ecda01a684583cbd78d3673e06a54124b26a2",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/examples/pack-c/template-bound.md",
-      "lines": 28,
-      "sha256": "af81a07c807c9fcb4bca26ab977c2541c57e778157ed41fa2f17cf680c520c25",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/generic.manifest.json",
-      "lines": 116,
-      "sha256": "a0ca9a554c39ad637ce3fb6a64453e001eff0587c54d4f297c42f62c9819800a",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/pack.schema.json",
-      "lines": 85,
-      "sha256": "2624bdbf8a89747a712881b11e99e35f13340e1e9f90afd7c09521878516a878",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "lines": 210,
-      "sha256": "bd1636db6bfa690f805d231ae9e45b871061e71af90c30868237033de2c0faf3",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
-      "lines": 33,
-      "sha256": "9b5ae710cfb61eb17dfae83103fea2409837260d50aa2a4c99501cfc144f16b0",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/subagent-report-contract.md",
-      "lines": 193,
-      "sha256": "964fa97e5f3c5280c82a94cd3cab535d8219f16b29aa449616b78455bc20402c",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/supplemental-contract.md",
-      "lines": 101,
-      "sha256": "b4b9a7a566ea0a53e4fc211887d1c5424d876e6ee10bdf1037c68bbbc24d536c",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/test-fixtures.yaml",
-      "lines": 355,
-      "sha256": "193656cae454115ed68731005fbfd64b8dee4446037ee632e545b50e8a940536",
-      "bom": false
-    },
-    {
-      "path": ".opencode/peoplesoft/test-scenarios.md",
-      "lines": 737,
-      "sha256": "32162800e47d6d394fb63f12699fb8e24ae481183b4f7a96d4052a84f05d212e",
-      "bom": false
-    },
-    {
-      "path": ".opencode/plugin/ps-runtime-guard.js",
-      "lines": 749,
-      "sha256": "fcc0657970e4b57986fd379cfa44e46d69f1cb1dd5a8b917d84108e125d0953d",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-ae-flow/SKILL.md",
-      "lines": 64,
-      "sha256": "9d58c3b75195247916f8e30ca9b006d236c58ce10f475b46754b1dd40f5c01b7",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-business-discovery/SKILL.md",
-      "lines": 187,
-      "sha256": "126bd52dfea1df0df554a60cbb17f1d6a0b989f1ac2c991af53327552bb462f9",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-business-explain/SKILL.md",
-      "lines": 116,
-      "sha256": "382b76ee6b6e0949ba3fe5a561d658ef3ed71ec22691b05e0d3d921f4079cd5d",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-data-lineage/SKILL.md",
-      "lines": 59,
-      "sha256": "c03d64fe10cd788d13b35b37778009f1aefbec152840b7553d8feaf971723847",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-impact-analysis/SKILL.md",
-      "lines": 61,
-      "sha256": "4c1b81fddffbe5d93db32b29494af11cfb2e5b65b0876d0afec97f5e14127b89",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-peoplecode-flow/SKILL.md",
-      "lines": 103,
-      "sha256": "4139bcce9251908a2c7bc6ce49dc721f05b381ec1ebed55ed5980231dd46ad0a",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-process-flow/SKILL.md",
-      "lines": 56,
-      "sha256": "99831b07188695b6f32dd2da4b2036ae7d8900cd7e1e09fdfe3e645639155c98",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-security-flow/SKILL.md",
-      "lines": 84,
-      "sha256": "2196520e09c3e9bb1c34c27d5870888aaa08d48ffdc5c2693c7bca4c59216a8e",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-sql-flow/SKILL.md",
-      "lines": 97,
-      "sha256": "5c16c94136058c8aae670258252fedeafbc530a4f1571339b76c316c472d8e78",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-sqr-flow/SKILL.md",
-      "lines": 116,
-      "sha256": "0ed4dff8255a22888e20afb5ea61be496a8282881e5c754737f0e8964b0f9c48",
-      "bom": false
-    },
-    {
-      "path": ".opencode/skills/ps-ui-flow/SKILL.md",
-      "lines": 200,
-      "sha256": "8a8fdfba3b06f63da882c43dff5666b7da6dfedd869bf4d7bf5e75e54b099115",
-      "bom": false
-    },
-    {
-      "path": "scripts/ps-agent-doc-lint.ps1",
-      "lines": 57,
-      "sha256": "b562267fee941ea73fd343971a0e69fcb71db2a3584a80a2db12ae515451abd9",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-auto-all.ps1",
-      "lines": 275,
-      "sha256": "bb9c1c3b5d41783980a97eaf78f02c3a83dd051c7f22c5ed7acaa5c90c0258cd",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-auto-loop.ps1",
-      "lines": 2647,
-      "sha256": "32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-bundle.ps1",
-      "lines": 496,
-      "sha256": "ee17daeaf5a5b9ff531a4f6b577ca0a71ff6dd4f29806d45a7198f3af079afe5",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-claude-doctor.ps1",
-      "lines": 168,
-      "sha256": "accc0e0aa9f38a3890dab118d9330485fab9b139fa4ccf1532eabfda6f1b7560",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-cli-lib.ps1",
-      "lines": 59,
-      "sha256": "03efed3b250ee8e825206e0a11ec3fecb44ae037e6148fa685882632952606d7",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-doc-lint.ps1",
-      "lines": 1612,
-      "sha256": "87410a5999e562834866c266d3a0df5ee79c896c97c2b29cb1dd0c61ed145365",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-fs-doctor.ps1",
-      "lines": 390,
-      "sha256": "587a3ddadc9675710702f0be530160533cf67c28be335a301fee2311c1880b2d",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-graduation.ps1",
-      "lines": 191,
-      "sha256": "6317c159db889ff70629236aaf0c4badb7d86d0d2f7995c91801570269a34fa4",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-knowledge-lib.ps1",
-      "lines": 1097,
-      "sha256": "3584bb7303779683420f806a6dfe82045eeec70d96a98061a1023ec4f10f6ba1",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-knowledge.ps1",
-      "lines": 92,
-      "sha256": "03188a292d89b89db413ba2135465ff8f662860992ab54ce63528f1f4255fe3c",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc-check-lib.ps1",
-      "lines": 614,
-      "sha256": "fdd31bdb7f176c5795c3ab60e73a0032b7eb649e167dc123bef2b50e12d94c8f",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc-diag.ps1",
-      "lines": 344,
-      "sha256": "09f5257bea3f70990ddc03c10355c19e377e7312e88088faa5159d9efe4bf0c4",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc-lib.ps1",
-      "lines": 1448,
-      "sha256": "901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc-reader-lib.ps1",
-      "lines": 373,
-      "sha256": "a6d3d5562495a46dfdea05c8ab6c5bd94dc459f9c896631437033c694ccc783b",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc-render-lib.ps1",
-      "lines": 589,
-      "sha256": "bf32d6c33ca01131cec06f378b393cabcaaaa0fa662f034d44aca35228cf23ba",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc-schema-lib.ps1",
-      "lines": 421,
-      "sha256": "41b681a29e512243ec2ab62cc115557e43f3aea78aac71845c2b8eec45645ce6",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc-status-lib.ps1",
-      "lines": 632,
-      "sha256": "d608a28ad0dfdec155b520446aa828941b9f9a862196c2810f7252908742c28f",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-sdoc.ps1",
-      "lines": 1501,
-      "sha256": "84fca0e92eb86f7a0dd3874617f2241d2f2c68a14148f706528b7967271535be",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-session-lib.ps1",
-      "lines": 713,
-      "sha256": "db7af4e7e23ff0c7fb3cb69eb59dfa59429fc8a5a24ffe226df1490f19155e1f",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-spec-build.ps1",
-      "lines": 455,
-      "sha256": "40a57f84050ae399e03871d9eb799f908defb3999eedabc4c2ba4dea5b6d7b2c",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-spec-clone-lib.ps1",
-      "lines": 544,
-      "sha256": "beeb5c7e07779f5eb7f9b7c71a045f37dad61c9d196bd3087401747366f092b9",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-spec-lib.ps1",
-      "lines": 2746,
-      "sha256": "0fb1320c511b4939e2ecb3f1558f5c2e3674b4e8c97757baf6dd6e5574ce5cd2",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-spec.ps1",
-      "lines": 307,
-      "sha256": "de5f42b04d56d3de59673c2b67c12ba6fed92e7b07725173eb6dd31644b061b0",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-supplemental-lib.ps1",
-      "lines": 1197,
-      "sha256": "6dd300916a4281a4f843fce5687a48271ce4d0b27b732dafbbc168489493ef11",
-      "bom": true
-    },
-    {
-      "path": "scripts/ps-supplemental.ps1",
-      "lines": 131,
-      "sha256": "751f35d4df5ae2d797cfc90db865ec93be1ac3eb1b4e5c9203d6a9b01f51532c",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/sdoc-test-fixtures.ps1",
-      "lines": 234,
-      "sha256": "44438f4f087f56687a7c640d69c3fe4f01f81c8ae2f53fed6f01e19b978ff632",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-auto-loop.ps1",
-      "lines": 1056,
-      "sha256": "1c2909efbc3122337405013df7e76f5641624dae31edf3f54b6069c73e18db69",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-bundle.ps1",
-      "lines": 263,
-      "sha256": "959fc4c89aa9846aeb4a7c92b656602a3c07227863af1ad6b7487f46c98f7273",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 589,
-      "sha256": "3641964a5c6c66cebdc6c9ab4998fdfb0a750401fd6e2d173928b0b2b236d08b",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-knowledge.ps1",
-      "lines": 341,
-      "sha256": "78cfcc86409c48c900351e55c5d44f683f3170781f2c8a7a7bed2fa1aaf7dde3",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-oracle-runtime.ps1",
-      "lines": 470,
-      "sha256": "af286e5fe59f20ec31af3396aab2cd1a0b2dbc4bde0ba231fb651d0f5d876290",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-ps51-static.ps1",
-      "lines": 125,
-      "sha256": "3825f4898a6fd35514b75e4a4923cfeda1ba5fedce2fdcbb9619a9218cf48681",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-sdoc-assemble.ps1",
-      "lines": 380,
-      "sha256": "f59f6fc10c7e08dc4d7436958cb15bf735d48c6eee4d0568192e28f8eec40a12",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-sdoc-run.ps1",
-      "lines": 862,
-      "sha256": "5cc89c122594ae8ceed9e9f45f7236740198bc488906d638407c7e99d27df949",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-sdoc.ps1",
-      "lines": 280,
-      "sha256": "88ba45049e1ed4f6411499404bb5d27960cbfb85a5a4648864f354cbb5d30384",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-spec-build.ps1",
-      "lines": 299,
-      "sha256": "e85d28fa30a5b57a992d783ed7d3284d1230536165b18c8d66e51580f0faaa2b",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-spec-clone.ps1",
-      "lines": 288,
-      "sha256": "89f020def4f34ec653703a7c8115824d3c6898e52a79d77bf0e69a04f004bd6b",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-spec.ps1",
-      "lines": 1147,
-      "sha256": "74de0409c4a47e4cbd6f09b008bed4d3a63352c4578750dcf8d40d36d269846f",
-      "bom": true
-    },
-    {
-      "path": "scripts/tests/test-supplemental.ps1",
-      "lines": 546,
-      "sha256": "1e02eea5bed7f6cb97e190cfd0b00ce9b79a8c7e7079b9e6e488e8a59bc13154",
-      "bom": true
-    }
-  ],
-  "removed": [
-    {
-      "path": ".opencode/plugin/ps-oracle-preflight-gate.js",
-      "note": "維護端已刪除／改名：公司機必須刪除此檔"
-    },
-    {
-      "path": "scripts/test-elasticsearch-mcp-tools-list.ps1",
-      "note": "維護端已刪除／改名：公司機必須刪除此檔"
-    },
-    {
-      "path": "scripts/test-mcp-tools-list.ps1",
-      "note": "維護端已刪除／改名：公司機必須刪除此檔"
-    },
-    {
-      "path": "scripts/tests/test-oracle-gate-runtime.ps1",
-      "note": "維護端已刪除／改名：公司機必須刪除此檔"
-    }
-  ]
-}
-@@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|190|fcce56fdecfe2d0897c858c8440def958fe28b50fc2080ffb6fa656f27a1a80e|0
-# AGENTS.md — OpenCode 專案指引
-
-## 這個 repo 是什麼
-
-- 根目錄 `README.md`：PeopleSoft 知識庫分析框架的入口（做什麼、怎麼跑、
-  兩段式畢業、環境紀律、資安邊界）。
-- `.opencode/`：框架本體——skills（ps-*）、subagent 定義（agent/）、
-  環境設定與協定（peoplesoft/）。架構總覽：`.opencode/peoplesoft/README.md`。
-- `scripts/`：確定性外環（lint／auto-loop／auto-all／收據／fs-doctor／知識索引 ps-knowledge／
-  補研究 ps-supplemental／Spec 引擎 ps-spec；共用 lib：ps-knowledge-lib／ps-session-lib／ps-supplemental-lib／ps-spec-lib）。
-- `claude-code/`：同一框架的 **Claude Code 版**（`CLAUDE.md`＋`.claude/`：agents／commands／skills／hooks／peoplesoft），
-  部署到公司機時去掉 `claude-code/` 前綴；`scripts/` 兩版共用（`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 是否存在認版本）。
-  說明與對照表見 `claude-code/README.md`。
-  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、agents ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）
-  兩版都有，`/ps-spec` 都走它（DOC1）：Claude Code 版的契約在 `claude-code/.claude/peoplesoft/sdoc/`；OpenCode 版在
-  `.opencode/peoplesoft/sdoc/`，外環加 `-Cli opencode`，人工輸入、執行狀態、產出與 log 各放 `*-opencode` 目錄
-  （與 Claude Code 版同一資料夾並存時各自一份工作），外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
-  單一 spec.md 的 CLONE1 仍可直接跑 `scripts/ps-spec-build.ps1`。
-- `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
-  lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
-  說明見 `rebuild-kit/HOW-TO-USE.md`。
-
-## PeopleSoft 問題的處理方式
-
-要以一個或多個確切 Component 產生「供獨立 LLM 重建功能」的 Spec 文件（00-index、14 份文件、90 問題清單），走
-`/ps-spec <Component...>`（ps-spec-author），或在 ps-spec-author 對話直接輸入清單。
-此路徑不走整個領域研究、不要求手填私有 pack；人工輸入只有 `.ps-private/sdoc-opencode/<jobId>/` 的 status.md（狀態圖，必備）、
-project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft/sdoc/research-contract.md`，結論碼見
-`.opencode/peoplesoft/spec/support-codes.md` 的 DOC1；外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
-`docs/ps-spec-opencode/**`、`docs/ps-spec/**` 同為公司機密、禁止外部 remote；REVIEW_READY 不等於企業 E2E 通過。
-
-收到 PeopleSoft 業務問題（例：兵役資料在哪維護、某選項選了會執行什麼）時：
-
-1. 問答走 `ps-orchestrator` agent（Tab 切換）；要**產完整業務文件**用
-   `/ps-research <領域>`（ps-deep-research，輸出 docs/ps-research/）。
-   在一般 agent 下則載入 `ps-business-discovery` skill 依其流程處理，
-   重的檢索用 task 委派給 ps-* **agent**（`.opencode/agent/*.md` 裡的名字）。
-   `.opencode/skills/*` 是 skill、不是可委派的 agent：授權／血緣／排程類（ps-security-flow／
-   ps-data-lineage／ps-process-flow）一律派 `ps-metadata-flow`，要用的 skill 寫進 task 文字。
-   oracleMCP（@vdeserto/oracle-mcp-server，唯讀）的連線由 opencode.json 的 MCP 設定決定，**沒有開線步驟**：
-   主 agent 不呼叫任何 `oracleMCP_` 工具（工具全關），查詢只由 ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor 以
-   `oracleMCP_oracle_execute_query` 照 cookbook 做（規則 7b：一次一句、不加分號與註解、帶 limit）。
-   執行期只有 `.opencode/plugin/ps-runtime-guard.js` 的無狀態檢查：task 的 subagent_type 不得是 skill 名
-   （`PS_TASK_TARGET_INVALID`）。**沒有派工前置閘門**——subagent 回 `NOT_CONNECTED`（DB 連不上）→ 重派一次，
-   只一次、不迴圈；第二次仍是就回報「DB 連線失敗」交管理者依 SOP-21 檢查 oracleMCP 設定。subagent 回 ORACLE_MCP_DOWN
-   （工具清單沒有 oracleMCP_ 工具＝掛載故障）→ 不猜工具名、不重派，交管理者依 SOP-21 重掛，不沿用舊結論。
-   問答一律**先查知識層**——`docs/ps-research/wiki/`（已歸戶的已驗證知識）與
-   `docs/ps-research/<領域>/NN-*.md`（已稽核的研究文件），照
-   `.opencode/peoplesoft/knowledge-retrieval-contract.md`：以 `docs/ps-research/knowledge/index.md`
-   定位（grep 用 `path=目錄`＋`include=檔名`）、只讀對應節、標來源等級、答覆附 `## 來源表`；
-   知識沒有或等級不足才現場檢索。
-2. 搜尋任何 PeopleSoft 物件前，先讀
-   `.opencode/peoplesoft/customization-profile.yaml` 與 `business-domain-map.yaml`；
-   `TW_` 是強客製訊號但非唯一判斷。**未命中已定義領域時，改用
-   `searchPolicy.defaultMode` 繼續搜尋——不得以「領域不存在」拒答。**
-3. 長文本鐵律（任何 agent 都適用）：
-   - `PeoplecodeElasticSearch` 搜到的 chunk ids / snippet 只是候選（SEARCH_CANDIDATE）；
-     必須用 `PeoplecodeSource` 以 chunk id 取回完整段落才能作為證據。
-   - 不可一次載入整支 PeopleCode / SQL / SQR / SQC。
-4. Subagent 回報一律依 `.opencode/peoplesoft/subagent-report-contract.md`
-   （單一 JSON、單段引用 ≤ 5 行、必附 evidence IDs）。
-
-## 一般規則
-
-- 用繁體中文回覆。
-- 查無證據就照實說，不要編造 PeopleSoft 物件名稱或執行期結果。
-- 被使用者指正答錯時，主動提議用 `/ps-lesson <描述>` 登錄教訓
-- 業務知識被指正（如資深同事更正業務邏輯）→ 建議
-  `/ps-correct <正確知識>` 更新 wiki（本機立即生效；團隊走內部 git PR）
-  （本機立即生效；團隊生效走內部 git PR 審核）。
-
-## 框架維護協作須知（給接手的 AI 維護 session）
-
-對話不是記憶體——歷任維護 session 的全部決策與因果都在檔案裡。接手前先讀：
-
-1. `.opencode/peoplesoft/lessons/applied.md`——L 編號帳本，每課含
-   症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
-2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
-3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-10-22 由 `claude/stoic-archimedes-q40rng` 快轉併入
-   oracleMCP 換成 @vdeserto/oracle-mcp-server（L160：主 agent 開線步驟拿掉、查詢 subagent 只開 `oracle_execute_query`、guard／hook 拿掉 connect 目標比對、
-   cookbook 加規則 7b／7c 與「連線與錯誤處理」並把 21 段 SQL 改成一句一段、profile 拿掉 connectionName／connectGuard、analyzer 與沙箱 e2e 改仿新 server），
-   兩版搬運包重生，併入前 `main` 頭 `09e62df`；同日稍早由 `claude/blissful-edison-7hbeqr` 快轉併入
-   主管報告拿掉第 1、7、8 章（其餘章節重新編號），框架檔未動，各份重生，併入前 `main` 頭 `b2347c4`；同日稍早同一分支併入
-   主管報告第 5 章加例子與 5.8 完整例子，框架檔未動，各份重生，併入前 `main` 頭 `91c7fb2`；同日稍早同一分支併入
-   主管報告第 5 章改成完整代碼一覽、協作鐵律加「只改文件的併回不跑 5.1 CI」（L159），框架檔未動，各份重生，併入前 `main` 頭 `4f0121c`；
-   同日稍早同一分支併入
-   主管報告「難在哪裡」精簡為三條，框架檔未動，各份重生，併入前 `main` 頭 `46d09bc`；同日稍早同一分支併入
-   主管報告經兩個 subagent 查核後的修正（L158；代碼確認紀錄的 128、第五輪說明檔補註），框架檔未動，各份重生，併入前 `main` 頭 `afba9a5`；
-   同日稍早同一分支併入
-   給主管的代碼確認工作報告（`docs/design/ui-control-verification-report.md`），框架檔未動，各份重生，併入前 `main` 頭 `0a2bfbe`；
-   2026-10-21 同一分支併入
-   相關顯示定案（兩版 cookbook §2l：相關顯示看 FIELDUSE 16、RELATED_TO＝ASSOCFIELDNUM＋1、DISPLAY_CONTROL 看 FIELDUSE 8；L157）與第七輪結果，
-   各份重生，併入前 `main` 頭 `13ffa06`；同日稍早同一分支併入
-   第六輪結果與第七輪驗證 SQL（`docs/design/ui-metadata-check-r7.md`：ASSOCFIELDNUM 是不是從 0 起算；L156），框架檔未動，各份重生，
-   併入前 `main` 頭 `9cb79cc`；同日稍早同一分支併入
-   代碼確認紀錄（`docs/design/ui-control-sql-record.md` 拿掉數量、只留代碼＝什麼與怎麼確認）、拿掉 R6C 計數 SQL、協作鐵律加「驗證只確認代碼意思」（L155），
-   框架檔未動，各份重生，併入前 `main` 頭 `50fcb81`；同日稍早同一分支併入
-   盤點紀錄補說明（筆數「未統計」不是 0、「不列」是不寫進研究文件、按鈕依 Destination 分四個代碼合計 1131）與 R6C 各代碼筆數 SQL，
-   框架檔未動，各份重生，併入前 `main` 頭 `e363e02`；同日稍早同一分支併入
-   盤點紀錄改寫（`docs/design/ui-control-sql-record.md` 改成每支 SQL 盤點什麼、結果代碼表、輸出怎麼解讀；框架檔未動，AGENTS.md 在 OpenCode 搬運包裡，各份重生），
-   併入前 `main` 頭 `b9eef9c`；同日稍早同一分支併入
-   盤點 SQL 紀錄（`docs/design/ui-control-sql-record.md`）與 Windows 5.1 CI 鎖測試誤判修正（walk 組改用共用 helper、等 60 秒；L154），各份重生，
-   併入前 `main` 頭 `997d414`；同日稍早同一分支併入
-   元件代碼 10／15／23／24 以 App Designer 確認後進 §2l（10 Scroll Bar、15 External Link 按鈕、24 Tab Separator 解碼，23 Horizontal Rule 不列；L153）、
-   第五輪結果與第六輪驗證 SQL（`docs/design/ui-metadata-check-r6.md`），各份重生，併入前 `main` 頭 `7bc739a`；
-   2026-10-20 同一分支併入
-   畫面元件與設計期屬性進研究範本（cookbook §2l、NN「## 畫面元件」、ps-deep-research／ps-ui-flow `pageControls[]`、補研究與 Spec 引擎 `UI.CONTROLS`；L151）、
-   Component 動作與搜尋 Record（cookbook §2m，寫成「## 畫面元件」第一列；元件名稱改成 App Designer 的叫法；L152）、第四輪結果、
-   官方對照與第五輪驗證 SQL（`docs/design/ui-metadata-check-r5.md`），各份重生，併入前 `main` 頭 `e78f5f6`；
-   2026-10-19 同一分支併入 agent 唯讀帳號的表名改帶擁有者前綴（兩版 cookbook 規則 1a 與 61 處樣板、ps-ui-flow／ps-metadata-flow／ps-ae-flow／ps-auditor、profile 註解、
-   ps-doc-lint 導覽證據比對、SOP-30；L150）、第四輪驗證 SQL（`docs/design/ui-metadata-check-r4.md`）與第三輪結果，各份重生，併入前 `main` 頭 `e86d8a6`；
-   同日稍早同一分支併入第三輪驗證 SQL（`docs/design/ui-metadata-check-r3.md`：依特徵自動判代碼、以相關顯示算唯讀位元、必填旁證、唯讀帳號 A 測試）與第二輪結果（框架檔未動、搬運包不變），併入前 `main` 頭 `5b60f84`；
-   同日稍早同一分支併入第二輪驗證 SQL（`docs/design/ui-metadata-check-r2.md`：欄位 Y/N 探查、找校準頁、核對代碼 10 以上）與第一輪結果完結記錄（框架檔未動、搬運包不變），併入前 `main` 頭 `b9f6762`；
-   同日稍早同一分支併入 G1（Group Box 以形狀確認）、V3c（Page 欄位補查）、唯讀帳號檢查改成免 ALTER SESSION＋同義字備案、ORA-02421 說明、結果續記（框架檔未動、搬運包不變），併入前 `main` 頭 `9d5f04c`；
-   2026-10-16 同一分支併入 V6 輕量版（只看客製頁面）、agent 唯讀帳號的授權清單與檢查 SQL、第一輪結果續記（框架檔未動、搬運包不變），併入前 `main` 頭 `12012d5`；
-   同日稍早同一分支併入第一輪驗證說明加第 0 步（設 CURRENT_SCHEMA）與部分結果（備忘 §7.1、HANDOFF；框架檔未動、搬運包不變），併入前 `main` 頭 `2d91149`；
-   2026-10-14 同一分支併入第一輪 metadata 驗證 SQL（`docs/design/ui-metadata-check-r1.md`／`.sql`）與備忘 §7（先 SQL 驗證、改走補查存進知識層；框架檔未動、搬運包不變），併入前 `main` 頭 `20cce49`；
-   同日稍早同一分支併入畫面元件、Prompt／Lookup 與欄位間規則的缺口盤點（提案 `docs/design/ui-control-lookup-dependency-memo.md`＋HANDOFF 一行；框架檔未動、搬運包不變），併入前 `main` 頭 `f76ef5e`；
-   同日稍早由 `claude/magical-hawking-txsbn2` 快轉併入
-   ——跟 deep-research 比：拿掉寫完 Read 回、讀者／判定 effort low、分段 20、時間軸檔、ps-sdoc-diag 一行回報（L149），併入前 `main` 頭 `a4152d8`；
-   同日稍早同一分支併入 ps-sdoc-diag 診斷腳本（代號回報）、每次回應綁小（分段 40 行、研究頁外環上限）、外環設 Claude Code 環境預設、session 失敗但產出合格照收（L148），併入前 `main` 頭 `0c79d43`；
-   同日稍早同一分支併入 Claude Code 版撞 gateway 504 的根因、模型端數據行、卡住提前結束（L147），併入前 `main` 頭 `da14021`；
-   2026-10-13 由 `claude/jolly-tesla-3l8lp5` 快轉併入 session slot 依前端分開、兩版可以同時跑（L146），併入前 `main` 頭 `beadc2b`；
-   同日稍早同一分支併入 Spec 文件流程的 OpenCode 版備案（`ps-sdoc.ps1 -Cli opencode`、模型只在 `.opencode/peoplesoft/sdoc/model.yaml`、與 Claude Code 版並行，
-   `claude-code/` 未動；L145），併入前 `main` 頭 `df83c1b`；
-   同日稍早由 `claude/brave-dirac-4q469u` 快轉併入 Windows 5.1 CI 的端到端測試拆三組平行、部署版面不重跑長測試（L143），併入前 `main` 頭 `3457765`；
-   同日稍早同一分支併入 ps-sdoc 的 Component 用空白分開不再誤塞給 -TimeoutMin（L142），併入前 `main` 頭 `48578f1`；
-   同日稍早同一分支併入狀態圖解讀分段寫出、Windows 5.1 CI 改成需要時才跑（L141），併入前 `main` 頭 `e906726`；
-   同日稍早同一分支併入模型端 504 判讀、session 上限預設 60 分、ps-spec-author 每次一個 session（L140），併入前 `main` 頭 `cf42295`；
-   2026-10-12 同一分支併入搬運包分份（L139），併入前 `main` 頭 `a9abd37`；同日稍早同一分支併入 issue #37 Claude Code 版 Spec 文件流程與
-   Windows PowerShell 5.1 CI，併入前 `main` 頭 `baae9f9`；再之前由 `claude/peoplesoft-framework-handover-0u6b5g`
-   快轉而來；更早接續自 `claude/review-implement-requirement-svqhqt` 的 `67e9b36`）。
-   新的維護 session 從 `main` 頭開自己的分支，交接時併回 `main` 並**回來更新本行**；
-   前後 `main` 頭的 diff＝該任 session 的全部改動（review 邊界）。
-
-與管理者（使用者）協作的鐵律（只活在這裡，別的檔案沒有）：
-
-- **併回 `main` 已授權**（2026-10-13 管理者）：改動在本機測試（需要時加 5.1 CI）驗證過，就直接快轉併回 `main`，
-  不必等管理者說「併回 main」；照樣更新上面的維護版線、重產搬運包，回覆裡說明併回了什麼並附搬運清單。
-- **只改文件的併回不跑 5.1 CI**（2026-10-22 管理者）：只動 `docs/**`、`HANDOFF.md`、`AGENTS.md` 維護版線時，搬運包與 manifest 只因維護版線與檔頭戳記重產；
-  併回 `main` 的最後一筆 commit 訊息加 `[skip ci]`，GitHub 就不啟動 ps51-tests（本機照跑 test-bundle、test-claude-variant）。
-  動到 `scripts/**` 的腳本、`.opencode/**`、`claude-code/**` 或 workflow 的併回不加。
-- 使用者在**公司內網 Windows＋PowerShell 5.1＋OpenCode CLI** 操作，
-  目標模型是本機部署（見 applied.md L6）；一切只經 opencode cli，
-  沒有任何 web UI。
-- 公司網路封鎖 git 下載 → **人工搬運**：你改完檔案只列「改動檔案
-  路徑清單」，使用者自己開 GitHub 網頁 Raw 複製整檔貼回本機——
-  **禁止在對話中貼整檔內容**（浪費 token，使用者開得了 GitHub）。
-- **兩個前端、只搬一版**：公司機只裝 OpenCode 版或 Claude Code 版其中之一，搬運清單只列該版
-  （OpenCode＝`scripts/**`＋`.opencode/**`，manifest `scripts/ps-transfer-manifest.json`；Claude Code＝`scripts/**`＋
-  `claude-code/` 去前綴的 `CLAUDE.md`／`.claude/**`，manifest `scripts/ps-transfer-manifest.claude.json`，每列 `repo` 欄＝GitHub 位置）。
-  改模型讀的規則時兩版對應檔都要改（Claude Code 版只換機制用語）；`scripts/tests/test-claude-variant.ps1` 驗兩版檔案一一對應。
-  管理者要兩版並行時（OpenCode 版的 Spec 文件流程當 Claude Code 版的備案），另搬 OpenCode 版搬運包；可以解在同一個資料夾
-  （`scripts/**` 兩版共用、`.claude/` 不動；有 `CLAUDE.md` 時 Claude Code 不讀 `AGENTS.md`），也可以另開資料夾。
-  同一個資料夾時交接清單兩版搬運包都列（共用 scripts 與兩份 manifest 要同一次交接，ps-fs-doctor 才兩版都一致；SOP-29 第 1 步）。
-- **搬運包（優先）**：`ps-fs-doctor -WriteManifest` 會把每版要搬的檔收成幾份文字檔（每份約 500 KB 以內，只在檔與檔之間切）
-  `transfer/ps-bundle-opencode-01ofNN.txt`…／`transfer/ps-bundle-claude-01ofNN.txt`…，公司機把各份放進同一個資料夾，以
-  `scripts\ps-bundle.ps1 -Bundle <資料夾>` 解開（逐份驗證、整包驗證、三方比對保留本機改過的檔、衝突另存 `.incoming`）。
-  交接時清單只列「該版搬運包的各份」（第一次另列 `scripts/ps-bundle.ps1`），逐份與整包驗證取代逐檔核對；不用搬運包時才給下面的逐檔清單。
-- 搬運清單必附**核對欄**（2026-08 管理者要求）：每檔一列——路徑／
-  新增或修改／行數（供編輯器總行數核對，允許 ±1 行尾差異）；
-  `.ps1` 標註「存 UTF-8 with BOM」。搬完整波跑一次
-  `ps-fs-doctor -Domain <領域>`（檢查 D 抓雙 BOM/FEFF 污染）。
-- **驗證 metadata 代碼只確認意思**（2026-10-21 管理者）：給管理者跑的驗證 SQL 只回答「這個代碼＝哪個元件／設定」，
-  目的是讓 NN 翻譯不誤判；不盤點公司系統裡各有幾個、不要求回報數量，紀錄也不寫數量。比例或筆數只能當確認意思的旁證。
-- 使用者受公司規範限制**無法提供真實檔名與機敏值**——以編號、
-  類別、遮罩值溝通，不要追問原文。
-- 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
-  （.ps-runtime/**）是公司機密：研究產出只進**內部** git，後兩者連內部 git 都不進（已 gitignore，
-  知識索引 docs/ps-research/knowledge/ 同為本機快取），嚴禁外部 remote 或公開貼出；
-  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1／DOC1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
-  不回報路徑、物件名、hash、requestId。
-- `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
-  誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。
-- `.opencode/plugin/*.js` 是 OpenCode 執行期的無狀態 guard 與診斷（task 目標
-  是不是 agent、oracleMCP 掛載診斷；**不是派工閘門**，不保存 READY／todo 狀態）：
-  **零外部 import**（只准 `node:` 內建；公司網路封鎖 npm）、只擋不改參數；
-  `.opencode/.npmrc` 的 `offline=true` 不可拿掉（否則有 plugin 時啟動會等
-  相依安裝逾時）。改 plugin 必跑 `node --test tests/runtime-guard/unit.test.mjs`
-  與 `tests/runtime-guard/run-e2e.mjs`（真 OpenCode＋假 oracleMCP＋假模型）。
-- 規則修改走**最小新增**（只加不刪）、當天記 applied.md、
-  團隊生效靠內部 git PR——實驗先行、規則後補，規則一律從
-  觀察到的行為推導，不從規格書想像。
-- **模型讀的檔（`.opencode/agent`、`skills`、`command`、`peoplesoft/*.md`、
-  `report-templates`）只留規則本身、做法、值域在哪**：出處（issue 編號、日期）、
-  審查／舊版／已廢止之類的變更敘述、外環或 lint 的實作機制，一律寫進
-  `lessons/applied.md`／`SOP.md`／`HANDOFF.md`／commit 訊息，不寫進模型檔。
-  「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
-  `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
-@@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|a6a00b11c5c33eb46bc5f250826d4d686d6342a88b1f41fc176372b5114b5fd2
-@@@PSBUNDLE-PART-END|7e86621cb27f0577|8|8
+@@@PSBUNDLE-PART-END|8a4882d3261ff6c9|6|7

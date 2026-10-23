@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 5cb35d7）第 1／6 份
-# 6 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|5cb35d7|83f90a34982efa76|1|6|10434|a9c3fa509609fd92d4d9242d47cd7e71efb70c218b1b73a123722b4aa9f9a6c6
-@@@PSBUNDLE|1|claude|5cb35d7|149
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3c33eb1）第 1／7 份
+# 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
+@@@PSBUNDLE-PART|1|claude|3c33eb1|8a4882d3261ff6c9|1|7|10442|d9c981386f15a77c081ae38ffd04551790e8eb3bbc0378a1e7bbb337c395da3b
+@@@PSBUNDLE|1|claude|3c33eb1|149
 @@@PSBUNDLE-FILE|.claude/agents/ps-ae-flow.md|69|36003ba655cf8c3c815fadb8637d52d4c12ddfa3a06be6af66439c7426603be2|0
 ---
 name: ps-ae-flow
@@ -355,7 +355,7 @@ hooks:
 
 寫完 Read 回指定檔確認可解析 JSON，回覆僅說「已寫工單指定產物」。不得把機敏內容貼回 stdout，不自行宣布 job 完成。
 @@@PSBUNDLE-END|.claude/agents/ps-clone-worker.md
-@@@PSBUNDLE-FILE|.claude/agents/ps-deep-research.md|510|1fdf3fe80889d787d2661109bdac47267a33737dbfa46e7adf16786331074f45|0
+@@@PSBUNDLE-FILE|.claude/agents/ps-deep-research.md|510|3b3a479dbc98488bb8a9c17b3d23c47ba58b4148603d0dcd78bf935ca550a34e|0
 ---
 name: ps-deep-research
 description: PeopleSoft 業務文件生成（deep research）：對任一業務領域先產總覽＋調查 checklist，再逐功能深查寫成 markdown 到 docs/ps-research/<領域>/。可中斷續跑。問答不產文件請用 ps-orchestrator。
@@ -478,7 +478,7 @@ docs/ps-research/<領域>/
      **絕不可**把它當導覽入口的 fallback、也不可用 `>` 串接。
    · profile `navigation.surfaces` 非 CLASSIC_ONLY 時，只要 `### 導覽入口` 有內容，「## 未解事項」就必須有一行
      「Navigation Collection／Fluid Tile／NavBar 未盤查——不宣稱唯一入口」；CLASSIC_ONLY 不需。
-   有 businessRelevant 條件 UI → 檔內加「條件 UI」小節：每筆一列
+   有 businessRelevant 條件 UI → 加「## 條件 UI」節（接在「## 行為邏輯」之後，照 function-detail 模板）：每筆一列
    「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→
    業務含意」；幾何包含標 INFERRED（此小節不屬必要章節）。
    **「## 畫面與欄位」生命狀態欄的欄位剖析**：欄位所屬 Record 有實體表時，委派 ps-metadata-flow
@@ -600,7 +600,7 @@ docs/ps-research/<領域>/
   （Activate／PostBuild）結構化定位，偵測 UI 狀態變異（含條件分支）。
 - 查無變異 → NN 檔不動、該列打勾，收據記「查無＋查法」。
 - 有 businessRelevant 變異 → 依 suggestedNext 委派 ps-ui-flow 解析
-  （oracleMCP 類，同時 ≤ 3，L109），在該 NN 檔**檔尾追加**「條件 UI」小節
+  （oracleMCP 類，同時 ≤ 3，L109），在該 NN 檔**檔尾追加**「## 條件 UI」節（已有該節就接在該節末尾）
   （格式同階段二步驟 2；證據照契約 CHUNK＋SQL；只追加，不改寫既有內容）。
 - 打勾前快驗照階段二步驟 4（auditor 任務 A）。
 - 不動 wiki——新知識由畢業後提煉相位歸戶。
@@ -2968,7 +2968,7 @@ UNRESOLVED
 高基數 Prompt Table：不回傳全部資料——先 COUNT，只回 Prompt Metadata
 與彙總，遵守遮罩原則（cookbook 使用規則 3／4）。
 @@@PSBUNDLE-END|.claude/peoplesoft/mcp-tool-contracts.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/oracle-query-cookbook.md|992|bade42a4dccf1685714cb4ad73e5930a469278f189f89c67c2e4944c9d41529b|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/oracle-query-cookbook.md|992|cf7a3383c662b408c904f972574cb84a1e9d0acf24f29ed548d6da53df7feaf2|0
 # Oracle Query Cookbook（oracleMCP 查詢樣板）
 
 `oracleMCP` 是唯讀的 Oracle 查詢 MCP（@vdeserto/oracle-mcp-server），連 PeopleSoft 資料庫。
@@ -3687,7 +3687,7 @@ FETCH FIRST 40 ROWS ONLY
 
 值域：
 
-- DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI），不改這裡。
+- DISPLAY_ONLY、INVISIBLE＝設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在 NN 的「## 條件 UI」，不改這裡。
 - 元件名稱＝App Designer 的元件名；按鈕／超連結在冒號後接目的地：PeopleCode Command＝按下去跑所綁欄位的 FieldChange
   （內容寫在「行為邏輯」）、Internal Link＝轉到 GOTO_COMPONENT、Secondary Page＝開 SUBPAGE 那一頁、External Link＝開外部網址
   （網址不在本查詢的欄位裡）。
@@ -4544,7 +4544,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.claude/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/report-templates/function-detail-template.md|131|48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/report-templates/function-detail-template.md|138|7f0ff3a7d1051a88180161fc9f07f8e3f79c7b617f3a8c494a272cfff1bad737|0
 # <NN> <功能名>（[[<Component / 物件名>]]）
 
 > 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE | PARTIAL | BLOCKED
@@ -4621,7 +4621,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 | TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
 | TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
 
-<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
+<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「## 條件 UI」。
      # ＝FIELDNUM（Component 那列寫 0）；屬性與查值的字樣照 §2m、§2l 轉寫規則，不翻譯、不改寫。
      主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
      沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
@@ -4632,6 +4632,13 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 
 - **CONFIRMED**：選 E 時開放免役原因並帶入日期（`<filePath>:<行號>`）
 - **DYNAMIC_RUNTIME**：核准後回寫的目標表由設定檔決定（`<filePath>:<行號>`）
+
+## 條件 UI
+
+- **CONFIRMED**：REQ_TYPE＝E → Group Box「免役資料」顯示 → TW_DEMO_REQHDR.EXEMPT_RSN、TW_DEMO_REQHDR.EXEMPT_DT → 選免役才填原因與日期（`<filePath>:<行號>`）
+
+<!-- 選填、不屬必要章節：只寫影響業務的條件 UI（PeopleCode 在執行期改的顯示、可改、必填），沒有就整節不寫。
+     每筆一列「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→ 業務含意」；「欄位在框內」靠位置判斷的標 INFERRED。 -->
 
 ## 資料流
 
@@ -8273,7 +8280,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 - 文件沒寫就答 `NOT_IN_SPEC`（`text` 可寫你找了哪裡，`ids` 空陣列）。文件明確寫了「沒有」（例如「不適用：…」）是 `ANSWERED`，`ids` 空陣列，`text` 寫文件的說法。
 - 寫完 Read 回 output.json 確認是合法 JSON；回覆只說「已寫工單指定產物」。
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/reader-contract.md
-@@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/research-contract.md|279|1959dff0a53b751e89cd3b6ed111a38e93894476c6e8b771010eee0844aa272b|0
+@@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/research-contract.md|280|f64186ecd7ec57acdb92387a9885acf9fafc0d210535fadba27eb1359f02dc07|0
 # Spec 文件研究契約
 
 讀者是看不到原 PeopleSoft 程式、但能用現代語言與架構開發的獨立 LLM。它要能只讀 00-index 與 14 份文件，就實作指定 Component 的可觀測核心行為，並以保留的原始識別字回查 PeopleSoft。文件描述行為契約，不替讀者選框架，不要求照搬 Component Processor。
@@ -8519,6 +8526,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 
 - 必須處置的分母：本 Component 每個 Page 的每個欄位（扣除 XF），鍵是 `UI/<Component>.<Page>.<Record>.<欄位>`；寫成 CONTROL，或開同鍵 EVIDENCE_GAP。每個 Page 另寫一筆 SCREEN（`<Component>.<Page>`）。
 - 照 clone-contract 的 ui 深度：搜尋與新增／修改模式、Page／Subpage／Scroll level（`regions`）、控制項型別、綁定欄位、畫面文字、出現方式（隱藏的技術欄位標 `HIDDEN_TECHNICAL`）、顯示與可編輯條件（條件式）、選項（顯示文字↔儲存值，儲存值要在欄位值域內，R05）、值來源、畫面初值、純畫面互動。
+- 控制項型別、設計期的隱藏／唯讀／必填、查值來源（Prompt 表與檢核、Translate、Y/N）委派 `ps-ui-flow` 照 cookbook §2l 取得（一個 Page 一次，回報 `pageControls[]`）；模式（`modes`）與搜尋 Record 照 §2m。這些是畫面打開時的預設；PeopleCode 在執行期改的顯示與可編輯照條件式寫進 `visibility`、`editability`。
 - `presence＝CONDITIONAL` 時 `visibility` 不能是 ALWAYS。
 - 會拒絕或寫資料的邏輯不寫在這裡，寫在規則單元，並以規則的 `trigger.control` 指回元件。
 - `usedBy` 列使用此畫面或元件的 FR。
@@ -10435,4 +10443,4 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
   }
 }
 @@@PSBUNDLE-END|.claude/peoplesoft/sdoc/schemas/03-roles-permissions.schema.json
-@@@PSBUNDLE-PART-END|83f90a34982efa76|1|6
+@@@PSBUNDLE-PART-END|8a4882d3261ff6c9|1|7

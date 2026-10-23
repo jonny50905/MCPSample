@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 5cb35d7）第 3／8 份
-# 8 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|5cb35d7|7e86621cb27f0577|3|8|13586|608b26ef91d1529725c77ab4c8879f9cdd91226eba3744290e14265fc1ced0c3
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3c33eb1）第 3／9 份
+# 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
+@@@PSBUNDLE-PART|1|opencode|3c33eb1|39908e8a7932a6d3|3|9|13594|64478c5eb1b4cd700b595725da0b57575cbca52a7f27c920f373ef258fc9ff39
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/README.md|341|d2d0bfb14925d8d071a758239d4a337ac4a57f5efdb76bf62fb93ef1dd3208c8|0
 # PeopleSoft Skills：客製化優先、UI 業務語意與長文本檢索
 
@@ -496,7 +496,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 <!-- 事實變更時：舊事實移到這裡標日期與原因，新事實寫回 Observations -->
 - YYYY-MM-DD 作廢：「<舊事實>」→ 改為「<新事實>」（原因 / evidence）
 @@@PSBUNDLE-END|.opencode/peoplesoft/report-templates/entity-template.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|131|48518b2ebe1125acb393e730e5b87c7b161913b2c61d341480f9221c5d2dc972|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/report-templates/function-detail-template.md|138|7f0ff3a7d1051a88180161fc9f07f8e3f79c7b617f3a8c494a272cfff1bad737|0
 # <NN> <功能名>（[[<Component / 物件名>]]）
 
 > 所屬總覽：[00-overview.md](00-overview.md)　狀態：COMPLETE | PARTIAL | BLOCKED
@@ -573,7 +573,7 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 | TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
 | TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
 
-<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
+<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「## 條件 UI」。
      # ＝FIELDNUM（Component 那列寫 0）；屬性與查值的字樣照 §2m、§2l 轉寫規則，不翻譯、不改寫。
      主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
      沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
@@ -584,6 +584,13 @@ reviewed: false            # true = 人工審定——agent 不得覆寫既有�
 
 - **CONFIRMED**：選 E 時開放免役原因並帶入日期（`<filePath>:<行號>`）
 - **DYNAMIC_RUNTIME**：核准後回寫的目標表由設定檔決定（`<filePath>:<行號>`）
+
+## 條件 UI
+
+- **CONFIRMED**：REQ_TYPE＝E → Group Box「免役資料」顯示 → TW_DEMO_REQHDR.EXEMPT_RSN、TW_DEMO_REQHDR.EXEMPT_DT → 選免役才填原因與日期（`<filePath>:<行號>`）
+
+<!-- 選填、不屬必要章節：只寫影響業務的條件 UI（PeopleCode 在執行期改的顯示、可改、必填），沒有就整節不寫。
+     每筆一列「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→ 業務含意」；「欄位在框內」靠位置判斷的標 INFERRED。 -->
 
 ## 資料流
 
@@ -4234,7 +4241,7 @@ model: anthropic/claude-haiku-4-5
 - 文件沒寫就答 `NOT_IN_SPEC`（`text` 可寫你找了哪裡，`ids` 空陣列）。文件明確寫了「沒有」（例如「不適用：…」）是 `ANSWERED`，`ids` 空陣列，`text` 寫文件的說法。
 - 寫完 read 回 output.json 確認是合法 JSON；回覆只說「已寫工單指定產物」。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/reader-contract.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/research-contract.md|279|dca5e430f7cd99531ee6d34b5f13df02819702914b636f1891fe86ea543588df|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/sdoc/research-contract.md|280|8a884d67286d98ad6748815241671049eb2dbd74bf4fede9f16d238888e6974a|0
 # Spec 文件研究契約
 
 讀者是看不到原 PeopleSoft 程式、但能用現代語言與架構開發的獨立 LLM。它要能只讀 00-index 與 14 份文件，就實作指定 Component 的可觀測核心行為，並以保留的原始識別字回查 PeopleSoft。文件描述行為契約，不替讀者選框架，不要求照搬 Component Processor。
@@ -4480,6 +4487,7 @@ model: anthropic/claude-haiku-4-5
 
 - 必須處置的分母：本 Component 每個 Page 的每個欄位（扣除 XF），鍵是 `UI/<Component>.<Page>.<Record>.<欄位>`；寫成 CONTROL，或開同鍵 EVIDENCE_GAP。每個 Page 另寫一筆 SCREEN（`<Component>.<Page>`）。
 - 照 clone-contract 的 ui 深度：搜尋與新增／修改模式、Page／Subpage／Scroll level（`regions`）、控制項型別、綁定欄位、畫面文字、出現方式（隱藏的技術欄位標 `HIDDEN_TECHNICAL`）、顯示與可編輯條件（條件式）、選項（顯示文字↔儲存值，儲存值要在欄位值域內，R05）、值來源、畫面初值、純畫面互動。
+- 控制項型別、設計期的隱藏／唯讀／必填、查值來源（Prompt 表與檢核、Translate、Y/N）委派 `ps-ui-flow` 照 cookbook §2l 取得（一個 Page 一次，回報 `pageControls[]`）；模式（`modes`）與搜尋 Record 照 §2m。這些是畫面打開時的預設；PeopleCode 在執行期改的顯示與可編輯照條件式寫進 `visibility`、`editability`。
 - `presence＝CONDITIONAL` 時 `visibility` 不能是 ALWAYS。
 - 會拒絕或寫資料的邏輯不寫在這裡，寫在規則單元，並以規則的 `trigger.control` 指回元件。
 - `usedBy` 列使用此畫面或元件的 FR。
@@ -13587,4 +13595,4 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-PART-END|7e86621cb27f0577|3|8
+@@@PSBUNDLE-PART-END|39908e8a7932a6d3|3|9
