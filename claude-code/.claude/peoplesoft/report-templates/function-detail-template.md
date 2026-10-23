@@ -74,7 +74,7 @@
 | TW_DEMO_PG | 6 | TW_DEMO_REQHDR.REQ_TYPE | Drop-Down List Box |  | XLAT |
 | TW_DEMO_PG | 11 | TW_DEMO_WRK.APPROVE_PB | Push Button/Hyperlink: PeopleCode Command |  |  |
 
-<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「行為邏輯」（條件 UI）。
+<!-- 只寫設計期設定；PeopleCode 在執行期改的顯示、可改、必填寫在「## 條件 UI」。
      # ＝FIELDNUM（Component 那列寫 0）；屬性與查值的字樣照 §2m、§2l 轉寫規則，不翻譯、不改寫。
      主物件沒有畫面（AE、SQR、Function Library 等）：本節整節不寫。
      沒查證：內文寫「畫面元件：未查證」，並在「未解事項」記一行查法收據。 -->
@@ -85,6 +85,13 @@
 
 - **CONFIRMED**：選 E 時開放免役原因並帶入日期（`<filePath>:<行號>`）
 - **DYNAMIC_RUNTIME**：核准後回寫的目標表由設定檔決定（`<filePath>:<行號>`）
+
+## 條件 UI
+
+- **CONFIRMED**：REQ_TYPE＝E → Group Box「免役資料」顯示 → TW_DEMO_REQHDR.EXEMPT_RSN、TW_DEMO_REQHDR.EXEMPT_DT → 選免役才填原因與日期（`<filePath>:<行號>`）
+
+<!-- 選填、不屬必要章節：只寫影響業務的條件 UI（PeopleCode 在執行期改的顯示、可改、必填），沒有就整節不寫。
+     每筆一列「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→ 業務含意」；「欄位在框內」靠位置判斷的標 INFERRED。 -->
 
 ## 資料流
 

@@ -539,6 +539,14 @@ $emptyRcpt = Join-Path $root 'empty-receipt.md'
 Write-Utf8 $emptyRcpt @('## 處置', '| 處置 | 查法收據 |', '|---|---|', '| NO_EVIDENCE | ps-peoplecode-flow 搜 TW_DEMO_A 全部事件 2 頁無 File 物件 |', '', '## 追加事實', '| 節 | 信心 | 敘述 | 證據# |', '|---|---|---|---|', '', '## 追加證據', '| 位置 | 說明 | 機器參照 |', '|---|---|---|', '') $false
 $vEmpty = Test-PsSuppReceipt -LiteralPath $emptyRcpt -Capabilities $cap
 Assert ($vEmpty.Ok -and $vEmpty.Disposition -eq 'NO_EVIDENCE' -and $vEmpty.Facts.Count -eq 0 -and $vEmpty.Evidence.Count -eq 0) "收據：查無時兩張空表（只有表頭與分隔列）合格（契約的空表規則）"
+$domH = Join-Path $research 'zz-hdr'
+Write-Utf8 (Join-Path $domH '04-功能丁.md') (New-NnLines '04' 'TW_DEMO_D' @()) $true "`r`n"
+Write-Utf8 (Join-Path $domH '04-功能丁-2.md') @('# 04 功能丁（續）', '') $false
+Write-Utf8 (Join-Path $domH '05-TW_DEMO_E.md') (New-NnLines '05' 'TW_DEMO_E' @()) $false
+Write-Utf8 (Join-Path $domH '06-功能己.md') (New-NnLines '06' 'TW_DEMO_E' @()) $false
+$fhD = Find-PsSuppTargetNn -DomainDir $domH -TargetName 'tw_demo_d'
+$fhE = Find-PsSuppTargetNn -DomainDir $domH -TargetName 'TW_DEMO_E'
+Assert ($fhD.Count -eq 2 -and ($fhD -contains '04-功能丁.md') -and ($fhD -contains '04-功能丁-2.md') -and $fhE.Count -eq 1 -and $fhE[0] -eq '05-TW_DEMO_E.md' -and (Find-PsSuppTargetNn -DomainDir $domH -TargetName 'TW_DEMO_F').Count -eq 0) "目標 NN：檔名是功能名時認檔頭 [[物件]]（含續篇、BOM＋CRLF）；檔名命中優先；都沒有＝0"
 
 Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ""

@@ -861,6 +861,7 @@ request／result 是資料檔（無自由文字），研究只回答 generic nee
    `-GitCommit` 只 commit request 檔到內部 git（永不 push）。
    舊 NN 補「## 畫面元件」：`-FactKind UI.CONTROLS -Properties controls,properties,lookup`（迷你圈委派 ps-ui-flow 跑 cookbook §2m 與 §2l，
    合併時沒有該節就建在「## 畫面與欄位」之後）。新研究的 NN 由 /ps-research 直接寫，不必補。
+   目標 NN 先認檔名（`<兩位數>-<物件>.md`）；檔名是功能名時改認檔頭第一行的 `[[物件]]`（連同 `-<n>` 續篇）——`-Target` 填檔頭的物件名即可。
 2. **執行**：`ps-auto-loop.ps1 -Domain <領域> -SupplementalOnly [-GitCommit]`（迷你圈；exit 4＝完成）；
    `ps-auto-all` 在每個領域判收據前若有 pending 會自動先跑。每 run 至多 2 張（`-SupplementalPerRun`）、
    同一個 NN 一個 run 只合併一張（其餘留到下次 run，仍 pending、不算 attempts）；

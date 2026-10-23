@@ -5,6 +5,12 @@
 
 ## 0. 一句話現況
 
+**條件 UI 進範本、選填節標題正規化、補研究認檔頭、sdoc 畫面研究指向 §2l／§2m（2026-10-23，L161，分支 `claude/nice-heisenberg-cws9q5`）**：本機 Sonnet 檢查新 NN 時誤判「條件 UI」
+小節多寫——它是 agent 規則的選填節、範本沒放，畫面元件註解又寫成「寫在行為邏輯」。兩版範本加選填「## 條件 UI」區塊、註解與 cookbook §2l 改成「寫在『## 條件 UI』」、
+ps-deep-research 指定標題與位置；lint `-FixHeadings` 也正規化「## 畫面元件」「## 條件 UI」（lint 改版＝已畢業收據失效）；`Find-PsSuppTargetNn` 檔名沒命中時認檔頭 `[[ ]]`；
+兩版 sdoc research-contract 的 ui 單元指到 §2l／§2m。管理者這次不搬包、由本機 Sonnet 照 prompt 逐行改 Claude Code 版的檔與 claude manifest 的對應列（ps-fs-doctor 結論 G＝改得一字不差）；
+搬運包照樣重生。
+
 **oracleMCP 換成 @vdeserto/oracle-mcp-server（2026-10-22，L160，分支 `claude/stoic-archimedes-q40rng`）**：新 server 沒有 connect／disconnect（連線＝MCP 設定的
 ORACLE_USER／ORACLE_PASSWORD／ORACLE_CONNECTION_STRING），查詢工具 `oracle_execute_query` 有送出前檢查（分號、註解、DML 字、DBMS_ 都擋）、外層包
 `SELECT * FROM (...) FETCH FIRST n ROWS ONLY`、錯誤只回一句 `Error: …`。框架：主 agent 的開線步驟拿掉（五個工具全關）、查詢 subagent 只開

@@ -535,6 +535,10 @@ $auditUa = @('# 稽核報告','','> 稽核輪次：1','','## 總覽記分卡','|
 [System.IO.File]::WriteAllText((Join-Path $fxDir "90-audit.md"), $auditUa, (New-Object System.Text.UTF8Encoding($true)))
 $lintUa = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom -StrictAudit *>&1 | ForEach-Object { [string]$_ }) -join "`n")
 Assert ($lintUa -match '90-audit\.md 記分卡有 1 檔標「未稽核」' -and $lintUa -match 'FAIL：') "lint -StrictAudit：記分卡「未稽核」列＝違規（L107）"
+[System.IO.File]::WriteAllText((Join-Path $fxDir "49-TW_DEMO_FH.md"), ((@('# 49 標題（TW_DEMO_FH）') + $secs8[0..5] + @('### 畫面元件', '| 頁面 | # |', '**條件UI**', '- x') + $secs8[6..($secs8.Count - 1)] + $goodEv) -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+$fhOut = ((& (Join-Path $repoRoot "scripts/ps-doc-lint.ps1") -Domain $fxDom -FixHeadings *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+$fhNn = [System.IO.File]::ReadAllText((Join-Path $fxDir "49-TW_DEMO_FH.md"))
+Assert ($fhNn -match '(?m)^## 畫面元件\r?$' -and $fhNn -match '(?m)^## 條件 UI\r?$' -and $fhOut -match '\[標題正規化\] 49-TW_DEMO_FH\.md') "-FixHeadings：選填節變體標題（### 畫面元件、**條件UI**）正規化成 ## 正典"
 Remove-Item -Recurse -Force $fxDir
 
 Write-Host "情境 28：lint 導覽主張守衛——技術選單冒充路徑／可見性過度宣稱／誠實 gap 不誤報（issue #24）"

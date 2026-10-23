@@ -4264,3 +4264,31 @@
   test-sdoc-run、test-ps51-static 全過；Claude Code 真 CLI e2e（花 API 費用）沒跑。沒有真 Oracle：外層包 FETCH FIRST 之後 §2k-C 的 WITH／CONNECT BY、
   §7e 的子查詢能不能跑，靠公司機 R44 驗。
 - 待公司機：opencode.json 換 command／environment（SOP-21 步驟 0）、搬兩版搬運包、R0／R1／R3／R44、ps-claude-doctor -Live（Claude Code 版）。
+
+### L161 「條件 UI」小節只寫在 agent 規則、範本沒有，還有一句註解指向「行為邏輯」——檢查的模型以為 NN 多寫了一節；選填章節標題不正規化、補研究只認檔名（2026-10-23）
+
+- 症狀：管理者用 Sonnet 重跑研究後，本機另一個 Sonnet 依 function-detail 範本檢查新 NN，警告「多寫了『條件 UI』小節，不在範本裡」。
+  同一輪排查還看到：舊 NN 送 UI.CONTROLS 補研究時，有的檔名是功能名、跟檔頭 `[[物件]]` 不同，補研究找不到這份 NN。
+- 根因：
+  1. 「條件 UI」小節是 L92 起 ps-deep-research 階段二第 2 步與 U 項的規則（選填、不屬必要章節），但範本從沒放這一節；L151 加畫面元件時，
+     範本註解與 cookbook §2l 寫成「PeopleCode 在執行期改的顯示、可改、必填寫在『行為邏輯』（條件 UI）」，讀起來像要寫進「## 行為邏輯」，
+     跟 agent 規則「另加小節」對不上。只拿範本當章節清單的讀者（檢查用的模型、人）必然誤判。產出的模型沒錯。
+  2. lint `-FixHeadings` 只正規化八個必要章節；「## 畫面元件」「## 條件 UI」寫成 `###`、粗體或少空格時不會被改回 `## ` 正典，
+     而知識索引、補研究（ALREADY_COVERED 判定、缺節插入）、Spec EXTRACT 都只認 `## ` 正典標題。
+  3. `Find-PsSuppTargetNn` 只認檔名 `<兩位數>-<Target>(-<n>).md`，NN 命名規則卻允許功能名；對不上時迷你圈把它當「目標尚無 NN」，
+     在 checklist 加 D 列等研究相位——等於白送。知識索引的 primaryObject 早就以檔頭 `[[ ]]` 為準，兩邊不一致。
+  4. Spec 文件流程（sdoc）的畫面研究要的控制項型別、隱藏／可編輯、查值來源、模式、搜尋鍵，正是 §2l／§2m 的輸出，研究契約卻沒指到這兩支查詢。
+- 落點：
+  1. 兩版 function-detail 範本加選填的「## 條件 UI」區塊（放在「## 行為邏輯」之後；格式與 INFERRED 規則照 agent 規則；沒有就整節不寫），
+     畫面元件註解與兩版 cookbook §2l 改成「寫在『## 條件 UI』」；兩版 ps-deep-research 階段二第 2 步改成「加『## 條件 UI』節（接在『## 行為邏輯』之後，照模板）」，
+     U 項改成「檔尾追加『## 條件 UI』節（已有該節就接在該節末尾）」。
+  2. ps-doc-lint：`$sectionLoose` 加兩個選填節、新增 `$optionalSections`，`-FixHeadings` 改掃必要＋選填；選填節仍不算缺章節。
+     lint 改版＝已畢業領域收據失效（lintScriptHash），下次 batch 重驗——管理者正在重跑研究，順勢一起。
+  3. `Find-PsSuppTargetNn`：檔名沒命中時改認檔頭（前五行內第一個帶 `[[ ]]` 的 `# ` 標題，比對不分大小寫），連同該檔的 `-<n>` 續篇；檔名命中優先。
+     路由掃描、D 列去重、迷你圈選檔、工單都走這一支，一起受惠。
+  4. 兩版 sdoc research-contract 的 ui 單元加一條：元件型別、設計期隱藏／唯讀／必填、查值來源委派 ps-ui-flow 照 §2l；模式與搜尋 Record 照 §2m；
+     執行期改變照條件式寫進 visibility／editability。
+- 測試：test-supplemental 加「功能名檔名認檔頭（含續篇、BOM＋CRLF）、檔名命中優先、都沒有＝0」；test-auto-loop 情境 27 加 `-FixHeadings` 正規化
+  `### 畫面元件`、`**條件UI**`。
+- 原則：**範本是讀者眼中的章節清單**——選填章節也要在範本裡有位置（標明選填與不寫的條件），否則「照範本檢查」的讀者會把正規產出當違規。
+  同一件事的規則散在 agent、範本、cookbook 三處時，三處的說法要一致，不能一處說「另立一節」、一處說「寫進某節」。

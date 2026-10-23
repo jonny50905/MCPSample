@@ -282,8 +282,22 @@ function Find-PsSuppTargetNn {
     $hits = @()
     if (-not [System.IO.Directory]::Exists($DomainDir)) { return , $hits }
     $esc = [regex]::Escape($TargetName)
-    foreach ($f in @(Get-ChildItem -LiteralPath $DomainDir -File -Filter '*.md' -ErrorAction SilentlyContinue)) {
-        if ($f.Name -match ('^(?i)\d\d-' + $esc + '(-\d+)?\.md$') -and $f.Name -notmatch '^(00|90)-') { $hits += $f.Name }
+    $nnFiles = @(Get-ChildItem -LiteralPath $DomainDir -File -Filter '*.md' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\d\d-' -and $_.Name -notmatch '^(00|90)-' })
+    foreach ($f in $nnFiles) {
+        if ($f.Name -match ('^(?i)\d\d-' + $esc + '(-\d+)?\.md$')) { $hits += $f.Name }
+    }
+    # 檔名是功能名時改認檔頭：標題列的 [[<Target>]]＝主物件（同知識索引 primaryObject），連同該檔的 -<n> 續篇
+    if ($hits.Count -eq 0) {
+        foreach ($f in $nnFiles) {
+            $t = Read-PsKnText -LiteralPath $f.FullName
+            if ($null -eq $t) { continue }
+            $m = [regex]::Match($t, '^(?:[^\n]*\n){0,4}?#\s+[^\n]*?\[\[([^\]|#]+)\]\]')
+            if ($m.Success -and [string]::Equals($m.Groups[1].Value.Trim(), $TargetName, [System.StringComparison]::OrdinalIgnoreCase)) { $hits += $f.Name }
+        }
+        foreach ($h in @($hits)) {
+            $stem = [regex]::Escape(($h -replace '\.md$', ''))
+            foreach ($f in $nnFiles) { if ($f.Name -match ('^' + $stem + '-\d+\.md$') -and $hits -notcontains $f.Name) { $hits += $f.Name } }
+        }
     }
     return , (Sort-PsKnOrdinal -Items $hits)
 }

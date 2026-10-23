@@ -243,6 +243,7 @@
 
 - 必須處置的分母：本 Component 每個 Page 的每個欄位（扣除 XF），鍵是 `UI/<Component>.<Page>.<Record>.<欄位>`；寫成 CONTROL，或開同鍵 EVIDENCE_GAP。每個 Page 另寫一筆 SCREEN（`<Component>.<Page>`）。
 - 照 clone-contract 的 ui 深度：搜尋與新增／修改模式、Page／Subpage／Scroll level（`regions`）、控制項型別、綁定欄位、畫面文字、出現方式（隱藏的技術欄位標 `HIDDEN_TECHNICAL`）、顯示與可編輯條件（條件式）、選項（顯示文字↔儲存值，儲存值要在欄位值域內，R05）、值來源、畫面初值、純畫面互動。
+- 控制項型別、設計期的隱藏／唯讀／必填、查值來源（Prompt 表與檢核、Translate、Y/N）委派 `ps-ui-flow` 照 cookbook §2l 取得（一個 Page 一次，回報 `pageControls[]`）；模式（`modes`）與搜尋 Record 照 §2m。這些是畫面打開時的預設；PeopleCode 在執行期改的顯示與可編輯照條件式寫進 `visibility`、`editability`。
 - `presence＝CONDITIONAL` 時 `visibility` 不能是 ALWAYS。
 - 會拒絕或寫資料的邏輯不寫在這裡，寫在規則單元，並以規則的 `trigger.control` 指回元件。
 - `usedBy` 列使用此畫面或元件的 FR。

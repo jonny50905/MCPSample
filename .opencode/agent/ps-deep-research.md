@@ -139,7 +139,7 @@ docs/ps-research/<領域>/
      **絕不可**把它當導覽入口的 fallback、也不可用 `>` 串接。
    · profile `navigation.surfaces` 非 CLASSIC_ONLY 時，只要 `### 導覽入口` 有內容，「## 未解事項」就必須有一行
      「Navigation Collection／Fluid Tile／NavBar 未盤查——不宣稱唯一入口」；CLASSIC_ONLY 不需。
-   有 businessRelevant 條件 UI → 檔內加「條件 UI」小節：每筆一列
+   有 businessRelevant 條件 UI → 加「## 條件 UI」節（接在「## 行為邏輯」之後，照 function-detail 模板）：每筆一列
    「條件 → 目標（Group Box／欄位）→ 受影響業務欄位（≤15 項）→
    業務含意」；幾何包含標 INFERRED（此小節不屬必要章節）。
    **「## 畫面與欄位」生命狀態欄的欄位剖析**：欄位所屬 Record 有實體表時，委派 @ps-metadata-flow
@@ -261,7 +261,7 @@ docs/ps-research/<領域>/
   （Activate／PostBuild）結構化定位，偵測 UI 狀態變異（含條件分支）。
 - 查無變異 → NN 檔不動、該列打勾，收據記「查無＋查法」。
 - 有 businessRelevant 變異 → 依 suggestedNext 委派 @ps-ui-flow 解析
-  （oracleMCP 類，同時 ≤ 3，L109），在該 NN 檔**檔尾追加**「條件 UI」小節
+  （oracleMCP 類，同時 ≤ 3，L109），在該 NN 檔**檔尾追加**「## 條件 UI」節（已有該節就接在該節末尾）
   （格式同階段二步驟 2；證據照契約 CHUNK＋SQL；只追加，不改寫既有內容）。
 - 打勾前快驗照階段二步驟 4（auditor 任務 A）。
 - 不動 wiki——新知識由畢業後提煉相位歸戶。

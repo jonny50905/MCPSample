@@ -449,7 +449,11 @@ $sectionLoose = @{
     '## 執行方式'      = '執行方式'
     '## 未解事項'      = '未解事項'
     '## Evidence 附錄' = 'Evidence[ \t]*附錄'
+    '## 畫面元件'      = '畫面元件'
+    '## 條件 UI'       = '條件[ \t]*UI'
 }
+# 選填章節：不算缺章節，只在 -FixHeadings 正規化變體標題（知識索引、補研究、Spec 只認 `## ` 正典標題）
+$optionalSections = @('## 畫面元件', '## 條件 UI')
 function Get-VariantLinePattern {
     param([string]$Sec)
     return '^[ \t]{0,3}(?:#{1,6}[ \t]*)?(?:\*\*)?[ \t]*' + $sectionLoose[$Sec] +
@@ -493,7 +497,7 @@ if ($FixHeadings) {
             if ($fhText.Length -gt 0 -and [int]$fhText[0] -eq 0xFEFF) { $fhText = $fhText.Substring(1) }
             $fhLines = @($fhText -split "`r?`n")
             $fhChanged = $false
-            foreach ($sec in $requiredSections) {
+            foreach ($sec in ($requiredSections + $optionalSections)) {
                 if ($fhText -match (Get-SectionAnchor $sec)) { continue }   # 正典已在＝不動
                 $vp = Get-VariantLinePattern $sec
                 $hits = @()
