@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 7a7106d）第 7／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 44b885e）第 7／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|7a7106d|eb5a726131081a4c|7|7|1562|8ce075d4254b954ff8e908e934e690b81baa3031b1d60fb121617a04982122ef
+@@@PSBUNDLE-PART|1|claude|44b885e|aa753b6c2344ca0d|7|7|1562|162d0fb08915909f25e21302757dd5545f6fa7e69154f1d8f2347e310632c248
 @@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|554|cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
@@ -557,10 +557,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1003|d5457d3db76aca192f0f1245b28f5569a813979e44c0676ea37868091cb47c00|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1003|800cf7cb2d79baaa7923daa7c23de57a157f9c918b2dd0ce3bb792af8f4af049|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "7a7106d",
+  "commit": "44b885e",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -1435,7 +1435,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-session-lib.ps1",
       "lines": 721,
-      "sha256": "cbc1a21b80dcb1d9ae3ab27253595dd155488a4190aaf72faefc2237b2397214",
+      "sha256": "3cb904683459a9bc0e120118468c159e6dce558216235d45d7a1b2edcd14b070",
       "bom": true
     },
     {
@@ -1562,5 +1562,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|149|69a9d796b8429932c35c621ee7b450f5eb5db7274e247efad3809e4f27951d33
-@@@PSBUNDLE-PART-END|eb5a726131081a4c|7|7
+@@@PSBUNDLE-EOF|149|72e2649b4235bea41869eaab09e107bcb512f79ba99fb666b482ed47cd2d84ab
+@@@PSBUNDLE-PART-END|aa753b6c2344ca0d|7|7

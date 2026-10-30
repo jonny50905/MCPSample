@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a7106d）第 6／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 6／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|7a7106d|48638023159732c0|6|9|6702|3579ba5c2571a7af4a2f531cae3c9c9906b4122e90ce5d3defdf33764f196d01
+@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|6|9|6702|279a03f4a02d17f6ea724f26350245d260979addd8d44fbd0ccbccbf5713afdd
 @@@PSBUNDLE-FILE|scripts/ps-sdoc-lib.ps1|1448|901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c|1
 # ps-sdoc-lib.ps1 — Spec 文件流程（Claude Code 版）的核心：常數、項目工具、ID registry、研究包驗收與合成、canonical 組裝、計算文件。
 # 依賴（呼叫端先載入）：ps-knowledge-lib.ps1（JSON 輸出、hash、原子寫入）、ps-sdoc-schema-lib.ps1、ps-sdoc-status-lib.ps1。
@@ -4977,7 +4977,7 @@ finally {
 Write-Host $code
 exit $exitCode
 @@@PSBUNDLE-END|scripts/ps-sdoc.ps1
-@@@PSBUNDLE-FILE|scripts/ps-session-lib.ps1|721|cbc1a21b80dcb1d9ae3ab27253595dd155488a4190aaf72faefc2237b2397214|1
+@@@PSBUNDLE-FILE|scripts/ps-session-lib.ps1|721|3cb904683459a9bc0e120118468c159e6dce558216235d45d7a1b2edcd14b070|1
 # ps-session-lib.ps1 — headless session 啟動共用邏輯（OpenCode：`opencode run`；Claude Code：`claude -p --agent`）
 # 由 ps-auto-loop.ps1（薄包裝 Invoke-Opencode）、ps-spec.ps1（-Run）、ps-spec-build.ps1、ps-supplemental 迷你圈 dot-source。
 # 責任：挑 .cmd/.exe/.bat 型 shim；以 cmd.exe 啟動 CLI（rc 檔取真實結束碼、.Handle 快取、
@@ -5119,7 +5119,7 @@ function Exit-PsOcSessionSlot {
     $Slot.Mutex = $null
 }
 
-# stream-json 的一行是不是 result 事件：回解析後的物件，不是回 $null。result 事件的鍵順序不固定（新版 Claude Code 把
+# stream-json 的一行是不是 result 事件：是就回解析後的物件，不是就回 $null。result 事件的鍵順序不固定（新版 Claude Code 把
 # "type" 排在幾十個鍵之後，"type":"result" 落在第一千多字元），所以不看位置：含該字樣的行解析 JSON、頂層 type＝result 才算
 # （工具結果裡的同樣字樣在字串內是跳脫過的，巢狀物件的 type 不是頂層）。
 function Get-PsOcResultEvent {
@@ -6703,4 +6703,4 @@ function ConvertTo-PsCloneTrace {
     return (($o -join "`n") + "`n")
 }
 @@@PSBUNDLE-END|scripts/ps-spec-clone-lib.ps1
-@@@PSBUNDLE-PART-END|48638023159732c0|6|9
+@@@PSBUNDLE-PART-END|6696b1a48bf32e64|6|9

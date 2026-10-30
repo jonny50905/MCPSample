@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a7106d）第 3／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 3／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|7a7106d|48638023159732c0|3|9|13594|64478c5eb1b4cd700b595725da0b57575cbca52a7f27c920f373ef258fc9ff39
+@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|3|9|13594|64478c5eb1b4cd700b595725da0b57575cbca52a7f27c920f373ef258fc9ff39
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/README.md|341|d2d0bfb14925d8d071a758239d4a337ac4a57f5efdb76bf62fb93ef1dd3208c8|0
 # PeopleSoft Skills：客製化優先、UI 業務語意與長文本檢索
 
@@ -13595,4 +13595,4 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-PART-END|48638023159732c0|3|9
+@@@PSBUNDLE-PART-END|6696b1a48bf32e64|3|9

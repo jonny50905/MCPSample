@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a7106d）第 9／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 9／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|7a7106d|48638023159732c0|9|9|1716|15eb940e872143988d50d9ea96af0aae5f89e100da488b86524592d8097f3d89
+@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|9|9|1716|af02490dc6b4d842c2d9d9572f141121a80d2b44523301839152720b155d0402
 @@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|554|cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
@@ -557,10 +557,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|0ea483578dc7b9754c275cf8eaa0136eaae6203b99cca7315290cd6528dfb84d|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|3b81b832606a35b7b544c43c462dcee644e3b22d7ee6ae74f97c57ab60fb28a5|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "7a7106d",
+  "commit": "44b885e",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -1375,7 +1375,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-session-lib.ps1",
       "lines": 721,
-      "sha256": "cbc1a21b80dcb1d9ae3ab27253595dd155488a4190aaf72faefc2237b2397214",
+      "sha256": "3cb904683459a9bc0e120118468c159e6dce558216235d45d7a1b2edcd14b070",
       "bom": true
     },
     {
@@ -1716,5 +1716,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|1ecfe62ca118663be96fb5a439df2a38f26f4bbf1179d6bb51fa2a32b79a76ee
-@@@PSBUNDLE-PART-END|48638023159732c0|9|9
+@@@PSBUNDLE-EOF|158|23288ce91b0e390737bec5427815ab10ccc88f1dc6c83a0d767889a6640e1c3f
+@@@PSBUNDLE-PART-END|6696b1a48bf32e64|9|9

@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 7a7106d）第 3／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 44b885e）第 3／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|7a7106d|eb5a726131081a4c|3|7|7735|0c7a8f48f5933ece86e2b2528c6e301932baecfb20d2dc0c4a1d87e66a9378a6
+@@@PSBUNDLE-PART|1|claude|44b885e|aa753b6c2344ca0d|3|7|7735|0c7a8f48f5933ece86e2b2528c6e301932baecfb20d2dc0c4a1d87e66a9378a6
 @@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2647|32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d|1
 # ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
 # 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
@@ -7736,4 +7736,4 @@ Write-Host ($sum2 + ' NEXT=' + $next)
 Write-Host ('NEXT' + $next + '：' + $why)
 exit 0
 @@@PSBUNDLE-END|scripts/ps-sdoc-diag.ps1
-@@@PSBUNDLE-PART-END|eb5a726131081a4c|3|7
+@@@PSBUNDLE-PART-END|aa753b6c2344ca0d|3|7

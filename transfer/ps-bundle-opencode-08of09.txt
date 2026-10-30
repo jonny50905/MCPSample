@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a7106d）第 8／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 8／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|7a7106d|48638023159732c0|8|9|4810|8785b07397a870b91beae194de9210a4178b26112bf9dbecf9a6a2eed1859047
+@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|8|9|4810|8785b07397a870b91beae194de9210a4178b26112bf9dbecf9a6a2eed1859047
 @@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|598|f6c068c0f2b46ced58bc486c80a324ec733514ebe9002e26573da6d70d4b047b|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
@@ -4811,4 +4811,4 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-spec.ps1
-@@@PSBUNDLE-PART-END|48638023159732c0|8|9
+@@@PSBUNDLE-PART-END|6696b1a48bf32e64|8|9
