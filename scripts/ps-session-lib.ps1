@@ -139,7 +139,7 @@ function Exit-PsOcSessionSlot {
     $Slot.Mutex = $null
 }
 
-# stream-json 的一行是不是 result 事件：回解析後的物件，不是回 $null。result 事件的鍵順序不固定（新版 Claude Code 把
+# stream-json 的一行是不是 result 事件：是就回解析後的物件，不是就回 $null。result 事件的鍵順序不固定（新版 Claude Code 把
 # "type" 排在幾十個鍵之後，"type":"result" 落在第一千多字元），所以不看位置：含該字樣的行解析 JSON、頂層 type＝result 才算
 # （工具結果裡的同樣字樣在字串內是跳脫過的，巢狀物件的 type 不是頂層）。
 function Get-PsOcResultEvent {

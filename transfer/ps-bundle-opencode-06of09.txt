@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3c33eb1）第 6／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a7106d）第 6／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3c33eb1|39908e8a7932a6d3|6|9|6694|9d36f401660056a9d0405a32e73d474d40865c4ebc49e5bc4e676179f4959330
+@@@PSBUNDLE-PART|1|opencode|7a7106d|48638023159732c0|6|9|6702|3579ba5c2571a7af4a2f531cae3c9c9906b4122e90ce5d3defdf33764f196d01
 @@@PSBUNDLE-FILE|scripts/ps-sdoc-lib.ps1|1448|901642c95bb86b3a00dff64e3b4f26216801be8d389616a34048e3afcf4e066c|1
 # ps-sdoc-lib.ps1 — Spec 文件流程（Claude Code 版）的核心：常數、項目工具、ID registry、研究包驗收與合成、canonical 組裝、計算文件。
 # 依賴（呼叫端先載入）：ps-knowledge-lib.ps1（JSON 輸出、hash、原子寫入）、ps-sdoc-schema-lib.ps1、ps-sdoc-status-lib.ps1。
@@ -4977,7 +4977,7 @@ finally {
 Write-Host $code
 exit $exitCode
 @@@PSBUNDLE-END|scripts/ps-sdoc.ps1
-@@@PSBUNDLE-FILE|scripts/ps-session-lib.ps1|713|db7af4e7e23ff0c7fb3cb69eb59dfa59429fc8a5a24ffe226df1490f19155e1f|1
+@@@PSBUNDLE-FILE|scripts/ps-session-lib.ps1|721|cbc1a21b80dcb1d9ae3ab27253595dd155488a4190aaf72faefc2237b2397214|1
 # ps-session-lib.ps1 — headless session 啟動共用邏輯（OpenCode：`opencode run`；Claude Code：`claude -p --agent`）
 # 由 ps-auto-loop.ps1（薄包裝 Invoke-Opencode）、ps-spec.ps1（-Run）、ps-spec-build.ps1、ps-supplemental 迷你圈 dot-source。
 # 責任：挑 .cmd/.exe/.bat 型 shim；以 cmd.exe 啟動 CLI（rc 檔取真實結束碼、.Handle 快取、
@@ -5119,20 +5119,30 @@ function Exit-PsOcSessionSlot {
     $Slot.Mutex = $null
 }
 
+# stream-json 的一行是不是 result 事件：回解析後的物件，不是回 $null。result 事件的鍵順序不固定（新版 Claude Code 把
+# "type" 排在幾十個鍵之後，"type":"result" 落在第一千多字元），所以不看位置：含該字樣的行解析 JSON、頂層 type＝result 才算
+# （工具結果裡的同樣字樣在字串內是跳脫過的，巢狀物件的 type 不是頂層）。
+function Get-PsOcResultEvent {
+    param([string]$Line)
+    if ($null -eq $Line -or $Line.IndexOf('"type":"result"', [System.StringComparison]::Ordinal) -lt 0) { return $null }
+    $o = $null
+    try { $o = $Line | ConvertFrom-Json } catch { return $null }
+    if ($null -ne $o -and [string]$o.type -eq 'result') { return $o }
+    return $null
+}
+
 # Claude Code 的 stream-json 輸出 → 最後一個 result 事件的最終回覆寫進 OutFile（與 OpenCode 的 stdout 同語意：外環的
 # 「stdout 回收」與尾行摘錄只看最終回覆）。回 @{ Found; IsError; Subtype; Turns }。
 function Convert-PsOcClaudeStream {
     param([string]$StreamFile, [string]$OutFile)
     $r = @{ Found = $false; IsError = $false; Subtype = ''; Turns = 0 }
     if (-not $StreamFile -or -not (Test-Path -LiteralPath $StreamFile)) { return $r }
-    $last = $null
-    foreach ($ln in [System.IO.File]::ReadLines($StreamFile, (New-Object System.Text.UTF8Encoding($false)))) {
-        $k = $ln.IndexOf('"type":"result"')
-        if ($k -ge 0 -and $k -lt 40) { $last = $ln }
-    }
-    if ($null -eq $last) { return $r }
     $o = $null
-    try { $o = $last | ConvertFrom-Json } catch { return $r }
+    foreach ($ln in [System.IO.File]::ReadLines($StreamFile, (New-Object System.Text.UTF8Encoding($false)))) {
+        $ro = Get-PsOcResultEvent $ln
+        if ($null -ne $ro) { $o = $ro }
+    }
+    if ($null -eq $o) { return $r }
     $r.Found = $true
     $r.IsError = [bool]$o.is_error
     $r.Subtype = [string]$o.subtype
@@ -5213,12 +5223,10 @@ function Get-PsOcClaudeApiRetry {
                 if ($isMain) { $lastMainId = $id }
                 continue
             }
-            $k = $ln.IndexOf('"type":"result"', $ord)
-            if ($k -ge 0 -and $k -lt 40) {
-                $m = [regex]::Match($ln, '"api_error_status":(\d+)')
-                if ($m.Success) { $r.ApiErrorStatus = $m.Groups[1].Value }
-                $m = [regex]::Match($ln, '"duration_api_ms":(\d+)')
-                if ($m.Success) { $r.DurationApiSec = [int]([long]$m.Groups[1].Value / 1000) }
+            $ro = Get-PsOcResultEvent $ln
+            if ($null -ne $ro) {
+                if ([string]$ro.api_error_status -match '^\d+$') { $r.ApiErrorStatus = [string]$ro.api_error_status }
+                if ([string]$ro.duration_api_ms -match '^\d+$') { $r.DurationApiSec = [int]([long][string]$ro.duration_api_ms / 1000) }
             }
         }
     }
@@ -6695,4 +6703,4 @@ function ConvertTo-PsCloneTrace {
     return (($o -join "`n") + "`n")
 }
 @@@PSBUNDLE-END|scripts/ps-spec-clone-lib.ps1
-@@@PSBUNDLE-PART-END|39908e8a7932a6d3|6|9
+@@@PSBUNDLE-PART-END|48638023159732c0|6|9

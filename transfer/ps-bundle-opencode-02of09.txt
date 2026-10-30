@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3c33eb1）第 2／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a7106d）第 2／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3c33eb1|39908e8a7932a6d3|2|9|5878|3aa24c6a312f80bd9c7e48f7ae01abf30d37040c91aaa822ee1e8e2bf5cb0cf0
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4294|f588591a8e7a8239ff1168664d7c75028ffff5ff27f275616e9c46eb7437eb6b|0
+@@@PSBUNDLE-PART|1|opencode|7a7106d|48638023159732c0|2|9|5898|617493eb83ff73d257a98a9c2906d489111b83ea7196fa03efa0d3a146c4cba9
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4314|01065fc2df87c8fd709a443f697945ca526e2f030842148fe6618cff79d103e2|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4296,6 +4296,26 @@
   `### 畫面元件`、`**條件UI**`。
 - 原則：**範本是讀者眼中的章節清單**——選填章節也要在範本裡有位置（標明選填與不寫的條件），否則「照範本檢查」的讀者會把正規產出當違規。
   同一件事的規則散在 agent、範本、cookbook 三處時，三處的說法要一致，不能一處說「另立一節」、一處說「寫進某節」。
+
+### L162 新版 Claude Code 的 result 事件鍵順序變了——「"type":"result" 在前 40 字元」的判斷全部漏抓，out.txt 一個都沒寫（2026-10-30）
+
+- 症狀：公司機 tier 1 畢業後的歸戶提煉，auto-loop.log 每一輪都寫「stream 沒有 result 事件（session 可能在啟動階段就死）」，
+  log 指向的 `*-distill.out.txt` 一個都不存在；但四個 distill 的 `.stream.jsonl` 各有一筆 type＝result。本機 Sonnet 查出該字樣在第 3089 字元。
+- 根因：外環三處用「行首 40 字元內出現 `"type":"result"`」認 result 事件（Convert-PsOcClaudeStream、Get-PsOcClaudeApiRetry、ps-sdoc-diag），
+  前提是 Claude Code 把 `type` 放在第一個鍵。維護端用 Claude Code 2.1.312 實測：assistant／user／system 事件 type 仍在第一個鍵，
+  result 事件卻改成 `duration_api_ms`、`stop_reason`、`session_id`、`total_cost_usd`、`usage`、`modelUsage`…排在前面，`type` 是第 19 個鍵
+  （最小的 session 就落在第 1690 字元）。結果：
+  1. out.txt 不寫——稽核的「stdout 回收」（模型把記分卡印在對話裡沒寫檔時的補救）失效、失敗批次的 out 尾行摘錄沒有東西；
+  2. `is_error`／`api_error_status` 讀不到——「重試用完仍失敗」只剩靠連續重試數判，「Claude Code 回報錯誤收場」那行不會出現；
+  3. `duration_api_ms` 讀不到——模型端數據少了「API 累計秒數」；ps-sdoc-diag 的 RU 欄空白；
+  4. log 的「沒有 result 事件」是誤報，會把人導去查啟動失敗。
+  畢業與提煉本身不受影響：研究、稽核、提煉的產出都是檔案，外環看檔案與 lint，不看 out.txt。
+- 落點：ps-session-lib 新增 `Get-PsOcResultEvent`——含 `"type":"result"` 字樣的行才解析 JSON、頂層 type＝result 才算（不看位置；
+  工具結果字串裡的同樣字樣是跳脫過的，巢狀物件的 type 不是頂層）；Convert-PsOcClaudeStream、Get-PsOcClaudeApiRetry（改讀物件的
+  api_error_status／duration_api_ms）、ps-sdoc-diag 三處改用它。ps-claude-doctor 本來就整行 ConvertFrom-Json 看 `$o.type`，不受影響。
+- 測試：test-claude-variant 加「type 排在後面的 result 也認得、巢狀物件的 type＝result 不算」與「新版 result 的 api_error_status／duration_api_ms」。
+  維護端另以真 Claude Code 2.1.312 的 stream 驗過：Found＝True、out 有內容、API 秒數有值。
+- 原則：**判斷外部程式的輸出格式，不要依賴鍵的位置**——JSON 鍵順序不是契約。效能需要先用字樣篩，篩到的再解析確認。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -5879,4 +5899,4 @@ Search results are candidates only.
 Retrieve exact database chunks before concluding.
 ```
 @@@PSBUNDLE-END|.opencode/peoplesoft/progressive-source-retrieval.md
-@@@PSBUNDLE-PART-END|39908e8a7932a6d3|2|9
+@@@PSBUNDLE-PART-END|48638023159732c0|2|9

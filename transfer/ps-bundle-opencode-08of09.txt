@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3c33eb1）第 8／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 7a7106d）第 8／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3c33eb1|39908e8a7932a6d3|8|9|4801|5486ce3a1a4e288c3ad6e663e1844c269f1be4f2693689aa022669f4c6874ac7
-@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|589|3641964a5c6c66cebdc6c9ab4998fdfb0a750401fd6e2d173928b0b2b236d08b|1
+@@@PSBUNDLE-PART|1|opencode|7a7106d|48638023159732c0|8|9|4810|8785b07397a870b91beae194de9210a4178b26112bf9dbecf9a6a2eed1859047
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|598|f6c068c0f2b46ced58bc486c80a324ec733514ebe9002e26573da6d70d4b047b|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
 #       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
@@ -393,6 +393,13 @@ try {
     Assert ($r.Found -and $r.IsError -and (Get-PsOcFailureKind -OutFile $of -ErrFile '') -eq 'CONTEXT_OVERFLOW') "stream-json：錯誤收場與 context 溢出字樣（Prompt is too long）可辨識"
     [System.IO.File]::WriteAllText($sf, '{"type":"system","subtype":"init"}', (New-Object System.Text.UTF8Encoding($false)))
     Assert (-not (Convert-PsOcClaudeStream -StreamFile $sf -OutFile (Join-Path $dep 'none.txt')).Found) "stream-json：沒有 result 事件 → Found=false"
+    $newRes = '{"duration_api_ms":412345,"stop_reason":"end_turn","session_id":"s","usage":{"input_tokens":2,"output_tokens":4},"is_error":false,"num_turns":5,"subtype":"success","api_error_status":null,"result":"新版收尾","type":"result","duration_ms":9}'
+    $nestedUsr = '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"x"}]},"tool_use_result":{"type":"result","note":"巢狀"}}'
+    [System.IO.File]::WriteAllText($sf, ((@('{"type":"system","subtype":"init"}', $nestedUsr, $newRes) -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $r = Convert-PsOcClaudeStream -StreamFile $sf -OutFile $of
+    $rOut = [System.IO.File]::ReadAllText($of)
+    [System.IO.File]::WriteAllText($sf, ($nestedUsr + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    Assert ($r.Found -and $r.Turns -eq 5 -and $rOut -ceq '新版收尾' -and -not (Convert-PsOcClaudeStream -StreamFile $sf -OutFile (Join-Path $dep 'none2.txt')).Found) "stream-json：result 事件的 type 排在後面（新版鍵順序）也認得；巢狀物件裡的 type＝result 不算"
     # 模型端重試判讀：system/api_retry 事件與 result 的 api_error_status
     function New-ApiRetryLine([int]$A, [string]$S) { return ('{"type":"system","subtype":"api_retry","attempt":' + $A + ',"max_retries":10,"retry_delay_ms":500,"error_status":' + $S + ',"error":"server_error","session_id":"s"}') }
     function Test-ApiStream([string[]]$Lines) { [System.IO.File]::WriteAllText($sf, (($Lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false))); return (Get-PsOcClaudeApiRetry -StreamFile $sf) }
@@ -418,6 +425,8 @@ try {
     Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.ApiErrorStatus -eq '504' -and $a.Trailing -eq 2) "模型端判讀：重試用完（result 帶 api_error_status）→ 卡住；API Error 訊息不算進展"
     $a = Test-ApiStream @($inA, '{"type":"assistant","message":{"content":[{"type":"text","text":"API Error: 401 x"}]}}', '{"type":"result","subtype":"success","is_error":true,"api_error_status":401,"num_turns":0,"result":"API Error: 401"}')
     Assert ($a.Kind -eq 'API_ERROR' -and $a.ApiErrorStatus -eq '401' -and $a.Progress -eq 0) "模型端判讀：沒有重試就以 API 錯誤收場 → API_ERROR"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), $errA, '{"duration_api_ms":412345,"is_error":true,"num_turns":1,"subtype":"success","api_error_status":504,"result":"API Error: 504","type":"result"}')
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.ApiErrorStatus -eq '504' -and $a.DurationApiSec -eq 412) "模型端判讀：新版鍵順序的 result 也讀得到 api_error_status 與 duration_api_ms"
     Assert ((Get-PsOcClaudeApiRetry -StreamFile (Join-Path $dep 'no-such.jsonl')).Kind -eq 'NONE' -and (Get-PsOcClaudeApiRetry -StreamFile '').Kind -eq 'NONE') "模型端判讀：沒有 stream 檔（OpenCode 版）→ NONE"
     Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_SLOW', 'API_RETRY_STUCK') -TimeoutMin 60) -like '卡在模型端*' -and (Get-PsOcApiHint -Kinds @('NONE', 'API_RETRY_SLOW') -TimeoutMin 45) -like '*上限 45 分*-TimeoutMin*' -and (Get-PsOcApiHint -Kinds @('NONE', '') -TimeoutMin 60) -eq '') "模型端判讀：下一步提示——卡住優先、拖慢帶目前上限、沒有模型端事件回空"
     # 模型端數據：assistant 事件的 message.usage（同一個 message id 的幾個區塊算一個請求；usage 裡可能有巢狀物件）、result 的 duration_api_ms
@@ -4802,4 +4811,4 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-spec.ps1
-@@@PSBUNDLE-PART-END|39908e8a7932a6d3|8|9
+@@@PSBUNDLE-PART-END|48638023159732c0|8|9

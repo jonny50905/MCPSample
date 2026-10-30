@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3c33eb1）第 3／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 7a7106d）第 3／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|3c33eb1|8a4882d3261ff6c9|3|7|7736|a41270ff19d8bb958d23ca9f4570c42733fc61781ff3636f524bec8c63a9d692
+@@@PSBUNDLE-PART|1|claude|7a7106d|eb5a726131081a4c|3|7|7735|0c7a8f48f5933ece86e2b2528c6e301932baecfb20d2dc0c4a1d87e66a9378a6
 @@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2647|32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d|1
 # ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
 # 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
@@ -7391,7 +7391,7 @@ function Get-PsSdSpeculationWarnings {
     return , $v.ToArray()
 }
 @@@PSBUNDLE-END|scripts/ps-sdoc-check-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-diag.ps1|344|09f5257bea3f70990ddc03c10355c19e377e7312e88088faa5159d9efe4bf0c4|1
+@@@PSBUNDLE-FILE|scripts/ps-sdoc-diag.ps1|343|73eacb23c3e4b3874ce33160add7895fbbe22ef91d30f14dc5e9d43ede7533fb|1
 # ps-sdoc-diag.ps1 — Spec 文件流程的診斷報告：只印代號與數字（不印路徑、物件名、jobId、hash），可以用唸的回報給維護端。
 # 用法：powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 [-Last 12] [-Cli claude|opencode]
 #   讀 .ps-runtime\sdoc[-opencode]\<job>\attempts\aNNNN\{input.json,outcome.json} 與 .ps-runtime\sdoc[-opencode]-logs\*-<job>-aNNNN.{stream.jsonl,err.txt}，
@@ -7563,8 +7563,7 @@ function Get-DgStreamExtra([string]$Path) {
             }
             $k = $ln.IndexOf('"type":"user"', $ord)
             if ($k -ge 0 -and $k -lt 20) { if ($ln.IndexOf('"tool_result"', $ord) -ge 0) { $resLen = $ln.Length } ; continue }
-            $k = $ln.IndexOf('"type":"result"', $ord)
-            if ($k -ge 0 -and $k -lt 40) {
+            if ($null -ne (Get-PsOcResultEvent $ln)) {
                 $u = $ln.IndexOf('"usage":{', $ord)
                 if ($u -ge 0) {
                     $uf = Get-PsOcUsageFields ($ln.Substring($u, [Math]::Min(600, $ln.Length - $u)))
@@ -7737,4 +7736,4 @@ Write-Host ($sum2 + ' NEXT=' + $next)
 Write-Host ('NEXT' + $next + '：' + $why)
 exit 0
 @@@PSBUNDLE-END|scripts/ps-sdoc-diag.ps1
-@@@PSBUNDLE-PART-END|8a4882d3261ff6c9|3|7
+@@@PSBUNDLE-PART-END|eb5a726131081a4c|3|7
