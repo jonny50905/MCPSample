@@ -5,6 +5,10 @@
 
 ## 0. 一句話現況
 
+**新版 Claude Code result 事件鍵順序變了（2026-10-30，L162，分支 `claude/nice-heisenberg-cws9q5`）**：外環三處用「前 40 字元內有 `"type":"result"`」認 result，
+Claude Code 2.1.3xx 把 type 排到第 19 個鍵 → out.txt 全沒寫、log 誤報「沒有 result 事件」、api_error_status／API 秒數讀不到。改成 `Get-PsOcResultEvent`（含字樣才解析、頂層 type＝result 才算），
+ps-session-lib 兩處與 ps-sdoc-diag 一處改用；test-claude-variant 加兩條。管理者照 prompt 在本機逐行改（scripts 三檔＋claude manifest 對應列）。
+
 **條件 UI 進範本、選填節標題正規化、補研究認檔頭、sdoc 畫面研究指向 §2l／§2m（2026-10-23，L161，分支 `claude/nice-heisenberg-cws9q5`）**：本機 Sonnet 檢查新 NN 時誤判「條件 UI」
 小節多寫——它是 agent 規則的選填節、範本沒放，畫面元件註解又寫成「寫在行為邏輯」。兩版範本加選填「## 條件 UI」區塊、註解與 cookbook §2l 改成「寫在『## 條件 UI』」、
 ps-deep-research 指定標題與位置；lint `-FixHeadings` 也正規化「## 畫面元件」「## 條件 UI」（lint 改版＝已畢業收據失效）；`Find-PsSuppTargetNn` 檔名沒命中時認檔頭 `[[ ]]`；

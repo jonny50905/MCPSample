@@ -389,6 +389,13 @@ try {
     Assert ($r.Found -and $r.IsError -and (Get-PsOcFailureKind -OutFile $of -ErrFile '') -eq 'CONTEXT_OVERFLOW') "stream-json：錯誤收場與 context 溢出字樣（Prompt is too long）可辨識"
     [System.IO.File]::WriteAllText($sf, '{"type":"system","subtype":"init"}', (New-Object System.Text.UTF8Encoding($false)))
     Assert (-not (Convert-PsOcClaudeStream -StreamFile $sf -OutFile (Join-Path $dep 'none.txt')).Found) "stream-json：沒有 result 事件 → Found=false"
+    $newRes = '{"duration_api_ms":412345,"stop_reason":"end_turn","session_id":"s","usage":{"input_tokens":2,"output_tokens":4},"is_error":false,"num_turns":5,"subtype":"success","api_error_status":null,"result":"新版收尾","type":"result","duration_ms":9}'
+    $nestedUsr = '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"x"}]},"tool_use_result":{"type":"result","note":"巢狀"}}'
+    [System.IO.File]::WriteAllText($sf, ((@('{"type":"system","subtype":"init"}', $nestedUsr, $newRes) -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $r = Convert-PsOcClaudeStream -StreamFile $sf -OutFile $of
+    $rOut = [System.IO.File]::ReadAllText($of)
+    [System.IO.File]::WriteAllText($sf, ($nestedUsr + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    Assert ($r.Found -and $r.Turns -eq 5 -and $rOut -ceq '新版收尾' -and -not (Convert-PsOcClaudeStream -StreamFile $sf -OutFile (Join-Path $dep 'none2.txt')).Found) "stream-json：result 事件的 type 排在後面（新版鍵順序）也認得；巢狀物件裡的 type＝result 不算"
     # 模型端重試判讀：system/api_retry 事件與 result 的 api_error_status
     function New-ApiRetryLine([int]$A, [string]$S) { return ('{"type":"system","subtype":"api_retry","attempt":' + $A + ',"max_retries":10,"retry_delay_ms":500,"error_status":' + $S + ',"error":"server_error","session_id":"s"}') }
     function Test-ApiStream([string[]]$Lines) { [System.IO.File]::WriteAllText($sf, (($Lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false))); return (Get-PsOcClaudeApiRetry -StreamFile $sf) }
@@ -414,6 +421,8 @@ try {
     Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.ApiErrorStatus -eq '504' -and $a.Trailing -eq 2) "模型端判讀：重試用完（result 帶 api_error_status）→ 卡住；API Error 訊息不算進展"
     $a = Test-ApiStream @($inA, '{"type":"assistant","message":{"content":[{"type":"text","text":"API Error: 401 x"}]}}', '{"type":"result","subtype":"success","is_error":true,"api_error_status":401,"num_turns":0,"result":"API Error: 401"}')
     Assert ($a.Kind -eq 'API_ERROR' -and $a.ApiErrorStatus -eq '401' -and $a.Progress -eq 0) "模型端判讀：沒有重試就以 API 錯誤收場 → API_ERROR"
+    $a = Test-ApiStream @($inA, $okA, $usrA, (New-ApiRetryLine 1 '504'), (New-ApiRetryLine 2 '504'), $errA, '{"duration_api_ms":412345,"is_error":true,"num_turns":1,"subtype":"success","api_error_status":504,"result":"API Error: 504","type":"result"}')
+    Assert ($a.Kind -eq 'API_RETRY_STUCK' -and $a.ApiErrorStatus -eq '504' -and $a.DurationApiSec -eq 412) "模型端判讀：新版鍵順序的 result 也讀得到 api_error_status 與 duration_api_ms"
     Assert ((Get-PsOcClaudeApiRetry -StreamFile (Join-Path $dep 'no-such.jsonl')).Kind -eq 'NONE' -and (Get-PsOcClaudeApiRetry -StreamFile '').Kind -eq 'NONE') "模型端判讀：沒有 stream 檔（OpenCode 版）→ NONE"
     Assert ((Get-PsOcApiHint -Kinds @('API_RETRY_SLOW', 'API_RETRY_STUCK') -TimeoutMin 60) -like '卡在模型端*' -and (Get-PsOcApiHint -Kinds @('NONE', 'API_RETRY_SLOW') -TimeoutMin 45) -like '*上限 45 分*-TimeoutMin*' -and (Get-PsOcApiHint -Kinds @('NONE', '') -TimeoutMin 60) -eq '') "模型端判讀：下一步提示——卡住優先、拖慢帶目前上限、沒有模型端事件回空"
     # 模型端數據：assistant 事件的 message.usage（同一個 message id 的幾個區塊算一個請求；usage 裡可能有巢狀物件）、result 的 duration_api_ms

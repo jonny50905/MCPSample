@@ -139,20 +139,30 @@ function Exit-PsOcSessionSlot {
     $Slot.Mutex = $null
 }
 
+# stream-json 的一行是不是 result 事件：回解析後的物件，不是回 $null。result 事件的鍵順序不固定（新版 Claude Code 把
+# "type" 排在幾十個鍵之後，"type":"result" 落在第一千多字元），所以不看位置：含該字樣的行解析 JSON、頂層 type＝result 才算
+# （工具結果裡的同樣字樣在字串內是跳脫過的，巢狀物件的 type 不是頂層）。
+function Get-PsOcResultEvent {
+    param([string]$Line)
+    if ($null -eq $Line -or $Line.IndexOf('"type":"result"', [System.StringComparison]::Ordinal) -lt 0) { return $null }
+    $o = $null
+    try { $o = $Line | ConvertFrom-Json } catch { return $null }
+    if ($null -ne $o -and [string]$o.type -eq 'result') { return $o }
+    return $null
+}
+
 # Claude Code 的 stream-json 輸出 → 最後一個 result 事件的最終回覆寫進 OutFile（與 OpenCode 的 stdout 同語意：外環的
 # 「stdout 回收」與尾行摘錄只看最終回覆）。回 @{ Found; IsError; Subtype; Turns }。
 function Convert-PsOcClaudeStream {
     param([string]$StreamFile, [string]$OutFile)
     $r = @{ Found = $false; IsError = $false; Subtype = ''; Turns = 0 }
     if (-not $StreamFile -or -not (Test-Path -LiteralPath $StreamFile)) { return $r }
-    $last = $null
-    foreach ($ln in [System.IO.File]::ReadLines($StreamFile, (New-Object System.Text.UTF8Encoding($false)))) {
-        $k = $ln.IndexOf('"type":"result"')
-        if ($k -ge 0 -and $k -lt 40) { $last = $ln }
-    }
-    if ($null -eq $last) { return $r }
     $o = $null
-    try { $o = $last | ConvertFrom-Json } catch { return $r }
+    foreach ($ln in [System.IO.File]::ReadLines($StreamFile, (New-Object System.Text.UTF8Encoding($false)))) {
+        $ro = Get-PsOcResultEvent $ln
+        if ($null -ne $ro) { $o = $ro }
+    }
+    if ($null -eq $o) { return $r }
     $r.Found = $true
     $r.IsError = [bool]$o.is_error
     $r.Subtype = [string]$o.subtype
@@ -233,12 +243,10 @@ function Get-PsOcClaudeApiRetry {
                 if ($isMain) { $lastMainId = $id }
                 continue
             }
-            $k = $ln.IndexOf('"type":"result"', $ord)
-            if ($k -ge 0 -and $k -lt 40) {
-                $m = [regex]::Match($ln, '"api_error_status":(\d+)')
-                if ($m.Success) { $r.ApiErrorStatus = $m.Groups[1].Value }
-                $m = [regex]::Match($ln, '"duration_api_ms":(\d+)')
-                if ($m.Success) { $r.DurationApiSec = [int]([long]$m.Groups[1].Value / 1000) }
+            $ro = Get-PsOcResultEvent $ln
+            if ($null -ne $ro) {
+                if ([string]$ro.api_error_status -match '^\d+$') { $r.ApiErrorStatus = [string]$ro.api_error_status }
+                if ([string]$ro.duration_api_ms -match '^\d+$') { $r.DurationApiSec = [int]([long][string]$ro.duration_api_ms / 1000) }
             }
         }
     }

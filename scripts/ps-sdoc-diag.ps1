@@ -169,8 +169,7 @@ function Get-DgStreamExtra([string]$Path) {
             }
             $k = $ln.IndexOf('"type":"user"', $ord)
             if ($k -ge 0 -and $k -lt 20) { if ($ln.IndexOf('"tool_result"', $ord) -ge 0) { $resLen = $ln.Length } ; continue }
-            $k = $ln.IndexOf('"type":"result"', $ord)
-            if ($k -ge 0 -and $k -lt 40) {
+            if ($null -ne (Get-PsOcResultEvent $ln)) {
                 $u = $ln.IndexOf('"usage":{', $ord)
                 if ($u -ge 0) {
                     $uf = Get-PsOcUsageFields ($ln.Substring($u, [Math]::Min(600, $ln.Length - $u)))
