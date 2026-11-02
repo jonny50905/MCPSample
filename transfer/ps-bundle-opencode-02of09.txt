@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c9f3db7）第 2／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3de6f4a）第 2／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|c9f3db7|b60bac9268ae117f|2|9|5917|fa2aaa50009138ca5f92043559abae48753b8265a4aa183f38ae027bbf48ba59
+@@@PSBUNDLE-PART|1|opencode|3de6f4a|25495914b6836d20|2|9|5917|fa2aaa50009138ca5f92043559abae48753b8265a4aa183f38ae027bbf48ba59
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4333|d0251ef182b30d07ca1916b64a2af5862333d081458339a3d81e8810732302d9|0
 # 教訓歸檔（applied）
 
@@ -5918,4 +5918,4 @@ Search results are candidates only.
 Retrieve exact database chunks before concluding.
 ```
 @@@PSBUNDLE-END|.opencode/peoplesoft/progressive-source-retrieval.md
-@@@PSBUNDLE-PART-END|b60bac9268ae117f|2|9
+@@@PSBUNDLE-PART-END|25495914b6836d20|2|9

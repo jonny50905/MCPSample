@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit c9f3db7）第 2／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3de6f4a）第 2／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|c9f3db7|b3f33ff186d92af3|2|7|12842|53e341d432239652a04f80eab104768d7df1571a1b94913a5f4889df05c64c82
+@@@PSBUNDLE-PART|1|claude|3de6f4a|99a2e5ec8b28bf01|2|7|12842|53e341d432239652a04f80eab104768d7df1571a1b94913a5f4889df05c64c82
 @@@PSBUNDLE-FILE|.claude/peoplesoft/sdoc/examples/workflow.json|628|f9205464c490aa926f2ad844104bc4ac76dfd0e00fa6b5d0111161b0b478bbbb|0
 {
   "schemaVersion": "1.0",
@@ -12843,4 +12843,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|b3f33ff186d92af3|2|7
+@@@PSBUNDLE-PART-END|99a2e5ec8b28bf01|2|7

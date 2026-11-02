@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit c9f3db7）第 3／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3de6f4a）第 3／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|c9f3db7|b3f33ff186d92af3|3|7|7740|3cd66515400bd9ab06dffc19dcf1645d48d26d0c43677058f58eaa45cd4070a3
+@@@PSBUNDLE-PART|1|claude|3de6f4a|99a2e5ec8b28bf01|3|7|7741|6d7f2bd58d2cd955569184036379b37ba576dadcda74f99849f275d46ad8ed60
 @@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2647|32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d|1
 # ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
 # 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
@@ -3073,7 +3073,7 @@ function ConvertTo-PsBzFindingsMd {
     return (($lines -join "`n") + "`n")
 }
 @@@PSBUNDLE-END|scripts/ps-bizspec-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-bizspec.ps1|541|d6a74ed7c1a5f8b9b0189ab6e4482d5c562537f5c2dae01d64ba134e1967537c|1
+@@@PSBUNDLE-FILE|scripts/ps-bizspec.ps1|542|7a1b6f56dc03cfe3bfaab55edab16efbdc9fd2e646ae38b1d4fc72dc96aa3c8a|1
 # ps-bizspec.ps1 — /ps-spec 的業務需求文件流程（BIZ1）。寫手 session 照 <框架>/peoplesoft/bizspec/standard.md 寫業務需求文件；
 # 外環逐字比對證據、退回修正、補查（只查「該問誰＝Spec 產製端」的開放假設）、回填、套用業務窗口回覆。PowerShell 5.1；公司機資料只留本機。
 # 輸入 .ps-private/bizspec/<job>/（status.md、project.md、answers.md）＋知識層 docs/ps-research/；執行狀態 .ps-runtime/bizspec/<job>/；
@@ -3340,6 +3340,7 @@ function Get-BzNext($Job) {
     }
     $listed = Get-PsBzQueryRows $J.OutputRoot
     $pending = @(); foreach ($e in $led.entries) { if (-not $listed.ContainsKey([System.IO.Path]::GetFileName($e.file).ToLowerInvariant())) { $pending += $e } }
+    if ($pending.Count -eq 0) { $Job.backfillTries = 0 }
     if ($pending.Count -gt 0) {
         if ($Job.backfillTries -ge 2) { return @{ Kind = 'BLOCKED'; Reason = '補查結果回填兩次後 10.2 仍沒有列出全部補查檔' } }
         return @{ Kind = 'BACKFILL'; Entries = $pending }
@@ -7741,4 +7742,4 @@ if ($Slice -ne '') {
     exit 0
 }
 @@@PSBUNDLE-END|scripts/ps-knowledge.ps1
-@@@PSBUNDLE-PART-END|b3f33ff186d92af3|3|7
+@@@PSBUNDLE-PART-END|99a2e5ec8b28bf01|3|7

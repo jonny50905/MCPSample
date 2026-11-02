@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit c9f3db7）第 7／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3de6f4a）第 7／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|c9f3db7|b3f33ff186d92af3|7|7|1608|26b6ed62e5341d16a610a134d98dea57ebf35ed537ff82c5cf3af99a3528a28d
+@@@PSBUNDLE-PART|1|claude|3de6f4a|99a2e5ec8b28bf01|7|7|1608|0d8e23ecb3bc340215e049355fb50004b1a1bb800d87a866ae9ef6e78610322a
 @@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|554|cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
@@ -557,10 +557,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1049|bf645b28a88c8af2a4d0209f6684dbe3e994c74370f46ea2051bbee100491c0d|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1049|8966cd872de8f0f3a5000ddcd22b7c33c625afc5541dd448ecec903ccdb2d9fa|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "c9f3db7",
+  "commit": "3de6f4a",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -1372,8 +1372,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-bizspec.ps1",
-      "lines": 541,
-      "sha256": "d6a74ed7c1a5f8b9b0189ab6e4482d5c562537f5c2dae01d64ba134e1967537c",
+      "lines": 542,
+      "sha256": "7a1b6f56dc03cfe3bfaab55edab16efbdc9fd2e646ae38b1d4fc72dc96aa3c8a",
       "bom": true
     },
     {
@@ -1608,5 +1608,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|156|bf5e825f6874d5d6bc881b5a014df4a9aec73b4461a6cb743cbdf2bdf0033783
-@@@PSBUNDLE-PART-END|b3f33ff186d92af3|7|7
+@@@PSBUNDLE-EOF|156|ff962d48f7e428e80ca1ac298dec73b2684ae2beebc2e7a52e8404833e4cd21a
+@@@PSBUNDLE-PART-END|99a2e5ec8b28bf01|7|7

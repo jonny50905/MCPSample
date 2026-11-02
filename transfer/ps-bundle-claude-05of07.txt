@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit c9f3db7）第 5／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3de6f4a）第 5／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|c9f3db7|b3f33ff186d92af3|5|7|6766|7f44661bfb386ca5d6076dd9edbda5d31b3e64d544088bbba36f1e354afa9ee3
+@@@PSBUNDLE-PART|1|claude|3de6f4a|99a2e5ec8b28bf01|5|7|6766|7f44661bfb386ca5d6076dd9edbda5d31b3e64d544088bbba36f1e354afa9ee3
 @@@PSBUNDLE-FILE|scripts/ps-spec-clone-lib.ps1|544|beeb5c7e07779f5eb7f9b7c71a045f37dad61c9d196bd3087401747366f092b9|1
 # ps-spec-clone-lib.ps1 — 核心重建規格的封閉資料契約、結構驗證與確定性 Markdown。
 # 先 dot-source ps-knowledge-lib.ps1；本檔不查 DB、不叫模型、不寫研究文件。
@@ -6767,4 +6767,4 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-bundle.ps1
-@@@PSBUNDLE-PART-END|b3f33ff186d92af3|5|7
+@@@PSBUNDLE-PART-END|99a2e5ec8b28bf01|5|7

@@ -264,6 +264,7 @@ function Get-BzNext($Job) {
     }
     $listed = Get-PsBzQueryRows $J.OutputRoot
     $pending = @(); foreach ($e in $led.entries) { if (-not $listed.ContainsKey([System.IO.Path]::GetFileName($e.file).ToLowerInvariant())) { $pending += $e } }
+    if ($pending.Count -eq 0) { $Job.backfillTries = 0 }
     if ($pending.Count -gt 0) {
         if ($Job.backfillTries -ge 2) { return @{ Kind = 'BLOCKED'; Reason = '補查結果回填兩次後 10.2 仍沒有列出全部補查檔' } }
         return @{ Kind = 'BACKFILL'; Entries = $pending }
