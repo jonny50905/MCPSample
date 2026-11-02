@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3de6f4a）第 9／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0e7d121）第 9／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3de6f4a|25495914b6836d20|9|9|1758|9a192ffdfcc0d06918b4647b02e19ee9b5f62459fdbd60ea82ae80d38a7be002
+@@@PSBUNDLE-PART|1|opencode|0e7d121|4cd913749d7167c9|9|9|1759|d678cda6bb9778a2726daeee6d7990c4533865811a8b1c89f3cd4e07dcd815fe
 @@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|554|cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
@@ -557,10 +557,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|1002|6056bf0d97c8e0a9d667977d0c2fe9317cf6051e274a8915d44e7a53c897bb78|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|1002|daff54cde52702ed46711cf1cde2c9bb56af815bc23779a9b61594a26dec6fea|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "3de6f4a",
+  "commit": "0e7d121",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -1561,7 +1561,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|195|dc3ace8835f7b721581cc6c06b16fbfa7a26455f6ae38f50b7567b65230a5cbd|0
+@@@PSBUNDLE-FILE|AGENTS.md|196|f3166719c5ed93598611963cb0579160f0d5795c03fac4dfac515cc59f5d2b5f|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -1641,7 +1641,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-10-30 由 `claude/nice-heisenberg-cws9q5` 快轉併入
+4. **維護版線**：`main` 是正式版線（最近一次：2026-11-02 由 `claude/bold-cori-jbk4bz` 快轉併入
+   /ps-spec 改成業務需求文件（BIZ1：`scripts/ps-bizspec*.ps1`、兩版 `peoplesoft/bizspec/`（standard.md 含第 10 章證據、query-contract.md）、agents ps-bizspec-writer／ps-bizspec-query、ps-spec-author 與 /ps-spec 改走 ps-bizspec；規範 `docs/business-spec/` 由 Opus／Fable／Sonnet 起草、三輪 9 份 Sonnet 試寫驗證；DOC1 保留直接跑 ps-sdoc.ps1；L163），兩版搬運包重生，併入前 `main` 頭 `7a7e3c2`；2026-10-30 由 `claude/nice-heisenberg-cws9q5` 快轉併入
    新版 Claude Code result 事件鍵順序的修正（`Get-PsOcResultEvent`：不看位置、頂層 type＝result 才算；ps-session-lib 兩處、ps-sdoc-diag 一處；L162），
    兩版搬運包重生，併入前 `main` 頭 `b8d4c48`；2026-10-23 同一分支快轉併入
    「條件 UI」進兩版 NN 範本（選填，放在「## 行為邏輯」之後；畫面元件註解與 cookbook §2l 改成「寫在『## 條件 UI』」、ps-deep-research 指定標題與位置）、
@@ -1758,5 +1759,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|165|cdb71df71ab546a560b4f60d80a39fa719d08ded1f389b28eb02cb571dff3575
-@@@PSBUNDLE-PART-END|25495914b6836d20|9|9
+@@@PSBUNDLE-EOF|165|876fd40c627c2f0f029cbb25bab11988d230c52015fae320177f76436f137324
+@@@PSBUNDLE-PART-END|4cd913749d7167c9|9|9

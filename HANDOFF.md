@@ -5,7 +5,7 @@
 
 ## 0. 一句話現況
 
-**/ps-spec 改成業務需求文件（2026-11-02，L163，分支 `claude/bold-cori-jbk4bz`，未併回 main）**：管理者以 PO 角度要「只談業務需求、不談系統設計」的規範並取代
+**/ps-spec 改成業務需求文件（2026-11-02，L163，分支 `claude/bold-cori-jbk4bz` 快轉併回 main，併入前 main 頭 `7a7e3c2`；Windows 5.1 CI 18 個 job 全過）**：管理者以 PO 角度要「只談業務需求、不談系統設計」的規範並取代
 原本 00-index＋14 份＋90 的格式，另加證據章避免幻覺。規範 `docs/business-spec/standard.md`（＝兩版 `peoplesoft/bizspec/standard.md`）由 Opus／Fable／Sonnet 分章起草、
 三輪各 3 份 Sonnet 試寫與覆核定稿（第三輪滿分、零編造；紀錄在 `docs/business-spec/validation/`）。新外環 `scripts/ps-bizspec.ps1`（BIZ1）：寫手 session 照規範寫、
 逐字比對第 10 章證據、退回修正、補查「該問誰＝Spec 產製端」的假設（ps-bizspec-query 只寫 evidence/Q-A-###.md，外環記帳本）、回填、套 answers.md 的業務回覆。

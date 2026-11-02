@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3de6f4a）第 6／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0e7d121）第 6／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|3de6f4a|25495914b6836d20|6|9|7117|1e84578878a078e4a154348f44e31083aac19cbfa05406bab49f12f200b4771b
+@@@PSBUNDLE-PART|1|opencode|0e7d121|4cd913749d7167c9|6|9|7117|1e84578878a078e4a154348f44e31083aac19cbfa05406bab49f12f200b4771b
 @@@PSBUNDLE-FILE|scripts/ps-sdoc-check-lib.ps1|614|fdd31bdb7f176c5795c3ab60e73a0032b7eb649e167dc123bef2b50e12d94c8f|1
 # ps-sdoc-check-lib.ps1 — Spec 文件流程的 L2（參照與一致性）與 L3（覆蓋）檢核，另有 S07 推測用語警告。
 # 輸入是 Build-PsSdModel 的結果（Items：前綴 → 項目清單；ById：ID → 項目）。每筆結果 @{ Doc; Layer（L2／L3／W）; Code; Message }。
@@ -7118,4 +7118,4 @@ finally { if ($held -and $null -ne $mutex) { $mutex.ReleaseMutex() }; if ($null 
 Write-Host $code
 exit $exitCode
 @@@PSBUNDLE-END|scripts/ps-spec-build.ps1
-@@@PSBUNDLE-PART-END|25495914b6836d20|6|9
+@@@PSBUNDLE-PART-END|4cd913749d7167c9|6|9
