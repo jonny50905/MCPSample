@@ -42,22 +42,24 @@ Record 定義與 Portal Registry 裡，客製（`TW_` 前綴等）又疊在原�
 框架的做法：**先用模型把領域探勘成結構化文件，再用機械稽核逼它拿出證據**，
 最後沉澱成可直接問答的 wiki。
 
-## 用 Component 直接產生重建規格
+## 用 Component 直接產生業務需求文件
 
 在 OpenCode 對話輸入 `/ps-spec TW_DEMO_A TW_DEMO_B`，或切到 `ps-spec-author`
 後直接輸入一個或多個 Component；不開對話也可以在 PowerShell 執行
-`powershell -NoProfile -File scripts\ps-sdoc.ps1 -Cli opencode -Components 'TW_DEMO_A,TW_DEMO_B'`。
-名稱只是合成範例，請在公司機換成確切名稱。不必先填 pack JSON、不必指定 Domain、不必先研究整個領域。
+`powershell -NoProfile -File scripts\ps-bizspec.ps1 -Cli opencode -Components 'TW_DEMO_A,TW_DEMO_B'`。
+名稱只是合成範例，請在公司機換成確切名稱。不必先填 pack JSON、不必指定 Domain。
 
-產出是給另一個 LLM 重建功能用的 Spec 文件：00-index（入口）、14 份文件、90 問題清單（DOC1，與 Claude Code 版同一個外環）。
-人工輸入是這組 Component 的狀態圖（`.ps-private/sdoc-opencode/<job>/status.md`）；之後三位讀者解讀狀態圖、
-依序研究範圍、資料、權限、流程、介面、功能、畫面、規則、操作、測試（每頁研究與獨立覆核分開 session），
-最後由只看文件的乾淨讀者驗證讀得懂。外環開的 session 用的模型**只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定**。
+產出是照 `.opencode/peoplesoft/bizspec/standard.md` 寫的業務需求文件（BIZ1）：第 0～10 章＋附錄，只談業務需求、不談系統設計；
+每條需求與假設都有證據編號，對到第 10 章逐字摘錄的來源原文。來源是知識層 `docs/ps-research/` 加人工輸入
+（`.ps-private/bizspec-opencode/<job>/` 的 status.md、project.md、answers.md）。外環逐字比對證據、不合格退回修正，
+對「該問誰＝Spec 產製端」的開放假設開補查 session（結果檔只有補查 session 能寫），再請寫手回填。外環開的 session 用的模型
+**只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定**。
 
-輸出位於 `docs/ps-spec-opencode/<job>/README.md`（最新文件入口）。中斷後重送相同清單即續跑；
-缺證據會留下草稿與 90 的問題，不會宣稱已完成。`REVIEW_READY` 表示可供內部審閱，**不是企業 E2E 或重建等價保證**。
-詳見 [SOP-29](.opencode/peoplesoft/SOP.md#sop-29-spec-文件-opencode-版claude-code-版的備案兩版並行)（與 Claude Code 版並行的方式）
-與 SOP-28。舊的單一 spec.md（CLONE1）仍可直接跑 `scripts/ps-spec-build.ps1`（SOP-25）；
+輸出位於 `docs/ps-spec-opencode/<job>/README.md`。中斷後重送相同清單即續跑；`BIZ1-7-01` 表示外環檢查全過、沒有開放假設，
+可供內部審閱，**不是業務驗收**。詳見 [SOP-31](.opencode/peoplesoft/SOP.md)。規範本身的寫法與試寫驗證見 `docs/business-spec/`。
+
+Spec 文件流程（00-index＋14 份＋90，DOC1）保留：直接跑 `scripts\ps-sdoc.ps1 -Cli opencode -Components '…'`（SOP-28、SOP-29）。
+舊的單一 spec.md（CLONE1）仍可直接跑 `scripts/ps-spec-build.ps1`（SOP-25）；
 既有公司 Template／Checklist 精準映射仍可用 SOP-24 的私有 pack 路徑。
 
 ## 證據契約（整個框架的地基）
@@ -118,7 +120,7 @@ skill    決定「怎麼做」   載入當下 context 的作業程序（查法�
 
 | 指令 | 做什麼 |
 |---|---|
-| `/ps-spec <Component...>` | 直接產 Spec 文件（00-index＋14 份＋90 問題清單）；支援複數 Component、分頁研究／獨立覆核、乾淨讀者驗證與續跑 |
+| `/ps-spec <Component...>` | 直接產業務需求文件（照 bizspec/standard.md，含證據章）；支援複數 Component、證據逐字比對、補查、續跑 |
 | `/ps-research <領域>` | 產完整業務文件：總覽 ＋ 逐功能深查 → `docs/ps-research/<領域>/`。中斷後重跑即續跑 |
 | `/ps-audit <領域>` | 稽核：逐檔委派 `ps-auditor` 做證據解引用、claim 反駁抽驗、完整性 diff → 產 `90-audit.md`，問題回灌 checklist |
 | `/ps-lesson <描述>` | 模型答錯時登錄教訓：自動分類落點、套用最小修改、記進 `applied.md` |
@@ -135,7 +137,9 @@ OpenCode 內建 agent 重新上鎖。
 
 | Agent | 類型 | 職責 |
 |---|---|---|
-| `ps-spec-author` | all | 對話／委派入口：接收 Component，執行 Spec 文件外環（`ps-sdoc.ps1 -Cli opencode`），回報文件與缺口 |
+| `ps-spec-author` | all | 對話／委派入口：接收 Component，執行業務需求文件外環（`ps-bizspec.ps1 -Cli opencode`），回報文件與缺口 |
+| `ps-bizspec-writer` | primary | 業務需求文件外環專用：照 bizspec/standard.md 寫、修正、套回覆、回填補查；只寫該工作的輸出資料夾（evidence/ 除外） |
+| `ps-bizspec-query` | primary | 業務需求文件外環專用：補查一筆「該問誰＝Spec 產製端」的假設，委派 flow subagent 查證，只寫 evidence/Q-A-###.md |
 | `ps-status-reader` | primary | Spec 文件外環專用：三位讀者之一，獨立解讀狀態圖（或回答第 2 輪確認），只寫工單指定的檔 |
 | `ps-sdoc-worker` | primary | Spec 文件外環專用：一頁研究或獨立覆核，委派 flow subagent 查證，只寫該 attempt 的 output.json |
 | `ps-spec-reader` | primary | Spec 文件外環專用：L5 乾淨讀者，只讀渲染後文件作答 |
@@ -296,7 +300,8 @@ BOM**，從哪個工作目錄執行都可以（腳本自己以 `$PSScriptRoot` �
 | `ps-supplemental.ps1`（＋`ps-supplemental-lib.ps1`） | 補研究 request 提交／狀態／結果；執行在 `ps-auto-loop -SupplementalOnly` | `docs/ps-research/supplemental/requests/` |
 | `ps-spec.ps1`（＋`ps-spec-lib.ps1`） | Spec 引擎：私有需求包驗證、規劃、外環、render、gate、doctor | `.ps-runtime/spec/`（gitignore） |
 | `ps-spec-build.ps1`（＋`ps-spec-clone-lib.ps1`） | Component 直接產核心重建 Spec：範圍、分段研究、獨立覆核、自動組文／續跑 | `.ps-runtime/clone-spec/`、`docs/ps-spec/`（皆 gitignore） |
-| `ps-sdoc.ps1 -Cli opencode`（＋`ps-sdoc-*-lib.ps1`） | Spec 文件（`/ps-spec` 的外環）：狀態圖解讀、依序研究與獨立覆核、乾淨讀者、組裝發布；模型讀 `.opencode/peoplesoft/sdoc/model.yaml` | `.ps-private/sdoc-opencode/`、`.ps-runtime/sdoc-opencode/`、`docs/ps-spec-opencode/`（皆 gitignore） |
+| `ps-bizspec.ps1 -Cli opencode`（＋`ps-bizspec-lib.ps1`） | 業務需求文件（`/ps-spec` 的外環）：寫手 session、證據逐字比對、退回修正、補查、回填；模型讀 `.opencode/peoplesoft/sdoc/model.yaml` | `.ps-private/bizspec-opencode/`、`.ps-runtime/bizspec-opencode/`、`docs/ps-spec-opencode/`（皆 gitignore） |
+| `ps-sdoc.ps1 -Cli opencode`（＋`ps-sdoc-*-lib.ps1`） | Spec 文件（直接執行；DOC1）：狀態圖解讀、依序研究與獨立覆核、乾淨讀者、組裝發布；模型讀 `.opencode/peoplesoft/sdoc/model.yaml` | `.ps-private/sdoc-opencode/`、`.ps-runtime/sdoc-opencode/`、`docs/ps-spec-opencode/`（皆 gitignore） |
 | `ps-session-lib.ps1` | headless session 啟動（`opencode run`／`claude -p --agent`）＋session slot 互斥鎖（兩版各一把；函式庫） | log |
 | `ps-cli-lib.ps1` | 前端版本描述：`.claude/peoplesoft` 存在＝Claude Code 版（`PS_CLI` 可強制），決定框架目錄、CLI 與搬運 manifest（函式庫） | — |
 | `ps-claude-doctor.ps1` | Claude Code 版安裝健檢（hook 自測、MCP 註冊、`-Live` 測試查詢 `SELECT 1 AS OK FROM DUAL`） | 唯讀（`-Live` 寫 log） |

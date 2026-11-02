@@ -9,8 +9,8 @@
     },
     {
       "path": ".opencode/agent/ps-spec-author.md",
-      "sha256": "3FC22300CB9E1DF1833FB34E0713D2E86B028C4C6A5DC16C29E2582C135B2334",
-      "lines": 85
+      "sha256": "AED47554B9E4B98EFC4BF6F51F107AEEB24C09031BE1A244421F3BD2D223C6A3",
+      "lines": 83
     },
     {
       "path": ".opencode/agent/ps-spec-worker.md",
@@ -29,7 +29,7 @@
     },
     {
       "path": ".opencode/command/ps-spec.md",
-      "sha256": "D15DFF3A59990F7069DC6858AEAC242E6093DB98AB147B370E8B32241BF6F24E",
+      "sha256": "8D85E8BF67EE2D20863ADA7C78B8C8858CDC390E0A5CD297949EF2E49F09B619",
       "lines": 14
     },
     {
@@ -84,8 +84,8 @@
     },
     {
       "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "sha256": "BD1636DB6BFA690F805D231AE9E45B871061E71AF90C30868237033DE2C0FAF3",
-      "lines": 211
+      "sha256": "080DB6AD65E33FF385AFCC4245D26EE8483AEE477F110E2C3371DAAD09476C0A",
+      "lines": 230
     },
     {
       "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",

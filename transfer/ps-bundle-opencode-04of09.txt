@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 4／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c9f3db7）第 4／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|4|9|5789|25ec941887649142b65faa6bb8c8b8c68fd4edd1eac6e1ec9b756916c82ced82
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1303|c3bd7b0f493b4eaae38094448c3f60fc91643a45596812f804c7b8c12558b093|0
+@@@PSBUNDLE-PART|1|opencode|c9f3db7|b60bac9268ae117f|4|9|5853|5659613bfbac1259f38b60b0238798fd83cd4a19123d81cd965c93b36c496557
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1348|f468f665720c87a7aedaed1b73736c08495c0d71ba4fb2f420d82fb30e057199|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -1053,7 +1053,7 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
 
 ## SOP-28 Spec 文件（00-index＋14 份文件＋90 問題清單；issue #37）
 
-兩版的 `/ps-spec` 都走 `scripts/ps-sdoc.ps1`。本節以 Claude Code 版為主；OpenCode 版（外環加 `-Cli opencode`、目錄各加 `-opencode`、
+`/ps-spec` 已改走業務需求文件流程（SOP-31）；本節的 Spec 文件流程保留，直接在 PowerShell 跑 `scripts\ps-sdoc.ps1`。本節以 Claude Code 版為主；OpenCode 版（外環加 `-Cli opencode`、目錄各加 `-opencode`、
 模型在 `.opencode/peoplesoft/sdoc/model.yaml`）的差異見 SOP-29。Claude Code 版入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，
 或 `claude --agent ps-spec-author` 後輸入清單（名稱為合成範例）。結論碼見 `.claude/peoplesoft/spec/support-codes.md` 的 DOC1。
 
@@ -1305,6 +1305,51 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 □ 6. 舊研究文件的 SQL 證據多半是裸表名：auditor 重跑前自己補前綴（只補前綴、其餘一字不改），文件不必改。
 □ 7. 端對端（OpenCode 版，test-scenarios R43）：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`
      ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 oracle_execute_query 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。
+
+## SOP-31 業務需求文件（/ps-spec；照 bizspec/standard.md，含證據章；L163）
+
+兩版的 `/ps-spec` 都走 `scripts/ps-bizspec.ps1`（結論碼 BIZ1，見兩版 `peoplesoft/spec/support-codes.md`）。寫手 session 照
+`<框架>/peoplesoft/bizspec/standard.md` 寫業務需求文件（第 0～10 章＋附錄；只談業務需求；每條需求與假設都有證據編號 `E-###`，
+第 10 章逐字摘錄來源原文）。外環在每個 session 之後：比對檔案圍欄（人工輸入、補查結果、工單被改就還原，多出的檔隔離）、
+逐字比對證據摘錄與引用、不合格寫檢查結果檔退回修正（最多 3 輪）、對「該問誰＝Spec 產製端」的開放假設開補查 session、
+請寫手回填與套用業務窗口回覆。OpenCode 版外環加 `-Cli opencode`，目錄各加 `-opencode`，模型讀 `.opencode/peoplesoft/sdoc/model.yaml`。
+
+### 日常操作
+
+□ 1. 輸入清單：`/ps-spec TW_DEMO_A TW_DEMO_B`（名稱為合成範例），或 `claude --agent ps-spec-author`（OpenCode 版切到 ps-spec-author）後輸入清單。
+     第一次會在 `.ps-private\bizspec\<jobId>\` 建 status.md、project.md、answers.md。
+□ 2. 來源：知識層 `docs\ps-research\`（外環列出提到這組 Component 的檔）加已填的 status.md、project.md。兩者都沒有 → BIZ1-0-01：
+     先 `/ps-research` 研究所屬領域，或把狀態圖、業務說明寫進 status.md、project.md（刪掉第一行的 `<!-- BIZSPEC:SKELETON -->`）。
+     同一組 Component 在 Spec 文件流程（DOC1）已有狀態圖時，第一次會複製過來。
+□ 3. 同一份清單續跑：ps-spec-author 每次呼叫只跑一個 session，BIZ1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑（寫手照 progress.md 接續）。
+     每個 session 上限預設 60 分（1～110；直接在 PowerShell 跑 `scripts\ps-bizspec.ps1 -TimeoutMin N` 可到 180）。不要補查就說「不要補查」（-NoQuery）。
+□ 4. 依結論碼處理：
+     - BIZ1-3-04：看 SESSION 判讀行（同 SOP-28「session 失敗的判讀」），已寫的檔保留，同命令續跑。
+     - BIZ1-4-03：看「卡住」「檢查」行——外環檢查連續 3 輪修正仍未過、寫手連續兩個 session 沒進度、或補查回填兩次仍缺；
+       排除原因後說「重試被擋項」（-Retry）。檢查結果檔在 `.ps-runtime\bizspec\<jobId>\check\`。
+     - BIZ1-5-01：外環檢查全過、補查已回填，還有開放假設 → 把 `07-assumptions.md` 交業務窗口，回覆寫進 answers.md
+       （假設編號、回覆、回覆人代稱、日期），同命令續跑，寫手照第 7 章 7.4 關閉。
+     - BIZ1-7-01：外環檢查全過、沒有開放假設 → 人工審閱；業務驗收照文件第 9 章。
+□ 5. 回報維護端：只回最後一行 BIZ1 結論碼與「欄位統計」行的計數；不回物件名、路徑、證據摘錄、文件內容。
+
+| 什麼 | 在哪 |
+|---|---|
+| 人工輸入 | `.ps-private\bizspec\<jobId>\`（status.md、project.md、answers.md；gitignore） |
+| 產出入口 | `docs\ps-spec\<jobId>\README.md`（jobId＝`biz-` 開頭） |
+| 補查結果 | `docs\ps-spec\<jobId>\evidence\Q-A-###.md`（只有補查 session 寫；帳本與副本在執行狀態） |
+| 執行狀態 | `.ps-runtime\bizspec\<jobId>\`（orders 工單、check 檢查結果、queries.json 補查帳本、queries 副本、job.json） |
+| session log | `.ps-runtime\bizspec-logs\` |
+
+- 證據只證明「文件寫的話出自來源原文」，不證明來源本身正確；BIZ1-7-01 不是業務驗收。
+- 規範在三處逐字相同：兩版的 `peoplesoft/bizspec/standard.md` 與 `docs/business-spec/standard.md`（test-bizspec 會比對）；改規範三處一起改。
+
+### 維護驗證
+
+- `pwsh -NoProfile -File scripts/tests/test-bizspec.ps1`：檢查函式庫（表格、位置、證據逐字比對、補查帳本、補查檔格式）與外環端對端
+  （合成寫手與補查：沒有來源、完整一輪、修正、卡住、越界寫檔、業務回覆、補查不合格、沒進度、續跑、OpenCode 版、複製 DOC1 狀態圖）。
+- 規範本身的寫法以 `docs/business-spec/validation/` 的合成來源與答案卷重跑試寫（不在搬運包）。
+- 兩個 headless agent（ps-bizspec-writer、ps-bizspec-query）的工具權限只在 Claude Code 版由 test-claude-variant 的 hook 情境驗；
+  OpenCode 版以 `tests/runtime-guard/run-clone-smoke.mjs`（真 OpenCode）驗 /ps-spec 的命令形狀。
 @@@PSBUNDLE-END|.opencode/peoplesoft/SOP.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/capabilities.json|38|6514e5d73ca2568acea32f9c3a4ff6c288b4964e92b7244b929c23049df86bc8|0
 {
@@ -1692,7 +1737,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 （無）
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|a0ca9a554c39ad637ce3fb6a64453e001eff0587c54d4f297c42f62c9819800a|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|965b792b30fcb1cedd02fb606c8a8b334f018cf96ff000b94eb01681b3356506|0
 {
   "schemaVersion": 1,
   "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
@@ -1704,8 +1749,8 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".opencode/agent/ps-spec-author.md",
-      "sha256": "3FC22300CB9E1DF1833FB34E0713D2E86B028C4C6A5DC16C29E2582C135B2334",
-      "lines": 85
+      "sha256": "AED47554B9E4B98EFC4BF6F51F107AEEB24C09031BE1A244421F3BD2D223C6A3",
+      "lines": 83
     },
     {
       "path": ".opencode/agent/ps-spec-worker.md",
@@ -1724,7 +1769,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".opencode/command/ps-spec.md",
-      "sha256": "D15DFF3A59990F7069DC6858AEAC242E6093DB98AB147B370E8B32241BF6F24E",
+      "sha256": "8D85E8BF67EE2D20863ADA7C78B8C8858CDC390E0A5CD297949EF2E49F09B619",
       "lines": 14
     },
     {
@@ -1779,8 +1824,8 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "sha256": "BD1636DB6BFA690F805D231AE9E45B871061E71AF90C30868237033DE2C0FAF3",
-      "lines": 211
+      "sha256": "080DB6AD65E33FF385AFCC4245D26EE8483AEE477F110E2C3371DAAD09476C0A",
+      "lines": 230
     },
     {
       "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
@@ -1897,11 +1942,11 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
   }
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/pack.schema.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/support-codes.md|210|bd1636db6bfa690f805d231ae9e45b871061e71af90c30868237033de2c0faf3|0
-# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1）
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/support-codes.md|229|080db6ad65e33ff385afcc4245d26ee8483aee477f110e2c3371daad09476c0a|0
+# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1／BIZ1）
 
 CLI 每個動詞的**最後一行**都是唯一的結論碼；上面的內容只在本機看。結論碼**不含**路徑、檔名、物件名、hash、requestId。
-形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC|CLONE|DOC)1-\d-\d\d(-\d+)?$`。
+形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC|CLONE|DOC|BIZ)1-\d-\d\d(-\d+)?$`。
 公司機回報只回結論碼、drill tuple 與 PASS／FAIL；`.ps-private`、template／checklist 原文、NN 內容一律不出公司。
 
 ## KNOW1（scripts/ps-knowledge.ps1）
@@ -1979,6 +2024,25 @@ CLONE1 不使用 drill tuple。請勿將本機錯誤文字、generated 文件或
 | 9 | 02 | 環境、收據完整性、產物衝突等錯誤；詳細內容只在本機看 | 2 |
 
 DOC1 不使用 drill tuple。對外只回報結論碼與「欄位統計」行的計數；status.md、decisions.md、generated 文件、attempt 一律不出公司。
+
+## BIZ1（scripts/ps-bizspec.ps1 -Cli opencode：/ps-spec 的業務需求文件，照 bizspec/standard.md）
+
+| stage | code | 意義 | exit |
+|---|---|---|---|
+| 0 | 01 | 等來源：知識層 `docs/ps-research` 沒有提到這組 Component，`.ps-private/bizspec-opencode/<jobId>/` 的 status.md、project.md 也還是骨架；先研究或填好再同命令續跑 | 0 |
+| 0 | 02 | 尚未開始（Status 唯讀） | 0 |
+| 0 | 03 | 同一組 Component 的業務需求文件工作正在執行 | 3 |
+| 3 | 02-`<n>` | RUNNABLE，還有工作（寫作、修正、套回覆、補查、回填）；同命令繼續 | 0 |
+| 3 | 03 | SLOT_BUSY；模型服務被其他 session 使用，稍後續跑 | 1 |
+| 3 | 04 | SESSION_FAILED；已寫的檔保留。看輸出的 SESSION 判讀：強殺當下輸出仍在增加 → 用更大的 -TimeoutMin 續跑；其他 → 檢查模型與 provider（`.opencode/peoplesoft/sdoc/model.yaml`）、MCP 後續跑，錯誤訊息在 `.ps-runtime/bizspec-opencode-logs/` 的 .err.txt | 1 |
+| 3 | 07 | WRITE_DEFERRED；解除檔案占用後續跑 | 1 |
+| 4 | 03 | BLOCKED；外環檢查連續修正 3 輪仍未通過、寫手連續兩個 session 沒進度，或補查回填兩次仍缺；看「卡住」「檢查」行，處理後加 -Retry | 1 |
+| 5 | 01 | 外環檢查全過、補查已回填，仍有開放假設待業務窗口回覆；回覆寫進 `answers.md` 後同命令續跑 | 0 |
+| 7 | 01 | REVIEW_READY；外環檢查（證據逐字比對、引用、表頭、必要檔）全過、沒有開放假設，可人工審閱；不是業務驗收 | 0 |
+| 9 | 01 | 參數不合法；模型設定不對或 OpenCode 沒有這個模型；缺 `.opencode/peoplesoft/bizspec/standard.md` | 2 |
+| 9 | 02 | 環境或產物錯誤；詳細內容只在本機看 | 2 |
+
+BIZ1 不使用 drill tuple。對外只回報結論碼與「欄位統計」行的計數；人工輸入、業務需求文件、證據、補查結果一律不出公司。
 
 ## SPEC1（scripts/ps-spec.ps1）
 
@@ -5454,7 +5518,7 @@ Choice Values：低基數最多回傳 100 個；
 - `.opencode/peoplesoft/customization-profile.yaml`（origin / prefix 過濾）
 - `.opencode/peoplesoft/mcp-tool-contracts.md`
 @@@PSBUNDLE-END|.opencode/skills/ps-ui-flow/SKILL.md
-@@@PSBUNDLE-FILE|scripts/ps-agent-doc-lint.ps1|57|b562267fee941ea73fd343971a0e69fcb71db2a3584a80a2db12ae515451abd9|1
+@@@PSBUNDLE-FILE|scripts/ps-agent-doc-lint.ps1|57|63d6e01b046087f0577fb5d561bdb4581178251d81db7e50dec10edc1b4bb7b6|1
 # ps-agent-doc-lint.ps1 — 模型讀的檔只留規則（唯讀檢查）
 # 範圍：.opencode/agent、skills、command、peoplesoft/*.md（SOP／README／test-scenarios 除外）、report-templates、peoplesoft/spec/*.md、peoplesoft/sdoc/*.md；
 #       Claude Code 版同一組（.claude/agents、skills、commands、peoplesoft/…、peoplesoft/sdoc/*.md）＋CLAUDE.md（維護端在 claude-code/ 子樹）。
@@ -5466,7 +5530,7 @@ Choice Values：低基數最多回傳 100 個；
 param([string]$Root = (Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference = 'Stop'
 $globs = @('.opencode/agent/*.md', '.opencode/skills/*/SKILL.md', '.opencode/command/*.md',
-           '.opencode/peoplesoft/*.md', '.opencode/peoplesoft/report-templates/*.md', '.opencode/peoplesoft/spec/*.md', '.opencode/peoplesoft/sdoc/*.md')
+           '.opencode/peoplesoft/*.md', '.opencode/peoplesoft/report-templates/*.md', '.opencode/peoplesoft/spec/*.md', '.opencode/peoplesoft/sdoc/*.md', '.opencode/peoplesoft/bizspec/*.md')
 # Claude Code 版：維護端在 claude-code/ 子樹、公司機部署在根目錄的 .claude（含 CLAUDE.md——它只放執行期規則）。
 # 根目錄 .claude 只有在 .claude/peoplesoft 存在時才是框架（維護端根目錄的 .claude 是維護工具，不掃）
 $pres = @('claude-code/')
@@ -5474,7 +5538,7 @@ if ([System.IO.Directory]::Exists((Join-Path $Root (Join-Path '.claude' 'peoples
 foreach ($pre in $pres) {
     $globs += @(($pre + '.claude/agents/*.md'), ($pre + '.claude/skills/*/SKILL.md'), ($pre + '.claude/commands/*.md'),
         ($pre + '.claude/peoplesoft/*.md'), ($pre + '.claude/peoplesoft/report-templates/*.md'), ($pre + '.claude/peoplesoft/spec/*.md'),
-        ($pre + '.claude/peoplesoft/sdoc/*.md'), ($pre + 'CLAUDE.md'))
+        ($pre + '.claude/peoplesoft/sdoc/*.md'), ($pre + '.claude/peoplesoft/bizspec/*.md'), ($pre + 'CLAUDE.md'))
 }
 $exclude = @('SOP.md', 'README.md', 'test-scenarios.md')
 $block = @(
@@ -5790,4 +5854,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|6696b1a48bf32e64|4|9
+@@@PSBUNDLE-PART-END|b60bac9268ae117f|4|9

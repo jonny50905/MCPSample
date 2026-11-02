@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 44b885e）第 7／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit c9f3db7）第 7／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|44b885e|aa753b6c2344ca0d|7|7|1562|162d0fb08915909f25e21302757dd5545f6fa7e69154f1d8f2347e310632c248
+@@@PSBUNDLE-PART|1|claude|c9f3db7|b3f33ff186d92af3|7|7|1608|26b6ed62e5341d16a610a134d98dea57ebf35ed537ff82c5cf3af99a3528a28d
 @@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|554|cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
@@ -557,10 +557,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1003|800cf7cb2d79baaa7923daa7c23de57a157f9c918b2dd0ce3bb792af8f4af049|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.claude.json|1049|bf645b28a88c8af2a4d0209f6684dbe3e994c74370f46ea2051bbee100491c0d|0
 {
   "note": "Claude Code 版（公司機只搬這一版）：path＝部署路徑，repo＝GitHub 上的原始位置（去掉 claude-code/ 前綴即 path）；scripts 兩版共用。維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "44b885e",
+  "commit": "c9f3db7",
   "files": [
     {
       "path": ".claude/agents/ps-ae-flow.md",
@@ -575,6 +575,20 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
       "sha256": "67a8408bc61cce39475c010b2c4586df4dcdebbaab9f16bb691533b14f85970e",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-auditor.md"
+    },
+    {
+      "path": ".claude/agents/ps-bizspec-query.md",
+      "lines": 28,
+      "sha256": "e5f02ae0b0baf3f121fa2762a9d9b144b653bebeb3effb10438624228fd77776",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-bizspec-query.md"
+    },
+    {
+      "path": ".claude/agents/ps-bizspec-writer.md",
+      "lines": 33,
+      "sha256": "8485bdde507f5dd8b63d75914d8de20b8de2ce83dd7205317ecdd221fa025a81",
+      "bom": false,
+      "repo": "claude-code/.claude/agents/ps-bizspec-writer.md"
     },
     {
       "path": ".claude/agents/ps-clone-worker.md",
@@ -620,8 +634,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/agents/ps-spec-author.md",
-      "lines": 51,
-      "sha256": "872602bafec10ec27724f0801ad3130e7b4420d442d59cd49029472d0a0793b0",
+      "lines": 49,
+      "sha256": "2cdad5dfd14d14692708dd719b255550c73315a444f33b80f779f996ea675d75",
       "bom": false,
       "repo": "claude-code/.claude/agents/ps-spec-author.md"
     },
@@ -726,7 +740,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/commands/ps-spec.md",
       "lines": 17,
-      "sha256": "a05b02491926317623a1977838cedceb678782a56cfcd13c0db79981b8a56f9c",
+      "sha256": "ae0e27e71820885d7c6c2037590fa79b876224bc511d49b2de3d0d6ee9d3fc39",
       "bom": false,
       "repo": "claude-code/.claude/commands/ps-spec.md"
     },
@@ -739,10 +753,24 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/hooks/ps-runtime-guard.ps1",
-      "lines": 337,
-      "sha256": "63e48c1c20756b6ee81bb0e265a0db1af7e36066abb990572b8b89f46aa64bd5",
+      "lines": 343,
+      "sha256": "a55aa98b76d400ea00a027dc915d6f86f403d3f057557abed109b0464af766c2",
       "bom": true,
       "repo": "claude-code/.claude/hooks/ps-runtime-guard.ps1"
+    },
+    {
+      "path": ".claude/peoplesoft/bizspec/query-contract.md",
+      "lines": 50,
+      "sha256": "b1aa675d039687d3b12bf67e521c99bb5103cb41087744a0ad8c8f19550b7874",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/bizspec/query-contract.md"
+    },
+    {
+      "path": ".claude/peoplesoft/bizspec/standard.md",
+      "lines": 1225,
+      "sha256": "b8574f7331894bf679936264313442f0d001befc9ec625be7ef9becc405b80fe",
+      "bom": false,
+      "repo": "claude-code/.claude/peoplesoft/bizspec/standard.md"
     },
     {
       "path": ".claude/peoplesoft/business-domain-map.yaml",
@@ -1188,7 +1216,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".claude/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "be3a18c1b35dc799270649bd4ee1aa5324f397243a4a41865944b9156d7c6c02",
+      "sha256": "51916ae631f6c11dded6cbd7a3e4309163c99233762f42ed1b6d266dcfa4cc20",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/generic.manifest.json"
     },
@@ -1201,8 +1229,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/peoplesoft/spec/support-codes.md",
-      "lines": 210,
-      "sha256": "bcd4067cdb99d2eed659f9413112db6141b69adbf283de059797912b9b627b25",
+      "lines": 229,
+      "sha256": "bfe1a07077caad29400a226f74d8b0bc561a06c23153ddb49aa889b3700eac40",
       "bom": false,
       "repo": "claude-code/.claude/peoplesoft/spec/support-codes.md"
     },
@@ -1229,8 +1257,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".claude/settings.json",
-      "lines": 58,
-      "sha256": "f86f451657a35b65518361539058bb3dc884676b5094951a56a234608e17afab",
+      "lines": 61,
+      "sha256": "735b1382f6f7f7fdbe414d204d2ff2fde772f90f88a27495832044357e1fba62",
       "bom": false,
       "repo": "claude-code/.claude/settings.json"
     },
@@ -1313,15 +1341,15 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "CLAUDE.md",
-      "lines": 81,
-      "sha256": "b6a01d369cb4994a218ff8e190e854d23150221c9789089a70e24a3e144cef60",
+      "lines": 80,
+      "sha256": "e46c8e8c574b4834fbfb33e1bd98254dbbb255b312f972e17ff3ae7f791e3a13",
       "bom": false,
       "repo": "claude-code/CLAUDE.md"
     },
     {
       "path": "scripts/ps-agent-doc-lint.ps1",
       "lines": 57,
-      "sha256": "b562267fee941ea73fd343971a0e69fcb71db2a3584a80a2db12ae515451abd9",
+      "sha256": "63d6e01b046087f0577fb5d561bdb4581178251d81db7e50dec10edc1b4bb7b6",
       "bom": true
     },
     {
@@ -1334,6 +1362,18 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
       "path": "scripts/ps-auto-loop.ps1",
       "lines": 2647,
       "sha256": "32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-bizspec-lib.ps1",
+      "lines": 421,
+      "sha256": "72532d9fabcd5af520ddc0f5856100d95948995b385369369f8e383ed7686695",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-bizspec.ps1",
+      "lines": 541,
+      "sha256": "d6a74ed7c1a5f8b9b0189ab6e4482d5c562537f5c2dae01d64ba134e1967537c",
       "bom": true
     },
     {
@@ -1487,6 +1527,12 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
       "bom": true
     },
     {
+      "path": "scripts/tests/test-bizspec.ps1",
+      "lines": 252,
+      "sha256": "e79373f99442521f1880f8621293e22df20d660181ee4d57834033ead2420070",
+      "bom": true
+    },
+    {
       "path": "scripts/tests/test-bundle.ps1",
       "lines": 263,
       "sha256": "959fc4c89aa9846aeb4a7c92b656602a3c07227863af1ad6b7487f46c98f7273",
@@ -1494,8 +1540,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 598,
-      "sha256": "f6c068c0f2b46ced58bc486c80a324ec733514ebe9002e26573da6d70d4b047b",
+      "lines": 617,
+      "sha256": "20ced9a57d2a939bad7ab4b63a63a17c1ee41d867c140e8dd4829ef81a2aaaec",
       "bom": true
     },
     {
@@ -1562,5 +1608,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   "removed": []
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.claude.json
-@@@PSBUNDLE-EOF|149|72e2649b4235bea41869eaab09e107bcb512f79ba99fb666b482ed47cd2d84ab
-@@@PSBUNDLE-PART-END|aa753b6c2344ca0d|7|7
+@@@PSBUNDLE-EOF|156|bf5e825f6874d5d6bc881b5a014df4a9aec73b4461a6cb743cbdf2bdf0033783
+@@@PSBUNDLE-PART-END|b3f33ff186d92af3|7|7

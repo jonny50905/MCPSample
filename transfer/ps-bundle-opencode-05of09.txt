@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 5／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c9f3db7）第 5／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|5|9|7735|0c7a8f48f5933ece86e2b2528c6e301932baecfb20d2dc0c4a1d87e66a9378a6
+@@@PSBUNDLE-PART|1|opencode|c9f3db7|b60bac9268ae117f|5|9|7740|3cd66515400bd9ab06dffc19dcf1645d48d26d0c43677058f58eaa45cd4070a3
 @@@PSBUNDLE-FILE|scripts/ps-auto-loop.ps1|2647|32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d|1
 # ps-auto-loop.ps1 — research→audit→lint 自動迴圈駕駛
 # 設計：確定性外環（本腳本）＋模型內步（新鮮 headless session：OpenCode `opencode run`／Claude Code `claude -p --agent`）＋確定性驗收（lint／checklist 解析）
@@ -2650,6 +2650,972 @@ if ($graduated) {
 $mutex.ReleaseMutex(); $mutex.Dispose()
 if ($graduated) { exit 0 } else { exit 1 }
 @@@PSBUNDLE-END|scripts/ps-auto-loop.ps1
+@@@PSBUNDLE-FILE|scripts/ps-bizspec-lib.ps1|421|72532d9fabcd5af520ddc0f5856100d95948995b385369369f8e383ed7686695|1
+# ps-bizspec-lib.ps1 — 業務需求文件流程（BIZ1）的解析與檢查：markdown 表格、證據章、證據逐字比對、引用、必要檔、進度、補查檔。
+# 純函式、不呼叫模型；ps-bizspec.ps1 與 scripts/tests/test-bizspec.ps1 共用。PowerShell 5.1；需要先載入 ps-knowledge-lib.ps1。
+
+$script:PsBzEvidenceHeader = @('證據編號', '類型', '位置', '原文摘錄')
+$script:PsBzQueryHeader = @('補查檔', '對應假設', '結論', '回填的證據')
+$script:PsBzAssumpHeader = @('編號', '類型', '缺什麼', '暫定做法', '影響的需求鍵', '該問誰', '狀態', '關閉依據')
+$script:PsBzIndexHeader = @('需求鍵', '類別', '摘要', '證據', '確認狀態', '相關假設')
+$script:PsBzTrackHeader = @('需求鍵', '摘要', '確認狀態', '確認人／日期', '驗收結果', '驗收日期', '備註')
+$script:PsBzAnswerHeader = @('假設編號', '回覆', '回覆人代稱', '日期')
+$script:PsBzRequiredFiles = @('README.md', '01-goals.md', '02-spec-overview.md', '03-reading-guide.md', '04-requirement-index.md',
+    '05-1-flows.md', '05-2-screens.md', '05-3-data.md', '05-4-rules.md', '05-5-states.md', '05-6-permissions.md', '05-7-interfaces.md', '05-8-coverage.md',
+    '06-tracking.md', '07-assumptions.md', '08-spec-change.md', '09-acceptance.md', '10-evidence.md', 'appendix.md', 'progress.md')
+$script:PsBzQueryConclusions = @('有答案', '查無', '查詢失敗')
+$script:PsBzEvidenceIdRx = New-Object System.Text.RegularExpressions.Regex('(?<![A-Za-z0-9-])E-([0-9]{3,})(?![0-9])')
+
+# ---------------- 表格 ----------------
+function ConvertFrom-PsBzRow {
+    # 一列 markdown 表格 → 儲存格陣列；「\|」是儲存格內的「|」。不是表格列回 $null。
+    param([string]$Line)
+    $t = $Line.Trim()
+    if (-not $t.StartsWith('|')) { return $null }
+    $cells = New-Object System.Collections.Generic.List[string]
+    $sb = New-Object System.Text.StringBuilder
+    $i = 1
+    while ($i -lt $t.Length) {
+        $ch = [string]$t[$i]
+        if ($ch -eq '\' -and ($i + 1) -lt $t.Length -and [string]$t[$i + 1] -eq '|') { [void]$sb.Append('|'); $i += 2; continue }
+        if ($ch -eq '|') { $cells.Add($sb.ToString().Trim()); [void]$sb.Remove(0, $sb.Length); $i++; continue }
+        [void]$sb.Append($ch); $i++
+    }
+    if ($sb.ToString().Trim() -ne '') { $cells.Add($sb.ToString().Trim()) }
+    return , $cells.ToArray()
+}
+
+function Get-PsBzTables {
+    # 文字中的全部表格（圍欄程式碼區塊內的不算）。每個表格：@{ Header = 儲存格陣列; Rows = @(@{ Cells; Line }); Line = 表頭行號 }
+    param([string]$Text)
+    $tables = New-Object System.Collections.Generic.List[object]
+    if ($null -eq $Text) { return , $tables.ToArray() }
+    $lines = Get-PsKnLines $Text
+    $cur = $null; $inCode = $false
+    for ($n = 0; $n -lt $lines.Count; $n++) {
+        $ln = [string]$lines[$n]
+        if ($ln.TrimStart().StartsWith('```')) { $inCode = -not $inCode; $cur = $null; continue }
+        if ($inCode) { continue }
+        $t = $ln.Trim()
+        if (-not $t.StartsWith('|')) { $cur = $null; continue }
+        $cells = ConvertFrom-PsBzRow $t
+        if ($null -eq $cur) {
+            if (($n + 1) -lt $lines.Count -and ([string]$lines[$n + 1]).Trim() -match '^\|(\s*:?-{3,}:?\s*\|)+\s*$') {
+                $cur = @{ Header = $cells; Rows = (New-Object System.Collections.Generic.List[object]); Line = $n + 1 }
+                $tables.Add($cur)
+                $n++
+            }
+            continue
+        }
+        $cur.Rows.Add(@{ Cells = $cells; Line = $n + 1 })
+    }
+    return , $tables.ToArray()
+}
+
+function Test-PsBzHeader {
+    param([string[]]$Header, [string[]]$Want)
+    if ($null -eq $Header -or $Header.Count -ne $Want.Count) { return $false }
+    for ($i = 0; $i -lt $Want.Count; $i++) { if ([string]$Header[$i] -cne [string]$Want[$i]) { return $false } }
+    return $true
+}
+
+function Get-PsBzCell {
+    param($Table, $Row, [string]$Name)
+    $idx = [array]::IndexOf([string[]]$Table.Header, $Name)
+    if ($idx -lt 0 -or $idx -ge $Row.Cells.Count) { return '' }
+    return [string]$Row.Cells[$idx]
+}
+
+# ---------------- 檔案 ----------------
+function Get-PsBzChapterFiles {
+    # 一章的主檔與續檔（<base>.md、<base>-02.md、<base>-03.md…），依名稱排序；只回存在的檔。
+    param([string]$OutDir, [string]$Base)
+    $out = @()
+    $main = Join-Path $OutDir ($Base + '.md')
+    if ([System.IO.File]::Exists($main)) { $out += $main }
+    if ([System.IO.Directory]::Exists($OutDir)) {
+        $cont = @()
+        foreach ($f in @(Get-ChildItem -LiteralPath $OutDir -File -Filter ($Base + '-*.md'))) {
+            if ($f.Name -match ('^' + [regex]::Escape($Base) + '-[0-9]{2}\.md$')) { $cont += $f.FullName }
+        }
+        foreach ($c in (Sort-PsKnOrdinal -Items $cont)) { if ($null -ne $c) { $out += $c } }
+    }
+    return , $out
+}
+
+function Get-PsBzTextOf {
+    param([string[]]$Files)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($f in @($Files)) { $t = Read-PsKnText -LiteralPath $f; if ($null -ne $t) { [void]$sb.Append($t); [void]$sb.Append("`n") } }
+    return $sb.ToString()
+}
+
+function ConvertTo-PsBzNorm {
+    # 比對用：連續空白（含全形空白）壓成一個、去頭尾空白、「\|」視為「|」
+    param([string]$Text)
+    if ($null -eq $Text) { return '' }
+    return ([regex]::Replace($Text.Replace('\|', '|'), '\s+', ' ')).Trim()
+}
+
+function Split-PsBzLocation {
+    # 「<路徑> §<章節>」或「<路徑> 第 N 列」→ @{ Path; Rest }；路徑可包反引號、可帶 ./ 開頭
+    param([string]$Location)
+    $t = ([string]$Location).Trim()
+    $m = [regex]::Match($t, '^`?(?<p>[^\s`§]+)`?\s*(?<rest>§.*|第\s*[0-9]+\s*列.*)$')
+    if (-not $m.Success) { return $null }
+    $p = $m.Groups['p'].Value.Replace('\', '/')
+    if ($p.StartsWith('./')) { $p = $p.Substring(2) }
+    return @{ Path = $p; Rest = $m.Groups['rest'].Value.Trim() }
+}
+
+function Get-PsBzSectionLines {
+    # 「## <名稱>」到下一個「## 」之間的行
+    param([string]$Text, [string]$Name)
+    $out = @(); $in = $false
+    foreach ($ln in (Get-PsKnLines $Text)) {
+        if ($ln -match '^##\s+(.+?)\s*$') { $in = ($Matches[1] -ceq $Name); continue }
+        if ($in) { $out += [string]$ln }
+    }
+    return , $out
+}
+
+# ---------------- 證據章 ----------------
+function Read-PsBzEvidence {
+    # 10-evidence*.md 的 10.1 表（表頭＝證據清單）→ @{ Items = 依出現順序; ById; Duplicates; Malformed }
+    param([string]$OutDir)
+    $items = New-Object System.Collections.Generic.List[object]
+    $byId = @{}; $dups = @(); $bad = @()
+    foreach ($f in (Get-PsBzChapterFiles $OutDir '10-evidence')) {
+        $text = Read-PsKnText -LiteralPath $f
+        foreach ($tb in (Get-PsBzTables $text)) {
+            if (-not (Test-PsBzHeader $tb.Header $script:PsBzEvidenceHeader)) { continue }
+            foreach ($row in $tb.Rows) {
+                $id = Get-PsBzCell $tb $row '證據編號'
+                $it = @{ Id = $id; Type = (Get-PsBzCell $tb $row '類型'); Location = (Get-PsBzCell $tb $row '位置'); Excerpt = (Get-PsBzCell $tb $row '原文摘錄'); File = [System.IO.Path]::GetFileName($f); Line = $row.Line }
+                if ($id -cnotmatch '^E-[0-9]{3,}$') { $bad += $it; continue }
+                if ($byId.ContainsKey($id)) { $dups += $id; continue }
+                $byId[$id] = $it
+                $items.Add($it)
+            }
+        }
+    }
+    return @{ Items = $items.ToArray(); ById = $byId; Duplicates = $dups; Malformed = $bad }
+}
+
+function Test-PsBzEvidenceItems {
+    # 每筆證據：類型、位置可解析、檔案在允許的根目錄底下且存在、摘錄長度、摘錄逐字出現在該檔同一行；補查類另驗帳本與「結果」節。
+    # Ctx：@{ Root; FileRoots = @('相對路徑前綴/', …); EvidenceRel = '<輸出>/evidence/'; Ledger = @{ 相對路徑 = sha256 } }
+    param($Evidence, [hashtable]$Ctx)
+    $findings = New-Object System.Collections.Generic.List[object]
+    $cache = @{}
+    foreach ($b in @($Evidence.Malformed)) { $findings.Add(@{ Code = 'BZ_EV_FORMAT'; File = $b.File; Detail = ('第 ' + $b.Line + ' 行：證據編號要寫成 E-###（實得「' + $b.Id + '」）') }) }
+    foreach ($d in @($Evidence.Duplicates | Select-Object -Unique)) { $findings.Add(@{ Code = 'BZ_EV_DUP'; File = '10-evidence.md'; Detail = ($d + ' 重複登記；一個編號只登一次') }) }
+    foreach ($it in $Evidence.Items) {
+        $where = $it.Id + '（' + $it.File + ' 第 ' + $it.Line + ' 行）'
+        if (@('檔案', '補查') -cnotcontains $it.Type) { $findings.Add(@{ Code = 'BZ_EV_FORMAT'; File = $it.File; Detail = ($where + '：類型只能是「檔案」或「補查」') }); continue }
+        $loc = Split-PsBzLocation $it.Location
+        if ($null -eq $loc) { $findings.Add(@{ Code = 'BZ_EV_FORMAT'; File = $it.File; Detail = ($where + '：位置要寫「<從專案根目錄起算的路徑> §<章節>」或「<路徑> 第 N 列」') }); continue }
+        $rel = $loc.Path
+        if ([System.IO.Path]::IsPathRooted($rel) -or $rel.Contains('..')) { $findings.Add(@{ Code = 'BZ_EV_PATH'; File = $it.File; Detail = ($where + '：路徑要從專案根目錄起算，不用絕對路徑或 ..（實得 ' + $rel + '）') }); continue }
+        $isQuery = $rel.StartsWith($Ctx.EvidenceRel, [System.StringComparison]::OrdinalIgnoreCase)
+        if ($it.Type -ceq '補查' -and -not $isQuery) { $findings.Add(@{ Code = 'BZ_EV_ROOT'; File = $it.File; Detail = ($where + '：補查類證據的位置要在 ' + $Ctx.EvidenceRel + ' 底下') }); continue }
+        if ($it.Type -ceq '檔案') {
+            $okRoot = $false
+            foreach ($fr in @($Ctx.FileRoots)) { if ($rel.StartsWith($fr, [System.StringComparison]::OrdinalIgnoreCase)) { $okRoot = $true; break } }
+            if ($isQuery -or -not $okRoot) { $findings.Add(@{ Code = 'BZ_EV_ROOT'; File = $it.File; Detail = ($where + '：檔案類證據只能引用 ' + (@($Ctx.FileRoots) -join '、') + ' 底下的檔（實得 ' + $rel + '）') }); continue }
+        }
+        $full = Join-Path $Ctx.Root $rel
+        if (-not [System.IO.File]::Exists($full)) { $findings.Add(@{ Code = 'BZ_EV_PATH'; File = $it.File; Detail = ($where + '：位置所指的檔不存在（' + $rel + '）') }); continue }
+        $ex = ConvertTo-PsBzNorm $it.Excerpt
+        if ($ex.Length -lt 10 -or $ex.Length -gt 150) { $findings.Add(@{ Code = 'BZ_EV_LENGTH'; File = $it.File; Detail = ($where + '：原文摘錄要 10～150 字（實得 ' + $ex.Length + ' 字）；太短就連前後文一起照抄，太長就拆成兩筆') }); continue }
+        if (-not $cache.ContainsKey($rel)) { $cache[$rel] = Read-PsKnText -LiteralPath $full }
+        $srcText = [string]$cache[$rel]
+        $lines = @()
+        if ($isQuery) {
+            $key = $rel.ToLowerInvariant()
+            $want = ''; foreach ($k in @($Ctx.Ledger.Keys)) { if ($k.ToLowerInvariant() -eq $key) { $want = [string]$Ctx.Ledger[$k] } }
+            if ($want -eq '') { $findings.Add(@{ Code = 'BZ_EV_QUERY'; File = $it.File; Detail = ($where + '：' + $rel + ' 不是外環補查寫的檔') }); continue }
+            if ((Get-PsKnTextHash -Text $srcText) -cne $want) { $findings.Add(@{ Code = 'BZ_EV_QUERY'; File = $it.File; Detail = ($where + '：' + $rel + ' 在補查後被改過') }); continue }
+            $lines = Get-PsBzSectionLines $srcText '結果'
+        }
+        else { $lines = Get-PsKnLines $srcText }
+        $hit = $false
+        foreach ($ln in $lines) { if ((ConvertTo-PsBzNorm ([string]$ln)).Contains($ex)) { $hit = $true; break } }
+        if (-not $hit) {
+            $scope = '該檔任何一行'; if ($isQuery) { $scope = '該檔「結果」節的任何一行' }
+            $findings.Add(@{ Code = 'BZ_EV_EXCERPT'; File = $it.File; Detail = ($where + '：原文摘錄不在' + $scope + '（' + $rel + '）；要從同一行逐字照抄，不改字、不跨行') })
+        }
+    }
+    return , $findings.ToArray()
+}
+
+# ---------------- 引用 ----------------
+function Get-PsBzOutputDocs {
+    # 輸出資料夾第一層的 .md（不含 evidence/ 與 progress.md）
+    param([string]$OutDir)
+    $out = @()
+    if ([System.IO.Directory]::Exists($OutDir)) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $OutDir -File -Filter '*.md')) { if ($f.Name -cne 'progress.md') { $out += $f.FullName } }
+    }
+    return , (Sort-PsKnOrdinal -Items $out)
+}
+
+function Test-PsBzReferences {
+    # 正文引用的 E-### 都要登在 10.1；10.1 每個編號至少被正文引用一次
+    param([string]$OutDir, $Evidence)
+    $findings = New-Object System.Collections.Generic.List[object]
+    $used = @{}
+    foreach ($f in (Get-PsBzOutputDocs $OutDir)) {
+        $name = [System.IO.Path]::GetFileName($f)
+        if ($name -like '10-evidence*') { continue }
+        $text = Read-PsKnText -LiteralPath $f
+        $missing = @()
+        foreach ($m in $script:PsBzEvidenceIdRx.Matches([string]$text)) {
+            $id = $m.Value
+            $used[$id] = $true
+            if (-not $Evidence.ById.ContainsKey($id) -and $missing -cnotcontains $id) { $missing += $id }
+        }
+        foreach ($id in $missing) { $findings.Add(@{ Code = 'BZ_REF_UNDEFINED'; File = $name; Detail = ($id + ' 沒有登在第 10 章 10.1') }) }
+    }
+    foreach ($it in $Evidence.Items) { if (-not $used.ContainsKey($it.Id)) { $findings.Add(@{ Code = 'BZ_REF_UNUSED'; File = $it.File; Detail = ($it.Id + ' 沒有被任何需求、假設或 3.4／7.3 引用；刪掉或補上引用') }) } }
+    return , $findings.ToArray()
+}
+
+function Test-PsBzRequirementEvidence {
+    # 03、05、09 的需求列與 07 的假設都要有證據編號（衍生的 ACC 寫「衍生」、OTHER 可寫「無」、假設可寫「（證據：無）」）
+    param([string]$OutDir)
+    $findings = New-Object System.Collections.Generic.List[object]
+    foreach ($f in (Get-PsBzOutputDocs $OutDir)) {
+        $name = [System.IO.Path]::GetFileName($f)
+        $text = Read-PsKnText -LiteralPath $f
+        if ($name -match '^(03|05-|09)') {
+            foreach ($tb in (Get-PsBzTables $text)) {
+                $h = [string[]]$tb.Header
+                if ($h -cnotcontains '需求鍵' -or $h -cnotcontains '證據') { continue }
+                foreach ($row in $tb.Rows) {
+                    $key = Get-PsBzCell $tb $row '需求鍵'
+                    if ($key -cnotmatch '^[A-Z]+-[0-9]{3,}$') { continue }
+                    $ev = Get-PsBzCell $tb $row '證據'
+                    if ($script:PsBzEvidenceIdRx.IsMatch($ev)) { continue }
+                    if ($h -ccontains '衍生' -and (Get-PsBzCell $tb $row '衍生') -ceq '是' -and $ev.Contains('衍生')) { continue }
+                    if ($key.StartsWith('OTHER-') -and $ev -ceq '無') { continue }
+                    $findings.Add(@{ Code = 'BZ_REQ_NO_EVIDENCE'; File = $name; Detail = ($key + '（第 ' + $row.Line + ' 行）的證據欄沒有證據編號') })
+                }
+            }
+            if ($name -like '05-1-flows*') {
+                $lines = Get-PsKnLines $text
+                $key = ''; $seen = $true; $at = 0
+                for ($n = 0; $n -le $lines.Count; $n++) {
+                    $ln = ''; if ($n -lt $lines.Count) { $ln = [string]$lines[$n] }
+                    $start = [regex]::Match($ln, '^#{2,4}\s+(FLOW-[0-9]{3,})\b')
+                    if ($n -eq $lines.Count -or $start.Success -or $ln -match '^#{1,3}\s') {
+                        if ($key -ne '' -and -not $seen) { $findings.Add(@{ Code = 'BZ_REQ_NO_EVIDENCE'; File = $name; Detail = ($key + '（第 ' + $at + ' 行）的「證據：」沒有證據編號') }) }
+                        $key = ''; $seen = $true
+                        if ($start.Success) { $key = $start.Groups[1].Value; $seen = $false; $at = $n + 1 }
+                        continue
+                    }
+                    if ($key -ne '') {
+                        $m = [regex]::Match($ln, '^\s*-\s*證據：(.*)$')
+                        if ($m.Success -and $script:PsBzEvidenceIdRx.IsMatch($m.Groups[1].Value)) { $seen = $true }
+                    }
+                }
+            }
+        }
+        if ($name -like '07-assumptions*') {
+            foreach ($tb in (Get-PsBzTables $text)) {
+                if (-not (Test-PsBzHeader $tb.Header $script:PsBzAssumpHeader)) { continue }
+                foreach ($row in $tb.Rows) {
+                    $id = Get-PsBzCell $tb $row '編號'
+                    if ($id -cnotmatch '^A-[0-9]{3,}$') { continue }
+                    $miss = Get-PsBzCell $tb $row '缺什麼'
+                    $m = [regex]::Match($miss, '（證據：([^）]*)）')
+                    if ($m.Success -and ($script:PsBzEvidenceIdRx.IsMatch($m.Groups[1].Value) -or $m.Groups[1].Value.Trim() -ceq '無')) { continue }
+                    $findings.Add(@{ Code = 'BZ_ASSUMP_NO_EVIDENCE'; File = $name; Detail = ($id + '（第 ' + $row.Line + ' 行）的「缺什麼」句末沒有「（證據：E-###）」或「（證據：無）」') })
+                }
+            }
+        }
+    }
+    return , $findings.ToArray()
+}
+
+# ---------------- 必要檔、表頭、進度 ----------------
+function Get-PsBzProgress {
+    param([string]$OutDir)
+    $t = Read-PsKnText -LiteralPath (Join-Path $OutDir 'progress.md')
+    if ($null -eq $t) { return @{ Exists = $false; Open = -1; SelfCheck = $false; Done = $false } }
+    $open = 0; $self = $false
+    foreach ($ln in (Get-PsKnLines $t)) {
+        if ($ln -match '^\s*[-*]\s*\[\s\]') { $open++ }
+        if ($ln -match '自我檢查：\s*通過') { $self = $true }
+    }
+    return @{ Exists = $true; Open = $open; SelfCheck = $self; Done = ($open -eq 0 -and $self) }
+}
+
+function Test-PsBzStructure {
+    param([string]$OutDir)
+    $findings = New-Object System.Collections.Generic.List[object]
+    foreach ($n in $script:PsBzRequiredFiles) { if (-not [System.IO.File]::Exists((Join-Path $OutDir $n))) { $findings.Add(@{ Code = 'BZ_FILE_MISSING'; File = $n; Detail = '必要的輸出檔不存在' }) } }
+    $pr = Get-PsBzProgress $OutDir
+    if ($pr.Exists -and $pr.Open -gt 0) { $findings.Add(@{ Code = 'BZ_PROGRESS_OPEN'; File = 'progress.md'; Detail = ('還有 ' + $pr.Open + ' 個沒打勾的項目') }) }
+    if ($pr.Exists -and -not $pr.SelfCheck) { $findings.Add(@{ Code = 'BZ_SELFCHECK_MISSING'; File = 'progress.md'; Detail = '沒有「自我檢查：通過」那一行' }) }
+    $want = @(@('04-requirement-index', $script:PsBzIndexHeader, '需求索引'), @('06-tracking', $script:PsBzTrackHeader, '追蹤表'), @('07-assumptions', $script:PsBzAssumpHeader, '假設'), @('10-evidence', $script:PsBzEvidenceHeader, '證據清單'))
+    foreach ($w in $want) {
+        $files = Get-PsBzChapterFiles $OutDir $w[0]
+        if ($files.Count -eq 0) { continue }
+        $found = $false
+        foreach ($tb in (Get-PsBzTables (Get-PsBzTextOf $files))) { if (Test-PsBzHeader $tb.Header $w[1]) { $found = $true; break } }
+        if (-not $found) { $findings.Add(@{ Code = 'BZ_HEADER_MISSING'; File = ($w[0] + '.md'); Detail = ($w[2] + '的表頭要逐字照規範：| ' + ($w[1] -join ' | ') + ' |') }) }
+    }
+    return , $findings.ToArray()
+}
+
+# ---------------- 假設、補查紀錄、業務回覆 ----------------
+function Get-PsBzAssumptions {
+    param([string]$OutDir)
+    $out = @()
+    $text = Get-PsBzTextOf (Get-PsBzChapterFiles $OutDir '07-assumptions')
+    foreach ($tb in (Get-PsBzTables $text)) {
+        if (-not (Test-PsBzHeader $tb.Header $script:PsBzAssumpHeader)) { continue }
+        foreach ($row in $tb.Rows) {
+            $id = Get-PsBzCell $tb $row '編號'
+            if ($id -cnotmatch '^A-[0-9]{3,}$') { continue }
+            $out += @{ Id = $id; Kind = (Get-PsBzCell $tb $row '類型'); Missing = (Get-PsBzCell $tb $row '缺什麼'); Provisional = (Get-PsBzCell $tb $row '暫定做法'); Keys = (Get-PsBzCell $tb $row '影響的需求鍵'); Owner = (Get-PsBzCell $tb $row '該問誰'); State = (Get-PsBzCell $tb $row '狀態') }
+        }
+    }
+    return , $out
+}
+
+function Get-PsBzQueryRows {
+    # 10.2 已列的補查檔（檔名，小寫）
+    param([string]$OutDir)
+    $set = @{}
+    $text = Get-PsBzTextOf (Get-PsBzChapterFiles $OutDir '10-evidence')
+    foreach ($tb in (Get-PsBzTables $text)) {
+        if (-not (Test-PsBzHeader $tb.Header $script:PsBzQueryHeader)) { continue }
+        foreach ($row in $tb.Rows) {
+            $f = (Get-PsBzCell $tb $row '補查檔').Replace('`', '').Replace('\', '/')
+            $name = [System.IO.Path]::GetFileName($f)
+            if ($name -ne '') { $set[$name.ToLowerInvariant()] = $true }
+        }
+    }
+    return $set
+}
+
+function Get-PsBzAnswers {
+    # 業務窗口回覆（answers.md 的表）：回覆非空的列
+    param([string]$Text)
+    $out = @()
+    foreach ($tb in (Get-PsBzTables $Text)) {
+        if (-not (Test-PsBzHeader $tb.Header $script:PsBzAnswerHeader)) { continue }
+        foreach ($row in $tb.Rows) {
+            $id = Get-PsBzCell $tb $row '假設編號'
+            $reply = Get-PsBzCell $tb $row '回覆'
+            if ($id -cmatch '^A-[0-9]{3,}$' -and $reply -ne '') { $out += @{ Id = $id; Reply = $reply } }
+        }
+    }
+    return , $out
+}
+
+function Test-PsBzQueryFile {
+    # 補查結果檔：四節依序、結論節第一個非空行以「有答案／查無／查詢失敗」開頭、結果節至少一行內容
+    param([string]$Text)
+    $errs = @(); $conclusion = ''
+    if ($null -eq $Text) { return @{ Ok = $false; Conclusion = ''; Errors = @('檔案不存在') } }
+    $order = @()
+    foreach ($ln in (Get-PsKnLines $Text)) { if ($ln -match '^##\s+(.+?)\s*$') { $order += $Matches[1] } }
+    $want = @('問題', '查詢', '結果', '結論')
+    $pos = -1
+    foreach ($w in $want) {
+        $i = [array]::IndexOf([string[]]$order, $w)
+        if ($i -lt 0) { $errs += ('缺「## ' + $w + '」節') } elseif ($i -lt $pos) { $errs += ('「## ' + $w + '」順序不對') } else { $pos = $i }
+    }
+    $resLines = Get-PsBzSectionLines $Text '結果'
+    $res = 0; foreach ($ln in $resLines) { if (([string]$ln).Trim() -ne '') { $res++ } }
+    if ($res -eq 0) { $errs += '「結果」節沒有內容' }
+    foreach ($ln in (Get-PsBzSectionLines $Text '結論')) {
+        $t = ([string]$ln).Trim()
+        if ($t -eq '') { continue }
+        foreach ($c in $script:PsBzQueryConclusions) { if ($t.StartsWith($c)) { $conclusion = $c; break } }
+        break
+    }
+    if ($conclusion -eq '') { $errs += '「結論」節第一行要以「有答案」「查無」或「查詢失敗」開頭' }
+    return @{ Ok = ($errs.Count -eq 0); Conclusion = $conclusion; Errors = $errs }
+}
+
+# ---------------- 全部檢查 ----------------
+function Invoke-PsBzCheck {
+    # 回傳 @{ Findings; Evidence; Stats }。Ctx 見 Test-PsBzEvidenceItems。
+    param([string]$OutDir, [hashtable]$Ctx)
+    $all = New-Object System.Collections.Generic.List[object]
+    foreach ($x in (Test-PsBzStructure $OutDir)) { $all.Add($x) }
+    $ev = Read-PsBzEvidence $OutDir
+    foreach ($x in (Test-PsBzEvidenceItems $ev $Ctx)) { $all.Add($x) }
+    foreach ($x in (Test-PsBzReferences $OutDir $ev)) { $all.Add($x) }
+    foreach ($x in (Test-PsBzRequirementEvidence $OutDir)) { $all.Add($x) }
+    $reqs = 0
+    foreach ($tb in (Get-PsBzTables (Get-PsBzTextOf (Get-PsBzChapterFiles $OutDir '04-requirement-index')))) {
+        if (Test-PsBzHeader $tb.Header $script:PsBzIndexHeader) { foreach ($row in $tb.Rows) { if ((Get-PsBzCell $tb $row '需求鍵') -cmatch '^[A-Z]+-[0-9]{3,}$') { $reqs++ } } }
+    }
+    $open = 0; foreach ($a in (Get-PsBzAssumptions $OutDir)) { if ($a.State -ceq '開放') { $open++ } }
+    $q = 0; foreach ($it in $ev.Items) { if ($it.Type -ceq '補查') { $q++ } }
+    return @{ Findings = $all.ToArray(); Evidence = $ev; Stats = @{ Requirements = $reqs; Evidence = @($ev.Items).Count; QueryEvidence = $q; OpenAssumptions = $open } }
+}
+
+function ConvertTo-PsBzFindingsMd {
+    param($Findings, [string]$Title, [int]$Max = 200)
+    $lines = @(('# ' + $Title), '', ('共 ' + @($Findings).Count + ' 項；只修表列的問題，不重寫其他內容。'), '', '| 代碼 | 檔案 | 說明 |', '|---|---|---|')
+    $n = 0
+    foreach ($f in @($Findings)) {
+        if ($n -ge $Max) { $lines += ('| … | … | 其餘 ' + (@($Findings).Count - $Max) + ' 項：修完上面的再跑一次檢查 |'); break }
+        $lines += ('| ' + $f.Code + ' | ' + ([string]$f.File).Replace('|', '\|') + ' | ' + ([string]$f.Detail).Replace('|', '\|') + ' |')
+        $n++
+    }
+    return (($lines -join "`n") + "`n")
+}
+@@@PSBUNDLE-END|scripts/ps-bizspec-lib.ps1
+@@@PSBUNDLE-FILE|scripts/ps-bizspec.ps1|541|d6a74ed7c1a5f8b9b0189ab6e4482d5c562537f5c2dae01d64ba134e1967537c|1
+# ps-bizspec.ps1 — /ps-spec 的業務需求文件流程（BIZ1）。寫手 session 照 <框架>/peoplesoft/bizspec/standard.md 寫業務需求文件；
+# 外環逐字比對證據、退回修正、補查（只查「該問誰＝Spec 產製端」的開放假設）、回填、套用業務窗口回覆。PowerShell 5.1；公司機資料只留本機。
+# 輸入 .ps-private/bizspec/<job>/（status.md、project.md、answers.md）＋知識層 docs/ps-research/；執行狀態 .ps-runtime/bizspec/<job>/；
+# 產出 docs/ps-spec/<job>/（寫手寫）與 docs/ps-spec/<job>/evidence/（只有補查 session 寫）。OpenCode 版（-Cli opencode，或資料夾只有 .opencode/peoplesoft）
+# 上面各目錄與 log 目錄加 -opencode；模型讀 .opencode/peoplesoft/sdoc/model.yaml（-Model 可臨時覆寫）。最後一行一律是結論碼（BIZ1-…）。
+# 每次執行依產出現況決定下一步（寫作 → 檢查 → 修正 → 套回覆 → 補查 → 回填 → 檢查），中斷後同命令續跑。
+[CmdletBinding(PositionalBinding = $false)]
+param(
+    [Parameter(Mandatory = $true, Position = 0)][string]$Components,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$MoreComponents = @(),
+    [string]$Root = '',
+    [switch]$Status,
+    [ValidateRange(1, 100)][int]$MaxSessions = 6,
+    [ValidateRange(1, 180)][int]$TimeoutMin = 60,
+    [string]$Model = '',
+    [string]$Cli = '',
+    [switch]$NoQuery,
+    [switch]$Retry,
+    [string]$FakeWriter = '',
+    [string]$FakeQuery = ''
+)
+$ErrorActionPreference = 'Stop'
+try {
+    . (Join-Path $PSScriptRoot 'ps-knowledge-lib.ps1')
+    . (Join-Path $PSScriptRoot 'ps-session-lib.ps1')
+    . (Join-Path $PSScriptRoot 'ps-bizspec-lib.ps1')
+}
+catch { Write-Host ('共用腳本載入失敗，請核對搬運清單與 UTF-8 BOM：' + $_.Exception.Message); Write-Host 'BIZ1-9-02'; exit 2 }
+
+$script:BzSkeletonMark = '<!-- BIZSPEC:SKELETON -->'
+$script:BzMaxFix = 3
+$script:BzMaxQueryTries = 2
+$script:BzMaxKnowledgeList = 40
+
+# ---------------- 檔案 ----------------
+function Get-BzRel([string]$Path) { return ($Path.Substring($J.Root.Length).TrimStart('\', '/') -replace '\\', '/') }
+function Get-BzText([string]$Path) { return (Read-PsKnText -LiteralPath $Path) }
+function Write-BzText([string]$Path, [string]$Text) { if (-not (Write-PsKnAtomicText -LiteralPath $Path -Text $Text)) { throw 'BZ_WRITE_DEFERRED' } }
+function Get-BzFiles([string]$Dir) {
+    $out = @()
+    if ([System.IO.Directory]::Exists($Dir)) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File -Recurse -Force)) {
+            if (($f.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { throw '不支援 reparse point 的工作目錄。' }
+            $out += $f.FullName
+        }
+    }
+    return , $out
+}
+function Get-BzNumber([string]$Dir, [string]$Pattern) {
+    $n = 0
+    if ([System.IO.Directory]::Exists($Dir)) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $Dir -Force)) { $m = [regex]::Match($f.Name, $Pattern); if ($m.Success) { $n = [Math]::Max($n, [int]$m.Groups[1].Value) } }
+    }
+    return $n
+}
+function Test-BzSamePath([string]$A, [string]$B) {
+    if ($A -eq '' -or $B -eq '') { return $false }
+    $fa = [System.IO.Path]::GetFullPath($A); $fb = [System.IO.Path]::GetFullPath($B)
+    if ([System.IO.Path]::DirectorySeparatorChar -eq [char]92) { return [string]::Equals($fa, $fb, [System.StringComparison]::OrdinalIgnoreCase) }
+    return [string]::Equals($fa, $fb, [System.StringComparison]::Ordinal)
+}
+
+# ---------------- 工作狀態（job.json）與補查帳本（queries.json） ----------------
+function Read-BzJson([string]$Path) {
+    $t = Get-BzText $Path
+    if ($null -eq $t -or $t.Trim() -eq '') { return $null }
+    try { return ($t | ConvertFrom-Json) } catch { throw ('JSON 損壞，保留現場：' + (Get-BzRel $Path)) }
+}
+function Read-BzJob {
+    $o = Read-BzJson $J.JobPath
+    $job = @{ fix = 0; stall = 0; answerTries = @{}; backfillTries = 0; phase = '' }
+    if ($null -ne $o) {
+        if ($null -ne $o.fix) { $job.fix = [int]$o.fix }
+        if ($null -ne $o.stall) { $job.stall = [int]$o.stall }
+        if ($null -ne $o.backfillTries) { $job.backfillTries = [int]$o.backfillTries }
+        if ($null -ne $o.answerTries) { foreach ($p in $o.answerTries.PSObject.Properties) { $job.answerTries[$p.Name] = [int]$p.Value } }
+        if ($null -ne $o.phase) { $job.phase = [string]$o.phase }
+    }
+    return $job
+}
+function Write-BzJob($Job) {
+    $tries = [ordered]@{}; foreach ($k in (Sort-PsKnOrdinal -Items @($Job.answerTries.Keys))) { if ($null -ne $k) { $tries[$k] = [int]$Job.answerTries[$k] } }
+    $o = [ordered]@{ schemaVersion = 1; jobId = $J.JobId; components = @($J.Names); phase = [string]$Job.phase; fix = [int]$Job.fix; stall = [int]$Job.stall; backfillTries = [int]$Job.backfillTries; answerTries = $tries; updatedAt = (Get-PsKnUtcStamp) }
+    Write-BzText $J.JobPath ((ConvertTo-PsKnJson -Value $o) + "`n")
+}
+function Read-BzLedger {
+    $o = Read-BzJson $J.LedgerPath
+    $led = @{ entries = @(); failed = @{} }
+    if ($null -ne $o) {
+        foreach ($e in @($o.entries)) { if ($null -ne $e) { $led.entries += @{ assumption = [string]$e.assumption; file = [string]$e.file; sha = [string]$e.sha; conclusion = [string]$e.conclusion; at = [string]$e.at } } }
+        if ($null -ne $o.failed) { foreach ($p in $o.failed.PSObject.Properties) { $led.failed[$p.Name] = [int]$p.Value } }
+    }
+    return $led
+}
+function Write-BzLedger($Led) {
+    $entries = @(); foreach ($e in $Led.entries) { $entries += [ordered]@{ assumption = $e.assumption; file = $e.file; sha = $e.sha; conclusion = $e.conclusion; at = $e.at } }
+    $failed = [ordered]@{}; foreach ($k in (Sort-PsKnOrdinal -Items @($Led.failed.Keys))) { if ($null -ne $k) { $failed[$k] = [int]$Led.failed[$k] } }
+    Write-BzText $J.LedgerPath ((ConvertTo-PsKnJson -Value ([ordered]@{ schemaVersion = 1; entries = $entries; failed = $failed })) + "`n")
+}
+function Get-BzLedgerMap($Led) { $m = @{}; foreach ($e in $Led.entries) { $m[$e.file] = $e.sha }; return $m }
+
+# ---------------- 輸入 ----------------
+function Initialize-BzInputs {
+    # 缺檔就建骨架（不覆寫既有檔）；同一組 Component 的 Spec 文件流程（DOC1）已有狀態圖就複製一份。
+    [void][System.IO.Directory]::CreateDirectory($J.InputRoot)
+    $st = Join-Path $J.InputRoot 'status.md'
+    if (-not [System.IO.File]::Exists($st)) {
+        $old = Get-BzText (Join-Path (Join-Path (Join-Path $J.Root ('.ps-private/sdoc' + $J.Sfx)) ('clone-' + $J.Hash)) 'status.md')
+        if ($null -ne $old -and -not $old.Contains('<!-- SDOC:SKELETON -->')) {
+            if (Write-PsKnCreateOnlyText -LiteralPath $st -Text $old) { Write-Host ('已從 Spec 文件流程同一組 Component 的輸入複製 status.md 到 ' + (Get-BzRel $J.InputRoot) + '/。') }
+        }
+    }
+    $files = [ordered]@{
+        'status.md' = @($script:BzSkeletonMark, '# 狀態圖（選填）', '',
+            '把這組 Component 的狀態圖貼在這裡（Mermaid 或文字都可以），圖下方可寫各階段誰做什麼。', '',
+            '貼好後刪掉第一行的 BIZSPEC:SKELETON 標記。沒有狀態圖就保留標記，外環只用知識層與其他輸入。') -join "`n"
+        'project.md' = @($script:BzSkeletonMark, '# 專案輸入（選填）', '', '## 業務名稱', '', '## 本期目標', '',
+            '## 補充說明（業務規則、範圍、例外，寫業務語言；不寫人名）', '', '填好後刪掉第一行的 BIZSPEC:SKELETON 標記。') -join "`n"
+        'answers.md' = @('# 業務窗口回覆', '', '假設編號以業務需求文件 07-assumptions.md 為準；回覆人只寫代稱；日期寫 YYYY-MM-DD。填好後用相同命令續跑，外環會請寫手照第 7 章 7.4 關閉。', '',
+            ('| ' + ($script:PsBzAnswerHeader -join ' | ') + ' |'), '|---|---|---|---|') -join "`n"
+    }
+    foreach ($name in $files.Keys) {
+        $p = Join-Path $J.InputRoot $name
+        if (-not [System.IO.File]::Exists($p)) { [void](Write-PsKnCreateOnlyText -LiteralPath $p -Text ($files[$name] + "`n")) }
+    }
+}
+function Get-BzHumanSources {
+    $out = @()
+    foreach ($n in @('status.md', 'project.md')) {
+        $t = Get-BzText (Join-Path $J.InputRoot $n)
+        if ($null -ne $t -and -not $t.Contains($script:BzSkeletonMark) -and $t.Trim() -ne '') { $out += ((Get-BzRel $J.InputRoot) + '/' + $n) }
+    }
+    return , $out
+}
+function Find-BzKnowledge {
+    # docs/ps-research 底下提到這組 Component 任一名稱的 .md（不分大小寫；knowledge/ 索引快取除外）
+    $dir = Join-Path $J.Root 'docs/ps-research'
+    $out = @()
+    if (-not [System.IO.Directory]::Exists($dir)) { return , $out }
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -File -Recurse -Filter '*.md')) {
+        $rel = Get-BzRel $f.FullName
+        if ($rel -like 'docs/ps-research/knowledge/*') { continue }
+        $t = Get-BzText $f.FullName
+        if ($null -eq $t) { continue }
+        foreach ($n in $J.Names) { if ($t.IndexOf($n, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $out += $rel; break } }
+    }
+    return , (Sort-PsKnOrdinal -Items $out)
+}
+
+# ---------------- 工單 ----------------
+function New-BzOrder([string]$Kind, [string[]]$Body) {
+    $n = (Get-BzNumber $J.OrderDir '^o([0-9]{4,8})\.md$') + 1
+    $id = 'o' + $n.ToString('0000')
+    $kn = @($J.Knowledge)
+    $knLines = @()
+    foreach ($k in ($kn | Select-Object -First $script:BzMaxKnowledgeList)) { $knLines += ('  - ' + $k) }
+    if ($kn.Count -gt $script:BzMaxKnowledgeList) { $knLines += ('  - 其餘 ' + ($kn.Count - $script:BzMaxKnowledgeList) + ' 個檔：以知識層索引定位') }
+    if ($kn.Count -eq 0) { $knLines += '  - （知識層沒有提到這組 Component 的檔）' }
+    $hs = Get-BzHumanSources
+    $hsText = '（人工輸入都還是骨架）'; if ($hs.Count -gt 0) { $hsText = ($hs -join '、') }
+    $q = '不可用'; if (-not $NoQuery) { $q = '可用' }
+    $lines = @(('# 工單 ' + $id + '（' + $Kind + '）'), '',
+        ('- 規範：' + $J.StandardRel),
+        ('- 來源資料夾：' + (Get-BzRel $J.InputRoot) + '（人工輸入，唯讀；已填的檔：' + $hsText + '）'),
+        '- 其他可引用位置：docs/ps-research（知識層，唯讀；先讀 docs/ps-research/knowledge/index.md 定位）。提到這組 Component 的檔：') + $knLines + @(
+        ('- 輸出資料夾：' + (Get-BzRel $J.OutputRoot)),
+        ('- 補查：' + $q),
+        ('- Component：' + ($J.Names -join '、')),
+        ('- 證據的位置一律寫從專案根目錄起算的路徑，例：' + (Get-BzRel $J.InputRoot) + '/status.md §…、docs/ps-research/<領域>/<檔名>.md §…。'),
+        '', '## 這次要做', '') + $Body
+    Write-BzText (Join-Path $J.OrderDir ($id + '.md')) ((($lines | ForEach-Object { [string]$_ }) -join "`n") + "`n")
+    return $id
+}
+
+# ---------------- session 與圍欄 ----------------
+function Get-BzFence([string[]]$Dirs) {
+    $map = @{}
+    foreach ($d in $Dirs) { foreach ($p in (Get-BzFiles $d)) { $map[$p] = [System.IO.File]::ReadAllBytes($p) } }
+    return , $map
+}
+function Restore-BzFence($Snapshot, [string[]]$Dirs, [string[]]$Allowed) {
+    # 快照裡的檔被改或刪 → 原樣還原；快照外新出現的檔（不在 Allowed）→ 移到 quarantine。回傳違規的相對路徑。
+    $violations = @()
+    foreach ($p in @($Snapshot.Keys)) {
+        $now = $null; if ([System.IO.File]::Exists($p)) { $now = [System.IO.File]::ReadAllBytes($p) }
+        if ($null -ne $now -and [Convert]::ToBase64String($now) -ceq [Convert]::ToBase64String($Snapshot[$p])) { continue }
+        [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($p))
+        [System.IO.File]::WriteAllBytes($p, $Snapshot[$p])
+        $violations += (Get-BzRel $p)
+    }
+    foreach ($d in $Dirs) {
+        foreach ($p in (Get-BzFiles $d)) {
+            if ($Snapshot.ContainsKey($p)) { continue }
+            $ok = $false; foreach ($a in @($Allowed)) { if (Test-BzSamePath $p $a) { $ok = $true; break } }
+            if ($ok) { continue }
+            $qd = Join-Path $J.RuntimeRoot 'quarantine'
+            [void][System.IO.Directory]::CreateDirectory($qd)
+            [System.IO.File]::Move($p, (Join-Path $qd ([guid]::NewGuid().ToString('N') + '-' + [System.IO.Path]::GetFileName($p))))
+            $violations += (Get-BzRel $p)
+        }
+    }
+    return , $violations
+}
+function Invoke-BzSession([string]$Agent, [string]$OrderId, [string]$Kind, [string]$Fake) {
+    Write-Host ('派工 ' + $OrderId + '：' + $Kind)
+    $orderPath = Join-Path $J.OrderDir ($OrderId + '.md')
+    try {
+        if ($Fake -ne '') {
+            $global:LASTEXITCODE = 0
+            $null = (& $Fake -OrderPath $orderPath -Kind $Kind -Root $J.Root -OutputRoot $J.OutputRoot *>&1 | ForEach-Object { [string]$_ })
+            return @{ ExitCode = [int]$LASTEXITCODE; TimedOut = $false; SlotBusy = $false; FailureKind = 'NONE'; ApiKind = 'NONE' }
+        }
+        return (Invoke-PsOcSession -OcPath $J.OcPath -Root $J.Root -LogRoot $J.LogRoot -Model $J.Model -ExtraArgs ('--agent ' + $Agent) -PromptText ($J.JobId + '/' + $OrderId) -TimeoutMin $TimeoutMin -Tag ($J.JobId + '-' + $OrderId) -Log { param($msg) Write-Host $msg } -SlotWaitMin 0 -TimeoutParamName 'TimeoutMin' -EnvDefaults (Get-PsOcClaudeEnvDefaults -Agent $Agent))
+    }
+    catch { Write-Host ('session 未完成：' + $_.Exception.Message); return @{ ExitCode = -1; TimedOut = $false; SlotBusy = $false; FailureKind = 'DISPATCH_ERROR'; ApiKind = 'NONE' } }
+}
+function Test-BzSessionFailed($Sr) { return ([bool]$Sr.TimedOut -or [int]$Sr.ExitCode -ne 0 -or (@('', 'NONE') -notcontains [string]$Sr.FailureKind)) }
+
+# ---------------- 檢查 ----------------
+function Get-BzCheckContext {
+    $led = Read-BzLedger
+    return @{ Root = $J.Root; FileRoots = @(((Get-BzRel $J.InputRoot) + '/'), 'docs/ps-research/'); EvidenceRel = ((Get-BzRel $J.EvidenceDir) + '/'); Ledger = (Get-BzLedgerMap $led) }
+}
+function Invoke-BzCheckNow {
+    $r = Invoke-PsBzCheck -OutDir $J.OutputRoot -Ctx (Get-BzCheckContext)
+    $J.LastStats = $r.Stats
+    return $r
+}
+
+# ---------------- 下一步 ----------------
+function Get-BzNext($Job) {
+    $pr = Get-PsBzProgress $J.OutputRoot
+    if (-not $pr.Done) {
+        if ($Job.stall -ge 2) { return @{ Kind = 'BLOCKED'; Reason = '寫手連續兩個 session 沒有進度（progress.md 沒有新打勾）' } }
+        return @{ Kind = 'WRITE'; Open = $pr.Open }
+    }
+    $chk = Invoke-BzCheckNow
+    if (@($chk.Findings).Count -gt 0) {
+        if ($Job.fix -ge $script:BzMaxFix) { return @{ Kind = 'BLOCKED'; Reason = ('外環檢查連續 ' + $script:BzMaxFix + ' 輪修正後仍未通過'); Findings = $chk.Findings } }
+        return @{ Kind = 'FIX'; Findings = $chk.Findings }
+    }
+    $Job.fix = 0
+    $assump = Get-PsBzAssumptions $J.OutputRoot
+    $open = @{}; foreach ($a in $assump) { if ($a.State -ceq '開放') { $open[$a.Id] = $a } }
+    $ans = @()
+    foreach ($x in (Get-PsBzAnswers (Get-BzText (Join-Path $J.InputRoot 'answers.md')))) {
+        if ($open.ContainsKey($x.Id) -and $ans -cnotcontains $x.Id) {
+            $tries = 0; if ($Job.answerTries.ContainsKey($x.Id)) { $tries = [int]$Job.answerTries[$x.Id] }
+            if ($tries -lt 2) { $ans += $x.Id }
+        }
+    }
+    if ($ans.Count -gt 0) { return @{ Kind = 'ANSWER'; Ids = $ans } }
+    $led = Read-BzLedger
+    $queried = @{}; foreach ($e in $led.entries) { $queried[$e.assumption] = $true }
+    if (-not $NoQuery) {
+        foreach ($id in (Sort-PsKnOrdinal -Items @($open.Keys))) {
+            if ($null -eq $id) { continue }
+            $a = $open[$id]
+            if ($a.Owner -cne 'Spec 產製端' -or $queried.ContainsKey($id)) { continue }
+            $f = 0; if ($led.failed.ContainsKey($id)) { $f = [int]$led.failed[$id] }
+            if ($f -ge $script:BzMaxQueryTries) { continue }
+            return @{ Kind = 'QUERY'; Assumption = $a }
+        }
+    }
+    $listed = Get-PsBzQueryRows $J.OutputRoot
+    $pending = @(); foreach ($e in $led.entries) { if (-not $listed.ContainsKey([System.IO.Path]::GetFileName($e.file).ToLowerInvariant())) { $pending += $e } }
+    if ($pending.Count -gt 0) {
+        if ($Job.backfillTries -ge 2) { return @{ Kind = 'BLOCKED'; Reason = '補查結果回填兩次後 10.2 仍沒有列出全部補查檔' } }
+        return @{ Kind = 'BACKFILL'; Entries = $pending }
+    }
+    if ($open.Count -gt 0) { return @{ Kind = 'DONE'; Phase = 'NEEDS_ANSWERS'; Open = $open.Count } }
+    return @{ Kind = 'DONE'; Phase = 'REVIEW_READY'; Open = 0 }
+}
+
+# ---------------- 各步驟 ----------------
+function Invoke-BzWriterStep($Next, $Job) {
+    $kind = $Next.Kind
+    $body = @()
+    if ($kind -eq 'WRITE') {
+        $body = @('照規範「怎麼開始與續寫」：輸出資料夾沒有 progress.md 就新寫；有就從第一個沒打勾的項目接續，已打勾的檔照「已打勾的檔怎麼改」處理。',
+            '一直寫到「完成前自我檢查」做完，在 progress.md 寫「自我檢查：通過；修正項：…」那一行。',
+            '來源 Spec＝來源資料夾的已填檔加上面列的知識層檔；每條需求先在 10-evidence.md 登證據再寫。只談業務需求，不寫系統設計。')
+    }
+    elseif ($kind -eq 'FIX') {
+        $n = (Get-BzNumber $J.CheckDir '^c([0-9]{4,8})\.md$') + 1
+        $cp = Join-Path $J.CheckDir ('c' + $n.ToString('0000') + '.md')
+        Write-BzText $cp (ConvertTo-PsBzFindingsMd -Findings $Next.Findings -Title ('外環檢查 c' + $n.ToString('0000')))
+        $body = @(('外環檢查沒過：讀 ' + (Get-BzRel $cp) + '，只修表列的問題。'),
+            '- BZ_EV_EXCERPT／BZ_EV_LENGTH：回到位置所指的檔，從同一行逐字照抄；檔裡真的沒有 → 刪掉這筆證據與只靠它的需求，改登記假設（第 7 章）。',
+            '- BZ_REF_*、BZ_REQ_NO_EVIDENCE、BZ_ASSUMP_NO_EVIDENCE：補登證據或補上引用；沒人引用的證據刪掉。',
+            '- BZ_FILE_MISSING、BZ_HEADER_MISSING、BZ_PROGRESS_OPEN、BZ_SELFCHECK_MISSING：照規範補檔、補表頭、補完未打勾的項目並重做自我檢查。',
+            ('修完在 progress.md 的自我檢查那一行後加「；外環檢查 c' + $n.ToString('0000') + ' 已修」。不要重寫其他內容。'))
+        $Job.fix = [int]$Job.fix + 1
+    }
+    elseif ($kind -eq 'ANSWER') {
+        $body = @(('業務窗口在 ' + (Get-BzRel (Join-Path $J.InputRoot 'answers.md')) + ' 回覆了下列假設：' + ($Next.Ids -join '、') + '。'),
+            '照規範第 7 章 7.4 逐筆關閉：關閉依據寫「〈日期〉〈回覆人代稱〉：〈結論一句〉」；把結論寫進受影響需求；確認狀態與追蹤表照 7.4 同步。',
+            '業務窗口的回覆不登證據；回覆與來源衝突時照 7.4 第 5 步處理。只改受影響的列。')
+        foreach ($id in $Next.Ids) { $t = 0; if ($Job.answerTries.ContainsKey($id)) { $t = [int]$Job.answerTries[$id] }; $Job.answerTries[$id] = $t + 1 }
+    }
+    elseif ($kind -eq 'BACKFILL') {
+        $fl = @(); foreach ($e in $Next.Entries) { $fl += ('  - ' + $e.file + '（' + $e.assumption + '，結論：' + $e.conclusion + '）') }
+        $body = @('外環補查完成：照規範第 10 章 10.3 回填下列補查檔（只讀，不改）：') + $fl + @('每個補查檔在 10.2 寫一列。只改受影響的列。')
+        $Job.backfillTries = [int]$Job.backfillTries + 1
+    }
+    Write-BzJob $Job
+    $id = New-BzOrder $kind $body
+    $before = Get-PsBzProgress $J.OutputRoot
+    $dirs = @($J.InputRoot, $J.EvidenceDir, $J.JobRoot)
+    $fence = Get-BzFence $dirs
+    $sr = Invoke-BzSession 'ps-bizspec-writer' $id $kind $FakeWriter
+    $viol = Restore-BzFence $fence $dirs @()
+    if (@($viol).Count -gt 0) { $J.Gaps += ('寫手改了不准改的檔，已還原／隔離：' + (@($viol | Select-Object -First 5) -join '、')) }
+    if ($kind -eq 'WRITE') {
+        $after = Get-PsBzProgress $J.OutputRoot
+        $progressed = ($after.Exists -and (-not $before.Exists -or $after.Open -lt $before.Open -or ($after.Done -and -not $before.Done)))
+        if ($progressed) { $Job.stall = 0 } elseif (-not (Test-BzSessionFailed $sr)) { $Job.stall = [int]$Job.stall + 1 }
+    }
+    Write-BzJob $Job
+    return $sr
+}
+function Invoke-BzQueryStep($Next, $Job) {
+    $a = $Next.Assumption
+    $rel = (Get-BzRel $J.EvidenceDir) + '/Q-' + $a.Id + '.md'
+    $target = Join-Path $J.Root $rel
+    $ev = Read-PsBzEvidence $J.OutputRoot
+    $ctx = @()
+    foreach ($m in $script:PsBzEvidenceIdRx.Matches([string]$a.Missing)) {
+        if ($ev.ById.ContainsKey($m.Value)) { $it = $ev.ById[$m.Value]; $ctx += ('  - ' + $it.Id + '：' + $it.Location + '：' + $it.Excerpt) }
+    }
+    if ($ctx.Count -eq 0) { $ctx += '  - （沒有相關證據）' }
+    $body = @(('- 契約：' + $J.QueryContractRel),
+        ('- 假設：' + $a.Id + '（' + $a.Kind + '）'),
+        ('- 缺什麼：' + $a.Missing),
+        ('- 暫定做法：' + $a.Provisional),
+        ('- 影響的需求鍵：' + $a.Keys),
+        '- 相關證據：') + $ctx + @(('- 輸出檔：' + $rel + '（只寫這一個檔）'), '',
+        '向舊系統補查這一件事，照契約寫補查結果檔。查不到就照實寫「查無」；查詢工具故障就寫「查詢失敗」。')
+    $id = New-BzOrder 'QUERY' $body
+    $dirs = @($J.InputRoot, $J.OutputRoot, $J.JobRoot)
+    $fence = Get-BzFence $dirs
+    $sr = Invoke-BzSession 'ps-bizspec-query' $id 'QUERY' $FakeQuery
+    $viol = Restore-BzFence $fence $dirs @($target)
+    if (@($viol).Count -gt 0) { $J.Gaps += ('補查 session 改了不准改的檔，已還原／隔離：' + (@($viol | Select-Object -First 5) -join '、')) }
+    $led = Read-BzLedger
+    $text = Get-BzText $target
+    $chk = Test-PsBzQueryFile $text
+    if ($null -ne $text -and $chk.Ok) {
+        $led.entries += @{ assumption = $a.Id; file = $rel; sha = (Get-PsKnTextHash -Text $text); conclusion = $chk.Conclusion; at = (Get-PsKnUtcStamp) }
+        Write-BzText (Join-Path $J.QueryCopyDir ('Q-' + $a.Id + '.md')) $text
+        Write-Host ('補查 ' + $a.Id + '：' + $chk.Conclusion)
+    }
+    else {
+        $f = 0; if ($led.failed.ContainsKey($a.Id)) { $f = [int]$led.failed[$a.Id] }
+        $led.failed[$a.Id] = $f + 1
+        if ($null -ne $text) {
+            $qd = Join-Path $J.RuntimeRoot 'quarantine'; [void][System.IO.Directory]::CreateDirectory($qd)
+            [System.IO.File]::Move($target, (Join-Path $qd ([guid]::NewGuid().ToString('N') + '-Q-' + $a.Id + '.md')))
+        }
+        $why = '沒有寫補查結果檔'; if ($null -ne $text) { $why = ($chk.Errors -join '；') }
+        $J.Gaps += ('補查 ' + $a.Id + ' 不合格（' + $why + '）；第 ' + $led.failed[$a.Id] + ' 次')
+    }
+    Write-BzLedger $led
+    return $sr
+}
+function Repair-BzLedgerFiles {
+    # 補查檔被改或刪：從 .ps-runtime 的副本還原（寫手只准讀）
+    $led = Read-BzLedger
+    foreach ($e in $led.entries) {
+        $p = Join-Path $J.Root $e.file
+        $t = Get-BzText $p
+        if ($null -ne $t -and (Get-PsKnTextHash -Text $t) -ceq $e.sha) { continue }
+        $copy = Get-BzText (Join-Path $J.QueryCopyDir ([System.IO.Path]::GetFileName($e.file)))
+        if ($null -ne $copy -and (Get-PsKnTextHash -Text $copy) -ceq $e.sha) { Write-BzText $p $copy; $J.Gaps += ('補查檔被改動，已從副本還原：' + $e.file) }
+    }
+}
+
+# ---------------- OpenCode 版的模型（與 Spec 文件流程共用 sdoc/model.yaml） ----------------
+function Get-BzOpencodeModel {
+    $t = Get-BzText (Join-Path $J.Root ($J.PsDir + '/sdoc/model.yaml'))
+    if ($null -eq $t) { return '' }
+    foreach ($ln in ($t -split "`n")) {
+        $m = [regex]::Match($ln, '^\s*model\s*:(.*)$')
+        if (-not $m.Success) { continue }
+        $v = ($m.Groups[1].Value -replace '\s+#.*$', '').Trim()
+        if ($v.Length -ge 2 -and (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'")))) { $v = $v.Substring(1, $v.Length - 2).Trim() }
+        return $v
+    }
+    return ''
+}
+function Test-BzOpencodeModelName([string]$Name) {
+    if ($null -eq $Name -or -not (Test-PsOcPromptSafe -PromptText $Name)) { return $false }
+    if ($Name -match '(?i)FILL_ME') { return $false }
+    return ($Name -cmatch '^[A-Za-z0-9_][A-Za-z0-9_.@-]*/[A-Za-z0-9_][A-Za-z0-9_.:/@-]*$')
+}
+
+# ---------------- 主程式 ----------------
+$exitCode = 0; $code = 'BIZ1-9-02'; $mutex = $null; $held = $false
+$J = @{ Gaps = @(); EnvChanged = $false; LastStats = $null; EnvSaved = @{ Cli = $env:PS_CLI; NoClaude = $env:OPENCODE_DISABLE_CLAUDE_CODE } }
+try {
+    if ($Root -eq '') { $Root = Split-Path $PSScriptRoot -Parent }
+    $Root = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    if (-not [System.IO.Directory]::Exists($Root) -or -not (Test-PsOcPromptSafe -PromptText $Root) -or ($Model -ne '' -and (-not (Test-PsOcPromptSafe -PromptText $Model) -or $Model -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$'))) { throw 'BZ_ARGUMENT_INVALID' }
+    if ($Status -and $Retry) { throw 'BZ_ARGUMENT_INVALID' }
+    $cliArg = ([string]$Cli).Trim().ToLowerInvariant()
+    if (@('', 'claude', 'opencode') -notcontains $cliArg) { throw 'BZ_ARGUMENT_INVALID' }
+    $set = @{}
+    $componentText = ((@($Components) + @($MoreComponents) | Where-Object { $null -ne $_ }) -join ' ').Replace("'", ' ').Trim()
+    foreach ($name in @($componentText -split '[,\s]+' | Where-Object { $_ -ne '' })) {
+        if ($name -match '[^\x00-\x7F]') { throw 'BZ_ARGUMENT_INVALID' }
+        $upper = $name.ToUpperInvariant()
+        if ($upper -cnotmatch '^[A-Z0-9_][A-Z0-9_.$#-]{0,59}$') { throw 'BZ_ARGUMENT_INVALID' }
+        $set[$upper] = $true
+    }
+    if ($set.Count -eq 0) { throw 'BZ_ARGUMENT_INVALID' }
+    if ($cliArg -ne '') { $J.EnvChanged = $true; $env:PS_CLI = $cliArg }
+    $fe = Get-PsCliVariant -Root $Root
+    $J.Cli = $fe.Name; $J.PsDir = $fe.PsDir; $J.Root = $Root
+    $J.StandardRel = $fe.PsDir + '/bizspec/standard.md'
+    $J.QueryContractRel = $fe.PsDir + '/bizspec/query-contract.md'
+    if (-not [System.IO.File]::Exists((Join-Path $Root $J.StandardRel))) { throw 'BZ_VARIANT' }
+    $J.Names = Sort-PsKnOrdinal -Items @($set.Keys)
+    $J.Hash = (Get-PsKnTextHash -Text ($J.Names -join "`n")).Substring(0, 16).ToLowerInvariant()
+    $J.JobId = 'biz-' + $J.Hash
+    $J.Sfx = ''; if ($fe.Name -eq 'opencode') { $J.Sfx = '-opencode' }
+    $J.InputRoot = Join-Path (Join-Path $Root ('.ps-private/bizspec' + $J.Sfx)) $J.JobId
+    $J.RuntimeRoot = Join-Path $Root ('.ps-runtime/bizspec' + $J.Sfx)
+    $J.LogRoot = Join-Path $Root ('.ps-runtime/bizspec' + $J.Sfx + '-logs')
+    $J.JobRoot = Join-Path $J.RuntimeRoot $J.JobId
+    $J.OrderDir = Join-Path $J.JobRoot 'orders'
+    $J.CheckDir = Join-Path $J.JobRoot 'check'
+    $J.QueryCopyDir = Join-Path $J.JobRoot 'queries'
+    $J.JobPath = Join-Path $J.JobRoot 'job.json'
+    $J.LedgerPath = Join-Path $J.JobRoot 'queries.json'
+    $J.OutputRoot = Join-Path (Join-Path $Root ('docs/ps-spec' + $J.Sfx)) $J.JobId
+    $J.EvidenceDir = Join-Path $J.OutputRoot 'evidence'
+    $J.NextCommand = "powershell -NoProfile -File '" + $PSCommandPath.Replace("'", "''") + "' -Root '" + $Root.Replace("'", "''") + "' -Components '" + ($J.Names -join ',') + "'"
+    if ($fe.Name -eq 'opencode') { $J.NextCommand += ' -Cli opencode' }
+    if ($Model -ne '') { $J.NextCommand += " -Model '" + $Model + "'" }
+    if ($NoQuery) { $J.NextCommand += ' -NoQuery' }
+    if ($PSBoundParameters.ContainsKey('TimeoutMin')) { $J.NextCommand += ' -TimeoutMin ' + $TimeoutMin }
+    $J.Model = $Model; $J.ModelFrom = '-Model'
+    if ($fe.Name -eq 'opencode') {
+        $J.EnvChanged = $true; $env:OPENCODE_DISABLE_CLAUDE_CODE = '1'
+        if ($J.Model -eq '') { $J.Model = Get-BzOpencodeModel; $J.ModelFrom = $fe.PsDir + '/sdoc/model.yaml' }
+        if (-not (Test-BzOpencodeModelName $J.Model)) { throw 'BZ_MODEL_INVALID' }
+        Write-Host ('OpenCode 模型：' + $J.Model + '（' + $J.ModelFrom + '）')
+    }
+    $rootLockId = (Get-PsKnTextHash -Text $Root.ToUpperInvariant()).Substring(0, 16)
+    $mutex = New-Object System.Threading.Mutex($false, ('Global\MCPSample-BizSpec-' + $rootLockId + '-' + $J.JobId + $J.Sfx))
+    try { $held = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $held = $true }
+    if (-not $held) { Write-Host '同一組 Component 的業務需求文件工作正在執行；稍後用相同命令繼續。'; $code = 'BIZ1-0-03'; $exitCode = 3 }
+    else {
+        if (-not $Status) { Initialize-BzInputs }
+        $J.Knowledge = Find-BzKnowledge
+        $human = Get-BzHumanSources
+        $started = [System.IO.File]::Exists((Join-Path $J.OutputRoot 'progress.md'))
+        if (-not $started -and $human.Count -eq 0 -and $J.Knowledge.Count -eq 0) {
+            Write-Host ('等待來源：知識層（docs/ps-research）沒有提到 ' + ($J.Names -join '、') + ' 的文件，人工輸入也還是骨架。')
+            Write-Host ('先用 /ps-research 研究這組 Component 所屬領域，或把狀態圖、業務說明寫進 ' + (Get-BzRel $J.InputRoot) + '/ 的 status.md、project.md（刪掉第一行的 BIZSPEC:SKELETON 標記）。放好後用相同命令繼續：')
+            Write-Host $J.NextCommand
+            $code = 'BIZ1-0-01'
+        }
+        elseif ($Status -and -not $started) { Write-Host '尚未開始。下一步：'; Write-Host $J.NextCommand; $code = 'BIZ1-0-02' }
+        else {
+            [void][System.IO.Directory]::CreateDirectory($J.OrderDir)
+            $job = Read-BzJob
+            if ($Retry) { $job.fix = 0; $job.stall = 0; $job.backfillTries = 0; $job.answerTries = @{}; $led0 = Read-BzLedger; $led0.failed = @{}; Write-BzLedger $led0; Write-BzJob $job }
+            if (-not $Status) {
+                if ($FakeWriter -eq '' -or (-not $NoQuery -and $FakeQuery -eq '')) {
+                    $oc = Get-PsOcPath -Root $Root; $J.OcPath = [string]$oc.Path
+                    if ($J.OcPath -eq '') { throw ('無法啟動 ' + $oc.Exe + '：' + $oc.Error) }
+                }
+                foreach ($fk in @($FakeWriter, $FakeQuery)) { if ($fk -ne '' -and -not [System.IO.File]::Exists($fk)) { throw 'Fake 腳本不存在。' } }
+                if ($fe.Name -eq 'opencode' -and $FakeWriter -eq '') {
+                    $mc = Test-PsOcOpencodeModel -OcPath $J.OcPath -Model $J.Model -Root $J.Root -LogRoot $J.LogRoot
+                    if ($mc.Result -eq 'UNKNOWN') { Write-Host ('提醒：無法先確認模型（' + $mc.Message + '）；照常開 session。') }
+                    elseif ($mc.Result -ne 'OK') { Write-Host ('模型不能用：' + $mc.Message + '。改 ' + $J.ModelFrom + ' 的 model 那一行，再跑同一個命令：'); Write-Host $J.NextCommand; throw 'BZ_MODEL_UNAVAILABLE' }
+                }
+                Repair-BzLedgerFiles
+            }
+            $sessions = 0; $stop = ''; $failedApi = @(); $next = $null
+            while ($true) {
+                $next = Get-BzNext $job
+                if (@('DONE', 'BLOCKED') -contains $next.Kind -or $Status) { break }
+                if ($sessions -ge $MaxSessions) { break }
+                $sr = $null
+                if ($next.Kind -eq 'QUERY') { $sr = Invoke-BzQueryStep $next $job } else { $sr = Invoke-BzWriterStep $next $job }
+                if ([bool]$sr.SlotBusy) { $stop = 'SLOT_BUSY'; break }
+                $sessions++
+                if (Test-BzSessionFailed $sr) { $stop = 'SESSION_FAILED'; $failedApi += [string]$sr.ApiKind; break }
+            }
+            if ($next.Kind -eq 'DONE') { $job.fix = 0 }
+            $job.phase = $next.Kind; if ($next.Kind -eq 'DONE') { $job.phase = $next.Phase }
+            if (-not $Status) { Write-BzJob $job }
+            if ($null -eq $J.LastStats -and [System.IO.File]::Exists((Join-Path $J.OutputRoot 'progress.md'))) { [void](Invoke-BzCheckNow) }
+            $s = $J.LastStats
+            $statLine = '欄位統計：需求=0；證據=0；補查證據=0；開放假設=0'
+            if ($null -ne $s) { $statLine = '欄位統計：需求=' + $s.Requirements + '；證據=' + $s.Evidence + '；補查證據=' + $s.QueryEvidence + '；開放假設=' + $s.OpenAssumptions }
+            Write-Host ('狀態：' + $job.phase + '；本輪 session=' + $sessions + '；修正輪次=' + $job.fix)
+            Write-Host $statLine
+            Write-Host ('入口：' + (Join-Path $J.OutputRoot 'README.md'))
+            foreach ($g in $J.Gaps) { Write-Host ('缺口：' + $g) }
+            if ($next.Kind -eq 'DONE' -and $next.Phase -eq 'REVIEW_READY') { Write-Host '外環檢查全過、補查已回填、沒有開放假設，可人工審閱。這不是業務驗收。'; $code = 'BIZ1-7-01' }
+            elseif ($next.Kind -eq 'DONE') {
+                Write-Host ('外環檢查全過、補查已回填；還有 ' + $next.Open + ' 筆開放假設要業務窗口回覆：看 07-assumptions.md，回覆寫進 ' + (Get-BzRel (Join-Path $J.InputRoot 'answers.md')) + ' 後用相同命令續跑。')
+                $code = 'BIZ1-5-01'
+            }
+            elseif ($next.Kind -eq 'BLOCKED') {
+                Write-Host ('卡住：' + $next.Reason + '。')
+                if ($null -ne $next.Findings) { foreach ($f in @($next.Findings | Select-Object -First 10)) { Write-Host ('檢查：' + $f.Code + ' ' + $f.File + '：' + $f.Detail) } }
+                Write-Host '處理原因後同命令加 -Retry：'; Write-Host ($J.NextCommand + ' -Retry'); $code = 'BIZ1-4-03'; $exitCode = 1
+            }
+            else { Write-Host ('下一步：' + $next.Kind + '；用相同命令繼續：'); Write-Host $J.NextCommand; $code = 'BIZ1-3-02-1' }
+            if ($stop -eq 'SLOT_BUSY') { Write-Host '模型服務被其他 session 使用；稍後重跑。'; $code = 'BIZ1-3-03'; $exitCode = 1 }
+            if ($stop -eq 'SESSION_FAILED') {
+                $hint = Get-PsOcApiHint -Kinds $failedApi -TimeoutMin $TimeoutMin
+                if ($hint -ne '') { Write-Host ('session 失敗。' + $hint + '。已寫的檔保留，同命令續跑。') }
+                elseif ($fe.Name -eq 'opencode') { Write-Host ('session 失敗；檢查 OpenCode 的模型與 provider（' + $J.Model + '，設定在 ' + $J.ModelFrom + '）與 MCP 後重跑；錯誤訊息在 ' + (Get-BzRel $J.LogRoot) + ' 最新的 .err.txt。') }
+                else { Write-Host 'session 失敗；檢查 Claude Code／MCP 後重跑。已寫的檔保留，同命令續跑。' }
+                $code = 'BIZ1-3-04'; $exitCode = 1
+            }
+        }
+    }
+}
+catch {
+    $exitCode = 1
+    $msg = $_.Exception.Message
+    if ($msg -eq 'BZ_WRITE_DEFERRED') { Write-Host '寫入暫時失敗，未假裝完成；解除檔案占用後用相同命令繼續。'; $code = 'BIZ1-3-07' }
+    elseif ($msg -eq 'BZ_ARGUMENT_INVALID') { Write-Host '參數錯誤：Components 只收 exact ASCII 物件名（逗號或空白分隔）；Status 與 Retry 不可混用；Model／Root 不可含命令列控制字元；Cli 只收 claude 或 opencode。'; $code = 'BIZ1-9-01'; $exitCode = 2 }
+    elseif ($msg -eq 'BZ_VARIANT') { Write-Host ('這個資料夾沒有 ' + $J.StandardRel + '（業務需求文件的規範）：請解開含 peoplesoft/bizspec/ 的搬運包。'); $code = 'BIZ1-9-01'; $exitCode = 2 }
+    elseif ($msg -eq 'BZ_MODEL_INVALID') { Write-Host ('OpenCode 版的模型設定不對（' + $J.ModelFrom + '，目前讀到「' + $J.Model + '」）：要寫成 <provider>/<model>，照「opencode models」列出的原樣。'); $code = 'BIZ1-9-01'; $exitCode = 2 }
+    elseif ($msg -eq 'BZ_MODEL_UNAVAILABLE') { $code = 'BIZ1-9-01'; $exitCode = 2 }
+    else { Write-Host ('無法繼續：' + $msg); if ($env:PS_BIZSPEC_TRACE) { Write-Host $_.ScriptStackTrace }; $code = 'BIZ1-9-02'; $exitCode = 2 }
+}
+finally {
+    if ($held -and $null -ne $mutex) { $mutex.ReleaseMutex() }; if ($null -ne $mutex) { $mutex.Dispose() }
+    if ($J.EnvChanged) { $env:PS_CLI = $J.EnvSaved.Cli; $env:OPENCODE_DISABLE_CLAUDE_CODE = $J.EnvSaved.NoClaude }
+}
+Write-Host $code
+exit $exitCode
+@@@PSBUNDLE-END|scripts/ps-bizspec.ps1
 @@@PSBUNDLE-FILE|scripts/ps-bundle.ps1|496|ee17daeaf5a5b9ff531a4f6b577ca0a71ff6dd4f29806d45a7198f3af079afe5|1
 # ps-bundle.ps1 — 搬運包：把一個版本要搬的檔收成幾份文字檔，公司機一個指令解回各檔
 # 用法（公司機）：
@@ -6775,965 +7741,4 @@ if ($Slice -ne '') {
     exit 0
 }
 @@@PSBUNDLE-END|scripts/ps-knowledge.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-check-lib.ps1|614|fdd31bdb7f176c5795c3ab60e73a0032b7eb649e167dc123bef2b50e12d94c8f|1
-# ps-sdoc-check-lib.ps1 — Spec 文件流程的 L2（參照與一致性）與 L3（覆蓋）檢核，另有 S07 推測用語警告。
-# 輸入是 Build-PsSdModel 的結果（Items：前綴 → 項目清單；ById：ID → 項目）。每筆結果 @{ Doc; Layer（L2／L3／W）; Code; Message }。
-# 欄位是 NOT_APPLICABLE 或 UNRESOLVED 時，依賴它的檢核略過（UNRESOLVED 已經是 90 的問題）。
-# 依賴：ps-sdoc-schema-lib.ps1、ps-sdoc-status-lib.ps1、ps-sdoc-lib.ps1。
-
-$script:PsSdCheckLibVersion = '1'
-$script:PsSdSpeculativeRx = [regex]'推測|猜測|應該是|大概|似乎|或許|假設|估計'
-
-function Add-PsSdViolation {
-    param($List, [string]$Doc, [string]$Layer, [string]$Code, [string]$Message)
-    $List.Add(@{ Doc = $Doc; Layer = $Layer; Code = $Code; Message = $Message })
-}
-
-function Get-PsSdField {
-    # 取欄位值；不存在回 $null（以 return , 保留陣列）。
-    param($Item, [string]$Name)
-    if ($null -eq $Item -or -not ($Item -is [System.Collections.IDictionary]) -or -not $Item.Contains($Name)) { return $null }
-    return , $Item[$Name]
-}
-
-function Test-PsSdIsList {
-    param($V)
-    return ($null -ne $V -and $V -is [System.Collections.IList] -and -not ($V -is [string]))
-}
-
-function Get-PsSdCodesOf {
-    # 運算元（state／const）代表的狀態碼集合。
-    param($Operands, $ById)
-    $out = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($o in $Operands) {
-        if ($o -is [System.Collections.IDictionary]) {
-            if ($o.Contains('state') -and $ById.ContainsKey([string]$o['state'])) { [void]$out.Add([string]$ById[[string]$o['state']]['code']) }
-            elseif ($o.Contains('const')) { [void]$out.Add([string]$o['const']) }
-        }
-    }
-    return , $out
-}
-
-function Get-PsSdBindingEntity {
-    param($State, $ById)
-    if ($null -eq $State -or -not $State.Contains('binding')) { return $null }
-    $b = [string]$State['binding']
-    if (-not $ById.ContainsKey($b)) { return $null }
-    return [string]$ById[$b]['entity']
-}
-
-function Test-PsSdFinalPred {
-    param($P, [string]$Bind, $Finals, $ById)
-    if (-not ($P -is [System.Collections.IDictionary]) -or -not $P.Contains('left')) { return $false }
-    $l = $P['left']
-    if (-not ($l -is [System.Collections.IDictionary]) -or $l.Count -ne 1 -or -not $l.Contains('fld') -or [string]$l['fld'] -cne $Bind) { return $false }
-    $op = [string]$P['op']
-    $got = $null
-    if ($op -ceq 'EQ') { $got = Get-PsSdCodesOf @($P['right']) $ById }
-    elseif ($op -ceq 'IN') { $got = Get-PsSdCodesOf @($P['right']) $ById }
-    else { return $false }
-    if ($got.Count -ne $Finals.Count) { return $false }
-    foreach ($x in $Finals) { if (-not $got.Contains($x)) { return $false } }
-    return $true
-}
-
-function Get-PsSdLeftAct {
-    param($C)
-    if ($C -is [System.Collections.IDictionary] -and $C.Contains('left') -and $C['left'] -is [System.Collections.IDictionary] -and $C['left'].Contains('act')) { return [string]$C['left']['act'] }
-    return $null
-}
-
-# ---------------- L2 ----------------
-function Invoke-PsSdL2Checks {
-    param($Model, $Registry)
-    $v = [System.Collections.Generic.List[object]]::new()
-    $items = $Model.Items; $byId = $Model.ById
-    $idKeys = Get-PsSdIdKeyMap $Registry
-    # R01／R03／R04：參照存在、只往上游、不引用 EXCLUDED 物件
-    foreach ($p in $script:PsSdPrefixInfo.Keys) {
-        $sdoc = $script:PsSdPrefixInfo[$p].Doc
-        foreach ($it in $items[$p]) {
-            $iid = [string]$it['id']
-            $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-            foreach ($ref in (Get-PsSdItemRefs $it)) {
-                if (-not $seen.Add($ref)) { continue }
-                if (-not $byId.ContainsKey($ref)) {
-                    if ($idKeys.ContainsKey($ref)) { Add-PsSdViolation $v $sdoc 'L2' 'R01' ($iid + ' 參照尚待研究（PENDING）的 ' + $ref) }
-                    else { Add-PsSdViolation $v $sdoc 'L2' 'R01' ($iid + ' 參照不存在的 ' + $ref) }
-                    continue
-                }
-                $tdoc = Get-PsSdDocOfId $ref
-                if ($tdoc -cne $sdoc -and -not ((Get-PsSdRankOfId $ref) -lt $script:PsSdPrefixInfo[$p].Rank)) { Add-PsSdViolation $v $sdoc 'L2' 'R03' ($iid + ' 往下游參照 ' + $ref) }
-                if ($ref.StartsWith('OBJ-') -and [string]$byId[$ref]['inclusion'] -ceq 'EXCLUDED' -and @('01-overview', '90-questions', '19-decision-log') -notcontains $sdoc) {
-                    Add-PsSdViolation $v $sdoc 'L2' 'R04' ($iid + ' 參照 EXCLUDED 物件 ' + $ref)
-                }
-            }
-        }
-    }
-    # R04：不建置欄位名不出現在 07、90、19 以外的正文
-    $xf = [System.Collections.Generic.List[object]]::new()
-    foreach ($x in $items['XF']) {
-        $ent = $null; if ($byId.ContainsKey([string]$x['entity'])) { $ent = $byId[[string]$x['entity']] }
-        $rec = ''; if ($null -ne $ent) { $rec = [string]$ent['key'] }
-        foreach ($f in @($x['fields'])) { $xf.Add(@{ Rec = $rec; Field = [string]$f; Rx = [regex]('(?<![A-Z0-9_])' + [regex]::Escape([string]$f) + '(?![A-Z0-9_])') }) }
-    }
-    if ($xf.Count -gt 0) {
-        foreach ($p in $script:PsSdPrefixInfo.Keys) {
-            $sdoc = $script:PsSdPrefixInfo[$p].Doc
-            if (@('07-database', '90-questions', '19-decision-log') -contains $sdoc) { continue }
-            foreach ($it in $items[$p]) {
-                $hit = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-                foreach ($s in (Get-PsSdStringsOf $it)) { foreach ($z in $xf) { if ($z.Rx.IsMatch($s) -and $hit.Add($z.Rec + '.' + $z.Field)) { Add-PsSdViolation $v $sdoc 'L2' 'R04' ([string]$it['id'] + ' 正文寫到不建置欄位 ' + $z.Rec + '.' + $z.Field) } } }
-            }
-        }
-    }
-    # R06：轉移寫入狀態欄位＝目標狀態碼；經判斷節點的轉移必有守衛
-    foreach ($t in $items['TRN']) {
-        $to = $null; if ($byId.ContainsKey([string]$t['to'])) { $to = $byId[[string]$t['to']] }
-        $w = Get-PsSdField $t 'writes'
-        if ($null -ne $to -and (Test-PsSdIsList $w) -and $to.Contains('binding')) {
-            $ok = $false
-            foreach ($a in $w) {
-                if ($a -is [System.Collections.IDictionary] -and [string]$a['field'] -ceq [string]$to['binding'] -and $a['value'] -is [System.Collections.IDictionary] -and [string]$a['value']['const'] -ceq [string]$to['code']) { $ok = $true }
-            }
-            if (-not $ok) { Add-PsSdViolation $v '04-workflow' 'L2' 'R06' ([string]$t['id'] + ' 未寫入狀態欄位＝' + $to['code']) }
-        }
-        $g = Get-PsSdField $t 'guard'
-        if ($t.Contains('via') -and @($t['via']).Count -gt 0 -and $g -is [System.Collections.IDictionary] -and $g.Contains('na')) { Add-PsSdViolation $v '04-workflow' 'L2' 'R06' ([string]$t['id'] + ' 經判斷節點收合但 guard 為 NA') }
-    }
-    # R07：狀態碼屬於綁定欄位的值域、顯示文字一致、狀態欄位值域只列圖上代碼
-    foreach ($s in $items['STATE']) {
-        if (-not $s.Contains('binding') -or -not $s.Contains('code') -or -not $byId.ContainsKey([string]$s['binding'])) { continue }
-        $f = $byId[[string]$s['binding']]
-        $vd = Get-PsSdField $f 'valueDomain'
-        if (-not ($vd -is [System.Collections.IDictionary]) -or -not $vd.Contains('xlat')) { continue }
-        $xl = New-PsSdMap; foreach ($e in @($vd['xlat'])) { $xl[[string]$e['stored']] = [string]$e['label'] }
-        if (-not $xl.ContainsKey([string]$s['code'])) { Add-PsSdViolation $v '04-workflow' 'L2' 'R07' ([string]$s['id'] + ' 狀態碼 ' + $s['code'] + ' 不在 ' + $f['key'] + ' 值域') }
-        elseif ($s['domainLabel'] -is [string] -and [string]$s['domainLabel'] -cne $xl[[string]$s['code']]) { Add-PsSdViolation $v '04-workflow' 'L2' 'R07' ([string]$s['id'] + ' 顯示文字與值域不符') }
-    }
-    foreach ($f in $items['FLD']) {
-        $codes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-        $bound = $false
-        foreach ($s in $items['STATE']) { if ($s.Contains('binding') -and [string]$s['binding'] -ceq [string]$f['id']) { $bound = $true; [void]$codes.Add([string]$s['code']) } }
-        $vd = Get-PsSdField $f 'valueDomain'
-        if ($bound -and $vd -is [System.Collections.IDictionary] -and $vd.Contains('xlat')) {
-            $extra = @(); foreach ($e in @($vd['xlat'])) { if (-not $codes.Contains([string]$e['stored'])) { $extra += [string]$e['stored'] } }
-            if ($extra.Count -gt 0) { Add-PsSdViolation $v '07-database' 'L2' 'R07' ([string]$f['id'] + ' 狀態欄位值域含圖外代碼 ' + ((Get-PsSdSortedIds $extra) -join '、')) }
-        }
-    }
-    # R05：元件選項的儲存值屬於欄位值域
-    foreach ($u in $items['UI']) {
-        $opts = Get-PsSdField $u 'options'
-        if (-not (Test-PsSdIsList $opts) -or $opts.Count -eq 0) { continue }
-        $b = Get-PsSdField $u 'binding'
-        if (-not ($b -is [System.Collections.IDictionary]) -or -not $b.Contains('fld') -or -not $byId.ContainsKey([string]$b['fld'])) { continue }
-        $vd = Get-PsSdField $byId[[string]$b['fld']] 'valueDomain'
-        if (-not ($vd -is [System.Collections.IDictionary]) -or -not $vd.Contains('xlat')) { continue }
-        $xl = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal); foreach ($e in @($vd['xlat'])) { [void]$xl.Add([string]$e['stored']) }
-        $bad = @(); foreach ($o in $opts) { if (-not $xl.Contains([string]$o['stored'])) { $bad += [string]$o['stored'] } }
-        if ($bad.Count -gt 0) { Add-PsSdViolation $v '05-ui' 'L2' 'R05' ([string]$u['id'] + ' 選項儲存值不在值域 ' + ($bad -join '、')) }
-    }
-    # R08：衍生概念對每個有效日實體都有有效日規則
-    foreach ($d in $items['DRV']) {
-        $res = Get-PsSdField $d 'resolution'
-        if (-not ($res -is [System.Collections.IDictionary])) { continue }
-        $cov = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-        foreach ($e in @($res['effectiveDating'])) { if ($e -is [System.Collections.IDictionary]) { [void]$cov.Add([string]$e['entity']) } }
-        foreach ($src in @($res['sources'])) {
-            if (-not $byId.ContainsKey([string]$src)) { continue }
-            $ed = Get-PsSdField $byId[[string]$src] 'effectiveDating'
-            if ($ed -is [System.Collections.IDictionary] -and [string]$ed['kind'] -cne 'NONE' -and -not $cov.Contains([string]$src)) { Add-PsSdViolation $v '07-database' 'L2' 'R08' ([string]$d['id'] + ' 來源 ' + $src + ' 有有效日但沒有有效日規則') }
-        }
-    }
-    # R09：功能入口與其轉移的觸發物件一致
-    foreach ($fr in $items['FR']) {
-        $entry = Get-PsSdField $fr 'entry'
-        if (-not ($entry -is [System.Collections.IDictionary])) { continue }
-        foreach ($t in @($fr['realizes'])) {
-            if (-not $byId.ContainsKey([string]$t)) { continue }
-            $trig = Get-PsSdField $byId[[string]$t] 'trigger'
-            if ($trig -is [System.Collections.IDictionary] -and $trig.Contains('object') -and [string]$trig['object'] -cne [string]$entry['object']) { Add-PsSdViolation $v '02-functional-requirements' 'L2' 'R09' ([string]$fr['id'] + ' 入口與 ' + $t + ' 觸發物件不同') }
-        }
-    }
-    # R10：規則的觸發元件屬於規則適用的功能
-    foreach ($b in $items['BR']) {
-        $trig = Get-PsSdField $b 'trigger'
-        if (-not ($trig -is [System.Collections.IDictionary]) -or -not $trig.Contains('control')) { continue }
-        $c = [string]$trig['control']
-        if (-not $byId.ContainsKey($c)) { continue }
-        $hit = $false; foreach ($x in @($byId[$c]['usedBy'])) { if (@($b['appliesTo']) -ccontains [string]$x) { $hit = $true } }
-        if (-not $hit) { Add-PsSdViolation $v '09-business-logic' 'L2' 'R10' ([string]$b['id'] + ' 觸發元件不屬於適用功能') }
-    }
-    # R11：操作的轉移屬於其功能實現的轉移
-    foreach ($o in $items['OP']) {
-        $eff = Get-PsSdField $o 'effects'
-        if (-not ($eff -is [System.Collections.IDictionary]) -or -not $eff.Contains('transitions') -or -not $byId.ContainsKey([string]$o['fr'])) { continue }
-        $real = @($byId[[string]$o['fr']]['realizes'])
-        $miss = @(); foreach ($t in @($eff['transitions'])) { if ($real -cnotcontains [string]$t) { $miss += [string]$t } }
-        if ($miss.Count -gt 0) { Add-PsSdViolation $v '08-api' 'L2' 'R11' ([string]$o['id'] + ' 轉移不屬於其功能 ' + ((Get-PsSdSortedIds $miss) -join '、')) }
-    }
-    # R12：轉移操作者條件中的角色，對觸發物件有權限設定
-    $permPairs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($pm in $items['PERM']) { [void]$permPairs.Add([string]$pm['principal'] + '|' + [string]$pm['resource']) }
-    foreach ($t in $items['TRN']) {
-        $trig = Get-PsSdField $t 'trigger'
-        if (-not ($trig -is [System.Collections.IDictionary]) -or -not $trig.Contains('object')) { continue }
-        $obj = [string]$trig['object']
-        $holder = New-PsSdObject; $holder['a'] = Get-PsSdField $t 'actor'
-        $roles = Get-PsSdSortedIds (@((Get-PsSdItemRefs $holder) | Where-Object { $_.StartsWith('ROLE-') }))
-        foreach ($ro in $roles) { if (-not $permPairs.Contains($ro + '|' + $obj)) { Add-PsSdViolation $v '04-workflow' 'L2' 'R12' ([string]$t['id'] + ' 操作者角色 ' + $ro + ' 對 ' + $obj + ' 沒有權限設定') } }
-    }
-    foreach ($x in (Invoke-PsSdR13 $Model)) { $v.Add($x) }
-    foreach ($x in (Invoke-PsSdR14 $Model)) { $v.Add($x) }
-    return , $v.ToArray()
-}
-
-function Invoke-PsSdR13 {
-    # 守門轉移與狀態活動。
-    param($Model)
-    $v = [System.Collections.Generic.List[object]]::new()
-    $items = $Model.Items; $byId = $Model.ById
-    $gateActs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($a in $items['ACT']) { if ([string]$a['enforcement'] -ceq 'SYSTEM_GATE') { [void]$gateActs.Add([string]$a['id']) } }
-    foreach ($p in $script:PsSdPrefixInfo.Keys) {
-        foreach ($it in $items[$p]) {
-            foreach ($c in (Get-PsSdConds $it)) {
-                $act = Get-PsSdLeftAct $c
-                if ($null -ne $act -and -not $gateActs.Contains($act)) { Add-PsSdViolation $v $script:PsSdPrefixInfo[$p].Doc 'L2' 'R13' ([string]$it['id'] + ' 以 ' + $c['op'] + ' 引用的 ' + $act + ' 不是 SYSTEM_GATE 活動') }
-            }
-        }
-    }
-    foreach ($a in $items['ACT']) {
-        $rb = Get-PsSdField $a 'realizedBy'
-        if (-not (Test-PsSdIsList $rb)) { continue }
-        foreach ($t in $rb) { if ($byId.ContainsKey([string]$t) -and [string]$byId[[string]$t]['from'] -cne [string]$a['state']) { Add-PsSdViolation $v '04-workflow' 'L2' 'R13' ([string]$a['id'] + ' 的完成轉移 ' + $t + ' 不是從活動所在狀態出發') } }
-    }
-    $checkRows = {
-        param([string]$Owner, $Cond, [string]$TargetEnt)
-        foreach ($c in (Get-PsSdConds $Cond)) {
-            if (-not $c.Contains('rows')) { continue }
-            $rid = [string]$c['rows']
-            $par = $null; if ($byId.ContainsKey($rid)) { $par = Get-PsSdField $byId[$rid] 'parent' }
-            if (-not ($par -is [System.Collections.IDictionary]) -or [string]$par['entity'] -cne $TargetEnt) { Add-PsSdViolation $v '04-workflow' 'L2' 'R13' ($Owner + ' 的逐列條件 ' + $rid + ' 沒有以 parent 連到被判斷的實體 ' + $TargetEnt) }
-        }
-    }
-    foreach ($t in $items['TRN']) {
-        $g = Get-PsSdField $t 'guard'
-        if ([string]$t['from'] -cne 'INITIAL' -and (Test-PsSdIsCond $g) -and $byId.ContainsKey([string]$t['from'])) {
-            $ent = Get-PsSdBindingEntity $byId[[string]$t['from']] $byId
-            if ($ent) { & $checkRows ([string]$t['id']) $g $ent }
-        }
-    }
-    foreach ($a in $items['ACT']) {
-        $cmp = Get-PsSdField $a 'completion'
-        if ((Test-PsSdIsCond $cmp) -and $byId.ContainsKey([string]$a['state'])) {
-            $ent = Get-PsSdBindingEntity $byId[[string]$a['state']] $byId
-            if ($ent) { & $checkRows ([string]$a['id']) $cmp $ent }
-        }
-    }
-    foreach ($t in $items['TRN']) {
-        if ([string](Get-PsSdField $t 'exitMode') -cne 'ON_COMPLETION') { continue }
-        $fs = $null; if ([string]$t['from'] -cne 'INITIAL' -and $byId.ContainsKey([string]$t['from'])) { $fs = $byId[[string]$t['from']] }
-        $regs = Get-PsSdField $fs 'regions'
-        if ($null -eq $fs -or -not (Test-PsSdIsList $regs) -or $regs.Count -eq 0) { Add-PsSdViolation $v '04-workflow' 'L2' 'R13' ([string]$t['id'] + ' 是 ON_COMPLETION，但起點沒有子業務'); continue }
-        $g = Get-PsSdField $t 'guard'
-        if (-not (Test-PsSdIsCond $g)) { continue }
-        $cs = Get-PsSdConj $g
-        foreach ($reg in $regs) {
-            $finals = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-            foreach ($x in @($reg['finalStates'])) { if ($byId.ContainsKey([string]$x)) { [void]$finals.Add([string]$byId[[string]$x]['code']) } }
-            $member = $null
-            foreach ($s in $items['STATE']) { if ([string]$s['entityKey'] -ceq [string]$reg['entityKey'] -and $s.Contains('binding')) { $member = $s; break } }
-            $bind = $null; $bent = $null
-            if ($null -ne $member) { $bind = [string]$member['binding']; if ($byId.ContainsKey($bind)) { $bent = [string]$byId[$bind]['entity'] } }
-            $ok = $false
-            foreach ($c in $cs) {
-                if ($c -is [System.Collections.IDictionary] -and $c.Contains('rows') -and [string]$c['rows'] -ceq $bent -and [string]$c['quantifier'] -ceq 'ALL') {
-                    foreach ($p2 in (Get-PsSdConj $c['where'])) { if (Test-PsSdFinalPred $p2 $bind $finals $byId) { $ok = $true } }
-                } elseif ((Test-PsSdFinalPred $c $bind $finals $byId) -and $bent -ceq (Get-PsSdBindingEntity $fs $byId)) { $ok = $true }
-            }
-            if (-not $ok) {
-                $fl = [System.Collections.Generic.List[string]]::new($finals); $fl.Sort([System.StringComparer]::Ordinal)
-                Add-PsSdViolation $v '04-workflow' 'L2' 'R13' ([string]$t['id'] + ' 的守衛沒有要求子業務 ' + $reg['entityKey'] + ' 的資料全部到終點 ' + ($fl -join '、'))
-            }
-        }
-        foreach ($a in $items['ACT']) {
-            if ([string]$a['state'] -ceq [string]$t['from'] -and [string]$a['enforcement'] -ceq 'SYSTEM_GATE') {
-                $hit = $false
-                foreach ($c in $cs) { if ((Get-PsSdLeftAct $c) -ceq [string]$a['id'] -and [string]$c['op'] -ceq 'DONE' -and $c['left'].Count -eq 1) { $hit = $true } }
-                if (-not $hit) { Add-PsSdViolation $v '04-workflow' 'L2' 'R13' ([string]$t['id'] + ' 的守衛沒有要求守門活動 ' + $a['id'] + ' 完成') }
-            }
-        }
-    }
-    return , $v.ToArray()
-}
-
-function Invoke-PsSdR14 {
-    # 原生未使用分支：本體條件不比對已證明不會出現的值；範圍外情境的證明不指向範圍內物件；09 的處置與 90 的證明互相對應。
-    param($Model)
-    $v = [System.Collections.Generic.List[object]]::new()
-    $items = $Model.Items; $byId = $Model.ById
-    $fldByKey = New-PsSdMap; foreach ($f in $items['FLD']) { $fldByKey[[string]$f['key']] = [string]$f['id'] }
-    $overridden = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($d in $items['DEC']) { if ([string]$d['effect'] -ceq 'ADD_SCOPE') { foreach ($q in @($d['resolves'])) { [void]$overridden.Add([string]$q) } } }
-    $qs = @(); foreach ($q in $items['Q']) { if ([string]$q['category'] -ceq 'NATIVE_UNUSED_BRANCH' -and -not $overridden.Contains([string]$q['id'])) { $qs += , $q } }
-    $inScope = @(); foreach ($o in $items['OBJ']) { if ([string]$o['inclusion'] -cne 'EXCLUDED' -and @('COMPONENT', 'PAGE', 'SECONDARY_PAGE') -contains [string]$o['objectType']) { $inScope += [string]$o['objectName'] } }
-    foreach ($q in $qs) {
-        $pf = Get-PsSdField $q 'proof'
-        if (-not ($pf -is [System.Collections.IDictionary])) { continue }
-        if (@('DATA_VALUE_ABSENT', 'CONFIG_VALUE') -contains [string]$pf['kind']) {
-            if (-not $fldByKey.ContainsKey([string]$pf['field'])) { continue }
-            $fid = $fldByKey[[string]$pf['field']]
-            $absent = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal); foreach ($x in @($pf['absentValues'])) { [void]$absent.Add([string]$x) }
-            foreach ($p in $script:PsSdPrefixInfo.Keys) {
-                if ($p -ceq 'AI' -or $script:PsSdPrefixInfo[$p].Rank -gt 9) { continue }
-                foreach ($it in $items[$p]) {
-                    foreach ($c in (Get-PsSdConds $it)) {
-                        $l = $c['left']
-                        if (-not ($l -is [System.Collections.IDictionary]) -or $l.Count -ne 1 -or [string]$l['fld'] -cne $fid) { continue }
-                        $r = $c['right']
-                        $vals = @(); if (Test-PsSdIsList $r) { $vals = @($r) } elseif ($null -ne $r) { $vals = @($r) }
-                        $hit = @(); foreach ($x in $vals) { if ($x -is [System.Collections.IDictionary] -and $x.Contains('const') -and $absent.Contains([string]$x['const'])) { $hit += [string]$x['const'] } }
-                        if ($hit.Count -gt 0) { Add-PsSdViolation $v $script:PsSdPrefixInfo[$p].Doc 'L2' 'R14' ([string]$it['id'] + ' 的條件比對 ' + $pf['field'] + '＝' + ((Get-PsSdSortedIds $hit) -join '、') + '，但 ' + $q['id'] + ' 已證明這個值不會出現') }
-                    }
-                }
-            }
-        } else {
-            foreach ($nm in (Get-PsSdSortedIds $inScope)) {
-                if ([regex]::IsMatch([string]$pf['context'], '(?<![A-Za-z0-9_])' + [regex]::Escape($nm) + '(?![A-Za-z0-9_])')) { Add-PsSdViolation $v '90-questions' 'L2' 'R14' ([string]$q['id'] + ' 以範圍外情境證明，但 ' + $nm + ' 在範圍內') }
-            }
-        }
-    }
-    $native = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($d in $Model.ProgramDispositions) { if (@($d['kinds']) -ccontains 'NATIVE_UNUSED_BRANCH' -and $byId.ContainsKey([string]$d['program'])) { [void]$native.Add([string]$byId[[string]$d['program']]['objectName']) } }
-    $locs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($q in $qs) { $ob = Get-PsSdField $q 'observed'; if ($ob -is [System.Collections.IDictionary] -and $ob.Contains('location')) { [void]$locs.Add([string]$ob['location']) } }
-    foreach ($l in (Get-PsSdSortedIds @($locs))) { if (-not $native.Contains($l)) { Add-PsSdViolation $v '09-business-logic' 'L2' 'R14' ($l + ' 有原生未使用分支的證明，但程式處置沒有標 NATIVE_UNUSED_BRANCH') } }
-    foreach ($l in (Get-PsSdSortedIds @($native))) { if (-not $locs.Contains($l)) { Add-PsSdViolation $v '09-business-logic' 'L2' 'R14' ($l + ' 標了 NATIVE_UNUSED_BRANCH，但 90 沒有對應的證明') } }
-    return , $v.ToArray()
-}
-
-# ---------------- L3 ----------------
-function Invoke-PsSdC01 {
-    # 04 與採用的解讀一致；STATUS 文字逐行恰好處置一次；04 記下的解讀摘要與這次比對相同。
-    param($Model, $Built, [string]$StatusRef, $Summary, $RecordedSummary)
-    $v = [System.Collections.Generic.List[object]]::new()
-    if ($null -eq $Built) { return , $v.ToArray() }
-    $items = $Model.Items; $byId = $Model.ById
-    $ents = $Built.Entities; $comps = $Built.Composites
-    $sid = New-PsSdMap
-    foreach ($s in $items['STATE']) { if ($s.Contains('code')) { $sid[[string]$s['entityKey'] + '|' + [string]$s['code']] = [string]$s['id'] } }
-    $codeOf = {
-        param([string]$Ref)
-        if ($Ref -ceq 'INITIAL') { return '*' }
-        if ($byId.ContainsKey($Ref)) { return [string]$byId[$Ref]['code'] }
-        return '?'
-    }
-    $allE = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($p in @('STATE', 'TRN', 'FLOW')) { foreach ($x in $items[$p]) { [void]$allE.Add([string]$x['entityKey']) } }
-    foreach ($e in (Get-PsSdSortedIds @($allE))) { if (-not $ents.ContainsKey($e)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ('狀態實體 ' + $e + ' 不在採用的解讀裡') } }
-    foreach ($ek in (Get-PsSdSortedKeys $ents)) {
-        $pr = $ents[$ek]
-        $mine = @(); foreach ($s in $items['STATE']) { if ([string]$s['entityKey'] -ceq $ek -and $s.Contains('code')) { $mine += , $s } }
-        $got = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal); foreach ($s in $mine) { [void]$got.Add([string]$s['code']) }
-        $more = @(); foreach ($c in $got) { if (-not $pr.Codes.Contains($c)) { $more += $c } }
-        $less = @(); foreach ($c in $pr.Codes) { if (-not $got.Contains($c)) { $less += $c } }
-        if ($more.Count -gt 0 -or $less.Count -gt 0) {
-            $msg = @(); if ($more.Count -gt 0) { $msg += ('多 ' + ((Get-PsSdSortedIds $more) -join '、')) }; if ($less.Count -gt 0) { $msg += ('少 ' + ((Get-PsSdSortedIds $less) -join '、')) }
-            Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($ek + ' 的 STATE 與解讀的狀態碼不符：' + ($msg -join '；'))
-        }
-        $pairs = New-PsSdMap
-        foreach ($t in $items['TRN']) { if ([string]$t['entityKey'] -ceq $ek) { $pairs[(& $codeOf ([string]$t['from'])) + '>' + (& $codeOf ([string]$t['to']))] = $t } }
-        $more = @(); foreach ($k in $pairs.Keys) { if (-not $pr.Pairs.Contains($k)) { $more += $k } }
-        $less = @(); foreach ($k in $pr.Pairs) { if (-not $pairs.ContainsKey($k)) { $less += $k } }
-        if ($more.Count -gt 0 -or $less.Count -gt 0) {
-            $msg = @(); if ($more.Count -gt 0) { $msg += ('多 ' + ((Get-PsSdSortedIds $more) -join '、')) }; if ($less.Count -gt 0) { $msg += ('少 ' + ((Get-PsSdSortedIds $less) -join '、')) }
-            Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($ek + ' 的 TRN 與解讀的轉移不符：' + ($msg -join '；'))
-        }
-        foreach ($k in (Get-PsSdSortedKeys $pairs)) {
-            $t = $pairs[$k]
-            $via = @(); if ($t.Contains('via')) { $via = @($t['via']) }
-            $want = @(); if ($pr.Via.ContainsKey($k)) { $want = @($pr.Via[$k]) }
-            if (($via -join [char]0) -cne ($want -join [char]0)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$t['id'] + ' via 與解讀不符') }
-            $labs = @(); if ($t.Contains('diagramLabels')) { $labs = @($t['diagramLabels']) }
-            $wl = @(); if ($pr.Labels.ContainsKey($k)) { $wl = @($pr.Labels[$k]) }
-            if (($labs -join [char]0) -cne ($wl -join [char]0)) {
-                $show = '沒有線上文字'; if ($wl.Count -gt 0) { $show = $wl -join '、' }
-                Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$t['id'] + ' 的線上文字與解讀不符（解讀：' + $show + '）')
-            }
-        }
-        foreach ($s in $mine) {
-            if ([bool]$s['isFinal'] -ne $pr.Finals.Contains([string]$s['code'])) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$s['id'] + ' 終點標記與解讀不符') }
-            if ([bool]$s['isInitialTarget'] -ne $pr.Initials.Contains([string]$s['code'])) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$s['id'] + ' 新建標記與解讀不符') }
-        }
-        $mineF = New-PsSdMap; foreach ($f in $items['FLOW']) { if ([string]$f['entityKey'] -ceq $ek) { $mineF[[string]$f['scenarioType']] = $f } }
-        $diff = @(); foreach ($k in $mineF.Keys) { if (-not $pr.Scenarios.ContainsKey($k)) { $diff += $k } }; foreach ($k in $pr.Scenarios.Keys) { if (-not $mineF.ContainsKey($k)) { $diff += $k } }
-        if ($diff.Count -gt 0) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($ek + ' 的 FLOW 與情境類型不符：' + ((Get-PsSdSortedIds $diff) -join '、')) }
-        foreach ($lab in (Get-PsSdSortedKeys $pr.Scenarios)) {
-            if (-not $mineF.ContainsKey($lab)) { continue }
-            $steps = Get-PsSdField $mineF[$lab] 'steps'
-            if (-not (Test-PsSdIsList $steps)) { continue }
-            $gp = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-            foreach ($st in $steps) { $tid = [string]$st['transition']; if ($byId.ContainsKey($tid)) { [void]$gp.Add((& $codeOf ([string]$byId[$tid]['from'])) + '>' + (& $codeOf ([string]$byId[$tid]['to']))) } }
-            $same = ($gp.Count -eq $pr.Scenarios[$lab].Count); foreach ($x in $pr.Scenarios[$lab]) { if (-not $gp.Contains($x)) { $same = $false } }
-            if (-not $same) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ('FLOW「' + $lab + '」步驟與解讀的情境不符') }
-        }
-    }
-    # 主業務狀態裡的子業務
-    $compIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($ck in $comps.Keys) {
-        $ci = $comps[$ck]
-        $k2 = $ci.Entity + '|' + $ci.Code
-        if (-not $sid.ContainsKey($k2)) { continue }
-        $csId = $sid[$k2]; [void]$compIds.Add($csId)
-        $cs = $byId[$csId]
-        $regs = @(); if ($cs.Contains('regions')) { $regs = @($cs['regions']) }
-        $re = @(); foreach ($r in $regs) { $re += [string]$r['entityKey'] }
-        if ([string]$cs['stateKind'] -cne 'COMPOSITE' -or ($re -join [char]0) -cne (@($ci.Regions) -join [char]0)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($csId + ' 的子業務與解讀不符（解讀：' + (@($ci.Regions) -join '、') + '）'); continue }
-        foreach ($r in $regs) {
-            $want = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-            if ($ents.ContainsKey([string]$r['entityKey'])) { foreach ($x in $ents[[string]$r['entityKey']].Finals) { [void]$want.Add($x) } }
-            $got = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-            foreach ($x in @($r['finalStates'])) { if ($byId.ContainsKey([string]$x)) { [void]$got.Add([string]$byId[[string]$x]['code']) } }
-            if (-not $got.SetEquals($want)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($csId + ' 的子業務 ' + $r['entityKey'] + ' 的終點與解讀不符') }
-            foreach ($s in $items['STATE']) { if ([string]$s['entityKey'] -ceq [string]$r['entityKey'] -and [string](Get-PsSdField $s 'parent') -cne $csId) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$s['id'] + ' 屬於 ' + $csId + ' 裡的子業務，但 parent 沒有指向它') } }
-        }
-        foreach ($t in $items['TRN']) { if ([string]$t['entityKey'] -ceq $ci.Entity -and [string]$t['from'] -ceq $csId -and [string](Get-PsSdField $t 'exitMode') -ceq 'NORMAL') { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$t['id'] + ' 從有子業務的 ' + $csId + ' 離開，exitMode 不得為 NORMAL') } }
-    }
-    foreach ($s in $items['STATE']) { if ($s.Contains('regions') -and @($s['regions']).Count -gt 0 -and -not $compIds.Contains([string]$s['id'])) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$s['id'] + ' 宣稱有子業務，但解讀裡沒有') } }
-    foreach ($t in $items['TRN']) { $em = [string](Get-PsSdField $t 'exitMode'); if (@('ON_COMPLETION', 'INTERRUPT') -ccontains $em -and -not $compIds.Contains([string]$t['from'])) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$t['id'] + ' 的 exitMode 是 ' + $em + '，但起點沒有子業務') } }
-    # STATUS 文字
-    $byLoc = New-PsSdMap
-    foreach ($d in $Model.StatusTexts) { $l = [string]$d['locator']; if (-not $byLoc.ContainsKey($l)) { $byLoc[$l] = [System.Collections.Generic.List[object]]::new() }; $byLoc[$l].Add($d) }
-    foreach ($l in (Get-PsSdSortedKeys $byLoc)) { if ($byLoc[$l].Count -gt 1) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ('STATUS 文字 ' + $l + ' 重複處置') } }
-    $enum = New-PsSdMap
-    foreach ($t in $Built.Texts) { $enum[$StatusRef + '#L' + $t.Line] = $t }
-    foreach ($t in $Built.Texts) {
-        $loc = $StatusRef + '#L' + $t.Line
-        if (-not $byLoc.ContainsKey($loc)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ('STATUS 文字 ' + $loc + '「' + $t.Text + '」沒有處置'); continue }
-        $d = $byLoc[$loc][0]
-        if ([string]$d['text'] -cne $t.Text) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($loc + ' 的處置文字與原文不同') }
-        foreach ($iid in @($d['items'])) {
-            if ($null -eq $iid) { continue }
-            if (-not $byId.ContainsKey([string]$iid)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($loc + ' 的處置指向不存在的 ' + $iid) }
-            elseif (([string]$iid).StartsWith('ACT-') -and $t.Kind -eq 'text' -and $t.Code) {
-                $want = $null; if ($sid.ContainsKey([string]$t.EntityKey + '|' + [string]$t.Code)) { $want = $sid[[string]$t.EntityKey + '|' + [string]$t.Code] }
-                if ([string]$byId[[string]$iid]['state'] -cne [string]$want) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($iid + ' 的所在狀態與 ' + $loc + ' 描述的狀態不符') }
-            }
-        }
-    }
-    foreach ($l in (Get-PsSdSortedKeys $byLoc)) { if (-not $enum.ContainsKey($l)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ($l + ' 不是 STATUS 檔的說明文字或狀態描述') } }
-    foreach ($a in $items['ACT']) {
-        $entries = @(); foreach ($d in $Model.StatusTexts) { if (@($d['items']) -ccontains [string]$a['id']) { $entries += , $d } }
-        if ($entries.Count -eq 0) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$a['id'] + ' 沒有對應的 STATUS 文字'); continue }
-        $hit = $false; foreach ($d in $entries) { if (([string]$d['text']).Contains([string]$a['behavior'])) { $hit = $true } }
-        if (-not $hit) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' ([string]$a['id'] + ' 的 behavior 不是對應那一行的原文') }
-    }
-    if ($null -ne $RecordedSummary -and -not (Test-PsSdSameNode $RecordedSummary $Summary)) { Add-PsSdViolation $v '04-workflow' 'L3' 'C01' '04 記下的狀態圖解讀摘要與這次比對的結果不同' }
-    return , $v.ToArray()
-}
-
-function Test-PsSdHasCompare {
-    param($Cond)
-    foreach ($c in (Get-PsSdConds $Cond)) { if (@('GT', 'GE', 'LT', 'LE', 'BETWEEN') -ccontains [string]$c['op']) { return $true } }
-    return $false
-}
-
-function Invoke-PsSdL3Checks {
-    param($Model, $Built, [string]$StatusRef, $Summary)
-    $v = [System.Collections.Generic.List[object]]::new()
-    $items = $Model.Items; $byId = $Model.ById
-    foreach ($x in (Invoke-PsSdC01 $Model $Built $StatusRef $Summary $null)) { $v.Add($x) }
-    $frOfTrn = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($fr in $items['FR']) { foreach ($t in @($fr['realizes'])) { if ($null -ne $t) { [void]$frOfTrn.Add([string]$t) } } }
-    $ifPerf = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($i in $items['IF']) { foreach ($t in @($i['performs'])) { if ($null -ne $t) { [void]$ifPerf.Add([string]$t) } } }
-    # C02
-    foreach ($t in $items['TRN']) {
-        $trig = Get-PsSdField $t 'trigger'
-        $auto = $false
-        if ($trig -is [System.Collections.IDictionary]) {
-            if ([string]$trig['kind'] -ceq 'COMPLETION') { $auto = $true }
-            if ([string]$trig['kind'] -ceq 'SYSTEM_EVENT' -and $trig.Contains('evaluatedAfter') -and @($trig['evaluatedAfter']).Count -gt 0) { $auto = $true }
-        }
-        if (-not $frOfTrn.Contains([string]$t['id']) -and -not $ifPerf.Contains([string]$t['id']) -and -not $auto) { Add-PsSdViolation $v '02-functional-requirements' 'L3' 'C02' ([string]$t['id'] + ' 沒有功能實現') }
-        if ((Get-PsSdField $t 'implementedAt') -is [System.Collections.IDictionary]) { Add-PsSdViolation $v '04-workflow' 'L3' 'C02' ([string]$t['id'] + ' 找不到實作') }
-    }
-    $performed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($fr in $items['FR']) { foreach ($a in @($fr['performs'])) { if ($null -ne $a) { [void]$performed.Add([string]$a) } } }
-    foreach ($a in $items['ACT']) { if ([string]$a['enforcement'] -ceq 'SYSTEM_GATE' -and -not $performed.Contains([string]$a['id'])) { Add-PsSdViolation $v '02-functional-requirements' 'L3' 'C02' ([string]$a['id'] + ' 是守門活動，但沒有功能讓操作者完成它') } }
-    # 不建置欄位
-    $xfNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($x in $items['XF']) { if ($byId.ContainsKey([string]$x['entity'])) { $rec = [string]$byId[[string]$x['entity']]['key']; foreach ($f in @($x['fields'])) { [void]$xfNames.Add($rec + '.' + [string]$f) } } }
-    # C03：頁面欄位都有 UI 元件
-    $ctrlKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($u in $items['UI']) { if ([string]$u['uiKind'] -ceq 'CONTROL') { [void]$ctrlKeys.Add([string]$u['key']) } }
-    foreach ($pg in $Model.Pages) {
-        foreach ($f in $pg.Fields) {
-            if ($xfNames.Contains([string]$f)) { continue }
-            $k = $pg.Component + '.' + $pg.Page + '.' + $f
-            if (-not $ctrlKeys.Contains($k)) { Add-PsSdViolation $v '05-ui' 'L3' 'C03' ('頁面欄位 ' + $pg.Component + '.' + $pg.Page + '.' + $f + ' 沒有 UI 項目') }
-        }
-    }
-    # C04：Record 欄位都有 FLD
-    $fldKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($f in $items['FLD']) { [void]$fldKeys.Add([string]$f['key']) }
-    foreach ($rc in $Model.Records) {
-        foreach ($fn in $rc.Fields) {
-            $k = $rc.Record + '.' + $fn
-            if ($xfNames.Contains($k)) { continue }
-            if (-not $fldKeys.Contains($k)) { Add-PsSdViolation $v '07-database' 'L3' 'C04' ($k + ' 沒有 FLD 項目') }
-        }
-    }
-    # C05：核心 PeopleCode 程式每支恰一筆處置
-    $disp = New-PsSdMap
-    foreach ($d in $Model.ProgramDispositions) { $k = [string]$d['program']; if ($disp.ContainsKey($k)) { $disp[$k]++ } else { $disp[$k] = 1 } }
-    foreach ($o in $items['OBJ']) {
-        if ([string]$o['objectType'] -cne 'PEOPLECODE' -or [string]$o['inclusion'] -ceq 'EXCLUDED') { continue }
-        $n = 0; if ($disp.ContainsKey([string]$o['id'])) { $n = $disp[[string]$o['id']] }
-        if ($n -ne 1) { Add-PsSdViolation $v '09-business-logic' 'L3' 'C05' ([string]$o['id'] + ' 處置筆數 ' + $n) }
-    }
-    # C06：Record 的排除欄數與 XF 一致
-    foreach ($o in $items['OBJ']) {
-        $fu = Get-PsSdField $o 'fieldUsage'
-        if (-not ($fu -is [System.Collections.IDictionary]) -or -not $fu.Contains('excluded')) { continue }
-        $ent = $null; foreach ($e in $items['ENT']) { if ([string]$e['record'] -ceq [string]$o['id']) { $ent = $e; break } }
-        $n = 0
-        if ($null -ne $ent) { foreach ($x in $items['XF']) { if ([string]$x['entity'] -ceq [string]$ent['id']) { $n += @($x['fields']).Count } } }
-        if ($n -ne [int]$fu['excluded']['count']) { Add-PsSdViolation $v '01-overview' 'L3' 'C06' ([string]$o['id'] + ' 排除欄數 ' + $fu['excluded']['count'] + ' 與 XF ' + $n + ' 不符') }
-    }
-    # C07：測試覆蓋
-    $tcs = $items['TC']
-    $covered = {
-        param([string]$Kind, [string]$Iid, [string]$WantType)
-        foreach ($t in $tcs) {
-            $cv = Get-PsSdField $t 'covers'
-            if (-not ($cv -is [System.Collections.IDictionary]) -or -not $cv.Contains($Kind)) { continue }
-            if (@($cv[$Kind]) -ccontains $Iid -and ($WantType -eq '' -or [string]$t['scenarioType'] -ceq $WantType)) { return $true }
-        }
-        return $false
-    }
-    foreach ($fr in $items['FR']) {
-        $ok = $false; foreach ($t in $tcs) { if ([string]$t['fr'] -ceq [string]$fr['id'] -and [string]$t['scenarioType'] -ceq 'POSITIVE') { $ok = $true } }
-        if (-not $ok) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$fr['id'] + ' 沒有正例') }
-    }
-    foreach ($b in $items['BR']) {
-        $act = Get-PsSdField $b 'action'
-        if ($act -is [System.Collections.IDictionary] -and [string]$act['kind'] -ceq 'REJECT' -and -not (& $covered 'rules' ([string]$b['id']) 'NEGATIVE')) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$b['id'] + ' 沒有反例') }
-        if ((Test-PsSdHasCompare (Get-PsSdField $b 'condition')) -and -not (& $covered 'rules' ([string]$b['id']) 'BOUNDARY')) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$b['id'] + ' 條件含比較運算但沒有邊界案例') }
-    }
-    foreach ($t in $items['TRN']) {
-        $tk = [string]$t['key']; $short = $tk.Substring($tk.IndexOf(':') + 1)
-        if (-not (& $covered 'transitions' ([string]$t['id']) '')) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$t['id'] + '（' + $short + '）沒有測試案例') }
-        if ((Test-PsSdHasCompare (Get-PsSdField $t 'guard')) -and -not (& $covered 'transitions' ([string]$t['id']) 'BOUNDARY')) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$t['id'] + ' 守衛含比較運算但沒有邊界案例') }
-    }
-    foreach ($f in $items['FLOW']) { if (-not (& $covered 'flows' ([string]$f['id']) '')) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$f['id'] + ' 沒有端到端案例') } }
-    foreach ($t in $items['TRN']) {
-        if ([string](Get-PsSdField $t 'exitMode') -cne 'ON_COMPLETION') { continue }
-        foreach ($typ in @('POSITIVE', 'NEGATIVE')) { if (-not (& $covered 'transitions' ([string]$t['id']) $typ)) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$t['id'] + ' 是守門轉移，缺 ' + $typ + ' 案例') } }
-        $we = $false; foreach ($c in (Get-PsSdConds (Get-PsSdField $t 'guard'))) { if ($c.Contains('whenEmpty')) { $we = $true } }
-        if ($we -and -not (& $covered 'transitions' ([string]$t['id']) 'BOUNDARY')) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$t['id'] + ' 的逐列條件有 whenEmpty，缺「沒有任何一列」的 BOUNDARY 案例') }
-    }
-    foreach ($a in $items['ACT']) { if ([string]$a['enforcement'] -ceq 'SYSTEM_GATE' -and -not (& $covered 'activities' ([string]$a['id']) '')) { Add-PsSdViolation $v '14-testing' 'L3' 'C07' ([string]$a['id'] + ' 是守門活動，沒有測試案例') } }
-    # C08：每個 FR 有操作契約；操作的檢核清單包含所有會在該操作觸發的拒絕型規則
-    foreach ($fr in $items['FR']) {
-        $ok = $false; foreach ($o in $items['OP']) { if ([string]$o['fr'] -ceq [string]$fr['id']) { $ok = $true } }
-        if (-not $ok) { Add-PsSdViolation $v '08-api' 'L3' 'C08' ([string]$fr['id'] + ' 沒有操作契約') }
-    }
-    foreach ($o in $items['OP']) {
-        $eff = Get-PsSdField $o 'effects'
-        $trs = @(); if ($eff -is [System.Collections.IDictionary] -and $eff.Contains('transitions')) { $trs = @($eff['transitions']) }
-        $vals = Get-PsSdField $o 'validations'; $vals = @($vals)
-        foreach ($b in $items['BR']) {
-            $act = Get-PsSdField $b 'action'
-            if (-not ($act -is [System.Collections.IDictionary]) -or [string]$act['kind'] -cne 'REJECT') { continue }
-            $trig = Get-PsSdField $b 'trigger'
-            if (-not ($trig -is [System.Collections.IDictionary])) { continue }
-            $need = $false
-            foreach ($x in @($trig['transitions'])) { if ($null -ne $x -and $trs -ccontains [string]$x) { $need = $true } }
-            if ([string]$trig['event'] -ceq 'SAVE_EDIT' -and @($b['appliesTo']) -ccontains [string]$o['fr'] -and @('CREATE', 'UPDATE', 'TRANSITION') -ccontains [string]$o['opKind']) { $need = $true }
-            if ($need -and $vals -cnotcontains [string]$b['id']) { Add-PsSdViolation $v '08-api' 'L3' 'C08' ([string]$o['id'] + ' 漏列檢核 ' + $b['id']) }
-        }
-    }
-    # C09：未解的 BLOCKING 問題
-    foreach ($q in $items['Q']) {
-        if ([string]$q['status'] -cne 'OPEN' -or [string]$q['severity'] -cne 'BLOCKING') { continue }
-        $aff = @($q['affects'])
-        if ($aff.Count -eq 0) { Add-PsSdViolation $v '90-questions' 'L3' 'C09' ([string]$q['id'] + ' 未解（BLOCKING）') }
-        foreach ($a in $aff) { if ($null -ne $a) { $d = Get-PsSdDocOfId ([string]$a); if ($d) { Add-PsSdViolation $v $d 'L3' 'C09' ([string]$q['id'] + ' 未解（BLOCKING）影響 ' + $a) } } }
-    }
-    # C10：每個 FR 恰一個切片；每個工作有完成條件
-    foreach ($fr in $items['FR']) {
-        $n = 0; foreach ($t in $items['TASK']) { if ([string]$t['fr'] -ceq [string]$fr['id']) { $n++ } }
-        if ($n -ne 1) { Add-PsSdViolation $v '17-tasks' 'L3' 'C10' ([string]$fr['id'] + ' 的工作項數 ' + $n) }
-    }
-    foreach ($t in $items['TASK']) {
-        $ok = $false; foreach ($d in $items['DOD']) { if ([string](Get-PsSdField $d 'task') -ceq [string]$t['id']) { $ok = $true } }
-        if (-not $ok) { Add-PsSdViolation $v '18-definition-of-done' 'L3' 'C10' ([string]$t['id'] + ' 沒有完成條件') }
-    }
-    return , $v.ToArray()
-}
-
-function Get-PsSdSpeculationWarnings {
-    # S07：CONFIRMED 項目的文字出現推測用語（警告，不擋；交 L4 覆核或改開問題）。
-    param($Model)
-    $v = [System.Collections.Generic.List[object]]::new()
-    foreach ($p in $script:PsSdPrefixInfo.Keys) {
-        if (@('AI', 'TASK', 'DOD', 'Q', 'DEC') -ccontains $p) { continue }
-        foreach ($it in $Model.Items[$p]) {
-            if ([string]$it['certainty'] -cne 'CONFIRMED') { continue }
-            foreach ($s in (Get-PsSdStringsOf $it)) {
-                $m = $script:PsSdSpeculativeRx.Match($s)
-                if ($m.Success) { Add-PsSdViolation $v $script:PsSdPrefixInfo[$p].Doc 'W' 'S07' ([string]$it['id'] + ' CONFIRMED 項目出現推測用語「' + $m.Value + '」（警告，交覆核）'); break }
-            }
-        }
-    }
-    return , $v.ToArray()
-}
-@@@PSBUNDLE-END|scripts/ps-sdoc-check-lib.ps1
-@@@PSBUNDLE-FILE|scripts/ps-sdoc-diag.ps1|343|73eacb23c3e4b3874ce33160add7895fbbe22ef91d30f14dc5e9d43ede7533fb|1
-# ps-sdoc-diag.ps1 — Spec 文件流程的診斷報告：只印代號與數字（不印路徑、物件名、jobId、hash），可以用唸的回報給維護端。
-# 用法：powershell -NoProfile -File scripts\ps-sdoc-diag.ps1 [-Last 12] [-Cli claude|opencode]
-#   讀 .ps-runtime\sdoc[-opencode]\<job>\attempts\aNNNN\{input.json,outcome.json} 與 .ps-runtime\sdoc[-opencode]-logs\*-<job>-aNNNN.{stream.jsonl,err.txt}，
-#   每個 attempt 一行、最後一行 SUM 彙總；Claude Code 版另以 ps-session-lib 的 Get-PsOcClaudeApiRetry 算每個 session 的模型端數據。
-# 代號：
-#   V   N＝新版 scripts（有環境預設與每頁上限）、O＝舊版
-#   K   工單種類 R=STATUS_READ 2=STATUS_ROUND2 S=RESEARCH V=REVIEW L=READER J=JUDGE
-#   U   研究單元 S0=stage0 SC=scope DA=data SE=security TX=texts WF=workflow IF=interfaces FN=functions UI=ui RU=rules OP=operations TE=testing L5=乾淨讀者
-#   S   outcome 狀態 OK=ACCEPTED CA=CANDIDATE IN=INVALID SF=SESSION_FAILED RF=REVIEW_FAIL RB=REVIEW_BLOCKED SB=SLOT_BUSY SC=SOURCE_CHANGED
-#   F   findings／sessionFindings T=TIMED_OUT Xn=EXIT_n A=API_ABORTED W=API_RETRY_SLOW K=API_RETRY_STUCK E=API_ERROR C=CONTEXT_OVERFLOW -=NONE ?=其他（驗收錯誤）
-#   Q   成功請求數  P   成功的 assistant 事件數（0＝第一個請求就沒成功過）  C   快取命中次數／成功請求數
-#   M   主代理最大輸入（k token）  L   主代理最後一次輸入（k token）  O   單次最多輸出（token）
-#   RT  模型端重試的狀態碼分布（504x6、NRx2＝無回應）  AE  result 的 api_error_status
-#   ERR err 檔分類 E0=空或沒有 E504=含 504 ECONN=連線中斷／重置 E400=含 400 EOTH=其他
-#   MD  模型家族 S45/S46/S5/S55=Sonnet 4.5/4.6/5/5.5 O=Opus H=Haiku X=看不出  PT=解讀分段數  CAP=本頁上限  DUR=session 分鐘（檔名時間到 stream 最後寫入）
-#   TH  含 thinking 區塊的 assistant 事件數（0＝這個 session 沒開 thinking）  UZ=最後一個成功回應的 usage 數值欄（欄名:值；全 0＝gateway 沒回 usage）
-#   G=  兩次重試的平均間隔秒數（時間軸檔量到的；≈ gateway 逾時＋退避）  D1=卡住的請求跑了幾秒才第一次失敗  LP=最長的一個成功回應（秒，含工具時間；30 秒粒度）
-#   LT/LR 卡住的那個請求之前最後一個工具呼叫的名稱／其結果的位元組數（Read 大結果＝卡在輸入側；Write＝卡在寫完之後）  RU=result 事件的 usage 總計 in/cc/cr/out
-#   F 另有 INVALID 的驗收錯誤代號 NJ=不是合法 JSON NW=少寫一段 FP=指紋不同 OV=超過每頁上限 SC=schema／欄位錯 LN=逐行交代錯 ?=其他
-#   SUM KF=失敗工單種類分布 RT=全部狀態碼分布 CACHE=C0（從沒命中）/C1（部分）/C2（都有） MAXM/MAXO=最大輸入／輸出 P0=第一個請求就失敗的 session 數 AFTEROK=session 失敗但產出照收的 attempt 數
-#   ENVNOW 跑本腳本的視窗目前設了哪些覆寫變數：D=PS_SESSION_CLAUDE_ENV_DEFAULTS K=PS_SESSION_CLAUDE_ENV_SKIP I=PS_SDOC_RESEARCH_PAGE_ITEMS L=PS_SDOC_READING_PART_LINES
-#          T=MAX_THINKING_TOKENS R=CLAUDE_CODE_MAX_RETRIES A=PS_SESSION_API_ABORT_AFTER N=CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK E=CLAUDE_CODE_EFFORT_LEVEL
-#   SUM2（只要回報這一行）：版本 模型家族 種類-findings 狀態碼 TH LT G NEXT——以最近一個失敗的 attempt 為準；G~秒＝估的 gateway 逾時（session 分鐘扣掉成功請求後除以重試數）
-#   NEXT 腳本判斷的下一步：0=先解新搬運包 1=設 CLAUDE_CODE_EFFORT_LEVEL=low（adaptive 模型關不掉 thinking，只能壓低）
-#        2=縮每次回應（讀者 PS_SDOC_READING_PART_LINES=20；研究 PS_SDOC_RESEARCH_PAGE_ITEMS=4） 3=縮輸入（CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT=1）
-#        4=gateway 不吃 effort（RT 有 400）：拿掉 CLAUDE_CODE_EFFORT_LEVEL 5=改走 OpenCode 版（-Cli opencode） 6=沒有失敗、不用改
-param([string]$Root = '', [ValidateRange(1, 500)][int]$Last = 12, [ValidateSet('', 'claude', 'opencode')][string]$Cli = '')
-$ErrorActionPreference = 'Stop'
-if ($Root -eq '') { $Root = Split-Path $PSScriptRoot -Parent }
-. (Join-Path $PSScriptRoot 'ps-session-lib.ps1')
-
-function Get-DgText([string]$Path, [int]$MaxBytes = 65536) {
-    if (-not [System.IO.File]::Exists($Path)) { return '' }
-    $fs = $null
-    try {
-        $fs = New-Object System.IO.FileStream($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-        $n = [int][Math]::Min([long]$MaxBytes, $fs.Length)
-        $buf = New-Object byte[] $n
-        $read = $fs.Read($buf, 0, $n)
-        return [System.Text.Encoding]::UTF8.GetString($buf, 0, $read)
-    }
-    catch { return '' }
-    finally { if ($null -ne $fs) { $fs.Dispose() } }
-}
-function Get-DgJson([string]$Path) {
-    if (-not [System.IO.File]::Exists($Path)) { return $null }
-    try { return ([System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json) } catch { return $null }
-}
-function Get-DgKind([string]$K) {
-    switch ($K) { 'STATUS_READ' { return 'R' } 'STATUS_ROUND2' { return '2' } 'RESEARCH' { return 'S' } 'REVIEW' { return 'V' } 'READER' { return 'L' } 'JUDGE' { return 'J' } }
-    return '?'
-}
-function Get-DgUnit([string]$U) {
-    $map = @{ 'stage0' = 'S0'; 'scope' = 'SC'; 'data' = 'DA'; 'security' = 'SE'; 'texts' = 'TX'; 'workflow' = 'WF'; 'interfaces' = 'IF'; 'functions' = 'FN'; 'ui' = 'UI'; 'rules' = 'RU'; 'operations' = 'OP'; 'testing' = 'TE'; 'l5' = 'L5' }
-    if ($map.ContainsKey($U)) { return [string]$map[$U] }
-    if ($U -eq '') { return '-' }
-    return '?'
-}
-function Get-DgStatus([string]$S) {
-    $map = @{ 'ACCEPTED' = 'OK'; 'CANDIDATE' = 'CA'; 'INVALID' = 'IN'; 'SESSION_FAILED' = 'SF'; 'REVIEW_FAIL' = 'RF'; 'REVIEW_BLOCKED' = 'RB'; 'SLOT_BUSY' = 'SB'; 'SOURCE_CHANGED' = 'SC' }
-    if ($map.ContainsKey($S)) { return [string]$map[$S] }
-    return '?'
-}
-function Get-DgFindings($List) {
-    $out = @()
-    foreach ($f in @($List)) {
-        $t = [string]$f
-        if ($t -eq 'TIMED_OUT') { $out += 'T' }
-        elseif ($t -match '^EXIT_(-?\d+)$') { $out += ('X' + $Matches[1]) }
-        elseif ($t -eq 'API_ABORTED') { $out += 'A' }
-        elseif ($t -eq 'API_RETRY_SLOW') { $out += 'W' }
-        elseif ($t -eq 'API_RETRY_STUCK') { $out += 'K' }
-        elseif ($t -eq 'API_ERROR') { $out += 'E' }
-        elseif ($t -eq 'CONTEXT_OVERFLOW') { $out += 'C' }
-        elseif ($t -eq 'NONE' -or $t -eq '') { $out += '-' }
-        elseif ($t.Contains('不是合法 JSON')) { $out += 'NJ' }
-        elseif ($t.Contains('沒有寫')) { $out += 'NW' }
-        elseif ($t.Contains('指紋')) { $out += 'FP' }
-        elseif ($t.Contains('超過上限')) { $out += 'OV' }
-        elseif ($t.Contains('schema') -or $t.Contains('應為') -or $t.Contains('欄位')) { $out += 'SC' }
-        elseif ($t.Contains('交代')) { $out += 'LN' }
-        else { $out += '?' }
-    }
-    if ($out.Count -eq 0) { return '-' }
-    return (($out | Select-Object -Unique) -join ',')
-}
-function Get-DgModel([string]$Head) {
-    $m = [regex]::Match($Head, '"model":"([^"]*)"')
-    if (-not $m.Success) { return 'X' }
-    $id = $m.Groups[1].Value.ToLowerInvariant()
-    if ($id -match 'sonnet-?5-?5|sonnet-5\.5') { return 'S55' }
-    if ($id -match 'sonnet-?5(?![\d.])|sonnet-5-') { return 'S5' }
-    if ($id -match 'sonnet-?4-?6') { return 'S46' }
-    if ($id -match 'sonnet-?4-?5') { return 'S45' }
-    if ($id -match 'sonnet') { return 'S?' }
-    if ($id -match 'opus') { return 'O' }
-    if ($id -match 'haiku') { return 'H' }
-    return 'X'
-}
-function Get-DgErrClass([string]$Err) {
-    if ($Err.Trim() -eq '') { return 'E0' }
-    if ($Err -match '\b504\b|Gateway Time-?out') { return 'E504' }
-    if ($Err -match '(?i)connection (lost|reset)|ECONNRESET|socket hang up|fetch failed|terminated|stalled') { return 'ECONN' }
-    if ($Err -match '\b400\b') { return 'E400' }
-    return 'EOTH'
-}
-function Format-DgK([int]$N) { return ([string][int][Math]::Round($N / 1000.0) + 'k') }
-# 時間軸檔（ps-session-lib 每 30 秒記的 P／R／T）→ @{ Gap; FirstFail; LongestOk }（秒；量不到為 0）
-function Get-DgTimeline([string]$Path) {
-    $r = @{ Gap = 0; FirstFail = 0; LongestOk = 0 }
-    if (-not [System.IO.File]::Exists($Path)) { return $r }
-    $prevP = 0; $prevR = 0; $prevT = 0; $lastPAt = $null; $lastRAt = $null; $gaps = @(); $okGaps = @(); $firstFail = 0
-    foreach ($ln in [System.IO.File]::ReadAllLines($Path)) {
-        $m = [regex]::Match($ln, '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|P=(\d+)\|R=(\d+)\|T=(\d+)')
-        if (-not $m.Success) { continue }
-        $t = $null
-        try { $t = [datetime]::ParseExact($m.Groups[1].Value, 'yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) } catch { continue }
-        $pp = [int]$m.Groups[2].Value; $rr = [int]$m.Groups[3].Value; $tt = [int]$m.Groups[4].Value
-        if ($pp -gt $prevP) {
-            if ($null -ne $lastPAt) { $okGaps += [int]($t - $lastPAt).TotalSeconds }
-            $lastPAt = $t; $lastRAt = $null
-        }
-        if ($rr -gt $prevR) {
-            $dr = $rr - $prevR
-            if ($null -ne $lastRAt -and $tt -ge $prevT + $dr) { $g = [int](($t - $lastRAt).TotalSeconds / $dr); for ($i = 0; $i -lt $dr; $i++) { $gaps += $g } }
-            elseif ($null -ne $lastPAt) { $firstFail = [int]($t - $lastPAt).TotalSeconds }
-            $lastRAt = $t
-        }
-        $prevP = $pp; $prevR = $rr; $prevT = $tt
-    }
-    if ($gaps.Count -gt 0) { $sum = 0; foreach ($g in $gaps) { $sum += $g }; $r.Gap = [int]($sum / $gaps.Count) }
-    $r.FirstFail = $firstFail
-    foreach ($g in $okGaps) { if ($g -gt $r.LongestOk) { $r.LongestOk = $g } }
-    return $r
-}
-# stream 的補充數據：thinking 區塊數、最後一個成功回應的 usage 欄位、卡住請求之前的最後一個工具與結果大小、result 的 usage 總計
-function Get-DgStreamExtra([string]$Path) {
-    $r = @{ Think = 0; Usage = ''; LastTool = ''; LastResultLen = 0; ResultUsage = '' }
-    if (-not [System.IO.File]::Exists($Path)) { return $r }
-    $ord = [System.StringComparison]::Ordinal
-    $tool = ''; $resLen = 0; $frozen = $false; $afterProgress = $false
-    $fs = $null; $rd = $null
-    try {
-        $fs = New-Object System.IO.FileStream($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-        $rd = New-Object System.IO.StreamReader($fs, (New-Object System.Text.UTF8Encoding($false)))
-        while ($true) {
-            $ln = $rd.ReadLine()
-            if ($null -eq $ln) { break }
-            if ($ln.IndexOf('"subtype":"api_retry"', $ord) -ge 0 -and $ln.IndexOf('"subtype":"api_retry"', $ord) -lt 80) {
-                # 一串重試的第一個：凍結「卡住的請求之前」的工具與結果大小（之後恢復又失敗會重新凍結）
-                if ($afterProgress) { $r.LastTool = $tool; $r.LastResultLen = $resLen; $afterProgress = $false }
-                continue
-            }
-            $k = $ln.IndexOf('"type":"assistant"', $ord)
-            if ($k -ge 0 -and $k -lt 20) {
-                if ($ln.IndexOf('"text":"API Error', $ord) -ge 0) { continue }
-                $afterProgress = $true
-                if ($ln.IndexOf('"type":"thinking"', $ord) -ge 0) { $r.Think++ }
-                $m = [regex]::Match($ln, '"type":"tool_use","id":"[^"]*","name":"([^"]+)"')
-                if ($m.Success) { $tool = $m.Groups[1].Value }
-                $u = $ln.LastIndexOf('"usage":{', $ord)
-                if ($u -ge 0) {
-                    $win = $ln.Substring($u + 9, [Math]::Min(400, $ln.Length - $u - 9))
-                    $pairs = @()
-                    foreach ($pm in [regex]::Matches($win, '"([a-z0-9_]+)":(\d+)')) { if ($pairs.Count -lt 8) { $pairs += ($pm.Groups[1].Value.Replace('_input_tokens', '').Replace('_tokens', '') + ':' + $pm.Groups[2].Value) } }
-                    if ($pairs.Count -gt 0) { $r.Usage = ($pairs -join ',') }
-                }
-                continue
-            }
-            $k = $ln.IndexOf('"type":"user"', $ord)
-            if ($k -ge 0 -and $k -lt 20) { if ($ln.IndexOf('"tool_result"', $ord) -ge 0) { $resLen = $ln.Length } ; continue }
-            if ($null -ne (Get-PsOcResultEvent $ln)) {
-                $u = $ln.IndexOf('"usage":{', $ord)
-                if ($u -ge 0) {
-                    $uf = Get-PsOcUsageFields ($ln.Substring($u, [Math]::Min(600, $ln.Length - $u)))
-                    if ($null -ne $uf) { $r.ResultUsage = ([string]([int]$uf.Context - [int]$uf.CacheRead) + '/' + [int]$uf.CacheRead + '/' + [int]$uf.Output) }
-                }
-            }
-        }
-    }
-    catch { }
-    finally { if ($null -ne $rd) { $rd.Dispose() } elseif ($null -ne $fs) { $fs.Dispose() } }
-    return $r
-}
-
-$roots = @()
-if ($Cli -eq '' -or $Cli -eq 'claude') { $roots += , @{ Dir = (Join-Path $Root '.ps-runtime/sdoc'); Logs = (Join-Path $Root '.ps-runtime/sdoc-logs'); Cli = 'claude' } }
-if ($Cli -eq '' -or $Cli -eq 'opencode') { $roots += , @{ Dir = (Join-Path $Root '.ps-runtime/sdoc-opencode'); Logs = (Join-Path $Root '.ps-runtime/sdoc-opencode-logs'); Cli = 'opencode' } }
-
-# 版本：新版 scripts 有環境預設與每頁上限
-$v = 'O'
-$libTxt = Get-DgText (Join-Path $PSScriptRoot 'ps-session-lib.ps1') 400000
-$sdlTxt = Get-DgText (Join-Path $PSScriptRoot 'ps-sdoc-lib.ps1') 400000
-if ($libTxt.Contains('PsOcClaudeEnvCommon') -and $sdlTxt.Contains('PsSdResearchPageItems')) { $v = 'N' }
-$envNow = @()
-foreach ($pair in @(@('D', 'PS_SESSION_CLAUDE_ENV_DEFAULTS'), @('K', 'PS_SESSION_CLAUDE_ENV_SKIP'), @('I', 'PS_SDOC_RESEARCH_PAGE_ITEMS'), @('L', 'PS_SDOC_READING_PART_LINES'), @('T', 'MAX_THINKING_TOKENS'), @('R', 'CLAUDE_CODE_MAX_RETRIES'), @('A', 'PS_SESSION_API_ABORT_AFTER'), @('N', 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK'), @('E', 'CLAUDE_CODE_EFFORT_LEVEL'))) {
-    $val = [string][System.Environment]::GetEnvironmentVariable($pair[1])
-    if ($val -ne '') { $envNow += ($pair[0] + '=' + $val) }
-}
-$envTxt = '-'
-if ($envNow.Count -gt 0) { $envTxt = ($envNow -join ',') }
-
-$rows = @()
-$jobs = 0
-foreach ($r in $roots) {
-    if (-not [System.IO.Directory]::Exists($r.Dir)) { continue }
-    foreach ($jd in @(Get-ChildItem -LiteralPath $r.Dir -Directory | Sort-Object Name)) {
-        $att = Join-Path $jd.FullName 'attempts'
-        if (-not [System.IO.Directory]::Exists($att)) { continue }
-        $jobs++
-        $jid = $jd.Name
-        foreach ($ad in @(Get-ChildItem -LiteralPath $att -Directory | Where-Object { $_.Name -match '^a\d{4,8}$' } | Sort-Object Name)) {
-            $oc = Get-DgJson (Join-Path $ad.FullName 'outcome.json')
-            $inp = Get-DgJson (Join-Path $ad.FullName 'input.json')
-            if ($null -eq $oc -or $null -eq $inp) { continue }
-            $row = @{ Job = $jobs; Aid = $ad.Name; Cli = $r.Cli; Kind = (Get-DgKind ([string]$inp.kind)); Unit = (Get-DgUnit ([string]$inp.unit)); Status = (Get-DgStatus ([string]$oc.status))
-                Findings = (Get-DgFindings $oc.findings); SessionFindings = ''; Parts = 0; Cap = ''; Api = $null; Model = '-'; Err = 'E0'; Dur = ''; Extra = $null; Tl = $null }
-            if ($null -ne $oc.PSObject.Properties['sessionFindings']) { $row.SessionFindings = Get-DgFindings $oc.sessionFindings }
-            if ($null -ne $inp.PSObject.Properties['outputParts']) { $row.Parts = @($inp.outputParts).Count }
-            if ($null -ne $inp.PSObject.Properties['pageItemCap']) { $row.Cap = [string]$inp.pageItemCap }
-            if ([System.IO.Directory]::Exists($r.Logs)) {
-                $sf = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.stream.jsonl') | Sort-Object Name | Select-Object -Last 1)
-                $ef = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.err.txt') | Sort-Object Name | Select-Object -Last 1)
-                $tf = @(Get-ChildItem -LiteralPath $r.Logs -File -Filter ('*-' + $jid + '-' + $ad.Name + '.timeline.txt') | Sort-Object Name | Select-Object -Last 1)
-                if ($tf.Count -gt 0) { $row.Tl = Get-DgTimeline $tf[0].FullName }
-                if ($sf.Count -gt 0) {
-                    $row.Api = Get-PsOcClaudeApiRetry -StreamFile $sf[0].FullName
-                    $row.Extra = Get-DgStreamExtra $sf[0].FullName
-                    $row.Model = Get-DgModel (Get-DgText $sf[0].FullName 200000)
-                    $m = [regex]::Match($sf[0].Name, '^(\d{8})-(\d{6})-')
-                    if ($m.Success) {
-                        $t0 = $null
-                        try { $t0 = [datetime]::ParseExact($m.Groups[1].Value + $m.Groups[2].Value, 'yyyyMMddHHmmss', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $t0 = $null }
-                        if ($null -ne $t0) { $row.Dur = [string][int]([Math]::Max(0, ($sf[0].LastWriteTime - $t0).TotalMinutes)) }
-                    }
-                }
-                if ($ef.Count -gt 0) { $row.Err = Get-DgErrClass (Get-DgText $ef[0].FullName 65536) }
-            }
-            $rows += , $row
-        }
-    }
-}
-
-$failed = @($rows | Where-Object { $_.Status -eq 'SF' })
-$afterOk = @($rows | Where-Object { $_.SessionFindings -ne '' })
-Write-Host ('DIAG v2 | V=' + $v + ' | JOBS=' + $jobs + ' | ATT=' + $rows.Count + ' | SF=' + $failed.Count + ' | AFTEROK=' + $afterOk.Count + ' | ENVNOW=' + $envTxt)
-$show = @($rows | Select-Object -Last $Last)
-$kf = @{}; $rt = @{}; $maxM = 0; $maxO = 0; $p0 = 0; $cacheHit = 0; $cacheReq = 0; $models = @{}
-foreach ($row in $rows) {
-    if ($row.Status -eq 'SF') { $k = $row.Kind; if ($kf.ContainsKey($k)) { $kf[$k] = [int]$kf[$k] + 1 } else { $kf[$k] = 1 } }
-    $a = $row.Api
-    if ($null -ne $a) {
-        if ([int]$a.MaxContextMain -gt $maxM) { $maxM = [int]$a.MaxContextMain }
-        if ([int]$a.MaxOutput -gt $maxO) { $maxO = [int]$a.MaxOutput }
-        if ([int]$a.Progress -eq 0 -and $row.Status -eq 'SF') { $p0++ }
-        $cacheHit += [int]$a.CacheRequests; $cacheReq += [int]$a.Requests
-        foreach ($part in ([string]$a.Statuses -split '、')) { $pm = [regex]::Match($part, '^(.+)×(\d+)$'); if ($pm.Success) { $code = $pm.Groups[1].Value; if ($code -eq '無回應') { $code = 'NR' }; if ($rt.ContainsKey($code)) { $rt[$code] = [int]$rt[$code] + [int]$pm.Groups[2].Value } else { $rt[$code] = [int]$pm.Groups[2].Value } } }
-        if ($row.Model -ne '-') { $models[$row.Model] = $true }
-    }
-}
-foreach ($row in $show) {
-    $line = 'J' + $row.Job + ' A' + $row.Aid.Substring(1) + ' K=' + $row.Kind + ' U=' + $row.Unit + ' S=' + $row.Status + ' F=' + $row.Findings
-    if ($row.SessionFindings -ne '') { $line += ' SF=' + $row.SessionFindings }
-    $a = $row.Api
-    if ($null -ne $a) {
-        $sts = [string]$a.Statuses; if ($sts -eq '') { $sts = '-' } else { $sts = $sts.Replace('無回應', 'NR').Replace('×', 'x').Replace('、', ',') }
-        $line += ' Q=' + [int]$a.Requests + ' P=' + [int]$a.Progress + ' C=' + [int]$a.CacheRequests + '/' + [int]$a.Requests + ' M=' + (Format-DgK ([int]$a.MaxContextMain)) + ' L=' + (Format-DgK ([int]$a.LastContextMain)) + ' O=' + [int]$a.MaxOutput + ' RT=' + $sts
-        if ([string]$a.ApiErrorStatus -ne '') { $line += ' AE=' + [string]$a.ApiErrorStatus }
-        if ([int]$a.MaxContextSub -gt 0) { $line += ' MS=' + (Format-DgK ([int]$a.MaxContextSub)) }
-        $x = $row.Extra
-        if ($null -ne $x) {
-            $line += ' TH=' + [int]$x.Think
-            if ([string]$x.LastTool -ne '' -or [int]$x.LastResultLen -gt 0) { $lt = [string]$x.LastTool; if ($lt -eq '') { $lt = '-' }; $line += ' LT=' + $lt + ' LR=' + [int]$x.LastResultLen }
-            if ([string]$x.Usage -ne '') { $line += ' UZ=' + [string]$x.Usage }
-            if ([string]$x.ResultUsage -ne '') { $line += ' RU=' + [string]$x.ResultUsage }
-        }
-        $tl = $row.Tl
-        if ($null -ne $tl) {
-            if ([int]$tl.Gap -gt 0) { $line += ' G=' + [int]$tl.Gap }
-            if ([int]$tl.FirstFail -gt 0) { $line += ' D1=' + [int]$tl.FirstFail }
-            if ([int]$tl.LongestOk -gt 0) { $line += ' LP=' + [int]$tl.LongestOk }
-        }
-    }
-    $line += ' ERR=' + $row.Err + ' MD=' + $row.Model
-    if ($row.Parts -gt 0) { $line += ' PT=' + $row.Parts }
-    if ($row.Cap -ne '') { $line += ' CAP=' + $row.Cap }
-    if ($row.Dur -ne '') { $line += ' DUR=' + $row.Dur }
-    Write-Host $line
-}
-$kfTxt = '-'; if ($kf.Count -gt 0) { $kfTxt = (@($kf.Keys | Sort-Object | ForEach-Object { $_ + ':' + $kf[$_] }) -join ',') }
-$rtTxt = '-'; if ($rt.Count -gt 0) { $rtTxt = (@($rt.Keys | Sort-Object | ForEach-Object { $_ + ':' + $rt[$_] }) -join ',') }
-$cache = '-'
-if ($cacheReq -gt 0) { if ($cacheHit -eq 0) { $cache = 'C0' } elseif ($cacheHit -lt $cacheReq) { $cache = 'C1' } else { $cache = 'C2' } }
-# 模型家族彙總：看得出家族的 session 存在時不列 X（合成或看不出 id 的 session）
-$mdKeys = @($models.Keys | Sort-Object)
-if ($mdKeys.Count -gt 1) { $mdKeys = @($mdKeys | Where-Object { $_ -ne 'X' }) }
-$mdTxt = '-'; if ($mdKeys.Count -gt 0) { $mdTxt = ($mdKeys -join ',') }
-Write-Host ('SUM | KF=' + $kfTxt + ' | RT=' + $rtTxt + ' | CACHE=' + $cache + ' | MAXM=' + (Format-DgK $maxM) + ' | MAXO=' + $maxO + ' | P0=' + $p0 + ' | MD=' + $mdTxt + ' | AFTEROK=' + $afterOk.Count)
-
-# ---------------- SUM2：一行就夠的回報，與腳本自己判斷的下一步 ----------------
-$focus = $null
-foreach ($row in $rows) { if ($row.Status -eq 'SF' -and $null -ne $row.Api) { $focus = $row } }
-if ($null -eq $focus) { foreach ($row in $rows) { if ($row.Status -eq 'SF') { $focus = $row } } }
-$next = 6; $why = '最近沒有 session 失敗；照常續跑'
-$sum2 = 'SUM2 ' + $v + ' ' + $mdTxt + ' -'
-if ($v -eq 'O') { $next = 0; $why = '跑的是舊版 scripts：先解新搬運包再跑' }
-elseif ($null -ne $focus) {
-    $a = $focus.Api; $x = $focus.Extra
-    $rtF = '-'; $th = 0; $ltTxt = '-'; $gTxt = '-'; $p0f = $false; $has400 = $false
-    if ($null -ne $a) {
-        $rtF = [string]$a.Statuses; if ($rtF -eq '') { $rtF = '-' } else { $rtF = $rtF.Replace('無回應', 'NR').Replace('×', 'x').Replace('、', ',') }
-        if ($rtF -match '(^|,)400x') { $has400 = $true }
-        if ([int]$a.Progress -eq 0) { $p0f = $true }
-        if ($null -ne $focus.Tl -and [int]$focus.Tl.Gap -gt 0) { $gTxt = 'G=' + [int]$focus.Tl.Gap }
-        elseif ([int]$a.Count -ge 3 -and $focus.Dur -ne '') {
-            $g = [int](([int]$focus.Dur * 60 - [int]$a.Requests * 30) / [int]$a.Count)
-            if ($g -gt 0) { $gTxt = 'G~' + [string]([int][Math]::Round($g / 10.0) * 10) }
-        }
-        if ($null -ne $focus.Tl -and [int]$focus.Tl.FirstFail -gt 0) { $gTxt += ' D1=' + [int]$focus.Tl.FirstFail }
-    }
-    if ($null -ne $x) {
-        $th = [int]$x.Think
-        $lt = [string]$x.LastTool
-        if ($lt -ne '' -or [int]$x.LastResultLen -gt 0) {
-            $code = 'M'
-            if ($lt -eq 'Read') { $code = 'R' } elseif ($lt -eq 'Write') { $code = 'W' } elseif ($lt -eq '') { $code = '-' }
-            $ltTxt = $code + (Format-DgK ([int]$x.LastResultLen))
-        }
-    }
-    $focusMd = $focus.Model; if ($focusMd -eq '-' -or $focusMd -eq 'X') { $focusMd = $mdTxt }
-    $sum2 = 'SUM2 ' + $v + ' ' + $focusMd + ' ' + $focus.Kind + '-' + $focus.Findings + ' ' + $rtF + ' TH' + $th + ' LT=' + $ltTxt + ' ' + $gTxt
-    $adaptive = ($focusMd -match '^S(46|5|55)$' -or $focusMd -eq 'O')
-    if ($has400) { $next = 4; $why = 'gateway 不吃 effort 參數（狀態碼有 400）：拿掉 CLAUDE_CODE_EFFORT_LEVEL（Remove-Item Env:CLAUDE_CODE_EFFORT_LEVEL）' }
-    elseif ($p0f) { $next = 5; $why = '第一個請求就沒成功過：這條線本身過不了，改走 OpenCode 版（scripts\ps-sdoc.ps1 -Cli opencode）' }
-    elseif ($th -gt 0 -and $adaptive -and ([string]$env:CLAUDE_CODE_EFFORT_LEVEL).Trim() -eq '') { $next = 1; $why = 'thinking 開著（TH>0）而這個模型關不掉：$env:CLAUDE_CODE_EFFORT_LEVEL = ''low'' 後重跑' }
-    elseif ($ltTxt.StartsWith('R') -and [int]$x.LastResultLen -ge 40000) { $next = 3; $why = '卡在讀完大檔之後的請求（輸入側）：$env:CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT = ''1'' 後重跑' }
-    elseif ($focus.Kind -eq 'S' -or $focus.Kind -eq 'V') { $next = 2; $why = '縮每次回應：$env:PS_SDOC_RESEARCH_PAGE_ITEMS = ''4'' 後重跑' }
-    elseif ($focus.Kind -eq 'R' -or $focus.Kind -eq '2') { $next = 2; $why = '縮每次回應：$env:PS_SDOC_READING_PART_LINES = ''20'' 後重跑' }
-    else { $next = 5; $why = '槓桿都試過仍卡：改走 OpenCode 版（scripts\ps-sdoc.ps1 -Cli opencode）' }
-}
-Write-Host ($sum2 + ' NEXT=' + $next)
-Write-Host ('NEXT' + $next + '：' + $why)
-exit 0
-@@@PSBUNDLE-END|scripts/ps-sdoc-diag.ps1
-@@@PSBUNDLE-PART-END|6696b1a48bf32e64|5|9
+@@@PSBUNDLE-PART-END|b60bac9268ae117f|5|9

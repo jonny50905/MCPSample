@@ -4312,3 +4312,22 @@
 - 測試：test-claude-variant 加「type 排在後面的 result 也認得、巢狀物件的 type＝result 不算」與「新版 result 的 api_error_status／duration_api_ms」。
   維護端另以真 Claude Code 2.1.312 的 stream 驗過：Found＝True、out 有內容、API 秒數有值。
 - 原則：**判斷外部程式的輸出格式，不要依賴鍵的位置**——JSON 鍵順序不是契約。效能需要先用字樣篩，篩到的再解析確認。
+
+### L163 /ps-spec 改成業務需求文件：照 bizspec/standard.md 寫、第 10 章證據逐字比對、補查只查「該問誰＝Spec 產製端」的假設（2026-11-02）
+
+- 症狀：管理者以 product owner 角度要一份「只談業務需求、不談系統設計」的規範，讓 Sonnet 照著寫 Spec，並取代原本 /ps-spec 的
+  00-index＋14 份＋90 格式；另要求加「證據」章，所有證據用編號對照，避免撰寫者幻覺。
+- 規範怎麼來：Opus（第 0～4 章）、Fable（第 5 章）、Sonnet（第 6～9 章、附錄、自我檢查）分章起草後整合；三輪各 3 份 Sonnet 獨立試寫，
+  兩組合成來源與答案卷，由 Fable／Opus 覆核。第一輪全命中但雜訊多（必答＋一定登假設逼出形式假設、待確認 36～42%、驗收情境 141～153）；
+  第二輪抓到三處會寫錯業務內容（其他檔已寫明的取消路徑被寫成不提供、只寫進入方式的自動轉移被暫停、矛盾假設沒涵蓋引用處）；
+  第三輪 31／31、38／38、38／38，零編造、需求描述零系統設計外洩。紀錄與重跑方式在 docs/business-spec/validation/。
+- 證據的設計：需求表的「來源」欄改「證據」欄寫 `E-###`；位置與原文摘錄只在第 10 章；摘錄必須出自位置所指檔案的同一行（10～150 字），
+  外環逐字比對（空白正規化、`\|` 視為「|」）。補查結果檔只由補查 session 寫，外環記帳本（sha256）與副本；寫手改了就還原，
+  帳本外的補查檔與偽造的補查證據會被擋（BZ_EV_QUERY）。
+- 落點：scripts/ps-bizspec.ps1、ps-bizspec-lib.ps1、tests/test-bizspec.ps1；兩版 peoplesoft/bizspec/（standard.md、query-contract.md）；
+  兩版 agents ps-bizspec-writer、ps-bizspec-query（Claude Code 版 hook profile bizspec-writer／bizspec-query、MainOnly）；ps-spec-author 與 /ps-spec 兩版改走
+  ps-bizspec；support-codes 加 BIZ1；settings 允許 ps-bizspec 與 `Edit(./docs/ps-spec/**)`；lint 與 test-claude-variant 涵蓋 bizspec；
+  run-clone-smoke 的 /ps-spec 情境改成 ps-bizspec；SOP-31；Spec 文件流程（DOC1）保留，直接跑 ps-sdoc.ps1。
+- 沒做（留待公司機數字）：真模型的端對端（Sonnet 寫手、補查委派）只在維護端以試寫驗過規範本身，外環與 agent 權限只有合成測試；
+  OpenCode 版新 agent 的權限沒有真 OpenCode 的 smoke（run-sdoc-smoke 只涵蓋 DOC1 的四個 agent）。
+- 原則：**證據要能被機器逐字核對**——「出處」寫成可解析的位置加同一行原文摘錄，外環才不必相信寫手的自評；查詢結果由另一個 session 寫、外環記帳，寫手只讀。

@@ -9,7 +9,7 @@
 param([string]$Root = (Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference = 'Stop'
 $globs = @('.opencode/agent/*.md', '.opencode/skills/*/SKILL.md', '.opencode/command/*.md',
-           '.opencode/peoplesoft/*.md', '.opencode/peoplesoft/report-templates/*.md', '.opencode/peoplesoft/spec/*.md', '.opencode/peoplesoft/sdoc/*.md')
+           '.opencode/peoplesoft/*.md', '.opencode/peoplesoft/report-templates/*.md', '.opencode/peoplesoft/spec/*.md', '.opencode/peoplesoft/sdoc/*.md', '.opencode/peoplesoft/bizspec/*.md')
 # Claude Code 版：維護端在 claude-code/ 子樹、公司機部署在根目錄的 .claude（含 CLAUDE.md——它只放執行期規則）。
 # 根目錄 .claude 只有在 .claude/peoplesoft 存在時才是框架（維護端根目錄的 .claude 是維護工具，不掃）
 $pres = @('claude-code/')
@@ -17,7 +17,7 @@ if ([System.IO.Directory]::Exists((Join-Path $Root (Join-Path '.claude' 'peoples
 foreach ($pre in $pres) {
     $globs += @(($pre + '.claude/agents/*.md'), ($pre + '.claude/skills/*/SKILL.md'), ($pre + '.claude/commands/*.md'),
         ($pre + '.claude/peoplesoft/*.md'), ($pre + '.claude/peoplesoft/report-templates/*.md'), ($pre + '.claude/peoplesoft/spec/*.md'),
-        ($pre + '.claude/peoplesoft/sdoc/*.md'), ($pre + 'CLAUDE.md'))
+        ($pre + '.claude/peoplesoft/sdoc/*.md'), ($pre + '.claude/peoplesoft/bizspec/*.md'), ($pre + 'CLAUDE.md'))
 }
 $exclude = @('SOP.md', 'README.md', 'test-scenarios.md')
 $block = @(

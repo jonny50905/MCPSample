@@ -5,6 +5,12 @@
 
 ## 0. 一句話現況
 
+**/ps-spec 改成業務需求文件（2026-11-02，L163，分支 `claude/bold-cori-jbk4bz`，未併回 main）**：管理者以 PO 角度要「只談業務需求、不談系統設計」的規範並取代
+原本 00-index＋14 份＋90 的格式，另加證據章避免幻覺。規範 `docs/business-spec/standard.md`（＝兩版 `peoplesoft/bizspec/standard.md`）由 Opus／Fable／Sonnet 分章起草、
+三輪各 3 份 Sonnet 試寫與覆核定稿（第三輪滿分、零編造；紀錄在 `docs/business-spec/validation/`）。新外環 `scripts/ps-bizspec.ps1`（BIZ1）：寫手 session 照規範寫、
+逐字比對第 10 章證據、退回修正、補查「該問誰＝Spec 產製端」的假設（ps-bizspec-query 只寫 evidence/Q-A-###.md，外環記帳本）、回填、套 answers.md 的業務回覆。
+DOC1（ps-sdoc.ps1）保留可直接跑。合成測試 `test-bizspec`；真模型端對端與 OpenCode 版新 agent 的真 OpenCode smoke 尚未做（SOP-31）。
+
 **新版 Claude Code result 事件鍵順序變了（2026-10-30，L162，分支 `claude/nice-heisenberg-cws9q5`）**：外環三處用「前 40 字元內有 `"type":"result"`」認 result，
 Claude Code 2.1.3xx 把 type 排到第 19 個鍵 → out.txt 全沒寫、log 誤報「沒有 result 事件」、api_error_status／API 秒數讀不到。改成 `Get-PsOcResultEvent`（含字樣才解析、頂層 type＝result 才算），
 ps-session-lib 兩處與 ps-sdoc-diag 一處改用；test-claude-variant 加兩條。管理者照 prompt 在本機逐行改（scripts 三檔＋claude manifest 對應列）。

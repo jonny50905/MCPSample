@@ -25,7 +25,7 @@ $ErrorActionPreference = 'Stop'
 $script:GuardRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $script:ClaudeDir = Join-Path $script:GuardRoot '.claude'
 $script:CodeTarget = 'PS_TASK_TARGET_INVALID'
-$script:MainOnly = @('ps-orchestrator', 'ps-deep-research', 'ps-spec-worker', 'ps-clone-worker', 'ps-status-reader', 'ps-sdoc-worker', 'ps-spec-reader', 'ps-spec-judge')
+$script:MainOnly = @('ps-orchestrator', 'ps-deep-research', 'ps-spec-worker', 'ps-clone-worker', 'ps-status-reader', 'ps-sdoc-worker', 'ps-spec-reader', 'ps-spec-judge', 'ps-bizspec-writer', 'ps-bizspec-query')
 $script:SkillCarrier = @{ 'ps-security-flow' = 'ps-metadata-flow'; 'ps-data-lineage' = 'ps-metadata-flow'; 'ps-process-flow' = 'ps-metadata-flow' }
 $script:SkillPrimaryOnly = @('ps-business-discovery', 'ps-business-explain', 'ps-impact-analysis')
 
@@ -245,7 +245,13 @@ function Get-PsGuardPathPolicy {
             return @{ Read = @('.ps-runtime/sdoc/*/inbox/*', '.claude/peoplesoft/sdoc/judge-contract.md', '.claude/peoplesoft/sdoc/schemas-runtime/l5-judge.schema.json'); Write = @('.ps-runtime/sdoc/*/inbox/output.json'); Shell = $false }
         }
         'spec-author' {
-            return @{ Read = @('docs/ps-spec/*', '.ps-runtime/sdoc/*/job.json', '.ps-private/sdoc/*', '.claude/peoplesoft/sdoc/*.md', '.claude/peoplesoft/spec/support-codes.md'); Write = @(); Shell = $true }
+            return @{ Read = @('docs/ps-spec/*', '.ps-runtime/sdoc/*/job.json', '.ps-private/sdoc/*', '.claude/peoplesoft/sdoc/*.md', '.ps-runtime/bizspec/*/job.json', '.ps-private/bizspec/*', '.claude/peoplesoft/bizspec/*.md', '.claude/peoplesoft/spec/support-codes.md'); Write = @(); Shell = $true }
+        }
+        'bizspec-writer' {
+            return @{ Read = @('.ps-runtime/bizspec/*/orders/*', '.ps-runtime/bizspec/*/check/*', '.ps-private/bizspec/*', 'docs/ps-spec/biz-*', 'docs/ps-research/*', '.claude/peoplesoft/bizspec/*'); Write = @('docs/ps-spec/biz-*/0*.md', 'docs/ps-spec/biz-*/1*.md', 'docs/ps-spec/biz-*/README.md', 'docs/ps-spec/biz-*/appendix*.md', 'docs/ps-spec/biz-*/progress.md'); Shell = $false }
+        }
+        'bizspec-query' {
+            return @{ Read = @('.ps-runtime/bizspec/*/orders/*', 'docs/ps-spec/biz-*', 'docs/ps-research/*', '.claude/peoplesoft/*'); Write = @('docs/ps-spec/biz-*/evidence/Q-A-*.md'); Shell = $false }
         }
     }
     return $null
@@ -310,8 +316,8 @@ function Invoke-PsGuardPath {
         $cmd = ([string](Get-PsGuardProp $ti 'command')).Trim()
         $ok = $false
         # 參數只准三種詞：-開關、單引號包住的 Component 清單（英數 _ . $ # - , 空白）、數字——沒有串接、重導向、未加引號的變數
-        if ($policy.Shell -and $cmd -match "^powershell(\.exe)? -NoProfile -File scripts[\\/]ps-sdoc\.ps1((\s+-[A-Za-z]+)|(\s+'[A-Za-z0-9_.`$#, -]+')|(\s+[0-9]+))*\s*$") { $ok = $true }
-        if (-not $ok) { $deny = 'PS_PATH_DENIED：本代理只准執行「powershell -NoProfile -File scripts/ps-sdoc.ps1 <參數>」這一種命令，不得串接其他命令、重導向或變數。' }
+        if ($policy.Shell -and $cmd -match "^powershell(\.exe)? -NoProfile -File scripts[\\/]ps-(sdoc|bizspec)\.ps1((\s+-[A-Za-z]+)|(\s+'[A-Za-z0-9_.`$#, -]+')|(\s+[0-9]+))*\s*$") { $ok = $true }
+        if (-not $ok) { $deny = 'PS_PATH_DENIED：本代理只准執行「powershell -NoProfile -File scripts/ps-bizspec.ps1 <參數>」或 ps-sdoc.ps1 這一種命令，不得串接其他命令、重導向或變數。' }
     }
     if ($deny -ne '') {
         Write-PsGuardLog -Tool $tool -Agent $agent -Decision 'deny' -Code 'PS_PATH_DENIED' -Session $session

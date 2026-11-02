@@ -11,23 +11,23 @@
 - `claude-code/`：同一框架的 **Claude Code 版**（`CLAUDE.md`＋`.claude/`：agents／commands／skills／hooks／peoplesoft），
   部署到公司機時去掉 `claude-code/` 前綴；`scripts/` 兩版共用（`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 是否存在認版本）。
   說明與對照表見 `claude-code/README.md`。
-  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、agents ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）
-  兩版都有，`/ps-spec` 都走它（DOC1）：Claude Code 版的契約在 `claude-code/.claude/peoplesoft/sdoc/`；OpenCode 版在
-  `.opencode/peoplesoft/sdoc/`，外環加 `-Cli opencode`，人工輸入、執行狀態、產出與 log 各放 `*-opencode` 目錄
-  （與 Claude Code 版同一資料夾並存時各自一份工作），外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
-  單一 spec.md 的 CLONE1 仍可直接跑 `scripts/ps-spec-build.ps1`。
+  業務需求文件流程（BIZ1；`scripts/ps-bizspec*.ps1`、agents ps-bizspec-writer／ps-bizspec-query）兩版都有，`/ps-spec` 都走它：
+  寫手照兩版的 `peoplesoft/bizspec/standard.md`（第 0～10 章＋附錄，第 10 章是證據；與 `docs/business-spec/standard.md` 逐字相同）寫，
+  外環逐字比對證據摘錄、退回修正、補查「該問誰＝Spec 產製端」的開放假設（結果檔 evidence/Q-A-###.md 只有補查 session 能寫）。
+  OpenCode 版外環加 `-Cli opencode`，人工輸入、執行狀態、產出與 log 各放 `*-opencode` 目錄，模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
+  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、agents ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge，DOC1）
+  保留，直接跑 `scripts/ps-sdoc.ps1`；契約在兩版的 `peoplesoft/sdoc/`。單一 spec.md 的 CLONE1 仍可直接跑 `scripts/ps-spec-build.ps1`。
 - `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
   lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
   說明見 `rebuild-kit/HOW-TO-USE.md`。
 
 ## PeopleSoft 問題的處理方式
 
-要以一個或多個確切 Component 產生「供獨立 LLM 重建功能」的 Spec 文件（00-index、14 份文件、90 問題清單），走
+要以一個或多個確切 Component 產生業務需求文件（照 `.opencode/peoplesoft/bizspec/standard.md`：只談業務需求、每條需求有證據編號），走
 `/ps-spec <Component...>`（ps-spec-author），或在 ps-spec-author 對話直接輸入清單。
-此路徑不走整個領域研究、不要求手填私有 pack；人工輸入只有 `.ps-private/sdoc-opencode/<jobId>/` 的 status.md（狀態圖，必備）、
-project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft/sdoc/research-contract.md`，結論碼見
-`.opencode/peoplesoft/spec/support-codes.md` 的 DOC1；外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
-`docs/ps-spec-opencode/**`、`docs/ps-spec/**` 同為公司機密、禁止外部 remote；REVIEW_READY 不等於企業 E2E 通過。
+來源是知識層 `docs/ps-research/` 加人工輸入 `.ps-private/bizspec-opencode/<jobId>/` 的 status.md、project.md（選填）與 answers.md（業務窗口回覆）；
+結論碼見 `.opencode/peoplesoft/spec/support-codes.md` 的 BIZ1；外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
+`docs/ps-spec-opencode/**`、`docs/ps-spec/**` 同為公司機密、禁止外部 remote；BIZ1-7-01 不等於業務驗收通過。
 
 收到 PeopleSoft 業務問題（例：兵役資料在哪維護、某選項選了會執行什麼）時：
 
@@ -174,7 +174,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 - 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
   （.ps-runtime/**）是公司機密：研究產出只進**內部** git，後兩者連內部 git 都不進（已 gitignore，
   知識索引 docs/ps-research/knowledge/ 同為本機快取），嚴禁外部 remote 或公開貼出；
-  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1／DOC1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
+  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1／DOC1／BIZ1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
   不回報路徑、物件名、hash、requestId。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。

@@ -1,7 +1,7 @@
-# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1）
+# 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1／BIZ1）
 
 CLI 每個動詞的**最後一行**都是唯一的結論碼；上面的內容只在本機看。結論碼**不含**路徑、檔名、物件名、hash、requestId。
-形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC|CLONE|DOC)1-\d-\d\d(-\d+)?$`。
+形狀：`<家族>1-<stage>-<code>[-<count>]`，regex `^(KNOW|SUPP|SPEC|CLONE|DOC|BIZ)1-\d-\d\d(-\d+)?$`。
 公司機回報只回結論碼、drill tuple 與 PASS／FAIL；`.ps-private`、template／checklist 原文、NN 內容一律不出公司。
 
 ## KNOW1（scripts/ps-knowledge.ps1）
@@ -79,6 +79,25 @@ CLONE1 不使用 drill tuple。請勿將本機錯誤文字、generated 文件或
 | 9 | 02 | 環境、收據完整性、產物衝突等錯誤；詳細內容只在本機看 | 2 |
 
 DOC1 不使用 drill tuple。對外只回報結論碼與「欄位統計」行的計數；status.md、decisions.md、generated 文件、attempt 一律不出公司。
+
+## BIZ1（scripts/ps-bizspec.ps1：/ps-spec 的業務需求文件，照 bizspec/standard.md）
+
+| stage | code | 意義 | exit |
+|---|---|---|---|
+| 0 | 01 | 等來源：知識層 `docs/ps-research` 沒有提到這組 Component，`.ps-private/bizspec/<jobId>/` 的 status.md、project.md 也還是骨架；先研究或填好再同命令續跑 | 0 |
+| 0 | 02 | 尚未開始（Status 唯讀） | 0 |
+| 0 | 03 | 同一組 Component 的業務需求文件工作正在執行 | 3 |
+| 3 | 02-`<n>` | RUNNABLE，還有工作（寫作、修正、套回覆、補查、回填）；同命令繼續 | 0 |
+| 3 | 03 | SLOT_BUSY；模型服務被其他 session 使用，稍後續跑 | 1 |
+| 3 | 04 | SESSION_FAILED；已寫的檔保留。看輸出的 SESSION 判讀：強殺當下輸出仍在增加 → 用更大的 -TimeoutMin 續跑；其他 → 檢查 Claude Code、gateway 與 MCP 後續跑，錯誤訊息在 `.ps-runtime/bizspec-logs/` 的 .err.txt | 1 |
+| 3 | 07 | WRITE_DEFERRED；解除檔案占用後續跑 | 1 |
+| 4 | 03 | BLOCKED；外環檢查連續修正 3 輪仍未通過、寫手連續兩個 session 沒進度，或補查回填兩次仍缺；看「卡住」「檢查」行，處理後加 -Retry | 1 |
+| 5 | 01 | 外環檢查全過、補查已回填，仍有開放假設待業務窗口回覆；回覆寫進 `answers.md` 後同命令續跑 | 0 |
+| 7 | 01 | REVIEW_READY；外環檢查（證據逐字比對、引用、表頭、必要檔）全過、沒有開放假設，可人工審閱；不是業務驗收 | 0 |
+| 9 | 01 | 參數不合法；缺 `.claude/peoplesoft/bizspec/standard.md` | 2 |
+| 9 | 02 | 環境或產物錯誤；詳細內容只在本機看 | 2 |
+
+BIZ1 不使用 drill tuple。對外只回報結論碼與「欄位統計」行的計數；人工輸入、業務需求文件、證據、補查結果一律不出公司。
 
 ## SPEC1（scripts/ps-spec.ps1）
 

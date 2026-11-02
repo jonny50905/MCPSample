@@ -98,16 +98,18 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft') -File -
 }
 # sdoc/model.yaml 只有 OpenCode 版（Claude Code 版的模型在 .claude/settings.json）
 $ocOnly = @('sdoc/model.yaml')
-foreach ($sub in @('report-templates', 'spec', 'sdoc')) {
+foreach ($sub in @('report-templates', 'spec', 'sdoc', 'bizspec')) {
     foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc ('peoplesoft/' + $sub)) -File -Recurse)) {
         $rel = Get-RelUnder (Join-Path $oc 'peoplesoft') $f.FullName
         if ($ocOnly -contains $rel) { continue }
         if (-not (Test-Path -LiteralPath (Join-Path $cc ('.claude/peoplesoft/' + $rel)))) { $contractMiss += $rel }
     }
 }
-foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/peoplesoft/sdoc') -File -Recurse)) {
-    $rel = Get-RelUnder (Join-Path $cc '.claude/peoplesoft') $f.FullName
-    if (-not (Test-Path -LiteralPath (Join-Path $oc ('peoplesoft/' + $rel)))) { $contractMiss += ('OpenCode 版缺 ' + $rel) }
+foreach ($sub in @('sdoc', 'bizspec')) {
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc ('.claude/peoplesoft/' + $sub)) -File -Recurse)) {
+        $rel = Get-RelUnder (Join-Path $cc '.claude/peoplesoft') $f.FullName
+        if (-not (Test-Path -LiteralPath (Join-Path $oc ('peoplesoft/' + $rel)))) { $contractMiss += ('OpenCode 版缺 ' + $rel) }
+    }
 }
 Assert ($contractMiss.Count -eq 0) ("契約／模板／spec／sdoc 檔一一對應（SOP.md、README.md、test-scenarios.md 為人讀文件，不部署；sdoc/model.yaml 只有 OpenCode 版）" + $(if ($contractMiss.Count -gt 0) { '：缺 ' + ($contractMiss -join ',') } else { '' }))
 
@@ -129,15 +131,15 @@ foreach ($rel in $dataFiles) {
 Assert ($dataDiff.Count -eq 0) ("資料檔兩版逐字相同（domain map、研究佇列、spec 的 JSON 與範例 pack、sdoc 的 schema／範例／AI 指引）" + $(if ($dataDiff.Count -gt 0) { '：' + ($dataDiff -join ',') } else { '' }))
 # sdoc 契約兩版只差機制用語：標題逐行相同，OpenCode 版不出現 Claude Code 的工具名與路徑
 $sdocBad = @()
-foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/sdoc') -File -Filter '*.md')) {
-    $ccf = Join-Path $cc ('.claude/peoplesoft/sdoc/' + $f.Name)
+foreach ($f in @(@(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/sdoc') -File -Filter '*.md') + @(Get-ChildItem -LiteralPath (Join-Path $oc 'peoplesoft/bizspec') -File -Filter '*.md'))) {
+    $ccf = Join-Path $cc ('.claude/peoplesoft/' + $f.Directory.Name + '/' + $f.Name)
     if (-not (Test-Path -LiteralPath $ccf)) { continue }
     $ho = @((Read-Norm $f.FullName) -split "`n" | Where-Object { $_ -match '^#' }) -join "`n"
     $hc = @((Read-Norm $ccf) -split "`n" | Where-Object { $_ -match '^#' }) -join "`n"
     if ($ho -cne $hc) { $sdocBad += ($f.Name + ':標題不同') }
     if ((Read-Norm $f.FullName) -cmatch '\.claude/|mcp__|Agent 工具|子代理|\b(Read|Write|Grep|Glob|Bash)\b') { $sdocBad += ($f.Name + ':Claude Code 用語') }
 }
-Assert ($sdocBad.Count -eq 0) ("sdoc 契約兩版標題相同、OpenCode 版只用 OpenCode 的工具名與 .opencode 路徑" + $(if ($sdocBad.Count -gt 0) { '：' + ($sdocBad -join '，') } else { '' }))
+Assert ($sdocBad.Count -eq 0) ("sdoc／bizspec 契約兩版標題相同、OpenCode 版只用 OpenCode 的工具名與 .opencode 路徑" + $(if ($sdocBad.Count -gt 0) { '：' + ($sdocBad -join '，') } else { '' }))
 function Get-YamlKeyLines([string]$Path) {
     $out = @()
     foreach ($ln in @((Read-Norm $Path) -split "`n")) {
@@ -150,8 +152,8 @@ function Get-YamlKeyLines([string]$Path) {
 Assert ((Get-YamlKeyLines (Join-Path $oc 'peoplesoft/customization-profile.yaml')) -ceq (Get-YamlKeyLines (Join-Path $cc '.claude/peoplesoft/customization-profile.yaml'))) "customization-profile.yaml 去註解後鍵值逐行相同（公司機可把已回填的值原樣抄過去）"
 
 $subagents = @('ps-ui-flow', 'ps-peoplecode-flow', 'ps-sql-flow', 'ps-sqr-flow', 'ps-ae-flow', 'ps-metadata-flow', 'ps-auditor')
-$dbMain = @('ps-orchestrator', 'ps-deep-research', 'ps-clone-worker', 'ps-sdoc-worker')
-$pathProfiles = @{ 'ps-spec-worker' = 'spec-worker'; 'ps-clone-worker' = 'clone-worker'; 'ps-spec-author' = 'spec-author'; 'ps-status-reader' = 'status-reader'; 'ps-sdoc-worker' = 'sdoc-worker'; 'ps-spec-reader' = 'spec-reader'; 'ps-spec-judge' = 'spec-judge' }
+$dbMain = @('ps-orchestrator', 'ps-deep-research', 'ps-clone-worker', 'ps-sdoc-worker', 'ps-bizspec-writer', 'ps-bizspec-query')
+$pathProfiles = @{ 'ps-spec-worker' = 'spec-worker'; 'ps-clone-worker' = 'clone-worker'; 'ps-spec-author' = 'spec-author'; 'ps-status-reader' = 'status-reader'; 'ps-sdoc-worker' = 'sdoc-worker'; 'ps-spec-reader' = 'spec-reader'; 'ps-spec-judge' = 'spec-judge'; 'ps-bizspec-writer' = 'bizspec-writer'; 'ps-bizspec-query' = 'bizspec-query' }
 $fmBad = @()
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $cc '.claude/agents') -File -Filter '*.md')) {
     $fm = Get-Frontmatter $f.FullName
@@ -206,6 +208,7 @@ if ($null -ne $settings) {
     Assert ($postCmd -match '-Mode post$') "settings：PostToolUse hook 掛 Agent 回傳"
     Assert ([string]$settings.env.BASH_MAX_TIMEOUT_MS -eq '7200000') "settings：Bash 上限 2 小時（ps-spec-author 的 ps-sdoc 長跑）"
     Assert ($allow -contains 'Bash(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)' -and $allow -contains 'Edit(./.ps-runtime/sdoc/**)') "settings：ps-spec-author 可跑 ps-sdoc、headless worker 可寫 .ps-runtime/sdoc"
+    Assert ($allow -contains 'Bash(powershell -NoProfile -File scripts/ps-bizspec.ps1 *)' -and $allow -contains 'PowerShell(powershell -NoProfile -File scripts/ps-bizspec.ps1 *)' -and $allow -contains 'Edit(./docs/ps-spec/**)') "settings：ps-spec-author 可跑 ps-bizspec、headless 寫手與補查可寫 docs/ps-spec"
 }
 $hookPath = Join-Path $cc '.claude/hooks/ps-runtime-guard.ps1'
 $hb = [System.IO.File]::ReadAllBytes($hookPath)
@@ -313,7 +316,23 @@ try {
     Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A,TW_B' -MaxSessions 4") "path spec-author：ps-sdoc 命令 → 放行"
     Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A,TW_B' -MaxSessions 1 -TimeoutMin 90") "path spec-author：ps-sdoc 帶 -MaxSessions 1 -TimeoutMin <n> → 放行"
     $saTxt = Read-Norm (Join-Path $cc '.claude/agents/ps-spec-author.md')
-    Assert ($saTxt -match 'ps-sdoc\.ps1 -Components ''TW_DEMO_A,TW_DEMO_B'' -MaxSessions 1\D' -and $saTxt -notmatch '-MaxSessions [2-9]' -and $saTxt -match '1～110' -and $saTxt -match 'DOC1-3-04') "ps-spec-author：每次呼叫只跑一個 session、-TimeoutMin 上限 110（Bash 工具 2 小時內）、DOC1-3-04 轉述判讀"
+    Assert ($saTxt -match 'ps-bizspec\.ps1 -Components ''TW_DEMO_A,TW_DEMO_B'' -MaxSessions 1\D' -and $saTxt -notmatch '-MaxSessions [2-9]' -and $saTxt -match '1～110' -and $saTxt -match 'BIZ1-3-04' -and $saTxt -match 'bizspec/standard\.md') "ps-spec-author：/ps-spec 走 ps-bizspec、每次呼叫只跑一個 session、-TimeoutMin 上限 110（Bash 工具 2 小時內）、BIZ1-3-04 轉述判讀"
+    Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-bizspec.ps1 -Components 'TW_A,TW_B' -MaxSessions 1 -NoQuery") "path spec-author：ps-bizspec 命令 → 放行"
+    Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-bizspec.ps1 -Components 'TW_A' | out-file x")) "path spec-author：ps-bizspec 串接管線 → 擋"
+    Assert (Test-PathHook 'spec-author' 'Read' 'file_path' (Join-Path $dep '.ps-private/bizspec/biz-0123456789abcdef/answers.md')) "path spec-author：讀業務需求文件的人工輸入檔 → 放行"
+    $bj = 'docs/ps-spec/biz-0123456789abcdef'
+    Assert (Test-PathHook 'bizspec-writer' 'Read' 'file_path' (Join-Path $dep '.ps-runtime/bizspec/biz-0123456789abcdef/orders/o0001.md')) "path bizspec-writer：讀工單 → 放行"
+    Assert (Test-PathHook 'bizspec-writer' 'Read' 'file_path' (Join-Path $dep 'docs/ps-research/x/01-A.md')) "path bizspec-writer：讀知識層 → 放行"
+    Assert (Test-PathHook 'bizspec-writer' 'Write' 'file_path' (Join-Path $dep ($bj + '/05-4-rules.md'))) "path bizspec-writer：寫章節檔 → 放行"
+    Assert (Test-PathHook 'bizspec-writer' 'Write' 'file_path' (Join-Path $dep ($bj + '/10-evidence.md'))) "path bizspec-writer：寫證據章 → 放行"
+    Assert (Test-PathHook 'bizspec-writer' 'Edit' 'file_path' (Join-Path $dep ($bj + '/progress.md'))) "path bizspec-writer：改 progress.md → 放行"
+    Assert (-not (Test-PathHook 'bizspec-writer' 'Write' 'file_path' (Join-Path $dep ($bj + '/evidence/Q-A-001.md')))) "path bizspec-writer：寫補查結果檔 → 擋"
+    Assert (-not (Test-PathHook 'bizspec-writer' 'Write' 'file_path' (Join-Path $dep '.ps-private/bizspec/biz-0123456789abcdef/answers.md'))) "path bizspec-writer：寫人工輸入檔 → 擋"
+    Assert (-not (Test-PathHook 'bizspec-writer' 'Write' 'file_path' (Join-Path $dep 'docs/ps-research/x/01-A.md'))) "path bizspec-writer：寫知識層 → 擋"
+    Assert (-not (Test-PathHook 'bizspec-writer' 'Bash' 'command' 'dir')) "path bizspec-writer：Bash → 擋"
+    Assert (Test-PathHook 'bizspec-query' 'Write' 'file_path' (Join-Path $dep ($bj + '/evidence/Q-A-003.md'))) "path bizspec-query：寫補查結果檔 → 放行"
+    Assert (-not (Test-PathHook 'bizspec-query' 'Write' 'file_path' (Join-Path $dep ($bj + '/10-evidence.md')))) "path bizspec-query：寫證據章 → 擋"
+    Assert (Test-PathHook 'bizspec-query' 'Read' 'file_path' '.claude/peoplesoft/bizspec/query-contract.md') "path bizspec-query：讀補查契約 → 放行"
     Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A'; del x")) "path spec-author：串接命令 → 擋"
     Assert (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components 'TW_A`$X,TW#B' -Status") "path spec-author：Component 名含 `$／#（單引號內）→ 放行"
     Assert (-not (Test-PathHook 'spec-author' 'Bash' 'command' "powershell -NoProfile -File scripts/ps-sdoc.ps1 -Components `$(whoami)")) "path spec-author：未加引號的變數／子命令 → 擋"

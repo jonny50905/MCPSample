@@ -77,7 +77,7 @@ hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`�
 | 業務問答 | `claude --agent ps-orchestrator` |
 | 產完整業務文件 | `claude --agent ps-deep-research`，進去後 `/ps-research <領域>`（或一行：`claude --agent ps-deep-research "/ps-research <領域>"`） |
 | 稽核／教訓／知識指正 | 同上的主代理，`/ps-audit <領域>`、`/ps-lesson <描述>`、`/ps-correct <正確知識>` |
-| 以 Component 產 Spec 文件（00-index＋14 份＋90） | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單；見下方「Spec 文件」 |
+| 以 Component 產業務需求文件（照 bizspec/standard.md，含證據章） | `/ps-spec <Component...>`（委派 ps-spec-author），或 `claude --agent ps-spec-author` 直接輸入清單；見下方「業務需求文件」 |
 | 框架維護、排錯、看 log | `claude`（一般 session，沒有主代理的工具限制；改了框架檔記得回報維護端） |
 | 無人看管跑批 | 不變：`scripts\ps-auto-loop.ps1`、`ps-auto-all.ps1`、`ps-supplemental.ps1`、`ps-spec.ps1 -Run`——外環自動改開 `claude -p --agent …` |
 
@@ -96,7 +96,7 @@ hook 指令是 `powershell -NoProfile -File .claude/hooks/ps-runtime-guard.ps1`�
 | oracleMCP 掛載故障 | `/mcps` 重掛；plugin 可受控自動重掛 | 該 session 打 `/mcp` 選 oracleMCP 重新連線；**沒有自動重掛**（profile 的 `mcpAutoRecover` 不使用） |
 | 外環 headless | `opencode run --command X "<參數>"` | `claude -p --agent <主代理> --permission-mode dontAsk --output-format stream-json --verbose "/X <參數>"` |
 | headless 權限 | 全域 opencode.json 的 permission | `.claude/settings.json`：允許 MCP 查詢工具、寫 `docs/ps-research/**`／`.ps-runtime/spec/**`／`.ps-runtime/clone-spec/**`／`.ps-runtime/sdoc/**`、ps-spec-build 與 ps-sdoc 命令；拒絕 oracleMCP 的 `oracle_list_schemas`／`oracle_list_tables`／`oracle_describe_table`／`oracle_get_table_data`、WebFetch、WebSearch；其餘在 headless 一律自動拒絕 |
-| `/ps-spec` | ps-spec-build（CLONE1：單一 spec.md） | ps-sdoc（DOC1：00-index＋14 份文件＋90 問題清單；本版獨有） |
+| `/ps-spec` | ps-bizspec（BIZ1：業務需求文件，`-Cli opencode`） | ps-bizspec（BIZ1：業務需求文件） |
 | session 紀錄 | out／err／rc | 另有 `<時間>-<tag>.stream.jsonl`（完整事件流）；`.out.txt` 是抽出的最終回覆（稽核 stdout 回收照舊） |
 | 教訓帳本 | `lessons/applied.md`（L 編號） | 本機帳本 `.claude/peoplesoft/lessons/applied.md`（C 編號；維護端主帳本另計） |
 | 模型 | 本機部署模型 | `settings.json` 的 `model: sonnet`；外環 `-Model` 透傳 `--model` |
@@ -107,9 +107,22 @@ SOP 編號照用；有差異的只有：
 - **SOP-17**（無人看管權限）：改看 `.claude/settings.json` 的允許清單與上面第 4 步的信任；要臨時換權限模式設 `$env:PS_CLAUDE_PERMISSION_MODE`（只接受 dontAsk／acceptEdits／default／auto／bypassPermissions）。
 - **SOP-21**（掛載故障）：`/mcp` → oracleMCP → 重新連線；hook 紀錄在 `auto-loop-logs\ps-runtime-guard\hook-<日期>.jsonl`（只記工具名、代理名、決策與錯誤碼）。
 
-## Spec 文件（本版獨有）
+## 業務需求文件（/ps-spec）
 
-`/ps-spec <Component...>` 產生給另一個 LLM 重建功能用的 Spec 文件：00-index（入口）、01～09、14、16～19 共 14 份，加 90 問題清單。
+`/ps-spec <Component...>` 走 `scripts\ps-bizspec.ps1`（結論碼 BIZ1）：寫手照 `.claude\peoplesoft\bizspec\standard.md` 寫業務需求文件
+（第 0～10 章＋附錄；只談業務需求；每條需求與假設都有證據編號，第 10 章逐字摘錄來源原文）。外環逐字比對證據、不合格退回修正，
+對「該問誰＝Spec 產製端」的開放假設開補查 session（`ps-bizspec-query` 委派 ps-* 子代理查證，只寫 `evidence\Q-A-###.md`），再請寫手回填。
+
+1. 第一次執行在 `.ps-private\bizspec\<jobId>\` 建 status.md、project.md（選填）與 answers.md（業務窗口回覆）。
+   來源是知識層 `docs\ps-research\` 加已填的人工輸入；兩者都沒有時結論碼 `BIZ1-0-01`。
+2. 同一份清單續跑：ps-spec-author 每次呼叫只跑一個 session，`BIZ1-3-02-<n>` 時自動續跑；產出在 `docs\ps-spec\<jobId>\README.md`（jobId＝`biz-` 開頭）。
+3. `BIZ1-5-01`：還有開放假設 → 把 07-assumptions.md 交業務窗口，回覆寫進 answers.md 後同命令續跑；`BIZ1-7-01`：外環檢查全過、沒有開放假設，可人工審閱（不是業務驗收）。
+4. 執行狀態在 `.ps-runtime\bizspec\<jobId>\`（工單、檢查結果、補查帳本與副本），log 在 `.ps-runtime\bizspec-logs\`。操作程序見 SOP-31。
+
+## Spec 文件（直接執行 ps-sdoc.ps1；DOC1）
+
+下面的 Spec 文件流程保留，直接在 PowerShell 跑 `scripts\ps-sdoc.ps1 -Components '…'`（`/ps-spec` 已改走上面的業務需求文件）。
+它產生給另一個 LLM 重建功能用的 Spec 文件：00-index（入口）、01～09、14、16～19 共 14 份，加 90 問題清單。
 
 1. 第一次執行會在 `.ps-private\sdoc\<jobId>\` 建四個檔的骨架，結論碼 `DOC1-0-01`：
    - `status.md`：把這組 Component 的狀態圖（Mermaid flowchart 或 stateDiagram-v2，畫法不限）與圖下的說明貼進來，刪掉第一行的 `SDOC:SKELETON` 標記。必備。

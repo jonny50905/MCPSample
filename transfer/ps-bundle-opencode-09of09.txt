@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 9／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c9f3db7）第 9／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|9|9|1716|af02490dc6b4d842c2d9d9572f141121a80d2b44523301839152720b155d0402
+@@@PSBUNDLE-PART|1|opencode|c9f3db7|b60bac9268ae117f|9|9|1758|cb6fe75583dcdcf6024b10ad81ade9a8ac978445583032f322d94f2abe998159
 @@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|554|cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
@@ -557,10 +557,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|960|3b81b832606a35b7b544c43c462dcee644e3b22d7ee6ae74f97c57ab60fb28a5|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|1002|067638fb8bfaa611c38589e04a60629d3a0571406717faaeb0f95cfe2cd4288b|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "44b885e",
+  "commit": "c9f3db7",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -596,6 +596,18 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
       "path": ".opencode/agent/ps-auditor.md",
       "lines": 266,
       "sha256": "23db6a6c449c9dc0f9b58216d4099baa9ab12aadf6efad107296d8f5ef6aae6d",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-bizspec-query.md",
+      "lines": 64,
+      "sha256": "376d5d964dc44389ff09cbd611c050b77f6b28be287988822ecc5e6e12855af9",
+      "bom": false
+    },
+    {
+      "path": ".opencode/agent/ps-bizspec-writer.md",
+      "lines": 66,
+      "sha256": "ee000e91a73f4b17b03dab7695e89452320fbe0037fb9e3adec7f6648da9f719",
       "bom": false
     },
     {
@@ -636,8 +648,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-spec-author.md",
-      "lines": 84,
-      "sha256": "3fc22300cb9e1df1833fb34e0713d2e86b028c4c6a5dc16c29e2582c135b2334",
+      "lines": 82,
+      "sha256": "aed47554b9e4b98efc4bf6f51f107aeeb24c09031be1a244421f3bd2d223c6a3",
       "bom": false
     },
     {
@@ -733,13 +745,25 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/command/ps-spec.md",
       "lines": 13,
-      "sha256": "d15dff3a59990f7069dc6858aeac242e6093db98ab147b370e8b32241bf6f24e",
+      "sha256": "8d85e8bf67ee2d20863ada7c78b8c8858cdc390e0a5cd297949ef2e49f09b619",
       "bom": false
     },
     {
       "path": ".opencode/command/ps-supplement.md",
       "lines": 27,
       "sha256": "d6c09782829bb2723a4b66733296bbafa27ba13b661aec08a832fb2e58e0b4a7",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/bizspec/query-contract.md",
+      "lines": 50,
+      "sha256": "d137c139bbc2d78e9d806345814f8d3ccbb26e16d65b3f51b1dd14f195aca7c9",
+      "bom": false
+    },
+    {
+      "path": ".opencode/peoplesoft/bizspec/standard.md",
+      "lines": 1225,
+      "sha256": "b8574f7331894bf679936264313442f0d001befc9ec625be7ef9becc405b80fe",
       "bom": false
     },
     {
@@ -762,8 +786,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4314,
-      "sha256": "01065fc2df87c8fd709a443f697945ca526e2f030842148fe6618cff79d103e2",
+      "lines": 4333,
+      "sha256": "d0251ef182b30d07ca1916b64a2af5862333d081458339a3d81e8810732302d9",
       "bom": false
     },
     {
@@ -792,8 +816,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/README.md",
-      "lines": 341,
-      "sha256": "d2d0bfb14925d8d071a758239d4a337ac4a57f5efdb76bf62fb93ef1dd3208c8",
+      "lines": 346,
+      "sha256": "0cbecbe515867446fe1cbc6e54729efdf01ef7de9ceb6c4e2cdd94554164317d",
       "bom": false
     },
     {
@@ -1080,8 +1104,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1303,
-      "sha256": "c3bd7b0f493b4eaae38094448c3f60fc91643a45596812f804c7b8c12558b093",
+      "lines": 1348,
+      "sha256": "f468f665720c87a7aedaed1b73736c08495c0d71ba4fb2f420d82fb30e057199",
       "bom": false
     },
     {
@@ -1141,7 +1165,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "a0ca9a554c39ad637ce3fb6a64453e001eff0587c54d4f297c42f62c9819800a",
+      "sha256": "965b792b30fcb1cedd02fb606c8a8b334f018cf96ff000b94eb01681b3356506",
       "bom": false
     },
     {
@@ -1152,8 +1176,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "lines": 210,
-      "sha256": "bd1636db6bfa690f805d231ae9e45b871061e71af90c30868237033de2c0faf3",
+      "lines": 229,
+      "sha256": "080db6ad65e33ff385afcc4245d26ee8483aee477f110e2c3371daad09476c0a",
       "bom": false
     },
     {
@@ -1261,7 +1285,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": "scripts/ps-agent-doc-lint.ps1",
       "lines": 57,
-      "sha256": "b562267fee941ea73fd343971a0e69fcb71db2a3584a80a2db12ae515451abd9",
+      "sha256": "63d6e01b046087f0577fb5d561bdb4581178251d81db7e50dec10edc1b4bb7b6",
       "bom": true
     },
     {
@@ -1274,6 +1298,18 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
       "path": "scripts/ps-auto-loop.ps1",
       "lines": 2647,
       "sha256": "32e7021348faf1330e4ecf739231286a93f29faa3b27b7f4af6d2b6bb3381e9d",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-bizspec-lib.ps1",
+      "lines": 421,
+      "sha256": "72532d9fabcd5af520ddc0f5856100d95948995b385369369f8e383ed7686695",
+      "bom": true
+    },
+    {
+      "path": "scripts/ps-bizspec.ps1",
+      "lines": 541,
+      "sha256": "d6a74ed7c1a5f8b9b0189ab6e4482d5c562537f5c2dae01d64ba134e1967537c",
       "bom": true
     },
     {
@@ -1427,6 +1463,12 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
       "bom": true
     },
     {
+      "path": "scripts/tests/test-bizspec.ps1",
+      "lines": 252,
+      "sha256": "e79373f99442521f1880f8621293e22df20d660181ee4d57834033ead2420070",
+      "bom": true
+    },
+    {
       "path": "scripts/tests/test-bundle.ps1",
       "lines": 263,
       "sha256": "959fc4c89aa9846aeb4a7c92b656602a3c07227863af1ad6b7487f46c98f7273",
@@ -1434,8 +1476,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 598,
-      "sha256": "f6c068c0f2b46ced58bc486c80a324ec733514ebe9002e26573da6d70d4b047b",
+      "lines": 617,
+      "sha256": "20ced9a57d2a939bad7ab4b63a63a17c1ee41d867c140e8dd4829ef81a2aaaec",
       "bom": true
     },
     {
@@ -1519,7 +1561,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   ]
 }
 @@@PSBUNDLE-END|scripts/ps-transfer-manifest.json
-@@@PSBUNDLE-FILE|AGENTS.md|195|893c7514f621c406f10469a397ad2a2b8f28bfcf7013f6e3584ec7afa8ba42e8|0
+@@@PSBUNDLE-FILE|AGENTS.md|195|dc3ace8835f7b721581cc6c06b16fbfa7a26455f6ae38f50b7567b65230a5cbd|0
 # AGENTS.md — OpenCode 專案指引
 
 ## 這個 repo 是什麼
@@ -1533,23 +1575,23 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
 - `claude-code/`：同一框架的 **Claude Code 版**（`CLAUDE.md`＋`.claude/`：agents／commands／skills／hooks／peoplesoft），
   部署到公司機時去掉 `claude-code/` 前綴；`scripts/` 兩版共用（`ps-cli-lib.ps1` 依 `.claude/peoplesoft` 是否存在認版本）。
   說明與對照表見 `claude-code/README.md`。
-  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、agents ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge）
-  兩版都有，`/ps-spec` 都走它（DOC1）：Claude Code 版的契約在 `claude-code/.claude/peoplesoft/sdoc/`；OpenCode 版在
-  `.opencode/peoplesoft/sdoc/`，外環加 `-Cli opencode`，人工輸入、執行狀態、產出與 log 各放 `*-opencode` 目錄
-  （與 Claude Code 版同一資料夾並存時各自一份工作），外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
-  單一 spec.md 的 CLONE1 仍可直接跑 `scripts/ps-spec-build.ps1`。
+  業務需求文件流程（BIZ1；`scripts/ps-bizspec*.ps1`、agents ps-bizspec-writer／ps-bizspec-query）兩版都有，`/ps-spec` 都走它：
+  寫手照兩版的 `peoplesoft/bizspec/standard.md`（第 0～10 章＋附錄，第 10 章是證據；與 `docs/business-spec/standard.md` 逐字相同）寫，
+  外環逐字比對證據摘錄、退回修正、補查「該問誰＝Spec 產製端」的開放假設（結果檔 evidence/Q-A-###.md 只有補查 session 能寫）。
+  OpenCode 版外環加 `-Cli opencode`，人工輸入、執行狀態、產出與 log 各放 `*-opencode` 目錄，模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
+  Spec 文件流程（00-index＋14 份＋90；`scripts/ps-sdoc*.ps1`、agents ps-status-reader／ps-sdoc-worker／ps-spec-reader／ps-spec-judge，DOC1）
+  保留，直接跑 `scripts/ps-sdoc.ps1`；契約在兩版的 `peoplesoft/sdoc/`。單一 spec.md 的 CLONE1 仍可直接跑 `scripts/ps-spec-build.ps1`。
 - `rebuild-kit/`：拿公司 Spec 在**新專案**重建 JO 的 prompt 套件（.NET＋React＋MariaDB 本機 MVP；
   lead／reviewer 用 Opus、dev 用 Sonnet）。複製到新專案使用，不在本 repo 執行；不假設 Spec 格式。
   說明見 `rebuild-kit/HOW-TO-USE.md`。
 
 ## PeopleSoft 問題的處理方式
 
-要以一個或多個確切 Component 產生「供獨立 LLM 重建功能」的 Spec 文件（00-index、14 份文件、90 問題清單），走
+要以一個或多個確切 Component 產生業務需求文件（照 `.opencode/peoplesoft/bizspec/standard.md`：只談業務需求、每條需求有證據編號），走
 `/ps-spec <Component...>`（ps-spec-author），或在 ps-spec-author 對話直接輸入清單。
-此路徑不走整個領域研究、不要求手填私有 pack；人工輸入只有 `.ps-private/sdoc-opencode/<jobId>/` 的 status.md（狀態圖，必備）、
-project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft/sdoc/research-contract.md`，結論碼見
-`.opencode/peoplesoft/spec/support-codes.md` 的 DOC1；外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
-`docs/ps-spec-opencode/**`、`docs/ps-spec/**` 同為公司機密、禁止外部 remote；REVIEW_READY 不等於企業 E2E 通過。
+來源是知識層 `docs/ps-research/` 加人工輸入 `.ps-private/bizspec-opencode/<jobId>/` 的 status.md、project.md（選填）與 answers.md（業務窗口回覆）；
+結論碼見 `.opencode/peoplesoft/spec/support-codes.md` 的 BIZ1；外環 session 的模型只在 `.opencode/peoplesoft/sdoc/model.yaml` 設定。
+`docs/ps-spec-opencode/**`、`docs/ps-spec/**` 同為公司機密、禁止外部 remote；BIZ1-7-01 不等於業務驗收通過。
 
 收到 PeopleSoft 業務問題（例：兵役資料在哪維護、某選項選了會執行什麼）時：
 
@@ -1696,7 +1738,7 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
 - 研究產出（docs/ps-research/**）、Spec 私有需求包（.ps-private/**）與 Spec 執行狀態
   （.ps-runtime/**）是公司機密：研究產出只進**內部** git，後兩者連內部 git 都不進（已 gitignore，
   知識索引 docs/ps-research/knowledge/ 同為本機快取），嚴禁外部 remote 或公開貼出；
-  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1／DOC1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
+  對維護端只回報結論碼（KNOW1／SUPP1／SPEC1／CLONE1／DOC1／BIZ1，見 `.opencode/peoplesoft/spec/support-codes.md`）與 enum 值，
   不回報路徑、物件名、hash、requestId。
 - `scripts/*.ps1` 一律 **UTF-8 with BOM**（PS 5.1 無 BOM 會把中文
   誤解析成語法錯誤）；repo 禁放執行檔與「繞過」類字串（SOP-2／3）。
@@ -1716,5 +1758,5 @@ project.md、decisions.md、approvals.md。研究規則依 `.opencode/peoplesoft
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|158|23288ce91b0e390737bec5427815ab10ccc88f1dc6c83a0d767889a6640e1c3f
-@@@PSBUNDLE-PART-END|6696b1a48bf32e64|9|9
+@@@PSBUNDLE-EOF|165|f17d346960436b20cb52796fdf1a624af3e3c7e82812b3d91d2ffc7819d73c08
+@@@PSBUNDLE-PART-END|b60bac9268ae117f|9|9

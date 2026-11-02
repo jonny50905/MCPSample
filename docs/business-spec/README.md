@@ -1,5 +1,9 @@
 # 業務需求文件撰寫規範：使用說明（給管理者）
 
+> 這份規範已是 `/ps-spec` 的產出格式：兩版框架的 `peoplesoft/bizspec/standard.md` 與本目錄的 `standard.md` 逐字相同，
+> `/ps-spec` 由外環 `scripts/ps-bizspec.ps1` 開 Sonnet session 照它寫、逐字比對第 10 章證據、補查並回填（操作見 SOP-31）。
+> 下面是不經框架、直接拿規範給 Sonnet 用的方式。
+
 `standard.md` 是一份給 Sonnet 照做的規範：把一組來源 Spec 整理成一份**只談業務需求、不談系統設計**的業務需求文件。
 不綁定業務領域、模組或技術棧；來源 Spec 的格式也不限（一組 md、單一檔、csv 都可以）。
 
@@ -19,6 +23,7 @@
 | 7 | 缺口、矛盾與假設（A-###）、來源問題清單對照、怎麼關閉 | `07-assumptions.md` |
 | 8 | Spec 改版怎麼處理 | `08-spec-change.md` |
 | 9 | 驗收情境（ACC）、業務人員驗收紀錄、本期完成判定 | `09-acceptance.md` |
+| 10 | 證據：每條需求與假設引用的來源原文（`E-###`，逐字摘錄）；補查紀錄 | `10-evidence.md` |
 | 附錄 | 名詞表、Spec 文件用途速查、範本、參考文件 | `appendix.md` |
 
 另有 `progress.md`：Sonnet 自己的進度檔，用來中斷後續寫。

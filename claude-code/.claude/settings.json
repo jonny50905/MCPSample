@@ -18,7 +18,10 @@
       "Bash(powershell -NoProfile -File scripts/ps-spec-build.ps1 *)",
       "PowerShell(powershell -NoProfile -File scripts/ps-spec-build.ps1 *)",
       "Bash(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)",
-      "PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)"
+      "PowerShell(powershell -NoProfile -File scripts/ps-sdoc.ps1 *)",
+      "Edit(./docs/ps-spec/**)",
+      "Bash(powershell -NoProfile -File scripts/ps-bizspec.ps1 *)",
+      "PowerShell(powershell -NoProfile -File scripts/ps-bizspec.ps1 *)"
     ],
     "deny": [
       "mcp__oracleMCP__oracle_list_schemas",

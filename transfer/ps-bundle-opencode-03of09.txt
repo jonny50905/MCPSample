@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 44b885e）第 3／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit c9f3db7）第 3／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|44b885e|6696b1a48bf32e64|3|9|13594|64478c5eb1b4cd700b595725da0b57575cbca52a7f27c920f373ef258fc9ff39
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/README.md|341|d2d0bfb14925d8d071a758239d4a337ac4a57f5efdb76bf62fb93ef1dd3208c8|0
+@@@PSBUNDLE-PART|1|opencode|c9f3db7|b60bac9268ae117f|3|9|13599|287e6256aa3666d7c51d1d3295f1081d5c8fa8f9eb16bd903ad53ce330008724
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/README.md|346|0cbecbe515867446fe1cbc6e54729efdf01ef7de9ceb6c4e2cdd94554164317d|0
 # PeopleSoft Skills：客製化優先、UI 業務語意與長文本檢索
 
 依《PeopleSoft Skill Plan Addendum：客製化優先、UI 業務語意與長文本檢索》實作
@@ -30,8 +30,9 @@
 │  ├─ knowledge-retrieval-contract.md  問答讀取 wiki＋NN 研究文件的契約（索引定位、片段讀取、來源表）
 │  ├─ supplemental-contract.md         補研究收據契約（事實類別→委派鏈、三張表、硬規則）
 │  ├─ spec/                            Spec 引擎公開部分：capabilities.json（能力目錄）、pack.schema.json、
-│  │                                   support-codes.md（KNOW1／SUPP1／SPEC1／CLONE1／DOC1 結論碼＋CAP-REQ）、troubleshooting-matrix.md、examples/
-│  ├─ sdoc/                            Spec 文件流程（/ps-spec → scripts/ps-sdoc.ps1 -Cli opencode）：狀態圖解讀、研究、覆核、
+│  │                                   support-codes.md（KNOW1／SUPP1／SPEC1／CLONE1／DOC1／BIZ1 結論碼＋CAP-REQ）、troubleshooting-matrix.md、examples/
+│  ├─ bizspec/                         業務需求文件（/ps-spec → scripts/ps-bizspec.ps1 -Cli opencode）：standard.md（規範，含第 10 章證據）、query-contract.md（補查）
+│  ├─ sdoc/                            Spec 文件流程（直接執行 scripts/ps-sdoc.ps1 -Cli opencode）：狀態圖解讀、研究、覆核、
 │  │                                   乾淨讀者、判定的契約，schemas／schemas-runtime、每單元範例、ai-instructions.json；
 │  │                                   model.yaml＝外環 session 用的模型（唯一要填的地方）
 │  ├─ report-templates/
@@ -56,7 +57,9 @@
 │  ├─ ps-metadata-flow.md              Subagent：血緣 / 排程 / 授權（三合一）
 │  ├─ ps-auditor.md                    Subagent：稽核（證據解引用 / claim 反駁 / 換角度盤點）
 │  ├─ ps-spec-worker.md                Primary（只由 ps-spec 外環以 --command ps-spec-batch 啟動）：Spec 片段組表，只讀 .ps-runtime/spec、只寫 fragment.md
-│  ├─ ps-spec-author.md                All：/ps-spec 入口，只准執行 scripts/ps-sdoc.ps1 -Cli opencode …，回報文件位置與缺口
+│  ├─ ps-spec-author.md                All：/ps-spec 入口，只准執行 scripts/ps-bizspec.ps1 -Cli opencode …，回報文件位置與缺口
+│  ├─ ps-bizspec-writer.md             Primary（只由 ps-bizspec 外環以 --agent 啟動）：業務需求文件寫手，只寫該工作的輸出資料夾（evidence/ 除外）
+│  ├─ ps-bizspec-query.md              Primary（同上）：補查一筆假設，委派 flow subagent 查證，只寫 evidence/Q-A-###.md
 │  ├─ ps-status-reader.md              Primary（只由 ps-sdoc 外環以 --agent 啟動）：狀態圖讀者，只讀 inbox 與 status.md、只寫 inbox 的解讀檔
 │  ├─ ps-sdoc-worker.md                Primary（同上）：一頁研究或獨立覆核，委派 flow subagent 查證，只寫該 attempt 的 output.json
 │  ├─ ps-spec-reader.md                Primary（同上）：L5 乾淨讀者，只讀 inbox 的渲染後文件
@@ -72,7 +75,7 @@
 │  ├─ ps-correct.md                    /ps-correct <正確知識> — 人工指正的業務知識更新 wiki（human 來源＋verified）
 │  ├─ ps-supplement.md                 /ps-supplement <領域> — 補研究（auto-loop -SupplementalOnly 專用；依工單只寫收據）
 │  ├─ ps-spec-batch.md                 /ps-spec-batch <jobId>-<attemptId> — Spec 片段（ps-spec -Run 專用；只寫 fragment.md）
-│  └─ ps-spec.md                       /ps-spec <Component...> — Spec 文件（00-index＋14 份＋90；交 ps-spec-author）
+│  └─ ps-spec.md                       /ps-spec <Component...> — 業務需求文件（bizspec/standard.md，含證據章；交 ps-spec-author）
 └─ skills/
    ├─ ps-business-discovery/SKILL.md   業務問題 → 根物件（入口）
    ├─ ps-ui-flow/SKILL.md              UI 結構 + 語意（顯示文字、選項）
@@ -222,10 +225,12 @@ Obsidian 桌面版可直接開 `docs/ps-research/` 當 vault 閱讀（選配，
           目標尚無 NN → checklist D 列（等研究相位）；ps-auto-all 在收據判定前自動先跑迷你圈
 Spec      scripts/ps-spec.ps1 -ValidatePack|-Plan|-Run|-Render|-Gate|-Doctor（需求包在 .ps-private/spec/<packId>/，
           狀態在 .ps-runtime/spec/<jobId>/，兩者 gitignore）；分母＝Component＋私有需求包，不是整個領域
-Spec 文件 scripts/ps-sdoc.ps1 -Cli opencode -Components '<清單>'（/ps-spec 的外環；狀態圖在 .ps-private/sdoc-opencode/<jobId>/，
+業務需求文件 scripts/ps-bizspec.ps1 -Cli opencode -Components '<清單>'（/ps-spec 的外環；人工輸入在 .ps-private/bizspec-opencode/<jobId>/，
+          狀態在 .ps-runtime/bizspec-opencode/<jobId>/，產出 docs/ps-spec-opencode/<jobId>/，皆 gitignore；模型只讀 sdoc/model.yaml）
+Spec 文件 scripts/ps-sdoc.ps1 -Cli opencode -Components '<清單>'（直接執行；狀態圖在 .ps-private/sdoc-opencode/<jobId>/，
           狀態在 .ps-runtime/sdoc-opencode/<jobId>/，產出 docs/ps-spec-opencode/<jobId>/，皆 gitignore）；
           外環 session 的模型只讀 sdoc/model.yaml；Claude Code 版同一個外環（不帶 -Cli、目錄不加 -opencode）
-結論碼    KNOW1／SUPP1／SPEC1／CLONE1／DOC1-<stage>-<code>[-<count>]（spec/support-codes.md）——維護端只看這一行
+結論碼    KNOW1／SUPP1／SPEC1／CLONE1／DOC1／BIZ1-<stage>-<code>[-<count>]（spec/support-codes.md）——維護端只看這一行
 ```
 
 ## 稽核與教訓迴路
@@ -13595,4 +13600,4 @@ Mermaid 區塊裡每一個非空行，要嘛被 `states`、`regions`、`transiti
 
 - 每題恰好回答一次；`note` 選填，寫判斷依據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/sdoc/status-reading-contract.md
-@@@PSBUNDLE-PART-END|6696b1a48bf32e64|3|9
+@@@PSBUNDLE-PART-END|b60bac9268ae117f|3|9

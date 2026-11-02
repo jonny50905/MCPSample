@@ -52,6 +52,7 @@ jobs:
           - test-spec-clone.ps1
           - test-supplemental.ps1
           - test-auto-loop.ps1
+          - test-bizspec.ps1
         include:
           - test: test-sdoc-run.ps1
             args: -Only walk

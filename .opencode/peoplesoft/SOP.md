@@ -1049,7 +1049,7 @@ SOP 編號在 Claude Code 版照用；差異：SOP-10 不適用（模型 context
 
 ## SOP-28 Spec 文件（00-index＋14 份文件＋90 問題清單；issue #37）
 
-兩版的 `/ps-spec` 都走 `scripts/ps-sdoc.ps1`。本節以 Claude Code 版為主；OpenCode 版（外環加 `-Cli opencode`、目錄各加 `-opencode`、
+`/ps-spec` 已改走業務需求文件流程（SOP-31）；本節的 Spec 文件流程保留，直接在 PowerShell 跑 `scripts\ps-sdoc.ps1`。本節以 Claude Code 版為主；OpenCode 版（外環加 `-Cli opencode`、目錄各加 `-opencode`、
 模型在 `.opencode/peoplesoft/sdoc/model.yaml`）的差異見 SOP-29。Claude Code 版入口：`/ps-spec TW_DEMO_A TW_DEMO_B`，
 或 `claude --agent ps-spec-author` 後輸入清單（名稱為合成範例）。結論碼見 `.claude/peoplesoft/spec/support-codes.md` 的 DOC1。
 
@@ -1301,3 +1301,48 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 □ 6. 舊研究文件的 SQL 證據多半是裸表名：auditor 重跑前自己補前綴（只補前綴、其餘一字不改），文件不必改。
 □ 7. 端對端（OpenCode 版，test-scenarios R43）：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test-oracle-runtime.ps1 -Scenario B1 -Runs 3`
      ——結束碼 0（每個 session 至少 1 個完成的 DB task：報告 COMPLETE 且 oracle_execute_query 真的成功）。Claude Code 版直接問一題選項題，答得出選項即可。
+
+## SOP-31 業務需求文件（/ps-spec；照 bizspec/standard.md，含證據章；L163）
+
+兩版的 `/ps-spec` 都走 `scripts/ps-bizspec.ps1`（結論碼 BIZ1，見兩版 `peoplesoft/spec/support-codes.md`）。寫手 session 照
+`<框架>/peoplesoft/bizspec/standard.md` 寫業務需求文件（第 0～10 章＋附錄；只談業務需求；每條需求與假設都有證據編號 `E-###`，
+第 10 章逐字摘錄來源原文）。外環在每個 session 之後：比對檔案圍欄（人工輸入、補查結果、工單被改就還原，多出的檔隔離）、
+逐字比對證據摘錄與引用、不合格寫檢查結果檔退回修正（最多 3 輪）、對「該問誰＝Spec 產製端」的開放假設開補查 session、
+請寫手回填與套用業務窗口回覆。OpenCode 版外環加 `-Cli opencode`，目錄各加 `-opencode`，模型讀 `.opencode/peoplesoft/sdoc/model.yaml`。
+
+### 日常操作
+
+□ 1. 輸入清單：`/ps-spec TW_DEMO_A TW_DEMO_B`（名稱為合成範例），或 `claude --agent ps-spec-author`（OpenCode 版切到 ps-spec-author）後輸入清單。
+     第一次會在 `.ps-private\bizspec\<jobId>\` 建 status.md、project.md、answers.md。
+□ 2. 來源：知識層 `docs\ps-research\`（外環列出提到這組 Component 的檔）加已填的 status.md、project.md。兩者都沒有 → BIZ1-0-01：
+     先 `/ps-research` 研究所屬領域，或把狀態圖、業務說明寫進 status.md、project.md（刪掉第一行的 `<!-- BIZSPEC:SKELETON -->`）。
+     同一組 Component 在 Spec 文件流程（DOC1）已有狀態圖時，第一次會複製過來。
+□ 3. 同一份清單續跑：ps-spec-author 每次呼叫只跑一個 session，BIZ1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑（寫手照 progress.md 接續）。
+     每個 session 上限預設 60 分（1～110；直接在 PowerShell 跑 `scripts\ps-bizspec.ps1 -TimeoutMin N` 可到 180）。不要補查就說「不要補查」（-NoQuery）。
+□ 4. 依結論碼處理：
+     - BIZ1-3-04：看 SESSION 判讀行（同 SOP-28「session 失敗的判讀」），已寫的檔保留，同命令續跑。
+     - BIZ1-4-03：看「卡住」「檢查」行——外環檢查連續 3 輪修正仍未過、寫手連續兩個 session 沒進度、或補查回填兩次仍缺；
+       排除原因後說「重試被擋項」（-Retry）。檢查結果檔在 `.ps-runtime\bizspec\<jobId>\check\`。
+     - BIZ1-5-01：外環檢查全過、補查已回填，還有開放假設 → 把 `07-assumptions.md` 交業務窗口，回覆寫進 answers.md
+       （假設編號、回覆、回覆人代稱、日期），同命令續跑，寫手照第 7 章 7.4 關閉。
+     - BIZ1-7-01：外環檢查全過、沒有開放假設 → 人工審閱；業務驗收照文件第 9 章。
+□ 5. 回報維護端：只回最後一行 BIZ1 結論碼與「欄位統計」行的計數；不回物件名、路徑、證據摘錄、文件內容。
+
+| 什麼 | 在哪 |
+|---|---|
+| 人工輸入 | `.ps-private\bizspec\<jobId>\`（status.md、project.md、answers.md；gitignore） |
+| 產出入口 | `docs\ps-spec\<jobId>\README.md`（jobId＝`biz-` 開頭） |
+| 補查結果 | `docs\ps-spec\<jobId>\evidence\Q-A-###.md`（只有補查 session 寫；帳本與副本在執行狀態） |
+| 執行狀態 | `.ps-runtime\bizspec\<jobId>\`（orders 工單、check 檢查結果、queries.json 補查帳本、queries 副本、job.json） |
+| session log | `.ps-runtime\bizspec-logs\` |
+
+- 證據只證明「文件寫的話出自來源原文」，不證明來源本身正確；BIZ1-7-01 不是業務驗收。
+- 規範在三處逐字相同：兩版的 `peoplesoft/bizspec/standard.md` 與 `docs/business-spec/standard.md`（test-bizspec 會比對）；改規範三處一起改。
+
+### 維護驗證
+
+- `pwsh -NoProfile -File scripts/tests/test-bizspec.ps1`：檢查函式庫（表格、位置、證據逐字比對、補查帳本、補查檔格式）與外環端對端
+  （合成寫手與補查：沒有來源、完整一輪、修正、卡住、越界寫檔、業務回覆、補查不合格、沒進度、續跑、OpenCode 版、複製 DOC1 狀態圖）。
+- 規範本身的寫法以 `docs/business-spec/validation/` 的合成來源與答案卷重跑試寫（不在搬運包）。
+- 兩個 headless agent（ps-bizspec-writer、ps-bizspec-query）的工具權限只在 Claude Code 版由 test-claude-variant 的 hook 情境驗；
+  OpenCode 版以 `tests/runtime-guard/run-clone-smoke.mjs`（真 OpenCode）驗 /ps-spec 的命令形狀。

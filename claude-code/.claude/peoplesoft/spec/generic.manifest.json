@@ -9,8 +9,8 @@
     },
     {
       "path": ".claude/agents/ps-spec-author.md",
-      "sha256": "872602BAFEC10EC27724F0801AD3130E7B4420D442D59CD49029472D0A0793B0",
-      "lines": 52
+      "sha256": "2CDAD5DFD14D14692708DD719B255550C73315A444F33B80F779F996EA675D75",
+      "lines": 50
     },
     {
       "path": ".claude/agents/ps-spec-worker.md",
@@ -29,7 +29,7 @@
     },
     {
       "path": ".claude/commands/ps-spec.md",
-      "sha256": "A05B02491926317623A1977838CEDCEB678782A56CFCD13C0DB79981B8A56F9C",
+      "sha256": "AE0E27E71820885D7C6C2037590FA79B876224BC511D49B2DE3D0D6EE9D3FC39",
       "lines": 18
     },
     {
@@ -84,8 +84,8 @@
     },
     {
       "path": ".claude/peoplesoft/spec/support-codes.md",
-      "sha256": "BCD4067CDB99D2EED659F9413112DB6141B69ADBF283DE059797912B9B627B25",
-      "lines": 211
+      "sha256": "BFE1A07077CAAD29400A226F74D8B0BC561A06C23153DDB49AA889B3700EAC40",
+      "lines": 230
     },
     {
       "path": ".claude/peoplesoft/spec/troubleshooting-matrix.md",
