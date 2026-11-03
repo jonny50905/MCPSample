@@ -5,7 +5,7 @@
 
 ## 0. 一句話現況
 
-**/ps-spec 寫手改成一個 session 一項（2026-11-03，L164）**：公司機第一次跑 32 分鐘一行沒寫、BIZ1-3-04——第一張工單叫寫手寫整份，第一個回應就超過 gateway 上限。
+**/ps-spec 寫手改成一個 session 一項（2026-11-03，L164，分支 `claude/bold-cori-jbk4bz` 快轉併回 main，併入前 main 頭 `133aee7`）**：公司機第一次跑 32 分鐘一行沒寫、BIZ1-3-04——第一張工單叫寫手寫整份，第一個回應就超過 gateway 上限。
 外環改成先建 progress.md（20 項）、每個 session 只派一項並只列該項的規範行號、每次寫入 ≤30 行、寫手 effort medium；加 `-Diag`（BIZ1-0-04）。下一次公司機數字看 -Diag 的 RT／P。
 
 **/ps-spec 改成業務需求文件（2026-11-02，L163，分支 `claude/bold-cori-jbk4bz` 快轉併回 main，併入前 main 頭 `7a7e3c2`；Windows 5.1 CI 18 個 job 全過）**：管理者以 PO 角度要「只談業務需求、不談系統設計」的規範並取代

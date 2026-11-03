@@ -77,7 +77,8 @@
    症狀／根因／落點，是本框架**唯一完整的歷史**；編號以 repo 為準。
 2. `.opencode/peoplesoft/SOP.md`——現行操作程序（含環境異動對齊檢查）。
 3. git log——每筆 commit 訊息都寫了為什麼。
-4. **維護版線**：`main` 是正式版線（最近一次：2026-11-02 由 `claude/bold-cori-jbk4bz` 快轉併入
+4. **維護版線**：`main` 是正式版線（最近一次：2026-11-03 由 `claude/bold-cori-jbk4bz` 快轉併入
+   /ps-spec 寫手改成一個 session 一項（公司機第一次跑 32 分鐘一行沒寫、BIZ1-3-04：外環先建 progress.md 20 項、每個 session 只派一項並只列該項的規範行號、每次寫入 ≤30 行、寫手 effort medium、`-Diag`（BIZ1-0-04）；L164），兩版搬運包重生，併入前 `main` 頭 `133aee7`；2026-11-02 同一分支快轉併入
    /ps-spec 改成業務需求文件（BIZ1：`scripts/ps-bizspec*.ps1`、兩版 `peoplesoft/bizspec/`（standard.md 含第 10 章證據、query-contract.md）、agents ps-bizspec-writer／ps-bizspec-query、ps-spec-author 與 /ps-spec 改走 ps-bizspec；規範 `docs/business-spec/` 由 Opus／Fable／Sonnet 起草、三輪 9 份 Sonnet 試寫驗證；DOC1 保留直接跑 ps-sdoc.ps1；L163），兩版搬運包重生，併入前 `main` 頭 `7a7e3c2`；2026-10-30 由 `claude/nice-heisenberg-cws9q5` 快轉併入
    新版 Claude Code result 事件鍵順序的修正（`Get-PsOcResultEvent`：不看位置、頂層 type＝result 才算；ps-session-lib 兩處、ps-sdoc-diag 一處；L162），
    兩版搬運包重生，併入前 `main` 頭 `b8d4c48`；2026-10-23 同一分支快轉併入
