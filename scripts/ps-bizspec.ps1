@@ -17,7 +17,8 @@ param(
     [switch]$NoQuery,
     [switch]$Retry,
     [string]$FakeWriter = '',
-    [string]$FakeQuery = ''
+    [string]$FakeQuery = '',
+    [switch]$Diag
 )
 $ErrorActionPreference = 'Stop'
 try {
@@ -29,6 +30,29 @@ catch { Write-Host ('共用腳本載入失敗，請核對搬運清單與 UTF-8 B
 
 $script:BzSkeletonMark = '<!-- BIZSPEC:SKELETON -->'
 $script:BzMaxFix = 3
+$script:BzMaxStepTries = 3
+$script:BzWriteLines = 30
+$script:BzFixBatch = 20
+$script:BzAnswerBatch = 5
+# 寫作步驟：照規範「寫作順序」，一個 session 只做一項；progress.md 的勾選項就是這張清單
+$script:BzSteps = @('02-spec-overview.md', '03-reading-guide.md', '05-3-data.md', '05-4-rules.md', '05-5-states.md', '05-7-interfaces.md', '05-6-permissions.md',
+    '05-1-flows.md', '05-2-screens.md', '09-acceptance.md', '05-8-coverage.md', '04-requirement-index.md', '06-tracking.md', '07-assumptions.md', '10-evidence.md',
+    '01-goals.md', '08-spec-change.md', 'appendix.md', 'README.md', '完成前自我檢查')
+# 每一步要讀的規範段落（Get-PsBzStandardRanges 的鍵）
+$script:BzStepSections = @{
+    '02-spec-overview.md' = @('general', 'ch2', 'ch10'); '03-reading-guide.md' = @('general', 'ch3', 'ch7a', 'ch10')
+    '05-3-data.md' = @('general', 'ch5common', 'ch5.3', 'ch7a', 'ch10'); '05-4-rules.md' = @('general', 'ch5common', 'ch5.4', 'ch7a', 'ch10')
+    '05-5-states.md' = @('general', 'ch5common', 'ch5.5', 'ch7a', 'ch10'); '05-7-interfaces.md' = @('general', 'ch5common', 'ch5.7', 'ch7a', 'ch10')
+    '05-6-permissions.md' = @('general', 'ch5common', 'ch5.6', 'ch7a', 'ch10'); '05-1-flows.md' = @('general', 'ch5common', 'ch5.1', 'ch7a', 'ch10')
+    '05-2-screens.md' = @('general', 'ch5common', 'ch5.2', 'ch7a', 'ch10'); '09-acceptance.md' = @('general', 'ch9', 'ch7a', 'ch10')
+    '05-8-coverage.md' = @('general', 'ch5common', 'ch5.8', 'ch7a'); '04-requirement-index.md' = @('general', 'ch4', 'ch10')
+    '06-tracking.md' = @('general', 'ch6'); '07-assumptions.md' = @('general', 'ch7', 'ch10'); '10-evidence.md' = @('general', 'ch10')
+    '01-goals.md' = @('general', 'ch1'); '08-spec-change.md' = @('general', 'ch8'); 'appendix.md' = @('general', 'appendix'); 'README.md' = @('general', 'ch0')
+    '完成前自我檢查' = @('general', 'selfcheck'); 'FIX' = @('general', 'ch7a', 'ch10'); 'ANSWER' = @('general', 'ch7'); 'BACKFILL' = @('general', 'ch7', 'ch10')
+}
+$script:BzSectionNames = @{ general = '通用規則'; ch0 = '第 0 章'; ch1 = '第 1 章'; ch2 = '第 2 章'; ch3 = '第 3 章'; ch4 = '第 4 章'; ch5common = '第 5 章共通規則'
+    'ch5.1' = '5.1'; 'ch5.2' = '5.2'; 'ch5.3' = '5.3'; 'ch5.4' = '5.4'; 'ch5.5' = '5.5'; 'ch5.6' = '5.6'; 'ch5.7' = '5.7'; 'ch5.8' = '5.8'
+    ch6 = '第 6 章'; ch7 = '第 7 章'; ch7a = '7.1～7.2（缺口與假設登記、暫定做法表）'; ch8 = '第 8 章'; ch9 = '第 9 章'; ch10 = '第 10 章（證據）'; appendix = '附錄'; selfcheck = '完成前自我檢查' }
 $script:BzMaxQueryTries = 2
 $script:BzMaxKnowledgeList = 40
 
@@ -68,19 +92,21 @@ function Read-BzJson([string]$Path) {
 }
 function Read-BzJob {
     $o = Read-BzJson $J.JobPath
-    $job = @{ fix = 0; stall = 0; answerTries = @{}; backfillTries = 0; phase = '' }
+    $job = @{ fix = 0; lastFindings = -1; stepTries = @{}; answerTries = @{}; backfillTries = 0; phase = '' }
     if ($null -ne $o) {
         if ($null -ne $o.fix) { $job.fix = [int]$o.fix }
-        if ($null -ne $o.stall) { $job.stall = [int]$o.stall }
+        if ($null -ne $o.lastFindings) { $job.lastFindings = [int]$o.lastFindings }
         if ($null -ne $o.backfillTries) { $job.backfillTries = [int]$o.backfillTries }
+        if ($null -ne $o.stepTries) { foreach ($p in $o.stepTries.PSObject.Properties) { $job.stepTries[$p.Name] = [int]$p.Value } }
         if ($null -ne $o.answerTries) { foreach ($p in $o.answerTries.PSObject.Properties) { $job.answerTries[$p.Name] = [int]$p.Value } }
         if ($null -ne $o.phase) { $job.phase = [string]$o.phase }
     }
     return $job
 }
+function ConvertTo-BzSortedCounts($Map) { $o = [ordered]@{}; foreach ($k in (Sort-PsKnOrdinal -Items @($Map.Keys))) { if ($null -ne $k) { $o[$k] = [int]$Map[$k] } }; return $o }
 function Write-BzJob($Job) {
-    $tries = [ordered]@{}; foreach ($k in (Sort-PsKnOrdinal -Items @($Job.answerTries.Keys))) { if ($null -ne $k) { $tries[$k] = [int]$Job.answerTries[$k] } }
-    $o = [ordered]@{ schemaVersion = 1; jobId = $J.JobId; components = @($J.Names); phase = [string]$Job.phase; fix = [int]$Job.fix; stall = [int]$Job.stall; backfillTries = [int]$Job.backfillTries; answerTries = $tries; updatedAt = (Get-PsKnUtcStamp) }
+    $o = [ordered]@{ schemaVersion = 1; jobId = $J.JobId; components = @($J.Names); phase = [string]$Job.phase; fix = [int]$Job.fix; lastFindings = [int]$Job.lastFindings
+        backfillTries = [int]$Job.backfillTries; stepTries = (ConvertTo-BzSortedCounts $Job.stepTries); answerTries = (ConvertTo-BzSortedCounts $Job.answerTries); updatedAt = (Get-PsKnUtcStamp) }
     Write-BzText $J.JobPath ((ConvertTo-PsKnJson -Value $o) + "`n")
 }
 function Read-BzLedger {
@@ -227,24 +253,66 @@ function Invoke-BzCheckNow {
     return $r
 }
 
+# ---------------- 輸出骨架與規範段落 ----------------
+function Initialize-BzOutput {
+    # 第一次寫之前由外環建 progress.md（勾選清單＝寫作步驟）與 10-evidence.md 的表頭；已有就不動
+    [void][System.IO.Directory]::CreateDirectory($J.OutputRoot)
+    $pp = Join-Path $J.OutputRoot 'progress.md'
+    if (-not [System.IO.File]::Exists($pp)) {
+        $items = @(); foreach ($st in $script:BzSteps) { $items += ('- [ ] ' + $st) }
+        $lines = @('# 進度', ('來源：' + (Get-BzRel $J.InputRoot)), ('輸出：' + (Get-BzRel $J.OutputRoot)), '', '## 勾選') + $items + @('',
+            '## 預留需求鍵', '| 需求鍵 | 摘要 | 來源 | 被誰引用 |', '|---|---|---|---|', '', '## 待歸類', '', '## 自我檢查', '')
+        [void](Write-PsKnCreateOnlyText -LiteralPath $pp -Text (($lines -join "`n") + "`n"))
+    }
+    $ep = Join-Path $J.OutputRoot '10-evidence.md'
+    if (-not [System.IO.File]::Exists($ep)) {
+        $lines = @('# 10 證據', '', '## 10.1 證據清單', '', ('| ' + ($script:PsBzEvidenceHeader -join ' | ') + ' |'), '|---|---|---|---|')
+        [void](Write-PsKnCreateOnlyText -LiteralPath $ep -Text (($lines -join "`n") + "`n"))
+    }
+}
+function Get-BzReadLines([string]$Key) {
+    # 工單的「規範要讀的段落」：段落名稱與行號（1 起算）
+    if ($null -eq $J.Ranges) { $J.Ranges = Get-PsBzStandardRanges (Get-BzText (Join-Path $J.Root $J.StandardRel)) }
+    $out = @()
+    foreach ($sec in @($script:BzStepSections[$Key])) {
+        if (-not $J.Ranges.ContainsKey($sec)) { continue }
+        $r = $J.Ranges[$sec]
+        $out += ('  - ' + $script:BzSectionNames[$sec] + '：第 ' + $r[0] + '～' + $r[1] + ' 行')
+    }
+    return , $out
+}
+function Get-BzReadHeader([string]$Key) {
+    return , (@(('- 先讀規範 ' + $J.StandardRel + ' 的這幾段（用行號分段讀，不要整份讀；其他章不用讀）：')) + (Get-BzReadLines $Key))
+}
+
 # ---------------- 下一步 ----------------
+function Test-BzStepDone([string]$Step) {
+    # 打勾才算完成；完成前自我檢查另要有「自我檢查：通過」那一行
+    $done = Test-PsBzItemChecked (Get-PsBzCheckedItems $J.OutputRoot) $Step
+    if ($done -and $Step -eq '完成前自我檢查') { $done = (Get-PsBzProgress $J.OutputRoot).SelfCheck }
+    return $done
+}
 function Get-BzNext($Job) {
-    $pr = Get-PsBzProgress $J.OutputRoot
-    if (-not $pr.Done) {
-        if ($Job.stall -ge 2) { return @{ Kind = 'BLOCKED'; Reason = '寫手連續兩個 session 沒有進度（progress.md 沒有新打勾）' } }
-        return @{ Kind = 'WRITE'; Open = $pr.Open }
+    foreach ($st in $script:BzSteps) {
+        if (Test-BzStepDone $st) { continue }
+        $t = 0; if ($Job.stepTries.ContainsKey($st)) { $t = [int]$Job.stepTries[$st] }
+        if ($t -ge $script:BzMaxStepTries) { return @{ Kind = 'BLOCKED'; Reason = ('「' + $st + '」連續 ' + $t + ' 個 session 沒有完成（progress.md 沒打勾）') } }
+        return @{ Kind = 'WRITE'; Step = $st }
     }
     $chk = Invoke-BzCheckNow
-    if (@($chk.Findings).Count -gt 0) {
-        if ($Job.fix -ge $script:BzMaxFix) { return @{ Kind = 'BLOCKED'; Reason = ('外環檢查連續 ' + $script:BzMaxFix + ' 輪修正後仍未通過'); Findings = $chk.Findings } }
+    $nf = @($chk.Findings).Count
+    if ($nf -gt 0) {
+        if ($Job.lastFindings -lt 0 -or $nf -lt [int]$Job.lastFindings) { $Job.fix = 0 }
+        $Job.lastFindings = $nf
+        if ($Job.fix -ge $script:BzMaxFix) { return @{ Kind = 'BLOCKED'; Reason = ('外環檢查連續 ' + $script:BzMaxFix + ' 輪修正後問題數沒有減少'); Findings = $chk.Findings } }
         return @{ Kind = 'FIX'; Findings = $chk.Findings }
     }
-    $Job.fix = 0
+    $Job.fix = 0; $Job.lastFindings = -1
     $assump = Get-PsBzAssumptions $J.OutputRoot
     $open = @{}; foreach ($a in $assump) { if ($a.State -ceq '開放') { $open[$a.Id] = $a } }
     $ans = @()
     foreach ($x in (Get-PsBzAnswers (Get-BzText (Join-Path $J.InputRoot 'answers.md')))) {
-        if ($open.ContainsKey($x.Id) -and $ans -cnotcontains $x.Id) {
+        if ($open.ContainsKey($x.Id) -and $ans -cnotcontains $x.Id -and $ans.Count -lt $script:BzAnswerBatch) {
             $tries = 0; if ($Job.answerTries.ContainsKey($x.Id)) { $tries = [int]$Job.answerTries[$x.Id] }
             if ($tries -lt 2) { $ans += $x.Id }
         }
@@ -266,8 +334,8 @@ function Get-BzNext($Job) {
     $pending = @(); foreach ($e in $led.entries) { if (-not $listed.ContainsKey([System.IO.Path]::GetFileName($e.file).ToLowerInvariant())) { $pending += $e } }
     if ($pending.Count -eq 0) { $Job.backfillTries = 0 }
     if ($pending.Count -gt 0) {
-        if ($Job.backfillTries -ge 2) { return @{ Kind = 'BLOCKED'; Reason = '補查結果回填兩次後 10.2 仍沒有列出全部補查檔' } }
-        return @{ Kind = 'BACKFILL'; Entries = $pending }
+        if ($Job.backfillTries -ge 2) { return @{ Kind = 'BLOCKED'; Reason = '同一個補查檔回填兩次後 10.2 仍沒有列出' } }
+        return @{ Kind = 'BACKFILL'; Entries = @($pending[0]) }
     }
     if ($open.Count -gt 0) { return @{ Kind = 'DONE'; Phase = 'NEEDS_ANSWERS'; Open = $open.Count } }
     return @{ Kind = 'DONE'; Phase = 'REVIEW_READY'; Open = 0 }
@@ -277,45 +345,64 @@ function Get-BzNext($Job) {
 function Invoke-BzWriterStep($Next, $Job) {
     $kind = $Next.Kind
     $body = @()
+    $limit = ('- 每次寫入不超過 ' + $script:BzWriteLines + ' 行：新檔先寫檔頭與第一段，之後在檔尾追加下一段；在 10-evidence.md 登證據也一樣在表末追加。寫完不要再讀回整份檔。')
     if ($kind -eq 'WRITE') {
-        $body = @('照規範「怎麼開始與續寫」：輸出資料夾沒有 progress.md 就新寫；有就從第一個沒打勾的項目接續，已打勾的檔照「已打勾的檔怎麼改」處理。',
-            '一直寫到「完成前自我檢查」做完，在 progress.md 寫「自我檢查：通過；修正項：…」那一行。',
-            '來源 Spec＝來源資料夾的已填檔加上面列的知識層檔；每條需求先在 10-evidence.md 登證據再寫。只談業務需求，不寫系統設計。')
+        $st = $Next.Step
+        $tag = $st
+        if ($st -eq '完成前自我檢查') {
+            $body = @('- 這次只做：完成前自我檢查（progress.md 的最後一項）。') + (Get-BzReadHeader $st) + @(
+                '- 一次查一項：查完就在 progress.md「## 自我檢查」節追加一行「第 N 項：通過」或「第 N 項：已修〈改了什麼〉」，再查下一項；不要先把全部檔讀完再寫。',
+                '- 這一節已經有結果的項目不重查，從下一項接著做。',
+                '- 全部查完後在同一節寫「自我檢查：通過；修正項：〈項號，無則寫無〉」，並把「完成前自我檢查」打勾。',
+                $limit)
+        }
+        else {
+            $body = @(('- 這次只做：' + $st + '（progress.md 的這一項）。做完把這一項打勾就結束，不接著做下一項。')) + (Get-BzReadHeader $st) + @(
+                ('- ' + $st + ' 已經存在（上一個 session 沒寫完）→ 只讀它的最後一段，從沒寫完的地方接著寫，不重寫已寫的部分。'),
+                '- 這一項要用到前面自己寫過的檔時，只讀需要的那幾列（例：需求鍵、證據編號），不整份重讀。',
+                '- 來源只讀這一項需要的段落：先看檔名與標題定位，再讀對應的節。',
+                $limit,
+                '- 只談業務需求，不寫系統設計；每條需求先在 10-evidence.md 登證據再寫。')
+        }
+        $t = 0; if ($Job.stepTries.ContainsKey($st)) { $t = [int]$Job.stepTries[$st] }
+        $Job.stepTries[$st] = $t + 1
     }
     elseif ($kind -eq 'FIX') {
         $n = (Get-BzNumber $J.CheckDir '^c([0-9]{4,8})\.md$') + 1
         $cp = Join-Path $J.CheckDir ('c' + $n.ToString('0000') + '.md')
-        Write-BzText $cp (ConvertTo-PsBzFindingsMd -Findings $Next.Findings -Title ('外環檢查 c' + $n.ToString('0000')))
-        $body = @(('外環檢查沒過：讀 ' + (Get-BzRel $cp) + '，只修表列的問題。'),
+        Write-BzText $cp (ConvertTo-PsBzFindingsMd -Findings $Next.Findings -Title ('外環檢查 c' + $n.ToString('0000')) -Max $script:BzFixBatch)
+        $body = @(('- 外環檢查沒過：讀 ' + (Get-BzRel $cp) + '，只修表列的項目（一次最多 ' + $script:BzFixBatch + ' 項，其餘下一輪再給）。')) + (Get-BzReadHeader 'FIX') + @(
             '- BZ_EV_EXCERPT／BZ_EV_LENGTH：回到位置所指的檔，從同一行逐字照抄；檔裡真的沒有 → 刪掉這筆證據與只靠它的需求，改登記假設（第 7 章）。',
             '- BZ_REF_*、BZ_REQ_NO_EVIDENCE、BZ_ASSUMP_NO_EVIDENCE：補登證據或補上引用；沒人引用的證據刪掉。',
-            '- BZ_FILE_MISSING、BZ_HEADER_MISSING、BZ_PROGRESS_OPEN、BZ_SELFCHECK_MISSING：照規範補檔、補表頭、補完未打勾的項目並重做自我檢查。',
-            ('修完在 progress.md 的自我檢查那一行後加「；外環檢查 c' + $n.ToString('0000') + ' 已修」。不要重寫其他內容。'))
+            '- BZ_FILE_MISSING、BZ_HEADER_MISSING：照規範補檔、補表頭。',
+            '- 一項一項修，每修一項就存檔；只改有問題的列，不重寫其他內容。',
+            $limit)
         $Job.fix = [int]$Job.fix + 1
     }
     elseif ($kind -eq 'ANSWER') {
-        $body = @(('業務窗口在 ' + (Get-BzRel (Join-Path $J.InputRoot 'answers.md')) + ' 回覆了下列假設：' + ($Next.Ids -join '、') + '。'),
-            '照規範第 7 章 7.4 逐筆關閉：關閉依據寫「〈日期〉〈回覆人代稱〉：〈結論一句〉」；把結論寫進受影響需求；確認狀態與追蹤表照 7.4 同步。',
-            '業務窗口的回覆不登證據；回覆與來源衝突時照 7.4 第 5 步處理。只改受影響的列。')
+        $body = @(('- 業務窗口在 ' + (Get-BzRel (Join-Path $J.InputRoot 'answers.md')) + ' 回覆了下列假設：' + ($Next.Ids -join '、') + '。')) + (Get-BzReadHeader 'ANSWER') + @(
+            '- 照規範第 7 章 7.4 逐筆關閉：關閉依據寫「〈日期〉〈回覆人代稱〉：〈結論一句〉」；把結論寫進受影響需求；確認狀態與追蹤表照 7.4 同步。',
+            '- 業務窗口的回覆不登證據；回覆與來源衝突時照 7.4 第 5 步處理。一筆一筆做，只改受影響的列。',
+            $limit)
         foreach ($id in $Next.Ids) { $t = 0; if ($Job.answerTries.ContainsKey($id)) { $t = [int]$Job.answerTries[$id] }; $Job.answerTries[$id] = $t + 1 }
     }
     elseif ($kind -eq 'BACKFILL') {
-        $fl = @(); foreach ($e in $Next.Entries) { $fl += ('  - ' + $e.file + '（' + $e.assumption + '，結論：' + $e.conclusion + '）') }
-        $body = @('外環補查完成：照規範第 10 章 10.3 回填下列補查檔（只讀，不改）：') + $fl + @('每個補查檔在 10.2 寫一列。只改受影響的列。')
+        $e = $Next.Entries[0]
+        $body = @(('- 外環補查完成：照規範第 10 章 10.3 回填補查檔 ' + $e.file + '（' + $e.assumption + '，結論：' + $e.conclusion + '；只讀，不改）。')) + (Get-BzReadHeader 'BACKFILL') + @(
+            '- 這個補查檔在 10.2 寫一列。只改受影響的列。', $limit)
         $Job.backfillTries = [int]$Job.backfillTries + 1
     }
     Write-BzJob $Job
     $id = New-BzOrder $kind $body
-    $before = Get-PsBzProgress $J.OutputRoot
     $dirs = @($J.InputRoot, $J.EvidenceDir, $J.JobRoot)
     $fence = Get-BzFence $dirs
     $sr = Invoke-BzSession 'ps-bizspec-writer' $id $kind $FakeWriter
     $viol = Restore-BzFence $fence $dirs @()
     if (@($viol).Count -gt 0) { $J.Gaps += ('寫手改了不准改的檔，已還原／隔離：' + (@($viol | Select-Object -First 5) -join '、')) }
     if ($kind -eq 'WRITE') {
-        $after = Get-PsBzProgress $J.OutputRoot
-        $progressed = ($after.Exists -and (-not $before.Exists -or $after.Open -lt $before.Open -or ($after.Done -and -not $before.Done)))
-        if ($progressed) { $Job.stall = 0 } elseif (-not (Test-BzSessionFailed $sr)) { $Job.stall = [int]$Job.stall + 1 }
+        $st = $Next.Step
+        if (Test-BzStepDone $st) { $Job.stepTries[$st] = 0 }
+        elseif (Test-BzSessionFailed $sr) { $Job.stepTries[$st] = [Math]::Max(0, [int]$Job.stepTries[$st] - 1) }
     }
     Write-BzJob $Job
     return $sr
@@ -374,6 +461,64 @@ function Repair-BzLedgerFiles {
         $copy = Get-BzText (Join-Path $J.QueryCopyDir ([System.IO.Path]::GetFileName($e.file)))
         if ($null -ne $copy -and (Get-PsKnTextHash -Text $copy) -ceq $e.sha) { Write-BzText $p $copy; $J.Gaps += ('補查檔被改動，已從副本還原：' + $e.file) }
     }
+}
+
+# ---------------- 診斷（-Diag：只印代號與數字，可以唸給維護端） ----------------
+# 每個工單一行：oNNNN K=種類（W 寫作 F 修正 A 套回覆 B 回填 Q 補查）ST=步驟（02、03、05-4…、SC=自我檢查、RD=README、AP=附錄）
+#   X=結束碼 RT=模型端重試的狀態碼分布（504x6、NRx2＝無回應）P=成功的回應數 Q=請求數 M=主代理最大輸入（k token）O=單次最多輸出
+#   ERR=err 檔分類（E0 空、E504、ECONN 連線中斷、E400、EOTH 其他）DUR=分鐘；最後一行 SUM 為各種類數與最近一個失敗工單的 RT。
+function Get-BzStepCode([string]$Step) {
+    if ($Step -eq '') { return '-' }
+    if ($Step -eq '完成前自我檢查') { return 'SC' }
+    if ($Step -eq 'README.md') { return 'RD' }
+    if ($Step -eq 'appendix.md') { return 'AP' }
+    $m = [regex]::Match($Step, '^([0-9]{2}(-[0-9])?)')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return '?'
+}
+function Show-BzDiag {
+    $kinds = @{ WRITE = 'W'; FIX = 'F'; ANSWER = 'A'; BACKFILL = 'B'; QUERY = 'Q' }
+    $orders = @()
+    if ([System.IO.Directory]::Exists($J.OrderDir)) { foreach ($f in @(Get-ChildItem -LiteralPath $J.OrderDir -File -Filter 'o*.md')) { $orders += $f.Name } }
+    $orders = @(Sort-PsKnOrdinal -Items $orders | Select-Object -Last 12)
+    $logs = @(); if ([System.IO.Directory]::Exists($J.LogRoot)) { $logs = @(Get-ChildItem -LiteralPath $J.LogRoot -File) }
+    $count = @{}; $lastFail = '-'
+    foreach ($name in $orders) {
+        if ($null -eq $name) { continue }
+        $oid = [System.IO.Path]::GetFileNameWithoutExtension($name)
+        $t = Get-BzText (Join-Path $J.OrderDir $name)
+        $k = '?'; $mk = [regex]::Match([string]$t, '（(WRITE|FIX|ANSWER|BACKFILL|QUERY)）'); if ($mk.Success) { $k = $kinds[$mk.Groups[1].Value] }
+        $step = ''; $ms = [regex]::Match([string]$t, '這次只做：([^（\r\n]+)'); if ($ms.Success) { $step = $ms.Groups[1].Value.Trim() }
+        if ($k -eq 'W' -and $step -eq '') { $step = '完成前自我檢查' }
+        $count[$k] = 1 + [int]$count[$k]
+        $tag = '-' + $J.JobId + '-' + $oid + '.'
+        $mine = @($logs | Where-Object { $_.Name.Contains($tag) } | Sort-Object Name)
+        $x = '-'; $rt = '-'; $p = '-'; $q = '-'; $mx = '-'; $mo = '-'; $err = 'E0'; $dur = '-'
+        $rc = $mine | Where-Object { $_.Name.EndsWith('.rc.txt') } | Select-Object -Last 1
+        if ($null -ne $rc) { $x = ([string](Get-BzText $rc.FullName)).Trim(); if ($x -eq '') { $x = '-' } }
+        $ef = $mine | Where-Object { $_.Name.EndsWith('.err.txt') } | Select-Object -Last 1
+        if ($null -ne $ef) {
+            $et = [string](Get-BzText $ef.FullName)
+            if ($et.Trim() -eq '') { $err = 'E0' } elseif ($et -match '504') { $err = 'E504' } elseif ($et -match '(?i)ECONNRESET|socket hang up|connection reset|terminated') { $err = 'ECONN' } elseif ($et -match '\b400\b') { $err = 'E400' } else { $err = 'EOTH' }
+        }
+        $sf = $mine | Where-Object { $_.Name.EndsWith('.stream.jsonl') } | Select-Object -Last 1
+        $last = $ef; if ($null -ne $sf) { $last = $sf }
+        if ($null -ne $sf) {
+            $a = Get-PsOcClaudeApiRetry -StreamFile $sf.FullName
+            $rt = [string]$a.Statuses; if ($rt -eq '') { $rt = '-' }
+            $p = [string]$a.Progress; $q = [string]$a.Requests; $mx = [string][Math]::Round([double]$a.MaxContextMain / 1000); $mo = [string]$a.MaxOutput
+        }
+        if ($null -ne $last) {
+            $ms2 = [regex]::Match($last.Name, '^([0-9]{8}-[0-9]{6})')
+            if ($ms2.Success) {
+                try { $st0 = [datetime]::ParseExact($ms2.Groups[1].Value, 'yyyyMMdd-HHmmss', [System.Globalization.CultureInfo]::InvariantCulture); $dur = [string][Math]::Round(($last.LastWriteTime - $st0).TotalMinutes) } catch { $dur = '-' }
+            }
+        }
+        if ($x -ne '0' -and $x -ne '-') { $lastFail = $rt }
+        Write-Host ($oid + ' K=' + $k + ' ST=' + (Get-BzStepCode $step) + ' X=' + $x + ' RT=' + $rt + ' P=' + $p + ' Q=' + $q + ' M=' + $mx + ' O=' + $mo + ' ERR=' + $err + ' DUR=' + $dur)
+    }
+    $parts = @(); foreach ($k in (Sort-PsKnOrdinal -Items @($count.Keys))) { if ($null -ne $k) { $parts += ($k + $count[$k]) } }
+    Write-Host ('SUM ' + $J.Cli + ' ' + ($parts -join ' ') + ' LASTFAIL-RT=' + $lastFail)
 }
 
 # ---------------- OpenCode 版的模型（與 Spec 文件流程共用 sdoc/model.yaml） ----------------
@@ -447,6 +592,7 @@ try {
         if (-not (Test-BzOpencodeModelName $J.Model)) { throw 'BZ_MODEL_INVALID' }
         Write-Host ('OpenCode 模型：' + $J.Model + '（' + $J.ModelFrom + '）')
     }
+    if ($Diag) { Show-BzDiag; throw 'BZ_DIAG_DONE' }
     $rootLockId = (Get-PsKnTextHash -Text $Root.ToUpperInvariant()).Substring(0, 16)
     $mutex = New-Object System.Threading.Mutex($false, ('Global\MCPSample-BizSpec-' + $rootLockId + '-' + $J.JobId + $J.Sfx))
     try { $held = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $held = $true }
@@ -466,7 +612,7 @@ try {
         else {
             [void][System.IO.Directory]::CreateDirectory($J.OrderDir)
             $job = Read-BzJob
-            if ($Retry) { $job.fix = 0; $job.stall = 0; $job.backfillTries = 0; $job.answerTries = @{}; $led0 = Read-BzLedger; $led0.failed = @{}; Write-BzLedger $led0; Write-BzJob $job }
+            if ($Retry) { $job.fix = 0; $job.lastFindings = -1; $job.stepTries = @{}; $job.backfillTries = 0; $job.answerTries = @{}; $led0 = Read-BzLedger; $led0.failed = @{}; Write-BzLedger $led0; Write-BzJob $job }
             if (-not $Status) {
                 if ($FakeWriter -eq '' -or (-not $NoQuery -and $FakeQuery -eq '')) {
                     $oc = Get-PsOcPath -Root $Root; $J.OcPath = [string]$oc.Path
@@ -479,6 +625,7 @@ try {
                     elseif ($mc.Result -ne 'OK') { Write-Host ('模型不能用：' + $mc.Message + '。改 ' + $J.ModelFrom + ' 的 model 那一行，再跑同一個命令：'); Write-Host $J.NextCommand; throw 'BZ_MODEL_UNAVAILABLE' }
                 }
                 Repair-BzLedgerFiles
+                Initialize-BzOutput
             }
             $sessions = 0; $stop = ''; $failedApi = @(); $next = $null
             while ($true) {
@@ -527,7 +674,8 @@ try {
 catch {
     $exitCode = 1
     $msg = $_.Exception.Message
-    if ($msg -eq 'BZ_WRITE_DEFERRED') { Write-Host '寫入暫時失敗，未假裝完成；解除檔案占用後用相同命令繼續。'; $code = 'BIZ1-3-07' }
+    if ($msg -eq 'BZ_DIAG_DONE') { $code = 'BIZ1-0-04'; $exitCode = 0 }
+    elseif ($msg -eq 'BZ_WRITE_DEFERRED') { Write-Host '寫入暫時失敗，未假裝完成；解除檔案占用後用相同命令繼續。'; $code = 'BIZ1-3-07' }
     elseif ($msg -eq 'BZ_ARGUMENT_INVALID') { Write-Host '參數錯誤：Components 只收 exact ASCII 物件名（逗號或空白分隔）；Status 與 Retry 不可混用；Model／Root 不可含命令列控制字元；Cli 只收 claude 或 opencode。'; $code = 'BIZ1-9-01'; $exitCode = 2 }
     elseif ($msg -eq 'BZ_VARIANT') { Write-Host ('這個資料夾沒有 ' + $J.StandardRel + '（業務需求文件的規範）：請解開含 peoplesoft/bizspec/ 的搬運包。'); $code = 'BIZ1-9-01'; $exitCode = 2 }
     elseif ($msg -eq 'BZ_MODEL_INVALID') { Write-Host ('OpenCode 版的模型設定不對（' + $J.ModelFrom + '，目前讀到「' + $J.Model + '」）：要寫成 <provider>/<model>，照「opencode models」列出的原樣。'); $code = 'BIZ1-9-01'; $exitCode = 2 }

@@ -1306,7 +1306,8 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 
 兩版的 `/ps-spec` 都走 `scripts/ps-bizspec.ps1`（結論碼 BIZ1，見兩版 `peoplesoft/spec/support-codes.md`）。寫手 session 照
 `<框架>/peoplesoft/bizspec/standard.md` 寫業務需求文件（第 0～10 章＋附錄；只談業務需求；每條需求與假設都有證據編號 `E-###`，
-第 10 章逐字摘錄來源原文）。外環在每個 session 之後：比對檔案圍欄（人工輸入、補查結果、工單被改就還原，多出的檔隔離）、
+第 10 章逐字摘錄來源原文）。寫手一個 session 只做 progress.md 的一項（一章；第 5 章一類一項，共 20 項），工單只列這一項要讀的規範段落與行號，每次寫入不超過 30 行；
+session 中斷時已寫的部分留著，下一個 session 從同一項接續。外環在每個 session 之後：比對檔案圍欄（人工輸入、補查結果、工單被改就還原，多出的檔隔離）、
 逐字比對證據摘錄與引用、不合格寫檢查結果檔退回修正（最多 3 輪）、對「該問誰＝Spec 產製端」的開放假設開補查 session、
 請寫手回填與套用業務窗口回覆。OpenCode 版外環加 `-Cli opencode`，目錄各加 `-opencode`，模型讀 `.opencode/peoplesoft/sdoc/model.yaml`。
 
@@ -1320,8 +1321,9 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 □ 3. 同一份清單續跑：ps-spec-author 每次呼叫只跑一個 session，BIZ1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑（寫手照 progress.md 接續）。
      每個 session 上限預設 60 分（1～110；直接在 PowerShell 跑 `scripts\ps-bizspec.ps1 -TimeoutMin N` 可到 180）。不要補查就說「不要補查」（-NoQuery）。
 □ 4. 依結論碼處理：
-     - BIZ1-3-04：看 SESSION 判讀行（同 SOP-28「session 失敗的判讀」），已寫的檔保留，同命令續跑。
-     - BIZ1-4-03：看「卡住」「檢查」行——外環檢查連續 3 輪修正仍未過、寫手連續兩個 session 沒進度、或補查回填兩次仍缺；
+     - BIZ1-3-04：看 SESSION 判讀行（同 SOP-28「session 失敗的判讀」），已寫的檔保留，同命令續跑。回報維護端時跑
+       `powershell -NoProfile -File scripts\ps-bizspec.ps1 -Components '<同一份清單>' -Diag`（OpenCode 版加 `-Cli opencode`），只回最後幾行代號與 SUM 行（BIZ1-0-04）。
+     - BIZ1-4-03：看「卡住」「檢查」行——同一項連續 3 個 session 沒打勾、外環檢查連續 3 輪修正問題數沒減少、或同一個補查檔回填兩次仍沒列出；
        排除原因後說「重試被擋項」（-Retry）。檢查結果檔在 `.ps-runtime\bizspec\<jobId>\check\`。
      - BIZ1-5-01：外環檢查全過、補查已回填，還有開放假設 → 把 `07-assumptions.md` 交業務窗口，回覆寫進 answers.md
        （假設編號、回覆、回覆人代稱、日期），同命令續跑，寫手照第 7 章 7.4 關閉。

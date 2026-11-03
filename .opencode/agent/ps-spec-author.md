@@ -71,7 +71,7 @@ permission:
 
 1. 以 bash 呼叫 `powershell -NoProfile -File scripts/ps-bizspec.ps1 -Cli opencode -Components 'TW_DEMO_A,TW_DEMO_B' -MaxSessions 1`（每次呼叫只跑一個 session），使用者已指定的合法清單取代範例；`-Cli opencode` 一定緊接在腳本路徑之後。工具 timeout 設為 7200000 毫秒；不要另外設定 execution policy、不修改系統權限。
 2. 每次只跑一個命令，等上一個結束。只有最後結論碼為 `BIZ1-3-02-<n>` 才自動用相同清單（與相同的 `-TimeoutMin`、`-NoQuery`）繼續，毋須問使用者要不要做下一個內部步驟；每輪（一個 session）只簡短報「狀態」行與「欄位統計」行。`-Retry` 只加在使用者要求的第一輪，後續呼叫移除它。`-Status` 是只看進度：呼叫一次、回報後結束，即使可續跑也不能自行開始。
-3. 其他結論碼結束本次操作，依結論碼告訴使用者下一步：BIZ1-0-01 先用 /ps-research 研究這組 Component 所屬領域，或填 status.md、project.md；BIZ1-9-01 且輸出提到模型時，轉述「模型不能用」那幾行，請使用者改 model.yaml 的 `model` 那一行或在 OpenCode 設定檔補 provider；BIZ1-3-04 轉述輸出中 SESSION 的「判讀」行與「session 失敗」那行——逾時而輸出仍在增加由使用者決定是否給更大的每 session 上限再續跑，其他請使用者檢查模型與 provider、MCP 後同命令續跑；BIZ1-4-03 轉述「卡住」與「檢查」各行，由使用者處理後決定 -Retry；BIZ1-5-01 把 07-assumptions.md 的開放假設交業務窗口，回覆寫進 answers.md 後同命令續跑；BIZ1-7-01 可人工審閱。不要自動加 Retry，不要修改人工輸入檔、輸出文件或 evidence/ 來消除錯誤。
+3. 其他結論碼結束本次操作，依結論碼告訴使用者下一步：BIZ1-0-01 先用 /ps-research 研究這組 Component 所屬領域，或填 status.md、project.md；BIZ1-9-01 且輸出提到模型時，轉述「模型不能用」那幾行，請使用者改 model.yaml 的 `model` 那一行或在 OpenCode 設定檔補 provider；BIZ1-3-04 轉述輸出中 SESSION 的「判讀」行與「session 失敗」那行——逾時而輸出仍在增加由使用者決定是否給更大的每 session 上限再續跑，其他請使用者檢查模型與 provider、MCP 後同命令續跑；使用者要回報維護端時，請他自己在 PowerShell 跑同一行命令加 `-Diag`，只回報輸出的代號行與 SUM 行（BIZ1-0-04）；BIZ1-4-03 轉述「卡住」與「檢查」各行，由使用者處理後決定 -Retry；BIZ1-5-01 把 07-assumptions.md 的開放假設交業務窗口，回覆寫進 answers.md 後同命令續跑；BIZ1-7-01 可人工審閱。不要自動加 Retry，不要修改人工輸入檔、輸出文件或 evidence/ 來消除錯誤。
 4. 工具因時間上限中止或失聯時，不假設子行程已停止：先以相同清單 `-Status` 看狀態；鎖被占用（BIZ1-0-03）時不重複啟動。把停止原因與安全續跑方式告訴使用者。
 5. 回覆必須含：中文狀態、README 的完整本機位置、尚缺的內容、要人做的下一步、同一份工作如何續跑。輸出有「欄位統計」行就原樣附上。長文件不要整份貼回對話。
 

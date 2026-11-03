@@ -87,11 +87,12 @@ DOC1 不使用 drill tuple。對外只回報結論碼與「欄位統計」行的
 | 0 | 01 | 等來源：知識層 `docs/ps-research` 沒有提到這組 Component，`.ps-private/bizspec/<jobId>/` 的 status.md、project.md 也還是骨架；先研究或填好再同命令續跑 | 0 |
 | 0 | 02 | 尚未開始（Status 唯讀） | 0 |
 | 0 | 03 | 同一組 Component 的業務需求文件工作正在執行 | 3 |
+| 0 | 04 | 診斷報告（`-Diag`，唯讀）：每個工單一行代號（K 種類、ST 步驟、X 結束碼、RT 模型端重試狀態碼、P／Q 回應與請求數、M／O 最大輸入／輸出、ERR、DUR）與 SUM 行；只回報這幾行 | 0 |
 | 3 | 02-`<n>` | RUNNABLE，還有工作（寫作、修正、套回覆、補查、回填）；同命令繼續 | 0 |
 | 3 | 03 | SLOT_BUSY；模型服務被其他 session 使用，稍後續跑 | 1 |
 | 3 | 04 | SESSION_FAILED；已寫的檔保留。看輸出的 SESSION 判讀：強殺當下輸出仍在增加 → 用更大的 -TimeoutMin 續跑；其他 → 檢查 Claude Code、gateway 與 MCP 後續跑，錯誤訊息在 `.ps-runtime/bizspec-logs/` 的 .err.txt | 1 |
 | 3 | 07 | WRITE_DEFERRED；解除檔案占用後續跑 | 1 |
-| 4 | 03 | BLOCKED；外環檢查連續修正 3 輪仍未通過、寫手連續兩個 session 沒進度，或補查回填兩次仍缺；看「卡住」「檢查」行，處理後加 -Retry | 1 |
+| 4 | 03 | BLOCKED；同一項連續 3 個 session 沒打勾、外環檢查連續 3 輪修正問題數沒減少，或同一個補查檔回填兩次仍沒列出；看「卡住」「檢查」行，處理後加 -Retry | 1 |
 | 5 | 01 | 外環檢查全過、補查已回填，仍有開放假設待業務窗口回覆；回覆寫進 `answers.md` 後同命令續跑 | 0 |
 | 7 | 01 | REVIEW_READY；外環檢查（證據逐字比對、引用、表頭、必要檔）全過、沒有開放假設，可人工審閱；不是業務驗收 | 0 |
 | 9 | 01 | 參數不合法；缺 `.claude/peoplesoft/bizspec/standard.md` | 2 |

@@ -485,6 +485,8 @@ try {
         $eff = @(@($dR) | Where-Object { [string]$_[0] -eq 'CLAUDE_CODE_EFFORT_LEVEL' })
         Assert (@($dR).Count -eq 5 -and $nR -contains 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK' -and $nR -contains 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC' -and $nR -contains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION' -and $mtt.Count -eq 1 -and [string]$mtt[0][1] -eq '0' -and $eff.Count -eq 1 -and [string]$eff[0][1] -eq 'low') "環境預設：狀態圖讀者＝共同三個＋MAX_THINKING_TOKENS=0＋CLAUDE_CODE_EFFORT_LEVEL=low"
         Assert (@($dW).Count -eq 3 -and $nW -notcontains 'MAX_THINKING_TOKENS' -and $nW -notcontains 'CLAUDE_CODE_EFFORT_LEVEL' -and @($dU).Count -eq 3 -and $nU -notcontains 'MAX_THINKING_TOKENS') "環境預設：研究 worker 與其他代理只有共同三個（不關 thinking、不壓 effort）"
+        $dBw = @(Get-PsOcClaudeEnvDefaults -Agent 'ps-bizspec-writer'); $effBw = @($dBw | Where-Object { $_[0] -eq 'CLAUDE_CODE_EFFORT_LEVEL' })
+        Assert (@($dBw).Count -eq 4 -and $effBw.Count -eq 1 -and [string]$effBw[0][1] -eq 'medium' -and (Get-EnvNames $dBw) -notcontains 'MAX_THINKING_TOKENS') "環境預設：業務需求文件寫手＝共同三個＋CLAUDE_CODE_EFFORT_LEVEL=medium（不關 thinking）"
         Assert ((Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-reader')) -contains 'CLAUDE_CODE_EFFORT_LEVEL' -and (Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-judge')) -contains 'CLAUDE_CODE_EFFORT_LEVEL') "環境預設：乾淨讀者與判定也關 thinking、壓 effort"
         $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'
         $dOff = Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader'

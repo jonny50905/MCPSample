@@ -389,6 +389,68 @@ function Test-PsBzQueryFile {
     return @{ Ok = ($errs.Count -eq 0); Conclusion = $conclusion; Errors = $errs }
 }
 
+# ---------------- 進度與規範段落 ----------------
+function Get-PsBzCheckedItems {
+    # progress.md 已打勾的項目文字（去頭尾空白）→ $true
+    param([string]$OutDir)
+    $set = @{}
+    $t = Read-PsKnText -LiteralPath (Join-Path $OutDir 'progress.md')
+    if ($null -eq $t) { return $set }
+    foreach ($ln in (Get-PsKnLines $t)) {
+        $m = [regex]::Match([string]$ln, '^\s*[-*]\s*\[[xX]\]\s*(.+?)\s*$')
+        if ($m.Success) { $set[$m.Groups[1].Value] = $true }
+    }
+    return $set
+}
+
+function Test-PsBzItemChecked {
+    # 某一項打勾了沒：打勾的文字以項目名稱開頭就算（容許後面加註）
+    param([hashtable]$Checked, [string]$Item)
+    foreach ($k in @($Checked.Keys)) { if (([string]$k).StartsWith($Item)) { return $true } }
+    return $false
+}
+
+function Get-PsBzStandardRanges {
+    # 規範各段的行號（1 起算、含頭尾；圍欄程式碼區塊裡的標題不算）：
+    # general、ch0～ch10、appendix、selfcheck（## 層）；ch5common、ch5.1～ch5.8、ch7a（7.1～7.2）（### 層）
+    param([string]$Text)
+    $lines = Get-PsKnLines $Text
+    $heads = New-Object System.Collections.Generic.List[object]
+    $inCode = $false
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $ln = [string]$lines[$i]
+        if ($ln.TrimStart().StartsWith('```')) { $inCode = -not $inCode; continue }
+        if ($inCode) { continue }
+        $m = [regex]::Match($ln, '^(#{2,3})\s+(.+?)\s*$')
+        if ($m.Success) { $heads.Add(@{ Level = $m.Groups[1].Value.Length; Line = $i + 1; Text = $m.Groups[2].Value }) }
+    }
+    $n = $lines.Count
+    $r = @{}
+    for ($k = 0; $k -lt $heads.Count; $k++) {
+        $h = $heads[$k]; $t = [string]$h.Text; $key = ''
+        if ($h.Level -eq 2) {
+            if ($t -ceq '通用規則') { $key = 'general' }
+            elseif ($t -match '^第\s*([0-9]+)\s*章') { $key = 'ch' + $Matches[1] }
+            elseif ($t.StartsWith('附錄')) { $key = 'appendix' }
+            elseif ($t.StartsWith('完成前自我檢查')) { $key = 'selfcheck' }
+        }
+        else {
+            if ($t.StartsWith('5 章共通規則')) { $key = 'ch5common' }
+            elseif ($t -match '^5\.([1-8])\s') { $key = 'ch5.' + $Matches[1] }
+            elseif ($t -match '^7\.1\s') { $key = 'ch7a' }
+        }
+        if ($key -eq '' -or $r.ContainsKey($key)) { continue }
+        $end = $n
+        for ($j = $k + 1; $j -lt $heads.Count; $j++) {
+            $o = $heads[$j]
+            if ($key -eq 'ch7a') { if ($o.Level -le 2 -or ($o.Level -eq 3 -and ([string]$o.Text) -match '^7\.3\s')) { $end = $o.Line - 1; break } }
+            elseif ($o.Level -le $h.Level) { $end = $o.Line - 1; break }
+        }
+        $r[$key] = @($h.Line, $end)
+    }
+    return $r
+}
+
 # ---------------- 全部檢查 ----------------
 function Invoke-PsBzCheck {
     # 回傳 @{ Findings; Evidence; Stats }。Ctx 見 Test-PsBzEvidenceItems。

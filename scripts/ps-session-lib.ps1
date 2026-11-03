@@ -26,7 +26,7 @@ $script:PsOcApiAbortMinSec = 60
 #   共同：串流中途斷線後不改用非串流重送（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時）、關掉背景流量與提示建議。
 #   機械代理（狀態圖讀者、乾淨讀者、判定）：關 thinking（固定預算的模型 MAX_THINKING_TOKENS=0；adaptive 的模型（Sonnet 4.6／5 起）不吃 0、
 #   只能用 CLAUDE_CODE_EFFORT_LEVEL=low 壓低；模型不吃 effort 時 Claude Code 會收到 400 後自動拿掉重送，數據行會看到 400）。
-#   研究 worker 不關 thinking。環境變數 PS_SESSION_CLAUDE_ENV_DEFAULTS=0 整組不套；PS_SESSION_CLAUDE_ENV_SKIP=名稱,名稱 剔除指定項。
+#   業務需求文件寫手壓到 medium（一次一章、要寫業務規則，不關 thinking）。研究 worker 不關 thinking。環境變數 PS_SESSION_CLAUDE_ENV_DEFAULTS=0 整組不套；PS_SESSION_CLAUDE_ENV_SKIP=名稱,名稱 剔除指定項。
 $script:PsOcClaudeEnvCommon = @(
     , @('CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK', '1')
     , @('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', '1')
@@ -36,6 +36,7 @@ $script:PsOcClaudeEnvByAgent = @{
     'ps-status-reader' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
     'ps-spec-reader' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
     'ps-spec-judge' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
+    'ps-bizspec-writer' = @(, @('CLAUDE_CODE_EFFORT_LEVEL', 'medium'))
 }
 
 # npm 同時裝 opencode / opencode.cmd / opencode.ps1；Get-Command 會優先回 .ps1——把 .ps1 丟給 cmd.exe
