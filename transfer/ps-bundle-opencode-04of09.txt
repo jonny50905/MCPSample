@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0e7d121）第 4／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3dd1168）第 4／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|0e7d121|4cd913749d7167c9|4|9|5853|5659613bfbac1259f38b60b0238798fd83cd4a19123d81cd965c93b36c496557
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1348|f468f665720c87a7aedaed1b73736c08495c0d71ba4fb2f420d82fb30e057199|0
+@@@PSBUNDLE-PART|1|opencode|3dd1168|009eef23506e6e79|4|9|5856|eb475a991893cb7d4e53c6ab8dd0025caf7d077afabbd1bd002d86793816331c
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/SOP.md|1350|e23d69079e776de33950dc2d0934dd8212b561273b993c62075905851f787b33|0
 # 管理者 SOP（人工作業標準程序）
 
 適用對象：系統管理者（維護規則檔、把關教訓、管理內部 git 的人）。
@@ -1310,7 +1310,8 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 
 兩版的 `/ps-spec` 都走 `scripts/ps-bizspec.ps1`（結論碼 BIZ1，見兩版 `peoplesoft/spec/support-codes.md`）。寫手 session 照
 `<框架>/peoplesoft/bizspec/standard.md` 寫業務需求文件（第 0～10 章＋附錄；只談業務需求；每條需求與假設都有證據編號 `E-###`，
-第 10 章逐字摘錄來源原文）。外環在每個 session 之後：比對檔案圍欄（人工輸入、補查結果、工單被改就還原，多出的檔隔離）、
+第 10 章逐字摘錄來源原文）。寫手一個 session 只做 progress.md 的一項（一章；第 5 章一類一項，共 20 項），工單只列這一項要讀的規範段落與行號，每次寫入不超過 30 行；
+session 中斷時已寫的部分留著，下一個 session 從同一項接續。外環在每個 session 之後：比對檔案圍欄（人工輸入、補查結果、工單被改就還原，多出的檔隔離）、
 逐字比對證據摘錄與引用、不合格寫檢查結果檔退回修正（最多 3 輪）、對「該問誰＝Spec 產製端」的開放假設開補查 session、
 請寫手回填與套用業務窗口回覆。OpenCode 版外環加 `-Cli opencode`，目錄各加 `-opencode`，模型讀 `.opencode/peoplesoft/sdoc/model.yaml`。
 
@@ -1324,8 +1325,9 @@ SELECT T.COLUMN_VALUE AS NO_ACCESS
 □ 3. 同一份清單續跑：ps-spec-author 每次呼叫只跑一個 session，BIZ1-3-02-<n> 時自動續跑；中斷後輸入同一份清單即續跑（寫手照 progress.md 接續）。
      每個 session 上限預設 60 分（1～110；直接在 PowerShell 跑 `scripts\ps-bizspec.ps1 -TimeoutMin N` 可到 180）。不要補查就說「不要補查」（-NoQuery）。
 □ 4. 依結論碼處理：
-     - BIZ1-3-04：看 SESSION 判讀行（同 SOP-28「session 失敗的判讀」），已寫的檔保留，同命令續跑。
-     - BIZ1-4-03：看「卡住」「檢查」行——外環檢查連續 3 輪修正仍未過、寫手連續兩個 session 沒進度、或補查回填兩次仍缺；
+     - BIZ1-3-04：看 SESSION 判讀行（同 SOP-28「session 失敗的判讀」），已寫的檔保留，同命令續跑。回報維護端時跑
+       `powershell -NoProfile -File scripts\ps-bizspec.ps1 -Components '<同一份清單>' -Diag`（OpenCode 版加 `-Cli opencode`），只回最後幾行代號與 SUM 行（BIZ1-0-04）。
+     - BIZ1-4-03：看「卡住」「檢查」行——同一項連續 3 個 session 沒打勾、外環檢查連續 3 輪修正問題數沒減少、或同一個補查檔回填兩次仍沒列出；
        排除原因後說「重試被擋項」（-Retry）。檢查結果檔在 `.ps-runtime\bizspec\<jobId>\check\`。
      - BIZ1-5-01：外環檢查全過、補查已回填，還有開放假設 → 把 `07-assumptions.md` 交業務窗口，回覆寫進 answers.md
        （假設編號、回覆、回覆人代稱、日期），同命令續跑，寫手照第 7 章 7.4 關閉。
@@ -1737,7 +1739,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
 
 （無）
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/examples/pack-c/template-bound.md
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|965b792b30fcb1cedd02fb606c8a8b334f018cf96ff000b94eb01681b3356506|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/generic.manifest.json|116|14ffc81da2a438edbc0fe7f88865e7394642d8f2d2855d789472193e89c0977a|0
 {
   "schemaVersion": 1,
   "note": "Spec generic 集合的正規化 hash（剝 BOM／CR）；ps-spec -Doctor stage 0 比對；重生：ps-spec -Doctor -WriteGenericManifest",
@@ -1749,7 +1751,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".opencode/agent/ps-spec-author.md",
-      "sha256": "AED47554B9E4B98EFC4BF6F51F107AEEB24C09031BE1A244421F3BD2D223C6A3",
+      "sha256": "26AF8CA4BD09B584ABE9860AEA9DA34689793E63419B44F6655BAA0819279B22",
       "lines": 83
     },
     {
@@ -1824,8 +1826,8 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
     },
     {
       "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "sha256": "080DB6AD65E33FF385AFCC4245D26EE8483AEE477F110E2C3371DAAD09476C0A",
-      "lines": 230
+      "sha256": "2408A80F3FFA3235DD815983185A80A6F0971A90B224D03CC51B3AC548A2510C",
+      "lines": 231
     },
     {
       "path": ".opencode/peoplesoft/spec/troubleshooting-matrix.md",
@@ -1942,7 +1944,7 @@ find_field_usage、搜尋候選、統計資訊只能用來找到使用跡象（�
   }
 }
 @@@PSBUNDLE-END|.opencode/peoplesoft/spec/pack.schema.json
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/support-codes.md|229|080db6ad65e33ff385afcc4245d26ee8483aee477f110e2c3371daad09476c0a|0
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/spec/support-codes.md|230|2408a80f3ffa3235dd815983185a80a6f0971a90b224d03cc51b3ac548a2510c|0
 # 結論碼與 drill tuple（KNOW1／SUPP1／SPEC1／CLONE1／DOC1／BIZ1）
 
 CLI 每個動詞的**最後一行**都是唯一的結論碼；上面的內容只在本機看。結論碼**不含**路徑、檔名、物件名、hash、requestId。
@@ -2032,11 +2034,12 @@ DOC1 不使用 drill tuple。對外只回報結論碼與「欄位統計」行的
 | 0 | 01 | 等來源：知識層 `docs/ps-research` 沒有提到這組 Component，`.ps-private/bizspec-opencode/<jobId>/` 的 status.md、project.md 也還是骨架；先研究或填好再同命令續跑 | 0 |
 | 0 | 02 | 尚未開始（Status 唯讀） | 0 |
 | 0 | 03 | 同一組 Component 的業務需求文件工作正在執行 | 3 |
+| 0 | 04 | 診斷報告（`-Diag`，唯讀）：每個工單一行代號（K 種類、ST 步驟、X 結束碼、RT 模型端重試狀態碼、P／Q 回應與請求數、M／O 最大輸入／輸出、ERR、DUR）與 SUM 行；只回報這幾行 | 0 |
 | 3 | 02-`<n>` | RUNNABLE，還有工作（寫作、修正、套回覆、補查、回填）；同命令繼續 | 0 |
 | 3 | 03 | SLOT_BUSY；模型服務被其他 session 使用，稍後續跑 | 1 |
 | 3 | 04 | SESSION_FAILED；已寫的檔保留。看輸出的 SESSION 判讀：強殺當下輸出仍在增加 → 用更大的 -TimeoutMin 續跑；其他 → 檢查模型與 provider（`.opencode/peoplesoft/sdoc/model.yaml`）、MCP 後續跑，錯誤訊息在 `.ps-runtime/bizspec-opencode-logs/` 的 .err.txt | 1 |
 | 3 | 07 | WRITE_DEFERRED；解除檔案占用後續跑 | 1 |
-| 4 | 03 | BLOCKED；外環檢查連續修正 3 輪仍未通過、寫手連續兩個 session 沒進度，或補查回填兩次仍缺；看「卡住」「檢查」行，處理後加 -Retry | 1 |
+| 4 | 03 | BLOCKED；同一項連續 3 個 session 沒打勾、外環檢查連續 3 輪修正問題數沒減少，或同一個補查檔回填兩次仍沒列出；看「卡住」「檢查」行，處理後加 -Retry | 1 |
 | 5 | 01 | 外環檢查全過、補查已回填，仍有開放假設待業務窗口回覆；回覆寫進 `answers.md` 後同命令續跑 | 0 |
 | 7 | 01 | REVIEW_READY；外環檢查（證據逐字比對、引用、表頭、必要檔）全過、沒有開放假設，可人工審閱；不是業務驗收 | 0 |
 | 9 | 01 | 參數不合法；模型設定不對或 OpenCode 沒有這個模型；缺 `.opencode/peoplesoft/bizspec/standard.md` | 2 |
@@ -5854,4 +5857,4 @@ foreach ($k in $counts.Keys) {
 Write-BatchLog "batch log：$batchLog"
 if ($counts.SYSTEM_ERROR -gt 0 -or $counts.MUTEX_BUSY -gt 0) { exit 2 } else { exit 0 }
 @@@PSBUNDLE-END|scripts/ps-auto-all.ps1
-@@@PSBUNDLE-PART-END|4cd913749d7167c9|4|9
+@@@PSBUNDLE-PART-END|009eef23506e6e79|4|9

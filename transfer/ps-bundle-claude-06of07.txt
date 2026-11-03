@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0e7d121）第 6／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3dd1168）第 6／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|0e7d121|cf2493eca77028e0|6|7|4829|6ca1ed09ff4f641e0f5e0572d28d9113f21dfc5e26aaadd2b6294fa7a546d8f0
-@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|617|20ced9a57d2a939bad7ab4b63a63a17c1ee41d867c140e8dd4829ef81a2aaaec|1
+@@@PSBUNDLE-PART|1|claude|3dd1168|180d2a24f5e2f513|6|7|4831|943c03be91c218e6e0cdbcfe113dfb7e03a2a19c90852919909189e37b91984f
+@@@PSBUNDLE-FILE|scripts/tests/test-claude-variant.ps1|619|7bed95e125e6b5b5aa59d3ad28f8afa896a98ca009a220ee1b88c6fe5f805106|1
 # scripts/tests/test-claude-variant.ps1 — Claude Code 版（repo 的 claude-code/ 子樹）一致性、hook 與外環版本層測試（維護端專用）
 # 用法：pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1                      ← 驗證（exit 1＝有 FAIL）
 #       pwsh -NoProfile -File scripts/tests/test-claude-variant.ps1 -WriteGenericManifest ← 重生 claude-code/.claude/peoplesoft/spec/generic.manifest.json
@@ -489,6 +489,8 @@ try {
         $eff = @(@($dR) | Where-Object { [string]$_[0] -eq 'CLAUDE_CODE_EFFORT_LEVEL' })
         Assert (@($dR).Count -eq 5 -and $nR -contains 'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK' -and $nR -contains 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC' -and $nR -contains 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION' -and $mtt.Count -eq 1 -and [string]$mtt[0][1] -eq '0' -and $eff.Count -eq 1 -and [string]$eff[0][1] -eq 'low') "環境預設：狀態圖讀者＝共同三個＋MAX_THINKING_TOKENS=0＋CLAUDE_CODE_EFFORT_LEVEL=low"
         Assert (@($dW).Count -eq 3 -and $nW -notcontains 'MAX_THINKING_TOKENS' -and $nW -notcontains 'CLAUDE_CODE_EFFORT_LEVEL' -and @($dU).Count -eq 3 -and $nU -notcontains 'MAX_THINKING_TOKENS') "環境預設：研究 worker 與其他代理只有共同三個（不關 thinking、不壓 effort）"
+        $dBw = Get-PsOcClaudeEnvDefaults -Agent 'ps-bizspec-writer'; $effBw = @(@($dBw) | Where-Object { [string]$_[0] -eq 'CLAUDE_CODE_EFFORT_LEVEL' })
+        Assert (@($dBw).Count -eq 4 -and $effBw.Count -eq 1 -and [string]$effBw[0][1] -eq 'medium' -and (Get-EnvNames $dBw) -notcontains 'MAX_THINKING_TOKENS') "環境預設：業務需求文件寫手＝共同三個＋CLAUDE_CODE_EFFORT_LEVEL=medium（不關 thinking）"
         Assert ((Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-reader')) -contains 'CLAUDE_CODE_EFFORT_LEVEL' -and (Get-EnvNames (Get-PsOcClaudeEnvDefaults -Agent 'ps-spec-judge')) -contains 'CLAUDE_CODE_EFFORT_LEVEL') "環境預設：乾淨讀者與判定也關 thinking、壓 effort"
         $env:PS_SESSION_CLAUDE_ENV_DEFAULTS = '0'
         $dOff = Get-PsOcClaudeEnvDefaults -Agent 'ps-status-reader'
@@ -4830,4 +4832,4 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-spec.ps1
-@@@PSBUNDLE-PART-END|cf2493eca77028e0|6|7
+@@@PSBUNDLE-PART-END|180d2a24f5e2f513|6|7

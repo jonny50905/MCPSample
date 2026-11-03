@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0e7d121）第 5／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3dd1168）第 5／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|0e7d121|cf2493eca77028e0|5|7|6766|7f44661bfb386ca5d6076dd9edbda5d31b3e64d544088bbba36f1e354afa9ee3
+@@@PSBUNDLE-PART|1|claude|3dd1168|180d2a24f5e2f513|5|7|6810|c10d0206d369cb8f65cce21cc6d0b8fe8c904632d6a806283f9221b8424851d2
 @@@PSBUNDLE-FILE|scripts/ps-spec-clone-lib.ps1|544|beeb5c7e07779f5eb7f9b7c71a045f37dad61c9d196bd3087401747366f092b9|1
 # ps-spec-clone-lib.ps1 — 核心重建規格的封閉資料契約、結構驗證與確定性 Markdown。
 # 先 dot-source ps-knowledge-lib.ps1；本檔不查 DB、不叫模型、不寫研究文件。
@@ -6248,7 +6248,7 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-auto-loop.ps1
-@@@PSBUNDLE-FILE|scripts/tests/test-bizspec.ps1|252|e79373f99442521f1880f8621293e22df20d660181ee4d57834033ead2420070|1
+@@@PSBUNDLE-FILE|scripts/tests/test-bizspec.ps1|296|6d11efdc01efd2b6be433b818e363dd7d64bec189c6a425b0a8443b03b09f538|1
 # test-bizspec.ps1 — 業務需求文件流程（ps-bizspec，BIZ1）的測試：檢查函式庫單元測試＋外環端對端（合成寫手與補查，不呼叫模型、不查 MCP）。
 # 用法：pwsh -NoProfile -File scripts/tests/test-bizspec.ps1   （公司機：powershell -NoProfile -ExecutionPolicy Bypass -File …）
 $ErrorActionPreference = 'Stop'
@@ -6368,18 +6368,35 @@ function Build([bool]$Bad, [bool]$Closed, [bool]$Query) {
     $evl += @('', '## 10.2 補查紀錄', '| 補查檔 | 對應假設 | 結論 | 回填的證據 |', '|---|---|---|---|')
     if ($Query) { $evl += '| evidence/Q-A-001.md | A-001 | 有答案 | E-004 |' }
     W '10-evidence.md' $evl
-    W 'progress.md' @('# 進度', '- [x] 02-spec-overview.md', '- [x] 完成前自我檢查', '## 自我檢查', '自我檢查：通過；修正項：無')
 }
+function Tick([string]$Item, [bool]$Self) {
+    $pp = Join-Path $OutputRoot 'progress.md'
+    $t = [System.IO.File]::ReadAllText($pp).Replace("- [ ] " + $Item, "- [x] " + $Item)
+    if ($Self) { $t = $t.TrimEnd() + "`n第 1 項：通過`n自我檢查：通過；修正項：無`n" }
+    [System.IO.File]::WriteAllText($pp, $t, $enc)
+}
+$order = [System.IO.File]::ReadAllText($OrderPath)
+$step = ''; $ms = [regex]::Match($order, '這次只做：([^（\r\n]+)'); if ($ms.Success) { $step = $ms.Groups[1].Value.Trim() }
 switch ($Kind) {
     'WRITE' {
-        if ($mode -eq 'stall') { if (-not [System.IO.File]::Exists((Join-Path $OutputRoot 'progress.md'))) { W 'progress.md' @('# 進度', '- [x] 02-spec-overview.md', '- [ ] 03-reading-guide.md') }; exit 0 }
-        Build ($mode -like 'bad*') $false $false
-        if ($mode -like 'evil*') {
-            W 'evidence/Q-A-999.md' @('# 偽造的補查結果')
-            $sfx = ''; if ((Split-Path (Split-Path $OutputRoot -Parent) -Leaf) -like '*-opencode') { $sfx = '-opencode' }
-            $ans = Join-Path (Join-Path $Root ('.ps-private/bizspec' + $sfx)) ((Split-Path $OutputRoot -Leaf) + '/answers.md')
-            [System.IO.File]::AppendAllText($ans, "| A-001 | 寫手自己代答 | 寫手 | 11/02 |`n")
+        [System.IO.File]::AppendAllText((Join-Path $dir 'steps.log'), ($step + "`n"))
+        if ($mode -eq 'stall') { exit 0 }
+        if ($mode -eq 'failonce' -and $step -eq '03-reading-guide.md' -and -not [System.IO.File]::Exists((Join-Path $dir 'failed.flag'))) {
+            [System.IO.File]::WriteAllText((Join-Path $dir 'failed.flag'), 'x')
+            W '03-reading-guide.md' @('# 3 怎麼讀 Spec（寫到一半）')
+            exit 1
         }
+        if ($step -eq '02-spec-overview.md') {
+            Build ($mode -like 'bad*') $false $false
+            if ($mode -like 'evil*') {
+                W 'evidence/Q-A-999.md' @('# 偽造的補查結果')
+                $sfx = ''; if ((Split-Path (Split-Path $OutputRoot -Parent) -Leaf) -like '*-opencode') { $sfx = '-opencode' }
+                $ans = Join-Path (Join-Path $Root ('.ps-private/bizspec' + $sfx)) ((Split-Path $OutputRoot -Leaf) + '/answers.md')
+                [System.IO.File]::AppendAllText($ans, "| A-001 | 寫手自己代答 | 寫手 | 11/02 |`n")
+            }
+        }
+        if ($step -eq '03-reading-guide.md' -and $mode -eq 'failonce') { Build $false $false $false }
+        Tick $step ($step -eq '完成前自我檢查')
     }
     'FIX' { if ($mode -eq 'badalways') { exit 0 }; Build $false $false $false }
     'BACKFILL' { Build $false $true $true }
@@ -6415,7 +6432,7 @@ function Invoke-Bz([string]$Root, [string]$Mode, [hashtable]$Extra = @{}) {
     $prior = @{ Mode = $env:PS_BZ_TEST_MODE; Dir = $env:PS_BZ_TEST_DIR; Cli = $env:PS_CLI }
     try {
         $env:PS_BZ_TEST_MODE = $Mode; $env:PS_BZ_TEST_DIR = $Root; $env:PS_CLI = $null
-        $h = @{ Root = $Root; Components = 'TW_DEMO_REQ'; FakeWriter = $fakeWriter; FakeQuery = $fakeQuery }
+        $h = @{ Root = $Root; Components = 'TW_DEMO_REQ'; FakeWriter = $fakeWriter; FakeQuery = $fakeQuery; MaxSessions = 100 }
         foreach ($k in $Extra.Keys) { $h[$k] = $Extra[$k] }
         $out = ((& $cli @h *>&1 | ForEach-Object { [string]$_ }) -join "`n")
         $lines = @($out -split "`n" | Where-Object { $_.Trim() -ne '' })
@@ -6423,7 +6440,18 @@ function Invoke-Bz([string]$Root, [string]$Mode, [hashtable]$Extra = @{}) {
     }
     finally { $env:PS_BZ_TEST_MODE = $prior.Mode; $env:PS_BZ_TEST_DIR = $prior.Dir; $env:PS_CLI = $prior.Cli }
 }
-function Get-BzCalls([string]$Root) { $p = Join-Path $Root 'calls.log'; if (-not [System.IO.File]::Exists($p)) { return '' }; return (([System.IO.File]::ReadAllText($p)).Trim() -replace "`n", ',') }
+function Get-BzCalls([string]$Root) {
+    # 呼叫紀錄壓成「種類*次數」：WRITE*20,QUERY,BACKFILL
+    $p = Join-Path $Root 'calls.log'; if (-not [System.IO.File]::Exists($p)) { return '' }
+    $out = @(); $prev = ''; $n = 0
+    foreach ($k in @(([System.IO.File]::ReadAllText($p)).Trim() -split "`n")) {
+        if ($k -ceq $prev) { $n++; continue }
+        if ($prev -ne '') { if ($n -gt 1) { $out += ($prev + '*' + $n) } else { $out += $prev } }
+        $prev = $k; $n = 1
+    }
+    if ($prev -ne '') { if ($n -gt 1) { $out += ($prev + '*' + $n) } else { $out += $prev } }
+    return ($out -join ',')
+}
 $job = 'biz-' + (Get-PsKnTextHash -Text 'TW_DEMO_REQ').Substring(0, 16).ToLowerInvariant()
 
 # 沒有來源
@@ -6437,22 +6465,22 @@ Assert-Bz ($x.Code -ceq 'BIZ1-0-02') '外環：-Status 尚未開始 → BIZ1-0-0
 # 完整一輪：寫作 → 檢查 → 補查 → 回填 → 檢查
 $r2 = New-BzRoot 'full'
 $x = Invoke-Bz $r2 'good'
-Assert-Bz ($x.Code -ceq 'BIZ1-7-01' -and (Get-BzCalls $r2) -ceq 'WRITE,QUERY,BACKFILL') '外環：寫作、補查、回填後檢查全過 → BIZ1-7-01' ((Get-BzCalls $r2) + "`n" + $x.Output)
+Assert-Bz ($x.Code -ceq 'BIZ1-7-01' -and (Get-BzCalls $r2) -ceq 'WRITE*20,QUERY,BACKFILL') '外環：一個 session 寫一項（20 項）、補查、回填後檢查全過 → BIZ1-7-01' ((Get-BzCalls $r2) + "`n" + $x.Output)
 Assert-Bz ($x.Output -match '欄位統計：需求=4；證據=4；補查證據=1；開放假設=0') '外環：欄位統計行' $x.Output
 $led = [System.IO.File]::ReadAllText((Join-Path $r2 ('.ps-runtime/bizspec/' + $job + '/queries.json')))
 Assert-Bz ($led -match 'Q-A-001\.md' -and $led -match '有答案') '外環：補查結果記進帳本' $led
 $x = Invoke-Bz $r2 'good'
-Assert-Bz ($x.Code -ceq 'BIZ1-7-01' -and (Get-BzCalls $r2) -ceq 'WRITE,QUERY,BACKFILL') '外環：完成後重跑不再開 session' (Get-BzCalls $r2)
+Assert-Bz ($x.Code -ceq 'BIZ1-7-01' -and (Get-BzCalls $r2) -ceq 'WRITE*20,QUERY,BACKFILL') '外環：完成後重跑不再開 session' (Get-BzCalls $r2)
 # 摘錄抄錯 → 退回修正
 $r3 = New-BzRoot 'fix'
 $x = Invoke-Bz $r3 'bad' @{ NoQuery = $true }
-Assert-Bz ($x.Code -ceq 'BIZ1-5-01' -and (Get-BzCalls $r3) -ceq 'WRITE,FIX') '外環：摘錄對不上 → FIX 一輪後通過；-NoQuery 不補查、留開放假設 → BIZ1-5-01' ((Get-BzCalls $r3) + "`n" + $x.Output)
+Assert-Bz ($x.Code -ceq 'BIZ1-5-01' -and (Get-BzCalls $r3) -ceq 'WRITE*20,FIX') '外環：摘錄對不上 → FIX 一輪後通過；-NoQuery 不補查、留開放假設 → BIZ1-5-01' ((Get-BzCalls $r3) + "`n" + $x.Output)
 $cf = Join-Path $r3 ('.ps-runtime/bizspec/' + $job + '/check/c0001.md')
 Assert-Bz ([System.IO.File]::Exists($cf) -and ([System.IO.File]::ReadAllText($cf)) -match 'BZ_EV_EXCERPT') '外環：檢查結果檔列出 BZ_EV_EXCERPT'
 # 一直修不好 → 卡住
 $r4 = New-BzRoot 'stubborn'
 $x = Invoke-Bz $r4 'badalways' @{ NoQuery = $true }
-Assert-Bz ($x.Code -ceq 'BIZ1-4-03' -and (Get-BzCalls $r4) -ceq 'WRITE,FIX,FIX,FIX' -and $x.Output -match '檢查：BZ_EV_EXCERPT') '外環：連續 3 輪修正仍未通過 → BIZ1-4-03，轉述檢查項' ((Get-BzCalls $r4) + "`n" + $x.Output)
+Assert-Bz ($x.Code -ceq 'BIZ1-4-03' -and (Get-BzCalls $r4) -ceq 'WRITE*20,FIX*3' -and $x.Output -match '檢查：BZ_EV_EXCERPT') '外環：連續 3 輪修正問題數沒減少 → BIZ1-4-03，轉述檢查項' ((Get-BzCalls $r4) + "`n" + $x.Output)
 $x = Invoke-Bz $r4 'good' @{ NoQuery = $true; Retry = $true }
 Assert-Bz ($x.Code -ceq 'BIZ1-5-01') '外環：處理後 -Retry → 重新修正並通過' $x.Output
 # 越界寫檔
@@ -6463,18 +6491,18 @@ Assert-Bz ($x.Output -match '寫手改了不准改的檔' -and -not [System.IO.F
 # 業務窗口回覆
 $r6 = New-BzRoot 'answer'
 $x = Invoke-Bz $r6 'biz'
-Assert-Bz ($x.Code -ceq 'BIZ1-5-01' -and (Get-BzCalls $r6) -ceq 'WRITE') '外環：開放假設的該問誰是業務窗口 → 不補查、BIZ1-5-01' ((Get-BzCalls $r6) + "`n" + $x.Output)
+Assert-Bz ($x.Code -ceq 'BIZ1-5-01' -and (Get-BzCalls $r6) -ceq 'WRITE*20') '外環：開放假設的該問誰是業務窗口 → 不補查、BIZ1-5-01' ((Get-BzCalls $r6) + "`n" + $x.Output)
 [System.IO.File]::AppendAllText((Join-Path $r6 ('.ps-private/bizspec/' + $job + '/answers.md')), "| A-001 | 逾期期限是送出後第 7 個工作天 | 業務窗口甲 | 11/03 |`n")
 $x = Invoke-Bz $r6 'biz'
-Assert-Bz ($x.Code -ceq 'BIZ1-7-01' -and (Get-BzCalls $r6) -ceq 'WRITE,ANSWER') '外環：answers.md 有回覆 → ANSWER 關閉假設 → BIZ1-7-01' ((Get-BzCalls $r6) + "`n" + $x.Output)
+Assert-Bz ($x.Code -ceq 'BIZ1-7-01' -and (Get-BzCalls $r6) -ceq 'WRITE*20,ANSWER') '外環：answers.md 有回覆 → ANSWER 關閉假設 → BIZ1-7-01' ((Get-BzCalls $r6) + "`n" + $x.Output)
 # 補查結果檔不合格
 $r7 = New-BzRoot 'qbad'
 $x = Invoke-Bz $r7 'qbad'
-Assert-Bz ($x.Code -ceq 'BIZ1-5-01' -and (Get-BzCalls $r7) -ceq 'WRITE,QUERY,QUERY' -and $x.Output -match '補查 A-001 不合格') '外環：補查結果檔不合格 → 隔離、最多兩次、留開放假設' ((Get-BzCalls $r7) + "`n" + $x.Output)
+Assert-Bz ($x.Code -ceq 'BIZ1-5-01' -and (Get-BzCalls $r7) -ceq 'WRITE*20,QUERY*2' -and $x.Output -match '補查 A-001 不合格') '外環：補查結果檔不合格 → 隔離、最多兩次、留開放假設' ((Get-BzCalls $r7) + "`n" + $x.Output)
 # 寫手沒有進度
 $r8 = New-BzRoot 'stall'
 $x = Invoke-Bz $r8 'stall' @{ NoQuery = $true }
-Assert-Bz ($x.Code -ceq 'BIZ1-4-03' -and (Get-BzCalls $r8) -ceq 'WRITE,WRITE,WRITE') '外環：寫手連續兩個 session 沒進度 → BIZ1-4-03' ((Get-BzCalls $r8) + "`n" + $x.Output)
+Assert-Bz ($x.Code -ceq 'BIZ1-4-03' -and (Get-BzCalls $r8) -ceq 'WRITE*3' -and $x.Output -match '02-spec-overview.md」連續 3 個 session') '外環：同一項連續 3 個 session 沒打勾 → BIZ1-4-03' ((Get-BzCalls $r8) + "`n" + $x.Output)
 # MaxSessions 到了 → 可續跑
 $r9 = New-BzRoot 'resume'
 $x = Invoke-Bz $r9 'good' @{ MaxSessions = 1 }
@@ -6490,6 +6518,22 @@ Write-T $doc1 "# 狀態圖`nflowchart LR`n  010 --> 020`n"
 $x = Invoke-Bz $r11 'good' @{ MaxSessions = 1 }
 $copied = Join-Path $r11 ('.ps-private/bizspec/' + $job + '/status.md')
 Assert-Bz ([System.IO.File]::Exists($copied) -and ([System.IO.File]::ReadAllText($copied)) -match '010 --> 020' -and $x.Code -ceq 'BIZ1-3-02-1') '外環：Spec 文件流程同一組 Component 的狀態圖複製過來並當作來源' $x.Output
+# 工單：一次一項、附規範行號
+$o1 = [System.IO.File]::ReadAllText((Join-Path $r2 ('.ps-runtime/bizspec/' + $job + '/orders/o0001.md')))
+Assert-Bz ($o1 -match '這次只做：02-spec-overview\.md' -and $o1 -match '通用規則：第 [0-9]+～[0-9]+ 行' -and $o1 -match '第 2 章：第 [0-9]+～[0-9]+ 行' -and $o1 -notmatch '第 5 章共通規則' -and $o1 -match '每次寫入不超過 30 行') '工單：只做一項、只列這一項要讀的規範段落與行號、每次寫入上限'
+$o4 = [System.IO.File]::ReadAllText((Join-Path $r2 ('.ps-runtime/bizspec/' + $job + '/orders/o0004.md')))
+Assert-Bz ($o4 -match '這次只做：05-4-rules\.md' -and $o4 -match '第 5 章共通規則：第' -and $o4 -match '5\.4：第' -and $o4 -notmatch '5\.3：第') '工單：業務規則那一項只列 5 章共通規則與 5.4'
+$steps = @([System.IO.File]::ReadAllLines((Join-Path $r2 'steps.log')))
+Assert-Bz ($steps.Count -eq 20 -and $steps[0] -ceq '02-spec-overview.md' -and $steps[2] -ceq '05-3-data.md' -and $steps[19] -ceq '完成前自我檢查') '工單：照寫作順序一項一項派（02 → 03 → 05-3 … → 完成前自我檢查）'
+$x = Invoke-Bz $r2 'good' @{ Diag = $true }
+Assert-Bz ($x.Code -ceq 'BIZ1-0-04' -and $x.Output -match 'o0011 K=W ST=05-8 X=' -and $x.Output -match 'o0021 K=Q ST=-' -and $x.Output -notmatch 'o0010 ' -and $x.Output -match 'SUM claude ' -and $x.Output -notmatch [regex]::Escape($job)) '-Diag：最近 12 個工單各一行代號、SUM 行、不印 jobId' $x.Output
+# session 失敗：同一項下次接續、不算沒進度
+$r12 = New-BzRoot 'failonce'
+$x = Invoke-Bz $r12 'failonce' @{ NoQuery = $true }
+Assert-Bz ($x.Code -ceq 'BIZ1-3-04' -and (Get-BzCalls $r12) -ceq 'WRITE*2') 'session 失敗：已寫的檔保留，BIZ1-3-04' ((Get-BzCalls $r12) + "`n" + $x.Output)
+$x = Invoke-Bz $r12 'failonce' @{ NoQuery = $true }
+$o3 = [System.IO.File]::ReadAllText((Join-Path $r12 ('.ps-runtime/bizspec/' + $job + '/orders/o0003.md')))
+Assert-Bz ($x.Code -ceq 'BIZ1-5-01' -and (Get-BzCalls $r12) -ceq 'WRITE*21' -and $o3 -match '這次只做：03-reading-guide\.md') 'session 失敗後同命令續跑：同一項重派一次、接著做完' ((Get-BzCalls $r12) + "`n" + $x.Output)
 # 參數
 $x = Invoke-Bz $r2 'good' @{ Components = 'TW DEMO 名稱' }
 Assert-Bz ($x.Code -ceq 'BIZ1-9-01') '外環：非 ASCII 名稱 → BIZ1-9-01' $x.Output
@@ -6767,4 +6811,4 @@ if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Re
 Write-Host "全部情境 PASS" -ForegroundColor Green
 exit 0
 @@@PSBUNDLE-END|scripts/tests/test-bundle.ps1
-@@@PSBUNDLE-PART-END|cf2493eca77028e0|5|7
+@@@PSBUNDLE-PART-END|180d2a24f5e2f513|5|7

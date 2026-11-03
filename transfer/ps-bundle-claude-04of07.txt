@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 0e7d121）第 4／7 份
+# PeopleSoft 知識庫分析框架——搬運包（claude 版；commit 3dd1168）第 4／7 份
 # 7 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|claude|0e7d121|cf2493eca77028e0|4|7|7117|1e84578878a078e4a154348f44e31083aac19cbfa05406bab49f12f200b4771b
+@@@PSBUNDLE-PART|1|claude|3dd1168|180d2a24f5e2f513|4|7|7118|a1f46e3219bf99b81568c3544f3759e44eac5d23739fed219facd6c58774edc4
 @@@PSBUNDLE-FILE|scripts/ps-sdoc-check-lib.ps1|614|fdd31bdb7f176c5795c3ab60e73a0032b7eb649e167dc123bef2b50e12d94c8f|1
 # ps-sdoc-check-lib.ps1 — Spec 文件流程的 L2（參照與一致性）與 L3（覆蓋）檢核，另有 S07 推測用語警告。
 # 輸入是 Build-PsSdModel 的結果（Items：前綴 → 項目清單；ById：ID → 項目）。每筆結果 @{ Doc; Layer（L2／L3／W）; Code; Message }。
@@ -5938,7 +5938,7 @@ finally {
 Write-Host $code
 exit $exitCode
 @@@PSBUNDLE-END|scripts/ps-sdoc.ps1
-@@@PSBUNDLE-FILE|scripts/ps-session-lib.ps1|721|3cb904683459a9bc0e120118468c159e6dce558216235d45d7a1b2edcd14b070|1
+@@@PSBUNDLE-FILE|scripts/ps-session-lib.ps1|722|8f7a4c488ab140993cddd0cb83520bcaf2ed127b69686d3681deeef46e39e910|1
 # ps-session-lib.ps1 — headless session 啟動共用邏輯（OpenCode：`opencode run`；Claude Code：`claude -p --agent`）
 # 由 ps-auto-loop.ps1（薄包裝 Invoke-Opencode）、ps-spec.ps1（-Run）、ps-spec-build.ps1、ps-supplemental 迷你圈 dot-source。
 # 責任：挑 .cmd/.exe/.bat 型 shim；以 cmd.exe 啟動 CLI（rc 檔取真實結束碼、.Handle 快取、
@@ -5967,7 +5967,7 @@ $script:PsOcApiAbortMinSec = 60
 #   共同：串流中途斷線後不改用非串流重送（非串流要 gateway 把整段回應憋完才回，幾分鐘的回應一定逾時）、關掉背景流量與提示建議。
 #   機械代理（狀態圖讀者、乾淨讀者、判定）：關 thinking（固定預算的模型 MAX_THINKING_TOKENS=0；adaptive 的模型（Sonnet 4.6／5 起）不吃 0、
 #   只能用 CLAUDE_CODE_EFFORT_LEVEL=low 壓低；模型不吃 effort 時 Claude Code 會收到 400 後自動拿掉重送，數據行會看到 400）。
-#   研究 worker 不關 thinking。環境變數 PS_SESSION_CLAUDE_ENV_DEFAULTS=0 整組不套；PS_SESSION_CLAUDE_ENV_SKIP=名稱,名稱 剔除指定項。
+#   業務需求文件寫手壓到 medium（一次一章、要寫業務規則，不關 thinking）。研究 worker 不關 thinking。環境變數 PS_SESSION_CLAUDE_ENV_DEFAULTS=0 整組不套；PS_SESSION_CLAUDE_ENV_SKIP=名稱,名稱 剔除指定項。
 $script:PsOcClaudeEnvCommon = @(
     , @('CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK', '1')
     , @('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', '1')
@@ -5977,6 +5977,7 @@ $script:PsOcClaudeEnvByAgent = @{
     'ps-status-reader' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
     'ps-spec-reader' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
     'ps-spec-judge' = @(@('MAX_THINKING_TOKENS', '0'), @('CLAUDE_CODE_EFFORT_LEVEL', 'low'))
+    'ps-bizspec-writer' = @(, @('CLAUDE_CODE_EFFORT_LEVEL', 'medium'))
 }
 
 # npm 同時裝 opencode / opencode.cmd / opencode.ps1；Get-Command 會優先回 .ps1——把 .ps1 丟給 cmd.exe
@@ -7118,4 +7119,4 @@ finally { if ($held -and $null -ne $mutex) { $mutex.ReleaseMutex() }; if ($null 
 Write-Host $code
 exit $exitCode
 @@@PSBUNDLE-END|scripts/ps-spec-build.ps1
-@@@PSBUNDLE-PART-END|cf2493eca77028e0|4|7
+@@@PSBUNDLE-PART-END|180d2a24f5e2f513|4|7

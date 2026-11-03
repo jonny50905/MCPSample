@@ -275,7 +275,7 @@ Assert-Bz ($o4 -match '這次只做：05-4-rules\.md' -and $o4 -match '第 5 章
 $steps = @([System.IO.File]::ReadAllLines((Join-Path $r2 'steps.log')))
 Assert-Bz ($steps.Count -eq 20 -and $steps[0] -ceq '02-spec-overview.md' -and $steps[2] -ceq '05-3-data.md' -and $steps[19] -ceq '完成前自我檢查') '工單：照寫作順序一項一項派（02 → 03 → 05-3 … → 完成前自我檢查）'
 $x = Invoke-Bz $r2 'good' @{ Diag = $true }
-Assert-Bz ($x.Code -ceq 'BIZ1-0-04' -and $x.Output -match 'o0001 K=W ST=02 X=' -and $x.Output -match 'o0021 K=Q ST=-' -and $x.Output -match 'SUM claude ' -and $x.Output -notmatch [regex]::Escape($job)) '-Diag：一個工單一行代號、SUM 行、不印 jobId' $x.Output
+Assert-Bz ($x.Code -ceq 'BIZ1-0-04' -and $x.Output -match 'o0011 K=W ST=05-8 X=' -and $x.Output -match 'o0021 K=Q ST=-' -and $x.Output -notmatch 'o0010 ' -and $x.Output -match 'SUM claude ' -and $x.Output -notmatch [regex]::Escape($job)) '-Diag：最近 12 個工單各一行代號、SUM 行、不印 jobId' $x.Output
 # session 失敗：同一項下次接續、不算沒進度
 $r12 = New-BzRoot 'failonce'
 $x = Invoke-Bz $r12 'failonce' @{ NoQuery = $true }

@@ -1,7 +1,7 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0e7d121）第 2／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3dd1168）第 2／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|0e7d121|4cd913749d7167c9|2|9|5917|fa2aaa50009138ca5f92043559abae48753b8265a4aa183f38ae027bbf48ba59
-@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4333|d0251ef182b30d07ca1916b64a2af5862333d081458339a3d81e8810732302d9|0
+@@@PSBUNDLE-PART|1|opencode|3dd1168|009eef23506e6e79|2|9|5940|f3057e0510b1419887d65c8ff0bb2c771e6ae9c98afbed7669ff144aa5630b95
+@@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/applied.md|4356|b615d8535f2756bae3fc8b945a3b9bd14f764ae61fe79ff72079c764846982b4|0
 # 教訓歸檔（applied）
 
 > `/ps-lesson` 直接套用的教訓逐筆記錄於此（症狀／根因／落點／實際修改摘要）。
@@ -4335,6 +4335,29 @@
 - 沒做（留待公司機數字）：真模型的端對端（Sonnet 寫手、補查委派）只在維護端以試寫驗過規範本身，外環與 agent 權限只有合成測試；
   OpenCode 版新 agent 的權限沒有真 OpenCode 的 smoke（run-sdoc-smoke 只涵蓋 DOC1 的四個 agent）。
 - 原則：**證據要能被機器逐字核對**——「出處」寫成可解析的位置加同一行原文摘錄，外環才不必相信寫手的自評；查詢結果由另一個 session 寫、外環記帳，寫手只讀。
+
+### L164 /ps-spec 第一次在公司機跑：32 分鐘一行沒寫、BIZ1-3-04——寫手一個 session 寫整份，違反 L148／L149 的「每次回應要小」（2026-11-03）
+
+- 症狀：管理者在公司機（Claude Code 版）跑 /ps-spec，第一個寫手 session 32 分鐘後失敗，結論碼 BIZ1-3-04，輸出資料夾一行都沒有。
+- 根因：L163 的外環第一張工單只寫「從 progress.md 開始，一路寫到完成前自我檢查」——整份文件交給同一個 session，中斷才換下一個。
+  寫手寫第一行之前要先讀 1161 行的規範與全部來源、想清楚整份結構，第一個回應（thinking＋輸出）就超過 gateway 的單次上限，
+  Claude Code 對 504 重送同樣大的請求直到用完（與 L147、L149 同一型態）。維護端的三輪試寫沒有 gateway 上限，一份約 30 分鐘寫完，所以沒看出來。
+- 落點：
+  - 外環先建 progress.md（勾選清單＝寫作順序的 20 項）與 10-evidence.md 表頭；每個 session 只派一項（「這次只做：05-4-rules.md」），
+    工單只列這一項要讀的規範段落與行號（`Get-PsBzStandardRanges`：通用規則、該章、7.1～7.2、第 10 章；05-4 約 380 行，原本整份 1161 行），
+    每次寫入不超過 30 行、在檔尾追加、寫完不讀回；同一項沒寫完時下一個 session 從同一項接續。
+  - 完成前自我檢查改成一次查一項、查完就把結果追加到 progress.md。
+  - 修正一次最多 20 項，問題數連續 3 輪沒減少才 BLOCKED；業務回覆一次最多 5 筆；回填一次一個補查檔。
+  - 同一項連續 3 個 session 沒打勾才 BLOCKED；session 失敗（3-04）不算。
+  - 寫手的 Claude Code 環境預設加 `CLAUDE_CODE_EFFORT_LEVEL=medium`（一次一章，不關 thinking）。
+  - `ps-bizspec.ps1 -Diag`：每個工單一行代號（K、ST、X、RT、P、Q、M、O、ERR、DUR）＋SUM，結論碼 BIZ1-0-04，管理者只回這幾行。
+  - 規範（三處）「怎麼開始與續寫」加「單項工單」、「寫作節奏」加「每次寫入不超過 30 行」；兩版寫手 agent 的節奏段同步。
+- 測試：test-bizspec 改成逐項派工（WRITE*20），加工單只列該項規範段落與行號、照寫作順序派、session 失敗後同一項接續、-Diag 一行一工單；
+  test-claude-variant 加寫手的環境預設。
+- 沒做（留待公司機數字）：真 gateway 下一項一個 session 夠不夠小——若 -Diag 仍看到 RT=504 且 P=0（第一個請求就失敗），下一步是
+  把 effort 壓到 low、或把第 5 章一類再依來源檔拆成更小的工單。
+- 原則：**新流程上線前，先對照既有教訓裡的執行環境限制**——L148／L149 已量出 gateway 對單次回應的上限，新外環的第一張工單卻又交出整份工作；
+  維護端沒有 gateway 上限的試寫，不能當作公司機也跑得動的證據。
 @@@PSBUNDLE-END|.opencode/peoplesoft/lessons/applied.md
 @@@PSBUNDLE-FILE|.opencode/peoplesoft/lessons/pending.md|25|9ac778dfefb5bbe0c60c3845c0464aaefd3395bd0c6b9d52e55ae5fd50185f16|0
 # 教訓登錄簿（pending——例外案件專用）
@@ -5918,4 +5941,4 @@ Search results are candidates only.
 Retrieve exact database chunks before concluding.
 ```
 @@@PSBUNDLE-END|.opencode/peoplesoft/progressive-source-retrieval.md
-@@@PSBUNDLE-PART-END|4cd913749d7167c9|2|9
+@@@PSBUNDLE-PART-END|009eef23506e6e79|2|9

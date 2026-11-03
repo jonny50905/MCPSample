@@ -1,6 +1,6 @@
-# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 0e7d121）第 9／9 份
+# PeopleSoft 知識庫分析框架——搬運包（opencode 版；commit 3dd1168）第 9／9 份
 # 9 份都另存成 UTF-8 文字檔（.txt，檔名不拘）放進同一個資料夾，用 scripts\ps-bundle.ps1 -Bundle <資料夾> 解開（先加 -DryRun 看計畫）。不要手改本檔。
-@@@PSBUNDLE-PART|1|opencode|0e7d121|4cd913749d7167c9|9|9|1759|d678cda6bb9778a2726daeee6d7990c4533865811a8b1c89f3cd4e07dcd815fe
+@@@PSBUNDLE-PART|1|opencode|3dd1168|009eef23506e6e79|9|9|1759|df00498e6a5b586139474b528a9f9b4bb6ef17afaaff62ac88ea225eac7e8ce4
 @@@PSBUNDLE-FILE|scripts/tests/test-supplemental.ps1|554|cc86099a2c6788aa5ac179b62a08dc2005c9259323f62bd859327e7df6365225|1
 # scripts/tests/test-supplemental.ps1 — 補研究協定（ps-supplemental-lib／ps-supplemental CLI）的功能測試
 # 用法：pwsh -NoProfile -File scripts/tests/test-supplemental.ps1   （PowerShell 7 或 5.1 皆可；不需 opencode）
@@ -557,10 +557,10 @@ Write-Host ""
 if ($failCount -gt 0) { Write-Host "共 $failCount 個 FAIL" -ForegroundColor Red; exit 1 }
 Write-Host "全部情境 PASS" -ForegroundColor Green
 @@@PSBUNDLE-END|scripts/tests/test-supplemental.ps1
-@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|1002|daff54cde52702ed46711cf1cde2c9bb56af815bc23779a9b61594a26dec6fea|0
+@@@PSBUNDLE-FILE|scripts/ps-transfer-manifest.json|1002|908127c91a31afb4e7b76a8241243fb93c5d9fc90e889edfe237e975cbcbadf6|0
 {
   "note": "維護 session 每批 push 前重生；公司機只讀不寫。搬運清單必含本檔。removed＝必須刪除的舊檔。",
-  "commit": "0e7d121",
+  "commit": "3dd1168",
   "files": [
     {
       "path": ".opencode/.npmrc",
@@ -606,8 +606,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/agent/ps-bizspec-writer.md",
-      "lines": 66,
-      "sha256": "ee000e91a73f4b17b03dab7695e89452320fbe0037fb9e3adec7f6648da9f719",
+      "lines": 68,
+      "sha256": "321cfb4a364927ad5ca1fe63ffedc93d99707e6e2f10dafd4293fc8dc21b0f36",
       "bom": false
     },
     {
@@ -649,7 +649,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/agent/ps-spec-author.md",
       "lines": 82,
-      "sha256": "aed47554b9e4b98efc4bf6f51f107aeeb24c09031be1a244421f3bd2d223c6a3",
+      "sha256": "26af8ca4bd09b584abe9860aea9da34689793e63419b44f6655baa0819279b22",
       "bom": false
     },
     {
@@ -762,8 +762,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/bizspec/standard.md",
-      "lines": 1225,
-      "sha256": "b8574f7331894bf679936264313442f0d001befc9ec625be7ef9becc405b80fe",
+      "lines": 1227,
+      "sha256": "e4907a85e3483a22aebd1384cec10811169bebf141e9b204fcd06d5310723fdb",
       "bom": false
     },
     {
@@ -786,8 +786,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/lessons/applied.md",
-      "lines": 4333,
-      "sha256": "d0251ef182b30d07ca1916b64a2af5862333d081458339a3d81e8810732302d9",
+      "lines": 4356,
+      "sha256": "b615d8535f2756bae3fc8b945a3b9bd14f764ae61fe79ff72079c764846982b4",
       "bom": false
     },
     {
@@ -1104,8 +1104,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/SOP.md",
-      "lines": 1348,
-      "sha256": "f468f665720c87a7aedaed1b73736c08495c0d71ba4fb2f420d82fb30e057199",
+      "lines": 1350,
+      "sha256": "e23d69079e776de33950dc2d0934dd8212b561273b993c62075905851f787b33",
       "bom": false
     },
     {
@@ -1165,7 +1165,7 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     {
       "path": ".opencode/peoplesoft/spec/generic.manifest.json",
       "lines": 116,
-      "sha256": "965b792b30fcb1cedd02fb606c8a8b334f018cf96ff000b94eb01681b3356506",
+      "sha256": "14ffc81da2a438edbc0fe7f88865e7394642d8f2d2855d789472193e89c0977a",
       "bom": false
     },
     {
@@ -1176,8 +1176,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": ".opencode/peoplesoft/spec/support-codes.md",
-      "lines": 229,
-      "sha256": "080db6ad65e33ff385afcc4245d26ee8483aee477f110e2c3371daad09476c0a",
+      "lines": 230,
+      "sha256": "2408a80f3ffa3235dd815983185a80a6f0971a90b224d03cc51b3ac548a2510c",
       "bom": false
     },
     {
@@ -1302,14 +1302,14 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-bizspec-lib.ps1",
-      "lines": 421,
-      "sha256": "72532d9fabcd5af520ddc0f5856100d95948995b385369369f8e383ed7686695",
+      "lines": 483,
+      "sha256": "97c418efed81e9c675e685149e1ecfc5d23b4534d990ceb792b307ac920772f1",
       "bom": true
     },
     {
       "path": "scripts/ps-bizspec.ps1",
-      "lines": 542,
-      "sha256": "7a1b6f56dc03cfe3bfaab55edab16efbdc9fd2e646ae38b1d4fc72dc96aa3c8a",
+      "lines": 691,
+      "sha256": "23f748195646d7db892cc3a80266d690dda0c58fdaea2487225c78edbd5794e5",
       "bom": true
     },
     {
@@ -1410,8 +1410,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/ps-session-lib.ps1",
-      "lines": 721,
-      "sha256": "3cb904683459a9bc0e120118468c159e6dce558216235d45d7a1b2edcd14b070",
+      "lines": 722,
+      "sha256": "8f7a4c488ab140993cddd0cb83520bcaf2ed127b69686d3681deeef46e39e910",
       "bom": true
     },
     {
@@ -1464,8 +1464,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-bizspec.ps1",
-      "lines": 252,
-      "sha256": "e79373f99442521f1880f8621293e22df20d660181ee4d57834033ead2420070",
+      "lines": 296,
+      "sha256": "6d11efdc01efd2b6be433b818e363dd7d64bec189c6a425b0a8443b03b09f538",
       "bom": true
     },
     {
@@ -1476,8 +1476,8 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
     },
     {
       "path": "scripts/tests/test-claude-variant.ps1",
-      "lines": 617,
-      "sha256": "20ced9a57d2a939bad7ab4b63a63a17c1ee41d867c140e8dd4829ef81a2aaaec",
+      "lines": 619,
+      "sha256": "7bed95e125e6b5b5aa59d3ad28f8afa896a98ca009a220ee1b88c6fe5f805106",
       "bom": true
     },
     {
@@ -1759,5 +1759,5 @@ Write-Host "全部情境 PASS" -ForegroundColor Green
   「只加不刪」指規則語意，錯句直接改對、不另加「釐清」段。
   `scripts/ps-agent-doc-lint.ps1` 會擋（`ps-fs-doctor -WriteManifest` 先跑它）。
 @@@PSBUNDLE-END|AGENTS.md
-@@@PSBUNDLE-EOF|165|876fd40c627c2f0f029cbb25bab11988d230c52015fae320177f76436f137324
-@@@PSBUNDLE-PART-END|4cd913749d7167c9|9|9
+@@@PSBUNDLE-EOF|165|4a95d76188a0c25ace0f3405602c87c1d5ea5d13dea99e8a5306606b5c5cdd55
+@@@PSBUNDLE-PART-END|009eef23506e6e79|9|9

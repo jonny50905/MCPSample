@@ -480,7 +480,8 @@ function Show-BzDiag {
     $kinds = @{ WRITE = 'W'; FIX = 'F'; ANSWER = 'A'; BACKFILL = 'B'; QUERY = 'Q' }
     $orders = @()
     if ([System.IO.Directory]::Exists($J.OrderDir)) { foreach ($f in @(Get-ChildItem -LiteralPath $J.OrderDir -File -Filter 'o*.md')) { $orders += $f.Name } }
-    $orders = @(Sort-PsKnOrdinal -Items $orders | Select-Object -Last 12)
+    $sorted = Sort-PsKnOrdinal -Items $orders
+    $orders = @($sorted | Select-Object -Last 12)
     $logs = @(); if ([System.IO.Directory]::Exists($J.LogRoot)) { $logs = @(Get-ChildItem -LiteralPath $J.LogRoot -File) }
     $count = @{}; $lastFail = '-'
     foreach ($name in $orders) {
